@@ -21,3 +21,12 @@ body {
   padding: 0.5em;
   box-sizing: border-box;
 }
+
+.screen.swipe {
+  animation: swipe 0.5s forwards;
+}
+
+@keyframes swipe {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-100%); opacity: 0; }
+}
