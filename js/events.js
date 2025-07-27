@@ -1,6 +1,78 @@
 import { PermitStatus, DisasterType, HarvestBlock } from "./gameModels.js";
 import { askChoice, formatCurrency, formatVolume } from "./utils.js";
 
+// Event Types for better organization
+export const EventType = {
+  POLICY: 'policy',
+  NATURAL_DISASTER: 'natural_disaster', 
+  MARKET: 'market',
+  FIRST_NATIONS_ANGER: 'first_nations_anger',
+  WORKPLACE_SAFETY: 'workplace_safety',
+  CEO_DECISION: 'ceo_decision'
+};
+
+// Events Router - centralized event management system
+export class EventsRouter {
+  constructor() {
+    this.eventHandlers = new Map();
+    
+    // Register core event handlers
+    this.registerEventHandler(EventType.POLICY, random_policy_events);
+    this.registerEventHandler(EventType.NATURAL_DISASTER, natural_disasters_during_harvest);
+    this.registerEventHandler(EventType.MARKET, market_fluctuations);
+  }
+
+  registerEventHandler(eventType, handler) {
+    this.eventHandlers.set(eventType, handler);
+  }
+
+  async triggerEvent(eventType, state, write, terminal = null, input = null, ...args) {
+    const handler = this.eventHandlers.get(eventType);
+    if (handler) {
+      return await handler(state, write, terminal, input, ...args);
+    } else {
+      write(`Unknown event type: ${eventType}`);
+      return false;
+    }
+  }
+
+  // Quarterly event management similar to Python system
+  async runQuarterlyEvents(state, write, terminal, input) {
+    // Policy events (Spring only)
+    if (state.quarter === 1) {
+      await this.triggerEvent(EventType.POLICY, state, write);
+    }
+    
+    // Market fluctuations (Winter only)  
+    if (state.quarter === 4) {
+      await this.triggerEvent(EventType.MARKET, state, write);
+    }
+    
+    // Random scenario events
+    await this.runScenarioEvents(state, write, terminal, input);
+  }
+
+  async runScenarioEvents(state, write, terminal, input) {
+    // First Nations anger events (25% chance)
+    if (Math.random() < 0.25) {
+      const { random_first_nations_anger_events } = await import('./firstNationsAnger.js');
+      await random_first_nations_anger_events(state, write, terminal, input);
+    }
+    
+    // Workplace safety incidents (15% chance)
+    if (Math.random() < 0.15) {
+      const { workplace_safety_incidents } = await import('./workplaceSafety.js');
+      await workplace_safety_incidents(state, write, terminal, input);
+    }
+    
+    // CEO automated decisions (if CEO exists)
+    if (state.ceo && Math.random() < 0.8) {
+      const { ceo_automated_decisions } = await import('./ceo.js');
+      await ceo_automated_decisions(state, write, terminal, input);
+    }
+  }
+}
+
 /**
  * Handle random policy and regulatory events.
  * @param {import("./gameModels.js").GameState} state

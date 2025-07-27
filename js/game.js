@@ -1,6 +1,6 @@
 import { GameState } from "./gameModels.js";
 import { choose_region, initial_setup, plan_harvest_schedule, conduct_harvest_operations } from "./gameLogic.js";
-import { random_policy_events, market_fluctuations } from "./events.js";
+import { EventsRouter } from "./events.js";
 import { process_permits, selective_permit_submission } from "./permits.js";
 import { ongoing_first_nations_consultation } from "./firstNations.js";
 import { certification_opportunities, maintain_certifications } from "./certification.js";
@@ -8,8 +8,6 @@ import { illegal_opportunities } from "./illegalActivities.js";
 import { quarterly_wacky_events } from "./wackyEvents.js";
 import { liaison_management } from "./liaison.js";
 import { ceo_management, pay_ceo_annual_costs } from "./ceo.js";
-import { random_first_nations_anger_events } from "./firstNationsAnger.js";
-import { workplace_safety_incidents } from "./workplaceSafety.js";
 import { ask, formatCurrency, formatVolume } from "./utils.js";
 
 class Game {
@@ -19,6 +17,7 @@ class Game {
     this.input = document.getElementById("input");
     this.statusPanel = document.getElementById("status-content");
     this.enable_wacky_events = false;
+    this.eventsRouter = new EventsRouter();
   }
 
   async start() {
@@ -47,34 +46,40 @@ class Game {
   }
 
   async runQuarter() {
-    this.write(`\n--- Q${this.state.quarter} ${this.state.year} ---`);
+    const quarter_names = ["", "Q1 (Spring)", "Q2 (Summer)", "Q3 (Fall)", "Q4 (Winter)"];
+    const season_emojis = ["", "🌱", "☀️", "🍂", "❄️"];
+    
+    this.write(`\n--- ${season_emojis[this.state.quarter]} ${quarter_names[this.state.quarter]} ${this.state.year} ---`);
 
+    // Seasonal events - like Python system
     if (this.state.quarter === 1) {
-      this.write("Spring: Planning and permit season begins!");
-      random_policy_events(this.state, this.write.bind(this));
+      this.write("🌱 SPRING: Planning and permit season begins!");
       await ongoing_first_nations_consultation(this.state, this.write.bind(this), this.terminal, this.input);
       await plan_harvest_schedule(this.state, this.write.bind(this), this.terminal, this.input);
       await selective_permit_submission(this.state, this.write.bind(this), this.terminal, this.input);
     } else if (this.state.quarter === 2) {
-      this.write("Summer: Prime harvesting season!");
+      this.write("☀️ SUMMER: Prime harvesting season!");
       process_permits(this.state, this.write.bind(this));
       conduct_harvest_operations(this.state, this.write.bind(this));
     } else if (this.state.quarter === 3) {
-      this.write("Fall: Harvest continues, winter prep begins!");
+      this.write("🍂 FALL: Harvest continues, winter prep begins!");
       process_permits(this.state, this.write.bind(this));
       conduct_harvest_operations(this.state, this.write.bind(this));
     } else {
-      this.write("Winter: Planning season, limited field operations!");
+      this.write("❄️ WINTER: Planning season, limited field operations!");
       maintain_certifications(this.state, this.write.bind(this));
-      market_fluctuations(this.state, this.write.bind(this));
       pay_ceo_annual_costs(this.state);
     }
 
+    // Use Events Router for all random events - like Python system
+    await this.eventsRouter.runQuarterlyEvents(this.state, this.write.bind(this), this.terminal, this.input);
+
+    // Optional wacky events
     if (this.enable_wacky_events) {
       await quarterly_wacky_events(this.state, this.write.bind(this), this.terminal, this.input);
     }
-    await workplace_safety_incidents(this.state, this.write.bind(this), this.terminal, this.input);
-    await random_first_nations_anger_events(this.state, this.write.bind(this), this.terminal, this.input);
+
+    // Management activities
     await illegal_opportunities(this.state, this.write.bind(this), this.terminal, this.input);
     await liaison_management(this.state, this.write.bind(this), this.terminal, this.input);
     await ceo_management(this.state, this.write.bind(this), this.terminal, this.input);
