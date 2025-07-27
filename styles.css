@@ -43,6 +43,7 @@ body {
 #input {
   width: 100%;
   font-family: monospace;
+  font-size: 16px;
   padding: 0.5em;
   box-sizing: border-box;
   background-color: #333;
