@@ -1,18 +1,43 @@
 body {
-  font-family: Arial, sans-serif;
-  margin: 2em;
-  line-height: 1.6;
+  background-color: #1a1a1a;
+  color: #f0f0f0;
+  font-family: "Courier New", Courier, monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+.game-container {
+  display: flex;
+  width: 90%;
+  max-width: 1200px;
+  height: 90vh;
+  border: 2px solid #444;
+}
+
+.left-panel {
+  width: 70%;
+  display: flex;
+  flex-direction: column;
+  border-right: 2px solid #444;
+}
+
+.right-panel {
+  width: 30%;
+  padding: 1em;
+  overflow-y: auto;
 }
 
 .terminal {
   background: #000;
   color: #0f0;
-  font-family: monospace;
   padding: 1em;
-  height: 300px;
+  height: 100%;
   overflow-y: auto;
   white-space: pre-wrap;
-  margin-bottom: 0.5em;
+  flex-grow: 1;
 }
 
 #input {
@@ -20,6 +45,9 @@ body {
   font-family: monospace;
   padding: 0.5em;
   box-sizing: border-box;
+  background-color: #333;
+  color: #0f0;
+  border: 1px solid #444;
 }
 
 .screen.swipe {
@@ -27,6 +55,26 @@ body {
 }
 
 @keyframes swipe {
-  from { transform: translateX(0); opacity: 1; }
-  to { transform: translateX(-100%); opacity: 0; }
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+h2 {
+  color: #0f0;
+  border-bottom: 1px solid #0f0;
+  padding-bottom: 0.5em;
+}
+
+.info-item {
+  margin-bottom: 0.5em;
+}
+
+.info-label {
+  font-weight: bold;
 }

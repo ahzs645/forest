@@ -1,14 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Forestry Trail Terminal</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <h1>Forestry Trail Demo</h1>
-  <pre id="terminal" class="terminal screen"></pre>
-  <input id="input" type="text" placeholder="Type here..." autocomplete="off" />
-  <script src="trailDemo.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Forestry Trail Terminal</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="game-container">
+      <div class="left-panel">
+        <pre id="terminal" class="terminal screen"></pre>
+        <input
+          id="input"
+          type="text"
+          placeholder="Type here..."
+          autocomplete="off"
+        />
+      </div>
+      <div class="right-panel" id="status-panel">
+        <h2>Status</h2>
+        <div id="status-content"></div>
+      </div>
+    </div>
+    <script src="js/game.js" type="module"></script>
+  </body>
 </html>
