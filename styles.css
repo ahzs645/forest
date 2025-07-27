@@ -1,0 +1,23 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 2em;
+  line-height: 1.6;
+}
+
+.terminal {
+  background: #000;
+  color: #0f0;
+  font-family: monospace;
+  padding: 1em;
+  height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  margin-bottom: 0.5em;
+}
+
+#input {
+  width: 100%;
+  font-family: monospace;
+  padding: 0.5em;
+  box-sizing: border-box;
+}
