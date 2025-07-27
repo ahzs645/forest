@@ -7,6 +7,7 @@ body {
   align-items: center;
   height: 100vh;
   margin: 0;
+  overflow: hidden;
 }
 
 .game-container {
@@ -38,16 +39,21 @@ body {
   overflow-y: auto;
   white-space: pre-wrap;
   flex-grow: 1;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 #input {
   width: 100%;
   font-family: monospace;
+  font-size: 16px;
   padding: 0.5em;
   box-sizing: border-box;
   background-color: #333;
   color: #0f0;
   border: 1px solid #444;
+  position: sticky;
+  bottom: 0;
 }
 
 .screen.swipe {
@@ -77,4 +83,33 @@ h2 {
 
 .info-label {
   font-weight: bold;
+}
+
+@media (max-width: 600px) {
+  body {
+    align-items: flex-start;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .game-container {
+    flex-direction: column;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .left-panel,
+  .right-panel {
+    width: 100%;
+    height: auto;
+  }
+
+  .left-panel {
+    border-right: none;
+    border-bottom: 2px solid #444;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
 }
