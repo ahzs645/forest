@@ -43,6 +43,7 @@ body {
 #input {
   width: 100%;
   font-family: monospace;
+  font-size: 16px;
   padding: 0.5em;
   box-sizing: border-box;
   background-color: #333;
@@ -77,4 +78,28 @@ h2 {
 
 .info-label {
   font-weight: bold;
+}
+
+@media (max-width: 600px) {
+  body {
+    align-items: flex-start;
+    height: auto;
+  }
+
+  .game-container {
+    flex-direction: column;
+    width: 100%;
+    height: auto;
+  }
+
+  .left-panel,
+  .right-panel {
+    width: 100%;
+    height: auto;
+  }
+
+  .left-panel {
+    border-right: none;
+    border-bottom: 2px solid #444;
+  }
 }
