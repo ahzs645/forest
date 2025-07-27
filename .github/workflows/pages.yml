@@ -1,7 +1,7 @@
 name: GitHub Pages
 on:
   push:
-    branches: [ work ]
+    branches: [ main ]
 permissions:
   contents: read
   pages: write
