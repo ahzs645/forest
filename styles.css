@@ -185,12 +185,12 @@ h2 {
   }
 }
 
-/* Prevent text selection for terminal aesthetic */
+/* Allow text selection in terminal */
 .terminal {
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
 }
 
 /* Allow selection on input */
@@ -209,7 +209,7 @@ h2 {
 }
 
 .terminal {
-  animation: flicker 0.15s infinite;
+  animation: none;
 }
 
 /* Disable flicker on mobile for performance */

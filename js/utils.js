@@ -30,14 +30,14 @@ export function printSubsection(title, write) {
  */
 export function ask(question, terminal, input) {
   return new Promise((resolve) => {
-    terminal.textContent += `\n${question}\n`;
+    terminal.textContent += `\n${question}\n> `;
     input.focus();
 
     const listener = (e) => {
       if (e.key === "Enter") {
         const value = input.value;
         input.value = "";
-        terminal.textContent += `> ${value}\n`;
+        terminal.textContent += `${value}\n`;
         input.removeEventListener("keydown", listener);
         resolve(value);
       }
