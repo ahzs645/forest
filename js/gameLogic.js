@@ -190,6 +190,100 @@ export function conduct_harvest_operations(state, write) {
  * @param {HTMLInputElement} input
  */
 export async function annual_management_decisions(state, write, terminal, input) {
+  // Quarterly management decisions (every quarter)
+  write("\n--- QUARTERLY MANAGEMENT DECISIONS ---");
+  write("💡 Choose a management activity for this quarter:");
+  
+  const managementOptions = [
+    "Focus on permit applications",
+    "First Nations relationship building ($25,000)",
+    "Pursue forest certification ($50,000)",
+    "Conduct forest health monitoring ($30,000)",
+    "Conduct voluntary safety audit ($15,000)",
+    "Skip management activities this quarter"
+  ];
+  
+  const choice = await askChoice(
+    "What's your management focus?",
+    managementOptions,
+    terminal,
+    input
+  );
+  
+  switch (choice) {
+    case 0: // Permit applications
+      if (state.harvest_blocks.filter(b => b.permit_status === "pending").length > 0) {
+        write("📋 Focusing on permit applications...");
+        state.harvest_blocks.forEach(block => {
+          if (block.permit_status === "pending" && Math.random() < 0.5) {
+            block.permit_status = "approved";
+            write(`✅ Permit approved for block ${block.id}`);
+          }
+        });
+      } else {
+        write("No pending permits to work on.");
+      }
+      break;
+      
+    case 1: // First Nations relationship
+      if (state.budget >= 25000) {
+        state.budget -= 25000;
+        state.first_nations.forEach(fn => {
+          fn.relationship_level = Math.min(1.0, fn.relationship_level + 0.1);
+        });
+        write("🤝 Invested in First Nations relationship building");
+      } else {
+        write("Insufficient funds for relationship building.");
+      }
+      break;
+      
+    case 2: // Forest certification
+      if (state.budget >= 50000 && !state.certifications.includes("FSC")) {
+        state.budget -= 50000;
+        if (Math.random() < 0.7) {
+          state.certifications.push("FSC");
+          state.reputation += 0.15;
+          write("🌲 FSC certification obtained! Reputation improved.");
+        } else {
+          write("Certification application pending review.");
+        }
+      } else if (state.certifications.includes("FSC")) {
+        write("Already FSC certified.");
+      } else {
+        write("Insufficient funds for certification.");
+      }
+      break;
+      
+    case 3: // Forest health monitoring
+      if (state.budget >= 30000) {
+        state.budget -= 30000;
+        state.reputation += 0.05;
+        write("🔬 Forest health monitoring completed. Slight reputation boost.");
+      } else {
+        write("Insufficient funds for monitoring.");
+      }
+      break;
+      
+    case 4: // Safety audit
+      if (state.budget >= 15000) {
+        state.budget -= 15000;
+        if (state.safety_violations > 0) {
+          state.safety_violations = Math.max(0, state.safety_violations - 1);
+          write("✅ Safety audit completed. Violations reduced.");
+        } else {
+          write("✅ Safety audit completed. No violations found.");
+        }
+      } else {
+        write("Insufficient funds for safety audit.");
+      }
+      break;
+      
+    case 5: // Skip
+      write("No management activities this quarter.");
+      break;
+  }
+  
+  // Annual-specific decisions in Q4
   if (state.quarter === 4) {
     write("\n--- ANNUAL MANAGEMENT DECISIONS ---");
     
@@ -200,13 +294,13 @@ export async function annual_management_decisions(state, write, terminal, input)
     // Equipment maintenance
     const maintenanceCost = 50000;
     if (state.budget >= maintenanceCost) {
-      const choice = await askChoice(
+      const maintenanceChoice = await askChoice(
         "Annual equipment maintenance ($50,000)?",
         ["Yes - maintain equipment", "No - defer maintenance"],
         terminal,
         input
       );
-      if (choice === 0) {
+      if (maintenanceChoice === 0) {
         state.budget -= maintenanceCost;
         state.equipment_condition = Math.min(1.0, state.equipment_condition + 0.2);
         write("✅ Equipment maintained");

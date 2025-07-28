@@ -67,9 +67,138 @@ export async function random_first_nations_anger_events(
         },
       ],
     }),
+    new AngerEvent({
+      title: "Sacred Site Disturbance",
+      description: `Your crews unknowingly harvested near a sacred burial ground, causing deep offense.`,
+      trigger_reason: "Sacred site violation",
+      relationship_penalty: 0.4,
+      reputation_penalty: 0.3,
+      response_options: [
+        {
+          description: "Immediately halt operations and seek elder guidance",
+          cost: 50000,
+          relationship_recovery: 0.3,
+          reputation_recovery: 0.2,
+          success_chance: 0.9,
+        },
+        {
+          description: "Offer compensation and continue operations",
+          cost: 30000,
+          relationship_recovery: 0.1,
+          reputation_recovery: 0.0,
+          success_chance: 0.5,
+        },
+        {
+          description: "Claim ignorance and deny responsibility",
+          cost: 0,
+          relationship_recovery: -0.2,
+          reputation_recovery: -0.2,
+          success_chance: 1.0,
+        },
+      ],
+    }),
+    new AngerEvent({
+      title: "Water Source Contamination",
+      description: `Sediment from your logging roads has contaminated a creek used for drinking water.`,
+      trigger_reason: "Environmental damage",
+      relationship_penalty: 0.35,
+      reputation_penalty: 0.25,
+      response_options: [
+        {
+          description: "Install water filtration systems and remediate the creek",
+          cost: 75000,
+          relationship_recovery: 0.25,
+          reputation_recovery: 0.15,
+          success_chance: 0.85,
+        },
+        {
+          description: "Provide temporary water supplies only",
+          cost: 15000,
+          relationship_recovery: 0.05,
+          reputation_recovery: 0.0,
+          success_chance: 0.6,
+        },
+      ],
+    }),
+    new AngerEvent({
+      title: "Traditional Medicine Plants Destroyed",
+      description: `Your operations destroyed a grove of rare medicinal plants used by healers for generations.`,
+      trigger_reason: "Cultural resource destruction",
+      relationship_penalty: 0.25,
+      reputation_penalty: 0.15,
+      response_options: [
+        {
+          description: "Fund a traditional medicine restoration project",
+          cost: 40000,
+          relationship_recovery: 0.2,
+          reputation_recovery: 0.1,
+          success_chance: 0.75,
+        },
+        {
+          description: "Offer monetary compensation to affected families",
+          cost: 20000,
+          relationship_recovery: 0.1,
+          reputation_recovery: 0.05,
+          success_chance: 0.5,
+        },
+      ],
+    }),
+    new AngerEvent({
+      title: "Treaty Rights Violation",
+      description: `Your harvest blocks overlap with treaty-protected hunting grounds during peak season.`,
+      trigger_reason: "Treaty violation",
+      relationship_penalty: 0.5,
+      reputation_penalty: 0.35,
+      response_options: [
+        {
+          description: "Immediately withdraw and renegotiate boundaries",
+          cost: 60000,
+          relationship_recovery: 0.3,
+          reputation_recovery: 0.2,
+          success_chance: 0.8,
+        },
+        {
+          description: "Propose shared access agreement",
+          cost: 30000,
+          relationship_recovery: 0.15,
+          reputation_recovery: 0.1,
+          success_chance: 0.6,
+        },
+        {
+          description: "Challenge the treaty interpretation in court",
+          cost: 100000,
+          relationship_recovery: -0.3,
+          reputation_recovery: -0.2,
+          success_chance: 0.3,
+        },
+      ],
+    }),
+    new AngerEvent({
+      title: "Archaeological Site Damage",
+      description: `Your road construction crew damaged ancient petroglyphs that weren't in the survey.`,
+      trigger_reason: "Heritage site damage",
+      relationship_penalty: 0.4,
+      reputation_penalty: 0.3,
+      response_options: [
+        {
+          description: "Hire archaeologists and fund full restoration",
+          cost: 80000,
+          relationship_recovery: 0.25,
+          reputation_recovery: 0.2,
+          success_chance: 0.7,
+        },
+        {
+          description: "Document the damage and pay fines",
+          cost: 35000,
+          relationship_recovery: 0.0,
+          reputation_recovery: -0.05,
+          success_chance: 1.0,
+        },
+      ],
+    }),
   ];
 
-  const chosen_event = anger_events[0];
+  const chosen_event = anger_events[Math.floor(Math.random() * anger_events.length)];
   write(`ANGER TRIGGER: ${chosen_event.trigger_reason}`);
   write(chosen_event.description);
 
