@@ -31,6 +31,7 @@ export function printSubsection(title, write) {
 export function ask(question, terminal, input) {
   return new Promise((resolve) => {
     terminal.textContent += `\n${question}\n> `;
+    terminal.scrollTop = terminal.scrollHeight;
     input.focus();
 
     const listener = (e) => {
@@ -38,6 +39,7 @@ export function ask(question, terminal, input) {
         const value = input.value;
         input.value = "";
         terminal.textContent += `${value}\n`;
+        terminal.scrollTop = terminal.scrollHeight;
         input.removeEventListener("keydown", listener);
         resolve(value);
       }
