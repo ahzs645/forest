@@ -23,7 +23,7 @@ class Game {
   }
 
   async start() {
-    this.write("Welcome to the BC Interior Forestry Simulator");
+    this.write("Welcome to the BC Forestry Simulator");
     this.write("===============================================\n");
     const companyName = await ask("Name your forestry company:", this.terminal, this.input);
     this.state.companyName = companyName || "Northern Forest Solutions";
@@ -75,7 +75,7 @@ class Game {
       }
       this.updateStatus();
     }
-    this.write("\nThanks for playing the BC Interior Forestry Simulator!");
+    this.write("\nThanks for playing the BC Forestry Simulator!");
   }
 
   async runQuarter() {

@@ -217,7 +217,83 @@ async function workplace_safety_incidents(state, write, terminal, input) {
   write(`🎯 RESPONSE: ${chosen_response.description}`);
 
   if (chosen_response.illegal) {
-    return await _handle_worksafebc_bribery(state, incident, chosen_response, write, terminal, input);
+    const bribery_result = await _handle_worksafebc_bribery(state, incident, chosen_response, write, terminal, input);
+    if (!bribery_result) {
+      // User declined bribery, let them choose a legal response
+      write("");
+      write("🤔 Choose a legal response to this crisis:");
+      
+      const legal_options = response_options.filter(opt => !opt.illegal);
+      for (let i = 0; i < legal_options.length; i++) {
+        const option = legal_options[i];
+        const cost_text = ` (Cost: ${formatCurrency(option.cost)})`;
+        write(`${i + 1}. ${option.description}${cost_text}`);
+        write(`   📝 ${option.description_detail}`);
+      }
+      
+      const legal_choice = await ask("Choose your response:", legal_options.map(opt => opt.description), terminal, input);
+      const chosen_legal_response = legal_options[legal_choice];
+      
+      write("");
+      write(`🎯 RESPONSE: ${chosen_legal_response.description}`);
+      
+      // Process the legal response
+      if (state.budget >= chosen_legal_response.cost) {
+        state.budget -= chosen_legal_response.cost;
+        write(`💰 Response cost: ${formatCurrency(chosen_legal_response.cost)} paid`);
+
+        const final_fine = Math.floor(incident.wsbc_fine * (1 - chosen_legal_response.fine_reduction));
+        state.budget -= final_fine;
+        write(`🏛️  Final WorkSafeBC fine: ${formatCurrency(final_fine)}`);
+
+        if (chosen_legal_response.reputation_recovery > 0) {
+          state.reputation = Math.min(1.0, state.reputation + chosen_legal_response.reputation_recovery);
+          write(`📈 Reputation recovery: +${chosen_legal_response.reputation_recovery.toFixed(2)}`);
+        } else if (chosen_legal_response.reputation_recovery < 0) {
+          state.reputation = Math.max(0.0, state.reputation + chosen_legal_response.reputation_recovery);
+          write(`📉 Additional reputation damage: ${chosen_legal_response.reputation_recovery.toFixed(2)}`);
+        }
+
+        // Handle specific response types
+        const legal_choice_index = response_options.findIndex(opt => opt === chosen_legal_response);
+        if (legal_choice_index === 0) {
+          // Full cooperation
+          write("✅ WorkSafeBC commends company's proactive response");
+          write("📈 Future inspection frequency reduced");
+          if (!state.safety_violations) {
+            state.safety_violations = 0;
+          }
+          state.safety_violations = Math.max(0, state.safety_violations - 1);
+        } else if (legal_choice_index === 2) {
+          // Challenge findings
+          write("⚖️  Legal battle with WorkSafeBC ongoing");
+          write("📰 Media portrays company as fighting safety regulations");
+          write("🔍 Future inspections will be more frequent and thorough");
+          if (!state.safety_violations) {
+            state.safety_violations = 0;
+          }
+          state.safety_violations += 1;
+        }
+      } else {
+        write("❌ INSUFFICIENT BUDGET: Cannot afford response costs!");
+        write("🚨 Bankruptcy proceedings may be initiated");
+        write(`💸 Full WorkSafeBC fine imposed: ${formatCurrency(incident.wsbc_fine)}`);
+        state.budget -= incident.wsbc_fine;
+      }
+    }
+    
+    write("");
+    write("📊 INDUSTRY IMPACT:");
+    write("🔍 Increased regulatory scrutiny across BC forestry sector");
+    write("📰 Media attention on forestry safety practices");
+    write("⚖️  Potential for new safety regulations");
+
+    if (!state.safety_violations) {
+      state.safety_violations = 0;
+    }
+    state.safety_violations += 1;
+
+    return true;
   }
 
   if (state.budget >= chosen_response.cost) {
