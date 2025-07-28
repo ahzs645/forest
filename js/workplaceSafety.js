@@ -360,4 +360,4 @@ export async function ongoing_safety_consequences(state, write) {
   }
 }
 
-export { workplace_safety_incidents, ongoing_safety_consequences };
+export { workplace_safety_incidents };
