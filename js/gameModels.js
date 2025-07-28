@@ -39,6 +39,7 @@ export class HarvestBlock {
     disaster_affected = false,
     disaster_type = null,
     volume_loss_percent = 0.0,
+    fn_consulted = false,
   }) {
     this.id = id;
     this.volume_m3 = volume_m3;
@@ -53,6 +54,7 @@ export class HarvestBlock {
     this.disaster_affected = disaster_affected;
     this.disaster_type = disaster_type;
     this.volume_loss_percent = volume_loss_percent;
+    this.fn_consulted = fn_consulted;
   }
 }
 
@@ -148,6 +150,16 @@ export class GameState {
     this.fn_liaison = null;
     this.ceo = null;
     this.quarterly_profit = 0;
+    
+    // Safety and criminal tracking
+    this.safety_violations = 0;
+    this.safety_fatalities = 0;
+    this.equipment_condition = 1.0; // 0-1 scale
+    this.under_criminal_investigation = false;
+    this.criminal_convictions = 0;
+    
+    // Company name
+    this.companyName = "Northern Forest Solutions";
   }
 
   get_active_certifications() {

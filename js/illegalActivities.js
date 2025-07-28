@@ -132,3 +132,31 @@ function handle_detection(state, act, write) {
 
   return true;
 }
+
+/**
+ * Process ongoing criminal consequences
+ * @param {import("./gameModels.js").GameState} state 
+ * @param {(text: string) => void} write 
+ */
+export async function ongoing_criminal_consequences(state, write) {
+  // Check if company is under criminal investigation
+  if (state.under_criminal_investigation) {
+    write("\n🚔 ONGOING CRIMINAL INVESTIGATION");
+    write("Company operations are under scrutiny");
+    state.reputation -= 0.02;
+    
+    // Random chance of charges being laid
+    if (Math.random() < 0.1) {
+      const fine = Math.floor(Math.random() * 500000) + 200000;
+      state.budget -= fine;
+      write(`⚖️ Criminal charges laid! Fine: ${formatCurrency(fine)}`);
+      state.under_criminal_investigation = false;
+      state.criminal_convictions++;
+    }
+  }
+  
+  // Past criminal convictions affect reputation
+  if (state.criminal_convictions > 0) {
+    state.reputation -= 0.01 * state.criminal_convictions;
+  }
+}

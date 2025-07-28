@@ -83,8 +83,10 @@ export async function selective_permit_submission(state, write, terminal, input)
  * Process pending permit applications.
  * @param {import("./gameModels.js").GameState} state
  * @param {(text: string) => void} write
+ * @param {HTMLElement} terminal
+ * @param {HTMLInputElement} input
  */
-export function process_permits(state, write) {
+export async function process_permits(state, write, terminal, input) {
   const pending_blocks = state.harvest_blocks.filter(
     (b) => b.permit_status === PermitStatus.PENDING && b.permit_submitted > 0
   );

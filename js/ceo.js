@@ -104,3 +104,85 @@ export function pay_ceo_annual_costs(state) {
   }
   state.ceo.years_employed += 0.25;
 }
+
+/**
+ * CEO makes automated decisions based on their profile
+ * @param {import("./gameModels.js").GameState} state
+ * @param {(text: string) => void} write
+ * @returns {string[]} Array of actions taken
+ */
+export async function ceo_automated_decisions(state, write) {
+  if (!state.ceo) return [];
+  
+  const actions = [];
+  
+  // Risk-based decision making
+  if (state.ceo.risk_tolerance === "high" && state.budget > 500000) {
+    if (Math.random() < 0.3) {
+      const investmentAmount = Math.floor(state.budget * 0.2);
+      state.budget -= investmentAmount;
+      actions.push(`Invested ${formatCurrency(investmentAmount)} in high-risk expansion`);
+    }
+  }
+  
+  // Cost-cutting decisions
+  if (state.ceo.decision_making === "cost-cutting" && state.quarterly_profit < 0) {
+    const cutAmount = Math.floor(state.operating_cost_per_m3 * 0.1);
+    state.operating_cost_per_m3 -= cutAmount;
+    actions.push(`Reduced operating costs by ${formatCurrency(cutAmount)}/m³`);
+    state.safety_violations++; // Cost cutting affects safety
+  }
+  
+  // Relationship building
+  if (state.ceo.decision_making === "relationship-focused") {
+    state.first_nations.forEach(fn => {
+      if (fn.relationship_level < 0.5) {
+        fn.relationship_level += 0.05;
+        actions.push(`Improved relations with ${fn.name} (+5%)`);
+      }
+    });
+  }
+  
+  return actions;
+}
+
+/**
+ * CEO provides quarterly performance report
+ * @param {import("./gameModels.js").GameState} state
+ * @param {(text: string) => void} write
+ */
+export async function ceo_quarterly_report(state, write) {
+  if (!state.ceo) return;
+  
+  write("\n--- CEO QUARTERLY REPORT ---");
+  write(`From: ${state.ceo.name}, CEO`);
+  
+  // Performance assessment
+  const profitStatus = state.quarterly_profit > 0 ? "profitable" : "unprofitable";
+  write(`This quarter was ${profitStatus}.`);
+  
+  // Risk assessment
+  if (state.reputation < 0.3) {
+    write("⚠️ Critical: Company reputation is dangerously low");
+  }
+  
+  if (state.budget < 100000) {
+    write("⚠️ Warning: Cash reserves critically low");
+  }
+  
+  // Recommendations based on CEO profile
+  if (state.ceo.decision_making === "aggressive-growth") {
+    write("📈 Recommendation: Expand operations aggressively");
+  } else if (state.ceo.decision_making === "cost-cutting") {
+    write("💰 Recommendation: Further cost reductions needed");
+  } else if (state.ceo.decision_making === "relationship-focused") {
+    write("🤝 Recommendation: Continue building stakeholder relationships");
+  }
+  
+  // Update CEO performance rating
+  if (state.quarterly_profit > 0) {
+    state.ceo.performance_rating = Math.min(1.0, state.ceo.performance_rating + 0.05);
+  } else {
+    state.ceo.performance_rating = Math.max(0.0, state.ceo.performance_rating - 0.05);
+  }
+}

@@ -105,3 +105,23 @@ export async function random_first_nations_anger_events(
 
   return true;
 }
+
+/**
+ * Check if anger events should be triggered based on game state
+ * @param {import("./gameModels.js").GameState} state
+ * @returns {boolean}
+ */
+export function check_anger_event_triggers(state) {
+  // Check if any First Nations have very low relationship levels
+  const hasAngryNation = state.first_nations.some(fn => fn.relationship_level < 0.3);
+  
+  // Check for recent violations or issues
+  const hasRecentViolations = state.safety_violations > 2 || state.criminal_convictions > 0;
+  
+  // Check if harvesting without proper consultation
+  const lackOfConsultation = state.harvest_blocks.some(block => 
+    block.permit_status === "approved" && !block.fn_consulted
+  );
+  
+  return hasAngryNation || hasRecentViolations || lackOfConsultation;
+}

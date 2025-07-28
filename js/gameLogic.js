@@ -181,3 +181,111 @@ export function conduct_harvest_operations(state, write) {
     (b) => b.permit_status !== "approved"
   );
 }
+
+/**
+ * Annual management decisions
+ * @param {GameState} state The game state
+ * @param {(text: string) => void} write
+ * @param {HTMLElement} terminal
+ * @param {HTMLInputElement} input
+ */
+export async function annual_management_decisions(state, write, terminal, input) {
+  if (state.quarter === 4) {
+    write("\n--- ANNUAL MANAGEMENT DECISIONS ---");
+    
+    // AAC decline
+    state.annual_allowable_cut *= (1 - state.aac_decline_rate);
+    write(`📉 AAC declined by ${(state.aac_decline_rate * 100).toFixed(1)}% to ${formatVolume(state.annual_allowable_cut)}`);
+    
+    // Equipment maintenance
+    const maintenanceCost = 50000;
+    if (state.budget >= maintenanceCost) {
+      const choice = await askChoice(
+        "Annual equipment maintenance ($50,000)?",
+        ["Yes - maintain equipment", "No - defer maintenance"],
+        terminal,
+        input
+      );
+      if (choice === 0) {
+        state.budget -= maintenanceCost;
+        state.equipment_condition = Math.min(1.0, state.equipment_condition + 0.2);
+        write("✅ Equipment maintained");
+      } else {
+        state.equipment_condition = Math.max(0.3, state.equipment_condition - 0.3);
+        state.safety_violations++;
+        write("⚠️ Equipment condition deteriorating");
+      }
+    }
+  }
+}
+
+/**
+ * Quarter end summary
+ * @param {GameState} state The game state
+ * @param {(text: string) => void} write
+ */
+export async function quarter_end_summary(state, write) {
+  write("\n--- QUARTER SUMMARY ---");
+  write(`Budget: ${formatCurrency(state.budget)}`);
+  write(`Reputation: ${state.reputation.toFixed(2)}`);
+  write(`Safety record: ${state.safety_violations} violations`);
+  
+  if (state.quarterly_profit !== 0) {
+    const profitEmoji = state.quarterly_profit > 0 ? "📈" : "📉";
+    write(`${profitEmoji} Quarterly profit: ${formatCurrency(state.quarterly_profit)}`);
+  }
+  
+  // First Nations relationships
+  let avgRelationship = 0;
+  state.first_nations.forEach(fn => {
+    avgRelationship += fn.relationship_level;
+  });
+  avgRelationship /= state.first_nations.length;
+  write(`First Nations relations: ${(avgRelationship * 100).toFixed(0)}%`);
+}
+
+/**
+ * Check win/loss conditions
+ * @param {GameState} state The game state
+ * @returns {[boolean, string]} [gameOver, message]
+ */
+export function check_win_conditions(state) {
+  // Loss conditions
+  if (state.budget < -500000) {
+    return [true, "GAME OVER: Company bankrupt! Debts exceed $500,000"];
+  }
+  
+  if (state.reputation <= 0) {
+    return [true, "GAME OVER: Company reputation destroyed! Social license revoked"];
+  }
+  
+  if (state.safety_fatalities >= 3) {
+    return [true, "GAME OVER: Too many workplace fatalities! Operations shut down"];
+  }
+  
+  // Check if all First Nations relationships are below 20%
+  const allRelationshipsBad = state.first_nations.every(fn => fn.relationship_level < 0.2);
+  if (allRelationshipsBad) {
+    return [true, "GAME OVER: All First Nations oppose your operations! Blockades prevent any work"];
+  }
+  
+  // Win conditions
+  if (state.year >= 10 && state.budget > 5000000) {
+    return [true, "VICTORY: You've built a successful forestry empire! Over $5M in assets after 10 years"];
+  }
+  
+  if (state.consecutive_profitable_years >= 8) {
+    return [true, "VICTORY: 8 consecutive profitable years! You've mastered sustainable forestry"];
+  }
+  
+  return [false, ""];
+}
+
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('en-CA', { 
+    style: 'currency', 
+    currency: 'CAD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+}

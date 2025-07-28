@@ -1,105 +1,220 @@
+* {
+  box-sizing: border-box;
+}
+
 body {
-  background-color: #1a1a1a;
-  color: #f0f0f0;
+  background-color: #000;
+  color: #00ff00;
   font-family: "Courier New", Courier, monospace;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
   margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .game-container {
   display: flex;
-  width: 90%;
-  max-width: 1200px;
-  height: 90vh;
-  border: 2px solid #444;
+  width: 100%;
+  height: 100vh;
+  background: #000;
+  position: relative;
 }
 
 .left-panel {
-  width: 70%;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  border-right: 2px solid #444;
+  border-right: 1px solid #00ff00;
+  background: #000;
+  position: relative;
 }
 
 .right-panel {
-  width: 30%;
+  width: 300px;
   padding: 1em;
   overflow-y: auto;
+  background: #000;
+  border-left: 1px solid #00ff00;
+  font-size: 14px;
 }
 
 .terminal {
   background: #000;
-  color: #0f0;
-  padding: 1em;
-  height: 100%;
+  color: #00ff00;
+  padding: 20px;
   overflow-y: auto;
   white-space: pre-wrap;
-  flex-grow: 1;
+  flex: 1;
+  font-size: 16px;
+  line-height: 1.5;
+  font-family: "Courier New", Courier, monospace;
+  text-shadow: 0 0 3px #00ff00;
+  scrollbar-width: thin;
+  scrollbar-color: #00ff00 #000;
+}
+
+.terminal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal::-webkit-scrollbar-track {
+  background: #000;
+}
+
+.terminal::-webkit-scrollbar-thumb {
+  background: #00ff00;
+  border-radius: 4px;
+}
+
+.terminal::before {
+  content: "BC FORESTRY SIMULATOR v2.0";
+  display: block;
+  color: #00ff00;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #00ff00;
+  font-weight: bold;
+  text-align: center;
 }
 
 #input {
   width: 100%;
-  font-family: monospace;
+  font-family: "Courier New", Courier, monospace;
   font-size: 16px;
-  padding: 0.5em;
-  box-sizing: border-box;
-  background-color: #333;
-  color: #0f0;
-  border: 1px solid #444;
+  padding: 15px 20px;
+  background-color: #000;
+  color: #00ff00;
+  border: none;
+  border-top: 1px solid #00ff00;
+  outline: none;
+  text-shadow: 0 0 3px #00ff00;
+  position: relative;
+  /* Prevent zoom on mobile */
+  touch-action: manipulation;
 }
 
-.screen.swipe {
-  animation: swipe 0.5s forwards;
+#input:focus {
+  background-color: #001100;
 }
 
-@keyframes swipe {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
+/* Terminal prompt styling */
+#input::before {
+  content: "> ";
+  position: absolute;
+  left: 5px;
+  color: #00ff00;
+}
+
+/* Terminal effects */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.cursor::after {
+  content: "_";
+  animation: blink 1s infinite;
+  color: #00ff00;
 }
 
 h2 {
-  color: #0f0;
-  border-bottom: 1px solid #0f0;
+  color: #00ff00;
+  border-bottom: 1px solid #00ff00;
   padding-bottom: 0.5em;
+  margin-top: 0;
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
 }
 
 .info-item {
-  margin-bottom: 0.5em;
+  margin-bottom: 0.8em;
+  color: #00ff00;
+  border-bottom: 1px dotted #003300;
+  padding-bottom: 0.5em;
 }
 
 .info-label {
   font-weight: bold;
+  color: #00ff00;
+  display: inline-block;
+  min-width: 100px;
 }
 
-@media (max-width: 600px) {
-  body {
-    align-items: flex-start;
-    height: auto;
-  }
+.info-value {
+  color: #00cc00;
+}
 
+/* Mobile responsive design */
+@media (max-width: 768px) {
   .game-container {
     flex-direction: column;
-    width: 100%;
-    height: auto;
-  }
-
-  .left-panel,
-  .right-panel {
-    width: 100%;
-    height: auto;
   }
 
   .left-panel {
     border-right: none;
-    border-bottom: 2px solid #444;
+    border-bottom: 1px solid #00ff00;
+    height: 70vh;
+  }
+
+  .right-panel {
+    width: 100%;
+    height: 30vh;
+    border-left: none;
+    border-top: 1px solid #00ff00;
+    font-size: 12px;
+  }
+  
+  .terminal {
+    font-size: 14px;
+    padding: 10px;
+  }
+  
+  #input {
+    font-size: 16px; /* Keep at 16px to prevent zoom on iOS */
+    padding: 12px 15px;
+  }
+  
+  h2 {
+    font-size: 16px;
+  }
+  
+  .info-item {
+    margin-bottom: 0.5em;
+    padding-bottom: 0.3em;
+  }
+}
+
+/* Prevent text selection for terminal aesthetic */
+.terminal {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Allow selection on input */
+#input {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* Terminal flicker effect */
+@keyframes flicker {
+  0% { opacity: 1; }
+  50% { opacity: 0.8; }
+  100% { opacity: 1; }
+}
+
+.terminal {
+  animation: flicker 0.15s infinite;
+}
+
+/* Disable flicker on mobile for performance */
+@media (max-width: 768px) {
+  .terminal {
+    animation: none;
   }
 }

@@ -36,6 +36,15 @@ export class EventsRouter {
     }
   }
 
+  // Add individual event trigger methods
+  async random_policy_events(state, write, terminal, input) {
+    return await this.triggerEvent(EventType.POLICY, state, write, terminal, input);
+  }
+  
+  async market_fluctuations(state, write, terminal, input) {
+    return await this.triggerEvent(EventType.MARKET, state, write, terminal, input);
+  }
+  
   // Quarterly event management similar to Python system
   async runQuarterlyEvents(state, write, terminal, input) {
     // Policy events (Spring only)

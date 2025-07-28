@@ -337,4 +337,27 @@ async function _handle_worksafebc_bribery(state, incident, response, write, term
   }
 }
 
-export { workplace_safety_incidents };
+/**
+ * Process ongoing safety consequences
+ * @param {import("./gameModels.js").GameState} state 
+ * @param {(text: string) => void} write 
+ */
+export async function ongoing_safety_consequences(state, write) {
+  // Safety violations affect future incident risk
+  if (state.safety_violations > 0) {
+    // Each violation increases scrutiny
+    if (Math.random() < 0.1 * state.safety_violations) {
+      const inspectionFine = Math.floor(Math.random() * 50000) + 10000;
+      state.budget -= inspectionFine;
+      write(`\n⚠️ WORKSAFEBC INSPECTION: Fine of ${formatCurrency(inspectionFine)} for safety violations`);
+    }
+  }
+  
+  // Poor equipment condition increases accident risk
+  if (state.equipment_condition < 0.5) {
+    state.reputation -= 0.01;
+    write("\n🔧 Poor equipment condition affecting operations");
+  }
+}
+
+export { workplace_safety_incidents, ongoing_safety_consequences };
