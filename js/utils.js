@@ -31,20 +31,21 @@ export function printSubsection(title, write) {
 export function ask(question, terminal, input) {
   return new Promise((resolve) => {
     terminal.textContent += `\n${question}\n> `;
-    // Use setTimeout to ensure scrolling and focus happen after DOM update
-    setTimeout(() => {
+    // Ensure scrolling and focus happen after DOM update with longer delay
+    requestAnimationFrame(() => {
       terminal.scrollTop = terminal.scrollHeight;
       input.focus();
-    }, 0);
+      input.value = ""; // Clear any existing value
+    });
 
     const listener = (e) => {
       if (e.key === "Enter") {
-        const value = input.value;
+        const value = input.value.trim();
         input.value = "";
         terminal.textContent += `${value}\n`;
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           terminal.scrollTop = terminal.scrollHeight;
-        }, 0);
+        });
         input.removeEventListener("keydown", listener);
         resolve(value);
       }

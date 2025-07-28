@@ -4,7 +4,7 @@ import { EventsRouter } from "./events.js";
 import { process_permits, selective_permit_submission } from "./permits.js";
 import { ongoing_first_nations_consultation } from "./firstNations.js";
 import { certification_opportunities, maintain_certifications } from "./certification.js";
-import { illegal_opportunities, ongoing_criminal_consequences } from "./illegalActivities.js";
+import { illegal_opportunities, ongoing_criminal_consequences, continue_illegal_operations } from "./illegalActivities.js";
 import { quarterly_wacky_events } from "./wackyEvents.js";
 import { liaison_management } from "./liaison.js";
 import { ceo_management, pay_ceo_annual_costs, ceo_automated_decisions, ceo_quarterly_report } from "./ceo.js";
@@ -75,7 +75,7 @@ class Game {
       }
       this.updateStatus();
     }
-    this.write("\nThanks for playing the Enhanced BC Interior Forestry Simulator!");
+    this.write("\nThanks for playing the BC Interior Forestry Simulator!");
   }
 
   async runQuarter() {
@@ -144,6 +144,9 @@ class Game {
     await ongoing_criminal_consequences(this.state, this.write.bind(this));
     await ongoing_safety_consequences(this.state, this.write.bind(this));
     
+    // Continue multi-stage illegal operations
+    await continue_illegal_operations(this.state, this.write.bind(this), this.terminal, this.input);
+    
     // Annual management decisions
     await annual_management_decisions(this.state, this.write.bind(this), this.terminal, this.input);
     
@@ -158,10 +161,10 @@ class Game {
 
   write(text) {
     this.terminal.textContent += `${text}\n`;
-    // Use setTimeout to ensure scrolling happens after DOM update
-    setTimeout(() => {
+    // Use requestAnimationFrame for better scrolling
+    requestAnimationFrame(() => {
       this.terminal.scrollTop = this.terminal.scrollHeight;
-    }, 0);
+    });
   }
 
   updateStatus() {

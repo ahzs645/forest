@@ -1,6 +1,8 @@
 import { GameState, FirstNation, HarvestBlock } from './gameModels.js';
-import { ask, askChoice, formatVolume } from './utils.js';
+import { ask, askChoice, formatVolume, formatCurrency } from './utils.js';
 import { natural_disasters_during_harvest } from './events.js';
+import { illegal_opportunities } from './illegalActivities.js';
+import { ceo_management } from './ceo.js';
 
 /**
  * Initial region selection with region-specific setup.
@@ -197,9 +199,11 @@ export async function annual_management_decisions(state, write, terminal, input)
   const managementOptions = [
     "Focus on permit applications",
     "First Nations relationship building ($25,000)",
+    "CEO management and hiring",
     "Pursue forest certification ($50,000)",
     "Conduct forest health monitoring ($30,000)",
     "Conduct voluntary safety audit ($15,000)",
+    "🔴 Explore illegal opportunities",
     "Skip management activities this quarter"
   ];
   
@@ -237,7 +241,11 @@ export async function annual_management_decisions(state, write, terminal, input)
       }
       break;
       
-    case 2: // Forest certification
+    case 2: // CEO management
+      await ceo_management(state, write, terminal, input);
+      break;
+      
+    case 3: // Forest certification
       if (state.budget >= 50000 && !state.certifications.includes("FSC")) {
         state.budget -= 50000;
         if (Math.random() < 0.7) {
@@ -254,7 +262,7 @@ export async function annual_management_decisions(state, write, terminal, input)
       }
       break;
       
-    case 3: // Forest health monitoring
+    case 4: // Forest health monitoring
       if (state.budget >= 30000) {
         state.budget -= 30000;
         state.reputation += 0.05;
@@ -264,7 +272,7 @@ export async function annual_management_decisions(state, write, terminal, input)
       }
       break;
       
-    case 4: // Safety audit
+    case 5: // Safety audit
       if (state.budget >= 15000) {
         state.budget -= 15000;
         if (state.safety_violations > 0) {
@@ -278,7 +286,14 @@ export async function annual_management_decisions(state, write, terminal, input)
       }
       break;
       
-    case 5: // Skip
+    case 6: // Illegal opportunities
+      const hadOpportunity = await illegal_opportunities(state, write, terminal, input);
+      if (!hadOpportunity) {
+        write("🎖️ No illegal opportunities available this quarter.");
+      }
+      break;
+      
+    case 7: // Skip
       write("No management activities this quarter.");
       break;
   }
