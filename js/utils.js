@@ -31,15 +31,20 @@ export function printSubsection(title, write) {
 export function ask(question, terminal, input) {
   return new Promise((resolve) => {
     terminal.textContent += `\n${question}\n> `;
-    terminal.scrollTop = terminal.scrollHeight;
-    input.focus();
+    // Use setTimeout to ensure scrolling and focus happen after DOM update
+    setTimeout(() => {
+      terminal.scrollTop = terminal.scrollHeight;
+      input.focus();
+    }, 0);
 
     const listener = (e) => {
       if (e.key === "Enter") {
         const value = input.value;
         input.value = "";
         terminal.textContent += `${value}\n`;
-        terminal.scrollTop = terminal.scrollHeight;
+        setTimeout(() => {
+          terminal.scrollTop = terminal.scrollHeight;
+        }, 0);
         input.removeEventListener("keydown", listener);
         resolve(value);
       }
@@ -61,13 +66,19 @@ export async function askChoice(question, options, terminal, input) {
   const formattedOptions = options
     .map((o, i) => `${i + 1}. ${o}`)
     .join("\n");
-  const answer = await ask(`${question}\n${formattedOptions}`, terminal, input);
-  const index = parseInt(answer, 10) - 1;
+  
+  while (true) {
+    const answer = await ask(`${question}\n${formattedOptions}`, terminal, input);
+    const index = parseInt(answer, 10) - 1;
 
-  if (index >= 0 && index < options.length) {
-    return index;
-  } else {
-    // In a real game, you'd want to handle this more gracefully.
-    return 0;
+    if (index >= 0 && index < options.length) {
+      return index;
+    } else {
+      terminal.textContent += `Invalid choice. Please enter a number between 1 and ${options.length}.\n`;
+      // Re-scroll after error message
+      setTimeout(() => {
+        terminal.scrollTop = terminal.scrollHeight;
+      }, 0);
+    }
   }
 }

@@ -158,7 +158,10 @@ class Game {
 
   write(text) {
     this.terminal.textContent += `${text}\n`;
-    this.terminal.scrollTop = this.terminal.scrollHeight;
+    // Use setTimeout to ensure scrolling happens after DOM update
+    setTimeout(() => {
+      this.terminal.scrollTop = this.terminal.scrollHeight;
+    }, 0);
   }
 
   updateStatus() {
