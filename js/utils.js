@@ -74,35 +74,51 @@ export function ask(question, terminal, input) {
 export function askChoiceWithButtons(question, options, terminal, input) {
   return new Promise((resolve) => {
     const buttonContainer = document.getElementById('button-container');
-    
+
     // Show the question in terminal
     terminal.textContent += `\n${question}\n`;
-    
+
     // Hide text input and show button container
     input.style.display = 'none';
     buttonContainer.style.display = 'flex';
-    buttonContainer.innerHTML = '';
-    
+
+    // Disable buttons from previous prompts
+    buttonContainer.querySelectorAll('.choice-button').forEach(btn => {
+      btn.disabled = true;
+    });
+
+    // Create a group for this question and its options
+    const group = document.createElement('div');
+    group.className = 'button-group';
+
+    const questionHeader = document.createElement('div');
+    questionHeader.className = 'button-question';
+    questionHeader.textContent = question;
+    group.appendChild(questionHeader);
+
     const handleChoice = (index) => {
       // Show the user's choice in terminal
       terminal.textContent += `> ${index + 1}\n`;
-      
+
+      // Disable current group's buttons so history remains non-interactive
+      group.querySelectorAll('.choice-button').forEach(btn => (btn.disabled = true));
+
       // Hide buttons and show text input again
       buttonContainer.style.display = 'none';
       input.style.display = 'block';
-      
+
       // Remove keyboard listeners
       document.removeEventListener('keydown', keyHandler);
-      
+
       // Scroll terminal
       requestAnimationFrame(() => {
         terminal.scrollTop = terminal.scrollHeight;
         input.focus();
       });
-      
+
       resolve(index);
     };
-    
+
     // Keyboard navigation handler
     const keyHandler = (e) => {
       if (e.key >= '1' && e.key <= '9') {
@@ -119,9 +135,9 @@ export function askChoiceWithButtons(question, options, terminal, input) {
         }
       } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
-        const buttons = [...buttonContainer.querySelectorAll('.choice-button')];
+        const buttons = [...group.querySelectorAll('.choice-button')];
         const currentIndex = buttons.indexOf(document.activeElement);
-        
+
         if (e.key === 'ArrowDown') {
           const nextIndex = (currentIndex + 1) % buttons.length;
           buttons[nextIndex].focus();
@@ -131,7 +147,7 @@ export function askChoiceWithButtons(question, options, terminal, input) {
         }
       }
     };
-    
+
     // Create buttons for each option
     options.forEach((option, index) => {
       const button = document.createElement('button');
@@ -144,17 +160,20 @@ export function askChoiceWithButtons(question, options, terminal, input) {
           handleChoice(index);
         }
       };
-      
-      buttonContainer.appendChild(button);
+
+      group.appendChild(button);
     });
-    
+
+    buttonContainer.appendChild(group);
+
     // Add keyboard listener
     document.addEventListener('keydown', keyHandler);
-    
-    // Scroll terminal and focus first button
+
+    // Scroll container to newest group and focus first button
     requestAnimationFrame(() => {
       terminal.scrollTop = terminal.scrollHeight;
-      const firstButton = buttonContainer.querySelector('.choice-button');
+      buttonContainer.scrollLeft = buttonContainer.scrollWidth;
+      const firstButton = group.querySelector('.choice-button');
       if (firstButton) {
         firstButton.focus();
       }
@@ -171,39 +190,17 @@ export function askChoiceWithButtons(question, options, terminal, input) {
  * @returns {Promise<number>} A promise that resolves with the index of the selected option.
  */
 export async function askChoice(question, options, terminal, input) {
-  // Special case: if there's only one option or it's a "Press Enter" type prompt, use text input
-  if (options.length === 1 || question.toLowerCase().includes('press enter')) {
-    const formattedOptions = options
-      .map((o, i) => `${i + 1}. ${o}`)
-      .join("\n");
-    
-    while (true) {
-      const answer = await ask(`${question}\n${formattedOptions}`, terminal, input);
-      const index = parseInt(answer, 10) - 1;
-
-      if (index >= 0 && index < options.length) {
-        return index;
-      } else {
-        terminal.textContent += `Invalid choice. Please enter a number between 1 and ${options.length}.\n`;
-        setTimeout(() => {
-          terminal.scrollTop = terminal.scrollHeight;
-        }, 0);
-      }
-    }
-  }
-  
-  // Use buttons for multiple choice questions on mobile/touch devices
   const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window;
-  
-  if (isMobile && options.length > 1) {
+
+  if (isMobile || options.length === 1 || question.toLowerCase().includes('press enter')) {
     return askChoiceWithButtons(question, options, terminal, input);
   }
-  
-  // Fallback to text input for desktop
+
+  // Fallback to text input for desktop with multiple options
   const formattedOptions = options
     .map((o, i) => `${i + 1}. ${o}`)
     .join("\n");
-  
+
   while (true) {
     const answer = await ask(`${question}\n${formattedOptions}`, terminal, input);
     const index = parseInt(answer, 10) - 1;

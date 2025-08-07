@@ -80,6 +80,19 @@ body[data-text-size="large"] .terminal { font-size: 18px; }
   font-size: 14px;
 }
 
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.status-arrow {
+  font-size: 18px;
+  line-height: 1;
+  margin-left: 8px;
+}
+
 .terminal {
   background: #000;
   color: #00ff00;
@@ -245,29 +258,48 @@ h2 {
   -ms-user-select: text;
 }
 
-/* Button container for mobile-friendly choice selections */
+/* Button container with swipeable history */
 .button-container {
   padding: 10px 20px;
   background-color: #000;
   border-top: 1px solid #00ff00;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  gap: 20px;
   max-height: 200px;
-  overflow-y: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
   scrollbar-width: thin;
   scrollbar-color: #00ff00 #000;
 }
 
-.button-container::-webkit-scrollbar {
+.button-question {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #00ff00;
+}
+
+/* Individual question groups */
+.button-group {
+  flex: 0 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-snap-align: start;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.button-group::-webkit-scrollbar {
   width: 6px;
 }
 
-.button-container::-webkit-scrollbar-track {
+.button-group::-webkit-scrollbar-track {
   background: #000;
 }
 
-.button-container::-webkit-scrollbar-thumb {
+.button-group::-webkit-scrollbar-thumb {
   background: #00ff00;
   border-radius: 3px;
 }
@@ -351,14 +383,24 @@ h2 {
 /* Mobile adjustments for buttons */
 @media (max-width: 768px) {
   .button-container {
-    padding: 8px 15px;
-    gap: 6px;
-    max-height: 150px;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 12px 20px;
+    gap: 20px;
+    max-height: 50vh;
+    z-index: 1000;
   }
-  
+
+  .button-question {
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+
   .choice-button {
-    padding: 10px 12px;
-    font-size: 13px;
+    padding: 14px 16px;
+    font-size: 16px;
     border-radius: 6px;
   }
 }

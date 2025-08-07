@@ -1,4 +1,4 @@
-import { ask, formatCurrency } from "./utils.js";
+import { askChoice, formatCurrency } from "./utils.js";
 
 class SafetyIncident {
   constructor(
@@ -226,7 +226,7 @@ async function workplace_safety_incidents(state, write, terminal, input) {
     write(`   📝 ${option.description_detail}`);
   }
 
-  const choice = await ask("Choose your response:", response_options.map(opt => opt.description), terminal, input);
+  const choice = await askChoice("Choose your response:", response_options.map(opt => opt.description), terminal, input);
   const chosen_response = response_options[choice];
 
   write("");
@@ -247,7 +247,7 @@ async function workplace_safety_incidents(state, write, terminal, input) {
         write(`   📝 ${option.description_detail}`);
       }
       
-      const legal_choice = await ask("Choose your response:", legal_options.map(opt => opt.description), terminal, input);
+      const legal_choice = await askChoice("Choose your response:", legal_options.map(opt => opt.description), terminal, input);
       const chosen_legal_response = legal_options[legal_choice];
       
       write("");
@@ -373,7 +373,7 @@ async function _handle_worksafebc_bribery(state, incident, response, write, term
   write("⚠️  WARNING: Bribing government officials is a serious criminal offense!");
   write("💀 Potential consequences: Criminal charges, asset forfeiture, imprisonment");
 
-  const confirm = await ask("Are you absolutely certain you want to proceed?", ["Yes, proceed with bribery", "No, choose legal response"], terminal, input);
+  const confirm = await askChoice("Are you absolutely certain you want to proceed?", ["Yes, proceed with bribery", "No, choose legal response"], terminal, input);
 
   if (confirm === 1) {
     write("📋 Returning to legal response options...");

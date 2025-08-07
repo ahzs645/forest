@@ -10,7 +10,7 @@ import { liaison_management } from "./liaison.js";
 import { ceo_management, pay_ceo_annual_costs, ceo_automated_decisions, ceo_quarterly_report } from "./ceo.js";
 import { random_first_nations_anger_events, check_anger_event_triggers } from "./firstNationsAnger.js";
 import { workplace_safety_incidents, ongoing_safety_consequences } from "./workplaceSafety.js";
-import { ask, formatCurrency, formatVolume } from "./utils.js";
+import { ask, askChoice, formatCurrency, formatVolume } from "./utils.js";
 import { story_progression } from "./storyEvents.js";
 import { strategic_management_decisions, getManagementStatus } from "./strategicManagement.js";
 import { forest_management_planning, get_fmp_status_summary } from "./forestManagementPlanning.js";
@@ -22,10 +22,12 @@ class Game {
     this.terminal = document.getElementById("terminal");
     this.input = document.getElementById("input");
     this.statusPanel = document.getElementById("status-content");
+    this.statusToggle = document.getElementById("status-toggle");
     this.enable_wacky_events = false;
     this.eventsRouter = new EventsRouter();
     this.mobileHud = document.getElementById("mobile-hud");
     this._bindSettingsUI();
+    this._bindStatusToggle();
   }
 
   async start() {
@@ -59,7 +61,7 @@ class Game {
       
       // Year-end continuation prompt
       if (this.state.quarter === 4 && quarterCount < quarters - 4) {
-        const choice = await ask(
+        const choice = await askChoice(
           `Continue to ${this.state.year + 1}?`,
           ["Yes", "No", "Play 1 more quarter only"],
           this.terminal,
@@ -176,7 +178,7 @@ class Game {
     // Quarter end summary
     await quarter_end_summary(this.state, this.write.bind(this));
     
-    await ask("Press Enter to continue...", this.terminal, this.input);
+    await askChoice("Press Enter to continue...", ["Continue"], this.terminal, this.input);
   }
 
   write(text) {
@@ -295,6 +297,32 @@ class Game {
     sizeSmall?.addEventListener('click', () => setSize('small'));
     sizeMedium?.addEventListener('click', () => setSize('medium'));
     sizeLarge?.addEventListener('click', () => setSize('large'));
+  }
+
+  _bindStatusToggle() {
+    const toggle = this.statusToggle;
+    const content = this.statusPanel;
+    if (!toggle || !content) return;
+    const arrow = toggle.querySelector('.status-arrow');
+
+    const collapse = () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', (!expanded).toString());
+      content.style.display = expanded ? 'none' : 'block';
+      if (arrow) arrow.textContent = expanded ? '▸' : '▾';
+    };
+
+    toggle.addEventListener('click', collapse);
+    toggle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        collapse();
+      }
+    });
+
+    if (window.innerWidth <= 768) {
+      collapse();
+    }
   }
 }
 
