@@ -1,7 +1,7 @@
 import { GameState } from "./gameModels.js";
 import { choose_region, initial_setup, plan_harvest_schedule, conduct_harvest_operations, annual_management_decisions, quarter_end_summary, check_win_conditions } from "./gameLogic.js";
 import { EventsRouter } from "./events.js";
-import { process_permits, selective_permit_submission } from "./permits.js";
+import { process_permits, strategic_permit_submission } from "./permits.js";
 import { ongoing_first_nations_consultation } from "./firstNations.js";
 import { certification_opportunities, maintain_certifications } from "./certification.js";
 import { illegal_opportunities, ongoing_criminal_consequences, continue_illegal_operations } from "./illegalActivities.js";
@@ -12,6 +12,9 @@ import { random_first_nations_anger_events, check_anger_event_triggers } from ".
 import { workplace_safety_incidents, ongoing_safety_consequences } from "./workplaceSafety.js";
 import { ask, formatCurrency, formatVolume } from "./utils.js";
 import { story_progression } from "./storyEvents.js";
+import { strategic_management_decisions, getManagementStatus } from "./strategicManagement.js";
+import { forest_management_planning, get_fmp_status_summary } from "./forestManagementPlanning.js";
+import { competitive_market_events, getCompetitiveMarketStatus } from "./competitiveMarket.js";
 
 class Game {
   constructor() {
@@ -130,6 +133,9 @@ class Game {
     // Workplace safety incidents
     await workplace_safety_incidents(this.state, this.write.bind(this), this.terminal, this.input);
     
+    // Competitive market events
+    await competitive_market_events(this.state, this.write.bind(this), this.terminal, this.input);
+    
     // First Nations anger events
     const angerChance = Math.max(0.05, 0.25 - this.state.community_support * 0.15);
     if (check_anger_event_triggers(this.state) || Math.random() < angerChance) {
@@ -150,8 +156,8 @@ class Game {
     // Continue multi-stage illegal operations
     await continue_illegal_operations(this.state, this.write.bind(this), this.terminal, this.input);
     
-    // Annual management decisions
-    await annual_management_decisions(this.state, this.write.bind(this), this.terminal, this.input);
+    // Strategic management decisions
+    await strategic_management_decisions(this.state, this.write.bind(this), this.terminal, this.input);
     
     // CEO quarterly report
     await ceo_quarterly_report(this.state, this.write.bind(this));
@@ -176,6 +182,12 @@ class Game {
     const repColor = this.state.reputation < 0.3 ? "style='color: #ff9900'" : "";
     const communityColor = this.state.community_support < 0.3 ? "style='color: #ff9900'" : "";
     
+    // Get strategic management status
+    const mgmtStatus = getManagementStatus(this.state);
+    const fmpStatus = get_fmp_status_summary(this.state);
+    const marketStatus = getCompetitiveMarketStatus(this.state);
+    const mgmtColor = mgmtStatus.actions_used >= mgmtStatus.actions_available ? "style='color: #ff9900'" : "";
+    
     this.statusPanel.innerHTML = `
       <div class="info-item">
         <span class="info-label">COMPANY:</span> <span class="info-value">${this.state.companyName}</span>
@@ -192,6 +204,23 @@ class Game {
       <div class="info-item">
         <span class="info-label">COMMUNITY SUPPORT:</span> <span class="info-value" ${communityColor}>${(this.state.community_support * 100).toFixed(0)}%</span>
       </div>
+      <hr>
+      <div class="info-item">
+        <span class="info-label">MANAGEMENT:</span> <span class="info-value" ${mgmtColor}>${mgmtStatus.actions_used}/${mgmtStatus.actions_available} actions</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">COMPANY SIZE:</span> <span class="info-value">${mgmtStatus.company_size}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">FMP STATUS:</span> <span class="info-value" style="color: ${fmpStatus.color}">${fmpStatus.status}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">MARKET SHARE:</span> <span class="info-value">${marketStatus.player_market_share}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">MARKET CONDITION:</span> <span class="info-value">${marketStatus.market_condition}</span>
+      </div>
+      <hr>
       <div class="info-item">
         <span class="info-label">AAC:</span> <span class="info-value">${formatVolume(this.state.annual_allowable_cut)}</span>
       </div>
