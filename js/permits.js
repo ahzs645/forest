@@ -319,7 +319,7 @@ async function selectApplicationQuality(blocks, state, write, terminal, input) {
   write("\\n--- 📄 APPLICATION QUALITY SELECTION ---");
   write("Higher quality applications cost more but have better approval chances:");
   
-  const quality_options = Object.entries(APPLICATION_QUALITY_TIERS).map(([key, tier]) => 
+  const quality_options = Object.entries(APPLICATION_QUALITY_TIERS).map(([, tier]) => 
     `${tier.name} (${tier.cost_multiplier}x cost, ${tier.approval_bonus ? '+' + (tier.approval_bonus*100).toFixed(0) + '%' : tier.approval_penalty ? (tier.approval_penalty*100).toFixed(0) + '%' : '0%'} approval)`
   );
   
