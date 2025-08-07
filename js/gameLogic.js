@@ -493,6 +493,9 @@ export async function annual_management_decisions(state, write, terminal, input)
  */
 export async function quarter_end_summary(state, write) {
   write("\n--- QUARTER SUMMARY ---");
+  const upkeep = 100000;
+  state.budget -= upkeep;
+  write(`Operational upkeep: ${formatCurrency(upkeep)}`);
   write(`Budget: ${formatCurrency(state.budget)}`);
   write(`Reputation: ${state.reputation.toFixed(2)}`);
   write(`Safety record: ${state.safety_violations} violations`);

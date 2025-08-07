@@ -156,6 +156,7 @@ export class GameState {
     this.community_support = 0.5; // 0-1 scale
     this.story_stage = 0;
     this.story_branch = null;
+    this.story_arc = null;
 
     // First Nations liaison and CEO
     this.fn_liaison = null;
