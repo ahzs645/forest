@@ -173,9 +173,9 @@ export async function forest_management_planning(state, write, terminal, input) 
 async function initiate_fmp_process(state, write, terminal, input) {
   const fmp = state.forest_management_plan;
   
-  write("\\n🚀 INITIATING FOREST MANAGEMENT PLAN");
+  write("\n🚀 INITIATING FOREST MANAGEMENT PLAN");
   write("In Canada, forest management planning is mandatory for all commercial operations on public lands.");
-  write("Your plan must cover a 20-year horizon and meet strict regulatory requirements.\\n");
+  write("Your plan must cover a 20-year horizon and meet strict regulatory requirements.\n");
   
   // Check prerequisites
   const prerequisites_met = check_fmp_prerequisites(state, write);
@@ -215,7 +215,7 @@ async function initiate_fmp_process(state, write, terminal, input) {
 function check_fmp_prerequisites(state, write) {
   let prerequisites_met = true;
   
-  write("\\n📋 FMP Prerequisites Check:");
+  write("\n📋 FMP Prerequisites Check:");
   
   // Budget check
   const min_budget_required = 180000;
@@ -261,7 +261,7 @@ async function start_comprehensive_planning(state, write, terminal, input) {
     return;
   }
   
-  write("\\n🎯 COMPREHENSIVE PLANNING APPROACH SELECTED");
+  write("\n🎯 COMPREHENSIVE PLANNING APPROACH SELECTED");
   write("This approach includes all optional components and ensures highest approval likelihood.");
   write(`💰 Total Investment: ${formatCurrency(total_cost)}`);
   write("📅 Estimated Timeline: 11 quarters (2.75 years)");
@@ -302,7 +302,7 @@ async function start_balanced_planning(state, write, terminal, input) {
     return;
   }
   
-  write("\\n⚖️  BALANCED PLANNING APPROACH SELECTED");
+  write("\n⚖️  BALANCED PLANNING APPROACH SELECTED");
   write("This approach includes key components while managing costs effectively.");
   write(`💰 Total Investment: ${formatCurrency(total_cost)}`);
   write("📅 Estimated Timeline: 9 quarters (2.25 years)");
@@ -342,7 +342,7 @@ async function start_cost_efficient_planning(state, write, terminal, input) {
     return;
   }
   
-  write("\\n💰 COST-EFFICIENT PLANNING APPROACH SELECTED");
+  write("\n💰 COST-EFFICIENT PLANNING APPROACH SELECTED");
   write("This approach meets minimum regulatory requirements at lowest cost.");
   write(`💰 Total Investment: ${formatCurrency(total_cost)}`);
   write("📅 Estimated Timeline: 7 quarters (1.75 years)");
@@ -376,8 +376,8 @@ async function start_cost_efficient_planning(state, write, terminal, input) {
  * Display detailed planning requirements
  */
 async function display_planning_requirements(state, write) {
-  write("\\n📋 FOREST MANAGEMENT PLAN REQUIREMENTS");
-  write("Based on Canadian forest management standards:\\n");
+  write("\n📋 FOREST MANAGEMENT PLAN REQUIREMENTS");
+  write("Based on Canadian forest management standards:\n");
   
   write("🏛️  REGULATORY REQUIREMENTS:");
   write("  • 20-year strategic planning horizon");
@@ -385,19 +385,19 @@ async function display_planning_requirements(state, write) {
   write("  • Ecosystem-based management approach");
   write("  • Climate change adaptation strategies");
   write("  • Biodiversity conservation measures");
-  write("  • Soil and water protection protocols\\n");
+  write("  • Soil and water protection protocols\n");
   
   write("👥 CONSULTATION REQUIREMENTS:");
   write("  • Minimum 3 stakeholder consultation sessions");
   write("  • First Nations engagement (minimum 2 sessions)");  
   write("  • 60-day public review period");
-  write("  • Government agency consultations\\n");
+  write("  • Government agency consultations\n");
   
   write("📊 TECHNICAL REQUIREMENTS:");
   write("  • Forest inventory completion (minimum 85%)");
   write("  • Environmental baseline assessment");
   write("  • Independent scientific review");
-  write("  • Monitoring and adaptive management framework\\n");
+  write("  • Monitoring and adaptive management framework\n");
   
   write("⏱️  APPROVAL PROCESS:");
   write("  • Government technical review (60-90 days)");
@@ -412,7 +412,7 @@ async function display_planning_requirements(state, write) {
 async function initiate_planning_activities(state, write, approach) {
   const fmp = state.forest_management_plan;
   
-  write("\\n📋 PLANNING ACTIVITIES INITIATED:");
+  write("\n📋 PLANNING ACTIVITIES INITIATED:");
   
   if (approach === "comprehensive") {
     fmp.activities_completed.push("Advanced Forest Inventory");
@@ -458,7 +458,7 @@ async function initiate_planning_activities(state, write, approach) {
     write(`  ✅ ${activity} scheduled`);
   });
   
-  write("\\n🎯 Planning phase will progress automatically over the coming quarters.");
+  write("\n🎯 Planning phase will progress automatically over the coming quarters.");
   write("📈 You can enhance the plan quality with additional investments during development.");
 }
 
@@ -474,7 +474,7 @@ async function continue_fmp_development(state, write, terminal, input) {
   
   fmp.completion_percentage = progress_percentage;
   
-  write(`\\n📊 FMP Development Progress: ${(progress_percentage * 100).toFixed(1)}%`);
+  write(`\n📊 FMP Development Progress: ${(progress_percentage * 100).toFixed(1)}%`);
   write(`⏱️  Quarters Elapsed: ${quarters_elapsed} / ${fmp.estimated_completion_quarter}`);
   write(`📋 Current Phase: ${fmp.current_phase.replace('_', ' ')}`);
   
@@ -501,7 +501,7 @@ async function continue_fmp_development(state, write, terminal, input) {
 async function offer_fmp_enhancements(state, write, terminal, input) {
   const fmp = state.forest_management_plan;
   
-  write("\\n💡 OPTIONAL FMP ENHANCEMENTS AVAILABLE:");
+  write("\n💡 OPTIONAL FMP ENHANCEMENTS AVAILABLE:");
   
   const enhancement_options = [
     "🔬 Advanced Ecological Modeling ($65,000) - +15% approval likelihood",
@@ -550,7 +550,7 @@ async function offer_fmp_enhancements(state, write, terminal, input) {
 async function handle_fmp_approval_process(state, write, terminal, input) {
   const fmp = state.forest_management_plan;
   
-  write("\\n🏛️  GOVERNMENT APPROVAL PROCESS");
+  write("\n🏛️  GOVERNMENT APPROVAL PROCESS");
   write("Your Forest Management Plan has been submitted for regulatory approval.");
   
   // Calculate approval outcome
@@ -576,7 +576,7 @@ async function handle_fmp_approval_process(state, write, terminal, input) {
   const cert_bonus = Math.min(0.1, state.get_active_certifications().length * 0.05);
   approval_chance += cert_bonus;
   
-  write(`\\n📊 Final Approval Likelihood: ${(approval_chance * 100).toFixed(1)}%`);
+  write(`\n📊 Final Approval Likelihood: ${(approval_chance * 100).toFixed(1)}%`);
   
   const approval_options = [
     "📋 Submit plan for formal approval",
@@ -608,7 +608,7 @@ async function process_fmp_approval(state, write, approval_chance) {
   const approved = Math.random() < approval_chance;
   
   if (approved) {
-    write("\\n🎉 FOREST MANAGEMENT PLAN APPROVED!");
+    write("\n🎉 FOREST MANAGEMENT PLAN APPROVED!");
     write("✅ Your 20-year FMP has received government approval");
     write("📋 Plan is now legally binding and operational");
     
@@ -620,14 +620,14 @@ async function process_fmp_approval(state, write, approval_chance) {
     state.reputation += 0.15;
     state.annual_allowable_cut *= 1.1; // 10% AAC increase
     
-    write("\\n📈 BENEFITS ACTIVATED:");
+    write("\n📈 BENEFITS ACTIVATED:");
     write("  • +20% permit approval rates");
     write("  • +15% company reputation");
     write("  • +10% Annual Allowable Cut");
     write("  • Access to sustainable forestry markets");
     
   } else {
-    write("\\n❌ FOREST MANAGEMENT PLAN CONDITIONAL APPROVAL");
+    write("\n❌ FOREST MANAGEMENT PLAN CONDITIONAL APPROVAL");
     
     const issues = [
       "Additional First Nations consultation required",
@@ -645,7 +645,7 @@ async function process_fmp_approval(state, write, approval_chance) {
     fmp.approval_likelihood += 0.3; // Higher chance on resubmission
     
     // Offer to address issues
-    write("\\nOptions:");
+    write("\nOptions:");
     write("1. Pay to address issues and resubmit");
     write("2. Appeal the decision (longer process, same cost)");
     write("3. Accept limited approval (reduced benefits)");
@@ -656,7 +656,7 @@ async function process_fmp_approval(state, write, approval_chance) {
  * Request plan modifications to improve approval chances
  */
 async function request_plan_modifications(state, write, terminal, input) {
-  write("\\n🔧 PLAN MODIFICATION OPTIONS");
+  write("\n🔧 PLAN MODIFICATION OPTIONS");
   write("Available modifications to improve approval likelihood:");
   
   const modification_options = [
@@ -698,7 +698,7 @@ async function request_plan_modifications(state, write, terminal, input) {
 async function handle_fmp_implementation(state, write, terminal, input) {
   const fmp = state.forest_management_plan;
   
-  write("\\n🚀 FMP IMPLEMENTATION PHASE");
+  write("\n🚀 FMP IMPLEMENTATION PHASE");
   write("Implementing approved Forest Management Plan across operations.");
   
   // Implementation activities
@@ -710,7 +710,7 @@ async function handle_fmp_implementation(state, write, terminal, input) {
     "Adaptive management framework setup"
   ];
   
-  write("\\n📋 Implementation Activities:");
+  write("\n📋 Implementation Activities:");
   impl_activities.forEach(activity => {
     write(`  ✅ ${activity}`);
   });
@@ -721,15 +721,15 @@ async function handle_fmp_implementation(state, write, terminal, input) {
   if (impl_progress >= 1.0) {
     fmp.status = "ACTIVE";
     fmp.current_phase = "MONITORING";
-    write("\\n🎯 FMP IMPLEMENTATION COMPLETE!");
+    write("\n🎯 FMP IMPLEMENTATION COMPLETE!");
     write("✅ Forest Management Plan is now fully operational");
     write("📊 Beginning 5-year monitoring and adaptive management cycle");
     
     // Full benefits now active
     fmp.annual_management_cost = 50000;
-    write(`\\n💰 Annual FMP management cost: ${formatCurrency(fmp.annual_management_cost)}`);
+    write(`\n💰 Annual FMP management cost: ${formatCurrency(fmp.annual_management_cost)}`);
   } else {
-    write(`\\n📊 Implementation Progress: ${(impl_progress * 100).toFixed(1)}%`);
+    write(`\n📊 Implementation Progress: ${(impl_progress * 100).toFixed(1)}%`);
     fmp.phase_progress++;
   }
 }
@@ -740,7 +740,7 @@ async function handle_fmp_implementation(state, write, terminal, input) {
 async function manage_active_fmp(state, write, terminal, input) {
   const fmp = state.forest_management_plan;
   
-  write("\\n🌲 ACTIVE FOREST MANAGEMENT PLAN");
+  write("\n🌲 ACTIVE FOREST MANAGEMENT PLAN");
   write(`📅 Plan Year: ${state.year - fmp.plan_started_year + 1} of 20`);
   write(`⭐ Plan Performance: ${(fmp.quality_score * 100).toFixed(1)}%`);
   write(`💰 Annual Management Cost: ${formatCurrency(fmp.annual_management_cost)}`);
@@ -793,7 +793,7 @@ async function annual_fmp_review(state, write, terminal, input) {
   const fmp = state.forest_management_plan;
   const plan_age = state.year - fmp.plan_started_year;
   
-  write("\\n📋 ANNUAL FMP PERFORMANCE REVIEW");
+  write("\n📋 ANNUAL FMP PERFORMANCE REVIEW");
   
   // Deduct annual management costs
   if (state.budget >= fmp.annual_management_cost) {
@@ -807,7 +807,7 @@ async function annual_fmp_review(state, write, terminal, input) {
   
   // Plan renewal considerations (every 5 years minimum)
   if (plan_age >= 5 && plan_age % 5 === 0) {
-    write("\\n🔄 FMP RENEWAL OPPORTUNITY");
+    write("\n🔄 FMP RENEWAL OPPORTUNITY");
     write("Your Forest Management Plan is eligible for renewal/revision.");
     write("Benefits of renewal:");
     write("  • Updated to current scientific standards");

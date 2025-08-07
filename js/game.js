@@ -4,7 +4,7 @@ import { EventsRouter } from "./events.js";
 import { process_permits, strategic_permit_submission } from "./permits.js";
 import { ongoing_first_nations_consultation } from "./firstNations.js";
 import { certification_opportunities, maintain_certifications } from "./certification.js";
-import { illegal_opportunities, ongoing_criminal_consequences, continue_illegal_operations } from "./illegalActivities.js";
+import { random_illegal_opportunities_event, ongoing_criminal_consequences, continue_illegal_operations } from "./illegalActivities.js";
 import { quarterly_wacky_events } from "./wackyEvents.js";
 import { liaison_management } from "./liaison.js";
 import { ceo_management, pay_ceo_annual_costs, ceo_automated_decisions, ceo_quarterly_report } from "./ceo.js";
@@ -132,6 +132,9 @@ class Game {
     
     // Workplace safety incidents
     await workplace_safety_incidents(this.state, this.write.bind(this), this.terminal, this.input);
+    
+    // Random illegal opportunities event
+    await random_illegal_opportunities_event(this.state, this.write.bind(this), this.terminal, this.input);
     
     // Competitive market events
     await competitive_market_events(this.state, this.write.bind(this), this.terminal, this.input);

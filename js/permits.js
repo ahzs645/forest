@@ -240,7 +240,7 @@ export async function strategic_permit_submission(state, write, terminal, input)
   }
 
   write(`📈 Current government backlog: ${state.permit_backlog_days} days average`);
-  write("\\n📊 Available blocks for permit application:");
+  write("\n📊 Available blocks for permit application:");
 
   // Enhanced risk assessment
   const analyzed_blocks = blocks_to_submit.map((block, i) => {
@@ -252,7 +252,7 @@ export async function strategic_permit_submission(state, write, terminal, input)
     if (analysis.complexity_factors.length > 0) {
       write(`     Issues: ${analysis.complexity_factors.join(", ")}`);
     }
-    write(`     Est. Processing: ${analysis.processing_time} days\\n`);
+    write(`     Est. Processing: ${analysis.processing_time} days\n`);
     
     return { block, analysis, index: i };
   });
@@ -268,7 +268,7 @@ export async function strategic_permit_submission(state, write, terminal, input)
     "❌ Skip permit submissions this quarter"
   ];
 
-  const choice = await askChoice("\\nChoose your permit strategy:", strategies, terminal, input);
+  const choice = await askChoice("\nChoose your permit strategy:", strategies, terminal, input);
 
   let blocks_to_process = [];
   
@@ -316,7 +316,7 @@ export async function strategic_permit_submission(state, write, terminal, input)
  * Select application quality level
  */
 async function selectApplicationQuality(blocks, state, write, terminal, input) {
-  write("\\n--- 📄 APPLICATION QUALITY SELECTION ---");
+  write("\n--- 📄 APPLICATION QUALITY SELECTION ---");
   write("Higher quality applications cost more but have better approval chances:");
   
   const quality_options = Object.entries(APPLICATION_QUALITY_TIERS).map(([, tier]) => 
@@ -335,7 +335,7 @@ async function selectApplicationQuality(blocks, state, write, terminal, input) {
     block.application_quality = quality_key;
   }
   
-  write(`\\n💰 Total application cost: ${formatCurrency(total_cost)}`);
+  write(`\n💰 Total application cost: ${formatCurrency(total_cost)}`);
   write(`📊 Blocks selected: ${blocks.length}`);
   write(`📈 Total volume: ${formatVolume(blocks.reduce((sum, b) => sum + b.volume_m3, 0))}`);
   
@@ -368,7 +368,7 @@ async function selectApplicationQuality(blocks, state, write, terminal, input) {
  * Custom block selection interface
  */
 async function customBlockSelection(analyzed_blocks, capacity, write, terminal, input) {
-  write("\\n--- 🎯 CUSTOM BLOCK SELECTION ---");
+  write("\n--- 🎯 CUSTOM BLOCK SELECTION ---");
   write(`Select up to ${capacity} blocks by number (e.g., "1 3 5"):`);
   
   const selection = await ask("> ", terminal, input);
@@ -394,7 +394,7 @@ async function customBlockSelection(analyzed_blocks, capacity, write, terminal, 
  * Display detailed analysis without submitting
  */
 async function displayDetailedAnalysis(analyzed_blocks, write) {
-  write("\\n--- 📊 DETAILED PERMIT ANALYSIS ---");
+  write("\n--- 📊 DETAILED PERMIT ANALYSIS ---");
   
   const risk_summary = {
     low: analyzed_blocks.filter(item => item.analysis.risk_score <= 3).length,
@@ -500,7 +500,7 @@ export async function process_permits(state, write, terminal, input) {
     // Show processing status for pending applications
     const in_process = pending_blocks.filter(b => b.permit_submitted > 0);
     if (in_process.length > 0) {
-      write("\\n📋 Applications in process:");
+      write("\n📋 Applications in process:");
       for (const block of in_process) {
         const years_elapsed = state.year - block.permit_submitted;
         const quarters_elapsed = (years_elapsed * 4) + (state.quarter - (block.permit_quarter_submitted || 1));

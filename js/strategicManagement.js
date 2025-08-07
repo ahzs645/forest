@@ -177,7 +177,7 @@ export async function strategic_management_decisions(state, write, terminal, inp
   
   // Show active initiatives
   if (sm.active_initiatives.length > 0) {
-    write("\\n📋 Active Initiatives:");
+    write("\n📋 Active Initiatives:");
     sm.active_initiatives.forEach(initiative => {
       const progress = Math.min(100, (initiative.progress / initiative.duration) * 100);
       write(`  🔄 ${initiative.name}: ${progress.toFixed(0)}% complete`);
@@ -249,7 +249,7 @@ function progressActiveInitiatives(state) {
   sm.active_initiatives = sm.active_initiatives.filter(init => !completed.includes(init));
   
   if (completed.length > 0) {
-    write(`\\n✅ Completed Initiatives: ${completed.map(i => i.name).join(", ")}`);
+    write(`\n✅ Completed Initiatives: ${completed.map(i => i.name).join(", ")}`);
   }
 }
 
@@ -352,7 +352,7 @@ async function executeManagementActivity(state, write, terminal, input, activity
     return;
   }
   
-  write(`\\n🎯 INITIATING: ${activity.name.toUpperCase()}`);
+  write(`\n🎯 INITIATING: ${activity.name.toUpperCase()}`);
   write(`💰 Cost: ${formatCurrency(activity.cost)}`);
   write(`⏱️  Duration: ${activity.duration} quarter${activity.duration > 1 ? 's' : ''}`);
   write(`📋 ${activity.description}`);
@@ -406,7 +406,7 @@ async function executeManagementActivity(state, write, terminal, input, activity
  * Display effects of completed activity
  */
 function displayActivityEffects(effects, write) {
-  write("\\n📈 BENEFITS GAINED:");
+  write("\n📈 BENEFITS GAINED:");
   Object.entries(effects).forEach(([effect, value]) => {
     const displayValue = (value * 100).toFixed(1);
     const effectName = effect.replace(/_/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase());
@@ -516,7 +516,7 @@ async function delegateToCSO(state, write, terminal, input) {
     return;
   }
   
-  write("\\n👔 CEO DELEGATION");
+  write("\n👔 CEO DELEGATION");
   write(`Delegate management tasks to ${state.ceo.name}`);
   write(`CEO Effectiveness: ${(state.ceo.effectiveness * 100).toFixed(0)}%`);
   
@@ -569,13 +569,13 @@ async function delegateToCSO(state, write, terminal, input) {
 async function companyPerformanceReview(state, write) {
   const sm = state.strategic_management;
   
-  write("\\n📊 COMPANY PERFORMANCE REVIEW");
+  write("\n📊 COMPANY PERFORMANCE REVIEW");
   write(`🎯 Management Effectiveness: ${(sm.management_effectiveness * 100).toFixed(1)}%`);
   write(`📈 Initiative Success Rate: ${(sm.initiative_success_rate * 100).toFixed(1)}%`);
   write(`✅ Completed Initiatives: ${sm.completed_initiatives.length}`);
   write(`🔄 Active Initiatives: ${sm.active_initiatives.length}`);
   
-  write("\\n🏆 STRATEGIC BONUSES ACTIVE:");
+  write("\n🏆 STRATEGIC BONUSES ACTIVE:");
   Object.entries(sm.bonuses).forEach(([bonus, value]) => {
     if (value > 0) {
       const bonusName = bonus.replace(/_/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase());
@@ -584,7 +584,7 @@ async function companyPerformanceReview(state, write) {
   });
   
   // Performance recommendations
-  write("\\n💡 PERFORMANCE RECOMMENDATIONS:");
+  write("\n💡 PERFORMANCE RECOMMENDATIONS:");
   if (sm.quarterly_actions_used / sm.quarterly_actions_available < 0.5) {
     write("  • Consider more aggressive management approach");
   }

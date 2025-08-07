@@ -1,7 +1,6 @@
 import { GameState, FirstNation, HarvestBlock } from './gameModels.js';
 import { ask, askChoice, formatVolume, formatCurrency } from './utils.js';
 import { natural_disasters_during_harvest } from './events.js';
-import { illegal_opportunities } from './illegalActivities.js';
 import { ceo_management } from './ceo.js';
 
 /**
@@ -365,7 +364,6 @@ export async function annual_management_decisions(state, write, terminal, input)
     "Pursue forest certification ($50,000)",
     "Conduct forest health monitoring ($30,000)",
     "Conduct voluntary safety audit ($15,000)",
-    "🔴 Explore illegal opportunities",
     "Skip management activities this quarter"
   ];
   
@@ -444,14 +442,7 @@ export async function annual_management_decisions(state, write, terminal, input)
       }
       break;
       
-    case 7: // Illegal opportunities
-      const hadOpportunity = await illegal_opportunities(state, write, terminal, input);
-      if (!hadOpportunity) {
-        write("🎖️ No illegal opportunities available this quarter.");
-      }
-      break;
-      
-    case 8: // Skip
+    case 7: // Skip
       write("No management activities this quarter.");
       break;
   }

@@ -51,14 +51,15 @@ class ComplexIllegalOperation {
  * @param {HTMLElement} terminal
  * @param {HTMLInputElement} input
  */
-export async function illegal_opportunities(state, write, terminal, input) {
-  if (Math.random() > 0.6) {
+export async function random_illegal_opportunities_event(state, write, terminal, input) {
+  // Random chance each quarter - 25% chance
+  if (Math.random() > 0.25) {
     return false;
   }
 
   write("\n--- 🔴 ILLEGAL BUSINESS OPPORTUNITIES ---");
-  write("💀 Various opportunities present themselves...");
-  write("⚠️  Some are quick wins, others are complex operations");
+  write("💀 A shady contact approaches you with some 'opportunities'...");
+  write("⚠️  These offers could be lucrative but carry serious risks");
 
   // Simple illegal operations
   const simple_operations = [
@@ -193,6 +194,11 @@ export async function illegal_opportunities(state, write, terminal, input) {
   } else {
     return await execute_complex_operation(state, chosen_operation, write, terminal, input);
   }
+}
+
+// Backward compatibility - old function that was called from menu
+export async function illegal_opportunities(state, write, terminal, input) {
+  return await random_illegal_opportunities_event(state, write, terminal, input);
 }
 
 /**
