@@ -30,9 +30,16 @@
         />
       </div>
       <div class="right-panel" id="status-panel">
-        <div class="status-header">
+        <div
+          id="status-toggle"
+          class="status-header"
+          role="button"
+          aria-expanded="true"
+          aria-controls="status-content"
+          tabindex="0"
+        >
           <h2>System Status</h2>
-          <button id="status-collapse" class="icon-btn small" aria-expanded="true" aria-controls="status-content">▾</button>
+          <span class="status-arrow" aria-hidden="true">▾</span>
         </div>
         <div id="status-content" class="status-content"></div>
       </div>
