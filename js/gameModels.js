@@ -152,6 +152,11 @@ export class GameState {
     this.consecutive_profitable_years = 0;
     this.social_license_maintained = true;
 
+    // Community & story progression
+    this.community_support = 0.5; // 0-1 scale
+    this.story_stage = 0;
+    this.story_branch = null;
+
     // First Nations liaison and CEO
     this.fn_liaison = null;
     this.ceo = null;
