@@ -149,22 +149,37 @@ export function conduct_harvest_operations(state, write) {
   }
 
   write("--- HARVEST OPERATIONS ---");
-  const volume_loss_factor = natural_disasters_during_harvest(state, approved_blocks, write);
+  natural_disasters_during_harvest(state, approved_blocks, write);
+
   let total_volume = 0;
+  let total_revenue = 0;
+  const harvest_details = {
+    sawlogs: { volume: 0, revenue: 0 },
+    pulp: { volume: 0, revenue: 0 },
+    firewood: { volume: 0, revenue: 0 },
+  };
+
   for (const block of approved_blocks) {
     let effective_volume = block.volume_m3;
     if (block.disaster_affected) {
-      effective_volume *= 1 - block.volume_loss_percent;
+      effective_volume *= (1 - block.volume_loss_percent);
     }
     total_volume += effective_volume;
+
+    for (const grade in block.log_grade_distribution) {
+      const grade_volume = effective_volume * block.log_grade_distribution[grade];
+      const grade_revenue = grade_volume * state.log_prices[grade];
+      harvest_details[grade].volume += grade_volume;
+      harvest_details[grade].revenue += grade_revenue;
+      total_revenue += grade_revenue;
+    }
   }
 
-  const revenue = total_volume * state.revenue_per_m3;
   const costs = total_volume * state.operating_cost_per_m3;
-  const net_profit = revenue - costs;
+  const net_profit = total_revenue - costs;
 
   state.budget += net_profit;
-  state.total_revenue += revenue;
+  state.total_revenue += total_revenue;
   state.total_costs += costs;
   state.quarterly_profit = net_profit;
 
@@ -174,14 +189,160 @@ export function conduct_harvest_operations(state, write) {
     state.consecutive_profitable_years = 0;
   }
 
-  write(`Harvested ${formatVolume(total_volume)}`);
-  write(`Revenue: ${formatVolume(revenue)}`);
-  write(`Costs: ${formatVolume(costs)}`);
-  write(`Net profit: ${formatVolume(net_profit)}`);
+  write(`TOTAL HARVESTED: ${formatVolume(total_volume)}`);
+  write("--- Grade Breakdown ---");
+  for (const grade in harvest_details) {
+    if (harvest_details[grade].volume > 0) {
+      write(`  ${grade.charAt(0).toUpperCase() + grade.slice(1)}: ${formatVolume(harvest_details[grade].volume)} -> ${formatCurrency(harvest_details[grade].revenue)}`);
+    }
+  }
+  write("-----------------------");
+  write(`Total Revenue: ${formatCurrency(total_revenue)}`);
+  write(`Operating Costs: ${formatCurrency(costs)}`);
+  write(`Net Profit: ${formatCurrency(net_profit)}`);
 
   state.harvest_blocks = state.harvest_blocks.filter(
     (b) => b.permit_status !== "approved"
   );
+}
+
+/**
+ * Handle First Nations engagement options.
+ * @param {GameState} state
+ * @param {(text: string) => void} write
+ * @param {HTMLElement} terminal
+ * @param {HTMLInputElement} input
+ */
+async function handle_first_nations_engagement(state, write, terminal, input) {
+  write("\n--- FIRST NATIONS ENGAGEMENT ---");
+  const engagement_options = [
+    "Community contribution ($25,000)",
+    "Offer Revenue Sharing (5% of quarterly profit)",
+    "Fund a Guardian Program ($100,000)",
+    "Cancel"
+  ];
+
+  const choice = await askChoice(
+    "Choose an engagement strategy:",
+    engagement_options,
+    terminal,
+    input
+  );
+
+  switch (choice) {
+    case 0: // Community contribution
+      if (state.budget >= 25000) {
+        state.budget -= 25000;
+        state.first_nations.forEach(fn => {
+          fn.relationship_level = Math.min(1.0, fn.relationship_level + 0.05);
+        });
+        write("💰 Made a community contribution. Relationship with all nations slightly improved.");
+      } else {
+        write("Insufficient funds for a community contribution.");
+      }
+      break;
+    case 1: // Revenue Sharing
+      // This is a policy decision that will affect future profits.
+      // For simplicity, we'll represent this as a one-time larger relationship boost and reputation gain.
+      // A more complex implementation could track this as an ongoing commitment.
+      if (state.quarterly_profit > 0) {
+        const share = state.quarterly_profit * 0.05;
+        if (state.budget >= share) {
+            state.budget -= share;
+            state.first_nations.forEach(fn => {
+                fn.relationship_level = Math.min(1.0, fn.relationship_level + 0.15);
+            });
+            state.reputation += 0.1;
+            write(`💸 Shared ${formatCurrency(share)} with First Nations. Relationship and reputation significantly improved.`);
+        } else {
+            write("Insufficient funds to cover the revenue share this quarter.");
+        }
+      } else {
+        write("No profits to share this quarter.");
+      }
+      break;
+    case 2: // Guardian Program
+      if (state.budget >= 100000) {
+        state.budget -= 100000;
+        state.first_nations.forEach(fn => {
+          fn.relationship_level = Math.min(1.0, fn.relationship_level + 0.1);
+        });
+        state.reputation += 0.15;
+        write("🌳 Funded a Guardian Program. Relationships and reputation improved significantly.");
+      } else {
+        write("Insufficient funds to establish a Guardian Program.");
+      }
+      break;
+    case 3: // Cancel
+      write("No action taken on First Nations engagement.");
+      break;
+  }
+}
+
+/**
+ * Handle Silviculture investment options.
+ * @param {GameState} state
+ * @param {(text: string) => void} write
+ * @param {HTMLElement} terminal
+ * @param {HTMLInputElement} input
+ */
+async function handle_silviculture_investments(state, write, terminal, input) {
+    write("\n--- SILVICULTURE INVESTMENTS ---");
+    const investment_options = [
+        "Basic Reforestation ($50,000)",
+        "Enhanced Silviculture ($150,000)",
+        "Fertilization Trial ($75,000)",
+        "Cancel"
+    ];
+
+    const choice = await askChoice(
+        "Choose a silviculture investment:",
+        investment_options,
+        terminal,
+        input
+    );
+
+    switch (choice) {
+        case 0: // Basic Reforestation
+            if (state.budget >= 50000) {
+                state.budget -= 50000;
+                state.aac_decline_rate = Math.max(0, state.aac_decline_rate - 0.005);
+                write("🌲 Basic reforestation funded. Future AAC decline slightly reduced.");
+            } else {
+                write("Insufficient funds for reforestation.");
+            }
+            break;
+        case 1: // Enhanced Silviculture
+            if (state.budget >= 150000) {
+                state.budget -= 150000;
+                state.aac_decline_rate = Math.max(0, state.aac_decline_rate - 0.015);
+                state.reputation += 0.05;
+                write("🌳 Enhanced silviculture program initiated. AAC decline significantly reduced and reputation improved.");
+            } else {
+                write("Insufficient funds for enhanced silviculture.");
+            }
+            break;
+        case 2: // Fertilization Trial
+            if (state.budget >= 75000) {
+                state.budget -= 75000;
+                if (Math.random() < 0.6) {
+                    // Positive outcome
+                    state.log_prices.sawlogs *= 1.05; // Simulate higher quality timber in future
+                    state.reputation += 0.02;
+                    write("📈 Fertilization trial successful! Future sawlog quality expected to increase slightly.");
+                } else {
+                    // Negative outcome
+                    state.reputation -= 0.1;
+                    write("📉 Fertilization trial resulted in unexpected ecological damage. Reputation harmed.");
+                }
+            } else {
+                write("Insufficient funds for a fertilization trial.");
+            }
+            break;
+        case 3: // Cancel
+            write("No silviculture investments made.");
+            break;
+    }
 }
 
 /**
@@ -198,8 +359,9 @@ export async function annual_management_decisions(state, write, terminal, input)
   
   const managementOptions = [
     "Focus on permit applications",
-    "First Nations relationship building ($25,000)",
+    "Engage with First Nations",
     "CEO management and hiring",
+    "Silviculture Investments",
     "Pursue forest certification ($50,000)",
     "Conduct forest health monitoring ($30,000)",
     "Conduct voluntary safety audit ($15,000)",
@@ -230,22 +392,18 @@ export async function annual_management_decisions(state, write, terminal, input)
       break;
       
     case 1: // First Nations relationship
-      if (state.budget >= 25000) {
-        state.budget -= 25000;
-        state.first_nations.forEach(fn => {
-          fn.relationship_level = Math.min(1.0, fn.relationship_level + 0.1);
-        });
-        write("🤝 Invested in First Nations relationship building");
-      } else {
-        write("Insufficient funds for relationship building.");
-      }
+      await handle_first_nations_engagement(state, write, terminal, input);
       break;
       
     case 2: // CEO management
       await ceo_management(state, write, terminal, input);
       break;
+
+    case 3: // Silviculture Investments
+      await handle_silviculture_investments(state, write, terminal, input);
+      break;
       
-    case 3: // Forest certification
+    case 4: // Forest certification
       if (state.budget >= 50000 && !state.certifications.includes("FSC")) {
         state.budget -= 50000;
         if (Math.random() < 0.7) {
@@ -262,7 +420,7 @@ export async function annual_management_decisions(state, write, terminal, input)
       }
       break;
       
-    case 4: // Forest health monitoring
+    case 5: // Forest health monitoring
       if (state.budget >= 30000) {
         state.budget -= 30000;
         state.reputation += 0.05;
@@ -272,7 +430,7 @@ export async function annual_management_decisions(state, write, terminal, input)
       }
       break;
       
-    case 5: // Safety audit
+    case 6: // Safety audit
       if (state.budget >= 15000) {
         state.budget -= 15000;
         if (state.safety_violations > 0) {
@@ -286,14 +444,14 @@ export async function annual_management_decisions(state, write, terminal, input)
       }
       break;
       
-    case 6: // Illegal opportunities
+    case 7: // Illegal opportunities
       const hadOpportunity = await illegal_opportunities(state, write, terminal, input);
       if (!hadOpportunity) {
         write("🎖️ No illegal opportunities available this quarter.");
       }
       break;
       
-    case 7: // Skip
+    case 8: // Skip
       write("No management activities this quarter.");
       break;
   }
