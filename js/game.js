@@ -11,6 +11,7 @@ import { ceo_management, pay_ceo_annual_costs, ceo_automated_decisions, ceo_quar
 import { random_first_nations_anger_events, check_anger_event_triggers } from "./firstNationsAnger.js";
 import { workplace_safety_incidents, ongoing_safety_consequences } from "./workplaceSafety.js";
 import { ask, formatCurrency, formatVolume } from "./utils.js";
+import { story_progression } from "./storyEvents.js";
 
 class Game {
   constructor() {
@@ -91,6 +92,7 @@ class Game {
       this.write("🌱 SPRING: Planning and permit season begins!");
       await this.eventsRouter.random_policy_events(this.state, this.write.bind(this), this.terminal, this.input);
       await ongoing_first_nations_consultation(this.state, this.write.bind(this), this.terminal, this.input);
+      await story_progression(this.state, this.write.bind(this), this.terminal, this.input);
       await plan_harvest_schedule(this.state, this.write.bind(this), this.terminal, this.input);
     } else if (this.state.quarter === 2) {
       this.write("☀️ SUMMER: Prime harvesting season!");
@@ -129,7 +131,8 @@ class Game {
     await workplace_safety_incidents(this.state, this.write.bind(this), this.terminal, this.input);
     
     // First Nations anger events
-    if (check_anger_event_triggers(this.state) || Math.random() < 0.25) {
+    const angerChance = Math.max(0.05, 0.25 - this.state.community_support * 0.15);
+    if (check_anger_event_triggers(this.state) || Math.random() < angerChance) {
       await random_first_nations_anger_events(this.state, this.write.bind(this), this.terminal, this.input);
     }
     
@@ -171,6 +174,7 @@ class Game {
     const quarter_names = ["", "Spring", "Summer", "Fall", "Winter"];
     const budgetColor = this.state.budget < 0 ? "style='color: #ff0000'" : "";
     const repColor = this.state.reputation < 0.3 ? "style='color: #ff9900'" : "";
+    const communityColor = this.state.community_support < 0.3 ? "style='color: #ff9900'" : "";
     
     this.statusPanel.innerHTML = `
       <div class="info-item">
@@ -184,6 +188,9 @@ class Game {
       </div>
       <div class="info-item">
         <span class="info-label">REPUTATION:</span> <span class="info-value" ${repColor}>${(this.state.reputation * 100).toFixed(0)}%</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">COMMUNITY SUPPORT:</span> <span class="info-value" ${communityColor}>${(this.state.community_support * 100).toFixed(0)}%</span>
       </div>
       <div class="info-item">
         <span class="info-label">AAC:</span> <span class="info-value">${formatVolume(this.state.annual_allowable_cut)}</span>

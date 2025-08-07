@@ -246,11 +246,14 @@ export function check_anger_event_triggers(state) {
   
   // Check for recent violations or issues
   const hasRecentViolations = state.safety_violations > 2 || state.criminal_convictions > 0;
-  
+
   // Check if harvesting without proper consultation
-  const lackOfConsultation = state.harvest_blocks.some(block => 
+  const lackOfConsultation = state.harvest_blocks.some(block =>
     block.permit_status === "approved" && !block.fn_consulted
   );
-  
-  return hasAngryNation || hasRecentViolations || lackOfConsultation;
+
+  // Low community support can also trigger anger events
+  const lowCommunitySupport = state.community_support < 0.3;
+
+  return hasAngryNation || hasRecentViolations || lackOfConsultation || lowCommunitySupport;
 }
