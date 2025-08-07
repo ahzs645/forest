@@ -82,6 +82,11 @@ export function askChoiceWithButtons(question, options, terminal, input) {
     input.style.display = 'none';
     buttonContainer.style.display = 'flex';
     buttonContainer.innerHTML = '';
+
+    const questionHeader = document.createElement('div');
+    questionHeader.className = 'button-question';
+    questionHeader.textContent = question;
+    buttonContainer.appendChild(questionHeader);
     
     const handleChoice = (index) => {
       // Show the user's choice in terminal

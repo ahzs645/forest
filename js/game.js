@@ -22,10 +22,12 @@ class Game {
     this.terminal = document.getElementById("terminal");
     this.input = document.getElementById("input");
     this.statusPanel = document.getElementById("status-content");
+    this.statusToggle = document.getElementById("status-toggle");
     this.enable_wacky_events = false;
     this.eventsRouter = new EventsRouter();
     this.mobileHud = document.getElementById("mobile-hud");
     this._bindSettingsUI();
+    this._bindStatusToggle();
   }
 
   async start() {
@@ -295,6 +297,32 @@ class Game {
     sizeSmall?.addEventListener('click', () => setSize('small'));
     sizeMedium?.addEventListener('click', () => setSize('medium'));
     sizeLarge?.addEventListener('click', () => setSize('large'));
+  }
+
+  _bindStatusToggle() {
+    const toggle = this.statusToggle;
+    const content = this.statusPanel;
+    if (!toggle || !content) return;
+    const arrow = toggle.querySelector('.status-arrow');
+
+    const collapse = () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', (!expanded).toString());
+      content.style.display = expanded ? 'none' : 'block';
+      if (arrow) arrow.textContent = expanded ? '▸' : '▾';
+    };
+
+    toggle.addEventListener('click', collapse);
+    toggle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        collapse();
+      }
+    });
+
+    if (window.innerWidth <= 768) {
+      collapse();
+    }
   }
 }
 
