@@ -195,6 +195,16 @@ class Game {
       <div class="info-item">
         <span class="info-label">CEO:</span> <span class="info-value">${this.state.ceo.name}</span>
       </div>` : ''}
+      <hr>
+      <div class="info-item">
+        <span class="info-label">LOG PRICES:</span>
+      </div>
+      ${Object.entries(this.state.log_prices).map(([grade, price]) => `
+        <div class="info-item" style="margin-left: 15px;">
+          <span class="info-label">${grade.charAt(0).toUpperCase() + grade.slice(1)}:</span>
+          <span class="info-value">${formatCurrency(price)}/m³</span>
+        </div>
+      `).join('')}
     `;
   }
 }

@@ -40,6 +40,7 @@ export class HarvestBlock {
     disaster_type = null,
     volume_loss_percent = 0.0,
     fn_consulted = false,
+    log_grade_distribution = { sawlogs: 0.6, pulp: 0.3, firewood: 0.1 },
   }) {
     this.id = id;
     this.volume_m3 = volume_m3;
@@ -55,6 +56,7 @@ export class HarvestBlock {
     this.disaster_type = disaster_type;
     this.volume_loss_percent = volume_loss_percent;
     this.fn_consulted = fn_consulted;
+    this.log_grade_distribution = log_grade_distribution;
   }
 }
 
@@ -136,7 +138,11 @@ export class GameState {
     this.permit_backlog_days = 120;
 
     // Economic tracking
-    this.revenue_per_m3 = 85; // CAD
+    this.log_prices = {
+      sawlogs: 120, // $/m3
+      pulp: 60,     // $/m3
+      firewood: 30  // $/m3
+    };
     this.operating_cost_per_m3 = 45;
     this.total_revenue = 0;
     this.total_costs = 0;

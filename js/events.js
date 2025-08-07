@@ -227,18 +227,28 @@ export function forest_health_monitoring(state, write) {
 }
 
 /**
- * Handle market price fluctuations.
+ * Handle market price fluctuations for different log grades.
  * @param {import("./gameModels.js").GameState} state
  * @param {(text: string) => void} write
  */
 export function market_fluctuations(state, write) {
-    const price_change = Math.random() * 0.3 - 0.15; // ±15%
+    write("--- MARKET UPDATE ---");
+    const base_change = (Math.random() * 0.4 - 0.2); // Base market trend between -20% and +20%
 
-    if (Math.abs(price_change) > 0.05) {
-        const old_price = state.revenue_per_m3;
-        state.revenue_per_m3 = Math.floor(state.revenue_per_m3 * (1 + price_change));
-        const direction = price_change > 0 ? "increased" : "decreased";
-        write("MARKET UPDATE: Lumber prices " + direction);
-        write(`   Price: ${formatCurrency(old_price)}/m³ → ${formatCurrency(state.revenue_per_m3)}/m³ (${(price_change * 100).toFixed(1)}%)`);
+    for (const grade in state.log_prices) {
+        const grade_volatility = { sawlogs: 0.15, pulp: 0.1, firewood: 0.05 }[grade];
+        const specific_change = (Math.random() * grade_volatility * 2) - grade_volatility; // Add some specific randomness
+        const total_change = base_change + specific_change;
+
+        if (Math.abs(total_change) > 0.03) { // Only report significant changes
+            const old_price = state.log_prices[grade];
+            const new_price = Math.max(10, Math.round(old_price * (1 + total_change)));
+            state.log_prices[grade] = new_price;
+
+            const direction = total_change > 0 ? "increased" : "decreased";
+            const grade_name = grade.charAt(0).toUpperCase() + grade.slice(1);
+            write(`${grade_name} prices have ${direction}.`);
+            write(`   ${formatCurrency(old_price)}/m³ → ${formatCurrency(new_price)}/m³ (${(total_change * 100).toFixed(1)}%)`);
+        }
     }
 }
