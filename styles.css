@@ -12,6 +12,11 @@ body {
   overflow: hidden;
 }
 
+/* Text size controls */
+body[data-text-size="small"] .terminal { font-size: 14px; }
+body[data-text-size="medium"] .terminal { font-size: 16px; }
+body[data-text-size="large"] .terminal { font-size: 18px; }
+
 .game-container {
   display: flex;
   width: 100%;
@@ -29,6 +34,43 @@ body {
   position: relative;
 }
 
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #00ff00;
+  background: linear-gradient(180deg, #001100, #000);
+}
+.brand {
+  color: #00ff88;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+.icon-btn {
+  background: #000;
+  border: 1px solid #00ff00;
+  color: #00ff00;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.icon-btn:hover { background: #001100; box-shadow: 0 0 6px #00ff00; }
+
+.mobile-hud {
+  display: none;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px dashed #00ff00;
+  background: #000;
+  grid-template-columns: repeat(4, 1fr);
+}
+.mobile-hud .hud-item {
+  color: #00ff88;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .right-panel {
   width: 300px;
   padding: 1em;
@@ -41,7 +83,7 @@ body {
 .terminal {
   background: #000;
   color: #00ff00;
-  padding: 20px;
+  padding: 16px 20px;
   overflow-y: auto;
   white-space: pre-wrap;
   flex: 1;
@@ -67,7 +109,7 @@ body {
 }
 
 .terminal::before {
-  content: "BC FORESTRY SIMULATOR";
+  content: "FORESTRY TRAIL";
   display: block;
   color: #00ff00;
   margin-bottom: 20px;
@@ -169,6 +211,8 @@ h2 {
     font-size: 14px;
     padding: 10px;
   }
+
+  .mobile-hud { display: grid; }
   
   #input {
     font-size: 16px; /* Keep at 16px to prevent zoom on iOS */
@@ -255,6 +299,48 @@ h2 {
   transform: translateY(0);
   box-shadow: 0 0 4px #00ff00;
 }
+
+/* Settings panel */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.settings-overlay.show { opacity: 1; pointer-events: auto; }
+
+.settings-panel {
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  width: 280px;
+  background: #000;
+  border: 1px solid #00ff00;
+  box-shadow: 0 0 12px #00ff00;
+  padding: 12px;
+  display: none;
+  z-index: 10;
+}
+.settings-panel.open { display: block; }
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.settings-group { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.pill { border: 1px solid #00ff00; background: #000; color:#00ff00; padding: 6px 10px; border-radius: 999px; cursor:pointer; }
+.pill:hover { background:#001100; }
+
+/* Toggle switch */
+.switch { position: relative; display: inline-block; width: 42px; height: 22px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #001100; border:1px solid #00ff00; transition: .2s; border-radius: 24px; }
+.slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 2px; background-color: #00ff00; transition: .2s; border-radius: 50%; }
+.switch input:checked + .slider { background-color: #002200; }
+.switch input:checked + .slider:before { transform: translateX(18px); }
 
 .choice-button:disabled {
   opacity: 0.5;

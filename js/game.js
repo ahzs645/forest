@@ -1,5 +1,5 @@
 import { GameState } from "./gameModels.js";
-import { choose_region, initial_setup, plan_harvest_schedule, conduct_harvest_operations, annual_management_decisions, quarter_end_summary, check_win_conditions } from "./gameLogic.js";
+import { choose_region, initial_setup, plan_harvest_schedule, conduct_harvest_operations, annual_management_decisions, quarter_end_summary, check_win_conditions, quarterly_operations_setup } from "./gameLogic.js";
 import { EventsRouter } from "./events.js";
 import { process_permits, strategic_permit_submission } from "./permits.js";
 import { ongoing_first_nations_consultation } from "./firstNations.js";
@@ -24,6 +24,8 @@ class Game {
     this.statusPanel = document.getElementById("status-content");
     this.enable_wacky_events = false;
     this.eventsRouter = new EventsRouter();
+    this.mobileHud = document.getElementById("mobile-hud");
+    this._bindSettingsUI();
   }
 
   async start() {
@@ -90,7 +92,10 @@ class Game {
     this.write(`${this.state.companyName} - ${season_emojis[this.state.quarter]} ${quarter_names[this.state.quarter]} Year ${this.state.year}`);
     this.write(`${"-".repeat(60)}\n`);
 
-    // Seasonal events matching Python system
+    // Quarterly setup (Oregon Trail-style choices)
+    await quarterly_operations_setup(this.state, this.write.bind(this), this.terminal, this.input);
+
+    // Seasonal events
     if (this.state.quarter === 1) {
       this.write("🌱 SPRING: Planning and permit season begins!");
       await this.eventsRouter.random_policy_events(this.state, this.write.bind(this), this.terminal, this.input);
@@ -124,6 +129,9 @@ class Game {
       
       await pay_ceo_annual_costs(this.state, this.write.bind(this));
     }
+
+    // Quarterly management decisions (more interactivity)
+    await annual_management_decisions(this.state, this.write.bind(this), this.terminal, this.input);
 
     // Wacky events if enabled
     if (this.enable_wacky_events) {
@@ -207,6 +215,12 @@ class Game {
       <div class="info-item">
         <span class="info-label">COMMUNITY SUPPORT:</span> <span class="info-value" ${communityColor}>${(this.state.community_support * 100).toFixed(0)}%</span>
       </div>
+      <div class="info-item">
+        <span class="info-label">OPERATIONS:</span> <span class="info-value">${this.state.operations_pace} pace, ${this.state.rations} rations</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">CREW MORALE:</span> <span class="info-value">${(this.state.crew_morale * 100).toFixed(0)}%</span>
+      </div>
       <hr>
       <div class="info-item">
         <span class="info-label">MANAGEMENT:</span> <span class="info-value" ${mgmtColor}>${mgmtStatus.actions_used}/${mgmtStatus.actions_available} actions</span>
@@ -245,6 +259,42 @@ class Game {
         </div>
       `).join('')}
     `;
+    // Mobile HUD (compact)
+    if (this.mobileHud) {
+      this.mobileHud.innerHTML = `
+        <div class="hud-item">💰 ${formatCurrency(this.state.budget)}</div>
+        <div class="hud-item">⭐ ${(this.state.reputation * 100).toFixed(0)}%</div>
+        <div class="hud-item">👥 ${(this.state.community_support * 100).toFixed(0)}%</div>
+        <div class="hud-item">🕒 ${this.state.year} ${quarter_names[this.state.quarter]}</div>
+      `;
+    }
+  }
+
+  _bindSettingsUI() {
+    const gear = document.getElementById('settings-gear');
+    const panel = document.getElementById('settings-panel');
+    const overlay = document.getElementById('settings-overlay');
+    const toggleWacky = document.getElementById('toggle-wacky');
+    const sizeSmall = document.getElementById('size-small');
+    const sizeMedium = document.getElementById('size-medium');
+    const sizeLarge = document.getElementById('size-large');
+    if (!gear || !panel) return;
+    const open = () => { panel.classList.add('open'); overlay?.classList.add('show'); };
+    const close = () => { panel.classList.remove('open'); overlay?.classList.remove('show'); };
+    gear.addEventListener('click', open);
+    overlay?.addEventListener('click', close);
+    document.getElementById('settings-close')?.addEventListener('click', close);
+    toggleWacky?.addEventListener('change', (e) => {
+      this.enable_wacky_events = e.target.checked;
+      this.write(`Wacky events ${this.enable_wacky_events ? 'enabled' : 'disabled'}.`);
+    });
+    const setSize = (sz) => {
+      document.body.dataset.textSize = sz; // CSS hooks sizes
+      this.terminal.scrollTop = this.terminal.scrollHeight;
+    };
+    sizeSmall?.addEventListener('click', () => setSize('small'));
+    sizeMedium?.addEventListener('click', () => setSize('medium'));
+    sizeLarge?.addEventListener('click', () => setSize('large'));
   }
 }
 

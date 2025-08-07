@@ -163,6 +163,13 @@ export function conduct_harvest_operations(state, write) {
     if (block.disaster_affected) {
       effective_volume *= (1 - block.volume_loss_percent);
     }
+    // Apply production modifiers from operations pace and morale
+    const paceVolumeMultiplier = state.operations_pace === 'cautious' ? 0.9 : (state.operations_pace === 'aggressive' ? 1.12 : 1.0);
+    let moraleMultiplier = 1.0;
+    if (state.crew_morale > 0.7) moraleMultiplier = 1.05;
+    if (state.crew_morale < 0.3) moraleMultiplier = 0.9;
+    if (state.supplies_boost) moraleMultiplier += 0.02; // small temporary boost
+    effective_volume *= paceVolumeMultiplier * moraleMultiplier;
     total_volume += effective_volume;
 
     for (const grade in block.log_grade_distribution) {
@@ -203,6 +210,75 @@ export function conduct_harvest_operations(state, write) {
   state.harvest_blocks = state.harvest_blocks.filter(
     (b) => b.permit_status !== "approved"
   );
+}
+
+/**
+ * Oregon Trail-style quarterly operations setup: pace, rations, supplies.
+ * @param {GameState} state
+ * @param {(text: string) => void} write
+ * @param {HTMLElement} terminal
+ * @param {HTMLInputElement} input
+ */
+export async function quarterly_operations_setup(state, write, terminal, input) {
+  write("\n--- QUARTERLY OPERATIONS SETUP ---");
+  // Pace selection
+  const paceOptions = [
+    `Cautious (safer, -10% output)`,
+    `Normal (balanced)`,
+    `Aggressive (faster, +12% output, higher risk)`,
+    `Keep current (${state.operations_pace})`
+  ];
+  const paceChoice = await askChoice("Set operations pace:", paceOptions, terminal, input);
+  if (paceChoice === 0) state.operations_pace = 'cautious';
+  if (paceChoice === 1) state.operations_pace = 'normal';
+  if (paceChoice === 2) state.operations_pace = 'aggressive';
+  write(`Pace set to: ${state.operations_pace}`);
+
+  // Rations selection
+  const rationOptions = [
+    `Meager (lower costs, morale -)`,
+    `Normal`,
+    `Generous (higher costs, morale +)`,
+    `Keep current (${state.rations})`
+  ];
+  const rationChoice = await askChoice("Set camp rations:", rationOptions, terminal, input);
+  if (rationChoice === 0) state.rations = 'meager';
+  if (rationChoice === 1) state.rations = 'normal';
+  if (rationChoice === 2) state.rations = 'generous';
+  write(`Rations set to: ${state.rations}`);
+
+  // Apply morale change and ration cost
+  let moraleDelta = 0;
+  let rationCost = 0;
+  if (state.rations === 'meager') moraleDelta -= 0.05;
+  if (state.rations === 'generous') { moraleDelta += 0.05; rationCost = 20000; }
+  if (state.operations_pace === 'cautious') moraleDelta += 0.03;
+  if (state.operations_pace === 'aggressive') moraleDelta -= 0.07;
+  state.crew_morale = Math.max(0, Math.min(1, state.crew_morale + moraleDelta));
+  if (rationCost > 0) {
+    state.budget -= rationCost;
+    write(`🍖 Rations cost: ${formatCurrency(rationCost)}`);
+  }
+  write(`Crew morale: ${(state.crew_morale * 100).toFixed(0)}%`);
+
+  // Optional supplies purchase
+  const suppliesIndex = await askChoice(
+    "Purchase supplies for a small productivity boost this quarter?",
+    ["Yes ($25,000)", "No"],
+    terminal,
+    input
+  );
+  if (suppliesIndex === 0) {
+    if (state.budget >= 25000) {
+      state.budget -= 25000;
+      state.supplies_boost = true;
+      write("📦 Supplies purchased. Minor productivity boost this quarter.");
+    } else {
+      write("Insufficient budget for supplies.");
+    }
+  } else {
+    state.supplies_boost = false;
+  }
 }
 
 /**
@@ -541,4 +617,3 @@ export function check_win_conditions(state) {
   
   return [false, ""];
 }
-

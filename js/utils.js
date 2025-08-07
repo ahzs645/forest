@@ -41,6 +41,8 @@ export function ask(question, terminal, input) {
       terminal.scrollTop = terminal.scrollHeight;
       input.focus();
       input.value = ""; // Clear any existing value
+      // Help mobile keep input visible when keyboard opens
+      try { input.scrollIntoView({ block: 'nearest' }); } catch {}
     });
 
     const listener = (e) => {
@@ -50,6 +52,7 @@ export function ask(question, terminal, input) {
         terminal.textContent += `${value}\n`;
         requestAnimationFrame(() => {
           terminal.scrollTop = terminal.scrollHeight;
+          try { input.scrollIntoView({ block: 'nearest' }); } catch {}
         });
         input.removeEventListener("keydown", listener);
         resolve(value);

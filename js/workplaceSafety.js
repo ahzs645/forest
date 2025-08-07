@@ -35,6 +35,22 @@ async function workplace_safety_incidents(state, write, terminal, input) {
   if (state.safety_violations > 0) {
     risk_multiplier += 0.4;
   }
+  // Oregon Trail-style modifiers
+  if (state.operations_pace === 'aggressive') {
+    risk_multiplier *= 1.3;
+  } else if (state.operations_pace === 'cautious') {
+    risk_multiplier *= 0.8;
+  }
+  if (state.rations === 'meager') {
+    risk_multiplier *= 1.15;
+  } else if (state.rations === 'generous') {
+    risk_multiplier *= 0.9;
+  }
+  if (state.crew_morale < 0.3) {
+    risk_multiplier *= 1.2;
+  } else if (state.crew_morale > 0.7) {
+    risk_multiplier *= 0.9;
+  }
 
   if (Math.random() > base_chance * risk_multiplier) {
     return false;

@@ -163,6 +163,12 @@ export class GameState {
     this.ceo = null;
     this.quarterly_profit = 0;
     
+    // Oregon Trail-style operations settings
+    this.operations_pace = 'normal'; // 'cautious' | 'normal' | 'aggressive'
+    this.rations = 'normal'; // 'meager' | 'normal' | 'generous'
+    this.crew_morale = 0.5; // 0-1 scale
+    this.supplies_boost = false; // temporary small boost when resupplied
+    
     // Safety and criminal tracking
     this.safety_violations = 0;
     this.safety_fatalities = 0;
