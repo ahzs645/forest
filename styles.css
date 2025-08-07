@@ -201,6 +201,82 @@ h2 {
   -ms-user-select: text;
 }
 
+/* Button container for mobile-friendly choice selections */
+.button-container {
+  padding: 10px 20px;
+  background-color: #000;
+  border-top: 1px solid #00ff00;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #00ff00 #000;
+}
+
+.button-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.button-container::-webkit-scrollbar-track {
+  background: #000;
+}
+
+.button-container::-webkit-scrollbar-thumb {
+  background: #00ff00;
+  border-radius: 3px;
+}
+
+.choice-button {
+  background: #000;
+  border: 1px solid #00ff00;
+  color: #00ff00;
+  padding: 12px 16px;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 4px;
+  text-shadow: 0 0 2px #00ff00;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.choice-button:hover,
+.choice-button:focus {
+  background-color: #001100;
+  box-shadow: 0 0 8px #00ff00;
+  transform: translateY(-1px);
+}
+
+.choice-button:active {
+  transform: translateY(0);
+  box-shadow: 0 0 4px #00ff00;
+}
+
+.choice-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Mobile adjustments for buttons */
+@media (max-width: 768px) {
+  .button-container {
+    padding: 8px 15px;
+    gap: 6px;
+    max-height: 150px;
+  }
+  
+  .choice-button {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-radius: 6px;
+  }
+}
+
 /* Terminal flicker effect */
 @keyframes flicker {
   0% { opacity: 1; }

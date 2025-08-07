@@ -10,7 +10,12 @@ import { askChoice } from "./utils.js";
  */
 export async function story_progression(state, write, terminal, input) {
   if (!state.story_arc) {
-    const arcs = ["ancientGrove", "rivalCompany", "endangeredSpecies"];
+    const arcs = [
+      "ancientGrove", "rivalCompany", "endangeredSpecies", "naturalDisaster", 
+      "indigenousPartnership", "wildcatStrike", "marketCrash", "newTechnology",
+      "politicalChange", "climateActivists", "fireDamage", "pesticideDebate",
+      "touristConflict", "mediaCoverage", "scientificDiscovery"
+    ];
     state.story_arc = arcs[Math.floor(Math.random() * arcs.length)];
     state.story_stage = 0;
   }
@@ -24,6 +29,42 @@ export async function story_progression(state, write, terminal, input) {
       break;
     case "endangeredSpecies":
       await endangeredSpeciesStory(state, write, terminal, input);
+      break;
+    case "naturalDisaster":
+      await naturalDisasterStory(state, write, terminal, input);
+      break;
+    case "indigenousPartnership":
+      await indigenousPartnershipStory(state, write, terminal, input);
+      break;
+    case "wildcatStrike":
+      await wildcatStrikeStory(state, write, terminal, input);
+      break;
+    case "marketCrash":
+      await marketCrashStory(state, write, terminal, input);
+      break;
+    case "newTechnology":
+      await newTechnologyStory(state, write, terminal, input);
+      break;
+    case "politicalChange":
+      await politicalChangeStory(state, write, terminal, input);
+      break;
+    case "climateActivists":
+      await climateActivistsStory(state, write, terminal, input);
+      break;
+    case "fireDamage":
+      await fireDamageStory(state, write, terminal, input);
+      break;
+    case "pesticideDebate":
+      await pesticideDebateStory(state, write, terminal, input);
+      break;
+    case "touristConflict":
+      await touristConflictStory(state, write, terminal, input);
+      break;
+    case "mediaCoverage":
+      await mediaCoverageStory(state, write, terminal, input);
+      break;
+    case "scientificDiscovery":
+      await scientificDiscoveryStory(state, write, terminal, input);
       break;
   }
 
@@ -335,5 +376,274 @@ async function endangeredSpeciesStory(state, write, terminal, input) {
       break;
     default:
       break;
+  }
+}
+
+async function naturalDisasterStory(state, write, terminal, input) {
+  switch (state.story_stage) {
+    case 0:
+      write("--- STORY EVENT: Devastating Landslide ---");
+      write("A massive landslide has blocked access roads and damaged equipment. Local media is watching your response.");
+      const choice = await askChoice(
+        "How do you respond to the crisis?",
+        ["Immediately send aid to affected communities", "Focus on recovering your equipment first"],
+        terminal, input
+      );
+      if (choice === 0) {
+        state.story_branch = "community_first";
+        state.budget -= 80000;
+        state.reputation += 0.15;
+        state.community_support += 0.25;
+        write("You prioritize helping displaced families. The community remembers your generosity.");
+      } else {
+        state.story_branch = "business_first";
+        state.budget -= 20000;
+        state.reputation -= 0.1;
+        state.community_support -= 0.1;
+        write("You focus on business recovery. Some see this as callous during a tragedy.");
+      }
+      state.story_stage = 1;
+      break;
+    case 1:
+      if (state.story_branch === "community_first") {
+        write("--- STORY EVENT: Insurance Investigation ---");
+        write("Insurance investigators are impressed by your community response and expedite your claim.");
+        state.budget += 120000;
+        state.reputation += 0.05;
+        write("Your compassionate response pays dividends in faster claim processing.");
+      } else {
+        write("--- STORY EVENT: Public Backlash ---");
+        write("Community groups organize boycotts of companies that buy your timber.");
+        const choice = await askChoice(
+          "How do you address the boycott?",
+          ["Launch $50k community outreach campaign", "Ignore the protesters"],
+          terminal, input
+        );
+        if (choice === 0) {
+          if (state.budget >= 50000) {
+            state.budget -= 50000;
+            state.reputation += 0.08;
+            state.community_support += 0.1;
+            write("Your outreach campaign slowly rebuilds trust.");
+          } else {
+            write("You can't afford the campaign right now.");
+          }
+        } else {
+          state.reputation -= 0.05;
+          state.community_support -= 0.1;
+          write("The boycott gains momentum as you remain silent.");
+        }
+      }
+      state.story_stage = 2;
+      break;
+    default:
+      break;
+  }
+}
+
+async function wildcatStrikeStory(state, write, terminal, input) {
+  switch (state.story_stage) {
+    case 0:
+      write("--- STORY EVENT: Wildcat Strike ---");
+      write("Your crew walks off the job demanding better safety equipment and higher wages after a near-miss accident.");
+      const choice = await askChoice(
+        "How do you handle the strike?",
+        ["Negotiate immediately with workers", "Hire replacement workers"],
+        terminal, input
+      );
+      if (choice === 0) {
+        state.story_branch = "negotiate";
+        state.budget -= 120000;
+        state.reputation += 0.1;
+        write("You meet with workers and address their safety concerns. Trust improves.");
+      } else {
+        state.story_branch = "replacements";
+        state.budget -= 80000;
+        state.reputation -= 0.2;
+        state.community_support -= 0.15;
+        write("Replacement workers cross the picket line. Tensions boil over in town.");
+      }
+      state.story_stage = 1;
+      break;
+    default:
+      break;
+  }
+}
+
+// Additional story functions can be added here as needed
+async function fireDamageStory(state, write, terminal, input) {
+  switch (state.story_stage) {
+    case 0:
+      write("--- STORY EVENT: Forest Fire Outbreak ---");
+      write("A wildfire threatens both your timber stands and the nearby town. Evacuation orders are in effect.");
+      const choice = await askChoice(
+        "How do you respond?",
+        ["Donate equipment to firefighting efforts", "Focus on protecting your timber assets"],
+        terminal, input
+      );
+      if (choice === 0) {
+        state.story_branch = "help_community";
+        state.budget -= 100000;
+        state.reputation += 0.2;
+        state.community_support += 0.3;
+        write("You send bulldozers and crews to help create firebreaks. The town is saved.");
+      } else {
+        state.story_branch = "protect_assets";
+        state.budget -= 50000;
+        state.reputation -= 0.1;
+        state.community_support -= 0.2;
+        write("You focus on sprinkler systems for your timber. Some see this as selfish.");
+      }
+      state.story_stage = 1;
+      break;
+    default:
+      break;
+  }
+}
+
+async function climateActivistsStory(state, write, terminal, input) {
+  switch (state.story_stage) {
+    case 0:
+      write("--- STORY EVENT: Climate Protesters ---");
+      write("Environmental activists have chained themselves to trees in your most profitable cut block.");
+      const choice = await askChoice(
+        "How do you handle the protest?",
+        ["Engage in dialogue with protesters", "Call police to remove them"],
+        terminal, input
+      );
+      if (choice === 0) {
+        state.story_branch = "dialogue";
+        state.reputation += 0.1;
+        write("You listen to their concerns and find common ground on sustainable practices.");
+      } else {
+        state.story_branch = "police";
+        state.budget -= 30000;
+        state.reputation -= 0.15;
+        state.community_support -= 0.1;
+        write("The arrests make national news and damage your environmental reputation.");
+      }
+      state.story_stage = 1;
+      break;
+    default:
+      break;
+  }
+}
+
+// Placeholder functions for remaining story types
+async function indigenousPartnershipStory(state, write, terminal, input) {
+  if (state.story_stage === 0) {
+    write("--- STORY EVENT: Partnership Opportunity ---");
+    write("A local First Nation proposes a joint venture for sustainable forestry practices.");
+    const choice = await askChoice("Do you accept?", ["Yes, form partnership", "Decline politely"], terminal, input);
+    if (choice === 0) {
+      state.budget -= 75000;
+      state.reputation += 0.15;
+      state.community_support += 0.2;
+      write("The partnership opens new markets and improves relationships.");
+    }
+    state.story_stage = 1;
+  }
+}
+
+async function marketCrashStory(state, write, terminal, input) {
+  if (state.story_stage === 0) {
+    write("--- STORY EVENT: Market Volatility ---");
+    write("Lumber prices have crashed 40% due to economic uncertainty.");
+    state.budget -= 200000;
+    write("You must adapt quickly to survive the downturn.");
+    state.story_stage = 1;
+  }
+}
+
+async function newTechnologyStory(state, write, terminal, input) {
+  if (state.story_stage === 0) {
+    write("--- STORY EVENT: Innovation Opportunity ---");
+    write("A tech company offers you first access to AI-powered forest management tools.");
+    const choice = await askChoice("Invest in new technology?", ["Yes, invest $150k", "No, too risky"], terminal, input);
+    if (choice === 0 && state.budget >= 150000) {
+      state.budget -= 150000;
+      state.reputation += 0.1;
+      write("The technology gives you a competitive edge in efficiency.");
+    }
+    state.story_stage = 1;
+  }
+}
+
+async function politicalChangeStory(state, write, terminal, input) {
+  if (state.story_stage === 0) {
+    write("--- STORY EVENT: Election Results ---");
+    write("A new government takes power with stricter environmental policies.");
+    state.reputation -= 0.05;
+    write("You'll need to adapt to the new regulatory environment.");
+    state.story_stage = 1;
+  }
+}
+
+async function pesticideDebateStory(state, write, terminal, input) {
+  if (state.story_stage === 0) {
+    write("--- STORY EVENT: Chemical Concerns ---");
+    write("Environmentalists question your use of forest pesticides near water sources.");
+    const choice = await askChoice("How do you respond?", ["Switch to organic alternatives", "Defend current practices"], terminal, input);
+    if (choice === 0) {
+      state.budget -= 60000;
+      state.reputation += 0.1;
+      write("The switch to organic methods costs more but improves your image.");
+    } else {
+      state.reputation -= 0.08;
+      write("You defend your practices but face continued criticism.");
+    }
+    state.story_stage = 1;
+  }
+}
+
+async function touristConflictStory(state, write, terminal, input) {
+  if (state.story_stage === 0) {
+    write("--- STORY EVENT: Recreation Conflict ---");
+    write("Hikers and campers are angry about logging near popular trails.");
+    const choice = await askChoice("How do you handle this?", ["Create buffer zones around trails", "Continue operations as planned"], terminal, input);
+    if (choice === 0) {
+      state.budget -= 40000;
+      state.community_support += 0.15;
+      write("Buffer zones preserve the recreational experience.");
+    } else {
+      state.community_support -= 0.1;
+      write("Tourism groups organize opposition to your operations.");
+    }
+    state.story_stage = 1;
+  }
+}
+
+async function mediaCoverageStory(state, write, terminal, input) {
+  if (state.story_stage === 0) {
+    write("--- STORY EVENT: Documentary Film ---");
+    write("A filmmaker wants to document your operations for a nature documentary.");
+    const choice = await askChoice("Allow filming?", ["Yes, showcase sustainable practices", "No, too much risk"], terminal, input);
+    if (choice === 0) {
+      state.reputation += 0.12;
+      write("The documentary portrays you as a responsible steward of the forest.");
+    } else {
+      state.reputation -= 0.05;
+      write("Your refusal creates suspicion about your practices.");
+    }
+    state.story_stage = 1;
+  }
+}
+
+async function scientificDiscoveryStory(state, write, terminal, input) {
+  if (state.story_stage === 0) {
+    write("--- STORY EVENT: Archaeological Find ---");
+    write("Researchers discover Indigenous artifacts in your harvest area that could rewrite local history.");
+    const choice = await askChoice("What do you do?", ["Halt operations and support research", "Minimize delays and continue"], terminal, input);
+    if (choice === 0) {
+      state.budget -= 120000;
+      state.reputation += 0.2;
+      state.community_support += 0.25;
+      write("Your support for the research earns widespread respect.");
+    } else {
+      state.reputation -= 0.15;
+      state.community_support -= 0.2;
+      write("Your impatience with the discovery damages cultural relationships.");
+    }
+    state.story_stage = 1;
   }
 }
