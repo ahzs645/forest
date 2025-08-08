@@ -1,16 +1,21 @@
 import { GameState, FirstNation, HarvestBlock } from './gameModels.js';
-import { ask, askChoice, formatVolume, formatCurrency } from './utils.js';
+import { ask, askChoice, formatVolume, formatCurrency, safeAddBudget, safeNumber } from './utils.js';
 import { natural_disasters_during_harvest } from './events.js';
 import { ceo_management } from './ceo.js';
+import { get_output_penalty_multiplier } from './scenarios.js';
 
 /**
  * Initial region selection with region-specific setup.
  * @param {GameState} state The game state.
  * @param {(text: string) => void} write
  */
-export async function choose_region(state, write) {
-  const terminal = document.getElementById("terminal");
-  const input = document.getElementById("input");
+export async function choose_region(state, write, terminal = null, input = null) {
+  if (!terminal || !input) {
+    try {
+      terminal = terminal || document.getElementById("terminal");
+      input = input || document.getElementById("input");
+    } catch {}
+  }
   const idx = await askChoice("Where will you operate?", [
     "Sub-Boreal Spruce (SBS) - High AAC, declining fast due to beetle kill",
     "Interior Douglas-fir (IDF) - Moderate AAC, wildfire risk",
@@ -22,21 +27,21 @@ export async function choose_region(state, write) {
 
   if (idx === 0) {
     state.annual_allowable_cut = 200000;
-    state.aac_decline_rate = 0.05;
+    state.aac_decline_rate = 0.015; // reduced base decline
     state.first_nations.push(
       new FirstNation({ name: "Carrier Nation", relationship_level: 0.6, treaty_area: false }),
       new FirstNation({ name: "Takla Nation", relationship_level: 0.4, treaty_area: false })
     );
   } else if (idx === 1) {
     state.annual_allowable_cut = 120000;
-    state.aac_decline_rate = 0.025;
+    state.aac_decline_rate = 0.012; // reduced base decline
     state.first_nations.push(
       new FirstNation({ name: "Secwepemc Nation", relationship_level: 0.5, treaty_area: true }),
       new FirstNation({ name: "Okanagan Nation", relationship_level: 0.3, treaty_area: true })
     );
   } else {
     state.annual_allowable_cut = 80000;
-    state.aac_decline_rate = 0.02;
+    state.aac_decline_rate = 0.01; // reduced base decline
     state.disturbance_cap = 30000;
     state.first_nations.push(
       new FirstNation({ name: "Treaty 8 Nation", relationship_level: 0.3, treaty_area: true }),
@@ -50,9 +55,13 @@ export async function choose_region(state, write) {
  * @param {GameState} state The game state.
  * @param {(text: string) => void} write
  */
-export async function initial_setup(state, write) {
-  const terminal = document.getElementById("terminal");
-  const input = document.getElementById("input");
+export async function initial_setup(state, write, terminal = null, input = null) {
+  if (!terminal || !input) {
+    try {
+      terminal = terminal || document.getElementById("terminal");
+      input = input || document.getElementById("input");
+    } catch {}
+  }
   const fspIdx = await askChoice(
     "How detailed will your Forest Stewardship Plan be?",
     [
@@ -158,6 +167,8 @@ export function conduct_harvest_operations(state, write) {
     firewood: { volume: 0, revenue: 0 },
   };
 
+  const weatherMultiplier = state.weather?.harvest_multiplier ?? 1.0;
+  const outputPenalty = get_output_penalty_multiplier(state);
   for (const block of approved_blocks) {
     let effective_volume = block.volume_m3;
     if (block.disaster_affected) {
@@ -169,7 +180,7 @@ export function conduct_harvest_operations(state, write) {
     if (state.crew_morale > 0.7) moraleMultiplier = 1.05;
     if (state.crew_morale < 0.3) moraleMultiplier = 0.9;
     if (state.supplies_boost) moraleMultiplier += 0.02; // small temporary boost
-    effective_volume *= paceVolumeMultiplier * moraleMultiplier;
+    effective_volume *= paceVolumeMultiplier * moraleMultiplier * weatherMultiplier * outputPenalty;
     total_volume += effective_volume;
 
     for (const grade in block.log_grade_distribution) {
@@ -221,7 +232,7 @@ export function conduct_harvest_operations(state, write) {
  */
 export async function quarterly_operations_setup(state, write, terminal, input) {
   write("\n--- QUARTERLY OPERATIONS SETUP ---");
-  // Pace selection
+  // Operations pace selection
   const paceOptions = [
     `Cautious (safer, -10% output)`,
     `Normal (balanced)`,
@@ -234,51 +245,15 @@ export async function quarterly_operations_setup(state, write, terminal, input) 
   if (paceChoice === 2) state.operations_pace = 'aggressive';
   write(`Pace set to: ${state.operations_pace}`);
 
-  // Rations selection
-  const rationOptions = [
-    `Meager (lower costs, morale -)`,
-    `Normal`,
-    `Generous (higher costs, morale +)`,
-    `Keep current (${state.rations})`
-  ];
-  const rationChoice = await askChoice("Set camp rations:", rationOptions, terminal, input);
-  if (rationChoice === 0) state.rations = 'meager';
-  if (rationChoice === 1) state.rations = 'normal';
-  if (rationChoice === 2) state.rations = 'generous';
-  write(`Rations set to: ${state.rations}`);
-
-  // Apply morale change and ration cost
+  // Update morale based on pace only (remove rations mechanics)
   let moraleDelta = 0;
-  let rationCost = 0;
-  if (state.rations === 'meager') moraleDelta -= 0.05;
-  if (state.rations === 'generous') { moraleDelta += 0.05; rationCost = 20000; }
-  if (state.operations_pace === 'cautious') moraleDelta += 0.03;
-  if (state.operations_pace === 'aggressive') moraleDelta -= 0.07;
+  if (state.operations_pace === 'cautious') moraleDelta += 0.02;
+  if (state.operations_pace === 'aggressive') moraleDelta -= 0.05;
   state.crew_morale = Math.max(0, Math.min(1, state.crew_morale + moraleDelta));
-  if (rationCost > 0) {
-    state.budget -= rationCost;
-    write(`🍖 Rations cost: ${formatCurrency(rationCost)}`);
-  }
-  write(`Crew morale: ${(state.crew_morale * 100).toFixed(0)}%`);
+  write(`Crew morale adjusted: ${(state.crew_morale * 100).toFixed(0)}%`);
 
-  // Optional supplies purchase
-  const suppliesIndex = await askChoice(
-    "Purchase supplies for a small productivity boost this quarter?",
-    ["Yes ($25,000)", "No"],
-    terminal,
-    input
-  );
-  if (suppliesIndex === 0) {
-    if (state.budget >= 25000) {
-      state.budget -= 25000;
-      state.supplies_boost = true;
-      write("📦 Supplies purchased. Minor productivity boost this quarter.");
-    } else {
-      write("Insufficient budget for supplies.");
-    }
-  } else {
-    state.supplies_boost = false;
-  }
+  // Disable any leftover supplies boost
+  state.supplies_boost = false;
 }
 
 /**
@@ -429,8 +404,8 @@ async function handle_silviculture_investments(state, write, terminal, input) {
  */
 export async function annual_management_decisions(state, write, terminal, input) {
   // Quarterly management decisions (every quarter)
-  write("\n--- QUARTERLY MANAGEMENT DECISIONS ---");
-  write("💡 Choose a management activity for this quarter:");
+  write("\n--- QUARTERLY ACTIVITIES ---");
+  write("💡 Choose an activity for this quarter:");
   
   const managementOptions = [
     "Focus on permit applications",
@@ -444,7 +419,7 @@ export async function annual_management_decisions(state, write, terminal, input)
   ];
   
   const choice = await askChoice(
-    "What's your management focus?",
+    "Choose quarterly activity:",
     managementOptions,
     terminal,
     input
@@ -558,11 +533,45 @@ export async function annual_management_decisions(state, write, terminal, input)
  * @param {GameState} state The game state
  * @param {(text: string) => void} write
  */
-export async function quarter_end_summary(state, write) {
+export async function quarter_end_summary(state, write, terminal, input) {
   write("\n--- QUARTER SUMMARY ---");
-  const upkeep = 100000;
-  state.budget -= upkeep;
+  
+  // Calculate upkeep with reduced operations mode
+  let upkeep = 100000;
+  if (state.reduced_operations_mode && state.reduced_operations_quarters > 0) {
+    upkeep = 50000; // Half upkeep in reduced mode
+    state.reduced_operations_quarters--;
+    write(`⚠️ Reduced operations mode: ${state.reduced_operations_quarters} quarters remaining`);
+    if (state.reduced_operations_quarters === 0) {
+      state.reduced_operations_mode = false;
+      write("Returning to normal operations next quarter.");
+    }
+  }
+  
+  // Apply loan interest
+  if (state.loans_balance > 0) {
+    const interest = Math.floor(state.loans_balance * state.loan_interest_rate);
+    state.loans_balance += interest;
+    write(`💸 Loan interest: ${formatCurrency(interest)} (Balance: ${formatCurrency(state.loans_balance)})`);
+  }
+  
+  // Safe budget operations
+  safeAddBudget(state, -upkeep, write, 'operational upkeep');
   write(`Operational upkeep: ${formatCurrency(upkeep)}`);
+  
+  // Carbon credits revenue
+  if (state.carbon_credits_enrolled) {
+    const carbonRevenue = Math.floor(state.annual_allowable_cut * 0.1 * 15); // $15 per m³ preserved
+    safeAddBudget(state, carbonRevenue, write, 'carbon credits');
+    write(`🌳 Carbon credits revenue: ${formatCurrency(carbonRevenue)}`);
+  }
+  
+  // Insurance premium
+  if (state.insurance_coverage) {
+    safeAddBudget(state, -state.insurance_premium, write, 'insurance premium');
+    write(`🛡️ Insurance premium: ${formatCurrency(state.insurance_premium)}`);
+  }
+  
   write(`Budget: ${formatCurrency(state.budget)}`);
   write(`Reputation: ${state.reputation.toFixed(2)}`);
   write(`Safety record: ${state.safety_violations} violations`);
@@ -579,6 +588,57 @@ export async function quarter_end_summary(state, write) {
   });
   avgRelationship /= state.first_nations.length;
   write(`First Nations relations: ${(avgRelationship * 100).toFixed(0)}%`);
+  
+  // Emergency options if budget is negative
+  if (state.budget < 0 && terminal && input) {
+    write("\n⚠️ WARNING: Your company is in debt!");
+    const options = [];
+    
+    if (state.emergency_loans_taken < 3) {
+      options.push(`Take emergency loan ($500,000 at 8% quarterly interest)`);
+    }
+    
+    if (!state.reduced_operations_mode) {
+      options.push("Enter reduced operations mode (50% upkeep for 4 quarters, -20% efficiency)");
+    }
+    
+    if (!state.asset_liquidation_used) {
+      options.push("Liquidate equipment ($300,000 immediate, +20% operating costs)");
+    }
+    
+    if (state.loans_balance > 0) {
+      options.push("Declare bankruptcy (Game Over)");
+    }
+    
+    options.push("Continue without assistance (risky)");
+    
+    const choice = await askChoice("Choose emergency action:", options, terminal, input);
+    
+    if (options[choice].includes("emergency loan")) {
+      const loanAmount = 500000;
+      safeAddBudget(state, loanAmount, write, 'emergency loan');
+      state.loans_balance += loanAmount;
+      state.emergency_loans_taken++;
+      write(`💰 Emergency loan received: ${formatCurrency(loanAmount)}`);
+      write(`Total debt: ${formatCurrency(state.loans_balance)}`);
+    } else if (options[choice].includes("reduced operations")) {
+      state.reduced_operations_mode = true;
+      state.reduced_operations_quarters = 4;
+      state.operating_cost_per_m3 *= 1.2; // 20% efficiency loss
+      write("📉 Entering reduced operations mode for 4 quarters");
+      write("Upkeep costs halved, but efficiency reduced by 20%");
+    } else if (options[choice].includes("Liquidate")) {
+      const liquidationAmount = 300000;
+      safeAddBudget(state, liquidationAmount, write, 'asset liquidation');
+      state.asset_liquidation_used = true;
+      state.operating_cost_per_m3 *= 1.2; // Permanent 20% increase
+      write(`💵 Equipment liquidated for ${formatCurrency(liquidationAmount)}`);
+      write("⚠️ Operating costs permanently increased by 20%");
+    } else if (options[choice].includes("bankruptcy")) {
+      state.budget = -1000000; // Trigger game over
+      write("💀 Company declares bankruptcy...");
+    }
+  }
 }
 
 /**

@@ -67,37 +67,37 @@ export async function random_illegal_opportunities_event(state, write, terminal,
       name: "Harvest Buffer Zone Violation",
       description: "Cut trees within 30m of streams (Save: $180,000)",
       story: "Your crew supervisor suggests 'adjusting' the buffer zone boundaries. Those extra trees near the creek are worth serious money.",
-      cost_savings: 180000,
+      cost_savings: 45000,
       detection_risk: 0.4,
       reputation_penalty: 0.2,
-      fine_amount: 450000,
+      fine_amount: 180000,
     }),
     new SimpleIllegalAct({
       name: "Exceed Cut Block Boundaries",
       description: "Harvest beyond approved limits (Save: $220,000)",
       story: "GPS shows premium timber just 50m beyond your boundary. Your crew chief says nobody will notice.",
-      cost_savings: 220000,
-      detection_risk: 0.3,
+      cost_savings: 55000,
+      detection_risk: 0.35,
       reputation_penalty: 0.15,
-      fine_amount: 550000,
+      fine_amount: 220000,
     }),
     new SimpleIllegalAct({
       name: "Underreport Harvest Volumes",
       description: "Scale logs smaller to reduce fees (Save: $320,000)",
       story: "The scaling supervisor hints that reported volumes could be 'conservative'. 20% underreporting saves massive stumpage fees.",
-      cost_savings: 320000,
-      detection_risk: 0.2,
+      cost_savings: 80000,
+      detection_risk: 0.25,
       reputation_penalty: 0.1,
-      fine_amount: 800000,
+      fine_amount: 320000,
     }),
     new SimpleIllegalAct({
       name: "Bypass Archaeological Assessment",
       description: "Skip heritage clearance (Save: $150,000)",
       story: "Archaeological assessment has been pending for 6 months. Your crew leader suggests just proceeding.",
-      cost_savings: 150000,
+      cost_savings: 35000,
       detection_risk: 0.5,
       reputation_penalty: 0.4,
-      fine_amount: 600000,
+      fine_amount: 200000,
     }),
     new SimpleIllegalAct({
       name: "Dump Waste Oil Improperly",
@@ -212,7 +212,7 @@ export async function random_illegal_opportunities_event(state, write, terminal,
         { name: "Expand Operation", cost: 200000, profit: 3000000, risk_increase: 0.2 },
         { name: "Final Payoff", cost: 150000, profit: 4000000, risk_increase: 0.3 },
       ],
-      total_profit: 8500000,
+      total_profit: 850000,
       base_risk: 0.2,
       complexity: "extreme",
     }),
@@ -226,7 +226,7 @@ export async function random_illegal_opportunities_event(state, write, terminal,
         { name: "Establish Route", cost: 100000, profit: 2000000, risk_increase: 0.15 },
         { name: "Scale Operations", cost: 200000, profit: 2200000, risk_increase: 0.25 },
       ],
-      total_profit: 5200000,
+      total_profit: 520000,
       base_risk: 0.3,
       complexity: "high",
     }),
@@ -240,7 +240,7 @@ export async function random_illegal_opportunities_event(state, write, terminal,
         { name: "Expand Network", cost: 50000, profit: 1500000, risk_increase: 0.12 },
         { name: "Final Harvest", cost: 0, profit: 1200000, risk_increase: 0.15 },
       ],
-      total_profit: 3800000,
+      total_profit: 380000,
       base_risk: 0.25,
       complexity: "moderate",
     }),
@@ -254,7 +254,7 @@ export async function random_illegal_opportunities_event(state, write, terminal,
         { name: "Expand Operations", cost: 100000, profit: 2200000, risk_increase: 0.2 },
         { name: "Major Harvest Season", cost: 80000, profit: 2400000, risk_increase: 0.25 },
       ],
-      total_profit: 6200000,
+      total_profit: 620000,
       base_risk: 0.2,
       complexity: "high",
     }),
@@ -268,7 +268,7 @@ export async function random_illegal_opportunities_event(state, write, terminal,
         { name: "Cover Operations", cost: 150000, profit: 1800000, risk_increase: 0.25 },
         { name: "Final Extraction", cost: 100000, profit: 1500000, risk_increase: 0.3 },
       ],
-      total_profit: 4800000,
+      total_profit: 480000,
       base_risk: 0.3,
       complexity: "extreme",
     }),
@@ -282,7 +282,7 @@ export async function random_illegal_opportunities_event(state, write, terminal,
         { name: "Ongoing Data Manipulation", cost: 30000, profit: 1200000, risk_increase: 0.15 },
         { name: "Final Cover-up", cost: 70000, profit: 800000, risk_increase: 0.2 },
       ],
-      total_profit: 2900000,
+      total_profit: 290000,
       base_risk: 0.15,
       complexity: "moderate",
     }),
@@ -296,7 +296,7 @@ export async function random_illegal_opportunities_event(state, write, terminal,
         { name: "Escalate Claims", cost: 20000, profit: 800000, risk_increase: 0.2 },
         { name: "Final Major Claim", cost: 10000, profit: 400000, risk_increase: 0.25 },
       ],
-      total_profit: 1800000,
+      total_profit: 180000,
       base_risk: 0.35,
       complexity: "moderate",
     }),
@@ -368,6 +368,33 @@ async function execute_simple_illegal_act(state, act, write, terminal, input) {
   write(`\n--- ${act.name.toUpperCase()} ---`);
   write(act.story);
   
+  // Optional concealment investment to reduce risk
+  const concealCost = Math.floor(Math.max(25000, act.cost_savings * 0.1));
+  const concealChoice = await askChoice(
+    "Do you want to fund concealment measures to reduce detection risk?",
+    [
+      `Yes (Pay ${formatCurrency(concealCost)} now, reduce risk ~30%)`,
+      "No (Proceed without concealment)",
+      "Cancel"
+    ],
+    terminal,
+    input
+  );
+  if (concealChoice === 2) {
+    write("Operation cancelled.");
+    return true;
+  }
+  let riskModifier = 1.0;
+  if (concealChoice === 0) {
+    if (state.budget < concealCost) {
+      write("❌ Insufficient funds for concealment. Proceeding without it.");
+    } else {
+      state.budget -= concealCost;
+      write(`🕵️ Concealment funded: ${formatCurrency(concealCost)}`);
+      riskModifier = 0.7;
+    }
+  }
+  
   const confirmChoice = await askChoice(
     "\n⚠️  Final decision:",
     ["Proceed with illegal activity", "Back out now"],
@@ -385,18 +412,48 @@ async function execute_simple_illegal_act(state, act, write, terminal, input) {
   state.budget += act.cost_savings;
   write(`💰 Gained ${formatCurrency(act.cost_savings)} from illegal activity`);
   
-  const detected = Math.random() < act.detection_risk;
+  const detected = Math.random() < (act.detection_risk * riskModifier);
   
   if (detected) {
     write("\n🚨 ILLEGAL ACTIVITY DETECTED!");
     write("📰 Media outlets are reporting on your violations");
     
-    state.budget -= act.fine_amount;
-    state.reputation -= act.reputation_penalty;
+    // Choose response strategy
+    const respIdx = await askChoice(
+      "How do you respond?",
+      [
+        "Plead guilty and fully cooperate (reduced fine, smaller rep hit)",
+        "Fight in court (chance to reduce fine, risk higher penalty)",
+        "Blame contractor publicly (lower fine, bigger rep loss)"
+      ],
+      terminal,
+      input
+    );
+    let fine = act.fine_amount;
+    let repHit = act.reputation_penalty;
+    if (respIdx === 0) {
+      fine = Math.floor(fine * 0.7);
+      repHit = Math.max(0.05, repHit * 0.6);
+      write("🤝 Cooperated with investigators.");
+    } else if (respIdx === 1) {
+      if (Math.random() < 0.4) {
+        fine = Math.floor(fine * 0.8);
+        write("⚖️  Legal challenge reduced penalties.");
+      } else {
+        fine = Math.floor(fine * 1.2);
+        write("⚖️  Court loss increased penalties.");
+      }
+    } else {
+      fine = Math.floor(fine * 0.85);
+      repHit = Math.min(0.6, repHit + 0.15);
+      write("📰 Public blameshift drew criticism.");
+    }
+    state.budget -= fine;
+    state.reputation -= repHit;
     state.under_criminal_investigation = true;
     
-    write(`💸 Fine imposed: ${formatCurrency(act.fine_amount)}`);
-    write(`📉 Reputation damage: -${(act.reputation_penalty * 100).toFixed(0)}%`);
+    write(`💸 Fine imposed: ${formatCurrency(fine)}`);
+    write(`📉 Reputation damage: -${(repHit * 100).toFixed(0)}%`);
     
     if (state.budget < 0) {
       write("\n💀 COMPANY BANKRUPTCY due to fines!");
@@ -405,6 +462,12 @@ async function execute_simple_illegal_act(state, act, write, terminal, input) {
   } else {
     write("\n✅ Activity went unnoticed... for now");
     state.reputation -= 0.05;
+    // Future whistleblower risk
+    if (!state._whistleblower_flags) state._whistleblower_flags = [];
+    if (Math.random() < 0.35) {
+      state._whistleblower_flags.push({ type: act.name, potential_fine: Math.floor(act.fine_amount * 0.5) });
+      write("👂 Rumors circulate internally. Risk of a future whistleblower increased.");
+    }
   }
   
   return true;
@@ -605,5 +668,19 @@ export async function ongoing_criminal_consequences(state, write) {
   // Past criminal convictions affect reputation
   if (state.criminal_convictions > 0) {
     state.reputation -= 0.01 * state.criminal_convictions;
+  }
+
+  // Handle potential whistleblowers from past undetected acts
+  if (state._whistleblower_flags && state._whistleblower_flags.length > 0) {
+    if (Math.random() < 0.2) {
+      const flag = state._whistleblower_flags.shift();
+      const fine = flag.potential_fine;
+      write(`\n🗣️ WHISTLEBLOWER TIP: Past illegal activity exposed (${flag.type})`);
+      state.budget -= fine;
+      state.reputation -= 0.2;
+      state.under_criminal_investigation = true;
+      write(`💸 Penalty issued: ${formatCurrency(fine)}`);
+      write(`📉 Reputation hit: -20%`);
+    }
   }
 }

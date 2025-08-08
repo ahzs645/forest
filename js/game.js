@@ -11,10 +11,12 @@ import { ceo_management, pay_ceo_annual_costs, ceo_automated_decisions, ceo_quar
 import { random_first_nations_anger_events, check_anger_event_triggers } from "./firstNationsAnger.js";
 import { workplace_safety_incidents, ongoing_safety_consequences } from "./workplaceSafety.js";
 import { ask, formatCurrency, formatVolume } from "./utils.js";
+import { generate_quarter_weather } from "./weather.js";
 import { story_progression } from "./storyEvents.js";
 import { strategic_management_decisions, getManagementStatus } from "./strategicManagement.js";
 import { forest_management_planning, get_fmp_status_summary } from "./forestManagementPlanning.js";
 import { competitive_market_events, getCompetitiveMarketStatus } from "./competitiveMarket.js";
+import { quarterly_special_scenarios, decay_temporary_effects } from "./scenarios.js";
 
 class Game {
   constructor() {
@@ -28,6 +30,8 @@ class Game {
     this.mobileHud = document.getElementById("mobile-hud");
     this._bindSettingsUI();
     this._bindStatusToggle();
+    // Expose for console/manual triggers
+    try { window.__game = this; } catch {}
   }
 
   async start() {
@@ -97,6 +101,14 @@ class Game {
     // Quarterly setup (Oregon Trail-style choices)
     await quarterly_operations_setup(this.state, this.write.bind(this), this.terminal, this.input);
 
+    // Quarter weather
+    const weather = generate_quarter_weather(this.state);
+    if (weather && weather.condition !== 'clear') {
+      this.write(`🌦️ Weather: ${weather.description} (Output x${weather.harvest_multiplier.toFixed(2)}, Safety x${weather.safety_risk_multiplier.toFixed(2)})`);
+    } else {
+      this.write("🌤️ Weather: Clear conditions");
+    }
+
     // Seasonal events
     if (this.state.quarter === 1) {
       this.write("🌱 SPRING: Planning and permit season begins!");
@@ -149,6 +161,9 @@ class Game {
     // Competitive market events
     await competitive_market_events(this.state, this.write.bind(this), this.terminal, this.input);
     
+    // Special scenarios
+    await quarterly_special_scenarios(this.state, this.write.bind(this), this.terminal, this.input);
+    
     // First Nations anger events
     const angerChance = Math.max(0.05, 0.25 - this.state.community_support * 0.15);
     if (check_anger_event_triggers(this.state) || Math.random() < angerChance) {
@@ -176,7 +191,10 @@ class Game {
     await ceo_quarterly_report(this.state, this.write.bind(this));
     
     // Quarter end summary
-    await quarter_end_summary(this.state, this.write.bind(this));
+    await quarter_end_summary(this.state, this.write.bind(this), this.terminal, this.input);
+    
+    // Decay temporary modifiers
+    decay_temporary_effects(this.state, this.write.bind(this));
     
     await ask("Press Enter to continue...", this.terminal, this.input);
   }
@@ -218,10 +236,20 @@ class Game {
         <span class="info-label">COMMUNITY SUPPORT:</span> <span class="info-value" ${communityColor}>${(this.state.community_support * 100).toFixed(0)}%</span>
       </div>
       <div class="info-item">
-        <span class="info-label">OPERATIONS:</span> <span class="info-value">${this.state.operations_pace} pace, ${this.state.rations} rations</span>
+        <span class="info-label">OPERATIONS:</span> <span class="info-value">${this.state.operations_pace} pace</span>
       </div>
       <div class="info-item">
         <span class="info-label">CREW MORALE:</span> <span class="info-value">${(this.state.crew_morale * 100).toFixed(0)}%</span>
+      </div>
+      <hr>
+      <div class="info-item">
+        <span class="info-label">WEATHER:</span> <span class="info-value">${this.state.weather?.description || 'Clear'}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">OUTPUT MOD:</span> <span class="info-value">x${(this.state.weather?.harvest_multiplier ?? 1).toFixed(2)}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">SAFETY RISK:</span> <span class="info-value">x${(this.state.weather?.safety_risk_multiplier ?? 1).toFixed(2)}</span>
       </div>
       <hr>
       <div class="info-item">
@@ -277,6 +305,10 @@ class Game {
     const panel = document.getElementById('settings-panel');
     const overlay = document.getElementById('settings-overlay');
     const toggleWacky = document.getElementById('toggle-wacky');
+    const toggleAuto = document.getElementById('toggle-auto');
+    const auto1y = document.getElementById('auto-1y');
+    const auto3y = document.getElementById('auto-3y');
+    const auto10q = document.getElementById('auto-10q');
     const sizeSmall = document.getElementById('size-small');
     const sizeMedium = document.getElementById('size-medium');
     const sizeLarge = document.getElementById('size-large');
@@ -290,6 +322,13 @@ class Game {
       this.enable_wacky_events = e.target.checked;
       this.write(`Wacky events ${this.enable_wacky_events ? 'enabled' : 'disabled'}.`);
     });
+    toggleAuto?.addEventListener('change', (e) => {
+      this.enableAuto(e.target.checked);
+      this.write(`Auto Play ${e.target.checked ? 'enabled' : 'disabled'}.`);
+    });
+    auto1y?.addEventListener('click', () => this.runAutoQuarters(4));
+    auto3y?.addEventListener('click', () => this.runAutoQuarters(12));
+    auto10q?.addEventListener('click', () => this.runAutoQuarters(10));
     const setSize = (sz) => {
       document.body.dataset.textSize = sz; // CSS hooks sizes
       this.terminal.scrollTop = this.terminal.scrollHeight;
@@ -297,6 +336,32 @@ class Game {
     sizeSmall?.addEventListener('click', () => setSize('small'));
     sizeMedium?.addEventListener('click', () => setSize('medium'));
     sizeLarge?.addEventListener('click', () => setSize('large'));
+  }
+
+  enableAuto(enabled) {
+    try {
+      if (!window.AUTO_PLAY) {
+        window.AUTO_PLAY = {
+          enabled: false,
+          nextIndex: (_q, options) => Math.floor(Math.random() * options.length),
+          nextText: () => ''
+        };
+      }
+      window.AUTO_PLAY.enabled = enabled;
+    } catch {}
+  }
+
+  async runAutoQuarters(n) {
+    this.enableAuto(true);
+    for (let i = 0; i < n; i++) {
+      await this.runQuarter();
+      const [gameOver, message] = check_win_conditions(this.state);
+      if (gameOver) { this.write(`\n🎯 ${message}`); break; }
+      this.state.quarter++;
+      if (this.state.quarter > 4) { this.state.quarter = 1; this.state.year++; }
+      this.updateStatus();
+    }
+    this.write('\nAuto-run complete.');
   }
 
   _bindStatusToggle() {

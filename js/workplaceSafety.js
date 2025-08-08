@@ -1,4 +1,4 @@
-import { ask, formatCurrency } from "./utils.js";
+import { ask, askChoice, formatCurrency, calculateAverageRevenue, safeAddBudget } from "./utils.js";
 
 class SafetyIncident {
   constructor(
@@ -50,6 +50,11 @@ async function workplace_safety_incidents(state, write, terminal, input) {
     risk_multiplier *= 1.2;
   } else if (state.crew_morale > 0.7) {
     risk_multiplier *= 0.9;
+  }
+
+  // Weather risk modifier
+  if (state.weather && state.weather.safety_risk_multiplier) {
+    risk_multiplier *= state.weather.safety_risk_multiplier;
   }
 
   if (Math.random() > base_chance * risk_multiplier) {
@@ -169,7 +174,8 @@ async function workplace_safety_incidents(state, write, terminal, input) {
     operations_suspended_days = incident.operational_impact.investigation_days || 30;
     write(`   ⏸️  All operations suspended for ${operations_suspended_days} days`);
 
-    const daily_revenue = (state.revenue_per_m3 * state.annual_allowable_cut) / 365;
+    const avg_revenue = calculateAverageRevenue(state);
+    const daily_revenue = (avg_revenue * state.annual_allowable_cut) / 365;
     const lost_revenue = daily_revenue * operations_suspended_days;
     state.budget -= Math.floor(lost_revenue);
     write(`   💸 Lost revenue during suspension: ${formatCurrency(Math.floor(lost_revenue))}`);
@@ -226,7 +232,7 @@ async function workplace_safety_incidents(state, write, terminal, input) {
     write(`   📝 ${option.description_detail}`);
   }
 
-  const choice = await ask("Choose your response:", response_options.map(opt => opt.description), terminal, input);
+  const choice = await askChoice("Choose your response:", response_options.map(opt => opt.description), terminal, input);
   const chosen_response = response_options[choice];
 
   write("");
@@ -247,7 +253,7 @@ async function workplace_safety_incidents(state, write, terminal, input) {
         write(`   📝 ${option.description_detail}`);
       }
       
-      const legal_choice = await ask("Choose your response:", legal_options.map(opt => opt.description), terminal, input);
+      const legal_choice = await askChoice("Choose your response:", legal_options.map(opt => opt.description), terminal, input);
       const chosen_legal_response = legal_options[legal_choice];
       
       write("");
@@ -373,7 +379,7 @@ async function _handle_worksafebc_bribery(state, incident, response, write, term
   write("⚠️  WARNING: Bribing government officials is a serious criminal offense!");
   write("💀 Potential consequences: Criminal charges, asset forfeiture, imprisonment");
 
-  const confirm = await ask("Are you absolutely certain you want to proceed?", ["Yes, proceed with bribery", "No, choose legal response"], terminal, input);
+  const confirm = await askChoice("Are you absolutely certain you want to proceed?", ["Yes, proceed with bribery", "No, choose legal response"], terminal, input);
 
   if (confirm === 1) {
     write("📋 Returning to legal response options...");

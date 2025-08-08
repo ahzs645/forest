@@ -157,6 +157,26 @@ export class GameState {
     this.story_stage = 0;
     this.story_branch = null;
     this.story_arc = null;
+    
+    // Emergency financial management
+    this.loans_balance = 0; // Outstanding loan amount
+    this.loan_interest_rate = 0.08; // 8% quarterly
+    this.reduced_operations_mode = false; // Half upkeep costs
+    this.reduced_operations_quarters = 0; // Quarters remaining in reduced mode
+    this.asset_liquidation_used = false; // Can only sell equipment once
+    this.emergency_loans_taken = 0; // Track number of emergency loans
+    
+    // Technology and innovation
+    this.technology_level = 0; // 0-5 scale
+    this.carbon_credits_enrolled = false;
+    this.carbon_credit_revenue = 0;
+    this.insurance_coverage = false;
+    this.insurance_premium = 25000; // Per quarter
+    this.joint_venture_partner = null;
+    
+    // Market dynamics
+    this.market_cycle_phase = 'normal'; // 'boom', 'normal', 'bust'
+    this.market_price_multiplier = 1.0;
 
     // First Nations liaison and CEO
     this.fn_liaison = null;
@@ -176,6 +196,10 @@ export class GameState {
     this.under_criminal_investigation = false;
     this.criminal_convictions = 0;
     
+    // Weather system
+    this.weather = { condition: 'clear', harvest_multiplier: 1.0, safety_risk_multiplier: 1.0, description: 'Clear conditions' };
+    this.weather_history = [];
+
     // Company name
     this.companyName = "Northern Forest Solutions";
   }

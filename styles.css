@@ -98,7 +98,10 @@ body[data-text-size="large"] .terminal { font-size: 18px; }
   color: #00ff00;
   padding: 16px 20px;
   overflow-y: auto;
+  overflow-x: hidden;
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   flex: 1;
   font-size: 16px;
   line-height: 1.5;
@@ -208,21 +211,20 @@ h2 {
 
   .left-panel {
     border-right: none;
-    border-bottom: 1px solid #00ff00;
-    height: 70vh;
+    border-bottom: none;
+    height: 100vh;
   }
 
-  .right-panel {
-    width: 100%;
-    height: 30vh;
-    border-left: none;
-    border-top: 1px solid #00ff00;
-    font-size: 12px;
-  }
+  .right-panel { display: none; }
   
   .terminal {
     font-size: 14px;
     padding: 10px;
+  }
+
+  /* Hide duplicate terminal banner on mobile to reduce clutter */
+  .terminal::before {
+    display: none;
   }
 
   .mobile-hud { display: grid; }
@@ -239,6 +241,17 @@ h2 {
   .info-item {
     margin-bottom: 0.5em;
     padding-bottom: 0.3em;
+  }
+}
+
+/* Keep terminal content visible when choices overlay is open */
+.choices-open .terminal {
+  padding-bottom: 220px;
+}
+
+@media (max-width: 768px) {
+  .choices-open .terminal {
+    padding-bottom: 55vh;
   }
 }
 

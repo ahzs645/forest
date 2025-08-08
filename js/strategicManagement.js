@@ -93,6 +93,51 @@ export const MANAGEMENT_ACTIVITIES = {
     description: "Invest in employee skills and safety training",
     action: "workforce_development"
   },
+  TECHNOLOGY_UPGRADE: {
+    name: "Technology Modernization",
+    cost: 120000,
+    duration: 2,
+    prerequisites: { staff_level: "MEDIUM_COMPANY" },
+    effects: { operating_cost_reduction: 0.15, harvest_efficiency: 0.1, technology_level: 1 },
+    description: "Upgrade equipment and operational technology to reduce costs",
+    action: "technology_upgrade"
+  },
+  CARBON_CREDITS: {
+    name: "Carbon Credits Program",
+    cost: 50000,
+    duration: 1,
+    prerequisites: { staff_level: "SMALL_COMPANY", reputation_minimum: 0.4 },
+    effects: { carbon_credits_enrolled: true, reputation: 0.15 },
+    description: "Enroll in carbon credit program for preserved forest areas",
+    action: "carbon_credits"
+  },
+  INSURANCE_COVERAGE: {
+    name: "Comprehensive Insurance",
+    cost: 0, // Premium paid quarterly
+    duration: 1,
+    prerequisites: { staff_level: "SMALL_COMPANY" },
+    effects: { insurance_coverage: true, disaster_protection: 0.5 },
+    description: "Purchase insurance to protect against disasters and accidents",
+    action: "insurance"
+  },
+  JOINT_VENTURE: {
+    name: "Joint Venture Partnership",
+    cost: 75000,
+    duration: 3,
+    prerequisites: { staff_level: "MEDIUM_COMPANY", reputation_minimum: 0.5 },
+    effects: { cost_sharing: 0.3, market_access: 0.2 },
+    description: "Form partnership to share costs and access new markets",
+    action: "joint_venture"
+  },
+  CLIMATE_ADAPTATION: {
+    name: "Climate Adaptation Program",
+    cost: 80000,
+    duration: 2,
+    prerequisites: { staff_level: "MEDIUM_COMPANY" },
+    effects: { aac_decline_reduction: 0.005, weather_resilience: 0.2 },
+    description: "Implement climate adaptation strategies to preserve AAC",
+    action: "climate_adaptation"
+  },
   GOVERNMENT_RELATIONS: {
     name: "Government Relations & Lobbying",
     cost: 90000,
@@ -159,7 +204,7 @@ export async function strategic_management_decisions(state, write, terminal, inp
   initializeStrategicManagement(state);
   
   // Reset quarterly actions at start of new quarter
-  resetQuarterlyActions(state);
+  resetQuarterlyActions(state, write);
   
   const sm = state.strategic_management;
   
@@ -191,7 +236,7 @@ export async function strategic_management_decisions(state, write, terminal, inp
 /**
  * Reset quarterly action counters
  */
-function resetQuarterlyActions(state) {
+function resetQuarterlyActions(state, write) {
   const sm = state.strategic_management;
   const lastReset = sm.last_quarter_reset;
   
@@ -210,14 +255,14 @@ function resetQuarterlyActions(state) {
     }
     
     // Progress active initiatives
-    progressActiveInitiatives(state);
+    progressActiveInitiatives(state, write);
   }
 }
 
 /**
  * Progress active initiatives
  */
-function progressActiveInitiatives(state) {
+function progressActiveInitiatives(state, write) {
   const sm = state.strategic_management;
   const completed = [];
   
@@ -230,7 +275,23 @@ function progressActiveInitiatives(state) {
       // Apply benefits
       const activity = MANAGEMENT_ACTIVITIES[initiative.activity_key];
       Object.entries(activity.effects).forEach(([effect, value]) => {
-        if (sm.bonuses.hasOwnProperty(effect)) {
+        // Handle special effects
+        if (effect === 'carbon_credits_enrolled') {
+          state.carbon_credits_enrolled = value;
+          write("🌳 Carbon credits program activated - will generate revenue quarterly");
+        } else if (effect === 'insurance_coverage') {
+          state.insurance_coverage = value;
+          write("🛡️ Insurance coverage activated - quarterly premium will be charged");
+        } else if (effect === 'technology_level') {
+          state.technology_level += value;
+          write(`🔧 Technology level increased to ${state.technology_level}`);
+        } else if (effect === 'operating_cost_reduction') {
+          state.operating_cost_per_m3 *= (1 - value);
+          write(`💰 Operating costs reduced by ${(value * 100).toFixed(0)}%`);
+        } else if (effect === 'aac_decline_reduction') {
+          state.aac_decline_rate = Math.max(0.005, state.aac_decline_rate - value);
+          write(`🌲 AAC decline rate reduced to ${(state.aac_decline_rate * 100).toFixed(1)}% per year`);
+        } else if (sm.bonuses.hasOwnProperty(effect)) {
           sm.bonuses[effect] += value;
         } else if (state.hasOwnProperty(effect)) {
           state[effect] += value;
@@ -248,7 +309,7 @@ function progressActiveInitiatives(state) {
   // Remove completed initiatives
   sm.active_initiatives = sm.active_initiatives.filter(init => !completed.includes(init));
   
-  if (completed.length > 0) {
+  if (completed.length > 0 && typeof write === 'function') {
     write(`\n✅ Completed Initiatives: ${completed.map(i => i.name).join(", ")}`);
   }
 }
@@ -278,7 +339,7 @@ async function selectManagementActivity(state, write, terminal, input) {
     "❌ Skip management activities this quarter"
   ];
   
-  const choice = await askChoice("Choose management focus:", activityOptions, terminal, input);
+  const choice = await askChoice("Choose strategic action:", activityOptions, terminal, input);
   
   if (choice < availableActivities.length) {
     // Regular management activity
@@ -376,7 +437,23 @@ async function executeManagementActivity(state, write, terminal, input, activity
     if (activity.duration === 1) {
       // Immediate completion
       Object.entries(activity.effects).forEach(([effect, value]) => {
-        if (sm.bonuses.hasOwnProperty(effect)) {
+        // Handle special effects
+        if (effect === 'carbon_credits_enrolled') {
+          state.carbon_credits_enrolled = value;
+          write("🌳 Carbon credits program activated - will generate revenue quarterly");
+        } else if (effect === 'insurance_coverage') {
+          state.insurance_coverage = value;
+          write("🛡️ Insurance coverage activated - quarterly premium will be charged");
+        } else if (effect === 'technology_level') {
+          state.technology_level += value;
+          write(`🔧 Technology level increased to ${state.technology_level}`);
+        } else if (effect === 'operating_cost_reduction') {
+          state.operating_cost_per_m3 *= (1 - value);
+          write(`💰 Operating costs reduced by ${(value * 100).toFixed(0)}%`);
+        } else if (effect === 'aac_decline_reduction') {
+          state.aac_decline_rate = Math.max(0.005, state.aac_decline_rate - value);
+          write(`🌲 AAC decline rate reduced to ${(state.aac_decline_rate * 100).toFixed(1)}% per year`);
+        } else if (sm.bonuses.hasOwnProperty(effect)) {
           sm.bonuses[effect] += value;
         } else if (state.hasOwnProperty(effect)) {
           state[effect] += value;
@@ -518,7 +595,8 @@ async function delegateToCSO(state, write, terminal, input) {
   
   write("\n👔 CEO DELEGATION");
   write(`Delegate management tasks to ${state.ceo.name}`);
-  write(`CEO Effectiveness: ${(state.ceo.effectiveness * 100).toFixed(0)}%`);
+  const ceoEffectiveness = (state.ceo.performance_rating ?? 0.6);
+  write(`CEO Effectiveness: ${(ceoEffectiveness * 100).toFixed(0)}%`);
   
   const delegationOptions = [
     "Delegate permit management (90% effectiveness)",
@@ -535,11 +613,11 @@ async function delegateToCSO(state, write, terminal, input) {
     const tasks = ["Permit Management", "Stakeholder Relations", "Operational Efficiency", "Strategic Planning"];
     
     write(`✅ ${tasks[choice]} delegated to ${state.ceo.name}`);
-    write(`📊 Effectiveness: ${(effectiveness * state.ceo.effectiveness * 100).toFixed(0)}%`);
+    write(`📊 Effectiveness: ${(effectiveness * ceoEffectiveness * 100).toFixed(0)}%`);
     
     // Apply reduced benefits based on CEO effectiveness
     const baseBonus = 0.1;
-    const actualBonus = baseBonus * effectiveness * state.ceo.effectiveness;
+    const actualBonus = baseBonus * effectiveness * ceoEffectiveness;
     
     if (choice === 0) {
       state.permit_bonus += actualBonus;

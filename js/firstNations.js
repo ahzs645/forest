@@ -19,16 +19,25 @@ export async function ongoing_first_nations_consultation(state, write, terminal,
   write("--- FIRST NATIONS CONSULTATION REQUIRED ---");
   write("The following First Nations require renewed consultation:");
 
+  // Calculate consultation costs based on company size and operations
+  const base_cost = 8000;
+  const size_multiplier = Math.max(1, state.annual_allowable_cut / 100000); // Scale with AAC
+  const nations_multiplier = Math.sqrt(nations_needing_consultation.length); // Scale with number of nations
+  const scaled_cost = Math.floor(base_cost * size_multiplier * nations_multiplier);
+
   for (const fn of nations_needing_consultation) {
+    fn.consultation_cost = scaled_cost; // Update consultation cost dynamically
     write(`  - ${fn.name}: Relationship level ${fn.relationship_level.toFixed(2)}`);
   }
+  
+  write(`Consultation costs scale with company size: ${formatCurrency(scaled_cost)} per nation`);
 
   const choice = await askChoice(
     "How will you approach required consultations?",
     [
-      "Conduct comprehensive consultations with all Nations",
-      "Schedule individual meetings with each Nation",
-      "Send formal notification letters only (minimal compliance)",
+      `Conduct comprehensive consultations with all Nations (${formatCurrency(scaled_cost * 2 * nations_needing_consultation.length)})`,
+      `Schedule individual meetings with each Nation (${formatCurrency(scaled_cost * nations_needing_consultation.length)})`,
+      `Send formal notification letters only (minimal compliance) (${formatCurrency(scaled_cost * 0.5 * nations_needing_consultation.length)})`,
       "Delay consultations (risk deteriorating relationships)",
     ],
     terminal,
@@ -36,10 +45,7 @@ export async function ongoing_first_nations_consultation(state, write, terminal,
   );
 
   if (choice === 0) {
-    const total_cost = nations_needing_consultation.reduce(
-      (sum, fn) => sum + fn.consultation_cost * 2,
-      0
-    );
+    const total_cost = nations_needing_consultation.length * scaled_cost * 2;
     if (state.budget < total_cost) {
       write("Insufficient budget for comprehensive consultations.");
       return;
@@ -54,10 +60,7 @@ export async function ongoing_first_nations_consultation(state, write, terminal,
     state.reputation += 0.2;
     state.permit_bonus += 0.15;
   } else if (choice === 1) {
-    const total_cost = nations_needing_consultation.reduce(
-      (sum, fn) => sum + fn.consultation_cost,
-      0
-    );
+    const total_cost = nations_needing_consultation.length * scaled_cost;
     if (state.budget < total_cost) {
       write("Insufficient budget for individual consultations.");
       return;
