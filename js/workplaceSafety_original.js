@@ -166,22 +166,7 @@ async function workplace_safety_incidents(state, write, terminal, input) {
   write(`   🏛️  WorkSafeBC fine: ${formatCurrency(incident.wsbc_fine)}`);
   write(`   📉 Reputation damage: -${incident.reputation_penalty.toFixed(2)}`);
 
-  
-  // Apply budget protection for immediate costs
-  const affordableImmediateCosts = Math.min(incident.immediate_costs, Math.max(0, state.budget * 0.4)); // Max 40% of budget
-  safeAddBudget(state, -affordableImmediateCosts, write, 'immediate incident costs');
-  
-  if (affordableImmediateCosts < incident.immediate_costs) {
-    const remainingCosts = incident.immediate_costs - affordableImmediateCosts;
-    write(`   ⚠️  Emergency costs partially deferred: ${formatCurrency(remainingCosts)} to be paid over time`);
-    if (!state.deferred_payments) state.deferred_payments = [];
-    state.deferred_payments.push({
-      amount: remainingCosts,
-      quarterly_payment: Math.ceil(remainingCosts / 8), // 8 quarter payment plan
-      remaining_quarters: 8,
-      description: 'WorkSafeBC incident emergency costs'
-    });
-  }
+  state.budget -= incident.immediate_costs;
   state.reputation = Math.max(0.0, state.reputation - incident.reputation_penalty);
 
   let operations_suspended_days = 0;
@@ -192,16 +177,8 @@ async function workplace_safety_incidents(state, write, terminal, input) {
     const avg_revenue = calculateAverageRevenue(state);
     const daily_revenue = (avg_revenue * state.annual_allowable_cut) / 365;
     const lost_revenue = daily_revenue * operations_suspended_days;
-    
-    // Apply budget protection for lost revenue too
-    const affordableLostRevenue = Math.min(lost_revenue, Math.max(0, state.budget * 0.3)); // Max 30% of budget
-    safeAddBudget(state, -Math.floor(affordableLostRevenue), write, 'lost revenue during suspension');
-    write(`   💸 Lost revenue during suspension: ${formatCurrency(Math.floor(affordableLostRevenue))}`);
-    
-    if (affordableLostRevenue < lost_revenue) {
-      const remainingRevenueLoss = lost_revenue - affordableLostRevenue;
-      write(`   📋 Additional revenue impact deferred: ${formatCurrency(Math.floor(remainingRevenueLoss))}`);
-    }
+    state.budget -= Math.floor(lost_revenue);
+    write(`   💸 Lost revenue during suspension: ${formatCurrency(Math.floor(lost_revenue))}`);
   }
 
   write("");
@@ -459,105 +436,18 @@ async function _handle_worksafebc_bribery(state, incident, response, write, term
 }
 
 /**
- * Process deferred payment obligations
- * @param {import("./gameModels.js").GameState} state 
- * @param {(text: string) => void} write 
- */
-export async function process_deferred_payments(state, write) {
-  if (!state.deferred_payments || state.deferred_payments.length === 0) {
-    return;
-  }
-
-  let totalQuarterlyPayment = 0;
-  const completedPayments = [];
-
-  for (let i = 0; i < state.deferred_payments.length; i++) {
-    const payment = state.deferred_payments[i];
-    
-    if (payment.remaining_quarters <= 0) {
-      completedPayments.push(i);
-      continue;
-    }
-
-    totalQuarterlyPayment += payment.quarterly_payment;
-    payment.remaining_quarters -= 1;
-    payment.amount -= payment.quarterly_payment;
-
-    if (payment.remaining_quarters === 0 || payment.amount <= 0) {
-      completedPayments.push(i);
-      write(`✅ Payment plan completed: ${payment.description}`);
-    }
-  }
-
-  if (totalQuarterlyPayment > 0) {
-    write(`\n💳 DEFERRED PAYMENT OBLIGATIONS: ${formatCurrency(totalQuarterlyPayment)}`);
-    
-    if (state.budget >= totalQuarterlyPayment) {
-      safeAddBudget(state, -totalQuarterlyPayment, write, 'quarterly deferred payments');
-      write(`   ✅ All scheduled payments made`);
-    } else {
-      // Partial payment or missed payment
-      const affordablePayment = Math.max(0, state.budget * 0.8); // Use up to 80% of budget
-      if (affordablePayment > 0) {
-        safeAddBudget(state, -affordablePayment, write, 'partial deferred payments');
-        write(`   ⚠️  Partial payment made: ${formatCurrency(affordablePayment)} of ${formatCurrency(totalQuarterlyPayment)}`);
-        
-        // Add penalty for missed payment portion
-        const missedAmount = totalQuarterlyPayment - affordablePayment;
-        const penalty = Math.floor(missedAmount * 0.1);
-        if (!state.deferred_payments.find(p => p.description.includes('penalty'))) {
-          state.deferred_payments.push({
-            amount: penalty,
-            quarterly_payment: Math.ceil(penalty / 4),
-            remaining_quarters: 4,
-            description: 'Late payment penalty'
-          });
-        }
-        write(`   📈 Late payment penalty added: ${formatCurrency(penalty)}`);
-      } else {
-        write(`   ❌ MISSED PAYMENT: ${formatCurrency(totalQuarterlyPayment)}`);
-        write(`   🚨 Additional legal consequences may follow`);
-        state.reputation = Math.max(0.0, state.reputation - 0.05);
-      }
-    }
-  }
-
-  // Remove completed payments
-  for (let i = completedPayments.length - 1; i >= 0; i--) {
-    state.deferred_payments.splice(completedPayments[i], 1);
-  }
-}
-
-/**
  * Process ongoing safety consequences
  * @param {import("./gameModels.js").GameState} state 
  * @param {(text: string) => void} write 
  */
 export async function ongoing_safety_consequences(state, write) {
-  // Process deferred payments first
-  await process_deferred_payments(state, write);
-  
   // Safety violations affect future incident risk
   if (state.safety_violations > 0) {
     // Each violation increases scrutiny
     if (Math.random() < 0.1 * state.safety_violations) {
       const inspectionFine = Math.floor(Math.random() * 50000) + 10000;
-      // Apply budget protection to inspection fines too
-      const affordableInspectionFine = Math.min(inspectionFine, Math.max(0, state.budget * 0.2));
-      safeAddBudget(state, -affordableInspectionFine, write, 'WorkSafeBC inspection fine');
-      write(`\n⚠️ WORKSAFEBC INSPECTION: Fine of ${formatCurrency(affordableInspectionFine)} for safety violations`);
-      
-      if (affordableInspectionFine < inspectionFine) {
-        const remainingFine = inspectionFine - affordableInspectionFine;
-        if (!state.deferred_payments) state.deferred_payments = [];
-        state.deferred_payments.push({
-          amount: remainingFine,
-          quarterly_payment: Math.ceil(remainingFine / 4),
-          remaining_quarters: 4,
-          description: 'WorkSafeBC inspection fine payment plan'
-        });
-        write(`   📋 Remaining ${formatCurrency(remainingFine)} on payment plan`);
-      }
+      state.budget -= inspectionFine;
+      write(`\n⚠️ WORKSAFEBC INSPECTION: Fine of ${formatCurrency(inspectionFine)} for safety violations`);
     }
   }
   

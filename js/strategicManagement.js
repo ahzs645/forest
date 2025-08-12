@@ -1,6 +1,7 @@
 import { ask, askChoice, formatCurrency, formatVolume } from "./utils.js";
 import { forest_management_planning } from "./forestManagementPlanning.js";
 import { strategic_permit_submission } from "./permits.js";
+import { liaison_management } from "./liaison.js";
 
 // Quarterly Management Capacity System
 export const MANAGEMENT_CAPACITY = {
@@ -333,6 +334,7 @@ async function selectManagementActivity(state, write, terminal, input) {
     ...availableActivities.map(a => a.display),
     "🌲 Forest Management Planning",
     "📋 Strategic Permit Management", 
+    "🤝 First Nations Liaison Management",
     "👔 CEO Management Activities",
     "📊 Company Performance Review",
     "🏢 Expand Management Capacity",
@@ -357,15 +359,20 @@ async function selectManagementActivity(state, write, terminal, input) {
     sm.quarterly_actions_used++;
     
   } else if (choice === availableActivities.length + 2) {
+    // First Nations Liaison Management
+    await liaison_management(state, write, terminal, input);
+    sm.quarterly_actions_used++;
+    
+  } else if (choice === availableActivities.length + 3) {
     // CEO Management
     await delegateToCSO(state, write, terminal, input);
     
-  } else if (choice === availableActivities.length + 3) {
+  } else if (choice === availableActivities.length + 4) {
     // Performance Review
     await companyPerformanceReview(state, write);
     sm.quarterly_actions_used++;
     
-  } else if (choice === availableActivities.length + 4) {
+  } else if (choice === availableActivities.length + 5) {
     // Expand Capacity
     await expandManagementCapacity(state, write, terminal, input);
     

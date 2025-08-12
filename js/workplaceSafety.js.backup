@@ -166,7 +166,6 @@ async function workplace_safety_incidents(state, write, terminal, input) {
   write(`   🏛️  WorkSafeBC fine: ${formatCurrency(incident.wsbc_fine)}`);
   write(`   📉 Reputation damage: -${incident.reputation_penalty.toFixed(2)}`);
 
-  
   // Apply budget protection for immediate costs
   const affordableImmediateCosts = Math.min(incident.immediate_costs, Math.max(0, state.budget * 0.4)); // Max 40% of budget
   safeAddBudget(state, -affordableImmediateCosts, write, 'immediate incident costs');
@@ -182,6 +181,7 @@ async function workplace_safety_incidents(state, write, terminal, input) {
       description: 'WorkSafeBC incident emergency costs'
     });
   }
+  
   state.reputation = Math.max(0.0, state.reputation - incident.reputation_penalty);
 
   let operations_suspended_days = 0;
@@ -282,22 +282,81 @@ async function workplace_safety_incidents(state, write, terminal, input) {
       write("");
       write(`🎯 RESPONSE: ${chosen_legal_response.description}`);
       
-      // Process the legal response
-      if (state.budget >= chosen_legal_response.cost) {
-        state.budget -= chosen_legal_response.cost;
+      // Process the legal response with budget protection
+      const final_fine = Math.floor(incident.wsbc_fine * (1 - chosen_legal_response.fine_reduction));
+      const total_cost = chosen_legal_response.cost + final_fine;
+      
+      if (state.budget >= total_cost) {
+        // Can afford full payment
+        safeAddBudget(state, -chosen_legal_response.cost, write, 'legal response cost');
+        safeAddBudget(state, -final_fine, write, 'WorkSafeBC fine');
         write(`💰 Response cost: ${formatCurrency(chosen_legal_response.cost)} paid`);
-
-        const final_fine = Math.floor(incident.wsbc_fine * (1 - chosen_legal_response.fine_reduction));
-        state.budget -= final_fine;
-        write(`🏛️  Final WorkSafeBC fine: ${formatCurrency(final_fine)}`);
-
-        if (chosen_legal_response.reputation_recovery > 0) {
-          state.reputation = Math.min(1.0, state.reputation + chosen_legal_response.reputation_recovery);
-          write(`📈 Reputation recovery: +${chosen_legal_response.reputation_recovery.toFixed(2)}`);
-        } else if (chosen_legal_response.reputation_recovery < 0) {
-          state.reputation = Math.max(0.0, state.reputation + chosen_legal_response.reputation_recovery);
-          write(`📉 Additional reputation damage: ${chosen_legal_response.reputation_recovery.toFixed(2)}`);
+        write(`🏛️  Final WorkSafeBC fine: ${formatCurrency(final_fine)} paid`);
+      } else if (state.budget >= chosen_legal_response.cost) {
+        // Can afford response cost but need payment plan for fine
+        safeAddBudget(state, -chosen_legal_response.cost, write, 'legal response cost');
+        write(`💰 Response cost: ${formatCurrency(chosen_legal_response.cost)} paid`);
+        
+        const affordableFine = Math.min(final_fine, Math.max(0, state.budget * 0.5)); // Max 50% of remaining budget
+        safeAddBudget(state, -affordableFine, write, 'partial WorkSafeBC fine payment');
+        
+        if (affordableFine < final_fine) {
+          const remainingFine = final_fine - affordableFine;
+          if (!state.deferred_payments) state.deferred_payments = [];
+          state.deferred_payments.push({
+            amount: remainingFine,
+            quarterly_payment: Math.ceil(remainingFine / 12), // 12 quarter payment plan for fines
+            remaining_quarters: 12,
+            description: 'WorkSafeBC fine payment plan'
+          });
+          write(`🏛️  WorkSafeBC fine: ${formatCurrency(affordableFine)} paid, ${formatCurrency(remainingFine)} on payment plan`);
+          write(`   📋 Quarterly payments: ${formatCurrency(Math.ceil(remainingFine / 12))} for 3 years`);
+        } else {
+          write(`🏛️  Final WorkSafeBC fine: ${formatCurrency(final_fine)} paid`);
         }
+      } else {
+        // Cannot afford even the response cost
+        write("❌ INSUFFICIENT BUDGET: Cannot afford response costs!");
+        write("🤝 WorkSafeBC offers emergency payment plan for struggling companies");
+        
+        // Emergency payment plan for everything
+        if (!state.deferred_payments) state.deferred_payments = [];
+        
+        const emergency_payment = Math.floor((total_cost * 0.1)); // 10% upfront
+        const remaining_amount = total_cost - emergency_payment;
+        
+        if (state.budget >= emergency_payment) {
+          safeAddBudget(state, -emergency_payment, write, 'emergency payment plan upfront');
+          write(`💰 Emergency upfront payment: ${formatCurrency(emergency_payment)} paid`);
+          
+          state.deferred_payments.push({
+            amount: remaining_amount,
+            quarterly_payment: Math.ceil(remaining_amount / 16), // 16 quarter payment plan
+            remaining_quarters: 16,
+            description: 'WorkSafeBC emergency payment plan'
+          });
+          write(`📋 Remaining ${formatCurrency(remaining_amount)} on 4-year payment plan`);
+          write(`   💸 Quarterly payments: ${formatCurrency(Math.ceil(remaining_amount / 16))}`);
+        } else {
+          // Truly bankrupt scenario
+          write("🚨 COMPANY INSOLVENCY: WorkSafeBC may seize assets");
+          state.deferred_payments.push({
+            amount: total_cost,
+            quarterly_payment: Math.ceil(total_cost / 20), // 20 quarter payment plan
+            remaining_quarters: 20,
+            description: 'WorkSafeBC insolvency payment plan'
+          });
+          write(`⚖️  Court-ordered payment plan: ${formatCurrency(Math.ceil(total_cost / 20))} quarterly for 5 years`);
+        }
+      }
+
+      if (chosen_legal_response.reputation_recovery > 0) {
+        state.reputation = Math.min(1.0, state.reputation + chosen_legal_response.reputation_recovery);
+        write(`📈 Reputation recovery: +${chosen_legal_response.reputation_recovery.toFixed(2)}`);
+      } else if (chosen_legal_response.reputation_recovery < 0) {
+        state.reputation = Math.max(0.0, state.reputation + chosen_legal_response.reputation_recovery);
+        write(`📉 Additional reputation damage: ${chosen_legal_response.reputation_recovery.toFixed(2)}`);
+      }
 
         // Handle specific response types
         const legal_choice_index = response_options.findIndex(opt => opt === chosen_legal_response);
@@ -327,6 +386,7 @@ async function workplace_safety_incidents(state, write, terminal, input) {
       }
     }
     
+    // After bribery handling, proceed to industry impact and end function
     write("");
     write("📊 INDUSTRY IMPACT:");
     write("🔍 Increased regulatory scrutiny across BC forestry sector");
@@ -341,45 +401,99 @@ async function workplace_safety_incidents(state, write, terminal, input) {
     return true;
   }
 
-  if (state.budget >= chosen_response.cost) {
-    state.budget -= chosen_response.cost;
+  // Process main response (non-illegal path) with budget protection
+  const final_fine = Math.floor(incident.wsbc_fine * (1 - chosen_response.fine_reduction));
+  const total_cost = chosen_response.cost + final_fine;
+  
+  if (state.budget >= total_cost) {
+    // Can afford full payment
+    safeAddBudget(state, -chosen_response.cost, write, 'response cost');
+    safeAddBudget(state, -final_fine, write, 'WorkSafeBC fine');
     write(`💰 Response cost: ${formatCurrency(chosen_response.cost)} paid`);
-
-    const final_fine = Math.floor(incident.wsbc_fine * (1 - chosen_response.fine_reduction));
-    state.budget -= final_fine;
-    write(`🏛️  Final WorkSafeBC fine: ${formatCurrency(final_fine)}`);
-
-    if (chosen_response.reputation_recovery > 0) {
-      state.reputation = Math.min(1.0, state.reputation + chosen_response.reputation_recovery);
-      write(`📈 Reputation recovery: +${chosen_response.reputation_recovery.toFixed(2)}`);
-    } else if (chosen_response.reputation_recovery < 0) {
-      state.reputation = Math.max(0.0, state.reputation + chosen_response.reputation_recovery);
-      write(`📉 Additional reputation damage: ${chosen_response.reputation_recovery.toFixed(2)}`);
-    }
-
-    if (choice === 0) {
-      // Full cooperation
-      write("✅ WorkSafeBC commends company's proactive response");
-      write("📈 Future inspection frequency reduced");
-      if (!state.safety_violations) {
-        state.safety_violations = 0;
-      }
-      state.safety_violations = Math.max(0, state.safety_violations - 1);
-    } else if (choice === 2) {
-      // Challenge findings
-      write("⚖️  Legal battle with WorkSafeBC ongoing");
-      write("📰 Media portrays company as fighting safety regulations");
-      write("🔍 Future inspections will be more frequent and thorough");
-      if (!state.safety_violations) {
-        state.safety_violations = 0;
-      }
-      state.safety_violations += 1;
+    write(`🏛️  Final WorkSafeBC fine: ${formatCurrency(final_fine)} paid`);
+  } else if (state.budget >= chosen_response.cost) {
+    // Can afford response cost but need payment plan for fine
+    safeAddBudget(state, -chosen_response.cost, write, 'response cost');
+    write(`💰 Response cost: ${formatCurrency(chosen_response.cost)} paid`);
+    
+    const affordableFine = Math.min(final_fine, Math.max(0, state.budget * 0.5)); // Max 50% of remaining budget
+    safeAddBudget(state, -affordableFine, write, 'partial WorkSafeBC fine payment');
+    
+    if (affordableFine < final_fine) {
+      const remainingFine = final_fine - affordableFine;
+      if (!state.deferred_payments) state.deferred_payments = [];
+      state.deferred_payments.push({
+        amount: remainingFine,
+        quarterly_payment: Math.ceil(remainingFine / 12), // 12 quarter payment plan for fines
+        remaining_quarters: 12,
+        description: 'WorkSafeBC fine payment plan'
+      });
+      write(`🏛️  WorkSafeBC fine: ${formatCurrency(affordableFine)} paid, ${formatCurrency(remainingFine)} on payment plan`);
+      write(`   📋 Quarterly payments: ${formatCurrency(Math.ceil(remainingFine / 12))} for 3 years`);
+    } else {
+      write(`🏛️  Final WorkSafeBC fine: ${formatCurrency(final_fine)} paid`);
     }
   } else {
+    // Cannot afford even the response cost
     write("❌ INSUFFICIENT BUDGET: Cannot afford response costs!");
-    write("🚨 Bankruptcy proceedings may be initiated");
-    write(`💸 Full WorkSafeBC fine imposed: ${formatCurrency(incident.wsbc_fine)}`);
-    state.budget -= incident.wsbc_fine;
+    write("🤝 WorkSafeBC offers emergency payment plan for struggling companies");
+    
+    // Emergency payment plan for everything
+    if (!state.deferred_payments) state.deferred_payments = [];
+    
+    const emergency_payment = Math.floor((total_cost * 0.1)); // 10% upfront
+    const remaining_amount = total_cost - emergency_payment;
+    
+    if (state.budget >= emergency_payment) {
+      safeAddBudget(state, -emergency_payment, write, 'emergency payment plan upfront');
+      write(`💰 Emergency upfront payment: ${formatCurrency(emergency_payment)} paid`);
+      
+      state.deferred_payments.push({
+        amount: remaining_amount,
+        quarterly_payment: Math.ceil(remaining_amount / 16), // 16 quarter payment plan
+        remaining_quarters: 16,
+        description: 'WorkSafeBC emergency payment plan'
+      });
+      write(`📋 Remaining ${formatCurrency(remaining_amount)} on 4-year payment plan`);
+      write(`   💸 Quarterly payments: ${formatCurrency(Math.ceil(remaining_amount / 16))}`);
+    } else {
+      // Truly bankrupt scenario
+      write("🚨 COMPANY INSOLVENCY: WorkSafeBC may seize assets");
+      state.deferred_payments.push({
+        amount: total_cost,
+        quarterly_payment: Math.ceil(total_cost / 20), // 20 quarter payment plan
+        remaining_quarters: 20,
+        description: 'WorkSafeBC insolvency payment plan'
+      });
+      write(`⚖️  Court-ordered payment plan: ${formatCurrency(Math.ceil(total_cost / 20))} quarterly for 5 years`);
+    }
+  }
+
+  if (chosen_response.reputation_recovery > 0) {
+    state.reputation = Math.min(1.0, state.reputation + chosen_response.reputation_recovery);
+    write(`📈 Reputation recovery: +${chosen_response.reputation_recovery.toFixed(2)}`);
+  } else if (chosen_response.reputation_recovery < 0) {
+    state.reputation = Math.max(0.0, state.reputation + chosen_response.reputation_recovery);
+    write(`📉 Additional reputation damage: ${chosen_response.reputation_recovery.toFixed(2)}`);
+  }
+
+  if (choice === 0) {
+    // Full cooperation
+    write("✅ WorkSafeBC commends company's proactive response");
+    write("📈 Future inspection frequency reduced");
+    if (!state.safety_violations) {
+      state.safety_violations = 0;
+    }
+    state.safety_violations = Math.max(0, state.safety_violations - 1);
+  } else if (choice === 2) {
+    // Challenge findings
+    write("⚖️  Legal battle with WorkSafeBC ongoing");
+    write("📰 Media portrays company as fighting safety regulations");
+    write("🔍 Future inspections will be more frequent and thorough");
+    if (!state.safety_violations) {
+      state.safety_violations = 0;
+    }
+    state.safety_violations += 1;
   }
 
   write("");
@@ -416,7 +530,7 @@ async function _handle_worksafebc_bribery(state, incident, response, write, term
     return false;
   }
 
-  state.budget -= response.cost;
+  safeAddBudget(state, -response.cost, write, 'bribery attempt');
 
   if (Math.random() < response.detection_risk) {
     write("🚨 BRIBERY DETECTED!");
@@ -424,16 +538,31 @@ async function _handle_worksafebc_bribery(state, incident, response, write, term
     write("⚖️  Criminal charges laid for corruption of government officials");
 
     const criminal_fine = 1500000;
-    state.budget -= criminal_fine;
+    const doubled_fine = incident.wsbc_fine * 2;
+    const total_penalties = criminal_fine + doubled_fine;
+    
+    // Apply budget protection even for criminal penalties
+    const affordablePenalties = Math.min(total_penalties, Math.max(0, state.budget * 0.8)); // Max 80% of budget
+    safeAddBudget(state, -affordablePenalties, write, 'criminal penalties');
+    
     state.reputation = Math.max(0.0, state.reputation - 0.6);
 
     write(`💸 Criminal fine: ${formatCurrency(criminal_fine)}`);
     write("📉 Massive reputation damage: -0.6");
     write("🏛️  Original WorkSafeBC fine DOUBLED as penalty");
-
-    const doubled_fine = incident.wsbc_fine * 2;
-    state.budget -= doubled_fine;
     write(`💸 Enhanced WorkSafeBC fine: ${formatCurrency(doubled_fine)}`);
+    
+    if (affordablePenalties < total_penalties) {
+      const remainingPenalties = total_penalties - affordablePenalties;
+      if (!state.deferred_payments) state.deferred_payments = [];
+      state.deferred_payments.push({
+        amount: remainingPenalties,
+        quarterly_payment: Math.ceil(remainingPenalties / 24), // 24 quarter payment plan (6 years)
+        remaining_quarters: 24,
+        description: 'Criminal conviction payment plan'
+      });
+      write(`⚖️  Criminal court payment plan: ${formatCurrency(Math.ceil(remainingPenalties / 24))} quarterly for 6 years`);
+    }
 
     write("🚫 Company blacklisted from government contracts");
     write("📰 International media coverage of corruption scandal");
@@ -443,8 +572,24 @@ async function _handle_worksafebc_bribery(state, incident, response, write, term
     write("🤫 Bribery successful - inspectors accept payment");
 
     const reduced_fine = Math.floor(incident.wsbc_fine * (1 - response.fine_reduction));
-    state.budget -= reduced_fine;
-    write(`🏛️  'Reduced' WorkSafeBC fine: ${formatCurrency(reduced_fine)}`);
+    
+    // Apply budget protection to reduced fine
+    const affordableReducedFine = Math.min(reduced_fine, Math.max(0, state.budget * 0.6));
+    safeAddBudget(state, -affordableReducedFine, write, 'reduced WorkSafeBC fine');
+    
+    if (affordableReducedFine < reduced_fine) {
+      const remainingFine = reduced_fine - affordableReducedFine;
+      if (!state.deferred_payments) state.deferred_payments = [];
+      state.deferred_payments.push({
+        amount: remainingFine,
+        quarterly_payment: Math.ceil(remainingFine / 8),
+        remaining_quarters: 8,
+        description: 'Bribed inspector "reduced" fine payment plan'
+      });
+      write(`🏛️  'Reduced' WorkSafeBC fine: ${formatCurrency(affordableReducedFine)} paid, ${formatCurrency(remainingFine)} deferred`);
+    } else {
+      write(`🏛️  'Reduced' WorkSafeBC fine: ${formatCurrency(reduced_fine)}`);
+    }
 
     write("⚠️  WARNING: Corrupt officials now have leverage over company");
     write("💰 Expect future 'requests' for additional payments");
