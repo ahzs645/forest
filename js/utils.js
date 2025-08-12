@@ -108,6 +108,14 @@ export function ask(question, terminal, input) {
       }
       terminal.textContent += `\n${question}\n> ${answer}\n`;
       requestAnimationFrame(() => { terminal.scrollTop = terminal.scrollHeight; });
+      // Ensure clean UI state after auto-play
+      const buttonContainer = document.getElementById('button-container');
+      const input = document.getElementById('input');
+      try { 
+        if (buttonContainer) buttonContainer.style.display = 'none'; 
+        if (input) input.style.display = 'block';
+        document.body.classList.remove('choices-open');
+      } catch {}
       return resolve(answer);
     }
     // Make sure text input is visible and button container is hidden
@@ -202,6 +210,14 @@ export function askChoiceWithButtons(question, options, terminal, input) {
       const idx = auto.nextIndex?.(question, options) ?? Math.floor(Math.random() * options.length);
       terminal.textContent += `\n${question}\n> ${idx + 1}. ${options[idx]}\n\n------------------------------------------------------------\n\n`;
       requestAnimationFrame(() => { terminal.scrollTop = terminal.scrollHeight; });
+      // Ensure clean UI state after auto-play choice
+      const buttonContainer = document.getElementById('button-container');
+      const input = document.getElementById('input');
+      try { 
+        if (buttonContainer) buttonContainer.style.display = 'none'; 
+        if (input) input.style.display = 'block';
+        document.body.classList.remove('choices-open');
+      } catch {}
       return resolve(idx);
     }
     const buttonContainer = document.getElementById('button-container');
@@ -391,5 +407,35 @@ export async function askChoice(question, options, terminal, input) {
         terminal.scrollTop = terminal.scrollHeight;
       }, 0);
     }
+  }
+}
+
+/**
+ * Resets the UI to a clean state, ensuring input is visible and buttons are hidden
+ */
+export function resetUIState() {
+  try {
+    const buttonContainer = document.getElementById('button-container');
+    const input = document.getElementById('input');
+    
+    if (buttonContainer) {
+      buttonContainer.style.display = 'none';
+      buttonContainer.innerHTML = '';
+    }
+    if (input) {
+      input.style.display = 'block';
+      input.value = '';
+      input.placeholder = 'Enter command...';
+    }
+    document.body.classList.remove('choices-open');
+    
+    // Focus the input if it's visible
+    requestAnimationFrame(() => {
+      if (input && input.style.display !== 'none') {
+        input.focus();
+      }
+    });
+  } catch (e) {
+    console.warn('Could not reset UI state:', e);
   }
 }

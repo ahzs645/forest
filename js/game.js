@@ -362,6 +362,10 @@ class Game {
       this.updateStatus();
     }
     this.write('\nAuto-run complete.');
+    this.enableAuto(false);
+    // Reset UI state to clean state after auto-play
+    const { resetUIState } = await import('./utils.js');
+    resetUIState();
   }
 
   _bindStatusToggle() {
