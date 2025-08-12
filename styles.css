@@ -207,12 +207,16 @@ h2 {
 @media (max-width: 768px) {
   .game-container {
     flex-direction: column;
+    height: 100vh;
+    height: 100dvh; /* Use dynamic viewport height on mobile */
   }
 
   .left-panel {
     border-right: none;
     border-bottom: none;
     height: 100vh;
+    height: 100dvh; /* Use dynamic viewport height on mobile */
+    min-height: 0; /* Allow shrinking */
   }
 
   .right-panel { display: none; }
@@ -220,6 +224,9 @@ h2 {
   .terminal {
     font-size: 14px;
     padding: 10px;
+    flex: 1;
+    min-height: 0; /* Allow shrinking */
+    padding-bottom: 60px; /* Extra space for input */
   }
 
   /* Hide duplicate terminal banner on mobile to reduce clutter */
@@ -232,6 +239,15 @@ h2 {
   #input {
     font-size: 16px; /* Keep at 16px to prevent zoom on iOS */
     padding: 12px 15px;
+    position: sticky;
+    bottom: 0;
+    background: #000;
+    border-top: 1px solid #00ff00;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    margin: 0;
+    flex-shrink: 0; /* Don't shrink the input */
   }
   
   h2 {
@@ -242,6 +258,15 @@ h2 {
     margin-bottom: 0.5em;
     padding-bottom: 0.3em;
   }
+
+  /* Ensure settings panel is properly positioned on mobile */
+  .settings-panel {
+    right: 8px;
+    top: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+  }
 }
 
 /* Keep terminal content visible when choices overlay is open */
@@ -251,7 +276,7 @@ h2 {
 
 @media (max-width: 768px) {
   .choices-open .terminal {
-    padding-bottom: 55vh;
+    padding-bottom: 60vh; /* Handled in mobile button adjustments */
   }
 }
 
@@ -383,25 +408,45 @@ h2 {
 /* Mobile adjustments for buttons */
 @media (max-width: 768px) {
   .button-container {
-    position: absolute;
+    position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 12px 20px;
-    gap: 8px;
+    padding: 16px 20px;
+    gap: 10px;
     max-height: 50vh;
     z-index: 1000;
+    background: #000;
+    border-top: 2px solid #00ff00;
+    box-shadow: 0 -4px 8px rgba(0, 255, 0, 0.1);
   }
 
   .button-question {
     font-size: 16px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+    line-height: 1.4;
   }
 
   .choice-button {
-    padding: 14px 16px;
+    padding: 16px 18px;
     font-size: 16px;
-    border-radius: 6px;
+    border-radius: 8px;
+    min-height: 48px; /* Ensure touch-friendly button size */
+    display: flex;
+    align-items: center;
+  }
+
+  /* Ensure choices are properly spaced from terminal content */
+  .choices-open .terminal {
+    padding-bottom: 60vh; /* More space for button overlay */
+  }
+
+  /* Better mobile viewport handling */
+  body {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
   }
 }
 
