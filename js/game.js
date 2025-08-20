@@ -156,7 +156,10 @@ class Game {
     }
 
     // Single quarterly management decision - core gameplay
-    await annual_management_decisions(this.state, this.write.bind(this), this.terminal, this.input);
+    const managementResult = await annual_management_decisions(this.state, this.write.bind(this), this.terminal, this.input);
+    if (managementResult === "GAME_OVER") {
+      return; // Exit quarter immediately if Don Kayne was hired
+    }
 
     // Random events - streamlined and balanced
     const eventTypes = [];

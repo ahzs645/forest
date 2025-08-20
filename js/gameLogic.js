@@ -445,7 +445,10 @@ export async function annual_management_decisions(state, write, terminal, input)
       break;
       
     case 2: // CEO management
-      await ceo_management(state, write, terminal, input);
+      const ceoResult = await ceo_management(state, write, terminal, input);
+      if (ceoResult === "GAME_OVER") {
+        return "GAME_OVER"; // Propagate game over up the call stack
+      }
       break;
 
     case 3: // Silviculture Investments
