@@ -192,6 +192,19 @@ export function ask(question, terminal, input) {
     };
 
     input.addEventListener("keydown", listener);
+    
+    // Add timeout protection to prevent freezing
+    const timeout = setTimeout(() => {
+      input.removeEventListener("keydown", listener);
+      resolve(""); // Default empty response on timeout
+    }, 30000); // 30 second timeout
+    
+    // Clear timeout when we get a response
+    const originalResolve = resolve;
+    resolve = (value) => {
+      clearTimeout(timeout);
+      originalResolve(value);
+    };
   });
 }
 
@@ -237,7 +250,11 @@ export function askChoiceWithButtons(question, options, terminal, input) {
     questionHeader.textContent = question;
     buttonContainer.appendChild(questionHeader);
     
+    let choiceCompleted = false;
     const handleChoice = (index) => {
+      if (choiceCompleted) return;
+      choiceCompleted = true;
+      
       // Show the user's choice in terminal
       terminal.textContent += `> ${index + 1}. ${options[index]}\n`;
       // Visual separator to mark a new screen/phase
@@ -258,6 +275,20 @@ export function askChoiceWithButtons(question, options, terminal, input) {
       });
       
       resolve(index);
+    };
+    
+    // Add timeout protection for choice buttons
+    const choiceTimeout = setTimeout(() => {
+      if (!choiceCompleted) {
+        handleChoice(0); // Default to first option on timeout
+      }
+    }, 45000); // 45 second timeout for choices
+    
+    // Override resolve to clear timeout
+    const originalChoiceResolve = resolve;
+    resolve = (value) => {
+      clearTimeout(choiceTimeout);
+      originalChoiceResolve(value);
     };
     
     // Keyboard navigation handler

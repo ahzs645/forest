@@ -92,10 +92,9 @@ class Game {
 
   async runQuarter() {
     const quarter_names = ["", "Q1 (Spring)", "Q2 (Summer)", "Q3 (Fall)", "Q4 (Winter)"];
-    const season_emojis = ["", "🌱", "☀️", "🍂", "❄️"];
     
     this.write(`\n${"-".repeat(60)}`);
-    this.write(`${this.state.companyName} - ${season_emojis[this.state.quarter]} ${quarter_names[this.state.quarter]} Year ${this.state.year}`);
+    this.write(`${this.state.companyName} - ${quarter_names[this.state.quarter]} Year ${this.state.year}`);
     this.write(`${"-".repeat(60)}\n`);
 
     // Quarterly setup (Oregon Trail-style choices)
@@ -104,70 +103,97 @@ class Game {
     // Quarter weather
     const weather = generate_quarter_weather(this.state);
     if (weather && weather.condition !== 'clear') {
-      this.write(`🌦️ Weather: ${weather.description} (Output x${weather.harvest_multiplier.toFixed(2)}, Safety x${weather.safety_risk_multiplier.toFixed(2)})`);
+      this.write(`Weather: ${weather.description} (Output x${weather.harvest_multiplier.toFixed(2)}, Safety x${weather.safety_risk_multiplier.toFixed(2)})`);
     } else {
-      this.write("🌤️ Weather: Clear conditions");
+      this.write("Weather: Clear conditions");
     }
 
-    // Seasonal events
+    // Core seasonal activities - streamlined and focused
     if (this.state.quarter === 1) {
-      this.write("🌱 SPRING: Planning and permit season begins!");
-      await this.eventsRouter.random_policy_events(this.state, this.write.bind(this), this.terminal, this.input);
-      await ongoing_first_nations_consultation(this.state, this.write.bind(this), this.terminal, this.input);
-      await story_progression(this.state, this.write.bind(this), this.terminal, this.input);
+      this.write("SPRING: Planning and permit season begins!");
+      // Core spring activities: planning and permits
       await plan_harvest_schedule(this.state, this.write.bind(this), this.terminal, this.input);
-    } else if (this.state.quarter === 2) {
-      this.write("☀️ SUMMER: Prime harvesting season!");
-      await process_permits(this.state, this.write.bind(this), this.terminal, this.input);
-      await conduct_harvest_operations(this.state, this.write.bind(this), this.terminal, this.input);
-    } else if (this.state.quarter === 3) {
-      this.write("🍂 FALL: Harvest continues, winter prep begins!");
+      await ongoing_first_nations_consultation(this.state, this.write.bind(this), this.terminal, this.input);
+      
+      // Occasional spring events
+      if (Math.random() < 0.4) {
+        await this.eventsRouter.random_policy_events(this.state, this.write.bind(this), this.terminal, this.input);
+      }
+      if (Math.random() < 0.3) {
+        await story_progression(this.state, this.write.bind(this), this.terminal, this.input);
+      }
+    } else if (this.state.quarter === 2 || this.state.quarter === 3) {
+      const season = this.state.quarter === 2 ? "SUMMER" : "FALL";
+      this.write(`${season}: ${this.state.quarter === 2 ? "Prime" : "Continued"} harvesting season!`);
+      
+      // Core harvesting activities
       await process_permits(this.state, this.write.bind(this), this.terminal, this.input);
       await conduct_harvest_operations(this.state, this.write.bind(this), this.terminal, this.input);
     } else {
-      this.write("❄️ WINTER: Planning season, limited field operations!");
-      await maintain_certifications(this.state, this.write.bind(this), this.terminal, this.input);
-      await this.eventsRouter.market_fluctuations(this.state, this.write.bind(this), this.terminal, this.input);
+      this.write("WINTER: Planning season, limited field operations!");
       
-      // Pay liaison annual fee if applicable
+      // Annual costs and planning
       if (this.state.fn_liaison) {
         const liaisonCost = this.state.fn_liaison.cost;
         if (this.state.budget >= liaisonCost) {
           this.state.budget -= liaisonCost;
-          this.write(`💰 Annual liaison fee: ${formatCurrency(liaisonCost)} paid to ${this.state.fn_liaison.name}`);
+          this.write(`Annual liaison fee: ${formatCurrency(liaisonCost)} paid to ${this.state.fn_liaison.name}`);
         } else {
-          this.write(`❌ Cannot afford liaison fee! ${this.state.fn_liaison.name} contract terminated`);
+          this.write(`Cannot afford liaison fee! ${this.state.fn_liaison.name} contract terminated`);
           this.state.fn_liaison = null;
         }
       }
       
       await pay_ceo_annual_costs(this.state, this.write.bind(this));
+      
+      // Occasional winter activities
+      if (Math.random() < 0.5) {
+        await maintain_certifications(this.state, this.write.bind(this), this.terminal, this.input);
+      }
+      if (Math.random() < 0.4) {
+        await this.eventsRouter.market_fluctuations(this.state, this.write.bind(this), this.terminal, this.input);
+      }
     }
 
-    // Quarterly management decisions (more interactivity)
+    // Single quarterly management decision - core gameplay
     await annual_management_decisions(this.state, this.write.bind(this), this.terminal, this.input);
 
+    // Random events - streamlined and balanced
+    const eventTypes = [];
+    
     // Wacky events if enabled
-    if (this.enable_wacky_events) {
-      await quarterly_wacky_events(this.state, this.write.bind(this), this.terminal, this.input);
+    if (this.enable_wacky_events && Math.random() < 0.3) {
+      eventTypes.push(() => quarterly_wacky_events(this.state, this.write.bind(this), this.terminal, this.input));
     }
     
     // Workplace safety incidents
-    await workplace_safety_incidents(this.state, this.write.bind(this), this.terminal, this.input);
+    if (Math.random() < 0.25) {
+      eventTypes.push(() => workplace_safety_incidents(this.state, this.write.bind(this), this.terminal, this.input));
+    }
     
-    // Random illegal opportunities event
+    // Illegal opportunities - now appears as random encounter, not menu choice
     await random_illegal_opportunities_event(this.state, this.write.bind(this), this.terminal, this.input);
     
     // Competitive market events
-    await competitive_market_events(this.state, this.write.bind(this), this.terminal, this.input);
+    if (Math.random() < 0.35) {
+      eventTypes.push(() => competitive_market_events(this.state, this.write.bind(this), this.terminal, this.input));
+    }
     
     // Special scenarios
-    await quarterly_special_scenarios(this.state, this.write.bind(this), this.terminal, this.input);
+    if (Math.random() < 0.2) {
+      eventTypes.push(() => quarterly_special_scenarios(this.state, this.write.bind(this), this.terminal, this.input));
+    }
     
-    // First Nations anger events
-    const angerChance = Math.max(0.05, 0.25 - this.state.community_support * 0.15);
+    // First Nations anger events - triggered by conditions or chance
+    const angerChance = Math.max(0.05, 0.2 - this.state.community_support * 0.1);
     if (check_anger_event_triggers(this.state) || Math.random() < angerChance) {
-      await random_first_nations_anger_events(this.state, this.write.bind(this), this.terminal, this.input);
+      eventTypes.push(() => random_first_nations_anger_events(this.state, this.write.bind(this), this.terminal, this.input));
+    }
+    
+    // Execute one random event type if any are queued (prevents event overload)
+    if (eventTypes.length > 0) {
+      const randomEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+      await randomEvent();
     }
     
     // CEO automated decisions
@@ -184,8 +210,7 @@ class Game {
     // Continue multi-stage illegal operations
     await continue_illegal_operations(this.state, this.write.bind(this), this.terminal, this.input);
     
-    // Strategic management decisions
-    await strategic_management_decisions(this.state, this.write.bind(this), this.terminal, this.input);
+    // Strategic management decisions - replaced by combined quarterly activities above
     
     // CEO quarterly report
     await ceo_quarterly_report(this.state, this.write.bind(this));

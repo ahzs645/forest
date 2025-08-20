@@ -52,14 +52,14 @@ class ComplexIllegalOperation {
  * @param {HTMLInputElement} input
  */
 export async function random_illegal_opportunities_event(state, write, terminal, input) {
-  // Random chance each quarter - 25% chance
-  if (Math.random() > 0.25) {
+  // Random chance each quarter - 45% chance (increased to be less rare)
+  if (Math.random() > 0.45) {
     return true; // Continue game flow even if no event triggered
   }
 
-  write("\n--- 🔴 ILLEGAL BUSINESS OPPORTUNITIES ---");
-  write("💀 A shady contact approaches you with some 'opportunities'...");
-  write("⚠️  These offers could be lucrative but carry serious risks");
+  write("\n--- ILLEGAL BUSINESS OPPORTUNITIES ---");
+  write("A shady contact approaches you with some 'opportunities'...");
+  write("These offers could be lucrative but carry serious risks");
 
   // Simple illegal operations
   const simple_operations = [
@@ -302,47 +302,32 @@ export async function random_illegal_opportunities_event(state, write, terminal,
     }),
   ];
 
-  // Mix simple and complex operations randomly
-  const all_operations = [];
+  // Pick ONE random opportunity (simple or complex based on conditions)
+  const all_operations = [...simple_operations];
   
-  // Add 2-3 random simple operations
-  const simpleCount = Math.floor(Math.random() * 2) + 2;
-  for (let i = 0; i < simpleCount && simple_operations.length > 0; i++) {
-    const index = Math.floor(Math.random() * simple_operations.length);
-    all_operations.push(simple_operations.splice(index, 1)[0]);
-  }
-  
-  // Add 1-2 random complex operations if conditions allow
+  // Add complex operations if conditions allow
   if (state.year >= 2 && state.reputation > 0.3) {
-    const complexCount = Math.floor(Math.random() * 2) + 1;
-    for (let i = 0; i < complexCount && complex_operations.length > 0; i++) {
-      const index = Math.floor(Math.random() * complex_operations.length);
-      all_operations.push(complex_operations.splice(index, 1)[0]);
-    }
+    all_operations.push(...complex_operations);
   }
 
-  // Shuffle the operations
-  all_operations.sort(() => Math.random() - 0.5);
+  // Randomly pick one opportunity
+  const chosen_operation = all_operations[Math.floor(Math.random() * all_operations.length)];
+  
+  // Present the single opportunity
+  const operationName = chosen_operation.type === "simple" 
+    ? chosen_operation.description 
+    : `${chosen_operation.description} [COMPLEX ${chosen_operation.stages.length}-STAGE]`;
+    
+  write(`\nOPPORTUNITY: ${operationName}`);
+  write(`"${chosen_operation.story}"`);
 
-  // Present options
-  const options = all_operations.map(op => {
-    if (op.type === "simple") {
-      return op.description;
-    } else {
-      return `${op.description} [COMPLEX ${op.stages.length}-STAGE]`;
-    }
-  });
-  options.push("Decline all illegal activities");
+  const choice = await askChoice("Do you take this opportunity?", ["Accept the deal", "Decline and stay legal"], terminal, input);
 
-  const choice = await askChoice("\nChoose your path:", options, terminal, input);
-
-  if (choice === all_operations.length) {
-    write("\n✅ Maintaining legal compliance and ethical standards");
+  if (choice === 1) {
+    write("\nYou decline the shady offer and maintain ethical standards.");
     state.reputation += 0.05;
     return true;
   }
-
-  const chosen_operation = all_operations[choice];
   
   if (chosen_operation.type === "simple") {
     return await execute_simple_illegal_act(state, chosen_operation, write, terminal, input);

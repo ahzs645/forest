@@ -404,8 +404,8 @@ async function handle_silviculture_investments(state, write, terminal, input) {
  */
 export async function annual_management_decisions(state, write, terminal, input) {
   // Quarterly management decisions (every quarter)
-  write("\n--- QUARTERLY ACTIVITIES ---");
-  write("💡 Choose an activity for this quarter:");
+  write("\n--- QUARTERLY MANAGEMENT ---");
+  write("Choose your focus for this quarter:");
   
   const managementOptions = [
     "Focus on permit applications",
@@ -428,11 +428,11 @@ export async function annual_management_decisions(state, write, terminal, input)
   switch (choice) {
     case 0: // Permit applications
       if (state.harvest_blocks.filter(b => b.permit_status === "pending").length > 0) {
-        write("📋 Focusing on permit applications...");
+        write("Focusing on permit applications...");
         state.harvest_blocks.forEach(block => {
-          if (block.permit_status === "pending" && Math.random() < 0.5) {
+          if (block.permit_status === "pending" && Math.random() < 0.7) { // Increased chance
             block.permit_status = "approved";
-            write(`✅ Permit approved for block ${block.id}`);
+            write(`Permit approved for block ${block.id}`);
           }
         });
       } else {
@@ -458,7 +458,7 @@ export async function annual_management_decisions(state, write, terminal, input)
         if (Math.random() < 0.7) {
           state.certifications.push("FSC");
           state.reputation += 0.15;
-          write("🌲 FSC certification obtained! Reputation improved.");
+          write("FSC certification obtained! Reputation improved.");
         } else {
           write("Certification application pending review.");
         }
@@ -473,7 +473,7 @@ export async function annual_management_decisions(state, write, terminal, input)
       if (state.budget >= 30000) {
         state.budget -= 30000;
         state.reputation += 0.05;
-        write("🔬 Forest health monitoring completed. Slight reputation boost.");
+        write("Forest health monitoring completed. Slight reputation boost.");
       } else {
         write("Insufficient funds for monitoring.");
       }
@@ -484,9 +484,9 @@ export async function annual_management_decisions(state, write, terminal, input)
         state.budget -= 15000;
         if (state.safety_violations > 0) {
           state.safety_violations = Math.max(0, state.safety_violations - 1);
-          write("✅ Safety audit completed. Violations reduced.");
+          write("Safety audit completed. Violations reduced.");
         } else {
-          write("✅ Safety audit completed. No violations found.");
+          write("Safety audit completed. No violations found.");
         }
       } else {
         write("Insufficient funds for safety audit.");
