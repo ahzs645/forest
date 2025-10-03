@@ -17,6 +17,7 @@ import { strategic_management_decisions, getManagementStatus } from "./strategic
 import { forest_management_planning, get_fmp_status_summary } from "./forestManagementPlanning.js";
 import { competitive_market_events, getCompetitiveMarketStatus } from "./competitiveMarket.js";
 import { quarterly_special_scenarios, decay_temporary_effects } from "./scenarios.js";
+import { createRegionalLandscape, playSeasonalTransition, showLoggingTruck, showEventCutIn, updateStatusIcons } from "./pixelArt.js";
 
 class Game {
   constructor() {
@@ -41,11 +42,15 @@ class Game {
     this.state.companyName = companyName || "Northern Forest Solutions";
 
     await choose_region(this.state, this.write.bind(this), this.terminal, this.input);
+    
+    // Show regional landscape scene
+    createRegionalLandscape(this.state.region, this.terminal);
+    
     await initial_setup(this.state, this.write.bind(this), this.terminal, this.input);
 
     this.write(`\n${this.state.companyName} is now operational in the ${this.state.region} region!`);
     this.write(`Starting budget: ${formatCurrency(this.state.budget)}`);
-    this.write("🗓️  Game runs quarterly - make decisions every 3 months!");
+    this.write("Game runs quarterly - make decisions every 3 months!");
     this.updateStatus();
     await this.gameLoop();
   }
@@ -97,8 +102,16 @@ class Game {
     this.write(`${this.state.companyName} - ${quarter_names[this.state.quarter]} Year ${this.state.year}`);
     this.write(`${"-".repeat(60)}\n`);
 
+    // Show seasonal transition animation
+    playSeasonalTransition(this.state.quarter, this.terminal);
+
     // Quarterly setup (Oregon Trail-style choices)
     await quarterly_operations_setup(this.state, this.write.bind(this), this.terminal, this.input);
+    
+    // Show logging truck during operations setup
+    if (this.state.operations_pace === 'aggressive') {
+      showLoggingTruck();
+    }
 
     // Quarter weather
     const weather = generate_quarter_weather(this.state);
@@ -317,15 +330,20 @@ class Game {
         </div>
       `).join('')}
     `;
-    // Mobile HUD (compact)
+    // Mobile HUD (compact) - using text indicators instead of emojis
     if (this.mobileHud) {
       this.mobileHud.innerHTML = `
-        <div class="hud-item">💰 ${formatCurrency(this.state.budget)}</div>
-        <div class="hud-item">⭐ ${(this.state.reputation * 100).toFixed(0)}%</div>
-        <div class="hud-item">👥 ${(this.state.community_support * 100).toFixed(0)}%</div>
-        <div class="hud-item">🕒 ${this.state.year} ${quarter_names[this.state.quarter]}</div>
+        <div class="hud-item">$ ${formatCurrency(this.state.budget)}</div>
+        <div class="hud-item">REP ${(this.state.reputation * 100).toFixed(0)}%</div>
+        <div class="hud-item">COM ${(this.state.community_support * 100).toFixed(0)}%</div>
+        <div class="hud-item">${this.state.year} ${quarter_names[this.state.quarter]}</div>
       `;
     }
+    
+    // Add animated status icons
+    setTimeout(() => {
+      updateStatusIcons(this.statusPanel, this.state);
+    }, 100);
   }
 
   _bindSettingsUI() {

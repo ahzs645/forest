@@ -152,6 +152,26 @@ async function offer_ceo_hiring(state, write, terminal, input) {
 
   const options = ceo_candidates.map((ceo) => `Hire ${ceo.name}`);
   options.push("Continue without CEO");
+  
+  // Add CEO portraits for visual appeal
+  try {
+    const { createCEOPortrait } = await import('./pixelArt.js');
+    ceo_candidates.forEach(ceo => {
+      const portrait = createCEOPortrait(ceo.name);
+      write(`\n${ceo.name} - ${ceo.background}`);
+      write(`Fee: ${formatCurrency(ceo.annual_fee)}/year | Profit cut: ${(ceo.profit_cut * 100).toFixed(1)}%`);
+      write(`Strengths: ${ceo.strengths.join(", ")}`);
+      write(`Weaknesses: ${ceo.weaknesses.join(", ")}`);
+    });
+  } catch (e) {
+    // Fallback to text-only descriptions
+    ceo_candidates.forEach(ceo => {
+      write(`\n${ceo.name} - ${ceo.background}`);
+      write(`Fee: ${formatCurrency(ceo.annual_fee)}/year | Profit cut: ${(ceo.profit_cut * 100).toFixed(1)}%`);
+      write(`Strengths: ${ceo.strengths.join(", ")}`);
+      write(`Weaknesses: ${ceo.weaknesses.join(", ")}`);
+    });
+  }
 
   const choice = await askChoice("CEO hiring decision:", options, terminal, input);
 

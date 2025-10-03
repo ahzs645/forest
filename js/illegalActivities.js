@@ -60,6 +60,14 @@ export async function random_illegal_opportunities_event(state, write, terminal,
   write("\n--- ILLEGAL BUSINESS OPPORTUNITIES ---");
   write("A shady contact approaches you with some 'opportunities'...");
   write("These offers could be lucrative but carry serious risks");
+  
+  // Show dramatic cut-in for illegal opportunities
+  try {
+    const { showEventCutIn } = await import('./pixelArt.js');
+    showEventCutIn('illegal', 'A shady contact approaches with illegal opportunities...');
+  } catch (e) {
+    // Fail silently if pixelArt module not available
+  }
 
   // Simple illegal operations
   const simple_operations = [

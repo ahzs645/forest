@@ -479,3 +479,506 @@ h2 {
     animation: none;
   }
 }
+
+/* Pixel Art Animations */
+.pixel-scene {
+  width: 100%;
+  height: 120px;
+  background: linear-gradient(to bottom, #000 0%, #001100 50%, #002200 100%);
+  margin: 10px 0;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #00ff00;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* Seasonal Animations */
+@keyframes springBuds {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fallLeaves {
+  0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(130px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes snowfall {
+  0% { transform: translateY(-10px); opacity: 1; }
+  100% { transform: translateY(130px); opacity: 0; }
+}
+
+@keyframes summerFireflies {
+  0%, 100% { opacity: 0.3; transform: translate(0, 0); }
+  50% { opacity: 1; transform: translate(20px, -10px); }
+}
+
+.spring-bud {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #00ff00;
+  border-radius: 50%;
+  animation: springBuds 2s ease-in-out;
+}
+
+.fall-leaf {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #ff8800;
+  animation: fallLeaves 3s linear infinite;
+}
+
+.snowflake {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #ffffff;
+  border-radius: 50%;
+  animation: snowfall 4s linear infinite;
+}
+
+.firefly {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: #ffff00;
+  border-radius: 50%;
+  animation: summerFireflies 2s ease-in-out infinite;
+}
+
+/* Pixel Trees */
+.pixel-tree {
+  position: absolute;
+  bottom: 10px;
+  width: 20px;
+  height: 40px;
+  background-image: 
+    linear-gradient(to bottom, #00ff00 0%, #00dd00 70%, #886644 70%, #664422 100%);
+  clip-path: polygon(40% 0%, 60% 0%, 80% 60%, 70% 60%, 70% 100%, 30% 100%, 30% 60%, 20% 60%);
+}
+
+/* Animated Logging Truck */
+@keyframes truckDrive {
+  0% { transform: translateX(-100px); }
+  100% { transform: translateX(calc(100vw + 100px)); }
+}
+
+.logging-truck {
+  position: fixed;
+  bottom: 20px;
+  width: 60px;
+  height: 20px;
+  background: linear-gradient(to right, #ff0000 0%, #ff0000 40%, #8B4513 40%, #8B4513 100%);
+  z-index: 1000;
+  animation: truckDrive 8s linear;
+  border: 1px solid #00ff00;
+  border-radius: 2px;
+}
+
+.logging-truck::before {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 5px;
+  width: 8px;
+  height: 8px;
+  background: #333;
+  border-radius: 50%;
+  border: 1px solid #00ff00;
+}
+
+.logging-truck::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  background: #333;
+  border-radius: 50%;
+  border: 1px solid #00ff00;
+}
+
+/* Status Icons with Animation */
+.status-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  image-rendering: pixelated;
+  vertical-align: middle;
+  position: relative;
+}
+
+/* Pixel Art Icons */
+.pixel-skull {
+  width: 48px;
+  height: 48px;
+  background: #000;
+  position: relative;
+  margin: 0 auto 10px;
+}
+
+.pixel-skull::before {
+  content: '';
+  position: absolute;
+  width: 40px;
+  height: 32px;
+  background: 
+    /* Eyes */
+    radial-gradient(circle at 12px 12px, #ff0000 4px, transparent 5px),
+    radial-gradient(circle at 28px 12px, #ff0000 4px, transparent 5px),
+    /* Skull shape */
+    linear-gradient(to bottom, #ffffff 0%, #ffffff 70%, transparent 70%);
+  top: 4px;
+  left: 4px;
+}
+
+.pixel-skull::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 8px;
+  background: #000;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  clip-path: polygon(0% 0%, 25% 100%, 75% 100%, 100% 0%);
+}
+
+.pixel-fire {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(to top, 
+    #ff0000 0%, 
+    #ff4400 25%, 
+    #ff8800 50%, 
+    #ffff00 75%, 
+    #ffffff 100%);
+  clip-path: polygon(
+    20% 100%, 
+    10% 80%, 
+    15% 60%, 
+    5% 40%, 
+    20% 30%, 
+    15% 10%, 
+    35% 20%, 
+    40% 5%, 
+    50% 15%, 
+    60% 5%, 
+    65% 20%, 
+    85% 10%, 
+    80% 30%, 
+    95% 40%, 
+    85% 60%, 
+    90% 80%, 
+    80% 100%
+  );
+  margin: 0 auto 10px;
+  animation: flicker 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes flicker {
+  0% { filter: brightness(1); }
+  100% { filter: brightness(1.2); }
+}
+
+.pixel-chart {
+  width: 48px;
+  height: 48px;
+  background: #000;
+  position: relative;
+  margin: 0 auto 10px;
+  border: 2px solid #00ff00;
+}
+
+.pixel-chart::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: 
+    /* Chart bars */
+    linear-gradient(to right, transparent 10%, #00ff00 10%, #00ff00 15%, transparent 15%),
+    linear-gradient(to right, transparent 20%, #00ff00 20%, #00ff00 25%, transparent 25%),
+    linear-gradient(to right, transparent 30%, #00ff00 30%, #00ff00 35%, transparent 35%),
+    linear-gradient(to right, transparent 40%, #00ff00 40%, #00ff00 45%, transparent 45%),
+    /* Grid lines */
+    linear-gradient(to bottom, transparent 20%, #006600 20%, #006600 21%, transparent 21%),
+    linear-gradient(to bottom, transparent 40%, #006600 40%, #006600 41%, transparent 41%),
+    linear-gradient(to bottom, transparent 60%, #006600 60%, #006600 61%, transparent 61%),
+    linear-gradient(to bottom, transparent 80%, #006600 80%, #006600 81%, transparent 81%);
+  background-size: 100% 100%;
+}
+
+.pixel-handshake {
+  width: 48px;
+  height: 48px;
+  background: #000;
+  position: relative;
+  margin: 0 auto 10px;
+  border: 2px solid #00ff00;
+}
+
+.pixel-handshake::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  top: 14px;
+  left: 4px;
+  clip-path: polygon(0% 40%, 40% 40%, 40% 0%, 60% 0%, 60% 40%, 100% 40%, 100% 100%, 0% 100%);
+}
+
+.pixel-handshake::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #cccccc;
+  top: 14px;
+  right: 4px;
+  clip-path: polygon(0% 40%, 40% 40%, 40% 0%, 60% 0%, 60% 40%, 100% 40%, 100% 100%, 0% 100%);
+}
+
+.pixel-warning {
+  width: 48px;
+  height: 48px;
+  background: #000;
+  position: relative;
+  margin: 0 auto 10px;
+}
+
+.pixel-warning::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 20px solid transparent;
+  border-right: 20px solid transparent;
+  border-bottom: 35px solid #ffff00;
+  top: 4px;
+  left: 4px;
+}
+
+.pixel-warning::after {
+  content: '!';
+  position: absolute;
+  color: #000;
+  font-size: 20px;
+  font-weight: bold;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.pixel-hammer {
+  width: 48px;
+  height: 48px;
+  background: #000;
+  position: relative;
+  margin: 0 auto 10px;
+}
+
+.pixel-hammer::before {
+  content: '';
+  position: absolute;
+  width: 30px;
+  height: 12px;
+  background: #888888;
+  top: 10px;
+  left: 9px;
+}
+
+.pixel-hammer::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 25px;
+  background: #8B4513;
+  top: 16px;
+  left: 22px;
+}
+
+/* Status icon pixel art replacements */
+.pixel-money {
+  background: 
+    radial-gradient(circle at center, #ffff00 30%, #ffaa00 40%, transparent 41%);
+  border: 2px solid #00ff00;
+  border-radius: 50%;
+}
+
+.pixel-star {
+  background: 
+    conic-gradient(from 0deg, #ffff00 0deg, #ffff00 36deg, transparent 36deg, transparent 72deg, #ffff00 72deg);
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.pixel-shield {
+  background: linear-gradient(to bottom, #0066ff 0%, #0044cc 100%);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.pixel-face-happy {
+  background: #ffff00;
+  border: 2px solid #000;
+  border-radius: 50%;
+  position: relative;
+}
+
+.pixel-face-happy::before {
+  content: '';
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #000;
+  border-radius: 50%;
+  top: 4px;
+  left: 4px;
+  box-shadow: 6px 0 0 #000;
+}
+
+.pixel-face-happy::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 4px;
+  border: 2px solid #000;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.pixel-face-sad {
+  background: #ffff00;
+  border: 2px solid #000;
+  border-radius: 50%;
+  position: relative;
+}
+
+.pixel-face-sad::before {
+  content: '';
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #000;
+  border-radius: 50%;
+  top: 4px;
+  left: 4px;
+  box-shadow: 6px 0 0 #000;
+}
+
+.pixel-face-sad::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 4px;
+  border: 2px solid #000;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); color: #ff0000; }
+  50% { transform: scale(1.2); color: #ff6666; }
+}
+
+.status-icon.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-icon.heartbeat {
+  animation: heartbeat 1.5s ease-in-out infinite;
+}
+
+/* Regional Landscape Scenes */
+.landscape-sbs {
+  background: linear-gradient(to bottom, #87CEEB 0%, #228B22 40%, #006400 100%);
+}
+
+.landscape-idf {
+  background: linear-gradient(to bottom, #FFD700 0%, #32CD32 30%, #8B4513 100%);
+}
+
+.landscape-ms {
+  background: linear-gradient(to bottom, #B0C4DE 0%, #228B22 20%, #696969 100%);
+}
+
+/* Beetle damage for SBS */
+.beetle-damage {
+  position: absolute;
+  width: 15px;
+  height: 30px;
+  background: #8B4513;
+  opacity: 0.7;
+}
+
+/* Mountains for MS */
+.mountain {
+  position: absolute;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-left: 30px solid transparent;
+  border-right: 30px solid transparent;
+  border-bottom: 60px solid #696969;
+}
+
+/* Event Cut-ins */
+.event-cutIn {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  height: 200px;
+  background: #000;
+  border: 3px solid #00ff00;
+  z-index: 9999;
+  padding: 20px;
+  text-align: center;
+  animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+  0% { transform: translate(-50%, -100%); opacity: 0; }
+  100% { transform: translate(-50%, -50%); opacity: 1; }
+}
+
+/* CEO Portraits */
+.ceo-portrait {
+  width: 80px;
+  height: 80px;
+  background: #001100;
+  border: 2px solid #00ff00;
+  margin: 10px auto;
+  position: relative;
+  image-rendering: pixelated;
+}
+
+/* Don Kayne special styling */
+.ceo-portrait.don-kayne {
+  border-color: #ff0000;
+  animation: ominous 2s ease-in-out infinite;
+}
+
+@keyframes ominous {
+  0%, 100% { box-shadow: 0 0 5px #ff0000; }
+  50% { box-shadow: 0 0 15px #ff0000; }
+}
