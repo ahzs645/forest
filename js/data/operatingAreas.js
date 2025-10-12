@@ -1,0 +1,81 @@
+export const OPERATING_AREAS = [
+  {
+    id: "fort-st-john-plateau",
+    name: "Fort St. John Plateau",
+    description:
+      "Glaciated uplands bridging agriculture and boreal muskeg in the Peace River district.",
+    becZone: "BWBSmw1 – Boreal White and Black Spruce moist warm",
+    becCode: "BWBSmw1",
+    dominantTrees: ["white spruce", "trembling aspen", "black spruce"],
+    focusTopics: ["muskeg road stability", "cumulative gas development effects", "wetland buffers"],
+    indigenousPartners: ["Doig River First Nation", "Blueberry River First Nations"],
+    communities: ["Fort St. John", "Charlie Lake"],
+    tags: ["bwbs", "peace-region", "peatland", "gas-interface", "winter-road", "northern-bc"],
+  },
+  {
+    id: "muskwa-foothills",
+    name: "Muskwa Foothills",
+    description:
+      "Rugged foothills leading to the Northern Rockies with steep drainages and remote camps.",
+    becZone: "BWBSdk2 – Boreal White and Black Spruce dry cool",
+    becCode: "BWBSdk2",
+    dominantTrees: ["lodgepole pine", "white spruce", "subalpine fir"],
+    focusTopics: ["permafrost slumps", "mountain caribou habitat", "helicopter access planning"],
+    indigenousPartners: ["Fort Nelson First Nation", "Prophet River First Nation"],
+    communities: ["Fort Nelson", "Toad River"],
+    tags: ["bwbs", "caribou", "steep", "remote-camps", "winter-road", "northern-bc"],
+  },
+  {
+    id: "bulkley-valley",
+    name: "Bulkley Valley Escarpment",
+    description:
+      "Sub-boreal spruce benches overlooking the Bulkley River with mixed-use community interface.",
+    becZone: "SBSmc2 – Sub-Boreal Spruce moist cold",
+    becCode: "SBSmc2",
+    dominantTrees: ["hybrid spruce", "subalpine fir", "paper birch"],
+    focusTopics: ["visual quality", "community water intakes", "interface fuel management"],
+    indigenousPartners: ["Wet'suwet'en", "Gitxsan"],
+    communities: ["Smithers", "Telkwa"],
+    tags: ["sbs", "community-interface", "visuals", "watershed", "northern-bc"],
+  },
+  {
+    id: "fraser-plateau",
+    name: "Fraser Plateau Uplands",
+    description:
+      "Gently rolling SBS plateau south of Prince George with long wildfire shadows and beetle legacies.",
+    becZone: "SBSwk1 – Sub-Boreal Spruce wet cool",
+    becCode: "SBSwk1",
+    dominantTrees: ["hybrid spruce", "lodgepole pine", "trembling aspen"],
+    focusTopics: ["landscape wildfire resilience", "beetle salvage regeneration", "community evacuation routes"],
+    indigenousPartners: ["Lheidli T'enneh First Nation", "Nazko First Nation"],
+    communities: ["Prince George", "Hixon"],
+    tags: ["sbs", "wildfire", "beetle-recovery", "evac-route", "northern-bc"],
+  },
+  {
+    id: "skeena-nass",
+    name: "Skeena-Nass Transition",
+    description:
+      "Fog-laden coastal hemlock valleys with deep ravines, salmon systems, and karst plateaus.",
+    becZone: "CWHws2 – Coastal Western Hemlock very wet submaritime",
+    becCode: "CWHws2",
+    dominantTrees: ["western hemlock", "sitka spruce", "western redcedar"],
+    focusTopics: ["salmon-bearing crossings", "karst conservation", "community water protection"],
+    indigenousPartners: ["Nisga'a Nation", "Gitanyow"],
+    communities: ["Terrace", "New Aiyansh"],
+    tags: ["cwh", "karst", "salmon", "community-water", "northern-bc"],
+  },
+  {
+    id: "tahltan-highland",
+    name: "Tahltan Highland",
+    description:
+      "High-elevation lodgepole pine and spruce parklands adjacent to alpine plateaus and glacial river systems.",
+    becZone: "SWBmk – Spruce–Willow–Birch moist cool",
+    becCode: "SWBmk",
+    dominantTrees: ["engelmann spruce", "subalpine fir", "willow scrub"],
+    focusTopics: ["glacial outburst preparedness", "cultural cedar harvest", "remote nursery logistics"],
+    indigenousPartners: ["Tahltan Nation"],
+    communities: ["Iskut", "Dease Lake"],
+    tags: ["swb", "glacial", "remote-camps", "caribou", "northern-bc"],
+  },
+];
+

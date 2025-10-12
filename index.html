@@ -2,24 +2,30 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <title>BC Forestry Simulator - Terminal</title>
+    <title>BC Forestry Simulator</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="game-container">
       <div class="left-panel">
         <div class="top-bar">
-          <div class="brand">FORESTRY TRAIL</div>
+          <div class="brand">FORESTRY SIMULATOR</div>
           <div class="top-actions">
-            <button id="settings-gear" class="icon-btn" aria-label="Settings">⚙️</button>
+            <button id="restart-hint" class="hint" type="button" aria-label="Restart hint">
+              Press ESC to restart
+            </button>
           </div>
         </div>
-        <div id="mobile-hud" class="mobile-hud"></div>
-        <pre id="terminal" class="terminal screen"></pre>
-        <div id="button-container" class="button-container" style="display: none;"></div>
+        <div id="mobile-hud" class="mobile-hud" aria-live="polite"></div>
+        <pre id="terminal" class="terminal screen" aria-live="polite"></pre>
+        <div id="button-container" class="button-container" aria-live="polite"></div>
+        <label for="input" class="visually-hidden">Command input</label>
         <input
           id="input"
           type="text"
@@ -29,7 +35,7 @@
           spellcheck="false"
         />
       </div>
-      <div class="right-panel" id="status-panel">
+      <aside class="right-panel" aria-label="Program status">
         <div
           id="status-toggle"
           class="status-header"
@@ -38,50 +44,12 @@
           aria-controls="status-content"
           tabindex="0"
         >
-          <h2>System Status</h2>
+          <h2>Field Status</h2>
           <span class="status-arrow" aria-hidden="true">▾</span>
         </div>
-        <div id="status-content" class="status-content"></div>
-      </div>
+        <div id="status-content" class="status-content" aria-live="polite"></div>
+      </aside>
     </div>
-    <!-- Settings Panel -->
-    <div id="settings-overlay" class="settings-overlay"></div>
-    <div id="settings-panel" class="settings-panel">
-      <div class="settings-header">
-        <span>Settings</span>
-        <button id="settings-close" class="icon-btn" aria-label="Close">✖</button>
-      </div>
-      <div class="settings-group">
-        <label class="switch">
-          <input type="checkbox" id="toggle-wacky" />
-          <span class="slider"></span>
-        </label>
-        <span>Enable Wacky Events</span>
-      </div>
-      <div class="settings-group">
-        <label class="switch">
-          <input type="checkbox" id="toggle-auto" />
-          <span class="slider"></span>
-        </label>
-        <span>Enable Auto Play</span>
-      </div>
-      <div class="settings-group">
-        <span>Auto Run</span>
-        <div class="size-buttons">
-          <button id="auto-1y" class="pill">Run 1 Year</button>
-          <button id="auto-3y" class="pill">Run 3 Years</button>
-          <button id="auto-10q" class="pill">Run 10 Quarters</button>
-        </div>
-      </div>
-      <div class="settings-group">
-        <span>Text Size</span>
-        <div class="size-buttons">
-          <button id="size-small" class="pill">Small</button>
-          <button id="size-medium" class="pill">Medium</button>
-          <button id="size-large" class="pill">Large</button>
-        </div>
-      </div>
-    </div>
-    <script src="js/game.js" type="module"></script>
+    <script type="module" src="js/game.js"></script>
   </body>
 </html>

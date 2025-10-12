@@ -1,33 +1,53 @@
-# Forestry Simulator
+# BC Forestry Simulator
 
-This repository contains text-based games in a retro "faux terminal" style.
+A rebuilt, choice-driven forestry operations simulator grounded in northern British Columbia BEC zones. Pick the type of forester you want to be, choose a northern operating area, and shepherd an integrated year of work. Every season you complete core duties for your specialization and react to a contextual issue drawn from an event library that considers both your role and the selected landscape.
 
-- **Web game** – open `index.html` in a browser or deploy to GitHub Pages. The page shows a terminal where you type commands. The `trailDemo.js` script provides a short retro intro with simple screen swipe animations.
-- **Command line prototype** – run `python3 forestry_game.py` if you want to try the older console version.
+## Play in the browser
 
-Gameplay now includes multiple planning phases: drafting the Forest Stewardship Plan, early consultation, old‑growth decisions, vegetation control, wildfire actions, heritage assessments, weather planning, species selection and new options for site preparation and crew training. The `docs/BC_interior_context.md` file provides background on provincial requirements, First Nations engagement and industry issues that inspired the game design.
+Open `index.html` in your browser to launch the retro terminal interface. Tap the on-screen buttons or type numbers/labels to answer prompts — the layout is fully mobile friendly. Press `ESC` at any time to restart with a different combination of role and operating area.
 
-To publish the game on GitHub Pages just push changes to the `work` branch. The included workflow (`.github/workflows/pages.yml`) uploads the repository as a static site each time you push.
+### Forester specializations
 
-## What’s New
-- Weather system each quarter that modifies harvest output and safety risk.
-- Special quarterly scenarios: labor strike, supply chain disruption, invasive species, community outreach opportunity.
-- Auto Play mode for quick simulations without manual input.
+Each role comes with bespoke tasks that appear every season:
 
-## Using Auto Play
-1. Open `index.html` in a browser.
-2. Click the gear icon to open Settings.
-3. Toggle `Enable Auto Play`.
-4. Use the `Run 1 Year`, `Run 3 Years`, or `Run 10 Quarters` buttons to simulate multiple quarters automatically.
+- **Strategic Planner** – landscape analysis, values balancing, and integration workshops.
+- **Permitting Specialist** – application packaging, referral follow-up, and regulatory tracking.
+- **Recon Crew Lead** – field access, cultural feature intelligence, and safety rhythms.
+- **Silviculture Supervisor** – planting coordination, regeneration strategy, and monitoring.
 
-## CLI Mode (headless)
-Run automated simulations from the terminal:
+### Operating areas
 
+Six northern BC operating areas capture BEC zones, dominant species, and landscape tags used to drive event selection.
+
+- Fort St. John Plateau — BWBSmw1 peatland plateaus and gas interface roads
+- Muskwa Foothills — BWBSdk2 permafrost slopes and remote camps
+- Bulkley Valley Escarpment — SBSmc2 community interface benches and water intakes
+- Fraser Plateau Uplands — SBSwk1 wildfire-prone spruce and beetle legacies
+- Skeena-Nass Transition — CWHws2 salmon systems with karst plateaus
+- Tahltan Highland — SWBmk glacial headwaters and alpine parklands
+
+### Dynamic issue library
+
+Every season the simulator draws a random issue that matches your specialization and the active operating area tags. Responses adjust five shared metrics — operational progress, forest health, relationships, regulatory confidence, and budget flexibility. Your year-end summary reflects the trade-offs you navigated.
+
+## Command line quick run
+
+A lightweight CLI runner is available for automated playthroughs:
+
+```bash
+node cli.mjs --runs 3 --rounds 4 --role planner --area fort-st-john-plateau
 ```
-node cli.mjs --runs 3 --quarters 16 --profile balanced
-```
 
-- `--runs`: number of separate simulations
-- `--quarters`: max quarters per simulation
-- `--profile`: `balanced` | `aggressive` (influences auto decisions)
- - `--step`: interactive, step-by-step CLI playthrough (prompts for each choice and pauses between quarters)
+Options:
+
+- `--runs` Number of simulations to run (default `1`).
+- `--rounds` Number of seasons to simulate (default `4`).
+- `--role` Optional role ID (defaults to random).
+- `--area` Optional operating area ID (defaults to random).
+- `--log` Output season summaries for each run.
+
+Each run makes heuristic decisions that prioritise balanced performance.
+
+## Local development
+
+The interactive version is a static site; no build step is required. Open `index.html` directly or serve the folder with any static server. Game content is organized under `js/data/` with dedicated modules for roles, operating areas, and dynamic issues, making it easy to extend forester duties or add new geography.
