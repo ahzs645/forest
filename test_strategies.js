@@ -1,207 +1,104 @@
 #!/usr/bin/env node
 
-import { spawn } from 'child_process';
+import {
+  FORESTER_ROLES,
+  OPERATING_AREAS,
+} from './js/data/index.js';
+import {
+  createInitialState,
+  getRoleTasks,
+  applyEffects,
+  drawIssue,
+  buildSummary,
+} from './js/engine.js';
 
-// Different strategy profiles for testing
-const strategies = {
-  aggressive: {
-    name: 'Aggressive',
-    decisions: {
-      'where will you operate': '1', // SBS - high AAC
-      'stewardship plan': '1', // Minimal plan
-      'archaeological': '1', // Minimal survey
-      'operations pace': '3', // Aggressive pace
-      'harvest': '3', // Aggressive harvest
-      'quarterly activity': '1', // Focus on permits
-      'maintenance': '2', // Skip maintenance
-      'first nations': '3', // Minimal compliance
-      'safety': '3', // Minimize response
-      'illegal': '1', // Take illegal opportunities
-      'concealment': '1', // Pay for concealment
-      'proceed with illegal': '1', // Proceed
-      'strategic action': '4', // Permit management
-      'proceed with this': '1', // Yes
-      'equipment maintenance': '2', // Skip
-      'response': '2', // Minimize costs
-      'bidding': '1', // Aggressive bid
-      'consultation': '3', // Minimal
-      'crisis': '2', // Focus on equipment
+const rounds = 4;
+
+function chooseOption(options) {
+  return options.reduce((best, option) => {
+    const score = scoreOption(option.effects || {});
+    if (!best || score > best.score) {
+      return { option, score };
     }
-  },
-  
-  conservative: {
-    name: 'Conservative',
-    decisions: {
-      'where will you operate': '2', // IDF - moderate
-      'stewardship plan': '2', // Comprehensive
-      'archaeological': '2', // Full assessment
-      'operations pace': '1', // Cautious
-      'harvest': '1', // Conservative harvest
-      'quarterly activity': '2', // Engage First Nations
-      'maintenance': '1', // Yes to maintenance
-      'first nations': '1', // Comprehensive
-      'safety': '1', // Full cooperation
-      'illegal': '5', // Decline illegal
-      'decline': '1', // Confirm decline
-      'strategic action': '2', // First Nations focus
-      'proceed with this': '1', // Yes
-      'equipment maintenance': '1', // Yes
-      'response': '1', // Full compliance
-      'bidding': '3', // Quality focus
-      'consultation': '1', // Comprehensive
-      'crisis': '1', // Help communities
+    return best;
+  }, null).option;
+}
+
+function scoreOption(effects) {
+  const weights = {
+    progress: 1,
+    forestHealth: 1.2,
+    relationships: 1.1,
+    compliance: 1.3,
+    budget: 0.8,
+  };
+  return Object.entries(effects).reduce((total, [key, value]) => total + (weights[key] || 0.5) * value, 0);
+}
+
+function makeRng(seed) {
+  let value = seed % 2147483647;
+  if (value <= 0) value += 2147483646;
+  return () => {
+    value = (value * 16807) % 2147483647;
+    return (value - 1) / 2147483646;
+  };
+}
+
+const results = [];
+let seed = 42;
+
+for (const role of FORESTER_ROLES) {
+  for (const area of OPERATING_AREAS) {
+    const state = createInitialState({ companyName: `${role.id}-${area.id}`, roleId: role.id, areaId: area.id });
+    state.totalRounds = rounds;
+    const rng = makeRng(seed++);
+
+    for (let round = 1; round <= rounds; round++) {
+      state.round = round;
+      const tasks = getRoleTasks(state);
+      for (const task of tasks) {
+        const option = chooseOption(task.options);
+        applyEffects(state, option.effects, {
+          type: 'task',
+          id: task.id,
+          title: task.title,
+          option: option.label,
+          round,
+        });
+      }
+      const issue = drawIssue(state, rng);
+      if (issue) {
+        const option = chooseOption(issue.options);
+        applyEffects(state, option.effects, {
+          type: 'issue',
+          id: issue.id,
+          title: issue.title,
+          option: option.label,
+          round,
+        });
+      }
     }
-  },
-  
-  balanced: {
-    name: 'Balanced',
-    decisions: {
-      'where will you operate': '1', // SBS
-      'stewardship plan': '2', // Comprehensive
-      'archaeological': '2', // Full assessment
-      'operations pace': '2', // Normal
-      'harvest': '2', // Moderate
-      'quarterly activity': '1', // Permits
-      'maintenance': '1', // Yes
-      'first nations': '2', // Individual meetings
-      'safety': '2', // Standard compliance
-      'illegal': '5', // Decline
-      'strategic action': '1', // Permit management
-      'proceed with this': '1', // Yes
-      'equipment maintenance': '1', // Yes
-      'response': '2', // Standard
-      'bidding': '2', // Competitive
-      'consultation': '2', // Individual
-      'crisis': '1', // Help communities
-    }
-  },
-  
-  random: {
-    name: 'Random',
-    decisions: {} // Will use random selection
+
+    const summary = buildSummary(state);
+    results.push({
+      role: role.id,
+      area: area.id,
+      summary: summary.overall,
+      progress: Math.round(state.metrics.progress),
+      forestHealth: Math.round(state.metrics.forestHealth),
+      relationships: Math.round(state.metrics.relationships),
+      compliance: Math.round(state.metrics.compliance),
+      budget: Math.round(state.metrics.budget),
+      notes: summary.messages.join(' | '),
+    });
   }
-};
-
-async function runStrategy(strategy, quarters = 8) {
-  return new Promise((resolve) => {
-    const results = {
-      strategy: strategy.name,
-      quarters: [],
-      finalBudget: 0,
-      finalReputation: 0,
-      finalCommunity: 0,
-      safetyViolations: 0,
-      bankrupt: false,
-      decisions: []
-    };
-    
-    const game = spawn('node', ['cli.mjs', '--runs', '1', '--quarters', quarters.toString(), '--profile', 'balanced', '--step'], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    
-    let buffer = '';
-    let quarterCount = 0;
-    
-    function makeDecision(question) {
-      const q = question.toLowerCase();
-      
-      // Track decision
-      let decision = '1';
-      
-      // Check strategy decisions
-      for (const [key, value] of Object.entries(strategy.decisions)) {
-        if (q.includes(key)) {
-          decision = value;
-          break;
-        }
-      }
-      
-      // Random strategy
-      if (strategy.name === 'Random') {
-        const matches = question.match(/^\d+\./gm);
-        if (matches) {
-          decision = Math.floor(Math.random() * matches.length + 1).toString();
-        }
-      }
-      
-      // Default for "Press Enter"
-      if (q.includes('press enter')) {
-        decision = '';
-      }
-      
-      results.decisions.push({ question: question.trim().slice(0, 50), choice: decision });
-      return decision;
-    }
-    
-    game.stdout.on('data', (data) => {
-      const text = data.toString();
-      buffer += text;
-      
-      // Extract quarterly data if present
-      if (text.includes('Quarter Summary')) {
-        quarterCount++;
-      }
-      
-      // Check for prompts
-      if (buffer.includes('>') && !buffer.trim().endsWith('---')) {
-        const lines = buffer.split('\n');
-        const questionLine = lines[lines.length - 2] || lines[lines.length - 1];
-        const decision = makeDecision(questionLine);
-        
-        setTimeout(() => {
-          game.stdin.write(decision + '\n');
-          buffer = '';
-        }, 10);
-      }
-      
-      // Extract final results
-      if (text.includes('=== RUN #1 SUMMARY ===')) {
-        const summaryText = text.split('=== RUN #1 SUMMARY ===')[1];
-        const budgetMatch = summaryText.match(/Budget: ([\d,]+|NaN)/);
-        const repMatch = summaryText.match(/Reputation: (-?\d+)%/);
-        const commMatch = summaryText.match(/Community: (\d+)%/);
-        const safetyMatch = summaryText.match(/Safety violations: (\d+)/);
-        
-        if (budgetMatch) {
-          results.finalBudget = budgetMatch[1] === 'NaN' ? 'BANKRUPT' : parseInt(budgetMatch[1].replace(/,/g, ''));
-          results.bankrupt = budgetMatch[1] === 'NaN';
-        }
-        if (repMatch) results.finalReputation = parseInt(repMatch[1]);
-        if (commMatch) results.finalCommunity = parseInt(commMatch[1]);
-        if (safetyMatch) results.safetyViolations = parseInt(safetyMatch[1]);
-      }
-    });
-    
-    game.on('close', () => {
-      resolve(results);
-    });
-    
-    game.on('error', (err) => {
-      console.error('Game error:', err);
-      resolve(results);
-    });
-  });
 }
 
-// Run tests
-console.log('Testing different strategies...\n');
+console.table(results, ['role', 'area', 'progress', 'forestHealth', 'relationships', 'compliance', 'budget']);
 
-for (const [key, strategy] of Object.entries(strategies)) {
-  console.log(`\nTesting ${strategy.name} strategy...`);
-  const result = await runStrategy(strategy, 8);
-  
-  console.log(`\n=== ${strategy.name} Strategy Results ===`);
-  console.log(`Final Budget: ${result.bankrupt ? 'BANKRUPT' : '$' + result.finalBudget.toLocaleString()}`);
-  console.log(`Final Reputation: ${result.finalReputation}%`);
-  console.log(`Community Relations: ${result.finalCommunity}%`);
-  console.log(`Safety Violations: ${result.safetyViolations}`);
-  console.log(`Key Decisions Made: ${result.decisions.length}`);
-  
-  // Show first few decisions
-  console.log('\nFirst 5 decisions:');
-  result.decisions.slice(0, 5).forEach(d => {
-    console.log(`  ${d.question}... => Choice ${d.choice}`);
-  });
+if (process.argv.includes('--verbose')) {
+  for (const result of results) {
+    console.log(`\n${result.role} in ${result.area}: ${result.summary}`);
+    console.log(`Metrics -> Progress ${result.progress}, Forest ${result.forestHealth}, Relationships ${result.relationships}, Compliance ${result.compliance}, Budget ${result.budget}`);
+  }
 }
-
-console.log('\n\n=== ANALYSIS COMPLETE ===');
