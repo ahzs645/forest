@@ -13,14 +13,22 @@
   box-sizing: border-box;
 }
 
+html {
+  min-height: 100%;
+  background: radial-gradient(circle at top, #001a0d 0%, #000 60%);
+  background-color: #000;
+}
+
 body {
   margin: 0;
   padding: 0;
   height: 100vh;
   background: radial-gradient(circle at top, #001a0d 0%, #000 60%);
+  background-color: #000;
   color: var(--fg);
   font-family: var(--font-mono);
   overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .game-container {
@@ -198,6 +206,10 @@ body {
 
 #input:focus {
   background: rgba(0, 48, 24, 0.85);
+}
+
+#input.input-hidden {
+  display: none;
 }
 
 .right-panel {

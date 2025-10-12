@@ -7,6 +7,8 @@ export class TerminalUI {
     this.statusToggle = document.getElementById("status-toggle");
     this.mobileHud = document.getElementById("mobile-hud");
     this._pending = null;
+    this._choiceKeyHandler = null;
+    this._inputMode = "idle";
 
     if (this.input) {
       this.input.addEventListener("keydown", (event) => {
@@ -35,6 +37,8 @@ export class TerminalUI {
         }
       });
     }
+
+    this._setInputMode("idle");
   }
 
   write(message = "") {
@@ -52,6 +56,7 @@ export class TerminalUI {
     this.write(question);
     return new Promise((resolve) => {
       this._awaitInput((value) => {
+        this._setInputMode("idle");
         resolve(value.trim());
       }, placeholder);
     });
@@ -59,48 +64,26 @@ export class TerminalUI {
 
   async promptChoice(question, options) {
     this.write(question);
-    options.forEach((option, index) => {
-      this.write(`  ${index + 1}. ${option.label}`);
-    });
+    this._setInputMode("choice");
+    this._pending = null;
 
     return new Promise((resolve) => {
-      const choose = (option, echo) => {
-        if (echo) {
-          this.write(`> ${echo}`);
-        }
+      const cleanup = () => {
         this._clearButtons();
-        this._pending = null;
+        this._setInputMode("idle");
         if (this.input) {
           this.input.value = "";
           this.input.blur();
         }
+      };
+
+      const choose = (option) => {
+        cleanup();
         resolve(option);
       };
 
-      this._showButtons(options, (option) => choose(option, option.label));
-
-      const handleInput = (raw) => {
-        const value = raw.trim();
-        if (!value) {
-          this._awaitInput(handleInput, "Enter choice number or tap button", { keepButtons: true });
-          return;
-        }
-        const numeric = Number.parseInt(value, 10);
-        let option = null;
-        if (!Number.isNaN(numeric) && numeric >= 1 && numeric <= options.length) {
-          option = options[numeric - 1];
-        } else {
-          option = options.find((opt) => opt.label.toLowerCase() === value.toLowerCase());
-        }
-        if (!option) {
-          this.write("Please choose a valid option by number or tap a button.");
-          this._awaitInput(handleInput, "Enter choice number or tap button", { keepButtons: true });
-          return;
-        }
-        choose(option, value);
-      };
-
-      this._awaitInput(handleInput, "Enter choice number or tap button", { keepButtons: true });
+      this._showButtons(options, choose);
+      this._enableChoiceKeyboard(options, choose);
     });
   }
 
@@ -168,6 +151,7 @@ export class TerminalUI {
     if (placeholder) {
       this.input.placeholder = placeholder;
     }
+    this._setInputMode("text");
     this.input.focus({ preventScroll: true });
   }
 
@@ -205,5 +189,51 @@ export class TerminalUI {
     if (!this.buttonContainer) return;
     this.buttonContainer.innerHTML = "";
     this.buttonContainer.classList.remove("active");
+    this._removeChoiceKeyHandler();
+  }
+
+  _enableChoiceKeyboard(options, choose) {
+    this._removeChoiceKeyHandler();
+    const handler = (event) => {
+      if (!/^[1-9]$/.test(event.key)) {
+        return;
+      }
+      const index = Number.parseInt(event.key, 10) - 1;
+      if (index < 0 || index >= options.length) {
+        return;
+      }
+      const target = event.target;
+      if (target) {
+        const tagName = typeof target.tagName === "string" ? target.tagName.toLowerCase() : "";
+        if (tagName === "input" || tagName === "textarea" || target.isContentEditable) {
+          return;
+        }
+      }
+      event.preventDefault();
+      choose(options[index]);
+    };
+    document.addEventListener("keydown", handler);
+    this._choiceKeyHandler = handler;
+  }
+
+  _removeChoiceKeyHandler() {
+    if (this._choiceKeyHandler) {
+      document.removeEventListener("keydown", this._choiceKeyHandler);
+      this._choiceKeyHandler = null;
+    }
+  }
+
+  _setInputMode(mode) {
+    if (!this.input) return;
+    this._inputMode = mode;
+    if (mode === "text") {
+      this.input.classList.remove("input-hidden");
+      this.input.removeAttribute("aria-hidden");
+      this.input.disabled = false;
+    } else {
+      this.input.classList.add("input-hidden");
+      this.input.setAttribute("aria-hidden", "true");
+      this.input.disabled = true;
+    }
   }
 }
