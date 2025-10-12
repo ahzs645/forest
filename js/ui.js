@@ -183,6 +183,11 @@ export class TerminalUI {
       });
       this.buttonContainer.appendChild(button);
     });
+    if (window.matchMedia("(max-width: 860px)").matches) {
+      requestAnimationFrame(() => {
+        this.buttonContainer?.scrollIntoView({ block: "end", behavior: "smooth" });
+      });
+    }
   }
 
   _clearButtons() {
