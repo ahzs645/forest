@@ -10,7 +10,7 @@ import {
   findRole,
   findArea,
 } from "./engine.js";
-import { FORESTER_ROLES, OPERATING_AREAS } from "./data/index.js";
+import { FORESTER_ROLES, OPERATING_AREAS, ILLEGAL_ACTS } from "./data/index.js";
 
 class ForestryGame {
   constructor() {
@@ -33,7 +33,7 @@ class ForestryGame {
     this.ui.write("FORESTRY SIMULATOR");
     this.ui.write("===================\n");
 
-    const companyName = await this.ui.promptText("Name your forestry outfit:");
+    const companyName = await this.ui.promptText("Name your forestry crew:");
     const roleOption = await this.ui.promptChoice(
       "Choose your forester specialization:",
       FORESTER_ROLES.map((role) => ({ label: `${role.name} – ${role.description}`, value: role.id }))
@@ -67,6 +67,9 @@ class ForestryGame {
     if (area.indigenousPartners?.length) {
       this.ui.write(`Key Indigenous partners: ${area.indigenousPartners.join(", ")}.`);
     }
+
+    this._leakIllegalFile(roleId);
+
     this.ui.write("Navigate one full operational year across four seasons. ESC to restart.\n");
 
     for (let round = 1; round <= this.state.totalRounds; round++) {
@@ -134,6 +137,33 @@ class ForestryGame {
     if (delta) {
       this.ui.write(`Impact: ${delta}`);
     }
+  }
+
+  _leakIllegalFile(roleId) {
+    const matches = ILLEGAL_ACTS.filter((act) => act.roles?.includes(roleId));
+    if (!matches.length) {
+      return;
+    }
+
+    const sampleCount = Math.min(3, matches.length);
+    const pool = [...matches];
+    const selections = [];
+    while (selections.length < sampleCount && pool.length) {
+      const index = Math.floor(Math.random() * pool.length);
+      const [pick] = pool.splice(index, 1);
+      if (pick) {
+        selections.push(pick);
+      }
+    }
+
+    this.ui.write("\n🚫 Illicit Operations File recovered from the breakroom copier:");
+    selections.forEach((act, position) => {
+      const tagList = act.tags?.length ? act.tags.map((tag) => `#${tag}`).join(" ") : "";
+      const header = `${position + 1}. ${act.title}`;
+      this.ui.write(tagList ? `${header} — ${tagList}` : header);
+      this.ui.write(`   ${act.description}`);
+    });
+    this.ui.write("(Satire only—keep your program clean.)\n");
   }
 
   _seasonCheckpoint() {

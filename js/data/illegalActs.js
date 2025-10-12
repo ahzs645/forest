@@ -1,0 +1,58 @@
+export const ILLEGAL_ACTS = [
+  {
+    id: "black-market-timber-maps",
+    title: "Forge Midnight Timber Maps",
+    description: "Swap in doctored GIS layers so unauthorized blocks slide through referral reviews before daylight.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "mapping", "fraud"],
+  },
+  {
+    id: "bootleg-fibre-shuffle",
+    title: "Bootleg Fibre Shuffle",
+    description: "Rebrand poached old-growth as windthrow salvage and funnel it through a shell mill down south.",
+    roles: ["planner", "recce"],
+    tags: ["recce", "planner", "old-growth", "laundering"],
+  },
+  {
+    id: "bribed-hazard-flags",
+    title: "Bribe Hazard Flaggers",
+    description: "Pay quad scouts to 'forget' wildlife tree patches so the mainline can punch straight through.",
+    roles: ["recce"],
+    tags: ["recce", "wildlife", "bribery"],
+  },
+  {
+    id: "permit-fastpass",
+    title: "Permit FastPass",
+    description: "Gift ski trips to ministry reviewers in exchange for rubber-stamped cutting permits.",
+    roles: ["permitter"],
+    tags: ["permitter", "corruption", "compliance"],
+  },
+  {
+    id: "slash-burn-party",
+    title: "Midnight Slash Burn Party",
+    description: "Light debris piles without smoke notifications to dodge venting forecasts and paperwork.",
+    roles: ["silviculture", "recce"],
+    tags: ["silviculture", "recce", "fire", "risk"],
+  },
+  {
+    id: "seedling-switcheroo",
+    title: "Seedling Switcheroo",
+    description: "Invoice premium whitebark pine while planting bargain lodgepole because the inspector stayed in town.",
+    roles: ["silviculture"],
+    tags: ["silviculture", "fraud", "nursery"],
+  },
+  {
+    id: "ghost-monitoring",
+    title: "Ghost Monitoring Reports",
+    description: "Copy last year's ecosystem monitoring data and change the date so audits see a perfect trendline.",
+    roles: ["planner", "silviculture"],
+    tags: ["planner", "silviculture", "reporting", "fabrication"],
+  },
+  {
+    id: "under-the-table-road",
+    title: "Under-the-Table Road Build",
+    description: "Carve an access spur through a no-go riparian reserve at night to reach premium spruce.",
+    roles: ["recce", "permitter"],
+    tags: ["recce", "permitter", "riparian", "blatant"],
+  },
+];
