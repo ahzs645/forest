@@ -366,6 +366,10 @@ body {
     min-height: 100vh;
   }
 
+  .left-panel {
+    min-height: 100vh;
+  }
+
   .right-panel {
     width: 100%;
     border-left: none;
@@ -375,6 +379,27 @@ body {
 
   .mobile-hud {
     display: grid;
+  }
+
+  .button-container {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.6);
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #input {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #input.input-hidden {
+    display: none;
   }
 }
 
