@@ -13,6 +13,7 @@ export class TerminalUI {
     this.modalTitle = document.getElementById("modal-title");
     this.modalBody = document.getElementById("modal-body");
     this.modalActions = document.getElementById("modal-actions");
+    this.alertStack = document.getElementById("metric-alerts");
     this._modalKeyHandler = null;
     this._modalOnClose = null;
     this._lastFocus = null;
@@ -184,6 +185,30 @@ export class TerminalUI {
         <div class="hud-item"><span>Compliance</span>${Math.round(metrics.compliance)}</div>
       `;
     }
+  }
+
+  flashMetricAlert({ label, message, direction }) {
+    if (!this.alertStack) {
+      return;
+    }
+    const alert = document.createElement("div");
+    alert.className = "metric-alert";
+    alert.setAttribute("role", "status");
+    alert.innerHTML = `
+      <span class="metric-alert__label">${label}</span>
+      <span class="metric-alert__message">${message}</span>
+    `;
+    if (direction) {
+      alert.classList.add(`metric-alert--${direction}`);
+    }
+    this.alertStack.appendChild(alert);
+    requestAnimationFrame(() => alert.classList.add("visible"));
+    window.setTimeout(() => {
+      alert.classList.add("fade");
+      window.setTimeout(() => {
+        alert.remove();
+      }, 400);
+    }, 3200);
   }
 
   onRestartRequest(handler) {

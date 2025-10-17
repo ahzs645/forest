@@ -18,6 +18,7 @@ class ForestryGame {
     this.state = null;
     this._seasonBaseline = null;
     this._restartConfirmOpen = false;
+    this._thresholdBuckets = {};
     this.ui.onRestartRequest(() => this._promptRestart());
     this.ui.loadGlossary(GLOSSARY_TERMS);
     this._bindRestart();
@@ -94,6 +95,7 @@ class ForestryGame {
     const areaId = areaOption.value ?? findAreaByLabel(areaOption.label)?.id ?? OPERATING_AREAS[0].id;
 
     this.state = createInitialState({ companyName, roleId, areaId });
+    this._thresholdBuckets = {};
     this.ui.updateStatus({ ...this.state, round: 0 });
 
     const role = findRole(roleId);
@@ -120,6 +122,7 @@ class ForestryGame {
       this.state.round = round;
       const season = SEASONS[round - 1] ?? `Season ${round}`;
       this.ui.write(`\n--- ${season.toUpperCase()} ---`);
+      this._advancePendingIssues();
       this.ui.updateStatus(this.state);
 
       this._seasonBaseline = { ...this.state.metrics };
@@ -141,6 +144,7 @@ class ForestryGame {
       if (headline) {
         this.ui.write(headline);
       }
+      this._recordSeasonSnapshot(season);
       this.ui.updateStatus(this.state);
     }
 
@@ -148,12 +152,34 @@ class ForestryGame {
     this.ui.write("\n=== YEAR-END SUMMARY ===");
     this.ui.write(summary.overall);
     summary.messages.forEach((message) => this.ui.write(message));
+    if (summary.legacy) {
+      if (summary.legacy.seasonSummaries?.length) {
+        this.ui.write("\nLegacy Report:");
+        summary.legacy.seasonSummaries.forEach((line) => this.ui.write(line));
+      }
+      if (summary.legacy.trendLines?.length) {
+        summary.legacy.trendLines.forEach((line) => this.ui.write(`  ${line}`));
+      }
+    }
+    if (summary.highlights?.length) {
+      this.ui.write("\nDecision Review:");
+      summary.highlights.forEach((line) => this.ui.write(line));
+    }
+    if (summary.achievements?.length) {
+      this.ui.write("\nAchievements Earned:");
+      summary.achievements.forEach((line) => this.ui.write(line));
+    }
+    if (summary.projection?.length) {
+      this.ui.write("\nFuture Outlook:");
+      summary.projection.forEach((line) => this.ui.write(`• ${line}`));
+    }
     this.ui.write("\nThanks for guiding the team. Press ESC to try a different combination.");
   }
 
   async _runTask(task) {
     this.ui.write(`\nTask: ${task.title}`);
     const option = await this.ui.promptChoice(task.prompt, this._decorateOptions(task.options));
+    const baseline = { ...this.state.metrics };
     const resolved = this._resolveOption(option);
     if (resolved.preface) {
       this.ui.write(resolved.preface);
@@ -170,6 +196,8 @@ class ForestryGame {
     if (delta) {
       this.ui.write(`Impact: ${delta}`);
     }
+    this._handleResolutionSideEffects(resolved);
+    this._checkThresholds(baseline, this.state.metrics);
     this.ui.updateStatus(this.state);
   }
 
@@ -180,6 +208,7 @@ class ForestryGame {
       "How will you respond?",
       this._decorateOptions(issue.options)
     );
+    const baseline = { ...this.state.metrics };
     const resolved = this._resolveOption(option);
     if (resolved.preface) {
       this.ui.write(resolved.preface);
@@ -196,6 +225,8 @@ class ForestryGame {
     if (delta) {
       this.ui.write(`Impact: ${delta}`);
     }
+    this._handleResolutionSideEffects(resolved, issue);
+    this._checkThresholds(baseline, this.state.metrics);
   }
 
   _leakIllegalFile(roleId) {
@@ -233,6 +264,17 @@ class ForestryGame {
       metrics.relationships
     )}, Compliance ${Math.round(metrics.compliance)}, Budget ${Math.round(metrics.budget)}`;
     return summary;
+  }
+
+  _recordSeasonSnapshot(season) {
+    if (!this.state.timeline) {
+      this.state.timeline = [];
+    }
+    this.state.timeline.push({
+      round: this.state.round,
+      season,
+      metrics: { ...this.state.metrics },
+    });
   }
 
   _decorateOptions(options = []) {
@@ -294,6 +336,9 @@ class ForestryGame {
         outcome: option.outcome ?? "",
         effects: option.effects ?? {},
         historyLabel: option.historyLabel ?? option.label,
+        setFlags: option.setFlags,
+        clearFlags: option.clearFlags,
+        scheduleIssues: option.scheduleIssues,
       };
     }
     const chance = Math.max(0, Math.min(1, Number(option.risk.chance) || 0));
@@ -314,6 +359,9 @@ class ForestryGame {
       outcome,
       effects,
       historyLabel: `${option.historyLabel ?? option.label}${branch?.historyLabelSuffix ?? (success ? " — Paid Off" : " — Backfired")}`,
+      setFlags: branch?.setFlags ?? option.setFlags,
+      clearFlags: branch?.clearFlags ?? option.clearFlags,
+      scheduleIssues: branch?.scheduleIssues ?? option.scheduleIssues,
     };
   }
 
@@ -323,6 +371,149 @@ class ForestryGame {
     }
     const index = Math.floor(Math.random() * collection.length);
     return collection[index];
+  }
+
+  _advancePendingIssues() {
+    if (!Array.isArray(this.state.pendingIssues)) {
+      this.state.pendingIssues = [];
+      return;
+    }
+    this.state.pendingIssues.forEach((item) => {
+      if (item && typeof item.delay === "number" && item.delay > 0) {
+        item.delay -= 1;
+      }
+    });
+  }
+
+  _handleResolutionSideEffects(resolved, issue) {
+    if (!resolved) {
+      return;
+    }
+    if (!this.state.flags) {
+      this.state.flags = {};
+    }
+    if (resolved.clearFlags) {
+      for (const key of [].concat(resolved.clearFlags)) {
+        if (key) {
+          delete this.state.flags[key];
+        }
+      }
+    }
+    if (resolved.setFlags) {
+      Object.entries(resolved.setFlags).forEach(([key, value]) => {
+        if (!key) return;
+        this.state.flags[key] = value ?? true;
+      });
+    }
+    if (resolved.scheduleIssues) {
+      if (!Array.isArray(this.state.pendingIssues)) {
+        this.state.pendingIssues = [];
+      }
+      const schedule = Array.isArray(resolved.scheduleIssues)
+        ? resolved.scheduleIssues
+        : [resolved.scheduleIssues];
+      schedule.forEach((item) => {
+        if (!item) return;
+        const payload = {
+          id: item.id,
+          delay: typeof item.delay === "number" ? Math.max(0, item.delay) : 0,
+        };
+        if (payload.id) {
+          this.state.pendingIssues.push(payload);
+        }
+      });
+    }
+    if (issue?.id && resolved.scheduleIssues) {
+      // Flag the originating issue so chained stages know their source completed.
+      this.state.flags[`resolved:${issue.id}`] = true;
+    }
+  }
+
+  _checkThresholds(previous = {}, next = {}) {
+    const metrics = ["progress", "forestHealth", "relationships", "compliance", "budget"];
+    metrics.forEach((metric) => {
+      const before = Number(previous[metric] ?? 0);
+      const after = Number(next[metric] ?? 0);
+      const prevBucket = this._thresholdBuckets[metric] ?? this._bucketFor(before);
+      const nextBucket = this._bucketFor(after);
+      if (metric === "budget") {
+        this._maybeScheduleBudgetEmergency(after);
+      }
+      this._thresholdBuckets[metric] = nextBucket;
+      if (prevBucket === nextBucket) {
+        return;
+      }
+      const direction = nextBucket > prevBucket ? "up" : "down";
+      const threshold = direction === "up" ? nextBucket : prevBucket;
+      const label = this._metricLabel(metric);
+      const message = this._thresholdMessage(label, direction, threshold, after);
+      this.ui.flashMetricAlert({
+        label,
+        message,
+        direction,
+        value: after,
+        threshold,
+      });
+      this.ui.write(message);
+    });
+  }
+
+  _maybeScheduleBudgetEmergency(value) {
+    if (value <= 5 && !this.state.flags?.budgetLoanActive) {
+      if (!this.state.flags) {
+        this.state.flags = {};
+      }
+      if (!this.state.flags.budgetEmergencyScheduled) {
+        this.state.flags.budgetEmergencyScheduled = true;
+        if (!Array.isArray(this.state.pendingIssues)) {
+          this.state.pendingIssues = [];
+        }
+        this.state.pendingIssues.push({ id: "budget-emergency-loan", delay: 0 });
+      }
+    } else if (value > 5 && this.state.flags?.budgetEmergencyScheduled && !this.state.flags?.budgetLoanActive) {
+      delete this.state.flags.budgetEmergencyScheduled;
+    }
+  }
+
+  _bucketFor(value) {
+    if (value < 30) return 0;
+    if (value < 50) return 30;
+    if (value < 70) return 50;
+    return 70;
+  }
+
+  _metricLabel(metric) {
+    switch (metric) {
+      case "progress":
+        return "Operational Progress";
+      case "forestHealth":
+        return "Forest Health";
+      case "relationships":
+        return "Relationships";
+      case "compliance":
+        return "Compliance";
+      case "budget":
+        return "Budget Flexibility";
+      default:
+        return metric;
+    }
+  }
+
+  _thresholdMessage(label, direction, threshold, value) {
+    const rounded = Math.round(value);
+    if (direction === "up") {
+      if (threshold >= 70) {
+        return `🌟 ${label} climbed above ${threshold}. Current reading: ${rounded}.`;
+      }
+      return `📈 ${label} rose past ${threshold}. Current reading: ${rounded}.`;
+    }
+    if (threshold <= 0) {
+      return `🚨 ${label} bottomed out. Current reading: ${rounded}.`;
+    }
+    if (threshold <= 30) {
+      return `⚠️ ${label} slipped below ${threshold}. Current reading: ${rounded}.`;
+    }
+    return `🔻 ${label} dipped under ${threshold}. Current reading: ${rounded}.`;
   }
 
   _drawWildcardSeverity() {
