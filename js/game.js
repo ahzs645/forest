@@ -10,21 +10,65 @@ import {
   findRole,
   findArea,
 } from "./engine.js";
-import { FORESTER_ROLES, OPERATING_AREAS, ILLEGAL_ACTS } from "./data/index.js";
+import { FORESTER_ROLES, OPERATING_AREAS, ILLEGAL_ACTS, GLOSSARY_TERMS } from "./data/index.js";
 
 class ForestryGame {
   constructor() {
     this.ui = new TerminalUI();
     this.state = null;
+    this._seasonBaseline = null;
+    this._restartConfirmOpen = false;
+    this.ui.onRestartRequest(() => this._promptRestart());
+    this.ui.loadGlossary(GLOSSARY_TERMS);
     this._bindRestart();
   }
 
   _bindRestart() {
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
-        this.ui.write("\nReloading scenario...");
-        this.start();
+        if (this.ui.isModalOpen()) {
+          return;
+        }
+        event.preventDefault();
+        this._promptRestart();
       }
+    });
+  }
+
+  _promptRestart() {
+    if (this._restartConfirmOpen) {
+      return;
+    }
+    this._restartConfirmOpen = true;
+    this.ui.openModal({
+      title: "Restart scenario?",
+      dismissible: true,
+      onClose: () => {
+        this._restartConfirmOpen = false;
+      },
+      buildContent: (container) => {
+        const message = document.createElement("p");
+        message.textContent = "Starting over clears your current crew's progress and returns to role selection.";
+        message.style.marginTop = "0";
+        container.appendChild(message);
+      },
+      actions: [
+        {
+          label: "Restart",
+          primary: true,
+          onSelect: () => {
+            this.ui.closeModal();
+            this.ui.write("\nReloading scenario...");
+            this.start();
+          },
+        },
+        {
+          label: "Keep playing",
+          onSelect: () => {
+            this.ui.closeModal();
+          },
+        },
+      ],
     });
   }
 
@@ -70,13 +114,15 @@ class ForestryGame {
 
     this._leakIllegalFile(roleId);
 
-    this.ui.write("Navigate one full operational year across four seasons. ESC to restart.\n");
+    this.ui.write("Navigate one full operational year across four seasons. ESC or the Restart button opens the restart prompt.\n");
 
     for (let round = 1; round <= this.state.totalRounds; round++) {
       this.state.round = round;
       const season = SEASONS[round - 1] ?? `Season ${round}`;
       this.ui.write(`\n--- ${season.toUpperCase()} ---`);
       this.ui.updateStatus(this.state);
+
+      this._seasonBaseline = { ...this.state.metrics };
 
       const tasks = getRoleTasks(this.state);
       for (const task of tasks) {
@@ -91,6 +137,10 @@ class ForestryGame {
       }
 
       this.ui.write(this._seasonCheckpoint());
+      const headline = this._seasonHeadline(season, this._seasonBaseline);
+      if (headline) {
+        this.ui.write(headline);
+      }
       this.ui.updateStatus(this.state);
     }
 
@@ -207,42 +257,29 @@ class ForestryGame {
       return null;
     }
     const pick = source[Math.floor(Math.random() * source.length)];
-    const hush = [
-      "diesel haze",
-      "frosty muskeg",
-      "cedar pitch",
-      "chain oil mist",
-      "river fog",
-    ];
+    const hush = ["diesel haze", "frosty muskeg", "cedar pitch", "chain oil mist", "river fog"];
     const sense = hush[Math.floor(Math.random() * hush.length)];
+    const severity = this._drawWildcardSeverity();
+    const labelSuffix = severity.label ? ` – ${severity.label}` : "";
     return {
-      label: `🚫 Wildcard: ${pick.title}`,
-      outcome: `You lean into the shady path. ${pick.description} The ${sense} hangs in the ${areaName} air as compliance officers start whispering about anomalies.`,
-      effects: { progress: 6, budget: 5, relationships: -6, compliance: -12 },
-      historyLabel: `${pick.title} (Wildcard)`,
+      label: `🚫 Wildcard: ${pick.title}${labelSuffix}`,
+      outcome: `You lean into the shady path. ${pick.description} ${severity.outcome} The ${sense} hangs in the ${areaName} air as compliance officers start whispering about anomalies.`,
+      effects: severity.effects,
+      historyLabel: `${pick.title} (Wildcard${severity.historySuffix})`,
     };
   }
 
   _createRiskOption() {
     const areaName = this.state?.area?.name ?? "north woods";
-    const chance = 0.45;
+    const chance = this._calculateRiskChance();
     const chanceLabel = Math.round(chance * 100);
+    const { successEffects, failureEffects } = this._riskEffectProfiles(chance);
     return {
       label: `🎲 Risk Play: Ignite a moonlit blitz in ${areaName} (${chanceLabel}% win chance)`,
       risk: {
         chance,
-        successHeadline: "Adrenaline Rush Pays Off",
-        failureHeadline: "Cratered in Spectacular Fashion",
-        success: {
-          outcome:
-            "The convoy rockets through the timber under aurora glow. Radios crackle with victory yelps and the mill rewards your audacity.",
-          effects: { progress: 8, budget: 5, relationships: 3, compliance: -4 },
-        },
-        failure: {
-          outcome:
-            "A drone pilot streams the whole gambit. Sirens echo, fines rain down, and the crew feels their stomachs drop into the slash pile.",
-          effects: { progress: -7, budget: -9, relationships: -6, compliance: -8 },
-        },
+        success: this._buildRiskNarratives("success", areaName, successEffects),
+        failure: this._buildRiskNarratives("failure", areaName, failureEffects),
       },
       historyLabel: `Risk Play (${areaName})`,
     };
@@ -262,10 +299,13 @@ class ForestryGame {
     const chance = Math.max(0, Math.min(1, Number(option.risk.chance) || 0));
     const roll = Math.random();
     const success = roll < chance;
-    const branch = success ? option.risk.success : option.risk.failure;
+    const deck = success ? option.risk.success : option.risk.failure;
+    const branch = Array.isArray(deck) ? this._pickRandom(deck) : deck;
     const outcome = branch?.outcome ?? option.outcome ?? "";
     const effects = branch?.effects ?? option.effects ?? {};
-    const headline = success
+    const headline = branch?.headline
+      ? branch.headline
+      : success
       ? option.risk.successHeadline || "Success"
       : option.risk.failureHeadline || "Failure";
     const preface = `🎲 Risk roll (${Math.round(chance * 100)}% target, rolled ${roll.toFixed(2)}): ${headline}!`;
@@ -273,8 +313,235 @@ class ForestryGame {
       preface,
       outcome,
       effects,
-      historyLabel: `${option.historyLabel ?? option.label}${success ? " — Paid Off" : " — Backfired"}`,
+      historyLabel: `${option.historyLabel ?? option.label}${branch?.historyLabelSuffix ?? (success ? " — Paid Off" : " — Backfired")}`,
     };
+  }
+
+  _pickRandom(collection = []) {
+    if (!collection.length) {
+      return null;
+    }
+    const index = Math.floor(Math.random() * collection.length);
+    return collection[index];
+  }
+
+  _drawWildcardSeverity() {
+    const roll = Math.random();
+    if (roll < 0.25) {
+      return {
+        label: "Low Profile",
+        outcome: "Somehow the auditors stay glued to their inboxes, and the crew pockets quiet gains.",
+        effects: { progress: 5, budget: 4, relationships: -2, compliance: -5 },
+        historySuffix: " – Slipped By",
+      };
+    }
+    if (roll < 0.85) {
+      return {
+        label: "Heat Rising",
+        outcome: "Rumours spiral around town, and partner nations send frosty emails asking for clarification.",
+        effects: { progress: 6, budget: 5, relationships: -6, compliance: -12 },
+        historySuffix: " – Raised Eyebrows",
+      };
+    }
+    return {
+      label: "Investigation Launched",
+      outcome: "Compliance officers find a paper trail before lunch. Inspectors descend with clipboards and emergency suspension powers.",
+      effects: { progress: -2, budget: -8, relationships: -12, compliance: -22 },
+      historySuffix: " – Busted",
+    };
+  }
+
+  _calculateRiskChance() {
+    const metrics = this.state?.metrics;
+    if (!metrics) {
+      return 0.45;
+    }
+    const budgetFactor = (metrics.budget - 50) / 150;
+    const complianceDrag = (50 - metrics.compliance) / 120;
+    const relationshipBoost = (metrics.relationships - 50) / 220;
+    const forestHealthDrag = (50 - metrics.forestHealth) / 260;
+    const raw = 0.38 + budgetFactor - complianceDrag + relationshipBoost - forestHealthDrag;
+    return Math.min(0.8, Math.max(0.15, raw));
+  }
+
+  _riskEffectProfiles(chance) {
+    const swing = 0.45 - chance;
+    const successScale = 1 + swing * 0.9;
+    const failureScale = 1 + (chance - 0.45) * 1.1;
+    return {
+      successEffects: this._scaleEffects(
+        {
+          progress: 8,
+          budget: 5,
+          relationships: 3,
+          compliance: -4,
+        },
+        successScale
+      ),
+      failureEffects: this._scaleEffects(
+        {
+          progress: -7,
+          budget: -9,
+          relationships: -6,
+          compliance: -8,
+        },
+        failureScale
+      ),
+    };
+  }
+
+  _scaleEffects(effects, scale) {
+    const scaled = {};
+    for (const [key, value] of Object.entries(effects)) {
+      const adjusted = Math.round(value * scale);
+      if (adjusted !== 0) {
+        scaled[key] = adjusted;
+      }
+    }
+    return scaled;
+  }
+
+  _buildRiskNarratives(type, areaName, effects) {
+    const templates = type === "success" ? this._riskSuccessTemplates(areaName) : this._riskFailureTemplates(areaName);
+    return templates.map((template) => ({
+      headline: template.headline,
+      outcome: template.outcome,
+      effects,
+      historyLabelSuffix: template.historyLabelSuffix,
+    }));
+  }
+
+  _riskSuccessTemplates(areaName) {
+    return [
+      {
+        headline: "Adrenaline Rush Pays Off",
+        outcome:
+          "The convoy rockets through the timber under aurora glow. Radios crackle with victory yelps and the mill rewards your audacity.",
+        historyLabelSuffix: " — Paid Off",
+      },
+      {
+        headline: "Big Bet Impresses the Board",
+        outcome: `Investors wake to sunrise selfies from the ${areaName} blitz. The brass declares you a legend of opportunistic logistics.`,
+        historyLabelSuffix: " — Board Approved",
+      },
+      {
+        headline: "Caribou Never Saw It Coming",
+        outcome: "Wildlife stewards praise your delicate timing as you thread machines between migratory herds without a single spooked hoof.",
+        historyLabelSuffix: " — Wildlife Wowed",
+      },
+    ];
+  }
+
+  _riskFailureTemplates(areaName) {
+    return [
+      {
+        headline: "Cratered in Spectacular Fashion",
+        outcome:
+          "A drone pilot streams the whole gambit. Sirens echo, fines rain down, and the crew feels their stomachs drop into the slash pile.",
+        historyLabelSuffix: " — Backfired",
+      },
+      {
+        headline: "Camp Cook Live-Blogged the Chaos",
+        outcome: `The mess tent posts viral updates about machines sunk axle-deep near ${areaName}. Regulators binge-watch the feed with clipboards ready.`,
+        historyLabelSuffix: " — Livestreamed",
+      },
+      {
+        headline: "Union Steward Pulls the Plug",
+        outcome: "Crew reps stage an impromptu safety stand-down after midnight mishaps, forcing an expensive reset while the rumour mill erupts.",
+        historyLabelSuffix: " — Mutiny",
+      },
+    ];
+  }
+
+  _seasonHeadline(season, baseline) {
+    if (!baseline) {
+      return "";
+    }
+    const metrics = this.state?.metrics;
+    if (!metrics) {
+      return "";
+    }
+    const deltas = Object.fromEntries(
+      Object.entries(baseline).map(([key, value]) => [key, Math.round((metrics[key] ?? 0) - value)])
+    );
+    const candidates = Object.entries(deltas)
+      .map(([key, change]) => ({ key, change, magnitude: Math.abs(change) }))
+      .filter((entry) => entry.magnitude >= 2)
+      .sort((a, b) => b.magnitude - a.magnitude);
+    if (!candidates.length) {
+      return `🗞️ ${season} dispatch: "Steady as she goes" reports the Northern Timber Times.`;
+    }
+    const top = candidates[0];
+    const pool = top.change >= 0 ? this._seasonPositiveHeadlines(top.key) : this._seasonNegativeHeadlines(top.key);
+    const template = this._pickRandom(pool);
+    if (!template) {
+      return "";
+    }
+    return `🗞️ ${template.replace("{value}", Math.abs(top.change)).replace("{season}", season)}`;
+  }
+
+  _seasonPositiveHeadlines(metric) {
+    switch (metric) {
+      case "progress":
+        return [
+          "{season} dispatch: Haulers celebrate a {value}-point surge in delivered loads.",
+          "{season} bonus edition: Mill logs spike {value} ticks as your blitz clears the block list.",
+        ];
+      case "forestHealth":
+        return [
+          "{season} dispatch: Botanists high-five over {value}-point forest health rebound.",
+          "{season} roundup: Satellite imagery shows canopy vigor up {value} after your tweaks.",
+        ];
+      case "relationships":
+        return [
+          "{season} dispatch: Treaty partners applaud a {value}-point goodwill upswing.",
+          "{season} news: Community radio spotlights your listening sessions, boosting ties by {value} ticks.",
+        ];
+      case "compliance":
+        return [
+          "{season} bulletin: Compliance office notes {value}-point improvement—no red pens snapped today.",
+          "{season} update: Auditors send heart emojis after risk profile tightens by {value}.",
+        ];
+      case "budget":
+        return [
+          "{season} ledger leak: Finance applauds a {value}-point bump in rainy-day funds.",
+          "{season} dispatch: Treasury meme account hails your {value}-point budget glow-up.",
+        ];
+      default:
+        return [];
+    }
+  }
+
+  _seasonNegativeHeadlines(metric) {
+    switch (metric) {
+      case "progress":
+        return [
+          "{season} dispatch: Production plunges {value} as graders sit idle in camp.",
+          "{season} late edition: Dispatch riders complain of {value}-point schedule slippage.",
+        ];
+      case "forestHealth":
+        return [
+          "{season} dispatch: Forest health dips {value}; moss bloggers sound the alarm.",
+          "{season} update: Satellite imagery shows canopy stress climbing {value} ticks.",
+        ];
+      case "relationships":
+        return [
+          "{season} dispatch: Partner liaisons report {value}-point goodwill crash after tense calls.",
+          "{season} news: Community FM loops a protest ballad over {value}-point relationship slide.",
+        ];
+      case "compliance":
+        return [
+          "{season} bulletin: Compliance nosedives {value}; auditors dust off the raid jackets.",
+          "{season} alert: Regulators cite {value}-point slide while sharpening suspension notices.",
+        ];
+      case "budget":
+        return [
+          "{season} ledger leak: Budget drains by {value}; finance orders instant ramen for camp.",
+          "{season} dispatch: Bean counters gasp at {value}-point burn rate spike.",
+        ];
+      default:
+        return [];
+    }
   }
 }
 

@@ -55,4 +55,25 @@ export const ILLEGAL_ACTS = [
     roles: ["recce", "permitter"],
     tags: ["recce", "permitter", "riparian", "blatant"],
   },
+  {
+    id: "bigfoot-haulage",
+    title: "Hire Bigfoot as a Subcontractor",
+    description: "Disguise a legendary biped as an equipment operator to double-shift the log haul without HR paperwork.",
+    roles: ["recce", "planner"],
+    tags: ["mythical", "labour", "recce", "planner"],
+  },
+  {
+    id: "carbon-offset-spin",
+    title: "Rebrand Clearcuts as Carbon Offsets",
+    description: "Pitch every stump field as a visionary 'future sequestration hub' and invoice municipal partners for credits.",
+    roles: ["planner", "permitter"],
+    tags: ["greenwashing", "planner", "permitter"],
+  },
+  {
+    id: "reality-show-pitch",
+    title: "Film a Logging Reality Show",
+    description: "Invite a streaming crew to dramatize your cutblocks, editing out safety briefings to keep the drama spicy.",
+    roles: ["recce", "silviculture"],
+    tags: ["media", "recce", "silviculture", "spectacle"],
+  },
 ];
