@@ -17,13 +17,12 @@
         <div class="top-bar">
           <div class="brand">FORESTRY SIMULATOR</div>
           <div class="top-actions">
-            <button id="restart-hint" class="hint" type="button" aria-label="Restart hint">
-              Press ESC to restart
-            </button>
+            <button id="glossary-button" class="hint" type="button">Glossary</button>
+            <button id="restart-button" class="hint" type="button">Restart</button>
           </div>
         </div>
         <div id="mobile-hud" class="mobile-hud" aria-live="polite"></div>
-        <pre id="terminal" class="terminal screen" aria-live="polite"></pre>
+        <div id="terminal" class="terminal screen" aria-live="polite" role="log"></div>
         <div id="button-container" class="button-container" aria-live="polite"></div>
         <label for="input" class="visually-hidden">Command input</label>
         <input
@@ -49,6 +48,15 @@
         </div>
         <div id="status-content" class="status-content" aria-live="polite"></div>
       </aside>
+    </div>
+    <div id="modal" class="modal" hidden>
+      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-header">
+          <h2 id="modal-title"></h2>
+        </div>
+        <div id="modal-body" class="modal-body"></div>
+        <div id="modal-actions" class="modal-actions"></div>
+      </div>
     </div>
     <script type="module" src="js/game.js"></script>
   </body>

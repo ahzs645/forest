@@ -4,7 +4,7 @@ A rebuilt, choice-driven forestry operations simulator grounded in northern Brit
 
 ## Play in the browser
 
-Open `index.html` in your browser to launch the retro terminal interface. Tap the on-screen buttons or type numbers/labels to answer prompts — the layout is fully mobile friendly. Press `ESC` at any time to restart with a different combination of role and operating area.
+Open `index.html` in your browser to launch the retro terminal interface. Tap the on-screen buttons or type numbers/labels to answer prompts — the layout is fully mobile friendly. Use the top-right **Glossary** button to search forestry jargon, and tap any highlighted in-line term to jump straight to its definition. Hit **Restart** (or press `ESC`) to open a confirmation modal before wiping your run and selecting a new crew.
 
 ### Forester specializations
 
@@ -30,6 +30,8 @@ Six northern BC operating areas capture BEC zones, dominant species, and landsca
 
 Every season the simulator draws a random issue that matches your specialization and the active operating area tags. Responses adjust five shared metrics — operational progress, forest health, relationships, regulatory confidence, and budget flexibility. Your year-end summary reflects the trade-offs you navigated.
 
+Wildcard mischief, risk plays, and seasonal news flashes keep runs varied. Illegal options now swing between hush-hush wins and investigations, while risk gambles read the room—higher compliance or frayed relationships shift the odds and payout magnitude. At the end of each season the Northern Timber Times prints a headline based on your biggest metric swing to celebrate (or roast) your strategy.
+
 ## Command line quick run
 
 A lightweight CLI runner is available for automated playthroughs:
@@ -51,3 +53,7 @@ Each run makes heuristic decisions that prioritise balanced performance.
 ## Local development
 
 The interactive version is a static site; no build step is required. Open `index.html` directly or serve the folder with any static server. Game content is organized under `js/data/` with dedicated modules for roles, operating areas, and dynamic issues, making it easy to extend forester duties or add new geography.
+
+## Future directions
+
+Curious about where the simulator could head next? Check out [`docs/future_directions.md`](docs/future_directions.md) for a curated list of mechanics, humour, and accessibility enhancements inspired by community feedback.
