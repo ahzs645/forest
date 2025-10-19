@@ -17,6 +17,9 @@
         <div class="top-bar">
           <div class="brand">FORESTRY SIMULATOR</div>
           <div class="top-actions">
+            <button id="status-button" class="hint status-toggle-button" type="button">
+              Field Status
+            </button>
             <button id="glossary-button" class="hint" type="button">Glossary</button>
             <button id="restart-button" class="hint" type="button">Restart</button>
           </div>
@@ -50,6 +53,7 @@
         <div id="status-content" class="status-content" aria-live="polite"></div>
       </aside>
     </div>
+    <div id="status-backdrop" class="status-backdrop" hidden></div>
     <div id="modal" class="modal" hidden>
       <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div class="modal-header">

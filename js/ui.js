@@ -5,6 +5,9 @@ export class TerminalUI {
     this.buttonContainer = document.getElementById("button-container");
     this.statusPanel = document.getElementById("status-content");
     this.statusToggle = document.getElementById("status-toggle");
+    this.rightPanel = document.querySelector(".right-panel");
+    this.statusButton = document.getElementById("status-button");
+    this.statusBackdrop = document.getElementById("status-backdrop");
     this.mobileHud = document.getElementById("mobile-hud");
     this.restartButton = document.getElementById("restart-button");
     this.glossaryButton = document.getElementById("glossary-button");
@@ -25,6 +28,12 @@ export class TerminalUI {
     this._pending = null;
     this._choiceKeyHandler = null;
     this._inputMode = "idle";
+    this._mobileStatusOpen = false;
+    this._statusMedia =
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(max-width: 860px)")
+        : null;
+    this._statusMediaHandler = null;
 
     if (this.input) {
       this.input.addEventListener("keydown", (event) => {
@@ -38,11 +47,9 @@ export class TerminalUI {
       const togglePanel = () => {
         const expanded = this.statusToggle.getAttribute("aria-expanded") === "true";
         const next = !expanded;
-        this.statusToggle.setAttribute("aria-expanded", String(next));
-        this.statusPanel.hidden = !next;
-        const arrow = this.statusToggle.querySelector(".status-arrow");
-        if (arrow) {
-          arrow.textContent = next ? "▾" : "▸";
+        this._setStatusExpanded(next);
+        if (this._statusMedia?.matches) {
+          this._setMobileStatusOpen(next);
         }
       };
       this.statusToggle.addEventListener("click", togglePanel);
@@ -51,6 +58,31 @@ export class TerminalUI {
           event.preventDefault();
           togglePanel();
         }
+      });
+    }
+
+    if (this.statusButton) {
+      this.statusButton.setAttribute("aria-controls", "status-content");
+      this.statusButton.setAttribute("aria-expanded", "false");
+      this.statusButton.addEventListener("click", () => {
+        if (!this._statusMedia?.matches) {
+          return;
+        }
+        if (this._mobileStatusOpen) {
+          this.dismissMobileStatusOverlay();
+        } else {
+          this._setStatusExpanded(true);
+          this._setMobileStatusOpen(true);
+          if (this.statusToggle) {
+            this.statusToggle.focus({ preventScroll: true });
+          }
+        }
+      });
+    }
+
+    if (this.statusBackdrop) {
+      this.statusBackdrop.addEventListener("click", () => {
+        this.dismissMobileStatusOverlay();
       });
     }
 
@@ -92,6 +124,18 @@ export class TerminalUI {
       });
     }
 
+    if (this._statusMedia) {
+      this._statusMediaHandler = (event) => {
+        this._applyStatusMode(event.matches);
+      };
+      if (typeof this._statusMedia.addEventListener === "function") {
+        this._statusMedia.addEventListener("change", this._statusMediaHandler);
+      } else if (typeof this._statusMedia.addListener === "function") {
+        this._statusMedia.addListener(this._statusMediaHandler);
+      }
+    }
+
+    this._applyStatusMode(this._statusMedia?.matches ?? false);
     this._setInputMode("idle");
   }
 
@@ -593,5 +637,61 @@ export class TerminalUI {
 
   _escapeRegex(value) {
     return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  dismissMobileStatusOverlay() {
+    if (!this._mobileStatusOpen) {
+      return false;
+    }
+    this._setStatusExpanded(false);
+    this._setMobileStatusOpen(false);
+    if (this.statusButton && this._statusMedia?.matches) {
+      this.statusButton.focus({ preventScroll: true });
+    }
+    return true;
+  }
+
+  _applyStatusMode(isMobile) {
+    if (!this.statusToggle || !this.statusPanel) {
+      return;
+    }
+    if (isMobile) {
+      this._setMobileStatusOpen(false);
+      this._setStatusExpanded(false);
+    } else {
+      this._setMobileStatusOpen(false);
+      this._setStatusExpanded(true);
+    }
+  }
+
+  _setStatusExpanded(expanded) {
+    if (!this.statusToggle || !this.statusPanel) {
+      return;
+    }
+    this.statusToggle.setAttribute("aria-expanded", String(expanded));
+    this.statusPanel.hidden = !expanded;
+    const arrow = this.statusToggle.querySelector(".status-arrow");
+    if (arrow) {
+      arrow.textContent = expanded ? "▾" : "▸";
+    }
+  }
+
+  _setMobileStatusOpen(open) {
+    this._mobileStatusOpen = Boolean(open);
+    if (this.rightPanel) {
+      this.rightPanel.classList.toggle("status-open", this._mobileStatusOpen);
+    }
+    if (this.statusBackdrop) {
+      this.statusBackdrop.hidden = !this._mobileStatusOpen;
+    }
+    if (typeof document !== "undefined" && document.body) {
+      document.body.classList.toggle("status-overlay-open", this._mobileStatusOpen);
+    }
+    if (this.statusButton) {
+      this.statusButton.setAttribute(
+        "aria-expanded",
+        this._mobileStatusOpen ? "true" : "false"
+      );
+    }
   }
 }
