@@ -145,6 +145,10 @@ body {
   transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.status-toggle-button {
+  display: none;
+}
+
 .hint:focus-visible,
 .hint:hover {
   outline: none;
@@ -522,6 +526,14 @@ body {
   box-shadow: var(--shadow);
 }
 
+.status-backdrop {
+  display: none;
+}
+
+.status-backdrop[hidden] {
+  display: none;
+}
+
 .glossary-list {
   margin: 0;
   padding: 0;
@@ -632,6 +644,10 @@ body {
     overflow: auto;
   }
 
+  body.status-overlay-open {
+    overflow: hidden;
+  }
+
   .game-container {
     flex-direction: column;
     height: auto;
@@ -643,14 +659,46 @@ body {
   }
 
   .right-panel {
-    width: 100%;
-    border-left: none;
-    border-top: 1px solid var(--border);
-    order: -1;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(360px, 90vw);
+    border-left: 1px solid var(--border);
+    border-top: none;
+    background: rgba(0, 20, 12, 0.96);
+    box-shadow: -16px 0 32px rgba(0, 0, 0, 0.75);
+    transform: translateX(100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    z-index: 12;
+  }
+
+  .right-panel.status-open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .status-toggle-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
   }
 
   .mobile-hud {
     display: grid;
+  }
+
+  .status-backdrop {
+    position: fixed;
+    inset: 0;
+    display: block;
+    background: rgba(0, 8, 4, 0.7);
+    backdrop-filter: blur(3px);
+    z-index: 11;
   }
 
   .button-container {

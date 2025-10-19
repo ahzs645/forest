@@ -30,6 +30,13 @@ class ForestryGame {
         if (this.ui.isModalOpen()) {
           return;
         }
+        if (
+          typeof this.ui.dismissMobileStatusOverlay === "function" &&
+          this.ui.dismissMobileStatusOverlay()
+        ) {
+          event.preventDefault();
+          return;
+        }
         event.preventDefault();
         this._promptRestart();
       }
