@@ -19,6 +19,7 @@ class ForestryGame {
     this._seasonBaseline = null;
     this._restartConfirmOpen = false;
     this._thresholdBuckets = {};
+    this._riskTipShown = false;
     this.ui.onRestartRequest(() => this._promptRestart());
     this.ui.loadGlossary(GLOSSARY_TERMS);
     this._bindRestart();
@@ -81,6 +82,7 @@ class ForestryGame {
   }
 
   async start() {
+    this.ui.prepareForNewGame();
     this.ui.clear();
     this.ui.write("FORESTRY SIMULATOR");
     this.ui.write("===================\n");
@@ -103,6 +105,7 @@ class ForestryGame {
 
     this.state = createInitialState({ companyName, roleId, areaId });
     this._thresholdBuckets = {};
+    this._riskTipShown = false;
     this.ui.updateStatus({ ...this.state, round: 0 });
 
     const role = findRole(roleId);
@@ -184,6 +187,8 @@ class ForestryGame {
   }
 
   async _runTask(task) {
+    this.ui.writeDivider("Decision Brief");
+    this.ui.write(this._statusSnapshot());
     this.ui.write(`\nTask: ${task.title}`);
     const option = await this.ui.promptChoice(task.prompt, this._decorateOptions(task.options));
     const baseline = { ...this.state.metrics };
@@ -209,6 +214,8 @@ class ForestryGame {
   }
 
   async _resolveIssue(issue) {
+    this.ui.writeDivider("Field Issue Update");
+    this.ui.write(this._statusSnapshot());
     this.ui.write(`\nField Issue: ${issue.title}`);
     this.ui.write(issue.description);
     const option = await this.ui.promptChoice(
@@ -323,7 +330,8 @@ class ForestryGame {
     const chance = this._calculateRiskChance();
     const chanceLabel = Math.round(chance * 100);
     const { successEffects, failureEffects } = this._riskEffectProfiles(chance);
-    return {
+    const description = this._describeRiskPlay(chance, successEffects, failureEffects);
+    const option = {
       label: `🎲 Risk Play: Ignite a moonlit blitz in ${areaName} (${chanceLabel}% win chance)`,
       risk: {
         chance,
@@ -331,7 +339,51 @@ class ForestryGame {
         failure: this._buildRiskNarratives("failure", areaName, failureEffects),
       },
       historyLabel: `Risk Play (${areaName})`,
+      description,
     };
+    this._maybeAnnounceRiskPlay(chance, successEffects, failureEffects);
+    return option;
+  }
+
+  _statusSnapshot() {
+    const metrics = this.state?.metrics;
+    if (!metrics) {
+      return "Status Brief -> gathering telemetry...";
+    }
+    const parts = [
+      `Progress ${Math.round(metrics.progress)}`,
+      `Forest Health ${Math.round(metrics.forestHealth)}`,
+      `Relationships ${Math.round(metrics.relationships)}`,
+      `Compliance ${Math.round(metrics.compliance)}`,
+      `Budget ${Math.round(metrics.budget)}`,
+    ];
+    return `Status Brief -> ${parts.join(" • ")}`;
+  }
+
+  _describeRiskPlay(chance, successEffects, failureEffects) {
+    const chanceLabel = Math.round(chance * 100);
+    const success = this._formatRiskDeltaList(successEffects);
+    const failure = this._formatRiskDeltaList(failureEffects);
+    return `Chance-based decision. Roll under ${chanceLabel}% to win. Success: ${success}. Failure: ${failure}.`;
+  }
+
+  _formatRiskDeltaList(effects = {}) {
+    const delta = formatMetricDelta(effects);
+    return delta || "Minimal impact";
+  }
+
+  _maybeAnnounceRiskPlay(chance, successEffects, failureEffects) {
+    if (this._riskTipShown) {
+      return;
+    }
+    this._riskTipShown = true;
+    const chanceLabel = Math.round(chance * 100);
+    const success = this._formatRiskDeltaList(successEffects);
+    const failure = this._formatRiskDeltaList(failureEffects);
+    this.ui.write(
+      `ℹ️ Risk plays compare a random roll against the listed chance. (${chanceLabel}% target — Success: ${success}; Failure: ${failure}).`
+    );
+    this.ui.write("Choose them only when you are comfortable with the potential downside.");
   }
 
   _resolveOption(option) {

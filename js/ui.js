@@ -139,6 +139,19 @@ export class TerminalUI {
     this._setInputMode("idle");
   }
 
+  prepareForNewGame() {
+    this._clearButtons();
+    if (this.alertStack) {
+      this.alertStack.innerHTML = "";
+    }
+    if (this.statusPanel) {
+      this.statusPanel.innerHTML = `<div class="status-placeholder">Select a crew and operating area to refresh the field status.</div>`;
+    }
+    if (this.mobileHud) {
+      this.mobileHud.innerHTML = "";
+    }
+  }
+
   write(message = "") {
     if (!this.terminal) return;
     const text = String(message ?? "");
@@ -147,6 +160,15 @@ export class TerminalUI {
       const line = this._createLine(segment);
       this.terminal.appendChild(line);
     });
+    this.terminal.scrollTop = this.terminal.scrollHeight;
+  }
+
+  writeDivider(label = "") {
+    if (!this.terminal) return;
+    const divider = document.createElement("div");
+    divider.className = "terminal-divider";
+    divider.textContent = label;
+    this.terminal.appendChild(divider);
     this.terminal.scrollTop = this.terminal.scrollHeight;
   }
 
@@ -514,17 +536,26 @@ export class TerminalUI {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "choice-btn";
-      button.textContent = `${index + 1}. ${option.label}`;
+      const label = document.createElement("span");
+      label.className = "choice-btn__label";
+      label.textContent = `${index + 1}. ${option.label}`;
+      button.appendChild(label);
+      if (option.description) {
+        const description = document.createElement("span");
+        description.className = "choice-btn__description";
+        description.textContent = option.description;
+        button.appendChild(description);
+      }
       button.addEventListener("click", () => {
         onSelect(option);
       });
       this.buttonContainer.appendChild(button);
     });
-    if (window.matchMedia("(max-width: 860px)").matches) {
-      requestAnimationFrame(() => {
-        this.buttonContainer?.scrollIntoView({ block: "end", behavior: "smooth" });
-      });
-    }
+    requestAnimationFrame(() => {
+      const firstButton = this.buttonContainer?.querySelector("button");
+      this.buttonContainer?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      firstButton?.focus({ preventScroll: true });
+    });
   }
 
   _clearButtons() {
@@ -612,8 +643,8 @@ export class TerminalUI {
         button.type = "button";
         button.className = "glossary-term";
         button.setAttribute("data-term-key", normalized);
-        button.setAttribute("title", `View glossary definition for ${entry.term}`);
-        button.setAttribute("aria-label", `Open glossary definition for ${entry.term}`);
+        button.setAttribute("title", entry.description);
+        button.setAttribute("aria-label", `${entry.term}. ${entry.description}`);
         button.textContent = termText;
         line.appendChild(button);
       } else {
