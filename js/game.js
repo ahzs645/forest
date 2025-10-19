@@ -615,9 +615,9 @@ class ForestryGame {
   }
 
   _riskEffectProfiles(chance) {
-    const swing = 0.45 - chance;
-    const successScale = 1 + swing * 0.9;
-    const failureScale = 1 + (chance - 0.45) * 1.1;
+    const deviation = chance - 0.45;
+    const successScale = 1 - deviation * 0.9;
+    const failureScale = 1 + (-deviation) * 1.1;
     return {
       successEffects: this._scaleEffects(
         {

@@ -743,7 +743,34 @@ body {
     right: 0;
     z-index: 5;
     box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.6);
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    max-height: min(45vh, 360px);
+    overflow-y: auto;
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    gap: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .button-container.active {
+    grid-template-columns: 1fr;
+  }
+
+  .button-container::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .button-container::-webkit-scrollbar-thumb {
+    background: rgba(100, 247, 255, 0.35);
+    border-radius: 999px;
+  }
+
+  .choice-btn {
+    font-size: 14px;
+    line-height: 1.4;
+    padding: 12px 14px;
+  }
+
+  .choice-btn__description {
+    font-size: 12px;
   }
 
   #input {
@@ -776,10 +803,6 @@ body {
   .terminal {
     padding: 16px;
     font-size: 15px;
-  }
-
-  .button-container.active {
-    grid-template-columns: 1fr;
   }
 
   #input {
