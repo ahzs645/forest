@@ -328,11 +328,11 @@ class ForestryGame {
   _createRiskOption() {
     const areaName = this.state?.area?.name ?? "north woods";
     const chance = this._calculateRiskChance();
-    const chanceLabel = Math.round(chance * 100);
+    const chanceLabel = this._formatRiskChanceLabel(chance);
     const { successEffects, failureEffects } = this._riskEffectProfiles(chance);
     const description = this._describeRiskPlay(chance, successEffects, failureEffects);
     const option = {
-      label: `🎲 Risk Play: Ignite a moonlit blitz in ${areaName} (${chanceLabel}% win chance)`,
+      label: `🎲 Risk Play: Ignite a moonlit blitz in ${areaName} (${chanceLabel} win chance)`,
       risk: {
         chance,
         success: this._buildRiskNarratives("success", areaName, successEffects),
@@ -361,10 +361,10 @@ class ForestryGame {
   }
 
   _describeRiskPlay(chance, successEffects, failureEffects) {
-    const chanceLabel = Math.round(chance * 100);
+    const chanceLabel = this._formatRiskChanceLabel(chance);
     const success = this._formatRiskDeltaList(successEffects);
     const failure = this._formatRiskDeltaList(failureEffects);
-    return `Chance-based decision. Roll under ${chanceLabel}% to win. Success: ${success}. Failure: ${failure}.`;
+    return `Chance-based decision. Roll under ${chanceLabel} to win. Success: ${success}. Failure: ${failure}.`;
   }
 
   _formatRiskDeltaList(effects = {}) {
@@ -377,13 +377,19 @@ class ForestryGame {
       return;
     }
     this._riskTipShown = true;
-    const chanceLabel = Math.round(chance * 100);
+    const chanceLabel = this._formatRiskChanceLabel(chance);
     const success = this._formatRiskDeltaList(successEffects);
     const failure = this._formatRiskDeltaList(failureEffects);
     this.ui.write(
-      `ℹ️ Risk plays compare a random roll against the listed chance. (${chanceLabel}% target — Success: ${success}; Failure: ${failure}).`
+      `ℹ️ Risk plays compare a random roll against the listed chance. (${chanceLabel} target — Success: ${success}; Failure: ${failure}).`
     );
     this.ui.write("Choose them only when you are comfortable with the potential downside.");
+  }
+
+  _formatRiskChanceLabel(chance) {
+    const percent = Math.max(0, Math.min(100, chance * 100));
+    const rounded = Math.round(percent * 10) / 10;
+    return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
   }
 
   _resolveOption(option) {
