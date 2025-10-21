@@ -1,1 +1,7 @@
 old py system
+
+# Test artifacts
+*_inputs.txt
+*.log
+playthrough*.log
+game_playthrough.log
