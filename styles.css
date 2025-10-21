@@ -158,12 +158,13 @@ body {
 
 .mobile-hud {
   display: none;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px dashed var(--border);
-  background: rgba(0, 16, 8, 0.7);
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(100, 247, 255, 0.3);
+  background: rgba(0, 28, 16, 0.95);
   font-size: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .mobile-hud .hud-item {
@@ -171,12 +172,20 @@ body {
   flex-direction: column;
   color: var(--fg-dim);
   gap: 2px;
+  padding: 4px 2px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(100, 247, 255, 0.15);
+  align-items: center;
+  text-align: center;
 }
 
 .mobile-hud .hud-item span {
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: rgba(250, 255, 255, 0.6);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: rgba(250, 255, 255, 0.5);
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .terminal {
@@ -743,11 +752,13 @@ body {
     right: 0;
     z-index: 5;
     box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.6);
-    max-height: min(45vh, 360px);
+    max-height: min(55vh, 500px);
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
     gap: 10px;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .button-container.active {
@@ -767,6 +778,9 @@ body {
     font-size: 14px;
     line-height: 1.4;
     padding: 12px 14px;
+    min-height: 48px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(100, 247, 255, 0.2);
   }
 
   .choice-btn__description {
@@ -803,6 +817,8 @@ body {
   .terminal {
     padding: 16px;
     font-size: 15px;
+    padding-bottom: 8px;
+    overscroll-behavior: contain;
   }
 
   #input {

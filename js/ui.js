@@ -245,10 +245,11 @@ export class TerminalUI {
     if (this.mobileHud) {
       this.mobileHud.innerHTML = `
         <div class="hud-item"><span>Season</span>${roundLabel}</div>
-        <div class="hud-item"><span>Role</span>${role.name}</div>
-        <div class="hud-item"><span>BEC</span>${area.becCode || area.becZone.split(" ")[0]}</div>
+        <div class="hud-item"><span>Progress</span>${Math.round(metrics.progress)}</div>
         <div class="hud-item"><span>Forest</span>${Math.round(metrics.forestHealth)}</div>
-        <div class="hud-item"><span>Compliance</span>${Math.round(metrics.compliance)}</div>
+        <div class="hud-item"><span>Relations</span>${Math.round(metrics.relationships)}</div>
+        <div class="hud-item"><span>Comply</span>${Math.round(metrics.compliance)}</div>
+        <div class="hud-item"><span>Budget</span>${Math.round(metrics.budget)}</div>
       `;
     }
   }
