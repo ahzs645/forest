@@ -489,11 +489,15 @@ export class TerminalUI {
 
   _metricRow(label, value) {
     const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
+    let color = "#2ea043"; // green
+    if (safeValue < 30) color = "#da3633"; // red
+    else if (safeValue < 60) color = "#d29922"; // yellow
+
     return `
       <div class="metric">
         <span>${label}</span>
         <div class="bar">
-          <div class="fill" style="width: ${safeValue}%"></div>
+          <div class="fill" style="width: ${safeValue}%; background: ${color};"></div>
           <span class="value">${Math.round(safeValue)}</span>
         </div>
       </div>

@@ -363,4 +363,25 @@ export const ILLEGAL_ACTS = [
     roles: ["recce", "planner"],
     tags: ["recce", "planner", "materials", "coverup"],
   },
+  {
+    id: "grizzly-poker-night",
+    title: "Host a High-Stakes Grizzly Poker Night",
+    description: "Invite the local conservation officer to a 'friendly' game in the cook shack where the pot is suspiciously heavy on cash.",
+    roles: ["recce", "silviculture"],
+    tags: ["bribery", "wildlife", "social"],
+  },
+  {
+    id: "beaver-dam-dynamite",
+    title: "The 'Beaver' Incident",
+    description: "Use 'excess' explosives to clear a beaver dam flooding the road, reporting it as a 'naturally occurring rapid dewatering event'.",
+    roles: ["recce"],
+    tags: ["explosives", "wildlife", "coverup"],
+  },
+  {
+    id: "sasquatch-marketing",
+    title: "Sasquatch Marketing Campaign",
+    description: "Market a blocked road as a 'Sasquatch Preservation Area' to tourists, charging admission for 'tours' that never leave the parking lot.",
+    roles: ["planner", "silviculture"],
+    tags: ["fraud", "tourism", "marketing"],
+  },
 ];

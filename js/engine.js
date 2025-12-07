@@ -70,6 +70,29 @@ export function applyEffects(state, effects = {}, source) {
   }
 }
 
+export function applySeasonDecay(state) {
+  const decay = {
+    progress: -5,
+    forestHealth: -3,
+    relationships: -3,
+    compliance: -2,
+    budget: -5 // overhead
+  };
+
+  // Random fluctuation
+  for (const key of Object.keys(decay)) {
+    decay[key] += Math.floor(Math.random() * 3) - 1;
+  }
+
+  applyEffects(state, decay, {
+    type: "decay",
+    id: "season-decay",
+    title: "Seasonal Degradation",
+    option: "Natural entropy and overhead",
+    round: state.round
+  });
+}
+
 export function getRoleTasks(state) {
   return state.role.tasks || [];
 }

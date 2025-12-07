@@ -101,19 +101,19 @@ export const FORESTER_ROLES = [
             label: "Bundle permits to fast-track volume",
             outcome:
               "You consolidate similar blocks to minimize paperwork. The ministry warns they expect pristine documentation.",
-            effects: { progress: 8, compliance: 1, relationships: -1 },
+            effects: { progress: 5, compliance: -1, relationships: -2 },
           },
           {
             label: "Sequence submissions with targeted referrals",
             outcome:
-              "You stage permits so each includes tailored referrals. Community partners feel heard.",
-            effects: { progress: 5, compliance: 5, relationships: 5 },
+              "You stage permits so each includes tailored referrals. Community partners feel heard, but it's slow.",
+            effects: { progress: 2, compliance: 3, relationships: 3, budget: -1 },
           },
           {
             label: "Pause to rebuild GIS attachments",
             outcome:
               "New orthophotos reveal access concerns. You redo the spatial package before mailing anything.",
-            effects: { progress: -2, compliance: 7, forestHealth: 4 },
+            effects: { progress: -4, compliance: 5, forestHealth: 2, budget: -2 },
           },
         ],
       },
@@ -127,19 +127,19 @@ export const FORESTER_ROLES = [
             label: "Call everyone for status updates",
             outcome:
               "You spend two days on the phone. Answers arrive and a few partners request more mitigation.",
-            effects: { progress: 3, relationships: 6, compliance: 4 },
+            effects: { progress: 1, relationships: 3, compliance: 2 },
           },
           {
             label: "Escalate through ministry contacts",
             outcome:
               "Direct ministry outreach shakes loose responses quickly, though local Nations worry they were bypassed.",
-            effects: { progress: 6, compliance: 2, relationships: -3 },
+            effects: { progress: 4, compliance: 1, relationships: -5 },
           },
           {
             label: "Extend deadlines and re-scope",
             outcome:
               "You officially extend the referral window and revise block notes. Production waits but trust grows.",
-            effects: { progress: -3, relationships: 7, compliance: 5 },
+            effects: { progress: -5, relationships: 4, compliance: 3 },
           },
         ],
       },
@@ -153,19 +153,19 @@ export const FORESTER_ROLES = [
             label: "Bring in a third-party professional immediately",
             outcome:
               "An independent RPF signs off after a rapid review. It costs, yet regulators applaud the diligence.",
-            effects: { progress: 2, compliance: 8, relationships: 3 },
+            effects: { progress: 1, compliance: 4, relationships: 1, budget: -5 },
           },
           {
             label: "Lobby for a grace period",
             outcome:
               "You coordinate with industry peers to request delayed implementation. Some relief is granted but scrutiny increases.",
-            effects: { progress: 5, compliance: 3, relationships: 1 },
+            effects: { progress: 3, compliance: -1, relationships: -1 },
           },
           {
             label: "Document internal competency and carry on",
             outcome:
               "Your senior team self-certifies compliance. Files move, although auditors flag gaps for later review.",
-            effects: { progress: 7, compliance: -3, relationships: -2 },
+            effects: { progress: 5, compliance: -5, relationships: -3 },
           },
         ],
       },
@@ -187,19 +187,19 @@ export const FORESTER_ROLES = [
             label: "Contract emergency repair",
             outcome:
               "You mobilize a local contractor and reopen the spur quickly, but budgets take a hit.",
-            effects: { progress: 8, relationships: 3, compliance: 2, budget: -4 },
+            effects: { progress: 5, relationships: 2, compliance: 1, budget: -6 },
           },
           {
             label: "Reroute crews to alternate access",
             outcome:
               "Longer quad trails keep work moving slowly while you plan a permanent fix.",
-            effects: { progress: 3, forestHealth: 2, compliance: 1, budget: -1 },
+            effects: { progress: 1, forestHealth: 1, compliance: 1, budget: -2 },
           },
           {
             label: "Suspend work until maintenance funds arrive",
             outcome:
               "The crew catches up on paperwork. Nothing gets damaged but production pauses.",
-            effects: { progress: -5, forestHealth: 4, relationships: 2 },
+            effects: { progress: -8, forestHealth: 2, relationships: 1 },
           },
         ],
       },
@@ -213,19 +213,19 @@ export const FORESTER_ROLES = [
             label: "GPS, photograph, and flag immediately",
             outcome:
               "You halt activity in both spots and send detailed reports. The Nations thank you for the respect.",
-            effects: { progress: -1, relationships: 8, compliance: 6 },
+            effects: { progress: -3, relationships: 5, compliance: 4 },
           },
           {
             label: "Confirm with office staff before stopping work",
             outcome:
               "The office validates one find and questions the other. You lose a day verifying maps but avoid false alarms.",
-            effects: { progress: 3, relationships: 2, compliance: 2 },
+            effects: { progress: 1, relationships: 1, compliance: 1 },
           },
           {
             label: "Keep working while documenting for later",
             outcome:
               "Crews stay productive, yet word spreads that you ignored a sensitive site.",
-            effects: { progress: 7, relationships: -5, compliance: -4 },
+            effects: { progress: 5, relationships: -8, compliance: -6 },
           },
         ],
       },
@@ -239,19 +239,19 @@ export const FORESTER_ROLES = [
             label: "Institute daily tailgate reviews with photos",
             outcome:
               "The crew walks slopes each morning and shares pictures. Morale rises and hazards drop.",
-            effects: { progress: 2, relationships: 5, compliance: 5, forestHealth: 1 },
+            effects: { progress: 1, relationships: 3, compliance: 3, forestHealth: 1, budget: -1 },
           },
           {
             label: "Bring in an external safety auditor",
             outcome:
               "A specialist shadows the crew. Findings improve practices but slow the schedule.",
-            effects: { progress: -2, compliance: 7, relationships: 2 },
+            effects: { progress: -4, compliance: 5, relationships: 1, budget: -3 },
           },
           {
             label: "Push to hit deliverables and coach later",
             outcome:
               "You prioritize schedules. A few more near-misses appear in the log and senior leadership takes note.",
-            effects: { progress: 6, compliance: -3, relationships: -2 },
+            effects: { progress: 5, compliance: -4, relationships: -3 },
           },
         ],
       },
@@ -273,19 +273,19 @@ export const FORESTER_ROLES = [
             label: "Stagger crews by elevation band",
             outcome:
               "You re-phase the program so warmer aspects go first. Productivity holds steady.",
-            effects: { progress: 6, forestHealth: 5, relationships: 3 },
+            effects: { progress: 3, forestHealth: 3, relationships: 1 },
           },
           {
             label: "Charter extra helicopters to stay on schedule",
             outcome:
               "Aerial shuttles keep crews moving but run up costs.",
-            effects: { progress: 8, forestHealth: 3, budget: -5 },
+            effects: { progress: 6, forestHealth: 1, budget: -8 },
           },
           {
             label: "Delay start until weather stabilizes",
             outcome:
               "You wait out the snow. Seedlings stay healthy, yet production targets slip.",
-            effects: { progress: -3, forestHealth: 6, compliance: 2 },
+            effects: { progress: -5, forestHealth: 4, compliance: 1 },
           },
         ],
       },
@@ -299,19 +299,19 @@ export const FORESTER_ROLES = [
             label: "Switch to mixed species blends",
             outcome:
               "You diversify with larch and spruce. It impresses regulators and may resist pests better.",
-            effects: { progress: 3, forestHealth: 8, compliance: 4 },
+            effects: { progress: 1, forestHealth: 5, compliance: 2, budget: -2 },
           },
           {
             label: "Apply intensive site prep and replant",
             outcome:
               "You scarify and replant aggressively. Survival improves though soil disturbance draws criticism.",
-            effects: { progress: 5, forestHealth: 5, compliance: 1 },
+            effects: { progress: 3, forestHealth: 3, compliance: -1, budget: -4 },
           },
           {
             label: "Monitor longer before intervening",
             outcome:
               "You extend monitoring to gather more data. Budgets appreciate the pause, but mortality continues.",
-            effects: { progress: -2, forestHealth: -1, relationships: 2, budget: 3 },
+            effects: { progress: -3, forestHealth: -3, relationships: 1, budget: 2 },
           },
         ],
       },
@@ -325,19 +325,19 @@ export const FORESTER_ROLES = [
             label: "Send technical crews early and host tours later",
             outcome:
               "You finish compliance work first, then bring communities once data is in hand.",
-            effects: { progress: 5, compliance: 7, relationships: 3 },
+            effects: { progress: 3, compliance: 5, relationships: 2, budget: -2 },
           },
           {
             label: "Merge the events into a single field day",
             outcome:
               "You walk the stands with everyone together. Questions take time but trust deepens.",
-            effects: { progress: 2, relationships: 7, compliance: 4 },
+            effects: { progress: 1, relationships: 5, compliance: 2, budget: -1 },
           },
           {
             label: "Prioritize the community tour",
             outcome:
               "You showcase healthy stands. Regulators grant an extension yet remind you about future deadlines.",
-            effects: { progress: 3, relationships: 6, compliance: -1 },
+            effects: { progress: 2, relationships: 4, compliance: -3 },
           },
         ],
       },

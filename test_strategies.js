@@ -8,6 +8,7 @@ import {
   createInitialState,
   getRoleTasks,
   applyEffects,
+  applySeasonDecay,
   drawIssue,
   buildSummary,
 } from './js/engine.js';
@@ -55,6 +56,7 @@ for (const role of FORESTER_ROLES) {
 
     for (let round = 1; round <= rounds; round++) {
       state.round = round;
+      applySeasonDecay(state);
       const tasks = getRoleTasks(state);
       for (const task of tasks) {
         const option = chooseOption(task.options);

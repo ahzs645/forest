@@ -3,6 +3,7 @@ import {
   createInitialState,
   getRoleTasks,
   applyEffects,
+  applySeasonDecay,
   drawIssue,
   buildSummary,
   formatMetricDelta,
@@ -133,6 +134,11 @@ class ForestryGame {
       const season = SEASONS[round - 1] ?? `Season ${round}`;
       this.ui.write(`\n--- ${season.toUpperCase()} ---`);
       this._advancePendingIssues();
+
+      // Apply decay at start of season
+      applySeasonDecay(this.state);
+      this.ui.write("Seasonal overhead and degradation applied.");
+
       this.ui.updateStatus(this.state);
 
       this._seasonBaseline = { ...this.state.metrics };
@@ -317,9 +323,16 @@ class ForestryGame {
     const sense = hush[Math.floor(Math.random() * hush.length)];
     const severity = this._drawWildcardSeverity();
     const labelSuffix = severity.label ? ` – ${severity.label}` : "";
+
+    // Minigame/Extra consequence logic
+    let extraNarrative = "";
+    if (severity.label === "Investigation Launched") {
+        extraNarrative = "\n\n!!! SUDDEN AUDIT !!!\nThe auditors have arrived by helicopter. They are going through your files right now.";
+    }
+
     return {
       label: `🚫 Wildcard: ${pick.title}${labelSuffix}`,
-      outcome: `You lean into the shady path. ${pick.description} ${severity.outcome} The ${sense} hangs in the ${areaName} air as compliance officers start whispering about anomalies.`,
+      outcome: `You lean into the shady path. ${pick.description} ${severity.outcome} The ${sense} hangs in the ${areaName} air as compliance officers start whispering about anomalies.${extraNarrative}`,
       effects: severity.effects,
       historyLabel: `${pick.title} (Wildcard${severity.historySuffix})`,
     };
