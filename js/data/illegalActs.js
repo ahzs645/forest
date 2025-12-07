@@ -363,4 +363,25 @@ export const ILLEGAL_ACTS = [
     roles: ["recce", "planner"],
     tags: ["recce", "planner", "materials", "coverup"],
   },
+  {
+    id: "bribe-bear",
+    title: "Bribe the Local Bear Population",
+    description: "Leave unsecured picnic baskets filled with salmon jerky near the cutblock boundary to distract bears from the crew.",
+    roles: ["recce", "silviculture"],
+    tags: ["recce", "silviculture", "wildlife", "bribery", "funny"],
+  },
+  {
+    id: "fake-moon-landing",
+    title: "Fake a Moon Landing Site",
+    description: "Terraform a clearcut to look like the lunar surface and charge tourists for 'alien encounter' tours.",
+    roles: ["planner", "silviculture"],
+    tags: ["planner", "silviculture", "fraud", "tourism", "funny"],
+  },
+  {
+    id: "sasquatch-consultant",
+    title: "Hire Sasquatch as a Consultant",
+    description: "List 'S. Squatch' as a senior wildlife advisor on the payroll to justify suspicious footprint findings.",
+    roles: ["recce", "planner"],
+    tags: ["recce", "planner", "mythical", "payroll", "funny"],
+  },
 ];
