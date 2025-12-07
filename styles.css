@@ -31,6 +31,101 @@ body {
   overscroll-behavior: contain;
 }
 
+body::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 100;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+}
+
+body::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: rgba(18, 16, 16, 0.1);
+  opacity: 0;
+  z-index: 100;
+  pointer-events: none;
+  animation: flicker 0.15s infinite;
+}
+
+@keyframes flicker {
+  0% {
+  opacity: 0.02795;
+  }
+  5% {
+  opacity: 0.04853;
+  }
+  10% {
+  opacity: 0.01633;
+  }
+  15% {
+  opacity: 0.07632;
+  }
+  20% {
+  opacity: 0.02456;
+  }
+  25% {
+  opacity: 0.06198;
+  }
+  30% {
+  opacity: 0.04419;
+  }
+  35% {
+  opacity: 0.07185;
+  }
+  40% {
+  opacity: 0.03842;
+  }
+  45% {
+  opacity: 0.08272;
+  }
+  50% {
+  opacity: 0.03265;
+  }
+  55% {
+  opacity: 0.01944;
+  }
+  60% {
+  opacity: 0.09638;
+  }
+  65% {
+  opacity: 0.08182;
+  }
+  70% {
+  opacity: 0.03222;
+  }
+  75% {
+  opacity: 0.09876;
+  }
+  80% {
+  opacity: 0.05211;
+  }
+  85% {
+  opacity: 0.04698;
+  }
+  90% {
+  opacity: 0.05432;
+  }
+  95% {
+  opacity: 0.03964;
+  }
+  100% {
+  opacity: 0.01435;
+  }
+}
+
 .game-container {
   display: flex;
   height: 100vh;

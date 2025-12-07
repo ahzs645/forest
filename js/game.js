@@ -84,6 +84,14 @@ class ForestryGame {
   async start() {
     this.ui.prepareForNewGame();
     this.ui.clear();
+
+    this.ui.write("Initializing BC Forestry Simulator v2.4...");
+    await this._delay(800);
+    this.ui.write("Loading geospatial data...");
+    await this._delay(600);
+    this.ui.write("Connecting to ministry servers...");
+    await this._delay(600);
+
     this.ui.write("FORESTRY SIMULATOR");
     this.ui.write("===================\n");
 
@@ -132,6 +140,7 @@ class ForestryGame {
       this.state.round = round;
       const season = SEASONS[round - 1] ?? `Season ${round}`;
       this.ui.write(`\n--- ${season.toUpperCase()} ---`);
+      this.ui.write(this._generateWeatherReport(season));
       this._advancePendingIssues();
       this.ui.updateStatus(this.state);
 
@@ -306,22 +315,17 @@ class ForestryGame {
 
   _createMischiefOption() {
     const roleId = this.state?.role?.id;
-    const areaName = this.state?.area?.name ?? "backcountry";
     const pool = ILLEGAL_ACTS.filter((act) => (roleId ? act.roles?.includes(roleId) : false));
     const source = pool.length ? pool : ILLEGAL_ACTS;
     if (!source.length) {
       return null;
     }
     const pick = source[Math.floor(Math.random() * source.length)];
-    const hush = ["diesel haze", "frosty muskeg", "cedar pitch", "chain oil mist", "river fog"];
-    const sense = hush[Math.floor(Math.random() * hush.length)];
-    const severity = this._drawWildcardSeverity();
-    const labelSuffix = severity.label ? ` – ${severity.label}` : "";
     return {
-      label: `🚫 Wildcard: ${pick.title}${labelSuffix}`,
-      outcome: `You lean into the shady path. ${pick.description} ${severity.outcome} The ${sense} hangs in the ${areaName} air as compliance officers start whispering about anomalies.`,
-      effects: severity.effects,
-      historyLabel: `${pick.title} (Wildcard${severity.historySuffix})`,
+      label: `🚫 Wildcard: ${pick.title}`,
+      mischief: {
+        pick,
+      },
     };
   }
 
@@ -396,6 +400,21 @@ class ForestryGame {
     if (!option) {
       return { outcome: "", effects: {}, historyLabel: "" };
     }
+    if (option.mischief) {
+      const { pick } = option.mischief;
+      const areaName = this.state?.area?.name ?? "backcountry";
+      const hush = ["diesel haze", "frosty muskeg", "cedar pitch", "chain oil mist", "river fog"];
+      const sense = hush[Math.floor(Math.random() * hush.length)];
+      const severity = this._drawWildcardSeverity();
+      const outcome = `You lean into the shady path. ${pick.description} ${severity.outcome} The ${sense} hangs in the ${areaName} air as compliance officers start whispering about anomalies.`;
+
+      return {
+        outcome,
+        effects: severity.effects,
+        historyLabel: `${pick.title} (Wildcard${severity.historySuffix})`,
+      };
+    }
+
     if (!option.risk) {
       return {
         outcome: option.outcome ?? "",
@@ -798,6 +817,25 @@ class ForestryGame {
       default:
         return [];
     }
+  }
+
+  _delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  _generateWeatherReport(season) {
+    const reports = [
+      "Weather: Overcast with a chance of drizzle. Roads are slick.",
+      "Weather: Clear skies, but the wind is picking up in the valley.",
+      "Weather: Heavy fog rolling in from the coast. Visibility is low.",
+      "Weather: Unseasonably warm. Fire risk is moderate.",
+      "Weather: Steady rain. Creeks are running high.",
+      "Weather: Frost overnight. Equipment warm-up needed.",
+      "Weather: Sun breaking through. Ideal conditions for aerial work.",
+      "Weather: Snow flurries at elevation. Winter is coming.",
+    ];
+    // Simple random selection for now, could be season-specific
+    return `[${season}] ${reports[Math.floor(Math.random() * reports.length)]}`;
   }
 }
 
