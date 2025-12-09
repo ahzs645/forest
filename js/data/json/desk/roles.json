@@ -1,0 +1,42 @@
+[
+  {
+    "id": "analyst",
+    "name": "Analyst",
+    "description": "Processes data and prepares reports",
+    "skills": ["analysis", "documentation"],
+    "baseHealth": 100,
+    "baseMorale": 70
+  },
+  {
+    "id": "coordinator",
+    "name": "Coordinator",
+    "description": "Manages schedules and communications",
+    "skills": ["organization", "communication"],
+    "baseHealth": 100,
+    "baseMorale": 75
+  },
+  {
+    "id": "admin",
+    "name": "Admin",
+    "description": "Handles paperwork and filing",
+    "skills": ["administration", "typing"],
+    "baseHealth": 100,
+    "baseMorale": 65
+  },
+  {
+    "id": "technician",
+    "name": "Technician",
+    "description": "Operates GIS and technical systems",
+    "skills": ["technical", "mapping"],
+    "baseHealth": 100,
+    "baseMorale": 80
+  },
+  {
+    "id": "liaison",
+    "name": "Liaison",
+    "description": "Manages stakeholder relationships",
+    "skills": ["diplomacy", "communication"],
+    "baseHealth": 100,
+    "baseMorale": 70
+  }
+]

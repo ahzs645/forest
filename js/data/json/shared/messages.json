@@ -1,0 +1,31 @@
+{
+  "departure": {
+    "death_injury": [
+      "{name} succumbed to their injuries.",
+      "{name} didn't make it through the night.",
+      "Despite everyone's efforts, {name} passed away."
+    ],
+    "death_illness": [
+      "{name} died from illness.",
+      "{name} grew weaker each day until they were gone.",
+      "The sickness took {name} from us."
+    ],
+    "quit_morale": [
+      "{name} packed their bags and left camp.",
+      "{name} said \"I've had enough\" and walked away.",
+      "{name} quit without notice.",
+      "{name} demanded to be taken back to town."
+    ],
+    "quit_fear": [
+      "{name} refused to continue after seeing the conditions.",
+      "{name} said this job isn't worth dying for.",
+      "After the incident, {name} wouldn't get back in the truck."
+    ]
+  },
+  "recovery": [
+    "{name} is feeling much better today.",
+    "{name} has recovered and is ready to work.",
+    "{name}'s condition has improved significantly.",
+    "{name} is back on their feet."
+  ]
+}

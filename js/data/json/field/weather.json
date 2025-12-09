@@ -1,0 +1,28 @@
+{
+  "conditions": [
+    { "id": "clear", "name": "Clear Skies", "travelModifier": 1.0, "moraleEffect": 2 },
+    { "id": "overcast", "name": "Overcast", "travelModifier": 1.0, "moraleEffect": 0 },
+    { "id": "light_rain", "name": "Light Rain", "travelModifier": 0.9, "moraleEffect": -1 },
+    { "id": "heavy_rain", "name": "Heavy Rain", "travelModifier": 0.7, "moraleEffect": -3 },
+    { "id": "fog", "name": "Dense Fog", "travelModifier": 0.6, "moraleEffect": -2 },
+    { "id": "light_snow", "name": "Light Snow", "travelModifier": 0.8, "moraleEffect": -1 },
+    { "id": "heavy_snow", "name": "Heavy Snow", "travelModifier": 0.5, "moraleEffect": -4 },
+    { "id": "freezing", "name": "Freezing Conditions", "travelModifier": 0.6, "moraleEffect": -5, "healthRisk": true },
+    { "id": "storm", "name": "Storm", "travelModifier": 0.3, "moraleEffect": -5, "dangerous": true }
+  ],
+  "temperatures": {
+    "hot": { "label": "Hot", "foodModifier": 0.9 },
+    "warm": { "label": "Warm", "foodModifier": 1.0 },
+    "cool": { "label": "Cool", "foodModifier": 1.1 },
+    "cold": { "label": "Cold", "foodModifier": 1.3 },
+    "freezing": { "label": "Freezing", "foodModifier": 1.5 }
+  },
+  "terrain": {
+    "flat": { "name": "Flat Road", "fuelModifier": 1.0, "equipmentModifier": 1.0, "speed": 1.0 },
+    "hilly": { "name": "Hilly Terrain", "fuelModifier": 1.2, "equipmentModifier": 1.2, "speed": 0.9 },
+    "steep": { "name": "Steep Grade", "fuelModifier": 1.4, "equipmentModifier": 1.5, "speed": 0.7 },
+    "muskeg": { "name": "Muskeg", "fuelModifier": 1.5, "equipmentModifier": 1.8, "speed": 0.6 },
+    "river": { "name": "River Crossing", "fuelModifier": 1.3, "equipmentModifier": 1.3, "speed": 0.5, "dangerous": true },
+    "cutblock": { "name": "Active Cutblock", "fuelModifier": 1.1, "equipmentModifier": 1.2, "speed": 0.8 }
+  }
+}

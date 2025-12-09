@@ -1,0 +1,252 @@
+{
+  "fort-st-john-plateau": [
+    {
+      "id": "fsj-1",
+      "name": "Highway Camp",
+      "description": "The staging area where Highway 97 meets the access road. Last chance for civilization.",
+      "distance": 0,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["gas station", "diner"]
+    },
+    {
+      "id": "fsj-2",
+      "name": "Pipeline Crossing",
+      "description": "The road crosses over the main gas pipeline. Heavy truck traffic.",
+      "distance": 12,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["traffic", "industrial"],
+      "features": ["pipeline"]
+    },
+    {
+      "id": "fsj-3",
+      "name": "Muskeg Flats",
+      "description": "Treacherous peatland that swallows machinery whole if you stray from the road.",
+      "distance": 18,
+      "terrain": "muskeg",
+      "hasSupply": false,
+      "hazards": ["bog", "subsidence"],
+      "features": ["wetland"]
+    },
+    {
+      "id": "fsj-4",
+      "name": "Doig River Camp",
+      "description": "Camp near Doig River First Nation territory. Community relations are key here.",
+      "distance": 15,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["first_nation", "river"]
+    },
+    {
+      "id": "fsj-5",
+      "name": "Spruce Ridge",
+      "description": "Climbing up through dense spruce forest. The grade gets steep.",
+      "distance": 14,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["grade", "deadfall"],
+      "features": ["spruce_forest"]
+    },
+    {
+      "id": "fsj-6",
+      "name": "Plateau Summit",
+      "description": "Top of the plateau. Wind howls across the exposed landscape.",
+      "distance": 10,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["wind", "exposure"],
+      "features": ["viewpoint"]
+    },
+    {
+      "id": "fsj-7",
+      "name": "Block A-7 Landing",
+      "description": "Active cutblock with equipment staging. Resupply possible from other crews.",
+      "distance": 16,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": ["equipment", "falling_timber"],
+      "features": ["active_harvest"]
+    },
+    {
+      "id": "fsj-8",
+      "name": "Wetland Bypass",
+      "description": "A long detour around sensitive wetland habitat.",
+      "distance": 20,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["moose", "detour"],
+      "features": ["wetland_buffer"]
+    },
+    {
+      "id": "fsj-9",
+      "name": "Gas Well Access",
+      "description": "Industrial access road serving several gas wells. Watch for tanker trucks.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["traffic", "h2s"],
+      "features": ["gas_wells"]
+    },
+    {
+      "id": "fsj-10",
+      "name": "North Muskeg",
+      "description": "More peatland. Someone got a Cat stuck here last spring.",
+      "distance": 16,
+      "terrain": "muskeg",
+      "hasSupply": false,
+      "hazards": ["bog", "old_equipment"],
+      "features": ["permafrost_edge"]
+    },
+    {
+      "id": "fsj-11",
+      "name": "Caribou Flats",
+      "description": "Open area frequented by caribou herds. Tread carefully during migration.",
+      "distance": 12,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["caribou", "wildlife"],
+      "features": ["caribou_habitat"]
+    },
+    {
+      "id": "fsj-12",
+      "name": "Final Destination - Block A-12",
+      "description": "You've reached the target block. Time to set up base camp.",
+      "distance": 15,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["destination"]
+    }
+  ],
+  "muskwa-foothills": [
+    {
+      "id": "msk-1",
+      "name": "Fort Nelson Staging",
+      "description": "The last town before wilderness. Stock up while you can.",
+      "distance": 0,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["town", "full_service"]
+    },
+    {
+      "id": "msk-2",
+      "name": "Alaska Highway Turnoff",
+      "description": "Leaving the main highway onto a forest service road.",
+      "distance": 25,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["wildlife_crossing"],
+      "features": ["highway"]
+    },
+    {
+      "id": "msk-3",
+      "name": "Prophet River",
+      "description": "Major river crossing. Check water levels before attempting.",
+      "distance": 18,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["river_crossing", "flood"],
+      "features": ["river", "bridge"]
+    },
+    {
+      "id": "msk-4",
+      "name": "Foothills Camp",
+      "description": "Entering the foothills. Terrain gets rougher from here.",
+      "distance": 20,
+      "terrain": "hilly",
+      "hasSupply": true,
+      "hazards": ["grade"],
+      "features": ["base_camp"]
+    },
+    {
+      "id": "msk-5",
+      "name": "Permafrost Zone",
+      "description": "Ground shifts and heaves. The road surface is unpredictable.",
+      "distance": 16,
+      "terrain": "muskeg",
+      "hasSupply": false,
+      "hazards": ["permafrost", "road_damage"],
+      "features": ["permafrost"]
+    },
+    {
+      "id": "msk-6",
+      "name": "Caribou Corridor",
+      "description": "Critical caribou migration route. Operations may be restricted.",
+      "distance": 15,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["caribou", "restrictions"],
+      "features": ["caribou_habitat", "sensitive_area"]
+    },
+    {
+      "id": "msk-7",
+      "name": "Mountain Pass",
+      "description": "Steep climb through a narrow pass. No room for error.",
+      "distance": 12,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["rockslide", "grade", "narrow"],
+      "features": ["pass"]
+    },
+    {
+      "id": "msk-8",
+      "name": "Alpine Meadow",
+      "description": "Brief respite in a high alpine meadow. Beautiful but exposed.",
+      "distance": 10,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["exposure", "weather"],
+      "features": ["alpine", "viewpoint"]
+    },
+    {
+      "id": "msk-9",
+      "name": "Remote Camp Alpha",
+      "description": "Helicopter-supplied remote camp. Limited resupply possible.",
+      "distance": 18,
+      "terrain": "hilly",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["remote_camp", "helicopter"]
+    },
+    {
+      "id": "msk-10",
+      "name": "Grizzly Creek",
+      "description": "Named for obvious reasons. Stay alert.",
+      "distance": 14,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["grizzly", "river_crossing"],
+      "features": ["creek", "wildlife"]
+    },
+    {
+      "id": "msk-11",
+      "name": "Final Ridge",
+      "description": "Last climb before the destination. Crew is getting tired.",
+      "distance": 16,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["grade", "fatigue"],
+      "features": ["ridge"]
+    },
+    {
+      "id": "msk-12",
+      "name": "Muskwa Summit Block",
+      "description": "You've made it to the most remote block in the district.",
+      "distance": 10,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["destination", "remote"]
+    }
+  ],
+  "areaMapping": {
+    "bulkley-valley": "fort-st-john-plateau",
+    "fraser-plateau": "fort-st-john-plateau",
+    "skeena-nass": "muskwa-foothills",
+    "tahltan-highland": "muskwa-foothills"
+  }
+}

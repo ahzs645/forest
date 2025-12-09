@@ -1,0 +1,50 @@
+[
+  {
+    "id": "faller",
+    "name": "Faller",
+    "description": "Operates chainsaw to fall trees",
+    "skills": ["cutting", "safety"],
+    "baseHealth": 100,
+    "baseMorale": 70
+  },
+  {
+    "id": "bucker",
+    "name": "Bucker",
+    "description": "Bucks fallen trees into logs",
+    "skills": ["processing", "measurement"],
+    "baseHealth": 100,
+    "baseMorale": 75
+  },
+  {
+    "id": "spotter",
+    "name": "Spotter",
+    "description": "Surveys terrain and spots hazards",
+    "skills": ["navigation", "observation"],
+    "baseHealth": 90,
+    "baseMorale": 80
+  },
+  {
+    "id": "driver",
+    "name": "Driver",
+    "description": "Operates trucks and heavy equipment",
+    "skills": ["driving", "mechanics"],
+    "baseHealth": 95,
+    "baseMorale": 70
+  },
+  {
+    "id": "medic",
+    "name": "First Aid",
+    "description": "Handles medical emergencies",
+    "skills": ["medical", "safety"],
+    "baseHealth": 85,
+    "baseMorale": 85
+  },
+  {
+    "id": "mechanic",
+    "name": "Mechanic",
+    "description": "Repairs and maintains equipment",
+    "skills": ["repair", "mechanics"],
+    "baseHealth": 95,
+    "baseMorale": 75
+  }
+]

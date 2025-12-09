@@ -1,0 +1,103 @@
+{
+  "broken_leg": {
+    "name": "Broken Leg",
+    "duration": 7,
+    "healthDrain": 0,
+    "moraleEffect": -5,
+    "workCapacity": 0,
+    "description": "Cannot work. Requires rest.",
+    "canTravel": true
+  },
+  "broken_arm": {
+    "name": "Broken Arm",
+    "duration": 5,
+    "healthDrain": 0,
+    "moraleEffect": -3,
+    "workCapacity": 0.3,
+    "description": "Limited work capacity.",
+    "canTravel": true
+  },
+  "sprained_ankle": {
+    "name": "Sprained Ankle",
+    "duration": 3,
+    "healthDrain": 0,
+    "moraleEffect": -2,
+    "workCapacity": 0.5,
+    "description": "Slowed movement.",
+    "canTravel": true
+  },
+  "concussion": {
+    "name": "Concussion",
+    "duration": 4,
+    "healthDrain": 2,
+    "moraleEffect": -4,
+    "workCapacity": 0,
+    "description": "Must rest. Health declining.",
+    "canTravel": true
+  },
+  "flu": {
+    "name": "Flu",
+    "duration": 5,
+    "healthDrain": 3,
+    "moraleEffect": -3,
+    "workCapacity": 0.2,
+    "description": "Feverish and weak.",
+    "canTravel": true,
+    "contagious": true
+  },
+  "cold": {
+    "name": "Bad Cold",
+    "duration": 3,
+    "healthDrain": 1,
+    "moraleEffect": -1,
+    "workCapacity": 0.7,
+    "description": "Sniffles and coughing.",
+    "canTravel": true,
+    "contagious": true
+  },
+  "food_poisoning": {
+    "name": "Food Poisoning",
+    "duration": 2,
+    "healthDrain": 5,
+    "moraleEffect": -5,
+    "workCapacity": 0,
+    "description": "Violently ill. Cannot work.",
+    "canTravel": false
+  },
+  "hypothermia": {
+    "name": "Hypothermia",
+    "duration": 2,
+    "healthDrain": 8,
+    "moraleEffect": -6,
+    "workCapacity": 0,
+    "description": "Dangerously cold. Needs warmth.",
+    "canTravel": false
+  },
+  "exhaustion": {
+    "name": "Exhaustion",
+    "duration": 2,
+    "healthDrain": 2,
+    "moraleEffect": -4,
+    "workCapacity": 0.3,
+    "description": "Completely worn out.",
+    "canTravel": true
+  },
+  "burnout": {
+    "name": "Burnout",
+    "duration": 5,
+    "healthDrain": 0,
+    "moraleEffect": -8,
+    "workCapacity": 0.4,
+    "description": "Mentally exhausted.",
+    "canTravel": true
+  },
+  "stressed": {
+    "name": "Stressed",
+    "duration": 3,
+    "healthDrain": 0,
+    "moraleEffect": -4,
+    "workCapacity": 0.7,
+    "description": "Anxious and overwhelmed.",
+    "canTravel": true
+  }
+}
