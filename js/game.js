@@ -277,6 +277,15 @@ class ForestryTrailGame {
       value: 'rest'
     });
 
+    // Add resupply option if at a supply point
+    if (currentBlock?.hasSupply) {
+      paceOptions.push({
+        label: 'Resupply',
+        description: 'Refuel and restock at this location',
+        value: 'resupply'
+      });
+    }
+
     const action = await this.ui.promptChoice('Choose your action:', paceOptions);
     const actionId = action.value || 'normal';
 
@@ -293,6 +302,34 @@ class ForestryTrailGame {
       }
       // Light resource use
       journey.resources.food = Math.max(0, journey.resources.food - 1);
+    } else if (actionId === 'resupply') {
+      this.ui.write('');
+      this.ui.write(`You spend the day restocking at ${currentBlock.name}.`);
+
+      // Restore resources to near maximum
+      const fuelAdded = Math.min(FIELD_RESOURCES.fuel.max - journey.resources.fuel, 100);
+      const foodAdded = Math.min(FIELD_RESOURCES.food.max - journey.resources.food, 40);
+      const equipRepaired = Math.min(100 - journey.resources.equipment, 30);
+      const kitsAdded = Math.min(FIELD_RESOURCES.firstAid.max - journey.resources.firstAid, 5);
+
+      journey.resources.fuel += fuelAdded;
+      journey.resources.food += foodAdded;
+      journey.resources.equipment += equipRepaired;
+      journey.resources.firstAid += kitsAdded;
+
+      this.ui.write(`  Fuel: +${fuelAdded} gallons`);
+      this.ui.write(`  Food: +${foodAdded} rations`);
+      if (equipRepaired > 0) this.ui.write(`  Equipment repaired: +${equipRepaired}%`);
+      if (kitsAdded > 0) this.ui.write(`  First aid kits: +${kitsAdded}`);
+      this.ui.write('');
+      this.ui.write('The crew is ready to continue tomorrow.');
+
+      // Crew also rests a bit
+      for (const member of journey.crew) {
+        if (member.isActive) {
+          member.morale = Math.min(100, member.morale + 5);
+        }
+      }
     } else {
       // Travel
       const result = executeFieldDay(journey, actionId);

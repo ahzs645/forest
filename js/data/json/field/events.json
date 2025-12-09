@@ -4,7 +4,7 @@
     "title": "Flat Tire",
     "type": "equipment",
     "severity": "minor",
-    "probability": 0.15,
+    "probability": 0.08,
     "description": "The lead truck hits a sharp rock. Hissing air signals another flat.",
     "options": [
       {
@@ -32,7 +32,7 @@
     "title": "Engine Trouble",
     "type": "equipment",
     "severity": "moderate",
-    "probability": 0.10,
+    "probability": 0.05,
     "description": "The skidder coughs and sputters. Smoke rises from the engine compartment.",
     "options": [
       {
@@ -58,7 +58,7 @@
     "title": "Chainsaw Breakdown",
     "type": "equipment",
     "severity": "minor",
-    "probability": 0.12,
+    "probability": 0.06,
     "description": "The primary saw throws its chain into a stump. Something's bent.",
     "options": [
       {
@@ -84,7 +84,7 @@
     "title": "Truck Stuck in Mud",
     "type": "equipment",
     "severity": "moderate",
-    "probability": 0.12,
+    "probability": 0.06,
     "terrainTrigger": ["muskeg", "river"],
     "description": "The truck sinks to its axles in soft ground. It's not going anywhere without help.",
     "options": [
@@ -111,7 +111,7 @@
     "title": "Sudden Storm",
     "type": "weather",
     "severity": "moderate",
-    "probability": 0.10,
+    "probability": 0.05,
     "description": "Dark clouds roll in fast. Lightning flashes over the ridge.",
     "options": [
       {
@@ -189,7 +189,7 @@
     "title": "Bear in Camp",
     "type": "wildlife",
     "severity": "moderate",
-    "probability": 0.12,
+    "probability": 0.06,
     "description": "A black bear has found the food cache. It's not happy about being interrupted.",
     "options": [
       {
@@ -290,7 +290,7 @@
     "title": "Worker Injury",
     "type": "injury",
     "severity": "moderate",
-    "probability": 0.12,
+    "probability": 0.05,
     "description": "A crew member slips on a log and goes down hard, clutching their ankle.",
     "options": [
       {
@@ -449,7 +449,7 @@
     "title": "Passing Supply Truck",
     "type": "supply",
     "severity": "positive",
-    "probability": 0.10,
+    "probability": 0.15,
     "description": "Another crew's supply truck is passing through. They've got extras.",
     "options": [
       {
@@ -491,6 +491,111 @@
         "label": "Secure remaining cargo",
         "outcome": "You stop to re-tie everything. No more losses.",
         "effects": { "progress": -2 }
+      }
+    ]
+  },
+  {
+    "id": "good_road_conditions",
+    "title": "Excellent Road Conditions",
+    "type": "terrain",
+    "severity": "positive",
+    "probability": 0.12,
+    "description": "The road ahead is in great shape - recently graded and smooth.",
+    "options": [
+      {
+        "label": "Make up time!",
+        "outcome": "The crew pushes forward quickly on the good road. Great progress!",
+        "effects": { "progress": 8 }
+      },
+      {
+        "label": "Take it easy, save fuel",
+        "outcome": "You cruise at low RPMs. Fuel gauge barely moves.",
+        "effects": { "fuel": 5 }
+      }
+    ]
+  },
+  {
+    "id": "abandoned_cache",
+    "title": "Abandoned Supply Cache",
+    "type": "supply",
+    "severity": "positive",
+    "probability": 0.10,
+    "description": "You spot an old camp with some leftover supplies. Looks usable.",
+    "options": [
+      {
+        "label": "Scavenge fuel and parts",
+        "outcome": "A few jerry cans of diesel and some spare belts. Score!",
+        "effects": { "fuel": 15, "equipment": 5 }
+      },
+      {
+        "label": "Grab the food supplies",
+        "outcome": "Canned goods and dried rations. Still good!",
+        "effects": { "food": 12 }
+      },
+      {
+        "label": "Take the first aid kit",
+        "outcome": "A dusty but complete first aid kit. Could be a lifesaver.",
+        "effects": { "firstAid": 2 }
+      }
+    ]
+  },
+  {
+    "id": "crew_morale_boost",
+    "title": "Beautiful Sunset",
+    "type": "morale",
+    "severity": "positive",
+    "probability": 0.12,
+    "description": "The evening sky puts on a spectacular show. Everyone stops to watch.",
+    "options": [
+      {
+        "label": "Take a break and enjoy it",
+        "outcome": "Moments like this remind everyone why they love this work.",
+        "effects": { "crew_morale": 15 }
+      },
+      {
+        "label": "Keep working but appreciate it",
+        "outcome": "Even while busy, the beauty lifts spirits.",
+        "effects": { "crew_morale": 8 }
+      }
+    ]
+  },
+  {
+    "id": "helpful_locals",
+    "title": "Helpful Locals",
+    "type": "social",
+    "severity": "positive",
+    "probability": 0.08,
+    "description": "Some local First Nations members stop by with advice and coffee.",
+    "options": [
+      {
+        "label": "Share a meal and listen",
+        "outcome": "They point out a shortcut and warn about a washout ahead.",
+        "effects": { "crew_morale": 10, "progress": 5 }
+      },
+      {
+        "label": "Trade for supplies",
+        "outcome": "They have smoked salmon to trade. Delicious and nutritious!",
+        "effects": { "food": 8, "crew_morale": 5 }
+      }
+    ]
+  },
+  {
+    "id": "equipment_running_well",
+    "title": "Equipment Running Smoothly",
+    "type": "equipment",
+    "severity": "positive",
+    "probability": 0.10,
+    "description": "Everything is humming along perfectly today. Not a single mechanical issue.",
+    "options": [
+      {
+        "label": "Keep up the momentum",
+        "outcome": "A productive day with no breakdowns. Equipment looks even better.",
+        "effects": { "equipment": 5, "progress": 3 }
+      },
+      {
+        "label": "Do preventive maintenance",
+        "outcome": "With things running well, you take time to check everything over.",
+        "effects": { "equipment": 10 }
       }
     ]
   }

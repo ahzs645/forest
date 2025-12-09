@@ -79,47 +79,50 @@ function checkDeskEvent(journey) {
  * Get pace event probability modifier
  */
 function getPaceEventModifier(paceId) {
+  // Reduced modifiers to lower overall event frequency
   const modifiers = {
-    resting: 0.3,
-    slow: 0.6,
-    normal: 1.0,
-    fast: 1.4,
-    grueling: 2.0
+    resting: 0.2,
+    slow: 0.4,
+    normal: 0.6,
+    fast: 0.9,
+    grueling: 1.3
   };
-  return modifiers[paceId] || 1;
+  return modifiers[paceId] || 0.6;
 }
 
 /**
  * Get terrain event probability modifier
  */
 function getTerrainEventModifier(terrain) {
+  // Reduced modifiers for less punishing terrain effects
   const modifiers = {
-    flat: 0.8,
-    hilly: 1.0,
-    steep: 1.3,
-    muskeg: 1.5,
-    river: 1.4,
-    cutblock: 1.1
+    flat: 0.6,
+    hilly: 0.8,
+    steep: 1.0,
+    muskeg: 1.1,
+    river: 1.0,
+    cutblock: 0.8
   };
-  return modifiers[terrain] || 1;
+  return modifiers[terrain] || 0.8;
 }
 
 /**
  * Get weather event probability modifier
  */
 function getWeatherEventModifier(weatherId) {
+  // Reduced modifiers for less weather-related event stacking
   const modifiers = {
-    clear: 0.7,
-    overcast: 1.0,
-    light_rain: 1.2,
-    heavy_rain: 1.5,
-    fog: 1.3,
-    light_snow: 1.2,
-    heavy_snow: 1.6,
-    freezing: 1.8,
-    storm: 2.0
+    clear: 0.5,
+    overcast: 0.7,
+    light_rain: 0.9,
+    heavy_rain: 1.1,
+    fog: 0.9,
+    light_snow: 0.9,
+    heavy_snow: 1.2,
+    freezing: 1.3,
+    storm: 1.5
   };
-  return modifiers[weatherId] || 1;
+  return modifiers[weatherId] || 0.7;
 }
 
 /**

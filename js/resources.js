@@ -10,16 +10,16 @@ export const FIELD_RESOURCES = {
     name: 'Fuel',
     unit: 'gallons',
     shortLabel: 'FUEL',
-    baseDaily: 5,          // Base daily consumption
-    max: 150,              // Maximum capacity
-    warning: 30,           // Warning threshold
-    critical: 10,          // Critical threshold
+    baseDaily: 3,          // Base daily consumption (reduced from 5)
+    max: 200,              // Maximum capacity (increased from 150)
+    warning: 40,           // Warning threshold
+    critical: 15,          // Critical threshold
     paceModifiers: {
       resting: 0,
-      slow: 3,
-      normal: 5,
-      fast: 8,
-      grueling: 12
+      slow: 2,             // Reduced from 3
+      normal: 3,           // Reduced from 5
+      fast: 5,             // Reduced from 8
+      grueling: 8          // Reduced from 12
     },
     terrainModifiers: {
       flat: 1.0,
@@ -34,17 +34,17 @@ export const FIELD_RESOURCES = {
     name: 'Food Rations',
     unit: 'person-days',
     shortLabel: 'FOOD',
-    baseDaily: 1,          // Per crew member per day
-    max: 60,               // Maximum storage
-    warning: 15,
-    critical: 5,
+    baseDaily: 0.8,        // Per crew member per day (reduced from 1)
+    max: 80,               // Maximum storage (increased from 60)
+    warning: 20,
+    critical: 8,
     // Food consumed faster in cold
     weatherModifiers: {
-      hot: 0.9,
+      hot: 0.8,
       warm: 1.0,
-      cool: 1.1,
-      cold: 1.3,
-      freezing: 1.5
+      cool: 1.05,
+      cold: 1.15,
+      freezing: 1.3
     }
   },
   equipment: {
@@ -125,10 +125,10 @@ export const DESK_RESOURCES = {
  */
 export function createFieldResources(options = {}) {
   return {
-    fuel: options.fuel ?? 100,
-    food: options.food ?? 40,
+    fuel: options.fuel ?? 150,      // Increased from 100
+    food: options.food ?? 60,       // Increased from 40
     equipment: options.equipment ?? 100,
-    firstAid: options.firstAid ?? 8
+    firstAid: options.firstAid ?? 10  // Increased from 8
   };
 }
 
