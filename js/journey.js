@@ -66,21 +66,63 @@ export const PACE_OPTIONS = {
   }
 };
 
+// Desk action definitions
+export const DESK_ACTIONS = {
+  process_permits: {
+    id: 'process_permits',
+    name: 'Process Permits',
+    description: 'Work on permit paperwork and reviews',
+    hoursRequired: 2,
+    energyCost: 10
+  },
+  stakeholder_meeting: {
+    id: 'stakeholder_meeting',
+    name: 'Stakeholder Meeting',
+    description: 'Meet with ministry, nations, or community',
+    hoursRequired: 3,
+    energyCost: 15
+  },
+  crisis_management: {
+    id: 'crisis_management',
+    name: 'Handle Crisis',
+    description: 'Deal with urgent issues (uses whole day)',
+    hoursRequired: 8,
+    energyCost: 30
+  },
+  team_morale: {
+    id: 'team_morale',
+    name: 'Team Building',
+    description: 'Boost crew morale with coffee and encouragement',
+    hoursRequired: 2,
+    energyCost: 5
+  },
+  end_day: {
+    id: 'end_day',
+    name: 'End Day',
+    description: 'Wrap up and head home',
+    hoursRequired: 0,
+    energyCost: 0
+  }
+};
+
 /**
  * Create initial field journey state
  * @param {Object} options - Setup options
  * @returns {Object} Field journey state
  */
 export function createFieldJourney(options = {}) {
-  const { roleId, areaId, companyName = 'Unnamed Crew' } = options;
-  const blocks = getBlocksForArea(areaId);
-  const totalDistance = getTotalDistance(areaId);
+  const { roleId, areaId, companyName, crewName, crew, role, area } = options;
+  const effectiveAreaId = areaId || area?.id;
+  const blocks = getBlocksForArea(effectiveAreaId);
+  const totalDistance = getTotalDistance(effectiveAreaId);
 
   return {
     journeyType: 'field',
-    companyName,
-    roleId,
-    areaId,
+    companyName: companyName || crewName || 'Unnamed Crew',
+    roleId: roleId || role?.id,
+    areaId: effectiveAreaId,
+    role,
+    area,
 
     // Progress
     day: 1,
@@ -95,7 +137,7 @@ export function createFieldJourney(options = {}) {
     temperature: 'cool',
 
     // Party
-    crew: generateCrew(5, 'field'),
+    crew: crew || generateCrew(5, 'field'),
     resources: createFieldResources(),
 
     // State flags
@@ -115,13 +157,16 @@ export function createFieldJourney(options = {}) {
  * @returns {Object} Desk journey state
  */
 export function createDeskJourney(options = {}) {
-  const { roleId, areaId, companyName = 'Unnamed Team' } = options;
+  const { roleId, areaId, companyName, crewName, crew, role, area } = options;
+  const effectiveAreaId = areaId || area?.id;
 
   return {
     journeyType: 'desk',
-    companyName,
-    roleId,
-    areaId,
+    companyName: companyName || crewName || 'Unnamed Team',
+    roleId: roleId || role?.id,
+    areaId: effectiveAreaId,
+    role,
+    area,
 
     // Progress
     day: 1,
@@ -146,7 +191,7 @@ export function createDeskJourney(options = {}) {
     },
 
     // Party
-    crew: generateCrew(5, 'desk'),
+    crew: crew || generateCrew(5, 'desk'),
     resources: createDeskResources(),
 
     // Daily time tracking

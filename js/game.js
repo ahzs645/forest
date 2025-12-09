@@ -236,11 +236,13 @@ class ForestryTrailGame {
     // Daily action choice
     this.ui.writeDivider('WHAT DO YOU DO?');
 
-    const paceOptions = Object.entries(PACE_OPTIONS).map(([id, pace]) => ({
-      label: `Travel ${pace.name}`,
-      description: `~${pace.distancePerDay}km/day, ${pace.fuelMultiplier}x fuel`,
-      value: id
-    }));
+    const paceOptions = Object.entries(PACE_OPTIONS)
+      .filter(([id]) => id !== 'resting') // Resting handled separately
+      .map(([id, pace]) => ({
+        label: `Travel ${pace.name}`,
+        description: `${Math.round(pace.distanceMultiplier * 100)}% speed`,
+        value: id
+      }));
 
     paceOptions.push({
       label: 'Rest here',
