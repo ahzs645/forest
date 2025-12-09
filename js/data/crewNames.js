@@ -19,6 +19,23 @@ export const FIRST_NAMES = [
   'Charlie', 'George', 'Tommy', 'Billy', 'Joseph', 'William', 'Frank', 'Henry'
 ];
 
+// Last names - common Canadian/BC surnames
+export const LAST_NAMES = [
+  // Common Canadian surnames
+  'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller', 'Wilson', 'Anderson',
+  'Taylor', 'Thomas', 'Moore', 'Martin', 'Thompson', 'White', 'Harris', 'Clark',
+  'Lewis', 'Robinson', 'Walker', 'Young', 'King', 'Wright', 'Hill', 'Scott',
+  // French-Canadian surnames
+  'Tremblay', 'Gagnon', 'Roy', 'Cote', 'Bouchard', 'Gauthier', 'Morin', 'Lavoie',
+  'Fortin', 'Pelletier', 'Belanger', 'Levesque', 'Bergeron', 'Leblanc', 'Paquette',
+  // BC/Western Canadian surnames
+  'Campbell', 'MacDonald', 'Stewart', 'Fraser', 'MacKenzie', 'Ross', 'Murray', 'Reid',
+  'MacLeod', 'Cameron', 'Johnston', 'Ferguson', 'Douglas', 'Grant', 'Hunter', 'Shaw',
+  // Indigenous surnames (BC First Nations)
+  'Joe', 'Pierre', 'Paul', 'Charlie', 'Thomas', 'Williams', 'Sam', 'Jack',
+  'Hunt', 'Dick', 'Peters', 'August', 'Bob', 'George', 'Billy', 'Johnny'
+];
+
 // Field crew roles (for Recon/Silviculture)
 export const FIELD_ROLES = [
   {
