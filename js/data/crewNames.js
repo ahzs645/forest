@@ -3,13 +3,13 @@
  * Names and roles for generating crew members
  */
 
-// Import data from JSON files
-import namesData from './json/shared/names.json' with { type: 'json' };
-import traitsData from './json/shared/traits.json' with { type: 'json' };
-import statusEffectsData from './json/shared/statusEffects.json' with { type: 'json' };
-import messagesData from './json/shared/messages.json' with { type: 'json' };
-import fieldRolesData from './json/field/roles.json' with { type: 'json' };
-import deskRolesData from './json/desk/roles.json' with { type: 'json' };
+// Import data from JSON files (Vite handles JSON imports natively)
+import namesData from './json/shared/names.json';
+import traitsData from './json/shared/traits.json';
+import statusEffectsData from './json/shared/statusEffects.json';
+import messagesData from './json/shared/messages.json';
+import fieldRolesData from './json/field/roles.json';
+import deskRolesData from './json/desk/roles.json';
 
 // Export name pools
 export const FIRST_NAMES = namesData.firstNames;

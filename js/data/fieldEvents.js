@@ -3,8 +3,8 @@
  * Oregon Trail-style random encounters
  */
 
-// Import data from JSON
-import eventsData from './json/field/events.json' with { type: 'json' };
+// Import data from JSON (Vite handles JSON imports natively)
+import eventsData from './json/field/events.json';
 
 // Export events
 export const FIELD_EVENTS = eventsData;

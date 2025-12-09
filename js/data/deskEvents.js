@@ -3,8 +3,8 @@
  * Office-based challenges and crises
  */
 
-// Import data from JSON
-import eventsData from './json/desk/events.json' with { type: 'json' };
+// Import data from JSON (Vite handles JSON imports natively)
+import eventsData from './json/desk/events.json';
 
 // Export events
 export const DESK_EVENTS = eventsData;
