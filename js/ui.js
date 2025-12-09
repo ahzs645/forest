@@ -110,6 +110,12 @@ export class TerminalUI {
         this.togglePanel();
       }
 
+      // L for journey log
+      if (e.key === 'l' && !this._isInputFocused()) {
+        e.preventDefault();
+        if (this._onLogRequest) this._onLogRequest();
+      }
+
       // Escape to close panel or modal
       if (e.key === 'Escape') {
         if (!this.modal?.hidden) {
@@ -304,11 +310,11 @@ export class TerminalUI {
       }
 
       btn.addEventListener('click', () => {
+        // Save handler before hiding choices (which clears it)
+        const handler = this._choiceHandler;
         this.write(`> ${option.label}`, 'term-dim');
         this._hideChoices();
-        if (this._choiceHandler) {
-          const handler = this._choiceHandler;
-          this._choiceHandler = null;
+        if (handler) {
           handler(option);
         }
       });
@@ -374,6 +380,11 @@ export class TerminalUI {
 
     this.crewPanel.innerHTML = '';
 
+    if (!crew || crew.length === 0) {
+      this.crewPanel.innerHTML = '<div class="panel-placeholder">No crew assigned yet</div>';
+      return;
+    }
+
     for (const member of crew) {
       const info = getCrewDisplayInfo(member);
       const div = document.createElement('div');
@@ -407,6 +418,12 @@ export class TerminalUI {
     if (!this.resourcesPanel) return;
 
     this.resourcesPanel.innerHTML = '';
+
+    if (!resources || Object.keys(resources).length === 0) {
+      this.resourcesPanel.innerHTML = '<div class="panel-placeholder">Supplies not loaded</div>';
+      return;
+    }
+
     const definitions = journeyType === 'field' ? FIELD_RESOURCES : DESK_RESOURCES;
 
     for (const [key, value] of Object.entries(resources)) {
@@ -439,6 +456,11 @@ export class TerminalUI {
    */
   updateLocationPanel(data) {
     if (!this.locationPanel) return;
+
+    if (!data || !data.name) {
+      this.locationPanel.innerHTML = '<div class="panel-placeholder">Select your destination</div>';
+      return;
+    }
 
     this.locationPanel.innerHTML = `
       <div class="location-name">${data.name || 'Unknown'}</div>
@@ -604,6 +626,7 @@ export class TerminalUI {
         <p><strong>Controls:</strong></p>
         <p>[1-9] - Select options</p>
         <p>[S] - Toggle status panel</p>
+        <p>[L] - View journey log</p>
         <p>[ESC] - Close panels</p>
         <br>
         <p><strong>Field Roles:</strong></p>
@@ -615,6 +638,38 @@ export class TerminalUI {
         <p><strong>Keep your crew healthy and reach your goal!</strong></p>
       `,
       actions: [{ label: 'Got it!', primary: true }]
+    });
+  }
+
+  /**
+   * Show journey log modal
+   * @param {Object[]} logEntries - Formatted log entries
+   */
+  showLog(logEntries) {
+    if (!logEntries || logEntries.length === 0) {
+      this.showModal({
+        title: 'JOURNEY LOG',
+        content: '<p>No events recorded yet.</p>',
+        actions: [{ label: 'Close', primary: true }]
+      });
+      return;
+    }
+
+    // Build log content
+    const logHtml = logEntries.map(entry => {
+      const icon = entry.icon || '·';
+      const detail = entry.detail ? ` - ${entry.detail}` : '';
+      return `<div class="log-entry log-${entry.type}">
+        <span class="log-day">Day ${entry.day}</span>
+        <span class="log-icon">${icon}</span>
+        <span class="log-summary">${entry.summary}${detail}</span>
+      </div>`;
+    }).join('');
+
+    this.showModal({
+      title: 'JOURNEY LOG',
+      content: `<div class="log-list">${logHtml}</div>`,
+      actions: [{ label: 'Close', primary: true }]
     });
   }
 
@@ -647,6 +702,14 @@ export class TerminalUI {
    */
   onRestartRequest(handler) {
     this._onRestart = handler;
+  }
+
+  /**
+   * Set log request handler
+   * @param {Function} handler - Log request callback
+   */
+  onLogRequest(handler) {
+    this._onLogRequest = handler;
   }
 
   /**
@@ -773,5 +836,10 @@ export class TerminalUI {
       crewTotal: 5,
       morale: 75
     });
+
+    // Reset panels with placeholder text
+    this.updateCrewPanel([]);
+    this.updateResourcesPanel({}, 'field');
+    this.updateLocationPanel({});
   }
 }

@@ -280,6 +280,9 @@ export function executeFieldDay(journey, paceId) {
   const messages = [];
   const pace = PACE_OPTIONS[paceId] || PACE_OPTIONS.normal;
 
+  // Track previous progress for milestone detection
+  const prevProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+
   // Calculate travel
   const travelInfo = calculateTravelDistance(journey, paceId);
 
@@ -287,10 +290,31 @@ export function executeFieldDay(journey, paceId) {
   journey.distanceTraveled += travelInfo.distance;
   journey.pace = paceId;
 
+  // Calculate new progress
+  const newProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+
   if (travelInfo.distance > 0) {
     messages.push(`Traveled ${travelInfo.distance} km at ${pace.name} pace.`);
   } else {
     messages.push('The crew rested for the day.');
+  }
+
+  // Check for milestone achievements
+  if (!journey.milestonesReached) journey.milestonesReached = [];
+
+  const milestones = [
+    { threshold: 25, message: 'Quarter of the journey complete! The crew is settling into the routine.' },
+    { threshold: 50, message: 'Halfway there! The destination feels within reach.' },
+    { threshold: 75, message: 'Three-quarters done! The end is in sight.' },
+    { threshold: 90, message: 'Almost there! Just a little further...' }
+  ];
+
+  for (const milestone of milestones) {
+    if (prevProgress < milestone.threshold && newProgress >= milestone.threshold &&
+        !journey.milestonesReached.includes(milestone.threshold)) {
+      messages.push(`*** MILESTONE: ${milestone.message} ***`);
+      journey.milestonesReached.push(milestone.threshold);
+    }
   }
 
   // Check if reached next block
@@ -298,6 +322,11 @@ export function executeFieldDay(journey, paceId) {
     journey.currentBlockIndex++;
     const newBlock = getCurrentBlock(journey);
     messages.push(`Arrived at ${newBlock.name}.`);
+
+    // Add block description if available
+    if (newBlock.description) {
+      messages.push(newBlock.description);
+    }
 
     // Check for victory (reached final block)
     if (journey.currentBlockIndex >= journey.blocks.length - 1) {
@@ -313,7 +342,8 @@ export function executeFieldDay(journey, paceId) {
     {
       pace: paceId,
       terrain,
-      weather: journey.temperature
+      weather: journey.temperature,
+      weatherCondition: journey.weather
     },
     getActiveCrewCount(journey.crew)
   );
@@ -351,6 +381,20 @@ export function executeFieldDay(journey, paceId) {
       member.morale = Math.max(0, Math.min(100, member.morale + pace.moraleBonus));
     }
 
+    // Apply weather morale effects
+    if (journey.weather?.moraleEffect) {
+      member.morale = Math.max(0, Math.min(100, member.morale + journey.weather.moraleEffect));
+    }
+
+    // Apply health risk from extreme weather
+    if (journey.weather?.healthRisk && !conditions.restDay) {
+      const healthLoss = Math.floor(Math.random() * 5) + 2; // 2-6 health loss
+      member.health = Math.max(0, member.health - healthLoss);
+      if (healthLoss > 3) {
+        messages.push(`${member.name} suffers from the ${journey.weather.name.toLowerCase()}.`);
+      }
+    }
+
     const updateResult = processDailyUpdate(member, conditions);
     messages.push(...updateResult.messages);
   }
@@ -375,14 +419,40 @@ export function executeFieldDay(journey, paceId) {
   journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day);
   journey.temperature = getTemperature(journey.weather, getCurrentBlock(journey));
 
-  // Log the day
+  // Log the day with more detail
   journey.log.push({
     day: journey.day - 1,
-    action: 'travel',
-    pace: paceId,
+    type: 'travel',
+    action: pace.name,
     distance: travelInfo.distance,
-    block: journey.currentBlockIndex
+    location: currentBlock?.name || 'Unknown',
+    weather: journey.weather?.name || 'Unknown',
+    summary: travelInfo.distance > 0
+      ? `Traveled ${travelInfo.distance} km (${pace.name})`
+      : 'Rested for the day'
   });
+
+  // Log milestone if reached
+  const lastMilestone = journey.milestonesReached?.[journey.milestonesReached.length - 1];
+  if (lastMilestone && !journey.log.some(l => l.type === 'milestone' && l.threshold === lastMilestone)) {
+    journey.log.push({
+      day: journey.day - 1,
+      type: 'milestone',
+      threshold: lastMilestone,
+      summary: `Reached ${lastMilestone}% of journey`
+    });
+  }
+
+  // Log block arrival
+  if (travelInfo.reachesBlock) {
+    const arrivedBlock = getCurrentBlock(journey);
+    journey.log.push({
+      day: journey.day - 1,
+      type: 'arrival',
+      location: arrivedBlock?.name || 'New location',
+      summary: `Arrived at ${arrivedBlock?.name || 'new location'}`
+    });
+  }
 
   return { journey, messages };
 }
@@ -627,6 +697,69 @@ export function getJourneyProgress(journey) {
   } else {
     return Math.round((journey.day / journey.deadline) * 100);
   }
+}
+
+/**
+ * Get detailed progress info for field journey
+ * @param {Object} journey - Field journey state
+ * @returns {Object} Detailed progress info
+ */
+export function getFieldProgressInfo(journey) {
+  const currentBlock = getCurrentBlock(journey);
+  const nextBlock = getNextBlock(journey);
+
+  // Calculate distance within current block
+  let distanceIntoBlock = journey.distanceTraveled;
+  for (let i = 0; i < journey.currentBlockIndex; i++) {
+    distanceIntoBlock -= journey.blocks[i].distance;
+  }
+
+  const distanceToNextBlock = nextBlock
+    ? Math.max(0, currentBlock.distance - distanceIntoBlock)
+    : 0;
+
+  const overallProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+  const blockProgress = currentBlock.distance > 0
+    ? Math.round((distanceIntoBlock / currentBlock.distance) * 100)
+    : 100;
+
+  return {
+    overallProgress,
+    distanceTraveled: journey.distanceTraveled,
+    totalDistance: journey.totalDistance,
+    currentBlock: currentBlock?.name || 'Unknown',
+    nextBlock: nextBlock?.name || 'Destination',
+    distanceToNextBlock: Math.round(distanceToNextBlock * 10) / 10,
+    blocksCompleted: journey.currentBlockIndex,
+    totalBlocks: journey.blocks.length,
+    blockProgress: Math.min(100, blockProgress)
+  };
+}
+
+/**
+ * Format journey log for display
+ * @param {Object} journey - Journey state
+ * @returns {Object[]} Formatted log entries
+ */
+export function formatJourneyLog(journey) {
+  if (!journey.log || journey.log.length === 0) {
+    return [];
+  }
+
+  const typeIcons = {
+    travel: '→',
+    event: '!',
+    milestone: '★',
+    arrival: '◆'
+  };
+
+  return journey.log.map(entry => ({
+    day: entry.day,
+    icon: typeIcons[entry.type] || '·',
+    type: entry.type,
+    summary: entry.summary || entry.eventTitle || entry.action || 'Unknown',
+    detail: entry.optionLabel || entry.weather || ''
+  }));
 }
 
 /**

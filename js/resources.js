@@ -152,16 +152,44 @@ export function createDeskResources(options = {}) {
  * @returns {Object} Resource consumption amounts
  */
 export function calculateFieldConsumption(conditions = {}, crewCount = 5) {
-  const { pace = 'normal', terrain = 'flat', weather = 'cool' } = conditions;
+  const { pace = 'normal', terrain = 'flat', weather = 'cool', weatherCondition = null } = conditions;
   const consumption = {};
+
+  // Weather modifiers for fuel and equipment
+  // Bad weather means more idling, slower driving, more wear
+  const weatherFuelModifiers = {
+    clear: 1.0,
+    overcast: 1.0,
+    light_rain: 1.1,
+    heavy_rain: 1.25,
+    fog: 1.15,
+    light_snow: 1.2,
+    heavy_snow: 1.4,
+    freezing: 1.35,
+    storm: 1.5
+  };
+  const weatherEquipModifiers = {
+    clear: 1.0,
+    overcast: 1.0,
+    light_rain: 1.1,
+    heavy_rain: 1.3,
+    fog: 1.05,
+    light_snow: 1.15,
+    heavy_snow: 1.4,
+    freezing: 1.3,
+    storm: 1.5
+  };
 
   // Fuel consumption
   const fuelDef = FIELD_RESOURCES.fuel;
   let fuelUse = fuelDef.paceModifiers[pace] ?? fuelDef.baseDaily;
   fuelUse *= fuelDef.terrainModifiers[terrain] ?? 1;
+  // Apply weather modifier
+  const weatherId = weatherCondition?.id || weather;
+  fuelUse *= weatherFuelModifiers[weatherId] ?? 1;
   consumption.fuel = Math.round(fuelUse * 10) / 10;
 
-  // Food consumption
+  // Food consumption (uses temperature via weather param)
   const foodDef = FIELD_RESOURCES.food;
   let foodUse = crewCount * foodDef.baseDaily;
   foodUse *= foodDef.weatherModifiers[weather] ?? 1;
@@ -172,6 +200,8 @@ export function calculateFieldConsumption(conditions = {}, crewCount = 5) {
     const equipDef = FIELD_RESOURCES.equipment;
     let equipWear = equipDef.paceModifiers[pace] ?? equipDef.baseDaily;
     equipWear *= equipDef.terrainModifiers[terrain] ?? 1;
+    // Apply weather modifier
+    equipWear *= weatherEquipModifiers[weatherId] ?? 1;
     consumption.equipment = Math.round(equipWear * 10) / 10;
   } else {
     consumption.equipment = 0;
@@ -272,6 +302,52 @@ export function checkResourceStatus(resources, definitions) {
   }
 
   return { depleted, critical, warnings };
+}
+
+/**
+ * Get formatted resource status for display
+ * @param {Object} resources - Current resources
+ * @param {Object} definitions - Resource definitions
+ * @returns {Object} Formatted status for each resource
+ */
+export function getFormattedResourceStatus(resources, definitions) {
+  const status = {};
+
+  for (const [key, value] of Object.entries(resources)) {
+    const def = definitions[key];
+    if (!def) continue;
+
+    let level = 'ok';
+    if (value <= 0) {
+      level = 'depleted';
+    } else if (value <= def.critical) {
+      level = 'critical';
+    } else if (value <= def.warning) {
+      level = 'low';
+    }
+
+    // Format display value
+    let display;
+    if (def.unit === '$') {
+      display = '$' + Math.round(value).toLocaleString();
+    } else if (def.unit === '%') {
+      display = Math.round(value) + '%';
+    } else {
+      display = `${Math.round(value)} ${def.unit}`;
+    }
+
+    status[key] = {
+      id: key,
+      label: def.name,
+      shortLabel: def.shortLabel,
+      value: Math.round(value),
+      display,
+      level,
+      percentage: getResourcePercentage(value, def)
+    };
+  }
+
+  return status;
 }
 
 /**

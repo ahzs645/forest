@@ -390,15 +390,59 @@ function getOptionHint(option) {
   const hints = [];
 
   if (option.effects) {
-    if (option.effects.fuel < -10) hints.push('high fuel cost');
-    if (option.effects.food < -10) hints.push('uses food');
-    if (option.effects.crew_morale < -10) hints.push('hurts morale');
-    if (option.effects.budget < -1000) hints.push('expensive');
-    if (option.effects.progress < -5) hints.push('delays progress');
+    // Resource costs
+    if (option.effects.fuel !== undefined) {
+      hints.push(option.effects.fuel > 0 ? `+${option.effects.fuel} fuel` : `${option.effects.fuel} fuel`);
+    }
+    if (option.effects.food !== undefined) {
+      hints.push(option.effects.food > 0 ? `+${option.effects.food} food` : `${option.effects.food} food`);
+    }
+    if (option.effects.equipment !== undefined) {
+      hints.push(option.effects.equipment > 0 ? `+${option.effects.equipment}% equip` : `${option.effects.equipment}% equip`);
+    }
+    if (option.effects.firstAid !== undefined) {
+      hints.push(option.effects.firstAid > 0 ? `+${option.effects.firstAid} med` : `${option.effects.firstAid} med`);
+    }
+    if (option.effects.budget !== undefined) {
+      const budgetStr = Math.abs(option.effects.budget) >= 1000
+        ? `$${Math.round(option.effects.budget/1000)}k`
+        : `$${option.effects.budget}`;
+      hints.push(option.effects.budget > 0 ? budgetStr : budgetStr);
+    }
+
+    // Crew effects
+    if (option.effects.crew_health !== undefined) {
+      hints.push(option.effects.crew_health > 0 ? `+${option.effects.crew_health} health` : `${option.effects.crew_health} health`);
+    }
+    if (option.effects.crew_morale !== undefined) {
+      hints.push(option.effects.crew_morale > 0 ? `+${option.effects.crew_morale} morale` : `${option.effects.crew_morale} morale`);
+    }
+
+    // Progress effects
+    if (option.effects.progress !== undefined && option.effects.progress !== 0) {
+      hints.push(option.effects.progress > 0 ? `+${option.effects.progress} km` : `${option.effects.progress} km`);
+    }
   }
 
-  if (option.riskInjury > 0.2) hints.push('risky');
-  if (option.timeUsed > 4) hints.push('time-consuming');
+  // Risk indicators
+  if (option.riskInjury) {
+    const riskPct = Math.round(option.riskInjury * 100);
+    hints.push(`${riskPct}% injury risk`);
+  }
 
-  return hints.length > 0 ? `(${hints.join(', ')})` : '';
+  // Time cost
+  if (option.timeUsed) {
+    hints.push(`-${option.timeUsed}h`);
+  }
+
+  return hints.length > 0 ? hints.join(', ') : 'Safe choice';
+}
+
+/**
+ * Format effect preview for display in UI
+ * @param {Object} option - Event option
+ * @returns {string} Formatted effect preview
+ */
+export function formatOptionEffects(option) {
+  return getOptionHint(option);
 }

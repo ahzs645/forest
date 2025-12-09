@@ -6,9 +6,9 @@
 import { TerminalUI } from './ui.js';
 import { FORESTER_ROLES, OPERATING_AREAS } from './data/index.js';
 import { generateCrew, processDailyUpdate, getCrewDisplayInfo, applyStatusEffect } from './crew.js';
-import { createFieldJourney, createDeskJourney, executeFieldDay, executeDeskDay, PACE_OPTIONS, DESK_ACTIONS } from './journey.js';
+import { createFieldJourney, createDeskJourney, executeFieldDay, executeDeskDay, PACE_OPTIONS, DESK_ACTIONS, getFieldProgressInfo, formatJourneyLog } from './journey.js';
 import { checkForEvent, resolveEvent, formatEventForDisplay, checkScheduledEvents } from './events.js';
-import { calculateFieldConsumption, calculateDeskConsumption, applyConsumption, checkResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
+import { calculateFieldConsumption, calculateDeskConsumption, applyConsumption, checkResourceStatus, getFormattedResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
 
 class ForestryTrailGame {
   constructor() {
@@ -19,7 +19,17 @@ class ForestryTrailGame {
     this._restartConfirmOpen = false;
 
     this.ui.onRestartRequest(() => this._promptRestart());
+    this.ui.onLogRequest(() => this._showLog());
     this._bindKeyboard();
+  }
+
+  _showLog() {
+    if (!this.journey) {
+      this.ui.showLog([]);
+      return;
+    }
+    const logEntries = formatJourneyLog(this.journey);
+    this.ui.showLog(logEntries);
   }
 
   _bindKeyboard() {
@@ -203,20 +213,31 @@ class ForestryTrailGame {
   async _runFieldDay() {
     const journey = this.journey;
     const currentBlock = journey.blocks[journey.currentBlockIndex];
+    const progressInfo = getFieldProgressInfo(journey);
 
     this.ui.clear();
     this.ui.writeHeader(`DAY ${journey.day} - ${currentBlock?.name || 'Unknown Territory'}`);
 
-    // Show current status
-    const progressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-    this.ui.write(`Progress: ${journey.distanceTraveled}/${journey.totalDistance} km (${progressPct}%)`);
-    this.ui.write(`Weather: ${journey.weather?.name || 'Clear'}`);
-    this.ui.write(`Terrain: ${currentBlock?.terrain || 'unknown'}`);
+    // Show current status with visual progress bar
+    const progressBarWidth = 20;
+    const filledWidth = Math.round((progressInfo.overallProgress / 100) * progressBarWidth);
+    const progressBar = '█'.repeat(filledWidth) + '░'.repeat(progressBarWidth - filledWidth);
+
+    this.ui.write(`Journey: [${progressBar}] ${progressInfo.overallProgress}%`);
+    this.ui.write(`Distance: ${journey.distanceTraveled}/${journey.totalDistance} km`);
+    this.ui.write(`Blocks: ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks} completed`);
+    if (progressInfo.nextBlock !== 'Destination') {
+      this.ui.write(`Next stop: ${progressInfo.nextBlock} (${progressInfo.distanceToNextBlock} km away)`);
+    } else {
+      this.ui.write(`Final destination ahead!`);
+    }
+    this.ui.write('');
+    this.ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'}`);
     this.ui.write('');
 
     // Show resources
     this.ui.writeDivider('SUPPLIES');
-    const resourceStatus = checkResourceStatus(journey.resources, FIELD_RESOURCES);
+    const resourceStatus = getFormattedResourceStatus(journey.resources, FIELD_RESOURCES);
     for (const [key, status] of Object.entries(resourceStatus)) {
       const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
       this.ui.write(`${icon} ${status.label}: ${status.display}`);
@@ -280,8 +301,8 @@ class ForestryTrailGame {
       const consumption = calculateFieldConsumption({
         pace: actionId,
         terrain: currentBlock?.terrain,
-        weather: journey.weather?.id,
-        crewHealth: journey.crew.reduce((sum, m) => sum + (m.isActive ? m.health : 0), 0) / activeCrewCount
+        weather: journey.temperature,
+        weatherCondition: journey.weather
       }, activeCrewCount);
 
       const consumptionResult = applyConsumption(journey.resources, consumption, FIELD_RESOURCES);
@@ -298,8 +319,10 @@ class ForestryTrailGame {
     // Update crew conditions
     this._updateCrewConditions();
 
-    // Advance day
-    journey.day++;
+    // Advance day only for rest (executeFieldDay already advances for travel)
+    if (actionId === 'rest') {
+      journey.day++;
+    }
 
     // Small pause
     await this.ui.promptChoice('', [{ label: 'Continue...', value: 'next' }]);
@@ -322,8 +345,8 @@ class ForestryTrailGame {
 
     // Show resources
     this.ui.writeDivider('RESOURCES');
-    const resourceStatus = checkResourceStatus(journey.resources, DESK_RESOURCES);
-    for (const [key, status] of Object.entries(resourceStatus)) {
+    const deskResourceStatus = getFormattedResourceStatus(journey.resources, DESK_RESOURCES);
+    for (const [key, status] of Object.entries(deskResourceStatus)) {
       const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
       this.ui.write(`${icon} ${status.label}: ${status.display}`);
     }
@@ -381,8 +404,7 @@ class ForestryTrailGame {
     // Update crew conditions
     this._updateCrewConditions();
 
-    // Advance day and reset energy
-    journey.day++;
+    // Reset daily energy (day is advanced in executeDeskDay)
     journey.hoursRemaining = 8;
 
     // Small pause
@@ -397,10 +419,10 @@ class ForestryTrailGame {
     this.ui.write(event.description);
     this.ui.write('');
 
-    // Build options
-    const options = event.options.map((opt, index) => ({
+    // Build options with effect previews
+    const options = formatted.options.map((opt, index) => ({
       label: opt.label,
-      description: opt.hint || '',
+      description: opt.hint ? `[${opt.hint}]` : '',
       value: index
     }));
 
@@ -424,24 +446,16 @@ class ForestryTrailGame {
   }
 
   _displayCrewStatus() {
-    this.ui.writeDivider('CREW');
-    for (const member of this.journey.crew) {
-      const info = getCrewDisplayInfo(member);
-      let status = `${info.name} (${info.role})`;
+    // Only show brief crew summary in terminal (detailed view in side panel via [S])
+    const activeCount = this.journey.crew.filter(m => m.isActive).length;
+    const totalCount = this.journey.crew.length;
+    const avgHealth = Math.round(
+      this.journey.crew.filter(m => m.isActive).reduce((sum, m) => sum + m.health, 0) / activeCount
+    );
+    const injured = this.journey.crew.filter(m => m.isActive && m.statusEffects?.length > 0).length;
 
-      if (!member.isActive) {
-        status += ' [EVACUATED]';
-      } else if (info.statusText) {
-        status += ` [${info.statusText}]`;
-      }
-
-      if (member.isActive) {
-        const healthBar = this._miniBar(member.health);
-        status += ` H:${healthBar}`;
-      }
-
-      this.ui.write(status);
-    }
+    this.ui.write(`Crew: ${activeCount}/${totalCount} active | Avg Health: ${avgHealth}%${injured > 0 ? ` | ${injured} injured` : ''}`);
+    this.ui.write('(Press [S] for detailed crew status)');
     this.ui.write('');
   }
 

@@ -242,6 +242,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .choice-btn {
@@ -386,6 +388,13 @@ body {
   margin-bottom: var(--space-sm);
   padding-bottom: var(--space-xs);
   border-bottom: 1px dashed var(--border-color);
+}
+
+.panel-placeholder {
+  color: var(--fg-dim);
+  font-style: italic;
+  font-size: var(--font-size-sm);
+  padding: var(--space-sm);
 }
 
 /* Crew panel */
@@ -575,6 +584,54 @@ body {
 
 .modal-btn.primary {
   border-color: var(--fg-main);
+}
+
+/* Journey log styles */
+.log-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px dotted var(--border-color);
+  font-size: var(--font-size-sm);
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-day {
+  color: var(--fg-dim);
+  min-width: 50px;
+}
+
+.log-icon {
+  width: 16px;
+  text-align: center;
+}
+
+.log-event .log-icon {
+  color: var(--fg-warning);
+}
+
+.log-milestone .log-icon {
+  color: var(--fg-positive);
+}
+
+.log-arrival .log-icon {
+  color: var(--fg-bright);
+}
+
+.log-summary {
+  flex: 1;
 }
 
 /* ASCII art pre-formatted text */
