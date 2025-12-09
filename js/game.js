@@ -5,10 +5,10 @@
 
 import { TerminalUI } from './ui.js';
 import { FORESTER_ROLES, OPERATING_AREAS } from './data/index.js';
-import { generateCrew, processDailyUpdate, getCrewDisplayInfo, applyStatusEffect } from './crew.js';
+import { generateCrew, processDailyUpdate, getCrewDisplayInfo } from './crew.js';
 import { createFieldJourney, createDeskJourney, executeFieldDay, executeDeskDay, PACE_OPTIONS, DESK_ACTIONS, getFieldProgressInfo, formatJourneyLog } from './journey.js';
 import { checkForEvent, resolveEvent, formatEventForDisplay, checkScheduledEvents } from './events.js';
-import { calculateFieldConsumption, calculateDeskConsumption, applyConsumption, checkResourceStatus, getFormattedResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
+import { calculateFieldConsumption, calculateDeskConsumption, applyConsumption, getFormattedResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
 
 class ForestryTrailGame {
   constructor() {
@@ -185,25 +185,31 @@ class ForestryTrailGame {
 
   async _mainLoop() {
     while (!this.gameOver && !this.victory) {
-      // Update UI
-      this.ui.updateAllStatus(this.journey);
+      try {
+        // Update UI
+        this.ui.updateAllStatus(this.journey);
 
-      // Check for scheduled events first
-      const scheduledEvent = checkScheduledEvents(this.journey);
-      if (scheduledEvent) {
-        await this._handleEvent(scheduledEvent);
-        if (this.gameOver) break;
+        // Check for scheduled events first
+        const scheduledEvent = checkScheduledEvents(this.journey);
+        if (scheduledEvent) {
+          await this._handleEvent(scheduledEvent);
+          if (this.gameOver) break;
+        }
+
+        // Run daily phase
+        if (this.journey.journeyType === 'field') {
+          await this._runFieldDay();
+        } else {
+          await this._runDeskDay();
+        }
+
+        // Check end conditions
+        this._checkEndConditions();
+      } catch (error) {
+        console.error('Main loop error:', error);
+        this.ui.writeDanger(`Error: ${error.message}. Please refresh to restart.`);
+        break;
       }
-
-      // Run daily phase
-      if (this.journey.journeyType === 'field') {
-        await this._runFieldDay();
-      } else {
-        await this._runDeskDay();
-      }
-
-      // Check end conditions
-      this._checkEndConditions();
     }
 
     // Show end screen
@@ -238,7 +244,7 @@ class ForestryTrailGame {
     // Show resources
     this.ui.writeDivider('SUPPLIES');
     const resourceStatus = getFormattedResourceStatus(journey.resources, FIELD_RESOURCES);
-    for (const [key, status] of Object.entries(resourceStatus)) {
+    for (const [, status] of Object.entries(resourceStatus)) {
       const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
       this.ui.write(`${icon} ${status.label}: ${status.display}`);
     }
@@ -311,17 +317,26 @@ class ForestryTrailGame {
       if (consumptionResult.warnings.length > 0) {
         this.ui.write('');
         for (const warning of consumptionResult.warnings) {
-          this.ui.writeWarning(warning);
+          // Format warning object as string
+          this.ui.writeWarning(`${warning.resource}: ${warning.value} ${warning.unit} remaining`);
         }
       }
     }
 
-    // Update crew conditions
-    this._updateCrewConditions();
+    try {
+      // Update crew conditions
+      this._updateCrewConditions();
 
-    // Advance day only for rest (executeFieldDay already advances for travel)
-    if (actionId === 'rest') {
-      journey.day++;
+      // Advance day only for rest (executeFieldDay already advances for travel)
+      if (actionId === 'rest') {
+        journey.day++;
+      }
+
+      // Update status panels to reflect changes
+      this.ui.updateAllStatus(this.journey);
+    } catch (error) {
+      console.error('Field day end processing error:', error);
+      this.ui.writeDanger('An error occurred during day processing.');
     }
 
     // Small pause
@@ -330,85 +345,135 @@ class ForestryTrailGame {
 
   async _runDeskDay() {
     const journey = this.journey;
-
-    this.ui.clear();
-    this.ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - ${journey.currentPhase.toUpperCase()}`);
-
-    // Show progress
     const daysRemaining = journey.deadline - journey.day;
-    const permitProgress = Math.round((journey.permits.approved / journey.permits.target) * 100);
 
-    this.ui.write(`Days Remaining: ${daysRemaining}`);
-    this.ui.write(`Permits: ${journey.permits.approved}/${journey.permits.target} approved (${permitProgress}%)`);
-    this.ui.write(`Pipeline: ${journey.permits.submitted} submitted, ${journey.permits.inReview} in review`);
-    this.ui.write('');
-
-    // Show resources
-    this.ui.writeDivider('RESOURCES');
-    const deskResourceStatus = getFormattedResourceStatus(journey.resources, DESK_RESOURCES);
-    for (const [key, status] of Object.entries(deskResourceStatus)) {
-      const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
-      this.ui.write(`${icon} ${status.label}: ${status.display}`);
-    }
-    this.ui.write(`   Hours Today: ${journey.hoursRemaining}`);
-    this.ui.write('');
-
-    // Show crew/team status
-    this._displayCrewStatus();
-
-    // Check for random event
+    // Check for random event at start of day
     const event = checkForEvent(journey);
     if (event) {
+      this.ui.clear();
+      this.ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - ${journey.currentPhase.toUpperCase()}`);
       await this._handleEvent(event);
       if (this.gameOver) return;
     }
 
-    // Daily action choice
-    this.ui.writeDivider('DAILY PRIORITIES');
+    // Inner loop: multiple actions per day until hours run out
+    while (journey.hoursRemaining > 0) {
+      this.ui.clear();
+      this.ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - ${journey.currentPhase.toUpperCase()}`);
 
-    const actionOptions = Object.entries(DESK_ACTIONS).map(([id, action]) => ({
-      label: action.name,
-      description: `${action.hoursRequired}h, ${action.description}`,
-      value: id
-    }));
-
-    const action = await this.ui.promptChoice('How will you spend today?', actionOptions);
-    const actionId = action.value || 'process_permits';
-
-    // Execute the day
-    const result = executeDeskDay(journey, actionId);
-
-    this.ui.write('');
-    for (const msg of result.messages) {
-      this.ui.write(msg);
-    }
-
-    // Apply resource consumption
-    const activeCrewCount = journey.crew.filter(m => m.isActive).length;
-    const consumption = calculateDeskConsumption({
-      daysRemaining,
-      crewMorale: journey.crew.reduce((sum, m) => sum + (m.isActive ? m.morale : 0), 0) / activeCrewCount,
-      hoursWorked: 8 - journey.hoursRemaining
-    }, activeCrewCount);
-
-    const consumptionResult = applyConsumption(journey.resources, consumption, DESK_RESOURCES);
-    journey.resources = consumptionResult.resources;
-
-    if (consumptionResult.warnings.length > 0) {
+      // Show progress
+      const permitProgress = Math.round((journey.permits.approved / journey.permits.target) * 100);
+      this.ui.write(`Days Remaining: ${journey.deadline - journey.day}`);
+      this.ui.write(`Permits: ${journey.permits.approved}/${journey.permits.target} approved (${permitProgress}%)`);
+      this.ui.write(`Pipeline: ${journey.permits.submitted} submitted, ${journey.permits.inReview} in review`);
       this.ui.write('');
-      for (const warning of consumptionResult.warnings) {
-        this.ui.writeWarning(warning);
+
+      // Show resources
+      this.ui.writeDivider('RESOURCES');
+      const deskResourceStatus = getFormattedResourceStatus(journey.resources, DESK_RESOURCES);
+      for (const [, status] of Object.entries(deskResourceStatus)) {
+        const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
+        this.ui.write(`${icon} ${status.label}: ${status.display}`);
+      }
+      this.ui.write(`   Hours Remaining: ${journey.hoursRemaining}`);
+      this.ui.write('');
+
+      // Show crew/team status
+      this._displayCrewStatus();
+
+      // Build action options - only show actions we have time for
+      this.ui.writeDivider('WHAT DO YOU DO?');
+
+      const actionOptions = Object.entries(DESK_ACTIONS)
+        .filter(([, action]) => action.hoursRequired <= journey.hoursRemaining)
+        .map(([id, action]) => ({
+          label: action.name,
+          description: `${action.hoursRequired}h - ${action.description}`,
+          value: id
+        }));
+
+      // Always add "End Day Early" option
+      actionOptions.push({
+        label: 'End Day Early',
+        description: 'Rest and start fresh tomorrow',
+        value: 'end_day'
+      });
+
+      const action = await this.ui.promptChoice(`${journey.hoursRemaining} hours remaining:`, actionOptions);
+      const actionId = action.value || 'end_day';
+
+      // End day early
+      if (actionId === 'end_day') {
+        this.ui.write('');
+        this.ui.write('You call it a day and head home to rest.');
+        break;
+      }
+
+      // Execute the action (action functions handle hour deduction internally)
+      let result;
+      try {
+        result = executeDeskDay(journey, actionId);
+      } catch (error) {
+        console.error('Action execution error:', error);
+        this.ui.writeDanger(`Error executing action: ${error.message}`);
+        continue;
+      }
+
+      this.ui.write('');
+      if (result && result.messages) {
+        for (const msg of result.messages) {
+          this.ui.write(msg);
+        }
+      }
+
+      // Update status panels
+      this.ui.updateAllStatus(this.journey);
+
+      // Brief pause between actions
+      if (journey.hoursRemaining > 0) {
+        await this.ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
       }
     }
 
-    // Update crew conditions
-    this._updateCrewConditions();
+    // End of day processing
+    this.ui.write('');
+    this.ui.write('--- End of Day ---');
 
-    // Reset daily energy (day is advanced in executeDeskDay)
-    journey.hoursRemaining = 8;
+    try {
+      // Apply daily resource consumption
+      const activeCrewCount = journey.crew.filter(m => m.isActive).length || 1;
+      const consumption = calculateDeskConsumption({
+        daysRemaining,
+        crewMorale: journey.crew.reduce((sum, m) => sum + (m.isActive ? m.morale : 0), 0) / activeCrewCount,
+        hoursWorked: 8 - journey.hoursRemaining
+      }, activeCrewCount);
 
-    // Small pause
-    await this.ui.promptChoice('', [{ label: 'Continue...', value: 'next' }]);
+      const consumptionResult = applyConsumption(journey.resources, consumption, DESK_RESOURCES);
+      journey.resources = consumptionResult.resources;
+
+      if (consumptionResult.warnings.length > 0) {
+        for (const warning of consumptionResult.warnings) {
+          // Format warning object as string
+          this.ui.writeWarning(`${warning.resource}: ${warning.value} ${warning.unit} remaining`);
+        }
+      }
+
+      // Update crew conditions
+      this._updateCrewConditions();
+
+      // Advance to next day
+      journey.day++;
+      journey.hoursRemaining = 8;
+
+      // Update status panels
+      this.ui.updateAllStatus(this.journey);
+    } catch (error) {
+      console.error('End of day processing error:', error);
+      this.ui.writeDanger('An error occurred. Please try again.');
+    }
+
+    // Pause before next day
+    await this.ui.promptChoice('', [{ label: 'Start next day...', value: 'next' }]);
   }
 
   async _handleEvent(event) {
@@ -447,12 +512,13 @@ class ForestryTrailGame {
 
   _displayCrewStatus() {
     // Only show brief crew summary in terminal (detailed view in side panel via [S])
-    const activeCount = this.journey.crew.filter(m => m.isActive).length;
+    const activeCrew = this.journey.crew.filter(m => m.isActive);
+    const activeCount = activeCrew.length;
     const totalCount = this.journey.crew.length;
-    const avgHealth = Math.round(
-      this.journey.crew.filter(m => m.isActive).reduce((sum, m) => sum + m.health, 0) / activeCount
-    );
-    const injured = this.journey.crew.filter(m => m.isActive && m.statusEffects?.length > 0).length;
+    const avgHealth = activeCount > 0
+      ? Math.round(activeCrew.reduce((sum, m) => sum + m.health, 0) / activeCount)
+      : 0;
+    const injured = activeCrew.filter(m => m.statusEffects?.length > 0).length;
 
     this.ui.write(`Crew: ${activeCount}/${totalCount} active | Avg Health: ${avgHealth}%${injured > 0 ? ` | ${injured} injured` : ''}`);
     this.ui.write('(Press [S] for detailed crew status)');
@@ -476,23 +542,26 @@ class ForestryTrailGame {
     for (const member of journey.crew) {
       if (!member.isActive) continue;
 
+      // Track state before update
+      const wasAlive = !member.isDead;
+      const wasActive = !member.hasQuit;
+
       const update = processDailyUpdate(member, conditions);
 
-      // Check for critical events
-      if (update.died) {
+      // Check for death (processDailyUpdate sets member.isDead = true)
+      if (wasAlive && member.isDead) {
         this.ui.writeWarning(`${member.name} has died from their injuries!`);
-        member.isActive = false;
-      } else if (update.incapacitated) {
-        this.ui.writeWarning(`${member.name} is too injured to continue and must be evacuated!`);
-        member.isActive = false;
-      } else if (update.quit) {
+      }
+      // Check for quitting (processDailyUpdate sets member.hasQuit = true)
+      else if (wasActive && member.hasQuit) {
         this.ui.writeWarning(`${member.name} has had enough and quit the expedition!`);
-        member.isActive = false;
       }
 
-      // Report recoveries
-      for (const recovery of update.recovered) {
-        this.ui.write(`${member.name} has recovered from ${recovery}.`);
+      // Report any messages (recoveries, status changes, etc.)
+      if (update.messages && update.messages.length > 0) {
+        for (const msg of update.messages) {
+          this.ui.write(msg);
+        }
       }
     }
 
