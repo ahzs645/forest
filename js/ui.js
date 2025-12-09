@@ -1,728 +1,777 @@
+/**
+ * Terminal UI Module
+ * Handles all display and input for the Oregon Trail-style interface
+ */
+
+import { progressBar, box, BOX, PROGRESS, healthIndicator } from './ascii.js';
+import { getCrewDisplayInfo, getActiveCrewCount, getAverageMorale } from './crew.js';
+import { FIELD_RESOURCES, DESK_RESOURCES, getResourcePercentage } from './resources.js';
+
 export class TerminalUI {
   constructor() {
-    this.terminal = document.getElementById("terminal");
-    this.input = document.getElementById("input");
-    this.buttonContainer = document.getElementById("button-container");
-    this.statusPanel = document.getElementById("status-content");
-    this.statusToggle = document.getElementById("status-toggle");
-    this.rightPanel = document.querySelector(".right-panel");
-    this.statusButton = document.getElementById("status-button");
-    this.statusBackdrop = document.getElementById("status-backdrop");
-    this.mobileHud = document.getElementById("mobile-hud");
-    this.restartButton = document.getElementById("restart-button");
-    this.glossaryButton = document.getElementById("glossary-button");
-    this.modal = document.getElementById("modal");
-    this.modalDialog = this.modal?.querySelector(".modal-dialog");
-    this.modalTitle = document.getElementById("modal-title");
-    this.modalBody = document.getElementById("modal-body");
-    this.modalActions = document.getElementById("modal-actions");
-    this.alertStack = document.getElementById("metric-alerts");
-    this._modalKeyHandler = null;
-    this._modalOnClose = null;
-    this._lastFocus = null;
-    this._modalDismissible = true;
-    this._glossaryEntries = [];
-    this._glossaryLookup = new Map();
-    this._glossaryRegex = null;
-    this._restartHandler = null;
+    // DOM elements
+    this.terminal = document.getElementById('terminal');
+    this.choices = document.getElementById('choices');
+    this.inputWrapper = document.getElementById('input-wrapper');
+    this.textInput = document.getElementById('text-input');
+    this.submitBtn = document.getElementById('submit-btn');
+
+    // Status bar elements
+    this.dayValue = document.getElementById('day-value');
+    this.progressValue = document.getElementById('progress-value');
+    this.crewValue = document.getElementById('crew-value');
+    this.moraleValue = document.getElementById('morale-value');
+
+    // Side panel elements
+    this.sidePanel = document.getElementById('side-panel');
+    this.crewPanel = document.getElementById('crew-panel');
+    this.resourcesPanel = document.getElementById('resources-panel');
+    this.locationPanel = document.getElementById('location-panel');
+    this.panelBackdrop = document.getElementById('panel-backdrop');
+
+    // Header buttons
+    this.statusBtn = document.getElementById('status-btn');
+    this.helpBtn = document.getElementById('help-btn');
+    this.restartBtn = document.getElementById('restart-btn');
+    this.closePanel = document.getElementById('close-panel');
+
+    // Modal elements
+    this.modal = document.getElementById('modal');
+    this.modalTitle = document.getElementById('modal-title');
+    this.modalBody = document.getElementById('modal-body');
+    this.modalActions = document.getElementById('modal-actions');
+
+    // State
     this._pending = null;
-    this._choiceKeyHandler = null;
-    this._inputMode = "idle";
-    this._mobileStatusOpen = false;
-    this._statusMedia =
-      typeof window !== "undefined" && typeof window.matchMedia === "function"
-        ? window.matchMedia("(max-width: 860px)")
-        : null;
-    this._statusMediaHandler = null;
+    this._choiceHandler = null;
+    this._keyHandler = null;
+    this._onRestart = null;
+    this._isPanelOpen = false;
 
-    if (this.input) {
-      this.input.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          this._handleSubmit();
+    // Initialize event listeners
+    this._initEventListeners();
+  }
+
+  _initEventListeners() {
+    // Text input submit
+    if (this.submitBtn) {
+      this.submitBtn.addEventListener('click', () => this._handleTextSubmit());
+    }
+
+    if (this.textInput) {
+      this.textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this._handleTextSubmit();
         }
       });
     }
 
-    if (this.statusToggle && this.statusPanel) {
-      const togglePanel = () => {
-        const expanded = this.statusToggle.getAttribute("aria-expanded") === "true";
-        const next = !expanded;
-        this._setStatusExpanded(next);
-        if (this._statusMedia?.matches) {
-          this._setMobileStatusOpen(next);
-        }
-      };
-      this.statusToggle.addEventListener("click", togglePanel);
-      this.statusToggle.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          togglePanel();
-        }
+    // Panel toggle
+    if (this.statusBtn) {
+      this.statusBtn.addEventListener('click', () => this.togglePanel());
+    }
+
+    if (this.closePanel) {
+      this.closePanel.addEventListener('click', () => this.closeStatusPanel());
+    }
+
+    if (this.panelBackdrop) {
+      this.panelBackdrop.addEventListener('click', () => this.closeStatusPanel());
+    }
+
+    // Restart button
+    if (this.restartBtn) {
+      this.restartBtn.addEventListener('click', () => {
+        if (this._onRestart) this._onRestart();
       });
     }
 
-    if (this.statusButton) {
-      this.statusButton.setAttribute("aria-controls", "status-content");
-      this.statusButton.setAttribute("aria-expanded", "false");
-      this.statusButton.addEventListener("click", () => {
-        if (!this._statusMedia?.matches) {
-          return;
-        }
-        if (this._mobileStatusOpen) {
-          this.dismissMobileStatusOverlay();
-        } else {
-          this._setStatusExpanded(true);
-          this._setMobileStatusOpen(true);
-          if (this.statusToggle) {
-            this.statusToggle.focus({ preventScroll: true });
-          }
-        }
-      });
+    // Help button
+    if (this.helpBtn) {
+      this.helpBtn.addEventListener('click', () => this.showHelp());
     }
 
-    if (this.statusBackdrop) {
-      this.statusBackdrop.addEventListener("click", () => {
-        this.dismissMobileStatusOverlay();
-      });
-    }
-
-    if (this.restartButton) {
-      this.restartButton.addEventListener("click", () => {
-        if (typeof this._restartHandler === "function") {
-          this._restartHandler();
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Number keys for choices
+      if (/^[1-9]$/.test(e.key) && this._choiceHandler) {
+        const index = parseInt(e.key, 10) - 1;
+        const buttons = this.choices?.querySelectorAll('.choice-btn');
+        if (buttons && buttons[index]) {
+          e.preventDefault();
+          buttons[index].click();
         }
-      });
-    }
-
-    if (this.glossaryButton) {
-      this.glossaryButton.addEventListener("click", () => {
-        this.showGlossary();
-      });
-    }
-
-    if (this.terminal) {
-      this.terminal.addEventListener("click", (event) => {
-        const target = event.target instanceof HTMLElement ? event.target : null;
-        const button = target?.closest(".glossary-term");
-        if (!button) {
-          return;
-        }
-        const termKey = button.getAttribute("data-term-key") ?? "";
-        const entry = this._glossaryLookup.get(termKey);
-        if (entry) {
-          event.preventDefault();
-          this.showGlossary({ focusTerm: entry.term });
-        }
-      });
-    }
-
-    if (this.modal) {
-      this.modal.addEventListener("click", (event) => {
-        if (event.target === this.modal && this._modalDismissible) {
-          this.closeModal();
-        }
-      });
-    }
-
-    if (this._statusMedia) {
-      this._statusMediaHandler = (event) => {
-        this._applyStatusMode(event.matches);
-      };
-      if (typeof this._statusMedia.addEventListener === "function") {
-        this._statusMedia.addEventListener("change", this._statusMediaHandler);
-      } else if (typeof this._statusMedia.addListener === "function") {
-        this._statusMedia.addListener(this._statusMediaHandler);
       }
-    }
 
-    this._applyStatusMode(this._statusMedia?.matches ?? false);
-    this._setInputMode("idle");
-  }
+      // S for status panel
+      if (e.key === 's' && !this._isInputFocused()) {
+        e.preventDefault();
+        this.togglePanel();
+      }
 
-  prepareForNewGame() {
-    this._clearButtons();
-    if (this.alertStack) {
-      this.alertStack.innerHTML = "";
-    }
-    if (this.statusPanel) {
-      this.statusPanel.innerHTML = `<div class="status-placeholder">Select a crew and operating area to refresh the field status.</div>`;
-    }
-    if (this.mobileHud) {
-      this.mobileHud.innerHTML = "";
-    }
-  }
-
-  write(message = "") {
-    if (!this.terminal) return;
-    const text = String(message ?? "");
-    const segments = text.split(/\n/);
-    segments.forEach((segment) => {
-      const line = this._createLine(segment);
-      this.terminal.appendChild(line);
+      // Escape to close panel or modal
+      if (e.key === 'Escape') {
+        if (!this.modal?.hidden) {
+          this.closeModal();
+        } else if (this._isPanelOpen) {
+          this.closeStatusPanel();
+        }
+      }
     });
-    this.terminal.scrollTop = this.terminal.scrollHeight;
   }
 
-  writeDivider(label = "") {
+  _isInputFocused() {
+    const active = document.activeElement;
+    return active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
+  }
+
+  // ============ Terminal Output ============
+
+  /**
+   * Write a line to the terminal
+   * @param {string} text - Text to display
+   * @param {string} className - Optional CSS class
+   */
+  write(text, className = '') {
     if (!this.terminal) return;
-    const divider = document.createElement("div");
-    divider.className = "terminal-divider";
-    divider.textContent = label;
-    this.terminal.appendChild(divider);
-    this.terminal.scrollTop = this.terminal.scrollHeight;
+
+    const line = document.createElement('div');
+    line.className = `term-line ${className}`.trim();
+    line.textContent = text;
+    this.terminal.appendChild(line);
+    this._scrollToBottom();
   }
 
+  /**
+   * Write HTML content to the terminal
+   * @param {string} html - HTML string
+   */
+  writeHTML(html) {
+    if (!this.terminal) return;
+
+    const div = document.createElement('div');
+    div.className = 'term-line';
+    div.innerHTML = html;
+    this.terminal.appendChild(div);
+    this._scrollToBottom();
+  }
+
+  /**
+   * Write a header line
+   * @param {string} text - Header text
+   */
+  writeHeader(text) {
+    this.write(text, 'term-header');
+  }
+
+  /**
+   * Write a divider
+   * @param {string} label - Optional label
+   */
+  writeDivider(label = '') {
+    if (!this.terminal) return;
+
+    const div = document.createElement('div');
+    div.className = 'term-divider';
+    div.textContent = label || '─'.repeat(40);
+    this.terminal.appendChild(div);
+    this._scrollToBottom();
+  }
+
+  /**
+   * Write a warning message
+   * @param {string} text - Warning text
+   */
+  writeWarning(text) {
+    this.write(`⚠ ${text}`, 'term-warning');
+  }
+
+  /**
+   * Write a danger/error message
+   * @param {string} text - Error text
+   */
+  writeDanger(text) {
+    this.write(`✗ ${text}`, 'term-danger');
+  }
+
+  /**
+   * Write a positive/success message
+   * @param {string} text - Success text
+   */
+  writePositive(text) {
+    this.write(`✓ ${text}`, 'term-positive');
+  }
+
+  /**
+   * Write a pre-formatted ASCII box
+   * @param {string} content - Pre-formatted content
+   */
+  writeBox(content) {
+    if (!this.terminal) return;
+
+    const div = document.createElement('div');
+    div.className = 'term-box ascii-box';
+    div.textContent = content;
+    this.terminal.appendChild(div);
+    this._scrollToBottom();
+  }
+
+  /**
+   * Clear the terminal
+   */
   clear() {
-    if (!this.terminal) return;
-    this.terminal.innerHTML = "";
+    if (this.terminal) {
+      this.terminal.innerHTML = '';
+    }
   }
 
-  async promptText(question, placeholder = "Type your response") {
-    this.write(question);
+  _scrollToBottom() {
+    if (this.terminal) {
+      this.terminal.scrollTop = this.terminal.scrollHeight;
+    }
+  }
+
+  // ============ Input Methods ============
+
+  /**
+   * Prompt for text input
+   * @param {string} prompt - Prompt message
+   * @param {string} placeholder - Input placeholder
+   * @returns {Promise<string>} User input
+   */
+  async promptText(prompt, placeholder = 'Type here...') {
+    this.write(prompt);
+    this._hideChoices();
+    this._showInput(placeholder);
+
     return new Promise((resolve) => {
-      this._awaitInput((value) => {
-        this._setInputMode("idle");
-        resolve(value.trim());
-      }, placeholder);
+      this._pending = resolve;
     });
   }
 
-  async promptChoice(question, options) {
-    this.write(question);
-    this._setInputMode("choice");
-    this._pending = null;
+  /**
+   * Prompt for a choice selection
+   * @param {string} prompt - Prompt message
+   * @param {Object[]} options - Array of { label, value, hint }
+   * @returns {Promise<Object>} Selected option
+   */
+  async promptChoice(prompt, options) {
+    this.write(prompt);
+    this._hideInput();
+    this._showChoices(options);
 
     return new Promise((resolve) => {
-      const cleanup = () => {
-        this._clearButtons();
-        this._setInputMode("idle");
-        if (this.input) {
-          this.input.value = "";
-          this.input.blur();
-        }
-      };
-
-      const choose = (option) => {
-        cleanup();
-        resolve(option);
-      };
-
-      this._showButtons(options, choose);
-      this._enableChoiceKeyboard(options, choose);
+      this._choiceHandler = resolve;
     });
   }
 
-  updateStatus(state) {
-    if (!state || !this.statusPanel) return;
-    const { companyName, role, area, metrics, round, totalRounds } = state;
-    const roundLabel = `${Math.min(round, totalRounds)}/${totalRounds}`;
+  _showInput(placeholder) {
+    if (!this.inputWrapper || !this.textInput) return;
 
-    const tagMarkup = (area.tags || [])
-      .map((tag) => `<span class="tag">${tag.replace(/-/g, " ")}</span>`)
-      .join("");
+    this.inputWrapper.hidden = false;
+    this.textInput.placeholder = placeholder;
+    this.textInput.value = '';
+    this.textInput.focus();
+  }
 
-    this.statusPanel.innerHTML = `
-      <div>
-        <div class="status-company">${companyName}</div>
-        <div class="status-role">${role.name}</div>
-        <div class="status-area">
-          <strong>${area.name}</strong>
-          <div class="bec">${area.becZone}</div>
-          <p>${area.description}</p>
-          ${tagMarkup ? `<div class="tags" aria-label="Area tags">${tagMarkup}</div>` : ""}
-        </div>
-      </div>
-      <div class="status-round">Season ${roundLabel}</div>
-      <div class="metrics">
-        ${this._metricRow("Operational Progress", metrics.progress)}
-        ${this._metricRow("Forest Health", metrics.forestHealth)}
-        ${this._metricRow("Relationships", metrics.relationships)}
-        ${this._metricRow("Compliance", metrics.compliance)}
-        ${this._metricRow("Budget Flexibility", metrics.budget)}
-      </div>
-    `;
-
-    if (this.mobileHud) {
-      this.mobileHud.innerHTML = `
-        <div class="hud-item"><span>Season</span>${roundLabel}</div>
-        <div class="hud-item"><span>Role</span>${role.name}</div>
-        <div class="hud-item"><span>BEC</span>${area.becCode || area.becZone.split(" ")[0]}</div>
-        <div class="hud-item"><span>Forest</span>${Math.round(metrics.forestHealth)}</div>
-        <div class="hud-item"><span>Compliance</span>${Math.round(metrics.compliance)}</div>
-      `;
+  _hideInput() {
+    if (this.inputWrapper) {
+      this.inputWrapper.hidden = true;
     }
   }
 
-  flashMetricAlert({ label, message, direction }) {
-    if (!this.alertStack) {
-      return;
-    }
-    const alert = document.createElement("div");
-    alert.className = "metric-alert";
-    alert.setAttribute("role", "status");
-    alert.innerHTML = `
-      <span class="metric-alert__label">${label}</span>
-      <span class="metric-alert__message">${message}</span>
-    `;
-    if (direction) {
-      alert.classList.add(`metric-alert--${direction}`);
-    }
-    this.alertStack.appendChild(alert);
-    requestAnimationFrame(() => alert.classList.add("visible"));
-    window.setTimeout(() => {
-      alert.classList.add("fade");
-      window.setTimeout(() => {
-        alert.remove();
-      }, 400);
-    }, 3200);
-  }
+  _showChoices(options) {
+    if (!this.choices) return;
 
-  onRestartRequest(handler) {
-    this._restartHandler = handler;
-  }
+    this.choices.innerHTML = '';
 
-  loadGlossary(entries = []) {
-    this._glossaryEntries = Array.isArray(entries) ? entries.slice() : [];
-    this._glossaryLookup.clear();
-    const patternParts = [];
-    this._glossaryEntries.forEach((entry) => {
-      if (!entry || !entry.term) {
-        return;
+    options.forEach((option, index) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'choice-btn';
+
+      const label = document.createElement('span');
+      label.className = 'choice-label';
+      label.textContent = `[${index + 1}] ${option.label}`;
+      btn.appendChild(label);
+
+      if (option.hint || option.description) {
+        const hint = document.createElement('span');
+        hint.className = 'choice-hint';
+        hint.textContent = option.hint || option.description;
+        btn.appendChild(hint);
       }
-      const key = this._normalizeTerm(entry.term);
-      if (!this._glossaryLookup.has(key)) {
-        this._glossaryLookup.set(key, entry);
-        patternParts.push(this._escapeRegex(entry.term));
-      }
-    });
-    patternParts.sort((a, b) => b.length - a.length);
-    this._glossaryRegex = patternParts.length
-      ? new RegExp(`\\b(${patternParts.join("|")})\\b`, "gi")
-      : null;
-    if (this.glossaryButton) {
-      const hasEntries = this._glossaryEntries.length > 0;
-      this.glossaryButton.hidden = !hasEntries;
-      this.glossaryButton.disabled = !hasEntries;
-      this.glossaryButton.setAttribute("aria-disabled", hasEntries ? "false" : "true");
-    }
-  }
 
-  showGlossary({ focusTerm = "" } = {}) {
-    if (!this._glossaryEntries.length) {
-      return;
-    }
-    const normalizedFocus = this._normalizeTerm(focusTerm);
-    this.openModal({
-      title: "Field Glossary",
-      dismissible: true,
-      buildContent: (container) => {
-        const intro = document.createElement("p");
-        intro.textContent = "Key forestry terms encountered in northern BC operations.";
-        intro.style.marginTop = "0";
-        container.appendChild(intro);
-
-        const searchLabel = document.createElement("label");
-        searchLabel.className = "glossary-search";
-        searchLabel.textContent = "Search glossary";
-        const searchInput = document.createElement("input");
-        searchInput.type = "search";
-        searchInput.placeholder = "Type to filter terms...";
-        searchInput.setAttribute("aria-label", "Search glossary terms");
-        searchInput.autocomplete = "off";
-        searchInput.spellcheck = false;
-        searchInput.inputMode = "search";
-        searchLabel.appendChild(searchInput);
-        container.appendChild(searchLabel);
-
-        const list = document.createElement("ul");
-        list.className = "glossary-list";
-        container.appendChild(list);
-
-        const renderList = () => {
-          const query = searchInput.value.trim().toLowerCase();
-          list.innerHTML = "";
-          const matches = this._glossaryEntries.filter((entry) => {
-            if (!query) return true;
-            const haystack = `${entry.term} ${entry.description}`.toLowerCase();
-            return haystack.includes(query);
-          });
-          if (!matches.length) {
-            const empty = document.createElement("li");
-            empty.className = "glossary-empty";
-            empty.textContent = "No terms match your search.";
-            list.appendChild(empty);
-            return;
-          }
-          matches.forEach((entry) => {
-            const item = document.createElement("li");
-            item.className = "glossary-item";
-            const termButton = document.createElement("button");
-            termButton.type = "button";
-            termButton.className = "glossary-item-title";
-            termButton.textContent = entry.term;
-            termButton.addEventListener("click", () => {
-              searchInput.value = entry.term;
-              renderList();
-              searchInput.focus({ preventScroll: true });
-            });
-            const description = document.createElement("p");
-            description.className = "glossary-item-description";
-            description.textContent = entry.description;
-            item.appendChild(termButton);
-            item.appendChild(description);
-            list.appendChild(item);
-          });
-        };
-
-        searchInput.addEventListener("input", renderList);
-
-        if (normalizedFocus && this._glossaryLookup.has(normalizedFocus)) {
-          searchInput.value = this._glossaryLookup.get(normalizedFocus).term;
-        } else if (focusTerm) {
-          searchInput.value = focusTerm;
-        }
-
-        renderList();
-        requestAnimationFrame(() => {
-          searchInput.focus({ preventScroll: true });
-          if (searchInput.value) {
-            searchInput.select();
-          }
-        });
-      },
-      actions: [
-        {
-          label: "Close",
-          primary: true,
-          onSelect: () => this.closeModal(),
-        },
-      ],
-    });
-  }
-
-  openModal({ title = "", buildContent, actions = [], dismissible = true, onClose = null }) {
-    if (!this.modal || !this.modalDialog || !this.modalTitle || !this.modalBody || !this.modalActions) {
-      return;
-    }
-    this._modalDismissible = dismissible;
-    this._modalOnClose = typeof onClose === "function" ? onClose : null;
-    this._lastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    this.modal.hidden = false;
-    this.modal.setAttribute("aria-hidden", "false");
-    this.modalTitle.textContent = title;
-    this.modalBody.innerHTML = "";
-    if (typeof buildContent === "function") {
-      buildContent(this.modalBody);
-    } else if (typeof buildContent === "string") {
-      this.modalBody.textContent = buildContent;
-    }
-    this.modalActions.innerHTML = "";
-    const buttonConfigs = actions.length
-      ? actions
-      : [
-          {
-            label: "Close",
-            primary: true,
-            onSelect: () => this.closeModal(),
-          },
-        ];
-    const buttons = buttonConfigs.map((config) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = config.label;
-      if (config.primary) {
-        button.classList.add("primary");
-      }
-      button.addEventListener("click", () => {
-        if (typeof config.onSelect === "function") {
-          config.onSelect();
-        } else {
-          this.closeModal();
+      btn.addEventListener('click', () => {
+        this.write(`> ${option.label}`, 'term-dim');
+        this._hideChoices();
+        if (this._choiceHandler) {
+          const handler = this._choiceHandler;
+          this._choiceHandler = null;
+          handler(option);
         }
       });
-      this.modalActions.appendChild(button);
-      return button;
+
+      this.choices.appendChild(btn);
     });
-    if (this._modalKeyHandler) {
-      document.removeEventListener("keydown", this._modalKeyHandler);
-    }
-    this._modalKeyHandler = (event) => {
-      if (event.key === "Escape" && this._modalDismissible) {
-        event.preventDefault();
-        this.closeModal();
-      }
-    };
-    document.addEventListener("keydown", this._modalKeyHandler);
-    const focusTarget = buttons.find((button) => button.classList.contains("primary")) ?? buttons[0];
-    if (focusTarget) {
-      requestAnimationFrame(() => focusTarget.focus({ preventScroll: true }));
-    }
+
+    // Focus first button
+    const firstBtn = this.choices.querySelector('.choice-btn');
+    if (firstBtn) firstBtn.focus();
   }
 
-  closeModal() {
-    if (!this.modal) {
-      return;
+  _hideChoices() {
+    if (this.choices) {
+      this.choices.innerHTML = '';
     }
-    this.modal.hidden = true;
-    this.modal.setAttribute("aria-hidden", "true");
-    if (this._modalKeyHandler) {
-      document.removeEventListener("keydown", this._modalKeyHandler);
-      this._modalKeyHandler = null;
-    }
-    const onClose = this._modalOnClose;
-    this._modalOnClose = null;
-    if (this._lastFocus && typeof this._lastFocus.focus === "function") {
-      requestAnimationFrame(() => this._lastFocus?.focus({ preventScroll: true }));
-    }
-    this._lastFocus = null;
-    if (typeof onClose === "function") {
-      onClose();
-    }
+    this._choiceHandler = null;
   }
 
-  isModalOpen() {
-    if (!this.modal) {
-      return false;
-    }
-    return !this.modal.hidden;
-  }
+  _handleTextSubmit() {
+    if (!this.textInput || !this._pending) return;
 
-  _metricRow(label, value) {
-    const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
-    return `
-      <div class="metric">
-        <span>${label}</span>
-        <div class="bar">
-          <div class="fill" style="width: ${safeValue}%"></div>
-          <span class="value">${Math.round(safeValue)}</span>
-        </div>
-      </div>
-    `;
-  }
+    const value = this.textInput.value.trim();
+    if (!value) return;
 
-  _awaitInput(resolver, placeholder, options = {}) {
-    if (!this.input) return;
-    if (!options.keepButtons) {
-      this._clearButtons();
-    }
-    this._pending = resolver;
-    this.input.value = "";
-    if (placeholder) {
-      this.input.placeholder = placeholder;
-    }
-    this._setInputMode("text");
-    this.input.focus({ preventScroll: true });
-  }
+    this.write(`> ${value}`, 'term-dim');
+    this._hideInput();
 
-  _handleSubmit() {
-    if (!this._pending || !this.input) {
-      return;
-    }
-    const value = this.input.value;
-    if (!value.trim()) {
-      return;
-    }
-    this.write(`> ${value}`);
     const resolver = this._pending;
     this._pending = null;
     resolver(value);
   }
 
-  _showButtons(options, onSelect) {
-    if (!this.buttonContainer) return;
-    this.buttonContainer.innerHTML = "";
-    this.buttonContainer.classList.add("active");
-    options.forEach((option, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "choice-btn";
-      const label = document.createElement("span");
-      label.className = "choice-btn__label";
-      label.textContent = `${index + 1}. ${option.label}`;
-      button.appendChild(label);
-      if (option.description) {
-        const description = document.createElement("span");
-        description.className = "choice-btn__description";
-        description.textContent = option.description;
-        button.appendChild(description);
-      }
-      button.addEventListener("click", () => {
-        onSelect(option);
+  // ============ Status Bar ============
+
+  /**
+   * Update the quick status bar
+   * @param {Object} data - Status data
+   */
+  updateStatusBar(data) {
+    if (this.dayValue) {
+      this.dayValue.textContent = data.day || '1';
+    }
+    if (this.progressValue) {
+      this.progressValue.textContent = `${data.progress || 0}%`;
+    }
+    if (this.crewValue) {
+      this.crewValue.textContent = `${data.crewActive || 0}/${data.crewTotal || 5}`;
+    }
+    if (this.moraleValue) {
+      this.moraleValue.textContent = `${data.morale || 0}%`;
+    }
+  }
+
+  // ============ Side Panel ============
+
+  /**
+   * Update the crew panel
+   * @param {Object[]} crew - Crew members
+   */
+  updateCrewPanel(crew) {
+    if (!this.crewPanel) return;
+
+    this.crewPanel.innerHTML = '';
+
+    for (const member of crew) {
+      const info = getCrewDisplayInfo(member);
+      const div = document.createElement('div');
+
+      let statusClass = '';
+      if (!info.isActive) statusClass = 'inactive';
+      else if (info.health < 30) statusClass = 'critical';
+      else if (info.effects.length > 0) statusClass = 'injured';
+
+      div.className = `crew-member ${statusClass}`.trim();
+
+      div.innerHTML = `
+        <div class="crew-name">${info.name}</div>
+        <div class="crew-role">${info.role}</div>
+        <div class="crew-stats">
+          <span>HP: ${progressBar(info.health, 8, true)}</span>
+        </div>
+        ${info.status !== 'Good' ? `<div class="crew-status">[${info.status}]</div>` : ''}
+      `;
+
+      this.crewPanel.appendChild(div);
+    }
+  }
+
+  /**
+   * Update the resources panel
+   * @param {Object} resources - Current resources
+   * @param {string} journeyType - 'field' or 'desk'
+   */
+  updateResourcesPanel(resources, journeyType) {
+    if (!this.resourcesPanel) return;
+
+    this.resourcesPanel.innerHTML = '';
+    const definitions = journeyType === 'field' ? FIELD_RESOURCES : DESK_RESOURCES;
+
+    for (const [key, value] of Object.entries(resources)) {
+      const def = definitions[key];
+      if (!def) continue;
+
+      const percentage = getResourcePercentage(value, def);
+      let fillClass = '';
+      if (percentage <= def.critical / def.max * 100) fillClass = 'critical';
+      else if (percentage <= def.warning / def.max * 100) fillClass = 'low';
+
+      const row = document.createElement('div');
+      row.className = 'resource-row';
+
+      row.innerHTML = `
+        <span class="resource-label">${def.shortLabel}</span>
+        <div class="resource-bar">
+          <div class="resource-fill ${fillClass}" style="width: ${percentage}%"></div>
+        </div>
+        <span class="resource-value">${Math.round(value)}</span>
+      `;
+
+      this.resourcesPanel.appendChild(row);
+    }
+  }
+
+  /**
+   * Update the location panel
+   * @param {Object} data - Location data
+   */
+  updateLocationPanel(data) {
+    if (!this.locationPanel) return;
+
+    this.locationPanel.innerHTML = `
+      <div class="location-name">${data.name || 'Unknown'}</div>
+      <div class="location-info">${data.description || ''}</div>
+      ${data.terrain ? `<div class="location-info">Terrain: ${data.terrain}</div>` : ''}
+      ${data.weather ? `<div class="location-weather">Weather: ${data.weather}</div>` : ''}
+      ${data.hazards?.length ? `<div class="location-info">Hazards: ${data.hazards.join(', ')}</div>` : ''}
+    `;
+  }
+
+  /**
+   * Toggle the status panel
+   */
+  togglePanel() {
+    if (this._isPanelOpen) {
+      this.closeStatusPanel();
+    } else {
+      this.openStatusPanel();
+    }
+  }
+
+  /**
+   * Open the status panel
+   */
+  openStatusPanel() {
+    if (this.sidePanel) {
+      this.sidePanel.classList.add('open');
+    }
+    if (this.panelBackdrop) {
+      this.panelBackdrop.hidden = false;
+    }
+    this._isPanelOpen = true;
+  }
+
+  /**
+   * Close the status panel
+   */
+  closeStatusPanel() {
+    if (this.sidePanel) {
+      this.sidePanel.classList.remove('open');
+    }
+    if (this.panelBackdrop) {
+      this.panelBackdrop.hidden = true;
+    }
+    this._isPanelOpen = false;
+  }
+
+  // ============ Full Status Update ============
+
+  /**
+   * Update all status displays
+   * @param {Object} journey - Journey state
+   */
+  updateAllStatus(journey) {
+    // Status bar
+    this.updateStatusBar({
+      day: journey.day,
+      progress: this._calculateProgress(journey),
+      crewActive: getActiveCrewCount(journey.crew),
+      crewTotal: journey.crew.length,
+      morale: Math.round(getAverageMorale(journey.crew))
+    });
+
+    // Panels
+    this.updateCrewPanel(journey.crew);
+    this.updateResourcesPanel(journey.resources, journey.journeyType);
+
+    // Location
+    if (journey.journeyType === 'field') {
+      const block = journey.blocks?.[journey.currentBlockIndex];
+      this.updateLocationPanel({
+        name: block?.name || 'Unknown Location',
+        description: block?.description,
+        terrain: block?.terrain,
+        weather: journey.weather?.name,
+        hazards: block?.hazards
       });
-      this.buttonContainer.appendChild(button);
-    });
-    requestAnimationFrame(() => {
-      const firstButton = this.buttonContainer?.querySelector("button");
-      this.buttonContainer?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      firstButton?.focus({ preventScroll: true });
-    });
-  }
-
-  _clearButtons() {
-    if (!this.buttonContainer) return;
-    this.buttonContainer.innerHTML = "";
-    this.buttonContainer.classList.remove("active");
-    this._removeChoiceKeyHandler();
-  }
-
-  _enableChoiceKeyboard(options, choose) {
-    this._removeChoiceKeyHandler();
-    const handler = (event) => {
-      if (!/^[1-9]$/.test(event.key)) {
-        return;
-      }
-      const index = Number.parseInt(event.key, 10) - 1;
-      if (index < 0 || index >= options.length) {
-        return;
-      }
-      const target = event.target;
-      if (target) {
-        const tagName = typeof target.tagName === "string" ? target.tagName.toLowerCase() : "";
-        if (tagName === "input" || tagName === "textarea" || target.isContentEditable) {
-          return;
-        }
-      }
-      event.preventDefault();
-      choose(options[index]);
-    };
-    document.addEventListener("keydown", handler);
-    this._choiceKeyHandler = handler;
-  }
-
-  _removeChoiceKeyHandler() {
-    if (this._choiceKeyHandler) {
-      document.removeEventListener("keydown", this._choiceKeyHandler);
-      this._choiceKeyHandler = null;
-    }
-  }
-
-  _setInputMode(mode) {
-    if (!this.input) return;
-    this._inputMode = mode;
-    if (mode === "text") {
-      this.input.classList.remove("input-hidden");
-      this.input.removeAttribute("aria-hidden");
-      this.input.disabled = false;
     } else {
-      this.input.classList.add("input-hidden");
-      this.input.setAttribute("aria-hidden", "true");
-      this.input.disabled = true;
+      this.updateLocationPanel({
+        name: `Day ${journey.day} of ${journey.deadline}`,
+        description: `${journey.deadline - journey.day} days remaining`,
+        weather: journey.currentPhase
+      });
     }
   }
 
-  _createLine(text = "") {
-    const line = document.createElement("div");
-    line.className = "terminal-line";
-    const content = String(text ?? "");
-    if (!content) {
-      line.classList.add("terminal-line--spacer");
-      line.innerHTML = "&nbsp;";
-      return line;
-    }
-    const regex = this._glossaryRegex;
-    if (!regex) {
-      line.textContent = content;
-      return line;
-    }
-    regex.lastIndex = 0;
-    let lastIndex = 0;
-    let match;
-    let matched = false;
-    while ((match = regex.exec(content)) !== null) {
-      const [termText] = match;
-      const matchStart = match.index;
-      const matchEnd = matchStart + termText.length;
-      if (matchStart > lastIndex) {
-        line.appendChild(document.createTextNode(content.slice(lastIndex, matchStart)));
-      }
-      const normalized = this._normalizeTerm(termText);
-      const entry = this._glossaryLookup.get(normalized);
-      if (entry) {
-        matched = true;
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "glossary-term";
-        button.setAttribute("data-term-key", normalized);
-        button.setAttribute("title", entry.description);
-        button.setAttribute("aria-label", `${entry.term}. ${entry.description}`);
-        button.textContent = termText;
-        line.appendChild(button);
-      } else {
-        line.appendChild(document.createTextNode(termText));
-      }
-      lastIndex = matchEnd;
-    }
-    if (lastIndex < content.length) {
-      line.appendChild(document.createTextNode(content.slice(lastIndex)));
-    }
-    if (!matched) {
-      line.textContent = content;
-    }
-    regex.lastIndex = 0;
-    return line;
-  }
-
-  _normalizeTerm(term) {
-    return String(term ?? "").trim().toLowerCase();
-  }
-
-  _escapeRegex(value) {
-    return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
-  dismissMobileStatusOverlay() {
-    if (!this._mobileStatusOpen) {
-      return false;
-    }
-    this._setStatusExpanded(false);
-    this._setMobileStatusOpen(false);
-    if (this.statusButton && this._statusMedia?.matches) {
-      this.statusButton.focus({ preventScroll: true });
-    }
-    return true;
-  }
-
-  _applyStatusMode(isMobile) {
-    if (!this.statusToggle || !this.statusPanel) {
-      return;
-    }
-    if (isMobile) {
-      this._setMobileStatusOpen(false);
-      this._setStatusExpanded(false);
+  _calculateProgress(journey) {
+    if (journey.journeyType === 'field') {
+      return Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
     } else {
-      this._setMobileStatusOpen(false);
-      this._setStatusExpanded(true);
+      return Math.round((journey.day / journey.deadline) * 100);
     }
   }
 
-  _setStatusExpanded(expanded) {
-    if (!this.statusToggle || !this.statusPanel) {
-      return;
+  // ============ Modal ============
+
+  /**
+   * Show a modal dialog
+   * @param {Object} options - Modal options
+   */
+  showModal(options) {
+    const { title, content, actions = [] } = options;
+
+    if (this.modalTitle) {
+      this.modalTitle.textContent = title || '';
     }
-    this.statusToggle.setAttribute("aria-expanded", String(expanded));
-    this.statusPanel.hidden = !expanded;
-    const arrow = this.statusToggle.querySelector(".status-arrow");
-    if (arrow) {
-      arrow.textContent = expanded ? "▾" : "▸";
+
+    if (this.modalBody) {
+      if (typeof content === 'string') {
+        this.modalBody.innerHTML = `<p>${content}</p>`;
+      } else if (content instanceof HTMLElement) {
+        this.modalBody.innerHTML = '';
+        this.modalBody.appendChild(content);
+      }
+    }
+
+    if (this.modalActions) {
+      this.modalActions.innerHTML = '';
+
+      const buttons = actions.length ? actions : [{ label: 'OK', primary: true }];
+
+      for (const action of buttons) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `modal-btn ${action.primary ? 'primary' : ''}`.trim();
+        btn.textContent = action.label;
+        btn.addEventListener('click', () => {
+          this.closeModal();
+          if (action.onClick) action.onClick();
+        });
+        this.modalActions.appendChild(btn);
+      }
+    }
+
+    if (this.modal) {
+      this.modal.hidden = false;
     }
   }
 
-  _setMobileStatusOpen(open) {
-    this._mobileStatusOpen = Boolean(open);
-    if (this.rightPanel) {
-      this.rightPanel.classList.toggle("status-open", this._mobileStatusOpen);
+  /**
+   * Close the modal
+   */
+  closeModal() {
+    if (this.modal) {
+      this.modal.hidden = true;
     }
-    if (this.statusBackdrop) {
-      this.statusBackdrop.hidden = !this._mobileStatusOpen;
+    if (this._modalOnClose) {
+      this._modalOnClose();
+      this._modalOnClose = null;
     }
-    if (typeof document !== "undefined" && document.body) {
-      document.body.classList.toggle("status-overlay-open", this._mobileStatusOpen);
+  }
+
+  /**
+   * Show help modal
+   */
+  showHelp() {
+    this.showModal({
+      title: 'HOW TO PLAY',
+      content: `
+        <p><strong>BC FORESTRY TRAIL</strong></p>
+        <p>Guide your crew through the northern BC wilderness.</p>
+        <br>
+        <p><strong>Controls:</strong></p>
+        <p>[1-9] - Select options</p>
+        <p>[S] - Toggle status panel</p>
+        <p>[ESC] - Close panels</p>
+        <br>
+        <p><strong>Field Roles:</strong></p>
+        <p>Travel through forest blocks. Manage fuel, food, and equipment.</p>
+        <br>
+        <p><strong>Desk Roles:</strong></p>
+        <p>Process permits against a deadline. Manage budget and stakeholders.</p>
+        <br>
+        <p><strong>Keep your crew healthy and reach your goal!</strong></p>
+      `,
+      actions: [{ label: 'Got it!', primary: true }]
+    });
+  }
+
+  /**
+   * Show restart confirmation
+   */
+  confirmRestart() {
+    return new Promise((resolve) => {
+      this.showModal({
+        title: 'RESTART GAME?',
+        content: 'Your current progress will be lost.',
+        actions: [
+          { label: 'Cancel', onClick: () => resolve(false) },
+          { label: 'Restart', primary: true, onClick: () => resolve(true) }
+        ]
+      });
+    });
+  }
+
+  /**
+   * Set restart handler
+   * @param {Function} handler - Restart callback
+   */
+  onRestart(handler) {
+    this._onRestart = handler;
+  }
+
+  /**
+   * Alias for onRestart (backward compat)
+   */
+  onRestartRequest(handler) {
+    this._onRestart = handler;
+  }
+
+  /**
+   * Check if modal is currently open
+   * @returns {boolean}
+   */
+  isModalOpen() {
+    return this.modal && !this.modal.hidden;
+  }
+
+  /**
+   * Open a modal dialog (game.js-style interface)
+   * @param {Object} options - Modal options
+   */
+  openModal(options) {
+    const { title, dismissible = false, buildContent, actions = [], onClose } = options;
+
+    if (this.modalTitle) {
+      this.modalTitle.textContent = title || '';
     }
-    if (this.statusButton) {
-      this.statusButton.setAttribute(
-        "aria-expanded",
-        this._mobileStatusOpen ? "true" : "false"
-      );
+
+    if (this.modalBody) {
+      this.modalBody.innerHTML = '';
+      if (buildContent) {
+        buildContent(this.modalBody);
+      }
     }
+
+    if (this.modalActions) {
+      this.modalActions.innerHTML = '';
+
+      for (const action of actions) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `modal-btn ${action.primary ? 'primary' : ''}`.trim();
+        btn.textContent = action.label;
+        btn.addEventListener('click', () => {
+          if (action.onSelect) action.onSelect();
+        });
+        this.modalActions.appendChild(btn);
+      }
+    }
+
+    this._modalOnClose = onClose;
+    this._modalDismissible = dismissible;
+
+    if (this.modal) {
+      this.modal.hidden = false;
+    }
+  }
+
+  // ============ ASCII Status Display ============
+
+  /**
+   * Render a detailed ASCII status box for field journey
+   * @param {Object} journey - Journey state
+   * @returns {string} ASCII art status display
+   */
+  renderFieldStatusBox(journey) {
+    const block = journey.blocks?.[journey.currentBlockIndex];
+    const progress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+    const progressBarText = this._makeProgressBar(progress, 20);
+
+    const lines = [
+      `Day ${journey.day} | ${block?.name || 'Unknown'}`,
+      `Weather: ${journey.weather?.name || 'Clear'}`,
+      '',
+      `Progress: ${progressBarText} ${progress}%`,
+      `Distance: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km`,
+      '',
+      `Crew: ${getActiveCrewCount(journey.crew)}/${journey.crew.length} active`,
+      `Morale: ${Math.round(getAverageMorale(journey.crew))}%`
+    ];
+
+    return box(lines, { double: true, title: 'STATUS' });
+  }
+
+  /**
+   * Render a detailed ASCII status box for desk journey
+   * @param {Object} journey - Journey state
+   * @returns {string} ASCII art status display
+   */
+  renderDeskStatusBox(journey) {
+    const daysRemaining = journey.deadline - journey.day;
+    const approvalRate = journey.permits.target > 0
+      ? Math.round((journey.permits.approved / journey.permits.target) * 100)
+      : 0;
+
+    const lines = [
+      `Day ${journey.day} of ${journey.deadline} | ${daysRemaining} days remaining`,
+      '',
+      `Permits: ${journey.permits.approved}/${journey.permits.target} approved (${approvalRate}%)`,
+      `Pipeline: ${journey.permits.submitted} submitted, ${journey.permits.inReview} in review`,
+      '',
+      `Team: ${getActiveCrewCount(journey.crew)}/${journey.crew.length} active`,
+      `Budget: $${Math.round(journey.resources.budget).toLocaleString()}`
+    ];
+
+    return box(lines, { double: true, title: 'STATUS' });
+  }
+
+  _makeProgressBar(percent, width) {
+    const filled = Math.round((percent / 100) * width);
+    return PROGRESS.FULL.repeat(filled) + PROGRESS.EMPTY.repeat(width - filled);
+  }
+
+  // ============ Utility ============
+
+  /**
+   * Prepare UI for a new game
+   */
+  prepareForNewGame() {
+    this.clear();
+    this._hideChoices();
+    this._hideInput();
+    this.closeStatusPanel();
+    this.closeModal();
+
+    // Reset status bar
+    this.updateStatusBar({
+      day: 1,
+      progress: 0,
+      crewActive: 5,
+      crewTotal: 5,
+      morale: 75
+    });
   }
 }

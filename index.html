@@ -2,67 +2,115 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <title>BC Forestry Simulator</title>
+    <title>BC Forestry Trail</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="game-container">
-      <div class="left-panel">
-        <div class="top-bar">
-          <div class="brand">FORESTRY SIMULATOR</div>
-          <div class="top-actions">
-            <button id="status-button" class="hint status-toggle-button" type="button">
-              Field Status
+    <div class="game-wrapper">
+      <!-- Main game screen -->
+      <main class="game-screen">
+        <!-- Header with title and actions -->
+        <header class="header">
+          <h1 class="header-title">BC FORESTRY TRAIL</h1>
+          <div class="header-actions">
+            <button id="status-btn" class="header-btn" type="button" aria-label="View status">
+              [S] Status
             </button>
-            <button id="glossary-button" class="hint" type="button">Glossary</button>
-            <button id="restart-button" class="hint" type="button">Restart</button>
+            <button id="help-btn" class="header-btn" type="button" aria-label="Help">
+              [?] Help
+            </button>
+            <button id="restart-btn" class="header-btn" type="button" aria-label="Restart game">
+              [R] Restart
+            </button>
+          </div>
+        </header>
+
+        <!-- Quick status bar (always visible) -->
+        <div id="status-bar" class="status-bar">
+          <div class="status-item">
+            <span class="status-label">DAY</span>
+            <span id="day-value" class="status-value">1</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">PROGRESS</span>
+            <span id="progress-value" class="status-value">0%</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">CREW</span>
+            <span id="crew-value" class="status-value">5/5</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">MORALE</span>
+            <span id="morale-value" class="status-value">75%</span>
           </div>
         </div>
-        <div id="mobile-hud" class="mobile-hud" aria-live="polite"></div>
-        <div id="metric-alerts" class="metric-alerts" aria-live="assertive"></div>
-        <div id="terminal" class="terminal screen" aria-live="polite" role="log"></div>
-        <div id="button-container" class="button-container" aria-live="polite"></div>
-        <label for="input" class="visually-hidden">Command input</label>
-        <input
-          id="input"
-          type="text"
-          placeholder="Enter command..."
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-        />
-      </div>
-      <aside class="right-panel" aria-label="Program status">
-        <div
-          id="status-toggle"
-          class="status-header"
-          role="button"
-          aria-expanded="true"
-          aria-controls="status-content"
-          tabindex="0"
-        >
-          <h2>Field Status</h2>
-          <span class="status-arrow" aria-hidden="true">▾</span>
+
+        <!-- Terminal output area -->
+        <div id="terminal" class="terminal" role="log" aria-live="polite"></div>
+
+        <!-- Action area (buttons and input) -->
+        <div id="action-area" class="action-area">
+          <div id="choices" class="choices"></div>
+          <div id="input-wrapper" class="input-wrapper" hidden>
+            <span class="input-prompt">&gt;</span>
+            <input
+              id="text-input"
+              type="text"
+              class="text-input"
+              placeholder="Type here..."
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              aria-label="Text input"
+            />
+            <button id="submit-btn" class="submit-btn" type="button">[ENTER]</button>
+          </div>
         </div>
-        <div id="status-content" class="status-content" aria-live="polite"></div>
+      </main>
+
+      <!-- Side panel for detailed status -->
+      <aside id="side-panel" class="side-panel" aria-label="Detailed status">
+        <div class="panel-header">
+          <h2 class="panel-title">STATUS REPORT</h2>
+          <button id="close-panel" class="close-btn" type="button" aria-label="Close panel">[X]</button>
+        </div>
+        <div id="panel-content" class="panel-content">
+          <!-- Crew section -->
+          <section class="panel-section">
+            <h3 class="section-title">CREW</h3>
+            <div id="crew-panel" class="crew-panel"></div>
+          </section>
+          <!-- Resources section -->
+          <section class="panel-section">
+            <h3 class="section-title">SUPPLIES</h3>
+            <div id="resources-panel" class="resources-panel"></div>
+          </section>
+          <!-- Location section -->
+          <section class="panel-section">
+            <h3 class="section-title">LOCATION</h3>
+            <div id="location-panel" class="location-panel"></div>
+          </section>
+        </div>
       </aside>
+
+      <!-- Panel backdrop (mobile) -->
+      <div id="panel-backdrop" class="panel-backdrop" hidden></div>
     </div>
-    <div id="status-backdrop" class="status-backdrop" hidden></div>
+
+    <!-- Modal dialog -->
     <div id="modal" class="modal" hidden>
-      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div class="modal-header">
-          <h2 id="modal-title"></h2>
+          <h2 id="modal-title" class="modal-title"></h2>
         </div>
         <div id="modal-body" class="modal-body"></div>
         <div id="modal-actions" class="modal-actions"></div>
       </div>
     </div>
+
     <script type="module" src="js/game.js"></script>
   </body>
 </html>

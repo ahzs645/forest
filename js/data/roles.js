@@ -2,6 +2,7 @@ export const FORESTER_ROLES = [
   {
     id: "planner",
     name: "Strategic Planner",
+    journeyType: "desk",
     description:
       "Build long range harvesting strategies across northern BC BEC zones, balancing values with land use plans.",
     tasks: [
@@ -88,6 +89,7 @@ export const FORESTER_ROLES = [
   {
     id: "permitter",
     name: "Permitting Specialist",
+    journeyType: "desk",
     description:
       "Coordinate northern referrals, ensure submissions reflect local values, and shepherd approvals across agencies.",
     tasks: [
@@ -174,6 +176,7 @@ export const FORESTER_ROLES = [
   {
     id: "recce",
     name: "Recon Crew Lead",
+    journeyType: "field",
     description:
       "Scout northern BC blocks, confirm rugged access, and collect field intel ahead of development.",
     tasks: [
@@ -260,6 +263,7 @@ export const FORESTER_ROLES = [
   {
     id: "silviculture",
     name: "Silviculture Supervisor",
+    journeyType: "field",
     description:
       "Design regeneration strategies tailored to northern BC, oversee planting, and monitor stand recovery.",
     tasks: [

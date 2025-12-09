@@ -1,0 +1,549 @@
+/**
+ * Field Events - Random events for field journey (Recon/Silviculture roles)
+ * Oregon Trail-style random encounters
+ */
+
+export const FIELD_EVENTS = [
+  // === EQUIPMENT EVENTS ===
+  {
+    id: 'flat_tire',
+    title: 'Flat Tire',
+    type: 'equipment',
+    severity: 'minor',
+    probability: 0.15,
+    description: 'The lead truck hits a sharp rock. Hissing air signals another flat.',
+    options: [
+      {
+        label: 'Change it yourself (2 hours)',
+        outcome: 'The crew changes the tire in the rain. Back on the road, but behind schedule.',
+        effects: { equipment: -5 },
+        timeUsed: 2
+      },
+      {
+        label: 'Use the spare and continue',
+        outcome: 'Quick swap and you\'re moving again. Hope there are no more surprises.',
+        effects: { equipment: -3 },
+        consumesSpare: true
+      },
+      {
+        label: 'Wait for help',
+        outcome: 'Another crew passes by and helps. Cost you half a day.',
+        effects: { progress: -5 },
+        timeUsed: 4
+      }
+    ]
+  },
+  {
+    id: 'engine_trouble',
+    title: 'Engine Trouble',
+    type: 'equipment',
+    severity: 'moderate',
+    probability: 0.10,
+    description: 'The skidder coughs and sputters. Smoke rises from the engine compartment.',
+    options: [
+      {
+        label: 'Field repair with spare parts',
+        outcome: 'Your mechanic works through the problem. Fixed, but parts are depleted.',
+        effects: { equipment: -15 },
+        requiresRole: 'mechanic'
+      },
+      {
+        label: 'Limp to the next block slowly',
+        outcome: 'Running on half power, you make it to a spot where proper repairs are possible.',
+        effects: { equipment: -20, progress: -8 }
+      },
+      {
+        label: 'Call for tow truck ($500)',
+        outcome: 'The machine gets hauled out. Expensive, but the right choice.',
+        effects: { budget: -500, equipment: -5 }
+      }
+    ]
+  },
+  {
+    id: 'chainsaw_failure',
+    title: 'Chainsaw Breakdown',
+    type: 'equipment',
+    severity: 'minor',
+    probability: 0.12,
+    description: 'The primary saw throws its chain into a stump. Something\'s bent.',
+    options: [
+      {
+        label: 'Swap to backup saw',
+        outcome: 'The backup saw is slower but works. Production drops for the day.',
+        effects: { progress: -3 }
+      },
+      {
+        label: 'Send runner for parts',
+        outcome: 'Someone drives to town. Lost time but the good saw runs again.',
+        effects: { fuel: -10, equipment: -8 }
+      },
+      {
+        label: 'Try to straighten the bar',
+        outcome: 'With patience and a hammer, it\'s serviceable. Probably.',
+        effects: { equipment: -10 },
+        riskInjury: 0.15
+      }
+    ]
+  },
+  {
+    id: 'truck_stuck',
+    title: 'Truck Stuck in Mud',
+    type: 'equipment',
+    severity: 'moderate',
+    probability: 0.12,
+    terrainTrigger: ['muskeg', 'river'],
+    description: 'The truck sinks to its axles in soft ground. It\'s not going anywhere without help.',
+    options: [
+      {
+        label: 'Winch it out with the skidder',
+        outcome: 'Slow work, but eventually free. Equipment takes a beating.',
+        effects: { equipment: -12, fuel: -5 }
+      },
+      {
+        label: 'Dig and lay brush road',
+        outcome: 'Everyone grabs shovels. Exhausting work but it works.',
+        effects: { crew_health: -5, crew_morale: -8 },
+        timeUsed: 4
+      },
+      {
+        label: 'Leave it and walk out',
+        outcome: 'You hike back with essential gear. The truck waits for drier weather.',
+        effects: { progress: -10 }
+      }
+    ]
+  },
+
+  // === WEATHER EVENTS ===
+  {
+    id: 'sudden_storm',
+    title: 'Sudden Storm',
+    type: 'weather',
+    severity: 'moderate',
+    probability: 0.10,
+    description: 'Dark clouds roll in fast. Lightning flashes over the ridge.',
+    options: [
+      {
+        label: 'Take shelter immediately',
+        outcome: 'Everyone piles into vehicles. Safe but no work gets done.',
+        effects: { progress: -5 }
+      },
+      {
+        label: 'Push through to the next block',
+        outcome: 'You race the storm. Most make it, but conditions are dangerous.',
+        effects: { crew_morale: -10 },
+        riskInjury: 0.20
+      },
+      {
+        label: 'Set up emergency camp',
+        outcome: 'Tarps go up fast. You wait out the worst. Morale holds.',
+        effects: { food: -3 }
+      }
+    ]
+  },
+  {
+    id: 'flash_flood',
+    title: 'Flash Flood Warning',
+    type: 'weather',
+    severity: 'severe',
+    probability: 0.06,
+    terrainTrigger: ['river'],
+    description: 'The creek you crossed this morning is now a torrent. Water\'s rising fast.',
+    options: [
+      {
+        label: 'Move to high ground immediately',
+        outcome: 'Everyone scrambles uphill. Equipment is safe but the day is lost.',
+        effects: { progress: -8 }
+      },
+      {
+        label: 'Risk crossing now before it gets worse',
+        outcome: 'A gamble. The trucks make it across, barely.',
+        effects: { crew_morale: -15, equipment: -10 },
+        riskInjury: 0.25
+      },
+      {
+        label: 'Camp on this side overnight',
+        outcome: 'You wait for waters to drop. Lost a day but everyone\'s dry.',
+        effects: { progress: -12, food: -5 }
+      }
+    ]
+  },
+  {
+    id: 'extreme_cold',
+    title: 'Extreme Cold Snap',
+    type: 'weather',
+    severity: 'moderate',
+    probability: 0.08,
+    description: 'Temperature drops to -30C overnight. Everything is frozen solid.',
+    options: [
+      {
+        label: 'Keep vehicles running all night',
+        outcome: 'Engines stay warm but fuel tanks drain fast.',
+        effects: { fuel: -20 }
+      },
+      {
+        label: 'Bundle up and wait it out',
+        outcome: 'Everyone huddles in camp. A few frostbite scares but manageable.',
+        effects: { crew_health: -8, crew_morale: -10 }
+      },
+      {
+        label: 'Light a big warming fire',
+        outcome: 'The fire keeps spirits high. Extra food consumed for energy.',
+        effects: { food: -8 }
+      }
+    ]
+  },
+
+  // === WILDLIFE EVENTS ===
+  {
+    id: 'bear_encounter',
+    title: 'Bear in Camp',
+    type: 'wildlife',
+    severity: 'moderate',
+    probability: 0.12,
+    description: 'A black bear has found the food cache. It\'s not happy about being interrupted.',
+    options: [
+      {
+        label: 'Make noise and back away slowly',
+        outcome: 'The bear eventually wanders off. Some food is ruined.',
+        effects: { food: -8 }
+      },
+      {
+        label: 'Use bear spray',
+        outcome: 'Direct hit. The bear runs. Everyone\'s shaken but safe.',
+        effects: { crew_morale: -5 },
+        consumesItem: 'bear_spray'
+      },
+      {
+        label: 'Fire a warning shot',
+        outcome: 'The blast startles the bear into the bush. Compliance might ask questions.',
+        effects: { compliance: -5 }
+      }
+    ]
+  },
+  {
+    id: 'grizzly_territory',
+    title: 'Grizzly Territory',
+    type: 'wildlife',
+    severity: 'severe',
+    probability: 0.06,
+    description: 'Fresh grizzly signs everywhere. Tracks, scat, claw marks on trees. This is her home.',
+    options: [
+      {
+        label: 'Post bear watch and continue',
+        outcome: 'Work continues with nervous glances. Productivity suffers.',
+        effects: { progress: -5, crew_morale: -8 }
+      },
+      {
+        label: 'Relocate operations for the day',
+        outcome: 'You move to a different area. Safe but inefficient.',
+        effects: { progress: -8, fuel: -5 }
+      },
+      {
+        label: 'Report and request guidance',
+        outcome: 'Wildlife officers advise caution. A two-day delay while they assess.',
+        effects: { progress: -12, relationships: 5, compliance: 5 }
+      }
+    ]
+  },
+  {
+    id: 'moose_road',
+    title: 'Moose on the Road',
+    type: 'wildlife',
+    severity: 'minor',
+    probability: 0.15,
+    description: 'A bull moose stands in the middle of the road. He\'s not moving.',
+    options: [
+      {
+        label: 'Wait him out',
+        outcome: 'After 20 minutes of staring, he finally ambles off.',
+        effects: {}
+      },
+      {
+        label: 'Honk and inch forward',
+        outcome: 'The moose charges the truck! Minor dents but everyone\'s okay.',
+        effects: { equipment: -5 }
+      },
+      {
+        label: 'Find an alternate route',
+        outcome: 'A longer path but no wildlife confrontation.',
+        effects: { fuel: -3 }
+      }
+    ]
+  },
+  {
+    id: 'caribou_herd',
+    title: 'Caribou Herd Crossing',
+    type: 'wildlife',
+    severity: 'minor',
+    probability: 0.10,
+    description: 'A herd of caribou is crossing ahead. Dozens of them, taking their time.',
+    options: [
+      {
+        label: 'Stop and watch respectfully',
+        outcome: 'Beautiful sight. The crew takes photos. Good for morale.',
+        effects: { crew_morale: 8 }
+      },
+      {
+        label: 'Radio ahead about the delay',
+        outcome: 'Office appreciates the update. Lost an hour.',
+        effects: { relationships: 3 }
+      },
+      {
+        label: 'Try to pass slowly',
+        outcome: 'The herd scatters. You save time but feel bad about it.',
+        effects: { crew_morale: -5, compliance: -3 }
+      }
+    ]
+  },
+
+  // === INJURY/ILLNESS EVENTS ===
+  {
+    id: 'worker_injury',
+    title: 'Worker Injury',
+    type: 'injury',
+    severity: 'moderate',
+    probability: 0.12,
+    description: 'A crew member slips on a log and goes down hard, clutching their ankle.',
+    options: [
+      {
+        label: 'Apply first aid and continue',
+        outcome: 'Bandaged up and back to light duty. They\'ll be sore for days.',
+        effects: { firstAid: -1 },
+        crewEffect: { injury: 'sprained_ankle' }
+      },
+      {
+        label: 'Send them out for medical care',
+        outcome: 'One truck heads to town. You\'re short-handed but it\'s the right call.',
+        effects: { fuel: -8, progress: -5 },
+        crewEffect: { evacuate: true }
+      },
+      {
+        label: 'Have them rest in camp',
+        outcome: 'They stay behind to heal. Might be fine tomorrow.',
+        effects: {},
+        crewEffect: { rest: 2 }
+      }
+    ]
+  },
+  {
+    id: 'food_poisoning',
+    title: 'Bad Food',
+    type: 'illness',
+    severity: 'moderate',
+    probability: 0.08,
+    description: 'Half the crew woke up sick. Something in last night\'s dinner didn\'t agree.',
+    options: [
+      {
+        label: 'Rest day for the sick',
+        outcome: 'Those affected stay in camp. Work continues short-handed.',
+        effects: { progress: -8 },
+        crewEffect: { illness: 'food_poisoning', count: 2 }
+      },
+      {
+        label: 'Push through anyway',
+        outcome: 'Everyone works but productivity tanks. Some near-miss incidents.',
+        effects: { progress: -3, crew_morale: -12 },
+        riskInjury: 0.15
+      },
+      {
+        label: 'Dispose of suspect food',
+        outcome: 'You throw out everything questionable. Food stores depleted.',
+        effects: { food: -15 }
+      }
+    ]
+  },
+  {
+    id: 'chainsaw_cut',
+    title: 'Chainsaw Accident',
+    type: 'injury',
+    severity: 'severe',
+    probability: 0.05,
+    description: 'A saw kicks back. There\'s blood. This is serious.',
+    options: [
+      {
+        label: 'Emergency first aid',
+        outcome: 'The first aid kit gets heavy use. Bleeding stopped. Needs hospital.',
+        effects: { firstAid: -3 },
+        crewEffect: { injury: 'severe_laceration', evacuate: true }
+      },
+      {
+        label: 'Call helicopter medevac',
+        outcome: 'Air ambulance arrives within the hour. They\'ll be okay. Expensive.',
+        effects: { budget: -2000 },
+        crewEffect: { evacuate: true, serious: true }
+      },
+      {
+        label: 'Drive to hospital (4 hours)',
+        outcome: 'Someone drives fast. They make it. The crew is shaken.',
+        effects: { crew_morale: -20, fuel: -15 },
+        crewEffect: { evacuate: true }
+      }
+    ]
+  },
+
+  // === TERRAIN/ACCESS EVENTS ===
+  {
+    id: 'road_washout',
+    title: 'Road Washed Out',
+    type: 'terrain',
+    severity: 'moderate',
+    probability: 0.10,
+    description: 'The road ahead has collapsed into the creek. No way through.',
+    options: [
+      {
+        label: 'Build a bypass',
+        outcome: 'With shovels and chainsaws, you cut a rough detour. Takes all day.',
+        effects: { progress: -8, equipment: -10, fuel: -5 }
+      },
+      {
+        label: 'Report and wait for road crew',
+        outcome: 'A proper crew will fix it in 2 days. You\'re stuck here.',
+        effects: { progress: -15, compliance: 5 }
+      },
+      {
+        label: 'Try to ford the creek',
+        outcome: 'A risky crossing. The truck makes it but scrapes bottom badly.',
+        effects: { equipment: -15 },
+        riskInjury: 0.15
+      }
+    ]
+  },
+  {
+    id: 'bridge_questionable',
+    title: 'Questionable Bridge',
+    type: 'terrain',
+    severity: 'minor',
+    probability: 0.12,
+    description: 'The log bridge ahead looks... tired. Uncertain if it will hold the truck.',
+    options: [
+      {
+        label: 'Test it on foot first',
+        outcome: 'You walk across. It holds. Trucks go one at a time, very slowly.',
+        effects: {}
+      },
+      {
+        label: 'Reinforce with fresh logs',
+        outcome: 'An hour of cutting and the bridge is solid. Good work.',
+        effects: { fuel: -2 }
+      },
+      {
+        label: 'Find another crossing',
+        outcome: 'A longer route around. Burns fuel but no bridge worries.',
+        effects: { fuel: -8 }
+      }
+    ]
+  },
+  {
+    id: 'landslide',
+    title: 'Landslide Debris',
+    type: 'terrain',
+    severity: 'moderate',
+    probability: 0.07,
+    description: 'A slope has let go across the road. Trees, mud, and rock block the path.',
+    options: [
+      {
+        label: 'Clear it with equipment',
+        outcome: 'The skidder pushes debris aside. Hard on the machine.',
+        effects: { equipment: -12, fuel: -8 }
+      },
+      {
+        label: 'Hand-clear a path',
+        outcome: 'Everyone grabs tools. Exhausting but it works.',
+        effects: { crew_health: -8, crew_morale: -5 }
+      },
+      {
+        label: 'Turn back and report',
+        outcome: 'Safety first. The office will coordinate geotechnical review.',
+        effects: { progress: -12, compliance: 8 }
+      }
+    ]
+  },
+
+  // === SUPPLY EVENTS ===
+  {
+    id: 'resupply_opportunity',
+    title: 'Passing Supply Truck',
+    type: 'supply',
+    severity: 'positive',
+    probability: 0.10,
+    description: 'Another crew\'s supply truck is passing through. They\'ve got extras.',
+    options: [
+      {
+        label: 'Trade for fuel',
+        outcome: 'You swap some food for fuel. Fair trade.',
+        effects: { fuel: 20, food: -5 }
+      },
+      {
+        label: 'Trade for food',
+        outcome: 'Fresh supplies for the camp. Morale rises.',
+        effects: { fuel: -5, food: 15, crew_morale: 5 }
+      },
+      {
+        label: 'Just share news',
+        outcome: 'Good conversation and road updates. Nothing more.',
+        effects: { crew_morale: 3 }
+      }
+    ]
+  },
+  {
+    id: 'lost_supplies',
+    title: 'Supplies Lost',
+    type: 'supply',
+    severity: 'moderate',
+    probability: 0.08,
+    description: 'A load shifted on the rough road. A box of supplies bounced off somewhere.',
+    options: [
+      {
+        label: 'Go back and search',
+        outcome: 'Found most of it scattered along the road. Lost time.',
+        effects: { progress: -3, food: -3 }
+      },
+      {
+        label: 'Write it off and continue',
+        outcome: 'Can\'t spare the time. That food is gone.',
+        effects: { food: -10 }
+      },
+      {
+        label: 'Secure remaining cargo',
+        outcome: 'You stop to re-tie everything. No more losses.',
+        effects: { progress: -2 }
+      }
+    ]
+  }
+];
+
+/**
+ * Get events filtered by conditions
+ * @param {Object} conditions - Current conditions (terrain, weather, etc.)
+ * @returns {Object[]} Filtered events
+ */
+export function getApplicableFieldEvents(conditions = {}) {
+  return FIELD_EVENTS.filter(event => {
+    // Filter by terrain trigger if specified
+    if (event.terrainTrigger && conditions.terrain) {
+      if (!event.terrainTrigger.includes(conditions.terrain)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+/**
+ * Select a random event based on probabilities
+ * @param {Object[]} events - Pool of possible events
+ * @param {Object} modifiers - Probability modifiers
+ * @returns {Object|null} Selected event or null
+ */
+export function selectRandomFieldEvent(events, modifiers = {}) {
+  const { paceModifier = 1, terrainModifier = 1 } = modifiers;
+
+  for (const event of events) {
+    const adjustedProb = event.probability * paceModifier * terrainModifier;
+    if (Math.random() < adjustedProb) {
+      return event;
+    }
+  }
+
+  return null;
+}

@@ -1,43 +1,31 @@
-import { TerminalUI } from "./ui.js";
-import {
-  createInitialState,
-  getRoleTasks,
-  applyEffects,
-  drawIssue,
-  buildSummary,
-  formatMetricDelta,
-  SEASONS,
-  findRole,
-  findArea,
-} from "./engine.js";
-import { FORESTER_ROLES, OPERATING_AREAS, ILLEGAL_ACTS, GLOSSARY_TERMS } from "./data/index.js";
+/**
+ * BC Forestry Trail - Oregon Trail Style Game
+ * Main game loop and orchestration
+ */
 
-class ForestryGame {
+import { TerminalUI } from './ui.js';
+import { FORESTER_ROLES, OPERATING_AREAS } from './data/index.js';
+import { generateCrew, processDailyUpdate, getCrewDisplayInfo, applyStatusEffect } from './crew.js';
+import { createFieldJourney, createDeskJourney, executeFieldDay, executeDeskDay, PACE_OPTIONS, DESK_ACTIONS } from './journey.js';
+import { checkForEvent, resolveEvent, formatEventForDisplay, checkScheduledEvents } from './events.js';
+import { calculateFieldConsumption, calculateDeskConsumption, applyConsumption, checkResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
+
+class ForestryTrailGame {
   constructor() {
     this.ui = new TerminalUI();
-    this.state = null;
-    this._seasonBaseline = null;
+    this.journey = null;
+    this.gameOver = false;
+    this.victory = false;
     this._restartConfirmOpen = false;
-    this._thresholdBuckets = {};
-    this._riskTipShown = false;
+
     this.ui.onRestartRequest(() => this._promptRestart());
-    this.ui.loadGlossary(GLOSSARY_TERMS);
-    this._bindRestart();
+    this._bindKeyboard();
   }
 
-  _bindRestart() {
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        if (this.ui.isModalOpen()) {
-          return;
-        }
-        if (
-          typeof this.ui.dismissMobileStatusOverlay === "function" &&
-          this.ui.dismissMobileStatusOverlay()
-        ) {
-          event.preventDefault();
-          return;
-        }
+  _bindKeyboard() {
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        if (this.ui.isModalOpen()) return;
         event.preventDefault();
         this._promptRestart();
       }
@@ -45,771 +33,592 @@ class ForestryGame {
   }
 
   _promptRestart() {
-    if (this._restartConfirmOpen) {
-      return;
-    }
+    if (this._restartConfirmOpen) return;
     this._restartConfirmOpen = true;
+
     this.ui.openModal({
-      title: "Restart scenario?",
+      title: 'Abandon Expedition?',
       dismissible: true,
-      onClose: () => {
-        this._restartConfirmOpen = false;
-      },
+      onClose: () => { this._restartConfirmOpen = false; },
       buildContent: (container) => {
-        const message = document.createElement("p");
-        message.textContent = "Starting over clears your current crew's progress and returns to role selection.";
-        message.style.marginTop = "0";
-        container.appendChild(message);
+        const msg = document.createElement('p');
+        msg.textContent = 'Starting over abandons your current crew and returns to role selection.';
+        msg.style.marginTop = '0';
+        container.appendChild(msg);
       },
       actions: [
         {
-          label: "Restart",
+          label: 'Abandon',
           primary: true,
           onSelect: () => {
             this.ui.closeModal();
-            this.ui.write("\nReloading scenario...");
+            this.gameOver = false;
+            this.victory = false;
             this.start();
-          },
+          }
         },
         {
-          label: "Keep playing",
-          onSelect: () => {
-            this.ui.closeModal();
-          },
-        },
-      ],
+          label: 'Continue',
+          onSelect: () => { this.ui.closeModal(); }
+        }
+      ]
     });
   }
 
   async start() {
     this.ui.prepareForNewGame();
     this.ui.clear();
-    this.ui.write("FORESTRY SIMULATOR");
-    this.ui.write("===================\n");
+    this.gameOver = false;
+    this.victory = false;
 
-    const companyName = await this.ui.promptText("Name your forestry crew:");
-    const roleOption = await this.ui.promptChoice(
-      "Choose your forester specialization:",
-      FORESTER_ROLES.map((role) => ({ label: `${role.name} – ${role.description}`, value: role.id }))
-    );
-    const roleId = roleOption.value ?? findRoleByLabel(roleOption.label)?.id ?? FORESTER_ROLES[0].id;
+    // Title screen
+    this.ui.writeHeader('BC FORESTRY TRAIL');
+    this.ui.write('');
+    this.ui.write('The year is 2024. You have been assigned to lead');
+    this.ui.write('a forestry operation in northern British Columbia.');
+    this.ui.write('');
+    this.ui.write('Your decisions will determine whether your crew');
+    this.ui.write('completes their mission... or faces disaster.');
+    this.ui.write('');
 
-    const areaOption = await this.ui.promptChoice(
-      "Select an operating area:",
-      OPERATING_AREAS.map((area) => ({
-        label: `${area.name} – ${area.description}`,
-        value: area.id,
-      }))
-    );
-    const areaId = areaOption.value ?? findAreaByLabel(areaOption.label)?.id ?? OPERATING_AREAS[0].id;
+    // Character creation
+    const crewName = await this.ui.promptText('Name your crew:', 'The Timber Wolves');
 
-    this.state = createInitialState({ companyName, roleId, areaId });
-    this._thresholdBuckets = {};
-    this._riskTipShown = false;
-    this.ui.updateStatus({ ...this.state, round: 0 });
+    // Role selection
+    this.ui.writeDivider('SELECT YOUR ROLE');
+    const roleOptions = FORESTER_ROLES.map(role => ({
+      label: role.name,
+      description: role.description,
+      value: role.id
+    }));
 
-    const role = findRole(roleId);
-    const area = findArea(areaId);
+    const roleChoice = await this.ui.promptChoice('What is your specialization?', roleOptions);
+    const roleId = roleChoice.value || roleChoice.label.toLowerCase().replace(/\s+/g, '_');
+    const role = FORESTER_ROLES.find(r => r.id === roleId) || FORESTER_ROLES[0];
 
-    this.ui.write(`\nWelcome ${companyName || "team"}!`);
-    this.ui.write(`You are serving as the ${role.name} in the ${area.name}.`);
-    this.ui.write(`BEC designation: ${area.becZone}.`);
+    // Area selection
+    this.ui.writeDivider('SELECT OPERATING AREA');
+    const areaOptions = OPERATING_AREAS.map(area => ({
+      label: area.name,
+      description: area.description,
+      value: area.id
+    }));
+
+    const areaChoice = await this.ui.promptChoice('Where will you operate?', areaOptions);
+    const areaId = areaChoice.value || areaChoice.label.toLowerCase().replace(/\s+/g, '_');
+    const area = OPERATING_AREAS.find(a => a.id === areaId) || OPERATING_AREAS[0];
+
+    // Create journey based on role type
+    const journeyType = role.journeyType || 'field';
+    const crew = generateCrew(5, journeyType);
+
+    if (journeyType === 'field') {
+      this.journey = createFieldJourney({
+        crewName,
+        role,
+        area,
+        crew
+      });
+    } else {
+      this.journey = createDeskJourney({
+        crewName,
+        role,
+        area,
+        crew
+      });
+    }
+
+    // Show starting info
+    this.ui.write('');
+    this.ui.writeHeader(`${crewName.toUpperCase() || 'YOUR CREW'} - ${role.name}`);
+    this.ui.write(`Operating Area: ${area.name}`);
+    this.ui.write(`BEC Zone: ${area.becZone}`);
     if (area.dominantTrees?.length) {
-      this.ui.write(`Dominant species: ${area.dominantTrees.join(", ")}.`);
+      this.ui.write(`Dominant Species: ${area.dominantTrees.join(', ')}`);
     }
-    if (area.focusTopics?.length) {
-      this.ui.write(`Season priorities: ${area.focusTopics.join(", ")}.`);
+    this.ui.write('');
+
+    // Show crew
+    this.ui.writeDivider('YOUR CREW');
+    for (const member of crew) {
+      const info = getCrewDisplayInfo(member);
+      this.ui.write(`${info.name} - ${info.role}`);
     }
-    if (area.indigenousPartners?.length) {
-      this.ui.write(`Key Indigenous partners: ${area.indigenousPartners.join(", ")}.`);
+    this.ui.write('');
+
+    // Journey-specific intro
+    if (journeyType === 'field') {
+      this.ui.write(`Mission: Travel ${this.journey.totalDistance}km through ${this.journey.blocks.length} forest blocks.`);
+      this.ui.write('Manage your fuel, food, and equipment. Keep your crew healthy.');
+      this.ui.write('');
+      this.ui.write('Starting supplies:');
+      this.ui.write(`  Fuel: ${this.journey.resources.fuel} gallons`);
+      this.ui.write(`  Food: ${this.journey.resources.food} days worth`);
+      this.ui.write(`  Equipment: ${this.journey.resources.equipment}% condition`);
+      this.ui.write(`  First Aid: ${this.journey.resources.firstAid} kits`);
+    } else {
+      this.ui.write(`Mission: Complete permit approvals within ${this.journey.deadline} days.`);
+      this.ui.write(`Target: ${this.journey.permits.target} permits approved.`);
+      this.ui.write('Manage your budget, political capital, and team energy.');
+      this.ui.write('');
+      this.ui.write('Starting resources:');
+      this.ui.write(`  Budget: $${this.journey.resources.budget.toLocaleString()}`);
+      this.ui.write(`  Political Capital: ${this.journey.resources.politicalCapital}`);
+      this.ui.write(`  Daily Energy: ${this.journey.hoursRemaining} hours`);
     }
 
-    this._leakIllegalFile(roleId);
+    await this.ui.promptChoice('Press any key to begin...', [{ label: 'Begin Journey', value: 'start' }]);
 
-    this.ui.write("Navigate one full operational year across four seasons. ESC or the Restart button opens the restart prompt.\n");
+    // Main game loop
+    await this._mainLoop();
+  }
 
-    for (let round = 1; round <= this.state.totalRounds; round++) {
-      this.state.round = round;
-      const season = SEASONS[round - 1] ?? `Season ${round}`;
-      this.ui.write(`\n--- ${season.toUpperCase()} ---`);
-      this._advancePendingIssues();
-      this.ui.updateStatus(this.state);
+  async _mainLoop() {
+    while (!this.gameOver && !this.victory) {
+      // Update UI
+      this.ui.updateAllStatus(this.journey);
 
-      this._seasonBaseline = { ...this.state.metrics };
-
-      const tasks = getRoleTasks(this.state);
-      for (const task of tasks) {
-        await this._runTask(task);
+      // Check for scheduled events first
+      const scheduledEvent = checkScheduledEvents(this.journey);
+      if (scheduledEvent) {
+        await this._handleEvent(scheduledEvent);
+        if (this.gameOver) break;
       }
 
-      const issue = drawIssue(this.state);
-      if (issue) {
-        await this._resolveIssue(issue);
+      // Run daily phase
+      if (this.journey.journeyType === 'field') {
+        await this._runFieldDay();
       } else {
-        this.ui.write("No critical issues surfaced this season.");
+        await this._runDeskDay();
       }
 
-      this.ui.write(this._seasonCheckpoint());
-      const headline = this._seasonHeadline(season, this._seasonBaseline);
-      if (headline) {
-        this.ui.write(headline);
-      }
-      this._recordSeasonSnapshot(season);
-      this.ui.updateStatus(this.state);
+      // Check end conditions
+      this._checkEndConditions();
     }
 
-    const summary = buildSummary(this.state);
-    this.ui.write("\n=== YEAR-END SUMMARY ===");
-    this.ui.write(summary.overall);
-    summary.messages.forEach((message) => this.ui.write(message));
-    if (summary.legacy) {
-      if (summary.legacy.seasonSummaries?.length) {
-        this.ui.write("\nLegacy Report:");
-        summary.legacy.seasonSummaries.forEach((line) => this.ui.write(line));
-      }
-      if (summary.legacy.trendLines?.length) {
-        summary.legacy.trendLines.forEach((line) => this.ui.write(`  ${line}`));
-      }
-    }
-    if (summary.highlights?.length) {
-      this.ui.write("\nDecision Review:");
-      summary.highlights.forEach((line) => this.ui.write(line));
-    }
-    if (summary.achievements?.length) {
-      this.ui.write("\nAchievements Earned:");
-      summary.achievements.forEach((line) => this.ui.write(line));
-    }
-    if (summary.projection?.length) {
-      this.ui.write("\nFuture Outlook:");
-      summary.projection.forEach((line) => this.ui.write(`• ${line}`));
-    }
-    this.ui.write("\nThanks for guiding the team. Press ESC to try a different combination.");
+    // Show end screen
+    await this._showEndScreen();
   }
 
-  async _runTask(task) {
-    this.ui.writeDivider("Decision Brief");
-    this.ui.write(this._statusSnapshot());
-    this.ui.write(`\nTask: ${task.title}`);
-    const option = await this.ui.promptChoice(task.prompt, this._decorateOptions(task.options));
-    const baseline = { ...this.state.metrics };
-    const resolved = this._resolveOption(option);
-    if (resolved.preface) {
-      this.ui.write(resolved.preface);
+  async _runFieldDay() {
+    const journey = this.journey;
+    const currentBlock = journey.blocks[journey.currentBlockIndex];
+
+    this.ui.clear();
+    this.ui.writeHeader(`DAY ${journey.day} - ${currentBlock?.name || 'Unknown Territory'}`);
+
+    // Show current status
+    const progressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+    this.ui.write(`Progress: ${journey.distanceTraveled}/${journey.totalDistance} km (${progressPct}%)`);
+    this.ui.write(`Weather: ${journey.weather?.name || 'Clear'}`);
+    this.ui.write(`Terrain: ${currentBlock?.terrain || 'unknown'}`);
+    this.ui.write('');
+
+    // Show resources
+    this.ui.writeDivider('SUPPLIES');
+    const resourceStatus = checkResourceStatus(journey.resources, FIELD_RESOURCES);
+    for (const [key, status] of Object.entries(resourceStatus)) {
+      const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
+      this.ui.write(`${icon} ${status.label}: ${status.display}`);
     }
-    this.ui.write(resolved.outcome);
-    applyEffects(this.state, resolved.effects, {
-      type: "task",
-      id: task.id,
-      title: task.title,
-      option: resolved.historyLabel,
-      round: this.state.round,
+    this.ui.write('');
+
+    // Show crew status
+    this._displayCrewStatus();
+
+    // Check for random event
+    const event = checkForEvent(journey);
+    if (event) {
+      await this._handleEvent(event);
+      if (this.gameOver) return;
+    }
+
+    // Daily action choice
+    this.ui.writeDivider('WHAT DO YOU DO?');
+
+    const paceOptions = Object.entries(PACE_OPTIONS).map(([id, pace]) => ({
+      label: `Travel ${pace.name}`,
+      description: `~${pace.distancePerDay}km/day, ${pace.fuelMultiplier}x fuel`,
+      value: id
+    }));
+
+    paceOptions.push({
+      label: 'Rest here',
+      description: 'Crew heals, morale improves',
+      value: 'rest'
     });
-    const delta = formatMetricDelta(resolved.effects);
-    if (delta) {
-      this.ui.write(`Impact: ${delta}`);
-    }
-    this._handleResolutionSideEffects(resolved);
-    this._checkThresholds(baseline, this.state.metrics);
-    this.ui.updateStatus(this.state);
-  }
 
-  async _resolveIssue(issue) {
-    this.ui.writeDivider("Field Issue Update");
-    this.ui.write(this._statusSnapshot());
-    this.ui.write(`\nField Issue: ${issue.title}`);
-    this.ui.write(issue.description);
-    const option = await this.ui.promptChoice(
-      "How will you respond?",
-      this._decorateOptions(issue.options)
-    );
-    const baseline = { ...this.state.metrics };
-    const resolved = this._resolveOption(option);
-    if (resolved.preface) {
-      this.ui.write(resolved.preface);
-    }
-    this.ui.write(resolved.outcome);
-    applyEffects(this.state, resolved.effects, {
-      type: "issue",
-      id: issue.id,
-      title: issue.title,
-      option: resolved.historyLabel,
-      round: this.state.round,
-    });
-    const delta = formatMetricDelta(resolved.effects);
-    if (delta) {
-      this.ui.write(`Impact: ${delta}`);
-    }
-    this._handleResolutionSideEffects(resolved, issue);
-    this._checkThresholds(baseline, this.state.metrics);
-  }
+    const action = await this.ui.promptChoice('Choose your action:', paceOptions);
+    const actionId = action.value || 'normal';
 
-  _leakIllegalFile(roleId) {
-    const matches = ILLEGAL_ACTS.filter((act) => act.roles?.includes(roleId));
-    if (!matches.length) {
-      return;
-    }
-
-    const sampleCount = Math.min(3, matches.length);
-    const pool = [...matches];
-    const selections = [];
-    while (selections.length < sampleCount && pool.length) {
-      const index = Math.floor(Math.random() * pool.length);
-      const [pick] = pool.splice(index, 1);
-      if (pick) {
-        selections.push(pick);
+    // Execute the day
+    if (actionId === 'rest') {
+      this.ui.write('');
+      this.ui.write('The crew takes the day to rest and recover.');
+      // Heal crew
+      for (const member of journey.crew) {
+        if (member.isActive) {
+          member.health = Math.min(100, member.health + 10);
+          member.morale = Math.min(100, member.morale + 15);
+        }
       }
-    }
+      // Light resource use
+      journey.resources.food = Math.max(0, journey.resources.food - 1);
+    } else {
+      // Travel
+      const result = executeFieldDay(journey, actionId);
 
-    this.ui.write("\n🚫 Illicit Operations File recovered from the breakroom copier:");
-    selections.forEach((act, position) => {
-      const tagList = act.tags?.length ? act.tags.map((tag) => `#${tag}`).join(" ") : "";
-      const header = `${position + 1}. ${act.title}`;
-      this.ui.write(tagList ? `${header} — ${tagList}` : header);
-      this.ui.write(`   ${act.description}`);
-    });
-    this.ui.write("(Satire only—keep your program clean.)\n");
-  }
-
-  _seasonCheckpoint() {
-    const { metrics, round, totalRounds } = this.state;
-    const summary = `Season ${round}/${totalRounds} snapshot -> Progress ${Math.round(
-      metrics.progress
-    )}, Forest Health ${Math.round(metrics.forestHealth)}, Relationships ${Math.round(
-      metrics.relationships
-    )}, Compliance ${Math.round(metrics.compliance)}, Budget ${Math.round(metrics.budget)}`;
-    return summary;
-  }
-
-  _recordSeasonSnapshot(season) {
-    if (!this.state.timeline) {
-      this.state.timeline = [];
-    }
-    this.state.timeline.push({
-      round: this.state.round,
-      season,
-      metrics: { ...this.state.metrics },
-    });
-  }
-
-  _decorateOptions(options = []) {
-    const deck = options.map((option) => ({ ...option }));
-    const mischief = this._createMischiefOption();
-    if (mischief) {
-      deck.push(mischief);
-    }
-    const risk = this._createRiskOption();
-    if (risk) {
-      deck.push(risk);
-    }
-    return deck;
-  }
-
-  _createMischiefOption() {
-    const roleId = this.state?.role?.id;
-    const areaName = this.state?.area?.name ?? "backcountry";
-    const pool = ILLEGAL_ACTS.filter((act) => (roleId ? act.roles?.includes(roleId) : false));
-    const source = pool.length ? pool : ILLEGAL_ACTS;
-    if (!source.length) {
-      return null;
-    }
-    const pick = source[Math.floor(Math.random() * source.length)];
-    const hush = ["diesel haze", "frosty muskeg", "cedar pitch", "chain oil mist", "river fog"];
-    const sense = hush[Math.floor(Math.random() * hush.length)];
-    const severity = this._drawWildcardSeverity();
-    const labelSuffix = severity.label ? ` – ${severity.label}` : "";
-    return {
-      label: `🚫 Wildcard: ${pick.title}${labelSuffix}`,
-      outcome: `You lean into the shady path. ${pick.description} ${severity.outcome} The ${sense} hangs in the ${areaName} air as compliance officers start whispering about anomalies.`,
-      effects: severity.effects,
-      historyLabel: `${pick.title} (Wildcard${severity.historySuffix})`,
-    };
-  }
-
-  _createRiskOption() {
-    const areaName = this.state?.area?.name ?? "north woods";
-    const chance = this._calculateRiskChance();
-    const chanceLabel = this._formatRiskChanceLabel(chance);
-    const { successEffects, failureEffects } = this._riskEffectProfiles(chance);
-    const description = this._describeRiskPlay(chance, successEffects, failureEffects);
-    const option = {
-      label: `🎲 Risk Play: Ignite a moonlit blitz in ${areaName} (${chanceLabel} win chance)`,
-      risk: {
-        chance,
-        success: this._buildRiskNarratives("success", areaName, successEffects),
-        failure: this._buildRiskNarratives("failure", areaName, failureEffects),
-      },
-      historyLabel: `Risk Play (${areaName})`,
-      description,
-    };
-    this._maybeAnnounceRiskPlay(chance, successEffects, failureEffects);
-    return option;
-  }
-
-  _statusSnapshot() {
-    const metrics = this.state?.metrics;
-    if (!metrics) {
-      return "Status Brief -> gathering telemetry...";
-    }
-    const parts = [
-      `Progress ${Math.round(metrics.progress)}`,
-      `Forest Health ${Math.round(metrics.forestHealth)}`,
-      `Relationships ${Math.round(metrics.relationships)}`,
-      `Compliance ${Math.round(metrics.compliance)}`,
-      `Budget ${Math.round(metrics.budget)}`,
-    ];
-    return `Status Brief -> ${parts.join(" • ")}`;
-  }
-
-  _describeRiskPlay(chance, successEffects, failureEffects) {
-    const chanceLabel = this._formatRiskChanceLabel(chance);
-    const success = this._formatRiskDeltaList(successEffects);
-    const failure = this._formatRiskDeltaList(failureEffects);
-    return `Chance-based decision. Roll under ${chanceLabel} to win. Success: ${success}. Failure: ${failure}.`;
-  }
-
-  _formatRiskDeltaList(effects = {}) {
-    const delta = formatMetricDelta(effects);
-    return delta || "Minimal impact";
-  }
-
-  _maybeAnnounceRiskPlay(chance, successEffects, failureEffects) {
-    if (this._riskTipShown) {
-      return;
-    }
-    this._riskTipShown = true;
-    const chanceLabel = this._formatRiskChanceLabel(chance);
-    const success = this._formatRiskDeltaList(successEffects);
-    const failure = this._formatRiskDeltaList(failureEffects);
-    this.ui.write(
-      `ℹ️ Risk plays compare a random roll against the listed chance. (${chanceLabel} target — Success: ${success}; Failure: ${failure}).`
-    );
-    this.ui.write("Choose them only when you are comfortable with the potential downside.");
-  }
-
-  _formatRiskChanceLabel(chance) {
-    const percent = Math.max(0, Math.min(100, chance * 100));
-    const rounded = Math.round(percent * 10) / 10;
-    return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
-  }
-
-  _resolveOption(option) {
-    if (!option) {
-      return { outcome: "", effects: {}, historyLabel: "" };
-    }
-    if (!option.risk) {
-      return {
-        outcome: option.outcome ?? "",
-        effects: option.effects ?? {},
-        historyLabel: option.historyLabel ?? option.label,
-        setFlags: option.setFlags,
-        clearFlags: option.clearFlags,
-        scheduleIssues: option.scheduleIssues,
-      };
-    }
-    const chance = Math.max(0, Math.min(1, Number(option.risk.chance) || 0));
-    const roll = Math.random();
-    const success = roll < chance;
-    const deck = success ? option.risk.success : option.risk.failure;
-    const branch = Array.isArray(deck) ? this._pickRandom(deck) : deck;
-    const outcome = branch?.outcome ?? option.outcome ?? "";
-    const effects = branch?.effects ?? option.effects ?? {};
-    const headline = branch?.headline
-      ? branch.headline
-      : success
-      ? option.risk.successHeadline || "Success"
-      : option.risk.failureHeadline || "Failure";
-    const preface = `🎲 Risk roll (${Math.round(chance * 100)}% target, rolled ${roll.toFixed(2)}): ${headline}!`;
-    return {
-      preface,
-      outcome,
-      effects,
-      historyLabel: `${option.historyLabel ?? option.label}${branch?.historyLabelSuffix ?? (success ? " — Paid Off" : " — Backfired")}`,
-      setFlags: branch?.setFlags ?? option.setFlags,
-      clearFlags: branch?.clearFlags ?? option.clearFlags,
-      scheduleIssues: branch?.scheduleIssues ?? option.scheduleIssues,
-    };
-  }
-
-  _pickRandom(collection = []) {
-    if (!collection.length) {
-      return null;
-    }
-    const index = Math.floor(Math.random() * collection.length);
-    return collection[index];
-  }
-
-  _advancePendingIssues() {
-    if (!Array.isArray(this.state.pendingIssues)) {
-      this.state.pendingIssues = [];
-      return;
-    }
-    this.state.pendingIssues.forEach((item) => {
-      if (item && typeof item.delay === "number" && item.delay > 0) {
-        item.delay -= 1;
+      this.ui.write('');
+      for (const msg of result.messages) {
+        this.ui.write(msg);
       }
-    });
-  }
 
-  _handleResolutionSideEffects(resolved, issue) {
-    if (!resolved) {
-      return;
-    }
-    if (!this.state.flags) {
-      this.state.flags = {};
-    }
-    if (resolved.clearFlags) {
-      for (const key of [].concat(resolved.clearFlags)) {
-        if (key) {
-          delete this.state.flags[key];
+      // Apply resource consumption
+      const activeCrewCount = journey.crew.filter(m => m.isActive).length;
+      const consumption = calculateFieldConsumption({
+        pace: actionId,
+        terrain: currentBlock?.terrain,
+        weather: journey.weather?.id,
+        crewHealth: journey.crew.reduce((sum, m) => sum + (m.isActive ? m.health : 0), 0) / activeCrewCount
+      }, activeCrewCount);
+
+      const consumptionResult = applyConsumption(journey.resources, consumption, FIELD_RESOURCES);
+      journey.resources = consumptionResult.resources;
+
+      if (consumptionResult.warnings.length > 0) {
+        this.ui.write('');
+        for (const warning of consumptionResult.warnings) {
+          this.ui.writeWarning(warning);
         }
       }
     }
-    if (resolved.setFlags) {
-      Object.entries(resolved.setFlags).forEach(([key, value]) => {
-        if (!key) return;
-        this.state.flags[key] = value ?? true;
-      });
+
+    // Update crew conditions
+    this._updateCrewConditions();
+
+    // Advance day
+    journey.day++;
+
+    // Small pause
+    await this.ui.promptChoice('', [{ label: 'Continue...', value: 'next' }]);
+  }
+
+  async _runDeskDay() {
+    const journey = this.journey;
+
+    this.ui.clear();
+    this.ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - ${journey.currentPhase.toUpperCase()}`);
+
+    // Show progress
+    const daysRemaining = journey.deadline - journey.day;
+    const permitProgress = Math.round((journey.permits.approved / journey.permits.target) * 100);
+
+    this.ui.write(`Days Remaining: ${daysRemaining}`);
+    this.ui.write(`Permits: ${journey.permits.approved}/${journey.permits.target} approved (${permitProgress}%)`);
+    this.ui.write(`Pipeline: ${journey.permits.submitted} submitted, ${journey.permits.inReview} in review`);
+    this.ui.write('');
+
+    // Show resources
+    this.ui.writeDivider('RESOURCES');
+    const resourceStatus = checkResourceStatus(journey.resources, DESK_RESOURCES);
+    for (const [key, status] of Object.entries(resourceStatus)) {
+      const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
+      this.ui.write(`${icon} ${status.label}: ${status.display}`);
     }
-    if (resolved.scheduleIssues) {
-      if (!Array.isArray(this.state.pendingIssues)) {
-        this.state.pendingIssues = [];
+    this.ui.write(`   Hours Today: ${journey.hoursRemaining}`);
+    this.ui.write('');
+
+    // Show crew/team status
+    this._displayCrewStatus();
+
+    // Check for random event
+    const event = checkForEvent(journey);
+    if (event) {
+      await this._handleEvent(event);
+      if (this.gameOver) return;
+    }
+
+    // Daily action choice
+    this.ui.writeDivider('DAILY PRIORITIES');
+
+    const actionOptions = Object.entries(DESK_ACTIONS).map(([id, action]) => ({
+      label: action.name,
+      description: `${action.hoursRequired}h, ${action.description}`,
+      value: id
+    }));
+
+    const action = await this.ui.promptChoice('How will you spend today?', actionOptions);
+    const actionId = action.value || 'process_permits';
+
+    // Execute the day
+    const result = executeDeskDay(journey, actionId);
+
+    this.ui.write('');
+    for (const msg of result.messages) {
+      this.ui.write(msg);
+    }
+
+    // Apply resource consumption
+    const activeCrewCount = journey.crew.filter(m => m.isActive).length;
+    const consumption = calculateDeskConsumption({
+      daysRemaining,
+      crewMorale: journey.crew.reduce((sum, m) => sum + (m.isActive ? m.morale : 0), 0) / activeCrewCount,
+      hoursWorked: 8 - journey.hoursRemaining
+    }, activeCrewCount);
+
+    const consumptionResult = applyConsumption(journey.resources, consumption, DESK_RESOURCES);
+    journey.resources = consumptionResult.resources;
+
+    if (consumptionResult.warnings.length > 0) {
+      this.ui.write('');
+      for (const warning of consumptionResult.warnings) {
+        this.ui.writeWarning(warning);
       }
-      const schedule = Array.isArray(resolved.scheduleIssues)
-        ? resolved.scheduleIssues
-        : [resolved.scheduleIssues];
-      schedule.forEach((item) => {
-        if (!item) return;
-        const payload = {
-          id: item.id,
-          delay: typeof item.delay === "number" ? Math.max(0, item.delay) : 0,
-        };
-        if (payload.id) {
-          this.state.pendingIssues.push(payload);
-        }
-      });
     }
-    if (issue?.id && resolved.scheduleIssues) {
-      // Flag the originating issue so chained stages know their source completed.
-      this.state.flags[`resolved:${issue.id}`] = true;
+
+    // Update crew conditions
+    this._updateCrewConditions();
+
+    // Advance day and reset energy
+    journey.day++;
+    journey.hoursRemaining = 8;
+
+    // Small pause
+    await this.ui.promptChoice('', [{ label: 'Continue...', value: 'next' }]);
+  }
+
+  async _handleEvent(event) {
+    const formatted = formatEventForDisplay(event);
+
+    this.ui.write('');
+    this.ui.writeHeader(`EVENT: ${formatted.title}`);
+    this.ui.write(event.description);
+    this.ui.write('');
+
+    // Build options
+    const options = event.options.map((opt, index) => ({
+      label: opt.label,
+      description: opt.hint || '',
+      value: index
+    }));
+
+    const choice = await this.ui.promptChoice('What do you do?', options);
+    const optionIndex = typeof choice.value === 'number' ? choice.value : 0;
+    const selectedOption = event.options[optionIndex];
+
+    // Resolve event
+    const result = resolveEvent(this.journey, event, selectedOption);
+
+    this.ui.write('');
+    for (const msg of result.messages) {
+      this.ui.write(msg);
+    }
+
+    // Check for game-ending events
+    if (selectedOption.gameOver) {
+      this.gameOver = true;
+      this.journey.endReason = selectedOption.gameOverReason || 'Event outcome';
     }
   }
 
-  _checkThresholds(previous = {}, next = {}) {
-    const metrics = ["progress", "forestHealth", "relationships", "compliance", "budget"];
-    metrics.forEach((metric) => {
-      const before = Number(previous[metric] ?? 0);
-      const after = Number(next[metric] ?? 0);
-      const prevBucket = this._thresholdBuckets[metric] ?? this._bucketFor(before);
-      const nextBucket = this._bucketFor(after);
-      if (metric === "budget") {
-        this._maybeScheduleBudgetEmergency(after);
+  _displayCrewStatus() {
+    this.ui.writeDivider('CREW');
+    for (const member of this.journey.crew) {
+      const info = getCrewDisplayInfo(member);
+      let status = `${info.name} (${info.role})`;
+
+      if (!member.isActive) {
+        status += ' [EVACUATED]';
+      } else if (info.statusText) {
+        status += ` [${info.statusText}]`;
       }
-      this._thresholdBuckets[metric] = nextBucket;
-      if (prevBucket === nextBucket) {
+
+      if (member.isActive) {
+        const healthBar = this._miniBar(member.health);
+        status += ` H:${healthBar}`;
+      }
+
+      this.ui.write(status);
+    }
+    this.ui.write('');
+  }
+
+  _miniBar(value, width = 5) {
+    const filled = Math.round((value / 100) * width);
+    return '█'.repeat(filled) + '░'.repeat(width - filled);
+  }
+
+  _updateCrewConditions() {
+    const journey = this.journey;
+    const conditions = {
+      isResting: journey.pace === 'resting',
+      hasFood: journey.journeyType === 'field' ? journey.resources.food > 0 : true,
+      hasFirstAid: journey.journeyType === 'field' ? journey.resources.firstAid > 0 : true,
+      weatherSeverity: journey.weather?.severity || 0
+    };
+
+    for (const member of journey.crew) {
+      if (!member.isActive) continue;
+
+      const update = processDailyUpdate(member, conditions);
+
+      // Check for critical events
+      if (update.died) {
+        this.ui.writeWarning(`${member.name} has died from their injuries!`);
+        member.isActive = false;
+      } else if (update.incapacitated) {
+        this.ui.writeWarning(`${member.name} is too injured to continue and must be evacuated!`);
+        member.isActive = false;
+      } else if (update.quit) {
+        this.ui.writeWarning(`${member.name} has had enough and quit the expedition!`);
+        member.isActive = false;
+      }
+
+      // Report recoveries
+      for (const recovery of update.recovered) {
+        this.ui.write(`${member.name} has recovered from ${recovery}.`);
+      }
+    }
+
+    // Update crew count in UI
+    this.ui.updateAllStatus(journey);
+  }
+
+  _checkEndConditions() {
+    const journey = this.journey;
+    const activeCrewCount = journey.crew.filter(m => m.isActive).length;
+
+    // Universal: No crew left
+    if (activeCrewCount === 0) {
+      this.gameOver = true;
+      journey.endReason = 'All crew members lost';
+      return;
+    }
+
+    if (journey.journeyType === 'field') {
+      // Victory: Reached destination
+      if (journey.distanceTraveled >= journey.totalDistance) {
+        this.victory = true;
+        journey.endReason = 'Expedition completed!';
         return;
       }
-      const direction = nextBucket > prevBucket ? "up" : "down";
-      const threshold = direction === "up" ? nextBucket : prevBucket;
-      const label = this._metricLabel(metric);
-      const message = this._thresholdMessage(label, direction, threshold, after);
-      this.ui.flashMetricAlert({
-        label,
-        message,
-        direction,
-        value: after,
-        threshold,
-      });
-      this.ui.write(message);
-    });
-  }
 
-  _maybeScheduleBudgetEmergency(value) {
-    if (value <= 5 && !this.state.flags?.budgetLoanActive) {
-      if (!this.state.flags) {
-        this.state.flags = {};
+      // Game over: Stranded (no fuel, no food)
+      if (journey.resources.fuel <= 0 && journey.resources.food <= 0) {
+        this.gameOver = true;
+        journey.endReason = 'Stranded with no supplies';
+        return;
       }
-      if (!this.state.flags.budgetEmergencyScheduled) {
-        this.state.flags.budgetEmergencyScheduled = true;
-        if (!Array.isArray(this.state.pendingIssues)) {
-          this.state.pendingIssues = [];
+
+    } else {
+      // Victory: Met permit target by deadline
+      if (journey.permits.approved >= journey.permits.target) {
+        this.victory = true;
+        journey.endReason = 'Permit targets achieved!';
+        return;
+      }
+
+      // Game over: Deadline passed
+      if (journey.day > journey.deadline) {
+        if (journey.permits.approved >= journey.permits.target * 0.8) {
+          // Partial success
+          this.victory = true;
+          journey.endReason = 'Deadline reached with acceptable progress';
+        } else {
+          this.gameOver = true;
+          journey.endReason = 'Failed to meet deadline';
         }
-        this.state.pendingIssues.push({ id: "budget-emergency-loan", delay: 0 });
+        return;
       }
-    } else if (value > 5 && this.state.flags?.budgetEmergencyScheduled && !this.state.flags?.budgetLoanActive) {
-      delete this.state.flags.budgetEmergencyScheduled;
-    }
-  }
 
-  _bucketFor(value) {
-    if (value < 30) return 0;
-    if (value < 50) return 30;
-    if (value < 70) return 50;
-    return 70;
-  }
-
-  _metricLabel(metric) {
-    switch (metric) {
-      case "progress":
-        return "Operational Progress";
-      case "forestHealth":
-        return "Forest Health";
-      case "relationships":
-        return "Relationships";
-      case "compliance":
-        return "Compliance";
-      case "budget":
-        return "Budget Flexibility";
-      default:
-        return metric;
-    }
-  }
-
-  _thresholdMessage(label, direction, threshold, value) {
-    const rounded = Math.round(value);
-    if (direction === "up") {
-      if (threshold >= 70) {
-        return `🌟 ${label} climbed above ${threshold}. Current reading: ${rounded}.`;
+      // Game over: Budget depleted
+      if (journey.resources.budget <= 0) {
+        this.gameOver = true;
+        journey.endReason = 'Budget exhausted';
+        return;
       }
-      return `📈 ${label} rose past ${threshold}. Current reading: ${rounded}.`;
-    }
-    if (threshold <= 0) {
-      return `🚨 ${label} bottomed out. Current reading: ${rounded}.`;
-    }
-    if (threshold <= 30) {
-      return `⚠️ ${label} slipped below ${threshold}. Current reading: ${rounded}.`;
-    }
-    return `🔻 ${label} dipped under ${threshold}. Current reading: ${rounded}.`;
-  }
 
-  _drawWildcardSeverity() {
-    const roll = Math.random();
-    if (roll < 0.25) {
-      return {
-        label: "Low Profile",
-        outcome: "Somehow the auditors stay glued to their inboxes, and the crew pockets quiet gains.",
-        effects: { progress: 5, budget: 4, relationships: -2, compliance: -5 },
-        historySuffix: " – Slipped By",
-      };
-    }
-    if (roll < 0.85) {
-      return {
-        label: "Heat Rising",
-        outcome: "Rumours spiral around town, and partner nations send frosty emails asking for clarification.",
-        effects: { progress: 6, budget: 5, relationships: -6, compliance: -12 },
-        historySuffix: " – Raised Eyebrows",
-      };
-    }
-    return {
-      label: "Investigation Launched",
-      outcome: "Compliance officers find a paper trail before lunch. Inspectors descend with clipboards and emergency suspension powers.",
-      effects: { progress: -2, budget: -8, relationships: -12, compliance: -22 },
-      historySuffix: " – Busted",
-    };
-  }
-
-  _calculateRiskChance() {
-    const metrics = this.state?.metrics;
-    if (!metrics) {
-      return 0.45;
-    }
-    const budgetFactor = (metrics.budget - 50) / 150;
-    const complianceDrag = (50 - metrics.compliance) / 120;
-    const relationshipBoost = (metrics.relationships - 50) / 220;
-    const forestHealthDrag = (50 - metrics.forestHealth) / 260;
-    const raw = 0.38 + budgetFactor - complianceDrag + relationshipBoost - forestHealthDrag;
-    return Math.min(0.8, Math.max(0.15, raw));
-  }
-
-  _riskEffectProfiles(chance) {
-    const deviation = chance - 0.45;
-    const successScale = 1 - deviation * 0.9;
-    const failureScale = 1 + (-deviation) * 1.1;
-    return {
-      successEffects: this._scaleEffects(
-        {
-          progress: 8,
-          budget: 5,
-          relationships: 3,
-          compliance: -4,
-        },
-        successScale
-      ),
-      failureEffects: this._scaleEffects(
-        {
-          progress: -7,
-          budget: -9,
-          relationships: -6,
-          compliance: -8,
-        },
-        failureScale
-      ),
-    };
-  }
-
-  _scaleEffects(effects, scale) {
-    const scaled = {};
-    for (const [key, value] of Object.entries(effects)) {
-      const adjusted = Math.round(value * scale);
-      if (adjusted !== 0) {
-        scaled[key] = adjusted;
+      // Game over: Political capital gone (fired)
+      if (journey.resources.politicalCapital <= 0) {
+        this.gameOver = true;
+        journey.endReason = 'Lost political support - removed from position';
+        return;
       }
     }
-    return scaled;
   }
 
-  _buildRiskNarratives(type, areaName, effects) {
-    const templates = type === "success" ? this._riskSuccessTemplates(areaName) : this._riskFailureTemplates(areaName);
-    return templates.map((template) => ({
-      headline: template.headline,
-      outcome: template.outcome,
-      effects,
-      historyLabelSuffix: template.historyLabelSuffix,
-    }));
-  }
+  async _showEndScreen() {
+    this.ui.clear();
 
-  _riskSuccessTemplates(areaName) {
-    return [
-      {
-        headline: "Adrenaline Rush Pays Off",
-        outcome:
-          "The convoy rockets through the timber under aurora glow. Radios crackle with victory yelps and the mill rewards your audacity.",
-        historyLabelSuffix: " — Paid Off",
-      },
-      {
-        headline: "Big Bet Impresses the Board",
-        outcome: `Investors wake to sunrise selfies from the ${areaName} blitz. The brass declares you a legend of opportunistic logistics.`,
-        historyLabelSuffix: " — Board Approved",
-      },
-      {
-        headline: "Caribou Never Saw It Coming",
-        outcome: "Wildlife stewards praise your delicate timing as you thread machines between migratory herds without a single spooked hoof.",
-        historyLabelSuffix: " — Wildlife Wowed",
-      },
-    ];
-  }
+    if (this.victory) {
+      this.ui.writeHeader('EXPEDITION SUCCESSFUL');
+      this.ui.write('');
+      this.ui.write(this.journey.endReason);
+    } else {
+      this.ui.writeHeader('EXPEDITION FAILED');
+      this.ui.write('');
+      this.ui.writeWarning(this.journey.endReason);
+    }
 
-  _riskFailureTemplates(areaName) {
-    return [
-      {
-        headline: "Cratered in Spectacular Fashion",
-        outcome:
-          "A drone pilot streams the whole gambit. Sirens echo, fines rain down, and the crew feels their stomachs drop into the slash pile.",
-        historyLabelSuffix: " — Backfired",
-      },
-      {
-        headline: "Camp Cook Live-Blogged the Chaos",
-        outcome: `The mess tent posts viral updates about machines sunk axle-deep near ${areaName}. Regulators binge-watch the feed with clipboards ready.`,
-        historyLabelSuffix: " — Livestreamed",
-      },
-      {
-        headline: "Union Steward Pulls the Plug",
-        outcome: "Crew reps stage an impromptu safety stand-down after midnight mishaps, forcing an expensive reset while the rumour mill erupts.",
-        historyLabelSuffix: " — Mutiny",
-      },
-    ];
-  }
+    this.ui.write('');
+    this.ui.writeDivider('FINAL STATISTICS');
 
-  _seasonHeadline(season, baseline) {
-    if (!baseline) {
-      return "";
-    }
-    const metrics = this.state?.metrics;
-    if (!metrics) {
-      return "";
-    }
-    const deltas = Object.fromEntries(
-      Object.entries(baseline).map(([key, value]) => [key, Math.round((metrics[key] ?? 0) - value)])
-    );
-    const candidates = Object.entries(deltas)
-      .map(([key, change]) => ({ key, change, magnitude: Math.abs(change) }))
-      .filter((entry) => entry.magnitude >= 2)
-      .sort((a, b) => b.magnitude - a.magnitude);
-    if (!candidates.length) {
-      return `🗞️ ${season} dispatch: "Steady as she goes" reports the Northern Timber Times.`;
-    }
-    const top = candidates[0];
-    const pool = top.change >= 0 ? this._seasonPositiveHeadlines(top.key) : this._seasonNegativeHeadlines(top.key);
-    const template = this._pickRandom(pool);
-    if (!template) {
-      return "";
-    }
-    return `🗞️ ${template.replace("{value}", Math.abs(top.change)).replace("{season}", season)}`;
-  }
+    const journey = this.journey;
 
-  _seasonPositiveHeadlines(metric) {
-    switch (metric) {
-      case "progress":
-        return [
-          "{season} dispatch: Haulers celebrate a {value}-point surge in delivered loads.",
-          "{season} bonus edition: Mill logs spike {value} ticks as your blitz clears the block list.",
-        ];
-      case "forestHealth":
-        return [
-          "{season} dispatch: Botanists high-five over {value}-point forest health rebound.",
-          "{season} roundup: Satellite imagery shows canopy vigor up {value} after your tweaks.",
-        ];
-      case "relationships":
-        return [
-          "{season} dispatch: Treaty partners applaud a {value}-point goodwill upswing.",
-          "{season} news: Community radio spotlights your listening sessions, boosting ties by {value} ticks.",
-        ];
-      case "compliance":
-        return [
-          "{season} bulletin: Compliance office notes {value}-point improvement—no red pens snapped today.",
-          "{season} update: Auditors send heart emojis after risk profile tightens by {value}.",
-        ];
-      case "budget":
-        return [
-          "{season} ledger leak: Finance applauds a {value}-point bump in rainy-day funds.",
-          "{season} dispatch: Treasury meme account hails your {value}-point budget glow-up.",
-        ];
-      default:
-        return [];
+    if (journey.journeyType === 'field') {
+      const progressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+      this.ui.write(`Distance Traveled: ${journey.distanceTraveled}/${journey.totalDistance} km (${progressPct}%)`);
+      this.ui.write(`Days Elapsed: ${journey.day - 1}`);
+      this.ui.write(`Blocks Completed: ${journey.currentBlockIndex}/${journey.blocks.length}`);
+    } else {
+      this.ui.write(`Permits Approved: ${journey.permits.approved}/${journey.permits.target}`);
+      this.ui.write(`Days Used: ${journey.day - 1}/${journey.deadline}`);
+      this.ui.write(`Budget Remaining: $${journey.resources.budget.toLocaleString()}`);
     }
-  }
 
-  _seasonNegativeHeadlines(metric) {
-    switch (metric) {
-      case "progress":
-        return [
-          "{season} dispatch: Production plunges {value} as graders sit idle in camp.",
-          "{season} late edition: Dispatch riders complain of {value}-point schedule slippage.",
-        ];
-      case "forestHealth":
-        return [
-          "{season} dispatch: Forest health dips {value}; moss bloggers sound the alarm.",
-          "{season} update: Satellite imagery shows canopy stress climbing {value} ticks.",
-        ];
-      case "relationships":
-        return [
-          "{season} dispatch: Partner liaisons report {value}-point goodwill crash after tense calls.",
-          "{season} news: Community FM loops a protest ballad over {value}-point relationship slide.",
-        ];
-      case "compliance":
-        return [
-          "{season} bulletin: Compliance nosedives {value}; auditors dust off the raid jackets.",
-          "{season} alert: Regulators cite {value}-point slide while sharpening suspension notices.",
-        ];
-      case "budget":
-        return [
-          "{season} ledger leak: Budget drains by {value}; finance orders instant ramen for camp.",
-          "{season} dispatch: Bean counters gasp at {value}-point burn rate spike.",
-        ];
-      default:
-        return [];
+    this.ui.write('');
+    this.ui.writeDivider('CREW FATE');
+
+    for (const member of journey.crew) {
+      const info = getCrewDisplayInfo(member);
+      let fate;
+      if (!member.isActive) {
+        if (member.health <= 0) {
+          fate = 'Died during expedition';
+        } else if (member.morale <= 0) {
+          fate = 'Quit the expedition';
+        } else {
+          fate = 'Evacuated for medical care';
+        }
+      } else if (this.victory) {
+        fate = 'Completed the journey';
+      } else {
+        fate = 'Stranded';
+      }
+      this.ui.write(`${info.name} (${info.role}): ${fate}`);
     }
+
+    // Show journey log highlights
+    if (journey.log?.length > 0) {
+      this.ui.write('');
+      this.ui.writeDivider('KEY EVENTS');
+      const highlights = journey.log.slice(-5);
+      for (const entry of highlights) {
+        this.ui.write(`Day ${entry.day}: ${entry.eventTitle || entry.type}`);
+      }
+    }
+
+    this.ui.write('');
+    this.ui.write('Press ESC to start a new expedition.');
+
+    // Wait for restart
+    await this.ui.promptChoice('', [{ label: 'New Expedition', value: 'restart' }]);
+    this.start();
   }
 }
 
-function findRoleByLabel(label) {
-  return FORESTER_ROLES.find((role) => label.startsWith(role.name));
-}
-
-function findAreaByLabel(label) {
-  return OPERATING_AREAS.find((area) => label.startsWith(area.name));
-}
-
-window.addEventListener("DOMContentLoaded", () => {
-  const game = new ForestryGame();
+// Initialize game on DOM load
+window.addEventListener('DOMContentLoaded', () => {
+  const game = new ForestryTrailGame();
   game.start();
 });
