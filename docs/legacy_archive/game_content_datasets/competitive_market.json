@@ -1,0 +1,118 @@
+{
+  "category": "Competitive Market",
+  "description": "Rival companies and market dynamics system",
+  "rival_companies": [
+    {
+      "id": "PACIFIC_TIMBER",
+      "name": "Pacific Timber Corp",
+      "size": "LARGE",
+      "specialization": "High-volume operations",
+      "market_share": 0.25,
+      "aggressiveness": 0.7,
+      "reputation": 0.6,
+      "financial_strength": 0.8,
+      "regions": ["SBS", "IDF"]
+    },
+    {
+      "id": "WESTERN_FOREST",
+      "name": "Western Forest Industries",
+      "size": "MEDIUM",
+      "specialization": "Sustainable forestry",
+      "market_share": 0.18,
+      "aggressiveness": 0.4,
+      "reputation": 0.8,
+      "financial_strength": 0.6,
+      "regions": ["IDF", "MS"]
+    },
+    {
+      "id": "NORTHERN_MILLS",
+      "name": "Northern Mills Ltd",
+      "size": "LARGE",
+      "specialization": "Integrated operations",
+      "market_share": 0.22,
+      "aggressiveness": 0.8,
+      "reputation": 0.5,
+      "financial_strength": 0.9,
+      "regions": ["SBS"]
+    },
+    {
+      "id": "COASTAL_LOGGING",
+      "name": "Coastal Logging Co",
+      "size": "SMALL",
+      "specialization": "Niche markets",
+      "market_share": 0.12,
+      "aggressiveness": 0.5,
+      "reputation": 0.7,
+      "financial_strength": 0.4,
+      "regions": ["MS"]
+    },
+    {
+      "id": "GREEN_HARVEST",
+      "name": "Green Harvest Solutions",
+      "size": "MEDIUM",
+      "specialization": "Certified forestry",
+      "market_share": 0.15,
+      "aggressiveness": 0.3,
+      "reputation": 0.9,
+      "financial_strength": 0.5,
+      "regions": ["IDF", "MS"]
+    }
+  ],
+  "market_conditions": {
+    "OVERSUPPLY": {
+      "price_impact": -0.15,
+      "competition_level": 0.8,
+      "description": "Market oversaturated with timber supply"
+    },
+    "BALANCED": {
+      "price_impact": 0,
+      "competition_level": 0.5,
+      "description": "Stable market conditions"
+    },
+    "HIGH_DEMAND": {
+      "price_impact": 0.12,
+      "competition_level": 0.7,
+      "description": "Strong demand driving prices up"
+    },
+    "SUPPLY_SHORTAGE": {
+      "price_impact": 0.25,
+      "competition_level": 0.9,
+      "description": "Supply constraints creating premium prices"
+    }
+  },
+  "competitive_events": [
+    "contract_competition",
+    "price_war",
+    "partnership_opportunity",
+    "market_disruption",
+    "regulatory_challenge",
+    "technology_advancement",
+    "reputation_attack"
+  ],
+  "partnership_types": [
+    {
+      "name": "Joint Venture on Large Contract",
+      "investment": 150000,
+      "benefit": "Shared risk, higher win probability on major contracts",
+      "relationship_boost": 0.3
+    },
+    {
+      "name": "Shared Infrastructure Development",
+      "investment": 200000,
+      "benefit": "Cost reduction on roads, equipment sharing",
+      "relationship_boost": 0.2
+    },
+    {
+      "name": "Market Intelligence Sharing",
+      "investment": 50000,
+      "benefit": "Better competitor insights, coordinated pricing",
+      "relationship_boost": 0.15
+    },
+    {
+      "name": "Technology Partnership",
+      "investment": 120000,
+      "benefit": "Shared R&D costs, operational efficiency gains",
+      "relationship_boost": 0.25
+    }
+  ]
+}

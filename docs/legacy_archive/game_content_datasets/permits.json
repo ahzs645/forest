@@ -1,0 +1,82 @@
+{
+  "category": "Permit Types",
+  "description": "Different permit types required for forestry operations in BC",
+  "permit_types": [
+    {
+      "id": "cutting_permit",
+      "name": "Cutting Permit",
+      "base_cost": 15000,
+      "base_timeline_days": 90,
+      "description": "Authorization to harvest timber from a specific cutblock",
+      "requirements": ["Forest Management Plan", "Environmental Assessment", "First Nations Consultation"],
+      "approval_factors": {
+        "reputation": 0.2,
+        "first_nations_relations": 0.3,
+        "compliance_history": 0.25,
+        "environmental_record": 0.25
+      }
+    },
+    {
+      "id": "road_permit",
+      "name": "Road Use Permit",
+      "base_cost": 8000,
+      "base_timeline_days": 45,
+      "description": "Authorization to construct or use forest service roads",
+      "requirements": ["Engineering Assessment", "Environmental Review"],
+      "approval_factors": {
+        "compliance_history": 0.4,
+        "environmental_record": 0.3,
+        "reputation": 0.3
+      }
+    },
+    {
+      "id": "special_use_permit",
+      "name": "Special Use Permit",
+      "base_cost": 5000,
+      "base_timeline_days": 30,
+      "description": "Authorization for non-timber activities like camps or staging areas",
+      "requirements": ["Site Plan", "Environmental Assessment"],
+      "approval_factors": {
+        "compliance_history": 0.5,
+        "reputation": 0.5
+      }
+    },
+    {
+      "id": "salvage_permit",
+      "name": "Salvage Permit",
+      "base_cost": 12000,
+      "base_timeline_days": 25,
+      "description": "Fast-track authorization for harvesting damaged timber",
+      "requirements": ["Damage Assessment", "Volume Estimate"],
+      "approval_factors": {
+        "compliance_history": 0.6,
+        "reputation": 0.4
+      },
+      "notes": "Expedited process for fire/beetle/windthrow damaged areas"
+    }
+  ],
+  "permit_modifiers": {
+    "first_nations_agreement": {
+      "timeline_reduction": 0.2,
+      "approval_bonus": 0.15
+    },
+    "fsc_certification": {
+      "timeline_reduction": 0.1,
+      "approval_bonus": 0.1
+    },
+    "previous_violations": {
+      "timeline_increase": 0.3,
+      "approval_penalty": 0.2
+    },
+    "environmental_bond": {
+      "cost_increase": 50000,
+      "approval_bonus": 0.1
+    }
+  },
+  "denial_consequences": {
+    "reputation_penalty": 0.05,
+    "reapplication_delay_days": 30,
+    "appeal_cost": 25000,
+    "appeal_success_rate": 0.3
+  }
+}

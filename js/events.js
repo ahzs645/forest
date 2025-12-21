@@ -7,6 +7,8 @@ import { FIELD_EVENTS, getApplicableFieldEvents, selectRandomFieldEvent } from '
 import { DESK_EVENTS, getApplicableDeskEvents, selectRandomDeskEvent } from './data/deskEvents.js';
 import { applyRandomInjury, applyStatusEffect } from './crew.js';
 import { PACE_OPTIONS } from './journey.js';
+import { FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
+import { LEGACY_ILLEGAL_ACTS } from './data/legacyIllegalActs.js';
 
 /**
  * Check if a random event should occur
@@ -14,11 +16,9 @@ import { PACE_OPTIONS } from './journey.js';
  * @returns {Object|null} Event to resolve or null
  */
 export function checkForEvent(journey) {
-  if (journey.journeyType === 'field') {
-    return checkFieldEvent(journey);
-  } else {
-    return checkDeskEvent(journey);
-  }
+  const event = journey.journeyType === 'field' ? checkFieldEvent(journey) : checkDeskEvent(journey);
+  if (event) return event;
+  return maybeCreateTemptationEvent(journey);
 }
 
 /**
@@ -73,6 +73,65 @@ function checkDeskEvent(journey) {
     stressModifier: stressModifier * moraleModifier,
     crisisMode: daysRemaining < 3
   });
+}
+
+function maybeCreateTemptationEvent(journey) {
+  if (!Array.isArray(LEGACY_ILLEGAL_ACTS) || LEGACY_ILLEGAL_ACTS.length === 0) {
+    return null;
+  }
+
+  const chance = journey.journeyType === 'desk' ? 0.03 : 0.04;
+  if (Math.random() > chance) return null;
+
+  const roleId = journey.roleId || journey.role?.id;
+  const candidates = LEGACY_ILLEGAL_ACTS.filter((act) => {
+    if (!act) return false;
+    if (!Array.isArray(act.roles) || act.roles.length === 0) return true;
+    return roleId ? act.roles.includes(roleId) : true;
+  });
+
+  const pool = candidates.length ? candidates : LEGACY_ILLEGAL_ACTS;
+  const act = pool[Math.floor(Math.random() * pool.length)];
+  if (!act) return null;
+
+  const isDesk = journey.journeyType === 'desk';
+  const baseGain = isDesk ? 3500 : 650;
+  const swing = isDesk ? 2500 : 550;
+  const gain = Math.max(0, Math.round(baseGain + (Math.random() * 2 - 1) * swing));
+
+  const takeEffects = isDesk
+    ? { budget: gain, politicalCapital: -4 }
+    : { budget: Math.min(gain, 1200), equipment: -8, crew_morale: -3 };
+
+  const refuseEffects = isDesk ? { politicalCapital: 2 } : { crew_morale: 2 };
+  const reportEffects = isDesk ? { politicalCapital: 4, timeUsed: 2 } : { crew_morale: 1 };
+
+  return {
+    id: `legacy_temptation_${String(act.id || Math.random().toString(36).slice(2))}`,
+    title: String(act.title || 'Shady Shortcut'),
+    type: 'temptation',
+    severity: 'moderate',
+    probability: 0,
+    description: String(act.description || 'A tempting shortcut appears.'),
+    options: [
+      {
+        label: 'Refuse and keep it clean',
+        outcome: 'You walk away. It keeps the run boring, but safe.',
+        effects: refuseEffects
+      },
+      {
+        label: 'Take the shortcut (high risk)',
+        outcome: 'It pays off today. Tomorrow is a question mark.',
+        effects: takeEffects,
+        riskInjury: isDesk ? undefined : 0.12
+      },
+      {
+        label: 'Document and report',
+        outcome: 'You put it in writing. It takes time, but strengthens your position.',
+        effects: reportEffects
+      }
+    ]
+  };
 }
 
 /**
@@ -194,34 +253,48 @@ export function resolveEvent(journey, event, option) {
 function applyEventEffects(journey, effects, messages) {
   // Resource effects (field)
   if (journey.journeyType === 'field') {
-    if (effects.fuel) {
-      journey.resources.fuel = Math.max(0, journey.resources.fuel + effects.fuel);
+    if (typeof effects.budget === 'number') {
+      journey.resources.budget = Math.max(0,
+        Math.min(FIELD_RESOURCES.budget.max, journey.resources.budget + effects.budget));
+      if (effects.budget !== 0) {
+        const delta = effects.budget;
+        const label = delta > 0 ? `+$${Math.abs(delta).toLocaleString()}` : `-$${Math.abs(delta).toLocaleString()}`;
+        messages.push(`Cash: ${label}`);
+      }
+    }
+    if (typeof effects.fuel === 'number') {
+      journey.resources.fuel = Math.max(0,
+        Math.min(FIELD_RESOURCES.fuel.max, journey.resources.fuel + effects.fuel));
       if (effects.fuel < 0) messages.push(`Fuel: ${effects.fuel} gallons`);
     }
-    if (effects.food) {
-      journey.resources.food = Math.max(0, journey.resources.food + effects.food);
+    if (typeof effects.food === 'number') {
+      journey.resources.food = Math.max(0,
+        Math.min(FIELD_RESOURCES.food.max, journey.resources.food + effects.food));
       if (effects.food < 0) messages.push(`Food: ${effects.food} days`);
     }
-    if (effects.equipment) {
-      journey.resources.equipment = Math.max(0, Math.min(100, journey.resources.equipment + effects.equipment));
+    if (typeof effects.equipment === 'number') {
+      journey.resources.equipment = Math.max(0,
+        Math.min(FIELD_RESOURCES.equipment.max, journey.resources.equipment + effects.equipment));
       if (effects.equipment < 0) messages.push(`Equipment: ${effects.equipment}%`);
     }
-    if (effects.firstAid) {
-      journey.resources.firstAid = Math.max(0, journey.resources.firstAid + effects.firstAid);
+    if (typeof effects.firstAid === 'number') {
+      journey.resources.firstAid = Math.max(0,
+        Math.min(FIELD_RESOURCES.firstAid.max, journey.resources.firstAid + effects.firstAid));
     }
   }
 
   // Resource effects (desk)
   if (journey.journeyType === 'desk') {
-    if (effects.budget) {
-      journey.resources.budget = Math.max(0, journey.resources.budget + effects.budget);
+    if (typeof effects.budget === 'number') {
+      journey.resources.budget = Math.max(0,
+        Math.min(DESK_RESOURCES.budget.max, journey.resources.budget + effects.budget));
       if (effects.budget < 0) messages.push(`Budget: $${Math.abs(effects.budget)}`);
     }
-    if (effects.politicalCapital) {
+    if (typeof effects.politicalCapital === 'number') {
       journey.resources.politicalCapital = Math.max(0,
-        Math.min(100, journey.resources.politicalCapital + effects.politicalCapital));
+        Math.min(DESK_RESOURCES.politicalCapital.max, journey.resources.politicalCapital + effects.politicalCapital));
     }
-    if (effects.timeUsed) {
+    if (typeof effects.timeUsed === 'number') {
       journey.hoursRemaining = Math.max(0, journey.hoursRemaining - effects.timeUsed);
     }
   }

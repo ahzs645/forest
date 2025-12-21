@@ -1,0 +1,263 @@
+{
+  "category": "Expanded CEO System",
+  "description": "Hireable CEOs with detailed profiles, decision-making capabilities, and strategic recommendation systems",
+  "ceo_profiles": [
+    {
+      "id": "margaret_chen",
+      "name": "Margaret Chen",
+      "background": "Former BC Ministry of Forests executive",
+      "annual_fee": 200000,
+      "profit_cut": 0.30,
+      "decision_making": 0.60,
+      "risk_tolerance": "conservative",
+      "strengths": ["Regulatory expertise", "Government relations", "Risk management"],
+      "weaknesses": ["Slow to innovate", "Avoids profitable risks"],
+      "hiring_effects": {
+        "permit_bonus": 0.1,
+        "description": "Immediate permit processing improvement from government connections"
+      },
+      "specialty_recommendations": [
+        {
+          "title": "Government Relations Blitz",
+          "description": "Launch intensive lobbying campaign with my former Ministry colleagues",
+          "rationale": "I know exactly which bureaucrats are creating bottlenecks. Strategic meetings and 'consulting fees' can accelerate everything.",
+          "cost": 75000,
+          "immediate_effects": {"Permit processing": "+50% speed", "Government relationships": "Enhanced"},
+          "long_term_effects": {"Regulatory advantage": "Ongoing", "Industry reputation": "Government insider"},
+          "risk_level": "low",
+          "success_chance": 0.9
+        },
+        {
+          "title": "Regulatory Compliance Excellence Program",
+          "description": "Implement gold-standard environmental and safety protocols",
+          "rationale": "Perfect compliance creates regulatory goodwill. Inspectors will start fast-tracking our applications.",
+          "cost": 120000,
+          "immediate_effects": {"Compliance rating": "Excellent", "Permit bonus": "+0.1"},
+          "long_term_effects": {"Regulatory trust": "Maximum", "Audit frequency": "Reduced"},
+          "risk_level": "low",
+          "success_chance": 0.85
+        }
+      ],
+      "rejection_reactions": [
+        "I understand the conservative approach, but regulatory compliance is not optional.",
+        "My government experience says this will become mandatory eventually.",
+        "Being proactive with regulators always pays dividends."
+      ]
+    },
+    {
+      "id": "james_running_bear",
+      "name": "James Running Bear",
+      "background": "Indigenous forestry leader with 25 years experience",
+      "annual_fee": 180000,
+      "profit_cut": 0.30,
+      "decision_making": 0.60,
+      "risk_tolerance": "moderate",
+      "strengths": ["First Nations relations", "Sustainable practices", "Community engagement"],
+      "weaknesses": ["Limited international markets", "Technology adoption"],
+      "hiring_effects": {
+        "relationship_boost": 0.1,
+        "description": "Immediate First Nations relationship improvement"
+      },
+      "specialty_recommendations": [
+        {
+          "title": "Indigenous Partnership Initiative",
+          "description": "Establish genuine co-management agreements with traditional knowledge integration",
+          "rationale": "My community connections can repair these relationships. True partnership, not just consultation, creates long-term stability.",
+          "cost": 180000,
+          "immediate_effects": {"First Nations relationships": "+0.3 all", "Cultural protocols": "Implemented"},
+          "long_term_effects": {"Partnership agreements": "Signed", "Community support": "Strong"},
+          "risk_level": "low",
+          "success_chance": 0.9
+        },
+        {
+          "title": "Traditional Territory Revenue Sharing",
+          "description": "Proactively offer 5% revenue sharing before it becomes mandatory",
+          "rationale": "Revenue sharing is coming whether we like it or not. Getting ahead of legislation creates goodwill and negotiating power.",
+          "cost": 0,
+          "immediate_effects": {"Future revenue": "-5%", "Indigenous relations": "Transformed"},
+          "long_term_effects": {"Legal challenges": "Eliminated", "Social license": "Secured"},
+          "risk_level": "medium",
+          "success_chance": 0.8
+        }
+      ],
+      "rejection_reactions": [
+        "I understand budget constraints, but relationships take time to build.",
+        "From my community perspective, this sends the wrong message.",
+        "Genuine partnership is more valuable than short-term savings."
+      ]
+    },
+    {
+      "id": "alexandra_kowalski",
+      "name": "Alexandra Kowalski",
+      "background": "Former Wall Street timber investment analyst",
+      "annual_fee": 250000,
+      "profit_cut": 0.30,
+      "decision_making": 0.60,
+      "risk_tolerance": "aggressive",
+      "strengths": ["Financial optimization", "Market analysis", "Profit maximization"],
+      "weaknesses": ["Regulatory compliance", "Environmental concerns", "Public relations"],
+      "hiring_effects": {
+        "revenue_multiplier": 1.05,
+        "description": "Immediate 5% revenue improvement from market optimization"
+      },
+      "specialty_recommendations": [
+        {
+          "title": "Operational Efficiency Overhaul",
+          "description": "Implement lean manufacturing principles and renegotiate contractor agreements",
+          "rationale": "Our operating costs are 15% above industry average. I can leverage my Wall Street connections to bring in efficiency consultants.",
+          "cost": 150000,
+          "immediate_effects": {"Operating cost reduction": "$8/m3", "Staff layoffs": "15 positions"},
+          "long_term_effects": {"Annual savings": "$400,000+", "Competitive advantage": "Significant"},
+          "risk_level": "medium",
+          "success_chance": 0.8
+        },
+        {
+          "title": "Premium Market Penetration",
+          "description": "Target high-end US and Asian markets with premium lumber grades",
+          "rationale": "We're leaving money on the table. My international contacts can access luxury markets paying 50%+ premiums.",
+          "cost": 200000,
+          "immediate_effects": {"Revenue per m3": "+$12", "Marketing costs": "$50,000"},
+          "long_term_effects": {"Market positioning": "Premium tier", "Customer loyalty": "High-value contracts"},
+          "risk_level": "medium",
+          "success_chance": 0.75
+        }
+      ],
+      "rejection_reactions": [
+        "I understand the conservative approach, but we're missing profit opportunities.",
+        "The numbers don't lie - this was a solid ROI proposition.",
+        "Market timing is critical. These opportunities won't last forever."
+      ]
+    },
+    {
+      "id": "dr_david_sustainability",
+      "name": "Dr. David Sustainability",
+      "background": "Environmental science PhD, certification specialist",
+      "annual_fee": 170000,
+      "profit_cut": 0.30,
+      "decision_making": 0.60,
+      "risk_tolerance": "conservative",
+      "strengths": ["Certification expertise", "Environmental compliance", "Scientific research"],
+      "weaknesses": ["Business acumen", "Aggressive timelines", "Cost control"],
+      "hiring_effects": {
+        "biodiversity_boost": 0.05,
+        "description": "Immediate biodiversity score improvement from environmental focus"
+      },
+      "specialty_recommendations": [
+        {
+          "title": "Triple Certification Strategy",
+          "description": "Simultaneously pursue FSC, SFI, and PEFC certifications for maximum market access",
+          "rationale": "My research shows certified timber commands 20-30% premiums. Multiple certifications open all premium markets.",
+          "cost": 250000,
+          "immediate_effects": {"Certification costs": "$250k", "Environmental audit": "Comprehensive"},
+          "long_term_effects": {"Revenue premium": "25%+", "Market access": "Global premium markets"},
+          "risk_level": "medium",
+          "success_chance": 0.85
+        },
+        {
+          "title": "Ecosystem Services Program",
+          "description": "Monetize carbon storage, watershed protection, and biodiversity conservation",
+          "rationale": "Environmental services are becoming valuable commodities. We can generate revenue while harvesting through ecosystem service credits.",
+          "cost": 100000,
+          "immediate_effects": {"Biodiversity score": "+0.2", "Environmental monitoring": "Advanced"},
+          "long_term_effects": {"Carbon credit revenue": "$50k annually", "Environmental reputation": "Industry leader"},
+          "risk_level": "low",
+          "success_chance": 0.8
+        }
+      ],
+      "rejection_reactions": [
+        "Environmental leadership requires investment, but the returns are substantial.",
+        "The market is moving toward sustainability - we need to lead, not follow.",
+        "Certification premiums more than offset the costs in my analysis."
+      ]
+    }
+  ],
+  "ceo_management": {
+    "replacement_costs": {
+      "severance_multiplier": 0.25,
+      "headhunter_fee": 50000
+    },
+    "termination_severance_multiplier": 0.5,
+    "strategic_directions": [
+      {
+        "direction": "Focus on regulatory compliance and risk reduction",
+        "sets_risk_tolerance": "conservative",
+        "effects": {"permit_bonus": 0.05}
+      },
+      {
+        "direction": "Prioritize First Nations relationships and consultation",
+        "effects": {"all_fn_relationship_boost": 0.05}
+      },
+      {
+        "direction": "Maximize short-term profits and harvest volumes",
+        "sets_risk_tolerance": "aggressive",
+        "effects": {"operating_cost_reduction": 0.05}
+      },
+      {
+        "direction": "Invest heavily in certifications and sustainability",
+        "effects": {"biodiversity_boost": 0.05}
+      },
+      {
+        "direction": "Balance all factors with moderate approach",
+        "sets_risk_tolerance": "moderate"
+      }
+    ],
+    "decision_cost_formula": "annual_fee / 8 per decision set",
+    "automated_decision_chance": 0.60
+  },
+  "universal_recommendations": [
+    {
+      "trigger": "budget > 3000000",
+      "title": "Aggressive Expansion Strategy",
+      "description": "Acquire smaller competitors and unused tenure rights",
+      "rationale": "We have the capital to consolidate the industry. Competitors are struggling - we can buy them cheap and eliminate competition.",
+      "cost": 1500000,
+      "immediate_effects": {"Market share": "Doubled", "Competition": "Reduced"},
+      "long_term_effects": {"Industry dominance": "Regional monopoly", "Pricing power": "Significant"},
+      "risk_level": "high",
+      "success_chance": 0.7
+    },
+    {
+      "trigger": "reputation < 0.4",
+      "title": "Reputation Recovery Campaign",
+      "description": "Hire top-tier PR firm and launch community investment program",
+      "rationale": "Our reputation is toxic. Without social license, we'll face constant resistance. Investment in image is investment in operations.",
+      "cost": 300000,
+      "immediate_effects": {"Reputation": "+0.3", "Community programs": "Launched"},
+      "long_term_effects": {"Social license": "Restored", "Opposition": "Reduced"},
+      "risk_level": "low",
+      "success_chance": 0.8
+    }
+  ],
+  "recommendation_modification_options": [
+    {
+      "option": "Reduce scope and cost by 50%",
+      "cost_multiplier": 0.5,
+      "success_multiplier": 0.8,
+      "effect_multiplier": 0.6
+    },
+    {
+      "option": "Increase timeline to reduce risk",
+      "risk_reduction": true,
+      "success_boost": 0.1
+    },
+    {
+      "option": "Add additional safeguards",
+      "cost_multiplier": 1.2,
+      "success_boost": 0.15,
+      "risk_reduction": true
+    },
+    {
+      "option": "Focus only on highest-impact elements",
+      "cost_multiplier": 0.7,
+      "keeps_only_best_effect": true
+    }
+  ],
+  "performance_tracking": {
+    "quarterly_increment": 0.25,
+    "profitable_year_rating_boost": 0.05,
+    "unprofitable_rating_penalty": 0.1,
+    "approved_recommendation_boost": 0.02,
+    "all_rejected_penalty": 0.05,
+    "successful_implementation_boost": 0.05
+  }
+}

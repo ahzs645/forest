@@ -1,0 +1,22 @@
+{
+  "category": "First Nations Liaison Types",
+  "description": "Different liaison specialists that can be hired for First Nations relations",
+  "liaison_types": [
+    {
+      "id": "indigenous_specialist",
+      "name": "Indigenous Relations Specialist",
+      "cost": 80000,
+      "effectiveness": 0.9,
+      "bias": "indigenous",
+      "description": "First Nations member with deep cultural knowledge and community connections"
+    },
+    {
+      "id": "corporate_consultant",
+      "name": "Corporate Consultant",
+      "cost": 60000,
+      "effectiveness": 0.6,
+      "bias": "corporate",
+      "description": "Business-focused consultant prioritizing company interests"
+    }
+  ]
+}

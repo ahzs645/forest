@@ -1,0 +1,61 @@
+{
+  "category": "CEO Profiles",
+  "description": "Hireable CEO characters with different strengths and management styles",
+  "ceo_candidates": [
+    {
+      "id": "margaret_chen",
+      "name": "Margaret Chen",
+      "background": "Former BC Ministry of Forests executive",
+      "annual_fee": 200000,
+      "profit_cut": 0.3,
+      "decision_making_style": "conservative",
+      "risk_tolerance": "conservative",
+      "strengths": ["Regulatory expertise", "Government connections", "Compliance focus"],
+      "weaknesses": ["Slow to innovate", "Risk averse", "Limited market vision"]
+    },
+    {
+      "id": "james_running_bear",
+      "name": "James Running Bear",
+      "background": "Indigenous forestry leader",
+      "annual_fee": 180000,
+      "profit_cut": 0.3,
+      "decision_making_style": "relationship-focused",
+      "risk_tolerance": "moderate",
+      "strengths": ["First Nations relations", "Community engagement", "Cultural knowledge"],
+      "weaknesses": ["Limited international markets", "Slower growth focus"]
+    }
+  ],
+  "ceo_decision_styles": {
+    "aggressive-growth": {
+      "description": "Focus on rapid expansion and market capture",
+      "auto_decisions": ["High-risk investments", "Aggressive bidding"],
+      "recommendation": "Expand operations aggressively"
+    },
+    "cost-cutting": {
+      "description": "Focus on efficiency and reducing overhead",
+      "auto_decisions": ["Reduce operating costs", "Streamline operations"],
+      "recommendation": "Further cost reductions needed",
+      "side_effects": ["May increase safety violations"]
+    },
+    "relationship-focused": {
+      "description": "Focus on stakeholder relationships and community",
+      "auto_decisions": ["Improve First Nations relations", "Community investment"],
+      "recommendation": "Continue building stakeholder relationships"
+    },
+    "conservative": {
+      "description": "Focus on stability and compliance",
+      "auto_decisions": ["Regulatory compliance", "Risk mitigation"],
+      "recommendation": "Maintain steady course"
+    }
+  },
+  "mechanics": {
+    "performance_rating_range": [0, 1],
+    "quarterly_profit_affects_rating": true,
+    "delegation_effectiveness": {
+      "permit_management": 0.9,
+      "stakeholder_relations": 0.8,
+      "operational_efficiency": 0.95,
+      "strategic_planning": 0.7
+    }
+  }
+}

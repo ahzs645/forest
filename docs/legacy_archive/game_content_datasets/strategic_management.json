@@ -1,0 +1,117 @@
+{
+  "category": "Strategic Management Activities",
+  "description": "Management initiatives players can invest in for long-term benefits",
+  "company_sizes": {
+    "SMALL_COMPANY": { "actions_per_quarter": 2, "staff_cost": 50000 },
+    "MEDIUM_COMPANY": { "actions_per_quarter": 3, "staff_cost": 120000 },
+    "LARGE_COMPANY": { "actions_per_quarter": 4, "staff_cost": 200000 },
+    "ENTERPRISE": { "actions_per_quarter": 5, "staff_cost": 350000 }
+  },
+  "expansion_costs": {
+    "SMALL_to_MEDIUM": 200000,
+    "MEDIUM_to_LARGE": 350000,
+    "LARGE_to_ENTERPRISE": 500000,
+    "temporary_consultant": 75000
+  },
+  "management_activities": [
+    {
+      "id": "PERMIT_FOCUS",
+      "name": "Strategic Permit Management",
+      "cost": 25000,
+      "duration_quarters": 1,
+      "prerequisites": { "staff_level": "SMALL_COMPANY" },
+      "effects": { "permit_efficiency": 0.15 },
+      "description": "Focus management attention on permit applications and approvals"
+    },
+    {
+      "id": "FN_ENGAGEMENT",
+      "name": "First Nations Relationship Building",
+      "cost": 35000,
+      "duration_quarters": 1,
+      "prerequisites": { "staff_level": "SMALL_COMPANY" },
+      "effects": { "fn_relations": 0.12, "community_support": 0.08 },
+      "description": "Comprehensive engagement with First Nations communities"
+    },
+    {
+      "id": "STRATEGIC_PLANNING",
+      "name": "Strategic Business Planning",
+      "cost": 45000,
+      "duration_quarters": 2,
+      "prerequisites": { "staff_level": "MEDIUM_COMPANY" },
+      "effects": { "planning_bonus": 0.1, "efficiency": 0.08 },
+      "description": "Long-term strategic planning and business optimization"
+    },
+    {
+      "id": "MARKET_DEVELOPMENT",
+      "name": "Market Development & Sales",
+      "cost": 60000,
+      "duration_quarters": 1,
+      "prerequisites": { "staff_level": "MEDIUM_COMPANY" },
+      "effects": { "price_premium": 0.12, "customer_relations": 0.15 },
+      "description": "Develop new markets and strengthen customer relationships"
+    },
+    {
+      "id": "ENVIRONMENTAL_STEWARDSHIP",
+      "name": "Environmental Stewardship Program",
+      "cost": 75000,
+      "duration_quarters": 2,
+      "prerequisites": { "staff_level": "MEDIUM_COMPANY" },
+      "effects": { "reputation": 0.2, "permit_bonus": 0.1, "biodiversity_score": 0.15 },
+      "description": "Comprehensive environmental protection and enhancement"
+    },
+    {
+      "id": "INNOVATION_RD",
+      "name": "Innovation & Research Development",
+      "cost": 85000,
+      "duration_quarters": 3,
+      "prerequisites": { "staff_level": "LARGE_COMPANY", "budget_minimum": 500000 },
+      "effects": { "efficiency": 0.2, "technology_bonus": 0.15, "competitive_advantage": 0.1 },
+      "description": "Invest in new technologies and operational innovations"
+    },
+    {
+      "id": "SUPPLY_CHAIN",
+      "name": "Supply Chain Optimization",
+      "cost": 55000,
+      "duration_quarters": 2,
+      "prerequisites": { "staff_level": "MEDIUM_COMPANY" },
+      "effects": { "cost_reduction": 0.08, "operational_efficiency": 0.12 },
+      "description": "Optimize logistics, equipment, and operational processes"
+    },
+    {
+      "id": "RISK_MANAGEMENT",
+      "name": "Enterprise Risk Management",
+      "cost": 70000,
+      "duration_quarters": 2,
+      "prerequisites": { "staff_level": "LARGE_COMPANY" },
+      "effects": { "disaster_resilience": 0.25, "insurance_discount": 0.15 },
+      "description": "Comprehensive risk assessment and mitigation strategies"
+    },
+    {
+      "id": "WORKFORCE_DEVELOPMENT",
+      "name": "Workforce Training & Development",
+      "cost": 40000,
+      "duration_quarters": 1,
+      "prerequisites": { "staff_level": "MEDIUM_COMPANY" },
+      "effects": { "safety_bonus": 0.2, "productivity": 0.1, "employee_retention": 0.15 },
+      "description": "Invest in employee skills and safety training"
+    },
+    {
+      "id": "GOVERNMENT_RELATIONS",
+      "name": "Government Relations & Lobbying",
+      "cost": 90000,
+      "duration_quarters": 1,
+      "prerequisites": { "staff_level": "LARGE_COMPANY", "reputation_minimum": 0.6 },
+      "effects": { "regulatory_influence": 0.2, "permit_bonus": 0.15, "policy_access": 0.1 },
+      "description": "Build relationships with government officials and policymakers"
+    },
+    {
+      "id": "CRISIS_MANAGEMENT",
+      "name": "Crisis Communication & Management",
+      "cost": 65000,
+      "duration_quarters": 1,
+      "prerequisites": { "staff_level": "MEDIUM_COMPANY" },
+      "effects": { "reputation_protection": 0.3, "media_relations": 0.2 },
+      "description": "Prepare for and manage potential crises and PR challenges"
+    }
+  ]
+}

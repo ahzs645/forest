@@ -1,0 +1,678 @@
+{
+  "category": "Legacy Illegal Acts",
+  "description": "Imported from previous versions; source archived under docs/legacy_archive.",
+  "illegal_acts": [
+    {
+      "id": "black-market-timber-maps",
+      "title": "Forge Midnight Timber Maps",
+      "description": "Swap in doctored GIS layers so unauthorized blocks slide through referral reviews before daylight.",
+      "roles": [
+        "planner",
+        "permitter"
+      ],
+      "tags": [
+        "mapping",
+        "fraud"
+      ]
+    },
+    {
+      "id": "bootleg-fibre-shuffle",
+      "title": "Bootleg Fibre Shuffle",
+      "description": "Rebrand poached old-growth as windthrow salvage and funnel it through a shell mill down south.",
+      "roles": [
+        "planner",
+        "recce"
+      ],
+      "tags": [
+        "old-growth",
+        "laundering"
+      ]
+    },
+    {
+      "id": "bribed-hazard-flags",
+      "title": "Bribe Hazard Flaggers",
+      "description": "Pay quad scouts to 'forget' wildlife tree patches so the mainline can punch straight through.",
+      "roles": [
+        "recce"
+      ],
+      "tags": [
+        "wildlife",
+        "bribery"
+      ]
+    },
+    {
+      "id": "permit-fastpass",
+      "title": "Permit FastPass",
+      "description": "Gift ski trips to ministry reviewers in exchange for rubber-stamped cutting permits.",
+      "roles": [
+        "permitter"
+      ],
+      "tags": [
+        "corruption",
+        "compliance"
+      ]
+    },
+    {
+      "id": "slash-burn-party",
+      "title": "Midnight Slash Burn Party",
+      "description": "Light debris piles without smoke notifications to dodge venting forecasts and paperwork.",
+      "roles": [
+        "silviculture",
+        "recce"
+      ],
+      "tags": [
+        "fire",
+        "risk"
+      ]
+    },
+    {
+      "id": "seedling-switcheroo",
+      "title": "Seedling Switcheroo",
+      "description": "Invoice premium whitebark pine while planting bargain lodgepole because the inspector stayed in town.",
+      "roles": [
+        "silviculture"
+      ],
+      "tags": [
+        "fraud",
+        "nursery"
+      ]
+    },
+    {
+      "id": "ghost-monitoring",
+      "title": "Ghost Monitoring Reports",
+      "description": "Copy last year's ecosystem monitoring data and change the date so audits see a perfect trendline.",
+      "roles": [
+        "planner",
+        "silviculture"
+      ],
+      "tags": [
+        "reporting",
+        "fabrication"
+      ]
+    },
+    {
+      "id": "under-the-table-road",
+      "title": "Under-the-Table Road Build",
+      "description": "Carve an access spur through a no-go riparian reserve at night to reach premium spruce.",
+      "roles": [
+        "recce",
+        "permitter"
+      ],
+      "tags": [
+        "riparian",
+        "blatant"
+      ]
+    },
+    {
+      "id": "bigfoot-haulage",
+      "title": "Hire Bigfoot as a Subcontractor",
+      "description": "Disguise a legendary biped as an equipment operator to double-shift the log haul without HR paperwork.",
+      "roles": [
+        "recce",
+        "planner"
+      ],
+      "tags": [
+        "mythical",
+        "labour"
+      ]
+    },
+    {
+      "id": "carbon-offset-spin",
+      "title": "Rebrand Clearcuts as Carbon Offsets",
+      "description": "Pitch every stump field as a visionary 'future sequestration hub' and invoice municipal partners for credits.",
+      "roles": [
+        "planner",
+        "permitter"
+      ],
+      "tags": [
+        "greenwashing"
+      ]
+    },
+    {
+      "id": "reality-show-pitch",
+      "title": "Film a Logging Reality Show",
+      "description": "Invite a streaming crew to dramatize your cutblocks, editing out safety briefings to keep the drama spicy.",
+      "roles": [
+        "recce",
+        "silviculture"
+      ],
+      "tags": [
+        "media",
+        "spectacle"
+      ]
+    },
+    {
+      "id": "midnight-bridge-shrink",
+      "title": "Midnight Bridge Diet",
+      "description": "Trim two metres off the engineered span after sign-off so the prefab girders fit the discount truck you already hired.",
+      "roles": [
+        "planner",
+        "permitter"
+      ],
+      "tags": [
+        "engineering",
+        "corner-cutting"
+      ]
+    },
+    {
+      "id": "helicopter-bingo",
+      "title": "Helicopter Bingo Fuel Scam",
+      "description": "Shuffle aerial block flight logs so you can bill the same sling loads twice and pocket the carbon levy rebate.",
+      "roles": [
+        "recce",
+        "planner"
+      ],
+      "tags": [
+        "billing",
+        "aviation"
+      ]
+    },
+    {
+      "id": "silt-fence-mirage",
+      "title": "Silt Fence Mirage",
+      "description": "Stage photogenic erosion controls the morning of inspection, then roll them up by lunch to keep the skid trail flowing.",
+      "roles": [
+        "silviculture",
+        "recce"
+      ],
+      "tags": [
+        "compliance",
+        "erosion"
+      ]
+    },
+    {
+      "id": "wildlife-eviction-notices",
+      "title": "Serve Wildlife Eviction Notices",
+      "description": "Pin fake relocation approvals on burrow trees so spotters assume the owls hired movers on their own dime.",
+      "roles": [
+        "recce",
+        "silviculture"
+      ],
+      "tags": [
+        "wildlife",
+        "forgery"
+      ]
+    },
+    {
+      "id": "inventory-data-laundering",
+      "title": "Launder Inventory Data",
+      "description": "Feed doctored LiDAR points into the timber supply model so your volume curve magically rises with every audit.",
+      "roles": [
+        "planner"
+      ],
+      "tags": [
+        "data",
+        "fraud",
+        "modeling"
+      ]
+    },
+    {
+      "id": "midnight-volume-swap",
+      "title": "Swap Volume Models at Midnight",
+      "description": "Overwrite the chief forester's projection spreadsheets with your aggressive cut targets while the servers reboot.",
+      "roles": [
+        "planner"
+      ],
+      "tags": [
+        "modeling",
+        "data",
+        "sabotage"
+      ]
+    },
+    {
+      "id": "phantom-culvert-locations",
+      "title": "Invent Phantom Culvert Locations",
+      "description": "Drop imaginary drainage structures into the GIS so referral reviewers think every fish-bearing creek is already protected.",
+      "roles": [
+        "planner",
+        "permitter"
+      ],
+      "tags": [
+        "mapping",
+        "deception"
+      ]
+    },
+    {
+      "id": "courtesy-flag-bribes",
+      "title": "Grease Courtesy Flag Crews",
+      "description": "Hand out gift cards so the layout crew 'forgets' to flag the cultural site buffers before your helicopter tour lands.",
+      "roles": [
+        "permitter"
+      ],
+      "tags": [
+        "bribery",
+        "cultural",
+        "compliance"
+      ]
+    },
+    {
+      "id": "disguised-habitat-burn",
+      "title": "Disguise a Habitat Burn",
+      "description": "Label a midnight broadcast burn as 'wildlife enhancement' to torch a stubborn reserve and slide the volume into this quarter's tally.",
+      "roles": [
+        "silviculture",
+        "recce"
+      ],
+      "tags": [
+        "fire",
+        "spin"
+      ]
+    },
+    {
+      "id": "salvage-raid-ferries",
+      "title": "Stage Salvage Raids from Ferry Docks",
+      "description": "Load dubious 'storm salvage' from coastal reserves straight onto night ferries before compliance patrols brew their coffee.",
+      "roles": [
+        "recce"
+      ],
+      "tags": [
+        "salvage",
+        "logistics",
+        "risk"
+      ]
+    },
+    {
+      "id": "hush-fund-monitoring",
+      "title": "Fund Monitoring with Hush Money",
+      "description": "Pay consultants to reuse last season's watershed report but watermark it 'proprietary' so auditors can't request the raw data.",
+      "roles": [
+        "planner",
+        "permitter"
+      ],
+      "tags": [
+        "monitoring",
+        "fraud"
+      ]
+    },
+    {
+      "id": "overtime-clone-crew",
+      "title": "Clone the Crew on Paper",
+      "description": "Duplicate your best fallers in the scheduling system so payroll covers a phantom second shift clearing sensitive blocks twice as fast.",
+      "roles": [
+        "recce",
+        "silviculture"
+      ],
+      "tags": [
+        "payroll",
+        "fraud"
+      ]
+    },
+    {
+      "id": "stealth-holly-herbicide",
+      "title": "Mist Holly with Ghost Herbicide",
+      "description": "Spike the invasive species tank with unlabeled product, then log it as a 'manual pull' so the regulator never sees the spray records.",
+      "roles": [
+        "silviculture"
+      ],
+      "tags": [
+        "herbicide",
+        "covert",
+        "records"
+      ]
+    },
+    {
+      "id": "ghost-borehole-ledger",
+      "title": "Forge Borehole Ledgers",
+      "description": "Transcribe invented geotech cores for every proposed landing so engineering signs off without stepping in the muskeg.",
+      "roles": [
+        "planner"
+      ],
+      "tags": [
+        "engineering",
+        "fabrication",
+        "risk"
+      ]
+    },
+    {
+      "id": "rogue-prospectors-liaison",
+      "title": "Coordinate with Rogue Prospectors",
+      "description": "Trade access routes with unlicensed mineral crews, letting them stash equipment in your block while you borrow their creek crossings.",
+      "roles": [
+        "recce",
+        "permitter"
+      ],
+      "tags": [
+        "access",
+        "collusion"
+      ]
+    },
+    {
+      "id": "drone-scouting-poachers",
+      "title": "Scout with Poacher Drones",
+      "description": "Rent wildlife poachers' thermal drones to map ungulate beds, then file the intel as 'traditional knowledge' to fast-track roads.",
+      "roles": [
+        "recce",
+        "planner"
+      ],
+      "tags": [
+        "drones",
+        "ethics"
+      ]
+    },
+    {
+      "id": "midnight-planting-bots",
+      "title": "Deploy Midnight Planting Bots",
+      "description": "Sneak autonomous planters into restricted burn scars, logging premium stocking credits without human eyes on the slopes.",
+      "roles": [
+        "silviculture"
+      ],
+      "tags": [
+        "automation",
+        "stocking",
+        "covert"
+      ]
+    },
+    {
+      "id": "hushmail-bid-rigging",
+      "title": "Rig Bids over Hushmail",
+      "description": "Coordinate service contracts through encrypted burner accounts so every tender 'naturally' lands with your cousin's outfit.",
+      "roles": [
+        "permitter",
+        "planner"
+      ],
+      "tags": [
+        "procurement",
+        "collusion"
+      ]
+    },
+    {
+      "id": "illegal-camp-laundromat",
+      "title": "Run a Camp Laundromat Side Hustle",
+      "description": "Launder cash through a fake camp services vendor, billing overtime laundry for crews that only exist on the org chart.",
+      "roles": [
+        "recce"
+      ],
+      "tags": [
+        "laundering",
+        "payroll",
+        "fraud"
+      ]
+    },
+    {
+      "id": "wildfire-grant-siphon",
+      "title": "Siphon Wildfire Grants",
+      "description": "Repackage slash disposal as 'community wildfire resilience workshops' and invoice emergency funds for work your fallers already did.",
+      "roles": [
+        "planner",
+        "permitter"
+      ],
+      "tags": [
+        "grants",
+        "double-dip"
+      ]
+    },
+    {
+      "id": "midnight-variance-forgery",
+      "title": "Forge Midnight Variances",
+      "description": "Backdate variance approvals on letterhead you scanned from the breakroom corkboard so the haul can roll before dawn.",
+      "roles": [
+        "permitter"
+      ],
+      "tags": [
+        "forgery",
+        "paperwork",
+        "rush"
+      ]
+    },
+    {
+      "id": "trespass-lidar-raid",
+      "title": "Stage a Trespass LiDAR Raid",
+      "description": "Fly a contract aircraft through a restricted valley at night to scoop height data for your competitor's untouched stands.",
+      "roles": [
+        "recce",
+        "planner"
+      ],
+      "tags": [
+        "aerial",
+        "espionage"
+      ]
+    },
+    {
+      "id": "ferry-cull-dump",
+      "title": "Dump Cull Logs off the Ferry",
+      "description": "Heave off-grade stems into deepwater while crossing the strait, then record them as donated habitat structures.",
+      "roles": [
+        "silviculture",
+        "recce"
+      ],
+      "tags": [
+        "disposal",
+        "coverup"
+      ]
+    },
+    {
+      "id": "hush-harvest-units",
+      "title": "Hide Extra Harvest Units",
+      "description": "Nest bonus cutblocks under shared block IDs so the AAC dashboard shows compliance even as trucks pour out secret spurs.",
+      "roles": [
+        "planner"
+      ],
+      "tags": [
+        "aac",
+        "fraud",
+        "reporting"
+      ]
+    },
+    {
+      "id": "black-market-seedlot",
+      "title": "Broker Black Market Seedlots",
+      "description": "Swap regen orders with coastal smugglers to score restricted seedlots, then claim they came from a sanctioned orchard.",
+      "roles": [
+        "silviculture"
+      ],
+      "tags": [
+        "seed",
+        "smuggling",
+        "fraud"
+      ]
+    },
+    {
+      "id": "shadow-nursery-pilot",
+      "title": "Pilot a Shadow Nursery",
+      "description": "Run a hidden greenhouse under the decommissioned heli-pad, billing its diesel to the community engagement fund.",
+      "roles": [
+        "silviculture",
+        "planner"
+      ],
+      "tags": [
+        "nursery",
+        "coverup"
+      ]
+    },
+    {
+      "id": "ghost-hazard-assessment",
+      "title": "Ghost a Hazard Assessment",
+      "description": "Copy last year's danger tree list, swap the block names, and sign off the form without sending anyone upriver.",
+      "roles": [
+        "recce",
+        "planner"
+      ],
+      "tags": [
+        "safety",
+        "forgery"
+      ]
+    },
+    {
+      "id": "midnight-hydro-cloaking",
+      "title": "Cloak Hydro Reroutes at Midnight",
+      "description": "Install unapproved siphons to drain wetlands, then mark the area as 'naturally dry' in your morning site memo.",
+      "roles": [
+        "planner",
+        "permitter"
+      ],
+      "tags": [
+        "hydro",
+        "illegal-works"
+      ]
+    },
+    {
+      "id": "hush-cabin-resurvey",
+      "title": "Hush the Cabin Resurvey",
+      "description": "Shuffle the boundary markers around an unpermitted guide cabin so tenure inspectors think the structure predates mapping.",
+      "roles": [
+        "recce"
+      ],
+      "tags": [
+        "tenure",
+        "deception",
+        "mapping"
+      ]
+    },
+    {
+      "id": "stealth-owl-relocation",
+      "title": "Stage a Stealth Owl Relocation",
+      "description": "Relocate a family of owls with a pet carrier, then submit photos of empty nests to justify clearing the buffer.",
+      "roles": [
+        "silviculture",
+        "recce"
+      ],
+      "tags": [
+        "wildlife",
+        "tampering"
+      ]
+    },
+    {
+      "id": "phantom-budget-recode",
+      "title": "Recode Phantom Budgets",
+      "description": "Split illegal road costs across dozens of office expense codes so the compliance spreadsheet shows nothing but ergonomic chairs.",
+      "roles": [
+        "planner"
+      ],
+      "tags": [
+        "budget",
+        "fraud",
+        "accounting"
+      ]
+    },
+    {
+      "id": "bribed-bridge-inspector",
+      "title": "Tip Off the Bridge Inspector",
+      "description": "Slip the certifying engineer a season pass so they sign off your underslung crossing without visiting the canyon.",
+      "roles": [
+        "permitter",
+        "recce"
+      ],
+      "tags": [
+        "engineering",
+        "bribery"
+      ]
+    },
+    {
+      "id": "hush-fee-surcharge",
+      "title": "Invent Hush Fee Surcharges",
+      "description": "Add mysterious 'regulatory harmonization' fees to logging invoices, funneling the skim into an off-book compliance kitty.",
+      "roles": [
+        "permitter"
+      ],
+      "tags": [
+        "billing",
+        "fraud",
+        "slush"
+      ]
+    },
+    {
+      "id": "midnight-hauler-switch",
+      "title": "Switch Haulers at Midnight",
+      "description": "Swap licensed truck plates onto your moonlighting rigs after dark to double-haul volume through weight-restricted corridors.",
+      "roles": [
+        "recce"
+      ],
+      "tags": [
+        "transport",
+        "plates",
+        "risk"
+      ]
+    },
+    {
+      "id": "illicit-carbon-spreadsheet",
+      "title": "Cook the Carbon Spreadsheet",
+      "description": "Massage sequestration formulas in the corporate dashboard so leadership believes every slash pile is soaking up emissions.",
+      "roles": [
+        "planner"
+      ],
+      "tags": [
+        "carbon",
+        "analytics",
+        "fraud"
+      ]
+    },
+    {
+      "id": "rogue-referral-autoresponder",
+      "title": "Spoof Referral Autoresponders",
+      "description": "Program fake email acknowledgements for overdue agencies so management thinks every referral was answered on time.",
+      "roles": [
+        "permitter",
+        "planner"
+      ],
+      "tags": [
+        "communication",
+        "deception"
+      ]
+    },
+    {
+      "id": "smuggled-aviation-fuel",
+      "title": "Smuggle Aviation Fuel Credits",
+      "description": "Submit rotor-wing fuel receipts twice—once to wildfire services, once to your own ledger—and pocket the duplicate rebate.",
+      "roles": [
+        "recce",
+        "planner"
+      ],
+      "tags": [
+        "aviation",
+        "fraud"
+      ]
+    },
+    {
+      "id": "covert-silviculture-royalties",
+      "title": "Skim Silviculture Royalties",
+      "description": "License your staff's planting photos to a stock website, then invoice the royalty purchases back to the reforestation grant.",
+      "roles": [
+        "silviculture"
+      ],
+      "tags": [
+        "media",
+        "royalties",
+        "fraud"
+      ]
+    },
+    {
+      "id": "sleeper-crew-hiding",
+      "title": "Hide Sleeper Crews in Payroll",
+      "description": "Rotate fake employee numbers through the timesheet so benefits flow to a rainy-day strike fund.",
+      "roles": [
+        "recce",
+        "permitter"
+      ],
+      "tags": [
+        "payroll",
+        "slush"
+      ]
+    },
+    {
+      "id": "undercover-mitigation-tour",
+      "title": "Host an Undercover Mitigation Tour",
+      "description": "Bus regulators to a scenic demo block while contractors quietly blast rock on the real, unpermitted spur.",
+      "roles": [
+        "permitter",
+        "recce"
+      ],
+      "tags": [
+        "diversion",
+        "staging"
+      ]
+    },
+    {
+      "id": "shadow-gravel-quarry",
+      "title": "Open a Shadow Gravel Quarry",
+      "description": "Excavate an unsanctioned borrow pit beyond the tenure line and mark the trucks as 'public works' in the GPS logs.",
+      "roles": [
+        "recce",
+        "planner"
+      ],
+      "tags": [
+        "materials",
+        "coverup"
+      ]
+    }
+  ]
+}

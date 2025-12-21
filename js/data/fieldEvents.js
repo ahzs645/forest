@@ -5,9 +5,10 @@
 
 // Import data from JSON (Vite handles JSON imports natively)
 import eventsData from './json/field/events.json';
+import legacyEventsData from './json/legacy/fieldEvents.json';
 
 // Export events
-export const FIELD_EVENTS = eventsData;
+export const FIELD_EVENTS = [...eventsData, ...(legacyEventsData || [])];
 
 /**
  * Get events filtered by conditions

@@ -1,0 +1,80 @@
+{
+  "category": "Policy and Natural Events",
+  "description": "Random events related to government policy changes and natural disasters",
+  "events": [
+    {
+      "id": "old_growth_deferrals",
+      "type": "policy",
+      "title": "Old-Growth Deferrals Expansion",
+      "description": "Government announces additional old-growth deferrals - 2M hectares now under deferral",
+      "effects": {
+        "reputation": 0.1,
+        "blocks_cancelled": "old_growth_affected_pending"
+      },
+      "trigger_chance": 0.15
+    },
+    {
+      "id": "glyphosate_ban",
+      "type": "policy",
+      "title": "Glyphosate Phase-Out",
+      "description": "Provincial government phases out glyphosate use - chemical vegetation control no longer permitted",
+      "effects": {
+        "reputation": 0.15
+      },
+      "trigger_chance": 0.05
+    },
+    {
+      "id": "wildfire_season",
+      "type": "natural_disaster",
+      "title": "Major Wildfire Season",
+      "description": "Major fires affect timber supply, government fast-tracks salvage permits (25-day timeline)",
+      "effects": {
+        "permit_backlog_reduction": 30,
+        "aac_reduction": 0.05
+      },
+      "trigger_chance": 0.1
+    },
+    {
+      "id": "media_spotlight",
+      "type": "policy",
+      "title": "Media Spotlight on Forestry",
+      "description": "Forestry practices under public scrutiny - outcome depends on current reputation",
+      "effects": {
+        "reputation_high": 0.1,
+        "reputation_low": -0.2
+      },
+      "trigger_chance": 0.1
+    },
+    {
+      "id": "court_ruling",
+      "type": "policy",
+      "title": "First Nations Land Rights Victory",
+      "description": "Court ruling strengthens First Nations land rights - stricter consultation requirements now in effect",
+      "effects": {
+        "consultation_cost_increase": 15000
+      },
+      "trigger_chance": 0.1
+    },
+    {
+      "id": "mountain_pine_beetle",
+      "type": "natural_disaster",
+      "title": "Mountain Pine Beetle Outbreak",
+      "description": "Beetle outbreak detected in harvest areas - 20-60% volume loss, salvage operations required",
+      "effects": {
+        "volume_loss_range": [0.2, 0.6],
+        "timber_quality": "reduced"
+      },
+      "trigger_chance": 0.08
+    },
+    {
+      "id": "severe_windstorm",
+      "type": "natural_disaster",
+      "title": "Severe Windstorm",
+      "description": "Windstorm damages standing timber - 10-30% volume loss to windthrow",
+      "effects": {
+        "volume_loss_range": [0.1, 0.3]
+      },
+      "trigger_chance": 0.04
+    }
+  ]
+}

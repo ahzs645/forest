@@ -6,6 +6,8 @@
 import { progressBar, box, BOX, PROGRESS, healthIndicator } from './ascii.js';
 import { getCrewDisplayInfo, getActiveCrewCount, getAverageMorale } from './crew.js';
 import { FIELD_RESOURCES, DESK_RESOURCES, getResourcePercentage } from './resources.js';
+import { GLOSSARY_TERMS } from './data/glossary.js';
+import { LEGACY_GLOSSARY_TERMS } from './data/legacyGlossary.js';
 
 export class TerminalUI {
   constructor() {
@@ -32,6 +34,7 @@ export class TerminalUI {
     // Header buttons
     this.statusBtn = document.getElementById('status-btn');
     this.helpBtn = document.getElementById('help-btn');
+    this.glossaryBtn = document.getElementById('glossary-btn');
     this.restartBtn = document.getElementById('restart-btn');
     this.closePanel = document.getElementById('close-panel');
 
@@ -92,6 +95,10 @@ export class TerminalUI {
       this.helpBtn.addEventListener('click', () => this.showHelp());
     }
 
+    if (this.glossaryBtn) {
+      this.glossaryBtn.addEventListener('click', () => this.showGlossary());
+    }
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       // Number keys for choices
@@ -114,6 +121,12 @@ export class TerminalUI {
       if (e.key === 'l' && !this._isInputFocused()) {
         e.preventDefault();
         if (this._onLogRequest) this._onLogRequest();
+      }
+
+      // G for glossary
+      if (e.key === 'g' && !this._isInputFocused()) {
+        e.preventDefault();
+        this.showGlossary();
       }
 
       // Escape to close panel or modal
@@ -638,6 +651,83 @@ export class TerminalUI {
         <p><strong>Keep your crew healthy and reach your goal!</strong></p>
       `,
       actions: [{ label: 'Got it!', primary: true }]
+    });
+  }
+
+  showGlossary() {
+    const combined = [...(Array.isArray(GLOSSARY_TERMS) ? GLOSSARY_TERMS : []), ...(Array.isArray(LEGACY_GLOSSARY_TERMS) ? LEGACY_GLOSSARY_TERMS : [])]
+      .filter((t) => t && typeof t.term === 'string' && typeof t.description === 'string');
+
+    const seen = new Set();
+    const terms = combined.filter((t) => {
+      const key = t.term.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => a.term.localeCompare(b.term));
+
+    this.openModal({
+      title: 'GLOSSARY',
+      dismissible: true,
+      buildContent: (container) => {
+        const wrapper = document.createElement('div');
+
+        const input = document.createElement('input');
+        input.type = 'search';
+        input.placeholder = 'Search terms...';
+        input.className = 'text-input';
+        input.style.width = '100%';
+        input.style.marginBottom = '12px';
+
+        const list = document.createElement('div');
+        list.style.maxHeight = '52vh';
+        list.style.overflow = 'auto';
+
+        const render = (query) => {
+          const q = (query || '').trim().toLowerCase();
+          const filtered = q
+            ? terms.filter((t) => t.term.toLowerCase().includes(q) || t.description.toLowerCase().includes(q))
+            : terms;
+
+          list.innerHTML = '';
+
+          if (filtered.length === 0) {
+            const empty = document.createElement('div');
+            empty.textContent = 'No matches.';
+            empty.className = 'term-dim';
+            list.appendChild(empty);
+            return;
+          }
+
+          for (const t of filtered.slice(0, 80)) {
+            const row = document.createElement('div');
+            row.style.marginBottom = '10px';
+
+            const title = document.createElement('div');
+            title.textContent = t.term;
+            title.style.fontWeight = '700';
+
+            const desc = document.createElement('div');
+            desc.textContent = t.description;
+            desc.className = 'term-dim';
+            desc.style.marginTop = '2px';
+
+            row.appendChild(title);
+            row.appendChild(desc);
+            list.appendChild(row);
+          }
+        };
+
+        input.addEventListener('input', () => render(input.value));
+
+        wrapper.appendChild(input);
+        wrapper.appendChild(list);
+        container.appendChild(wrapper);
+
+        render('');
+        setTimeout(() => input.focus(), 0);
+      },
+      actions: [{ label: 'Close', primary: true, onSelect: () => this.closeModal() }]
     });
   }
 

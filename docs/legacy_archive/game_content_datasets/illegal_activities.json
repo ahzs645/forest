@@ -1,0 +1,100 @@
+{
+  "category": "Illegal Activities",
+  "description": "Illegal operations players can choose to engage in with risk/reward mechanics",
+  "trigger_chance": 0.6,
+  "simple_operations": [
+    {
+      "id": "buffer_zone_violation",
+      "name": "Harvest Buffer Zone Violation",
+      "description": "Cut trees within 30m of streams",
+      "story": "Your crew supervisor suggests 'adjusting' the buffer zone boundaries. Those extra trees near the creek are worth serious money.",
+      "cost_savings": 180000,
+      "detection_risk": 0.4,
+      "reputation_penalty": 0.2,
+      "fine_amount": 450000
+    },
+    {
+      "id": "exceed_boundaries",
+      "name": "Exceed Cut Block Boundaries",
+      "description": "Harvest beyond approved limits",
+      "story": "GPS shows premium timber just 50m beyond your boundary. Your crew chief says nobody will notice.",
+      "cost_savings": 220000,
+      "detection_risk": 0.3,
+      "reputation_penalty": 0.15,
+      "fine_amount": 550000
+    },
+    {
+      "id": "underreport_volumes",
+      "name": "Underreport Harvest Volumes",
+      "description": "Scale logs smaller to reduce fees",
+      "story": "The scaling supervisor hints that reported volumes could be 'conservative'. 20% underreporting saves massive stumpage fees.",
+      "cost_savings": 320000,
+      "detection_risk": 0.2,
+      "reputation_penalty": 0.1,
+      "fine_amount": 800000
+    },
+    {
+      "id": "bypass_archaeological",
+      "name": "Bypass Archaeological Assessment",
+      "description": "Skip heritage clearance requirements",
+      "story": "Archaeological assessment has been pending for 6 months. Your crew leader suggests just proceeding.",
+      "cost_savings": 150000,
+      "detection_risk": 0.5,
+      "reputation_penalty": 0.4,
+      "fine_amount": 600000
+    }
+  ],
+  "complex_operations": [
+    {
+      "id": "government_kickback",
+      "name": "Government Contract Kickback Scheme",
+      "description": "Multi-year corruption operation with government officials",
+      "story": "A government official offers preferential treatment for timber licenses in exchange for regular payments.",
+      "total_profit": 8500000,
+      "base_risk": 0.2,
+      "complexity": "extreme",
+      "stages": [
+        { "name": "Initial Contact", "cost": 50000, "profit": 0, "risk_increase": 0.1 },
+        { "name": "First Timber License", "cost": 100000, "profit": 2000000, "risk_increase": 0.15 },
+        { "name": "Expand Operation", "cost": 200000, "profit": 3000000, "risk_increase": 0.2 },
+        { "name": "Final Payoff", "cost": 150000, "profit": 4000000, "risk_increase": 0.3 }
+      ]
+    },
+    {
+      "id": "timber_laundering",
+      "name": "Cross-Border Timber Laundering",
+      "description": "International smuggling ring for restricted timber",
+      "story": "Export restricted old-growth timber through shell companies to overseas buyers at premium prices.",
+      "total_profit": 5200000,
+      "base_risk": 0.3,
+      "complexity": "high",
+      "stages": [
+        { "name": "Setup Shell Companies", "cost": 80000, "profit": 0, "risk_increase": 0.05 },
+        { "name": "First Shipment", "cost": 150000, "profit": 1500000, "risk_increase": 0.1 },
+        { "name": "Establish Route", "cost": 100000, "profit": 2000000, "risk_increase": 0.15 },
+        { "name": "Scale Operations", "cost": 200000, "profit": 2200000, "risk_increase": 0.25 }
+      ]
+    },
+    {
+      "id": "tax_evasion",
+      "name": "Tax Evasion Network",
+      "description": "Offshore profit hiding scheme",
+      "story": "Your accountant knows people who can make profits 'disappear' through Caribbean shell companies.",
+      "total_profit": 3800000,
+      "base_risk": 0.25,
+      "complexity": "moderate",
+      "stages": [
+        { "name": "Offshore Setup", "cost": 100000, "profit": 0, "risk_increase": 0.08 },
+        { "name": "First Transfer", "cost": 0, "profit": 1200000, "risk_increase": 0.1 },
+        { "name": "Expand Network", "cost": 50000, "profit": 1500000, "risk_increase": 0.12 },
+        { "name": "Final Harvest", "cost": 0, "profit": 1200000, "risk_increase": 0.15 }
+      ]
+    }
+  ],
+  "consequences": {
+    "detection_triggers_investigation": true,
+    "criminal_convictions_affect_reputation": -0.01,
+    "bankruptcy_possible": true,
+    "declining_legal_option_bonus": 0.05
+  }
+}

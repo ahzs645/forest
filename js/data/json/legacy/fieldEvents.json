@@ -1,0 +1,597 @@
+[
+  {
+    "id": "sasquatch_sighting",
+    "title": "Sasquatch Family Establishes Homestead",
+    "type": "legacy",
+    "severity": "minor",
+    "probability": 0.02,
+    "description": "A Sasquatch family has moved into one of your harvest blocks",
+    "options": [
+      {
+        "label": "Negotiate with Sasquatch family for coexistence",
+        "outcome": "Sasquatch family agrees to sustainable coexistence!",
+        "effects": {
+          "budget": -2500,
+          "crew_morale": 8
+        }
+      },
+      {
+        "label": "Hire cryptozoologist to study them",
+        "outcome": "Cryptozoologist discovers Sasquatch are excellent forest managers.",
+        "effects": {
+          "budget": -3750
+        }
+      },
+      {
+        "label": "Sell documentary rights and relocate block",
+        "outcome": "Netflix deal signed! Block relocated.",
+        "effects": {
+          "budget": 5000
+        }
+      },
+      {
+        "label": "Ignore it and hope they leave",
+        "outcome": "Sasquatch family moves on, leaving a 1-star review.",
+        "effects": {
+          "crew_morale": -4
+        }
+      }
+    ]
+  },
+  {
+    "id": "social_media_viral",
+    "title": "TikTok Dance Trend",
+    "type": "legacy",
+    "severity": "minor",
+    "probability": 0.02,
+    "description": "A TikTok dance trend starts among forestry workers",
+    "options": [
+      {
+        "label": "Lean into it",
+        "outcome": "Merchandise sales generate $30,000",
+        "effects": {
+          "budget": 1500,
+          "crew_morale": 6
+        }
+      },
+      {
+        "label": "Stay focused",
+        "outcome": "You keep the crew on task and avoid distractions.",
+        "effects": {
+          "crew_morale": -1
+        }
+      }
+    ]
+  },
+  {
+    "id": "celebrity_endorsement",
+    "title": "Ryan Reynolds Endorsement",
+    "type": "legacy",
+    "severity": "minor",
+    "probability": 0.02,
+    "description": "Ryan Reynolds makes sarcastic commercials about your sustainable logging",
+    "options": [
+      {
+        "label": "Lean into it",
+        "outcome": "You adapt and roll with it.",
+        "effects": {
+          "budget": 6000,
+          "crew_morale": 10
+        }
+      },
+      {
+        "label": "Stay focused",
+        "outcome": "You keep the crew on task and avoid distractions.",
+        "effects": {
+          "crew_morale": -1
+        }
+      }
+    ]
+  },
+  {
+    "id": "alien_landing",
+    "title": "Alien First Contact",
+    "type": "legacy",
+    "severity": "minor",
+    "probability": 0.02,
+    "description": "An alien spacecraft lands in your logging road",
+    "options": [
+      {
+        "label": "Trade alien technology for Earth wood samples",
+        "outcome": "Aliens give you a matter replicator.",
+        "effects": {}
+      },
+      {
+        "label": "Offer aliens jobs in forest management",
+        "outcome": "Aliens join workforce as 'Interdimensional Forest Consultants'.",
+        "effects": {
+          "crew_morale": 8
+        }
+      },
+      {
+        "label": "Ask aliens for advice on sustainable practices",
+        "outcome": "Aliens share advanced ecological knowledge.",
+        "effects": {}
+      }
+    ]
+  },
+  {
+    "id": "peatland-subsidence_field",
+    "title": "Muskeg Subsidence on Haul Route",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "A warm spell is softening peatland crossings along your mainline north of the Peace River, and loaded trucks are starting to break through.",
+    "options": [
+      {
+        "label": "Corduroy the approaches and reduce axle loads",
+        "outcome": "Crews spend two days laying corduroy mats and instituting lighter loads. Production slows but you keep the haul alive.",
+        "effects": {
+          "progress": -4,
+          "budget": -750,
+          "crew_morale": 4
+        }
+      },
+      {
+        "label": "Reroute across higher ridge ground",
+        "outcome": "You pivot to a longer ridge alignment. It avoids damage yet demands extra engineering checks.",
+        "effects": {
+          "progress": -8,
+          "budget": -500,
+          "crew_morale": 5
+        }
+      },
+      {
+        "label": "Suspend hauling until freeze-up",
+        "outcome": "Operations pause entirely. Communities appreciate the caution while the mill scrambles for fibre.",
+        "effects": {
+          "progress": -12,
+          "crew_morale": 5
+        }
+      }
+    ]
+  },
+  {
+    "id": "caribou-range-closure_field",
+    "title": "Caribou Maternal Pen Closure",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "The province issues an emergency access restriction around a caribou maternal pen overlapping your BWBS and SWB tenure.",
+    "options": [
+      {
+        "label": "Shift development to alternate watersheds",
+        "outcome": "You relocate effort to adjacent drainages. Stakeholders applaud but contractors face idle periods.",
+        "effects": {
+          "progress": -10,
+          "crew_morale": 6
+        }
+      },
+      {
+        "label": "Negotiate limited access windows with guardians",
+        "outcome": "A co-developed schedule allows short hauling windows with Indigenous monitors on site.",
+        "effects": {
+          "progress": 4,
+          "crew_morale": 4
+        }
+      },
+      {
+        "label": "Challenge the order citing economic hardship",
+        "outcome": "An appeal buys you time but strains relationships across the table.",
+        "effects": {
+          "progress": 8,
+          "crew_morale": -5
+        }
+      }
+    ]
+  },
+  {
+    "id": "cultural-burning-collab_field",
+    "title": "Cultural Burning Collaboration",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "Lheidli T'enneh firekeepers request support for a cultural burn on SBS interface blocks to reduce ladder fuels before summer.",
+    "options": [
+      {
+        "label": "Fund planning and integrate burn objectives",
+        "outcome": "You supply burn plans, crews, and monitoring. The collaboration deepens trust and improves stand resilience.",
+        "effects": {
+          "progress": 2,
+          "budget": -750,
+          "crew_morale": 10
+        }
+      },
+      {
+        "label": "Decline citing risk and resource limits",
+        "outcome": "You keep focus on conventional treatments. Partners view the response as dismissive.",
+        "effects": {
+          "progress": 4,
+          "crew_morale": -3
+        }
+      },
+      {
+        "label": "Refer to BC Wildfire Service to lead",
+        "outcome": "BCWS agrees to facilitate under strict conditions. The burn proceeds cautiously with moderate relationship gains.",
+        "effects": {
+          "crew_morale": 6
+        }
+      }
+    ]
+  },
+  {
+    "id": "salmon-crossing-washout_field",
+    "title": "Salmon Crossing Washout",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "An atmospheric river scours a fish-bearing creek along your Skeena access road, leaving gear stranded beyond the washout.",
+    "options": [
+      {
+        "label": "Install a temporary Bailey bridge with habitat oversight",
+        "outcome": "Engineers and biologists fast-track a modular bridge. It's costly but keeps the salmon channel stable.",
+        "effects": {
+          "progress": 6,
+          "budget": -1250,
+          "crew_morale": 4
+        }
+      },
+      {
+        "label": "Suspend hauling and reroute to higher ground",
+        "outcome": "You leave equipment in place and develop a ridge detour. Contractors grumble, yet communities commend the patience.",
+        "effects": {
+          "progress": -8,
+          "crew_morale": 5
+        }
+      },
+      {
+        "label": "Helicopter sling high-value loads",
+        "outcome": "Critical gear is flown out to resume production elsewhere, draining contingency funds.",
+        "effects": {
+          "progress": 2,
+          "budget": -1750,
+          "crew_morale": 1
+        }
+      }
+    ]
+  },
+  {
+    "id": "smoke-inversion_field",
+    "title": "Persistent Smoke Inversion",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "Wildfires to the south trap smoke over the SBS plateau, pushing particulate levels past safe work thresholds for a week.",
+    "options": [
+      {
+        "label": "Move crews to remote sensing and planning tasks",
+        "outcome": "You pivot to mapping, data entry, and equipment maintenance until the inversion breaks.",
+        "effects": {
+          "progress": -4,
+          "crew_morale": 4
+        }
+      },
+      {
+        "label": "Maintain field work with respirators and hazard pay",
+        "outcome": "Productivity stays high but morale drops and WorkSafeBC raises concerns.",
+        "effects": {
+          "progress": 10,
+          "budget": -250,
+          "crew_morale": -2
+        }
+      }
+    ]
+  },
+  {
+    "id": "spruce-budworm-front_field",
+    "title": "Spruce Budworm Expansion",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "Budworm egg masses appear across SBS regeneration blocks, threatening next year's survival counts.",
+    "options": [
+      {
+        "label": "Deploy aerial BtK treatments on priority polygons",
+        "outcome": "You charter aircraft for targeted spraying, stemming the outbreak with regulator support.",
+        "effects": {
+          "progress": 4,
+          "budget": -1250,
+          "crew_morale": 6
+        }
+      },
+      {
+        "label": "Adjust stocking standards and species mix",
+        "outcome": "You amend prescriptions to diversify species resilience, lowering immediate survival targets.",
+        "effects": {
+          "progress": -2,
+          "crew_morale": 5
+        }
+      },
+      {
+        "label": "Monitor and hope for natural predators",
+        "outcome": "Monitoring costs stay low, yet defoliation expands and auditors flag the passive stance.",
+        "effects": {
+          "progress": -6
+        }
+      }
+    ]
+  },
+  {
+    "id": "ice-road-window_field",
+    "title": "Ice Road Window Collapsing",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "Mid-winter rain threatens to close the ice bridge supplying your BWBS camp for the rest of the season.",
+    "options": [
+      {
+        "label": "Accelerate hauling with double shifts",
+        "outcome": "Crews push through long hours to move inventory before thaw. Wear and tear increases, but quotas are met.",
+        "effects": {
+          "progress": 12,
+          "budget": -500,
+          "crew_morale": -1
+        }
+      },
+      {
+        "label": "Stage loads and wait for re-freeze",
+        "outcome": "You secure landings and pause hauling. Expenses climb while you safeguard the corridor.",
+        "effects": {
+          "progress": -6,
+          "budget": -500,
+          "crew_morale": 3
+        }
+      },
+      {
+        "label": "Truck via distant all-weather route",
+        "outcome": "A 300 km detour keeps fibre flowing but hammers your budget and schedules.",
+        "effects": {
+          "progress": 2,
+          "budget": -1500,
+          "crew_morale": 1
+        }
+      }
+    ]
+  },
+  {
+    "id": "karst-cave-discovery_field",
+    "title": "Karst Cave Discovery",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "A reconnaissance crew in the Skeena-Nass plateau uncovers a karst cave with cultural features in the planned cutblock.",
+    "options": [
+      {
+        "label": "Commission karst and cultural inventories",
+        "outcome": "Specialists map subterranean passages alongside Indigenous knowledge keepers, leading to a major redesign.",
+        "effects": {
+          "progress": -8,
+          "budget": -750,
+          "crew_morale": 9
+        }
+      },
+      {
+        "label": "Flag a reserve and proceed with buffers",
+        "outcome": "You set aside the cave feature with generous buffers. Regulators caution that monitoring must continue.",
+        "effects": {
+          "progress": 6,
+          "crew_morale": 3
+        }
+      },
+      {
+        "label": "Harvest around the feature with minimal change",
+        "outcome": "Operations continue with narrow setbacks. Guardians question the protection level.",
+        "effects": {
+          "progress": 10,
+          "crew_morale": -3
+        }
+      }
+    ]
+  },
+  {
+    "id": "glacial-outburst-watch_field",
+    "title": "Glacial Outburst Watch",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "Hydrometric crews detect rising risk of a jökulhlaup on the Stikine headwaters below your SWB operations.",
+    "options": [
+      {
+        "label": "Evacuate valley crews and redesign drainage",
+        "outcome": "You pull teams back and invest in terrain stability modelling before re-entry.",
+        "effects": {
+          "progress": -10,
+          "budget": -750,
+          "crew_morale": 6
+        }
+      },
+      {
+        "label": "Install remote sensors and keep skeleton crews",
+        "outcome": "Monitoring arrays provide lead time while limited operations continue cautiously.",
+        "effects": {
+          "progress": 4,
+          "budget": -500,
+          "crew_morale": 2
+        }
+      },
+      {
+        "label": "Accept the low probability and stay the course",
+        "outcome": "Productivity remains high, yet emergency planners flag your risk tolerance.",
+        "effects": {
+          "progress": 8,
+          "crew_morale": -4
+        }
+      }
+    ]
+  },
+  {
+    "id": "wildfire-heat-dome_field",
+    "title": "Heat Dome Sparks Extreme Fire Behaviour",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "Temperatures hit record highs and fine fuels are flashing to torch height within minutes of ignition.",
+    "options": [
+      {
+        "label": "Suspend operations and cut fuel breaks with Nations",
+        "outcome": "You stand down machinery and co-create shaded fuel breaks. Communities appreciate the caution.",
+        "effects": {
+          "progress": -10,
+          "crew_morale": 7
+        }
+      },
+      {
+        "label": "Shift to night operations with heavy patrols",
+        "outcome": "Crews work graveyards chasing cooler temps. Productivity holds but fatigue and risk climb.",
+        "effects": {
+          "progress": 6,
+          "budget": -500,
+          "crew_morale": -2
+        }
+      },
+      {
+        "label": "Stage sprinkler protection and keep priority blocks running",
+        "outcome": "You install pump protection with BCWS support, balancing risk reduction with production.",
+        "effects": {
+          "progress": -4,
+          "budget": -750,
+          "crew_morale": 4
+        }
+      }
+    ]
+  },
+  {
+    "id": "contractor-bankruptcy_field",
+    "title": "Key Contractor Bankruptcy",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "A long-time road builder files for bankruptcy, leaving projects mid-stream.",
+    "options": [
+      {
+        "label": "Absorb crews into company operations",
+        "outcome": "You hire the core crew directly, stabilizing delivery but expanding payroll.",
+        "effects": {
+          "progress": 2,
+          "budget": -1000,
+          "crew_morale": 2
+        }
+      },
+      {
+        "label": "Rebid projects to other contractors",
+        "outcome": "New bidders take time to mobilize, delaying schedules but protecting capital.",
+        "effects": {
+          "progress": -8,
+          "budget": 500
+        }
+      },
+      {
+        "label": "Pause worksites and renegotiate scope",
+        "outcome": "You shrink the program, frustrating mills yet avoiding risk.",
+        "effects": {
+          "progress": -6,
+          "budget": 250
+        }
+      }
+    ]
+  },
+  {
+    "id": "labour-job-action_field",
+    "title": "Labour Job Action Threatened",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "Union stewards demand revised safety provisions or threaten a strategic slowdown before fall surge.",
+    "options": [
+      {
+        "label": "Co-develop a refreshed safety charter",
+        "outcome": "You spend two weeks negotiating safeguards and joint inspections, averting the slowdown.",
+        "effects": {
+          "progress": -4,
+          "budget": -500,
+          "crew_morale": 5
+        }
+      },
+      {
+        "label": "Offer bonuses to keep the season moving",
+        "outcome": "You buy short-term peace yet signal safety takes a backseat to quotas.",
+        "effects": {
+          "progress": 8,
+          "budget": -750,
+          "crew_morale": -3
+        }
+      },
+      {
+        "label": "Call the bluff and prepare replacement crews",
+        "outcome": "Replacement hires arrive but community sentiment cools dramatically.",
+        "effects": {
+          "progress": 6,
+          "crew_morale": -3
+        }
+      }
+    ]
+  },
+  {
+    "id": "pine-beetle-scouts_field",
+    "title": "Mountain Pine Beetle Scouts Detected",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "Beetles are surfacing on the fringe of your SBS salvage recovery units. Entomologists warn an outbreak could reignite.",
+    "options": [
+      {
+        "label": "Launch sanitation crews immediately",
+        "outcome": "You fall trap-trees and chip hotspots, buying valuable time against the beetles.",
+        "effects": {
+          "progress": -4,
+          "budget": -750,
+          "crew_morale": 5
+        }
+      },
+      {
+        "label": "Monitor with pheromone traps for a season",
+        "outcome": "You collect data before committing funds. Scientists caution that action will be needed soon.",
+        "effects": {
+          "budget": -250,
+          "crew_morale": 1
+        }
+      },
+      {
+        "label": "Hold budgets for now and hope cold snaps arrive",
+        "outcome": "You bank on weather doing the work. Neighbours question the hands-off approach.",
+        "effects": {
+          "progress": 4,
+          "crew_morale": -2
+        }
+      }
+    ]
+  },
+  {
+    "id": "pine-beetle-escalation_field",
+    "title": "Beetle Flights Intensify",
+    "type": "issue",
+    "severity": "moderate",
+    "probability": 0.004,
+    "description": "Trap data shows beetle flights tripled. Adjacent licensees report mortality creeping toward their stands.",
+    "options": [
+      {
+        "label": "Fund aerial surveys and joint response now",
+        "outcome": "You coordinate aerial sweep maps, sharing intel region-wide to contain spread.",
+        "effects": {
+          "progress": -6,
+          "budget": -750,
+          "crew_morale": 5
+        }
+      },
+      {
+        "label": "Prioritize salvage volume while it lasts",
+        "outcome": "You swing crews into salvage blitzes, drawing criticism for short-term thinking.",
+        "effects": {
+          "progress": 8,
+          "budget": 500,
+          "crew_morale": -4
+        }
+      }
+    ]
+  }
+]

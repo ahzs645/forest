@@ -26,6 +26,31 @@
     ]
   },
   {
+    "id": "audit_followup",
+    "title": "Audit Follow-up Visit",
+    "type": "compliance",
+    "severity": "moderate",
+    "probability": 0,
+    "description": "The auditors return. They want updated referral notes, professional sign-off, and evidence you addressed the last gaps.",
+    "options": [
+      {
+        "label": "Present a remediation package",
+        "outcome": "You hand over a clean package with clear corrective actions. The tone softens.",
+        "effects": { "timeUsed": 4, "budget": -2000, "politicalCapital": 6 }
+      },
+      {
+        "label": "Ask for more time (again)",
+        "outcome": "They note the pattern. You buy a little time, but credibility drops.",
+        "effects": { "politicalCapital": -8 }
+      },
+      {
+        "label": "Throw the team under the bus",
+        "outcome": "It deflects blame short term. Internally, morale and trust take a hit.",
+        "effects": { "timeUsed": 2, "crew_morale": -10, "politicalCapital": -4 }
+      }
+    ]
+  },
+  {
     "id": "audit_findings",
     "title": "Audit Findings Released",
     "type": "compliance",

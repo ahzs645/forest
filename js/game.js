@@ -5,10 +5,10 @@
 
 import { TerminalUI } from './ui.js';
 import { FORESTER_ROLES, OPERATING_AREAS } from './data/index.js';
-import { generateCrew, processDailyUpdate, getCrewDisplayInfo } from './crew.js';
+import { generateCrew, processDailyUpdate, getCrewDisplayInfo, healCrewMember, removeStatusEffect, applyRandomInjury, crewHasSkill } from './crew.js';
 import { createFieldJourney, createDeskJourney, executeFieldDay, executeDeskDay, PACE_OPTIONS, DESK_ACTIONS, getFieldProgressInfo, formatJourneyLog } from './journey.js';
 import { checkForEvent, resolveEvent, formatEventForDisplay, checkScheduledEvents } from './events.js';
-import { calculateFieldConsumption, calculateDeskConsumption, applyConsumption, getFormattedResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
+import { calculateDeskConsumption, applyConsumption, getFormattedResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
 
 class ForestryTrailGame {
   constructor() {
@@ -162,6 +162,7 @@ class ForestryTrailGame {
       this.ui.write('Manage your fuel, food, and equipment. Keep your crew healthy.');
       this.ui.write('');
       this.ui.write('Starting supplies:');
+      this.ui.write(`  Cash: $${this.journey.resources.budget.toLocaleString()}`);
       this.ui.write(`  Fuel: ${this.journey.resources.fuel} gallons`);
       this.ui.write(`  Food: ${this.journey.resources.food} days worth`);
       this.ui.write(`  Equipment: ${this.journey.resources.equipment}% condition`);
@@ -263,121 +264,264 @@ class ForestryTrailGame {
     // Daily action choice
     this.ui.writeDivider('WHAT DO YOU DO?');
 
-    const paceOptions = Object.entries(PACE_OPTIONS)
-      .filter(([id]) => id !== 'resting') // Resting handled separately
-      .map(([id, pace]) => ({
-        label: `Travel ${pace.name}`,
-        description: `${Math.round(pace.distanceMultiplier * 100)}% speed`,
-        value: id
-      }));
+    const actionOptions = [];
 
-    paceOptions.push({
-      label: 'Rest here',
-      description: 'Crew heals, morale improves',
-      value: 'rest'
+    // Travel actions
+    for (const [id, pace] of Object.entries(PACE_OPTIONS)) {
+      if (id === 'resting' || id === 'camp_work') continue;
+      actionOptions.push({
+        label: `Travel ${pace.name}`,
+        description: `${Math.round(pace.distanceMultiplier * 100)}% pace`,
+        value: id
+      });
+    }
+
+    // Camp actions
+    actionOptions.push({
+      label: 'Make Camp (Rest)',
+      description: 'Recover health and morale',
+      value: 'resting'
+    });
+    actionOptions.push({
+      label: 'Forage & Scout (Camp Work)',
+      description: 'Try to find supplies; small injury risk',
+      value: 'forage'
+    });
+    actionOptions.push({
+      label: 'Maintenance Day (Camp Work)',
+      description: 'Improve equipment condition; costs cash or sweat',
+      value: 'maintain'
     });
 
-    // Add resupply option if at a supply point
+    const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
+    if (hasAnyInjured && journey.resources.firstAid > 0) {
+      actionOptions.push({
+        label: 'Triage (Camp Work)',
+        description: 'Use a first aid kit to treat someone',
+        value: 'triage'
+      });
+    }
+
     if (currentBlock?.hasSupply) {
-      paceOptions.push({
-        label: 'Resupply',
-        description: 'Refuel and restock at this location',
+      actionOptions.push({
+        label: 'Trading Post / Resupply (Camp Work)',
+        description: 'Buy fuel, rations, repairs, and kits',
         value: 'resupply'
       });
     }
 
-    const action = await this.ui.promptChoice('Choose your action:', paceOptions);
+    const action = await this.ui.promptChoice('Choose your action:', actionOptions);
     const actionId = action.value || 'normal';
 
-    // Execute the day
-    if (actionId === 'rest') {
-      this.ui.write('');
-      this.ui.write('The crew takes the day to rest and recover.');
-      // Heal crew
-      for (const member of journey.crew) {
-        if (member.isActive) {
-          member.health = Math.min(100, member.health + 10);
-          member.morale = Math.min(100, member.morale + 15);
-        }
-      }
-      // Light resource use
-      journey.resources.food = Math.max(0, journey.resources.food - 1);
-    } else if (actionId === 'resupply') {
-      this.ui.write('');
-      this.ui.write(`You spend the day restocking at ${currentBlock.name}.`);
+    this.ui.write('');
 
-      // Restore resources to near maximum
-      const fuelAdded = Math.min(FIELD_RESOURCES.fuel.max - journey.resources.fuel, 100);
-      const foodAdded = Math.min(FIELD_RESOURCES.food.max - journey.resources.food, 40);
-      const equipRepaired = Math.min(100 - journey.resources.equipment, 30);
-      const kitsAdded = Math.min(FIELD_RESOURCES.firstAid.max - journey.resources.firstAid, 5);
-
-      journey.resources.fuel += fuelAdded;
-      journey.resources.food += foodAdded;
-      journey.resources.equipment += equipRepaired;
-      journey.resources.firstAid += kitsAdded;
-
-      this.ui.write(`  Fuel: +${fuelAdded} gallons`);
-      this.ui.write(`  Food: +${foodAdded} rations`);
-      if (equipRepaired > 0) this.ui.write(`  Equipment repaired: +${equipRepaired}%`);
-      if (kitsAdded > 0) this.ui.write(`  First aid kits: +${kitsAdded}`);
-      this.ui.write('');
-      this.ui.write('The crew is ready to continue tomorrow.');
-
-      // Crew also rests a bit
-      for (const member of journey.crew) {
-        if (member.isActive) {
-          member.morale = Math.min(100, member.morale + 5);
-        }
-      }
+    // Execute the day (field updates, consumption, weather/day advancement all live in executeFieldDay)
+    if (actionId === 'resupply') {
+      await this._handleResupply(currentBlock);
+      const result = executeFieldDay(journey, 'camp_work');
+      for (const msg of result.messages) this.ui.write(msg);
+    } else if (actionId === 'triage') {
+      await this._handleTriage();
+      const result = executeFieldDay(journey, 'camp_work');
+      for (const msg of result.messages) this.ui.write(msg);
+    } else if (actionId === 'maintain') {
+      await this._handleMaintenance();
+      const result = executeFieldDay(journey, 'camp_work');
+      for (const msg of result.messages) this.ui.write(msg);
+    } else if (actionId === 'forage') {
+      const result = executeFieldDay(journey, 'camp_work');
+      for (const msg of result.messages) this.ui.write(msg);
+      this._applyForageResults();
     } else {
-      // Travel
-      const result = executeFieldDay(journey, actionId);
-
-      this.ui.write('');
-      for (const msg of result.messages) {
-        this.ui.write(msg);
-      }
-
-      // Apply resource consumption
-      const activeCrewCount = journey.crew.filter(m => m.isActive).length;
-      const consumption = calculateFieldConsumption({
-        pace: actionId,
-        terrain: currentBlock?.terrain,
-        weather: journey.temperature,
-        weatherCondition: journey.weather
-      }, activeCrewCount);
-
-      const consumptionResult = applyConsumption(journey.resources, consumption, FIELD_RESOURCES);
-      journey.resources = consumptionResult.resources;
-
-      if (consumptionResult.warnings.length > 0) {
-        this.ui.write('');
-        for (const warning of consumptionResult.warnings) {
-          // Format warning object as string
-          this.ui.writeWarning(`${warning.resource}: ${warning.value} ${warning.unit} remaining`);
-        }
-      }
+      const paceId = actionId;
+      const result = executeFieldDay(journey, paceId);
+      for (const msg of result.messages) this.ui.write(msg);
     }
 
-    try {
-      // Update crew conditions
-      this._updateCrewConditions();
-
-      // Advance day only for rest (executeFieldDay already advances for travel)
-      if (actionId === 'rest') {
-        journey.day++;
-      }
-
-      // Update status panels to reflect changes
-      this.ui.updateAllStatus(this.journey);
-    } catch (error) {
-      console.error('Field day end processing error:', error);
-      this.ui.writeDanger('An error occurred during day processing.');
-    }
+    // Update status panels to reflect changes
+    this.ui.updateAllStatus(this.journey);
 
     // Small pause
     await this.ui.promptChoice('', [{ label: 'Continue...', value: 'next' }]);
+  }
+
+  async _handleResupply(block) {
+    const journey = this.journey;
+    const cash = journey.resources.budget || 0;
+    this.ui.writeHeader(`RESUPPLY: ${block?.name || 'Supply Point'}`);
+    this.ui.write(`Cash on hand: $${Math.round(cash).toLocaleString()}`);
+    this.ui.write('');
+
+    const clampToMax = (resourceId, value) => {
+      const def = FIELD_RESOURCES[resourceId];
+      if (!def) return value;
+      return Math.max(0, Math.min(def.max ?? value, value));
+    };
+
+    const offers = [
+      { id: 'fuel_drum', label: 'Fuel Drum', description: '+40 fuel', cost: 180, apply: () => { journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 40); } },
+      { id: 'rations', label: 'Rations Crate', description: '+20 food', cost: 160, apply: () => { journey.resources.food = clampToMax('food', journey.resources.food + 20); } },
+      { id: 'first_aid', label: 'First Aid Kit', description: '+1 kit', cost: 120, apply: () => { journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 1); } },
+      { id: 'field_repair', label: 'Field Repair', description: '+15% equipment', cost: 220, apply: () => { journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 15); } },
+      {
+        id: 'full_restock',
+        label: 'Full Restock',
+        description: '+50 fuel, +25 food, +20% equip, +2 kits',
+        cost: 650,
+        apply: () => {
+          journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 50);
+          journey.resources.food = clampToMax('food', journey.resources.food + 25);
+          journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 20);
+          journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 2);
+        }
+      }
+    ];
+
+    while (true) {
+      const money = journey.resources.budget || 0;
+      const options = [
+        ...offers.map(o => ({
+          label: `${o.label} ($${o.cost})`,
+          description: o.description,
+          value: o.id
+        })),
+        { label: 'Done', description: 'Finish shopping', value: 'done' }
+      ];
+
+      const choice = await this.ui.promptChoice(`Buy supplies (cash: $${Math.round(money).toLocaleString()}):`, options);
+      if (choice.value === 'done') break;
+
+      const offer = offers.find(o => o.id === choice.value);
+      if (!offer) continue;
+
+      if (money < offer.cost) {
+        this.ui.writeWarning('Not enough cash for that.');
+        continue;
+      }
+
+      journey.resources.budget = Math.max(0, money - offer.cost);
+      offer.apply();
+      this.ui.writePositive(`Purchased ${offer.label}.`);
+    }
+
+    this.ui.write('');
+  }
+
+  async _handleTriage() {
+    const journey = this.journey;
+    if ((journey.resources.firstAid || 0) <= 0) {
+      this.ui.writeWarning('No first aid kits left.');
+      return;
+    }
+
+    const candidates = journey.crew.filter(m => m.isActive && (m.health < 100 || (m.statusEffects?.length || 0) > 0));
+    if (candidates.length === 0) {
+      this.ui.write('Nobody needs treatment today.');
+      return;
+    }
+
+    const options = candidates.map(m => {
+      const info = getCrewDisplayInfo(m);
+      const effect = info.effects?.[0]?.name ? `, ${info.effects[0].name}` : '';
+      return {
+        label: `${info.name} (${info.health}% HP${effect})`,
+        description: info.role,
+        value: m.id
+      };
+    });
+
+    const choice = await this.ui.promptChoice('Treat who?', options);
+    const target = journey.crew.find(m => m.id === choice.value);
+    if (!target || !target.isActive) return;
+
+    journey.resources.firstAid = Math.max(0, (journey.resources.firstAid || 0) - 1);
+
+    if ((target.statusEffects?.length || 0) > 0) {
+      const effectId = target.statusEffects[0].effectId;
+      const removed = removeStatusEffect(target, effectId);
+      if (removed.message) this.ui.writePositive(removed.message);
+      const healed = healCrewMember(target, 15);
+      if (healed.message) this.ui.writePositive(healed.message);
+    } else {
+      const healed = healCrewMember(target, 25);
+      if (healed.message) this.ui.writePositive(healed.message);
+    }
+  }
+
+  async _handleMaintenance() {
+    const journey = this.journey;
+    const hasMechanic = crewHasSkill(journey.crew, 'mechanic');
+    const cash = journey.resources.budget || 0;
+
+    const options = [
+      {
+        label: hasMechanic ? 'DIY Maintenance' : 'DIY Maintenance (No mechanic)',
+        description: '+10% equipment, 10% injury risk',
+        value: 'diy'
+      },
+      {
+        label: 'Hire Mobile Mechanic',
+        description: '+25% equipment, costs $250',
+        value: 'pro'
+      }
+    ];
+
+    const choice = await this.ui.promptChoice('How do you handle maintenance?', options);
+
+    if (choice.value === 'pro') {
+      if (cash < 250) {
+        this.ui.writeWarning('Not enough cash to hire a mechanic.');
+        return;
+      }
+      journey.resources.budget = Math.max(0, cash - 250);
+      journey.resources.equipment = Math.min(100, journey.resources.equipment + 25);
+      this.ui.writePositive('Equipment serviced and patched up.');
+      return;
+    }
+
+    // DIY maintenance
+    const bonus = hasMechanic ? 14 : 10;
+    journey.resources.equipment = Math.min(100, journey.resources.equipment + bonus);
+    this.ui.writePositive('You tighten bolts, swap filters, and grease fittings.');
+
+    if (Math.random() < 0.10) {
+      const victim = journey.crew.find(m => m.isActive) || null;
+      if (victim) {
+        const result = applyRandomInjury(victim, 'minor');
+        this.ui.writeWarning(`Accident during maintenance! ${result.message}`);
+      }
+    }
+  }
+
+  _applyForageResults() {
+    const journey = this.journey;
+    const active = journey.crew.filter(m => m.isActive).length || 1;
+    const foodFound = Math.round((6 + Math.random() * 10) * (active / 5));
+    const fuelFound = Math.random() < 0.25 ? Math.round(5 + Math.random() * 10) : 0;
+    const cashFound = Math.random() < 0.15 ? Math.round(120 + Math.random() * 480) : 0;
+
+    journey.resources.food = Math.min(FIELD_RESOURCES.food.max, journey.resources.food + foodFound);
+    if (fuelFound > 0) {
+      journey.resources.fuel = Math.min(FIELD_RESOURCES.fuel.max, journey.resources.fuel + fuelFound);
+    }
+    if (cashFound > 0) {
+      journey.resources.budget = Math.min(FIELD_RESOURCES.budget.max, journey.resources.budget + cashFound);
+    }
+
+    this.ui.write('');
+    this.ui.writeHeader('FORAGE RESULTS');
+    this.ui.writePositive(`Found food: +${foodFound} rations`);
+    if (fuelFound > 0) this.ui.writePositive(`Recovered fuel: +${fuelFound} gallons`);
+    if (cashFound > 0) this.ui.writePositive(`Sold salvage: +$${cashFound.toLocaleString()}`);
+
+    if (Math.random() < 0.12) {
+      const activeCrew = journey.crew.filter(m => m.isActive);
+      const victim = activeCrew.length ? activeCrew[Math.floor(Math.random() * activeCrew.length)] : null;
+      if (victim) {
+        const injury = applyRandomInjury(victim, 'minor');
+        this.ui.writeWarning(`Foraging accident! ${injury.message}`);
+      }
+    }
   }
 
   async _runDeskDay() {

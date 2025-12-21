@@ -5,9 +5,10 @@
 
 // Import data from JSON (Vite handles JSON imports natively)
 import eventsData from './json/desk/events.json';
+import legacyEventsData from './json/legacy/deskEvents.json';
 
 // Export events
-export const DESK_EVENTS = eventsData;
+export const DESK_EVENTS = [...eventsData, ...(legacyEventsData || [])];
 
 /**
  * Get events filtered by current phase

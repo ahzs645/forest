@@ -1,0 +1,78 @@
+{
+  "category": "Forestry Glossary",
+  "description": "Educational terms for BC forestry concepts",
+  "terms": [
+    {
+      "term": "BEC Zone",
+      "description": "Biogeoclimatic Ecosystem Classification zone describing regional climate, vegetation, and soils. Example: BWBSmw1 is Boreal White and Black Spruce moist warm subzone variant 1."
+    },
+    {
+      "term": "Hydrology Assessment",
+      "description": "Review of surface and subsurface water movement to ensure roads and harvest plans maintain watershed function and protect downstream values."
+    },
+    {
+      "term": "LiDAR",
+      "description": "Light Detection and Ranging remote sensing that maps terrain and vegetation structure using laser pulses from aircraft."
+    },
+    {
+      "term": "Silviculture",
+      "description": "Practices that establish and tend the future forest, including site preparation, planting, brushing, and regeneration monitoring."
+    },
+    {
+      "term": "Referral",
+      "description": "Formal consultation package sent to Indigenous governments, stakeholders, and regulators for comment on a proposed activity."
+    },
+    {
+      "term": "Free Growing",
+      "description": "Regeneration milestone in BC where planted or natural seedlings meet height and density targets, proving the stand is established."
+    },
+    {
+      "term": "Road Deactivation",
+      "description": "Works that render a temporary or inactive road stable and environmentally secure by pulling culverts, installing water bars, and re-contouring."
+    },
+    {
+      "term": "Cultural Feature Inventory",
+      "description": "Field program led with Indigenous partners to identify culturally significant sites such as trails, cabins, or harvesting areas before work proceeds."
+    },
+    {
+      "term": "Wildfire Hazard Abatement",
+      "description": "Reducing the buildup of flammable fuels near infrastructure or communities through treatments like pruning, spacing, or debris disposal."
+    },
+    {
+      "term": "Riparian Reserve",
+      "description": "Protected buffer adjacent to streams, lakes, or wetlands that maintains shade, bank stability, and aquatic habitat."
+    },
+    {
+      "term": "Annual Allowable Cut (AAC)",
+      "description": "The volume of timber that can legally be harvested from a defined area each year, determined by the Chief Forester."
+    },
+    {
+      "term": "Stumpage",
+      "description": "Fees paid to the provincial government for the right to harvest timber from Crown land."
+    },
+    {
+      "term": "Cutting Permit",
+      "description": "Authorization from the Ministry of Forests to harvest timber from a specific area under specific conditions."
+    },
+    {
+      "term": "FREP",
+      "description": "Forest and Range Evaluation Program - BC's monitoring program for forest and range practices effectiveness."
+    },
+    {
+      "term": "First Nations Consultation",
+      "description": "Legal requirement to engage with Indigenous communities whose traditional territories overlap with proposed forestry activities."
+    },
+    {
+      "term": "Old Growth Management Area (OGMA)",
+      "description": "Designated areas where old-growth forest attributes are maintained through harvest restrictions."
+    },
+    {
+      "term": "Mountain Pine Beetle (MPB)",
+      "description": "Bark beetle species that has caused massive mortality in BC's lodgepole pine forests since the 1990s."
+    },
+    {
+      "term": "Salvage Logging",
+      "description": "Harvesting of timber damaged by fire, insects, disease, or windthrow before it loses economic value."
+    }
+  ]
+}

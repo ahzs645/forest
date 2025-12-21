@@ -1,0 +1,204 @@
+{
+  "category": "BC Interior Forestry Context",
+  "description": "Research document covering provincial requirements, First Nations engagement, industry issues, and regulatory framework for BC forestry operations",
+  "provincial_requirements": [
+    {
+      "requirement": "Forest Stewardship Plan (FSP)",
+      "details": "Before any harvesting or road-building can begin, licensees must submit a map-based FSP with a five-year term",
+      "resource_values_covered": [
+        "biodiversity",
+        "cultural heritage resources",
+        "fish/riparian areas",
+        "forage",
+        "recreation",
+        "soil",
+        "timber",
+        "visual quality",
+        "water quality",
+        "wildlife"
+      ],
+      "governing_legislation": ["Forest and Range Practices Act", "Forest Planning & Practices Regulation"]
+    },
+    {
+      "requirement": "Old-Growth Deferrals",
+      "details": "Since 2021, the Province and First Nations have temporarily deferred logging on vulnerable old-growth forests while long-term management plans are developed",
+      "area_deferred": "2.4 million ha",
+      "area_already_protected": "3.7 million ha",
+      "implementation_methods": ["Voluntary agreements with First Nations and industry", "Part 13 of Forest Act", "Direction to BC Timber Sales"]
+    },
+    {
+      "requirement": "Heritage Conservation Act",
+      "details": "Archaeological permits often required before road building or harvesting. Act not substantively updated since 1996.",
+      "modernization_goals": ["Faster permitting", "Better protection of sacred sites", "Stronger First Nations roles in decision-making"],
+      "alignment": "UN Declaration on the Rights of Indigenous Peoples"
+    },
+    {
+      "requirement": "Blueberry River First Nations Implementation Agreement",
+      "details": "2021 Yahey v. British Columbia ruling found cumulative industrial activities infringed Treaty 8 rights",
+      "requirements": ["Ecosystem-based management", "Land-disturbance caps", "Habitat restoration funding"],
+      "impact": "Influences how permits are issued in northeast interior"
+    },
+    {
+      "requirement": "Wildfire Resilience & BCTS Review",
+      "details": "BC Timber Sales taking larger role in reducing wildfire risk",
+      "bcts_responsibilities": ["Reduce fuel loads", "Remove health-damaged trees", "Commercial thinning", "Prescribed fire", "Rangeland rehabilitation"],
+      "permit_target": "Speed up salvage and wildfire-related permits from 40 days to 25"
+    }
+  ],
+  "first_nations_engagement": {
+    "duty_to_consult": {
+      "legal_basis": ["Section 35 of Constitution Act", "Declaration on the Rights of Indigenous Peoples Act"],
+      "guidance": "Proponents should engage early with First Nations to build relationships and complement formal government consultation processes"
+    },
+    "cultural_heritage": {
+      "heritage_sites_registered": "64,000+",
+      "first_nations_origin_percentage": 90,
+      "impact_on_forestry": "Working at or near sites often triggers archaeological permitting which can slow projects"
+    },
+    "blueberry_river_precedent": {
+      "key_finding": "Cumulative impacts across industries can infringe treaty rights",
+      "company_requirement": "Must account for overall disturbance footprints, not just individual permit compliance",
+      "resulting_framework": "Ecosystem-based management and caps on land disturbance"
+    },
+    "old_growth_deferrals_negotiation": {
+      "process": "Negotiated with individual First Nations",
+      "voluntary_deferrals_area": "Almost 2 million ha",
+      "map_confidentiality": "Maps not publicly released to respect government-to-government discussions",
+      "importance": "First Nations support critical to determining where harvesting can continue"
+    }
+  ],
+  "industry_issues": [
+    {
+      "issue": "Declining Timber Supply",
+      "details": "After mountain pine beetle epidemic, AAC temporarily boosted for salvage then reduced",
+      "bcts_harvest_decline": {
+        "2014": ">11 million m3",
+        "recent_years": "<4 million m3"
+      },
+      "projected_aac_decline": {
+        "2024": "61.7 million m3",
+        "2035": "37.7 million m3"
+      },
+      "causes": ["Old-growth deferrals", "Caribou habitat protection", "Wildfire losses", "Reduced beetle salvage"]
+    },
+    {
+      "issue": "Regulatory Complexity & Permit Delays",
+      "details": "Permitting timelines have lengthened significantly",
+      "example": "Canfor reports waiting over 2 years for harvesting permits in some cases (vs 7 months in 2016)",
+      "impact": "Harvest levels now 60% below allowable cut due to delays",
+      "government_response": ["Targets for faster wildfire-related permits (40 to 25 days)", "Heritage Conservation Act modernization"]
+    },
+    {
+      "issue": "Consultation and Negotiation Costs",
+      "details": "Companies must participate in early engagement with First Nations, fund archaeological assessments, adapt plans",
+      "additional_requirements": ["Negotiate land-disturbance caps", "Restoration commitments"],
+      "complexity_factor": "Multiple First Nations may overlap a timber supply area"
+    },
+    {
+      "issue": "Changing Policy Objectives",
+      "details": "Province re-orienting forest management toward biodiversity, climate adaptation, and Indigenous co-management",
+      "examples": ["2.4 million ha old-growth deferrals", "BRFN ecosystem-based management framework", "BCTS fuel load reduction mandate"],
+      "implication": "Timber production no longer sole objective of provincial forest management"
+    },
+    {
+      "issue": "Public Controversy Over Silviculture Practices",
+      "details": "Glyphosate spraying on over 1 million ha of BC forests is controversial",
+      "additional_brushing": "1.5 million ha manually brushed",
+      "concerns": ["Undermines biodiversity", "Reduces fire resilience"],
+      "political_response": "Parties have pledged to phase out or ban glyphosate"
+    },
+    {
+      "issue": "Labour and Economic Decline",
+      "details": "BC forestry workforce shrunk by ~45% since 2001 (about 35,000 jobs lost)",
+      "recent_job_losses": "3,750 jobs in past year",
+      "cause": "Declining timber supply and market dynamics, not solely permitting delays"
+    }
+  ],
+  "key_truths": [
+    {
+      "truth": "Permitting delays are a factor but not the sole cause of industry decline",
+      "evidence": "Larger issue is shrinking timber supply due to beetle salvage end, wildfire damage, old-growth deferrals, habitat protections"
+    },
+    {
+      "truth": "First Nations engagement is both a legal obligation and an opportunity",
+      "evidence": "Early consultation and negotiated agreements ensure respect for treaty rights and can facilitate joint planning"
+    },
+    {
+      "truth": "Policies are shifting toward ecosystem-based management and reconciliation",
+      "evidence": "Old-growth deferrals, heritage-act modernization, wildfire-resilience initiatives"
+    },
+    {
+      "truth": "Public expectations around herbicides and biodiversity are changing",
+      "evidence": "Heavy reliance on glyphosate is controversial; political parties pledging bans"
+    },
+    {
+      "truth": "Economic realities remain challenging",
+      "evidence": "Even with faster permitting, long-term forecasts suggest significant reductions in harvest volumes and employment"
+    }
+  ],
+  "simulator_elements": {
+    "regulatory_steps": [
+      "Drafting Forest Stewardship Plans",
+      "Obtaining Heritage Act permits",
+      "Complying with old-growth deferrals",
+      "Working within BRFN disturbance caps"
+    ],
+    "consultation_dynamics": [
+      "Early engagement with First Nations",
+      "Trade-offs between project delays and relationship-building",
+      "Consequences of ignoring treaty rights"
+    ],
+    "operational_variability": [
+      "Declining log supply",
+      "Unpredictable weather",
+      "Wildfire risk",
+      "Herbicide use decisions",
+      "Species selection"
+    ],
+    "policy_changes": [
+      "BCTS wildfire role adaptation",
+      "Glyphosate phase-out scenarios",
+      "Evolving legal frameworks"
+    ],
+    "economic_outcomes": [
+      "Balancing costs",
+      "Permit timelines",
+      "Wood supply constraints",
+      "Social licence to operate"
+    ]
+  },
+  "glossary_additions": [
+    {
+      "term": "FSP",
+      "definition": "Forest Stewardship Plan - map-based 5-year plan required before harvesting"
+    },
+    {
+      "term": "BCTS",
+      "definition": "BC Timber Sales - manages harvesting on ~20% of BC public land"
+    },
+    {
+      "term": "Yahey Decision",
+      "definition": "2021 BC Supreme Court ruling that cumulative industrial impacts can infringe treaty rights"
+    },
+    {
+      "term": "Treaty 8",
+      "definition": "Historic treaty covering northeastern BC First Nations including Blueberry River"
+    },
+    {
+      "term": "Ecosystem-Based Management",
+      "definition": "Management approach that considers entire ecosystems rather than single resources"
+    }
+  ],
+  "sources": [
+    "BC Government - Forest Stewardship Plans",
+    "BC Government - Old Growth Deferral Areas",
+    "BC Gov News - Heritage Conservation Act modernization",
+    "Environmental Law Centre - Blueberry River case",
+    "BC Gov News - Wildfire Resiliency News Release",
+    "BC Government - Consulting with First Nations",
+    "The Tyee - Forestry reporting",
+    "Business Examiner - AAC analysis",
+    "The Narwhal - Glyphosate reporting",
+    "BC Forestry Workers campaign data"
+  ]
+}

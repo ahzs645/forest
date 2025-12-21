@@ -17,6 +17,9 @@ import {
 } from './resources.js';
 import { getBlocksForArea, getTotalDistance, getRandomWeather, getTemperature, TERRAIN_TYPES } from './data/blocks.js';
 
+const BASE_DAILY_TRAVEL_KM = 16;
+const DAILY_TRAVEL_VARIANCE = 0.12;
+
 // Pace definitions
 export const PACE_OPTIONS = {
   resting: {
@@ -27,6 +30,15 @@ export const PACE_OPTIONS = {
     healthBonus: 10,
     moraleBonus: 8,
     eventRisk: 0.05
+  },
+  camp_work: {
+    id: 'camp_work',
+    name: 'Camp Work',
+    description: 'Stay put and handle camp tasks',
+    distanceMultiplier: 0,
+    healthBonus: 2,
+    moraleBonus: -1,
+    eventRisk: 0.10
   },
   slow: {
     id: 'slow',
@@ -227,6 +239,59 @@ export function getNextBlock(journey) {
   return journey.blocks[nextIndex] || null;
 }
 
+function getCumulativeDistanceToIndex(blocks, index) {
+  let sum = 0;
+  for (let i = 0; i <= index && i < blocks.length; i++) {
+    sum += blocks[i]?.distance || 0;
+  }
+  return sum;
+}
+
+function getCurrentSegmentLength(blocks, currentIndex) {
+  const nextBlock = blocks[currentIndex + 1];
+  return nextBlock?.distance || 0;
+}
+
+function getDistanceIntoCurrentSegment(journey) {
+  const blocks = journey.blocks || [];
+  const currentIndex = Math.max(0, Math.min(blocks.length - 1, journey.currentBlockIndex || 0));
+  const distanceAtCurrentBlock = getCumulativeDistanceToIndex(blocks, currentIndex);
+  return Math.max(0, journey.distanceTraveled - distanceAtCurrentBlock);
+}
+
+function travelDistanceForDay(journey, paceId) {
+  const pace = PACE_OPTIONS[paceId] || PACE_OPTIONS.normal;
+  if (!pace.distanceMultiplier || pace.distanceMultiplier <= 0) {
+    return 0;
+  }
+
+  const currentBlock = getCurrentBlock(journey);
+  const terrain = TERRAIN_TYPES[currentBlock?.terrain] || TERRAIN_TYPES.flat;
+  const weatherMod = journey.weather?.travelModifier || 1;
+
+  const variance = 1 + (Math.random() * 2 - 1) * DAILY_TRAVEL_VARIANCE;
+  const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance;
+  return Math.max(0, distance);
+}
+
+function advanceBlocksForDistance(journey) {
+  const blocks = journey.blocks || [];
+  const arrivals = [];
+
+  while (journey.currentBlockIndex < blocks.length - 1) {
+    const nextIndex = journey.currentBlockIndex + 1;
+    const distanceToNextCumulative = getCumulativeDistanceToIndex(blocks, nextIndex);
+    if (journey.distanceTraveled + 1e-6 >= distanceToNextCumulative) {
+      journey.currentBlockIndex = nextIndex;
+      arrivals.push(blocks[nextIndex]);
+      continue;
+    }
+    break;
+  }
+
+  return arrivals;
+}
+
 /**
  * Calculate travel distance for a day
  * @param {Object} journey - Journey state
@@ -234,36 +299,24 @@ export function getNextBlock(journey) {
  * @returns {Object} Distance info
  */
 export function calculateTravelDistance(journey, paceId) {
-  const pace = PACE_OPTIONS[paceId] || PACE_OPTIONS.normal;
   const currentBlock = getCurrentBlock(journey);
   const nextBlock = getNextBlock(journey);
+  const terrain = TERRAIN_TYPES[currentBlock?.terrain] || TERRAIN_TYPES.flat;
+
+  const distance = travelDistanceForDay(journey, paceId);
 
   if (!nextBlock) {
     return { distance: 0, reachesBlock: false, blockName: null };
   }
 
-  // Base distance from next block
-  const baseDistance = nextBlock.distance;
-
-  // Apply pace modifier
-  let distance = baseDistance * pace.distanceMultiplier;
-
-  // Apply terrain modifier
-  const terrain = TERRAIN_TYPES[currentBlock.terrain] || TERRAIN_TYPES.flat;
-  distance *= terrain.speed;
-
-  // Apply weather modifier
-  if (journey.weather) {
-    distance *= journey.weather.travelModifier || 1;
-  }
-
-  // Check if we reach the next block
-  const distanceToNextBlock = nextBlock.distance - (journey.distanceTraveled % nextBlock.distance);
-  const reachesBlock = distance >= distanceToNextBlock;
+  const segmentLength = getCurrentSegmentLength(journey.blocks, journey.currentBlockIndex);
+  const distanceIntoSegment = getDistanceIntoCurrentSegment(journey);
+  const remaining = Math.max(0, segmentLength - distanceIntoSegment);
+  const reachesBlock = distance >= remaining && remaining > 0;
 
   return {
     distance: Math.round(distance * 10) / 10,
-    reachesBlock,
+    reachesBlock: Boolean(reachesBlock),
     blockName: reachesBlock ? nextBlock.name : null,
     terrain: terrain.name,
     weatherEffect: journey.weather?.name
@@ -282,12 +335,15 @@ export function executeFieldDay(journey, paceId) {
 
   // Track previous progress for milestone detection
   const prevProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+  const dayNumber = journey.day;
+  const startBlock = getCurrentBlock(journey);
+  const weatherToday = journey.weather;
 
   // Calculate travel
   const travelInfo = calculateTravelDistance(journey, paceId);
 
   // Update distance
-  journey.distanceTraveled += travelInfo.distance;
+  journey.distanceTraveled = Math.min(journey.totalDistance, journey.distanceTraveled + travelInfo.distance);
   journey.pace = paceId;
 
   // Calculate new progress
@@ -296,7 +352,11 @@ export function executeFieldDay(journey, paceId) {
   if (travelInfo.distance > 0) {
     messages.push(`Traveled ${travelInfo.distance} km at ${pace.name} pace.`);
   } else {
-    messages.push('The crew rested for the day.');
+    if (paceId === 'resting') {
+      messages.push('The crew made camp and rested for the day.');
+    } else {
+      messages.push('The crew stayed in camp for the day.');
+    }
   }
 
   // Check for milestone achievements
@@ -317,22 +377,21 @@ export function executeFieldDay(journey, paceId) {
     }
   }
 
-  // Check if reached next block
-  if (travelInfo.reachesBlock) {
-    journey.currentBlockIndex++;
-    const newBlock = getCurrentBlock(journey);
-    messages.push(`Arrived at ${newBlock.name}.`);
-
-    // Add block description if available
-    if (newBlock.description) {
-      messages.push(newBlock.description);
+  const arrivals = advanceBlocksForDistance(journey);
+  if (arrivals.length > 0) {
+    for (const block of arrivals) {
+      if (!block) continue;
+      messages.push(`Arrived at ${block.name}.`);
+      if (block.description) {
+        messages.push(block.description);
+      }
     }
+  }
 
-    // Check for victory (reached final block)
-    if (journey.currentBlockIndex >= journey.blocks.length - 1) {
-      journey.isComplete = true;
-      messages.push('You have reached your destination!');
-    }
+  // Check for victory
+  if (journey.distanceTraveled >= journey.totalDistance || journey.currentBlockIndex >= journey.blocks.length - 1) {
+    journey.isComplete = true;
+    messages.push('You have reached your destination!');
   }
 
   // Calculate resource consumption
@@ -382,16 +441,16 @@ export function executeFieldDay(journey, paceId) {
     }
 
     // Apply weather morale effects
-    if (journey.weather?.moraleEffect) {
-      member.morale = Math.max(0, Math.min(100, member.morale + journey.weather.moraleEffect));
+    if (weatherToday?.moraleEffect) {
+      member.morale = Math.max(0, Math.min(100, member.morale + weatherToday.moraleEffect));
     }
 
     // Apply health risk from extreme weather
-    if (journey.weather?.healthRisk && !conditions.restDay) {
+    if (weatherToday?.healthRisk && !conditions.restDay) {
       const healthLoss = Math.floor(Math.random() * 5) + 2; // 2-6 health loss
       member.health = Math.max(0, member.health - healthLoss);
       if (healthLoss > 3) {
-        messages.push(`${member.name} suffers from the ${journey.weather.name.toLowerCase()}.`);
+        messages.push(`${member.name} suffers from the ${weatherToday.name.toLowerCase()}.`);
       }
     }
 
@@ -402,7 +461,7 @@ export function executeFieldDay(journey, paceId) {
   // Check for game over conditions
   const resourceStatus = checkResourceStatus(journey.resources, FIELD_RESOURCES);
 
-  if (resourceStatus.depleted.some(d => d.id === 'fuel') && paceId !== 'resting') {
+  if (resourceStatus.depleted.some(d => d.id === 'fuel') && (PACE_OPTIONS[paceId]?.distanceMultiplier ?? 1) > 0) {
     journey.isGameOver = true;
     journey.gameOverReason = 'OUT OF FUEL - The crew is stranded.';
     messages.push(journey.gameOverReason);
@@ -421,22 +480,22 @@ export function executeFieldDay(journey, paceId) {
 
   // Log the day with more detail
   journey.log.push({
-    day: journey.day - 1,
+    day: dayNumber,
     type: 'travel',
     action: pace.name,
     distance: travelInfo.distance,
-    location: currentBlock?.name || 'Unknown',
-    weather: journey.weather?.name || 'Unknown',
+    location: getCurrentBlock(journey)?.name || startBlock?.name || 'Unknown',
+    weather: weatherToday?.name || 'Unknown',
     summary: travelInfo.distance > 0
       ? `Traveled ${travelInfo.distance} km (${pace.name})`
-      : 'Rested for the day'
+      : (paceId === 'resting' ? 'Rested for the day' : 'Camp work day')
   });
 
   // Log milestone if reached
   const lastMilestone = journey.milestonesReached?.[journey.milestonesReached.length - 1];
   if (lastMilestone && !journey.log.some(l => l.type === 'milestone' && l.threshold === lastMilestone)) {
     journey.log.push({
-      day: journey.day - 1,
+      day: dayNumber,
       type: 'milestone',
       threshold: lastMilestone,
       summary: `Reached ${lastMilestone}% of journey`
@@ -444,10 +503,10 @@ export function executeFieldDay(journey, paceId) {
   }
 
   // Log block arrival
-  if (travelInfo.reachesBlock) {
-    const arrivedBlock = getCurrentBlock(journey);
+  if (arrivals.length > 0) {
+    const arrivedBlock = arrivals[arrivals.length - 1] || getCurrentBlock(journey);
     journey.log.push({
-      day: journey.day - 1,
+      day: dayNumber,
       type: 'arrival',
       location: arrivedBlock?.name || 'New location',
       summary: `Arrived at ${arrivedBlock?.name || 'new location'}`
@@ -708,19 +767,13 @@ export function getFieldProgressInfo(journey) {
   const currentBlock = getCurrentBlock(journey);
   const nextBlock = getNextBlock(journey);
 
-  // Calculate distance within current block
-  let distanceIntoBlock = journey.distanceTraveled;
-  for (let i = 0; i < journey.currentBlockIndex; i++) {
-    distanceIntoBlock -= journey.blocks[i].distance;
-  }
-
-  const distanceToNextBlock = nextBlock
-    ? Math.max(0, currentBlock.distance - distanceIntoBlock)
-    : 0;
+  const segmentLength = getCurrentSegmentLength(journey.blocks, journey.currentBlockIndex);
+  const distanceIntoSegment = getDistanceIntoCurrentSegment(journey);
+  const distanceToNextBlock = nextBlock ? Math.max(0, segmentLength - distanceIntoSegment) : 0;
 
   const overallProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-  const blockProgress = currentBlock.distance > 0
-    ? Math.round((distanceIntoBlock / currentBlock.distance) * 100)
+  const blockProgress = segmentLength > 0
+    ? Math.round((distanceIntoSegment / segmentLength) * 100)
     : 100;
 
   return {

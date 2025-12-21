@@ -1,0 +1,69 @@
+{
+  "category": "Wacky Events",
+  "description": "Humorous and absurd random events for comic relief",
+  "trigger_chance": 0.4,
+  "events": [
+    {
+      "id": "sasquatch_sighting",
+      "title": "Sasquatch Family Establishes Homestead",
+      "description": "A Sasquatch family has moved into one of your harvest blocks",
+      "choices": [
+        {
+          "label": "Negotiate with Sasquatch family for coexistence",
+          "effects": { "budget": -50000, "reputation": 0.2 },
+          "outcome": "Sasquatch family agrees to sustainable coexistence!"
+        },
+        {
+          "label": "Hire cryptozoologist to study them",
+          "effects": { "budget": -75000, "biodiversity_score": 0.15 },
+          "outcome": "Cryptozoologist discovers Sasquatch are excellent forest managers."
+        },
+        {
+          "label": "Sell documentary rights and relocate block",
+          "effects": { "budget": 100000, "blocks_removed": 1 },
+          "outcome": "Netflix deal signed! Block relocated."
+        },
+        {
+          "label": "Ignore it and hope they leave",
+          "effects": { "reputation": -0.1 },
+          "outcome": "Sasquatch family moves on, leaving a 1-star review."
+        }
+      ]
+    },
+    {
+      "id": "social_media_viral",
+      "title": "TikTok Dance Trend",
+      "description": "A TikTok dance trend starts among forestry workers",
+      "effects": { "budget": 30000, "reputation": 0.15 },
+      "outcome": "Merchandise sales generate $30,000"
+    },
+    {
+      "id": "celebrity_endorsement",
+      "title": "Ryan Reynolds Endorsement",
+      "description": "Ryan Reynolds makes sarcastic commercials about your sustainable logging",
+      "effects": { "budget": 150000, "reputation": 0.25 }
+    },
+    {
+      "id": "alien_landing",
+      "title": "Alien First Contact",
+      "description": "An alien spacecraft lands in your logging road",
+      "choices": [
+        {
+          "label": "Trade alien technology for Earth wood samples",
+          "effects": { "operating_cost_multiplier": 0.5 },
+          "outcome": "Aliens give you a matter replicator."
+        },
+        {
+          "label": "Offer aliens jobs in forest management",
+          "effects": { "jobs_created": 100, "reputation": 0.2 },
+          "outcome": "Aliens join workforce as 'Interdimensional Forest Consultants'."
+        },
+        {
+          "label": "Ask aliens for advice on sustainable practices",
+          "effects": { "biodiversity_score": 0.3 },
+          "outcome": "Aliens share advanced ecological knowledge."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,250 @@
+{
+  "category": "Story Arcs",
+  "description": "Multi-stage narrative storylines that unfold over time",
+  "story_arcs": [
+    {
+      "id": "ancientGrove",
+      "title": "Discovery of the Ancient Grove",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "Survey crews have found an untouched ancient cedar grove with trees older than 800 years",
+          "choices": [
+            {
+              "label": "Protect the grove and seek heritage status",
+              "branch": "protect",
+              "effects": { "reputation": 0.05, "community_support": 0.2 }
+            },
+            {
+              "label": "Harvest the valuable timber",
+              "branch": "harvest",
+              "effects": { "budget": 50000, "reputation": -0.1, "community_support": -0.2 }
+            }
+          ]
+        },
+        {
+          "stage": 1,
+          "branch_protect": {
+            "title": "Eco-tourism Opportunity",
+            "description": "A local entrepreneur wants to create an eco-tourism venture around the protected grove",
+            "choices": [
+              { "label": "Invest $40,000", "effects": { "budget": -40000, "reputation": 0.1, "community_support": 0.1 } },
+              { "label": "Decline", "effects": { "community_support": -0.05 } }
+            ]
+          },
+          "branch_harvest": {
+            "title": "Environmental Protest",
+            "description": "Activists blockade the road to the grove, demanding its preservation",
+            "choices": [
+              { "label": "Negotiate and offer partial protection", "effects": { "reputation": 0.05, "community_support": 0.1 } },
+              { "label": "Call law enforcement to clear the blockade", "effects": { "reputation": -0.15, "community_support": -0.15, "budget": -20000 } }
+            ]
+          }
+        },
+        {
+          "stage": 2,
+          "branch_protect": {
+            "title": "Provincial Review",
+            "description": "The province recognizes your stewardship and awards a sustainability grant",
+            "effects": { "budget": 60000, "reputation": 0.05 }
+          },
+          "branch_harvest": {
+            "title": "Provincial Review",
+            "description": "The province fines your company for inadequate consultation during the harvest",
+            "effects": { "budget": -40000, "reputation": -0.05 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "rivalCompany",
+      "title": "Rival Company Encroachment",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "A rival logging firm has begun working near your tenure and wants to buy some of your cutting rights",
+          "choices": [
+            { "label": "Negotiate partnership", "branch": "partner", "effects": { "reputation": 0.05, "community_support": 0.1 } },
+            { "label": "Compete aggressively", "branch": "compete", "effects": { "budget": -20000, "reputation": -0.05 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "endangeredSpecies",
+      "title": "Endangered Species Habitat",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "Biologists discover habitat of an endangered species in a planned cut block",
+          "choices": [
+            { "label": "Set aside habitat (-$20k)", "branch": "protect", "effects": { "budget": -20000, "reputation": 0.1, "community_support": 0.1 } },
+            { "label": "Apply for exemption", "branch": "exempt", "effects": { "budget": 50000, "reputation": -0.1, "community_support": -0.1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "naturalDisaster",
+      "title": "Devastating Landslide",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "A massive landslide has blocked access roads and damaged equipment. Local media is watching your response",
+          "choices": [
+            { "label": "Immediately send aid to affected communities", "branch": "community_first", "effects": { "budget": -80000, "reputation": 0.15, "community_support": 0.25 } },
+            { "label": "Focus on recovering your equipment first", "branch": "business_first", "effects": { "budget": -20000, "reputation": -0.1, "community_support": -0.1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wildcatStrike",
+      "title": "Wildcat Strike",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "Your crew walks off the job demanding better safety equipment and higher wages after a near-miss accident",
+          "choices": [
+            { "label": "Negotiate immediately with workers", "branch": "negotiate", "effects": { "budget": -120000, "reputation": 0.1 } },
+            { "label": "Hire replacement workers", "branch": "replacements", "effects": { "budget": -80000, "reputation": -0.2, "community_support": -0.15 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fireDamage",
+      "title": "Forest Fire Outbreak",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "A wildfire threatens both your timber stands and the nearby town. Evacuation orders are in effect",
+          "choices": [
+            { "label": "Donate equipment to firefighting efforts", "branch": "help_community", "effects": { "budget": -100000, "reputation": 0.2, "community_support": 0.3 } },
+            { "label": "Focus on protecting your timber assets", "branch": "protect_assets", "effects": { "budget": -50000, "reputation": -0.1, "community_support": -0.2 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "climateActivists",
+      "title": "Climate Protesters",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "Environmental activists have chained themselves to trees in your most profitable cut block",
+          "choices": [
+            { "label": "Engage in dialogue with protesters", "branch": "dialogue", "effects": { "reputation": 0.1 } },
+            { "label": "Call police to remove them", "branch": "police", "effects": { "budget": -30000, "reputation": -0.15, "community_support": -0.1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "indigenousPartnership",
+      "title": "Partnership Opportunity",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "A local First Nation proposes a joint venture for sustainable forestry practices",
+          "choices": [
+            { "label": "Yes, form partnership", "effects": { "budget": -75000, "reputation": 0.15, "community_support": 0.2 } },
+            { "label": "Decline politely", "effects": {} }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "marketCrash",
+      "title": "Market Volatility",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "Lumber prices have crashed 40% due to economic uncertainty",
+          "effects": { "budget": -200000 }
+        }
+      ]
+    },
+    {
+      "id": "newTechnology",
+      "title": "Innovation Opportunity",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "A tech company offers you first access to AI-powered forest management tools",
+          "choices": [
+            { "label": "Yes, invest $150k", "effects": { "budget": -150000, "reputation": 0.1 } },
+            { "label": "No, too risky", "effects": {} }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "politicalChange",
+      "title": "Election Results",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "A new government takes power with stricter environmental policies",
+          "effects": { "reputation": -0.05 }
+        }
+      ]
+    },
+    {
+      "id": "pesticideDebate",
+      "title": "Chemical Concerns",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "Environmentalists question your use of forest pesticides near water sources",
+          "choices": [
+            { "label": "Switch to organic alternatives", "effects": { "budget": -60000, "reputation": 0.1 } },
+            { "label": "Defend current practices", "effects": { "reputation": -0.08 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "touristConflict",
+      "title": "Recreation Conflict",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "Hikers and campers are angry about logging near popular trails",
+          "choices": [
+            { "label": "Create buffer zones around trails", "effects": { "budget": -40000, "community_support": 0.15 } },
+            { "label": "Continue operations as planned", "effects": { "community_support": -0.1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mediaCoverage",
+      "title": "Documentary Film",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "A filmmaker wants to document your operations for a nature documentary",
+          "choices": [
+            { "label": "Yes, showcase sustainable practices", "effects": { "reputation": 0.12 } },
+            { "label": "No, too much risk", "effects": { "reputation": -0.05 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scientificDiscovery",
+      "title": "Archaeological Find",
+      "stages": [
+        {
+          "stage": 0,
+          "description": "Researchers discover Indigenous artifacts in your harvest area that could rewrite local history",
+          "choices": [
+            { "label": "Halt operations and support research", "effects": { "budget": -120000, "reputation": 0.2, "community_support": 0.25 } },
+            { "label": "Minimize delays and continue", "effects": { "reputation": -0.15, "community_support": -0.2 } }
+          ]
+        }
+      ]
+    }
+  ]
+}

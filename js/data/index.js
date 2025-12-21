@@ -3,6 +3,8 @@ export { OPERATING_AREAS } from "./operatingAreas.js";
 export { ISSUE_LIBRARY } from "./issues.js";
 export { ILLEGAL_ACTS } from "./illegalActs.js";
 export { GLOSSARY_TERMS } from "./glossary.js";
+export { LEGACY_GLOSSARY_TERMS } from "./legacyGlossary.js";
+export { LEGACY_ILLEGAL_ACTS } from "./legacyIllegalActs.js";
 
 // Oregon Trail additions - Crew data
 export {

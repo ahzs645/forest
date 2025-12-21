@@ -1,0 +1,164 @@
+{
+  "category": "Workplace Safety Incidents",
+  "description": "Safety incidents that can occur during operations with response options",
+  "base_incident_chance": 0.08,
+  "risk_multipliers": {
+    "low_operating_cost": 0.5,
+    "low_reputation": 0.3,
+    "previous_violations": 0.4
+  },
+  "incidents": [
+    {
+      "id": "fatality_falling_tree",
+      "type": "FATALITY",
+      "title": "Falling Tree Fatality",
+      "description": "A 28-year-old faller was struck and killed by a widow-maker during harvest operations",
+      "cause": "Inadequate hazard assessment and communication failures",
+      "immediate_costs": 150000,
+      "wsbc_fine": 500000,
+      "reputation_penalty": 0.4,
+      "operational_impact": {
+        "operations_suspended": true,
+        "investigation_days": 45
+      },
+      "legal_consequences": [
+        "Criminal negligence investigation",
+        "Coroner's inquest",
+        "Media scrutiny"
+      ]
+    },
+    {
+      "id": "fatality_equipment",
+      "type": "FATALITY",
+      "title": "Equipment Rollover Fatality",
+      "description": "Heavy equipment operator crushed when loader rolled over on steep terrain",
+      "cause": "Equipment operated beyond safe slope limits, no rollover protection",
+      "immediate_costs": 200000,
+      "wsbc_fine": 750000,
+      "reputation_penalty": 0.5,
+      "operational_impact": {
+        "operations_suspended": true,
+        "investigation_days": 60,
+        "equipment_seized": true
+      },
+      "legal_consequences": [
+        "Crown counsel review",
+        "Equipment manufacturer lawsuit",
+        "Family wrongful death suit"
+      ]
+    },
+    {
+      "id": "fatality_transportation",
+      "type": "FATALITY",
+      "title": "Transportation Fatality",
+      "description": "Logging truck driver killed in highway collision with loaded trailer",
+      "cause": "Driver fatigue and inadequate vehicle maintenance",
+      "immediate_costs": 300000,
+      "wsbc_fine": 400000,
+      "reputation_penalty": 0.3,
+      "operational_impact": {
+        "transportation_suspended": true,
+        "investigation_days": 30
+      },
+      "legal_consequences": [
+        "Criminal negligence charges",
+        "Commercial vehicle ban",
+        "Public inquiry"
+      ]
+    },
+    {
+      "id": "serious_injury_chainsaw",
+      "type": "SERIOUS_INJURY",
+      "title": "Chainsaw Accident",
+      "description": "Worker suffered severe leg lacerations requiring emergency helicopter evacuation",
+      "cause": "Improper chainsaw safety procedures and inadequate first aid response",
+      "immediate_costs": 75000,
+      "wsbc_fine": 150000,
+      "reputation_penalty": 0.2,
+      "operational_impact": {
+        "safety_review": true,
+        "investigation_days": 15
+      },
+      "legal_consequences": [
+        "WorkSafeBC prosecution",
+        "Safety program review"
+      ]
+    },
+    {
+      "id": "multiple_injury_helicopter",
+      "type": "MULTIPLE_INJURIES",
+      "title": "Helicopter Crash",
+      "description": "Helicopter carrying 4 workers crashed during crew transport, 2 critical injuries",
+      "cause": "Pilot error in poor weather conditions, inadequate weather protocols",
+      "immediate_costs": 500000,
+      "wsbc_fine": 800000,
+      "reputation_penalty": 0.6,
+      "operational_impact": {
+        "operations_suspended": true,
+        "investigation_days": 90,
+        "aviation_ban": true
+      },
+      "legal_consequences": [
+        "Transport Canada investigation",
+        "Criminal charges",
+        "Aviation lawsuit"
+      ]
+    },
+    {
+      "id": "chemical_exposure",
+      "type": "CHEMICAL_EXPOSURE",
+      "title": "Herbicide Exposure Incident",
+      "description": "3 workers hospitalized after exposure to herbicide spray drift",
+      "cause": "Inadequate wind monitoring and personal protective equipment failures",
+      "immediate_costs": 125000,
+      "wsbc_fine": 250000,
+      "reputation_penalty": 0.25,
+      "operational_impact": {
+        "chemical_operations_suspended": true,
+        "investigation_days": 25
+      },
+      "legal_consequences": [
+        "Health Canada investigation",
+        "Environmental prosecution",
+        "Worker compensation claims"
+      ]
+    }
+  ],
+  "response_options": [
+    {
+      "id": "full_cooperation",
+      "description": "Full cooperation with investigation, implement all safety recommendations",
+      "cost": 200000,
+      "fine_reduction": 0.3,
+      "reputation_recovery": 0.15,
+      "detail": "Hire external safety consultants, implement gold-standard protocols"
+    },
+    {
+      "id": "standard_compliance",
+      "description": "Standard compliance response, meet minimum legal requirements",
+      "cost": 75000,
+      "fine_reduction": 0.1,
+      "reputation_recovery": 0.05,
+      "detail": "Basic legal compliance, internal safety review"
+    },
+    {
+      "id": "challenge_findings",
+      "description": "Minimize response, challenge WorkSafeBC findings in court",
+      "cost": 150000,
+      "fine_reduction": -0.2,
+      "reputation_recovery": -0.1,
+      "detail": "Aggressive legal defense, minimal safety improvements"
+    },
+    {
+      "id": "bribery",
+      "description": "Attempt to bribe WorkSafeBC inspectors",
+      "cost": 100000,
+      "fine_reduction": 0.5,
+      "reputation_recovery": 0,
+      "detail": "ILLEGAL: Attempt to corrupt government officials",
+      "illegal": true,
+      "detection_risk": 0.6,
+      "criminal_fine_if_caught": 1500000
+    }
+  ]
+}

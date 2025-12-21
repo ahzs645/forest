@@ -1,0 +1,475 @@
+{
+  "category": "Enhanced Illegal Activities System",
+  "description": "Multi-layer illegal operations with simple crimes and complex multi-stage criminal enterprises",
+  "simple_illegal_acts": [
+    {
+      "id": "buffer_zone_violation",
+      "name": "Harvest Buffer Zone Violation",
+      "description": "Cut trees within 30m of streams to maximize volume",
+      "cost_savings": 180000,
+      "detection_risk": 0.4,
+      "reputation_penalty": 0.2,
+      "fine_amount": 450000,
+      "story": "Your crew supervisor suggests 'adjusting' the buffer zone boundaries. Those extra trees near the creek are worth $180K, but violating riparian buffers is a serious offense."
+    },
+    {
+      "id": "exceed_boundaries",
+      "name": "Exceed Cut Block Boundaries",
+      "description": "Harvest additional trees beyond approved cut block limits",
+      "cost_savings": 220000,
+      "detection_risk": 0.3,
+      "reputation_penalty": 0.15,
+      "fine_amount": 550000,
+      "story": "GPS shows your crew is approaching the cut block boundary, but there's premium timber just 50m beyond. Extending the harvest would add $220K profit."
+    },
+    {
+      "id": "underreport_volumes",
+      "name": "Underreport Harvest Volumes",
+      "description": "Scale logs as smaller than actual to reduce stumpage fees",
+      "cost_savings": 320000,
+      "detection_risk": 0.2,
+      "reputation_penalty": 0.1,
+      "fine_amount": 800000,
+      "story": "The scaling supervisor hints that reported volumes could be 'conservative'. Underreporting 20% of harvest volume saves massive stumpage fees."
+    },
+    {
+      "id": "bypass_archaeological",
+      "name": "Bypass Archaeological Assessment",
+      "description": "Harvest area without waiting for heritage clearance",
+      "cost_savings": 150000,
+      "detection_risk": 0.5,
+      "reputation_penalty": 0.4,
+      "fine_amount": 600000,
+      "story": "Archaeological assessment has been pending for 6 months. Your crew leader suggests just proceeding - 'what they don't know won't hurt them'."
+    },
+    {
+      "id": "dump_fluids",
+      "name": "Dump Equipment Fluids",
+      "description": "Illegally dispose of hydraulic fluid and oil in forest",
+      "cost_savings": 85000,
+      "detection_risk": 0.3,
+      "reputation_penalty": 0.3,
+      "fine_amount": 400000,
+      "story": "Proper disposal of equipment fluids costs $85K. A mechanic offers to 'handle disposal' by dumping everything in a remote clearcut."
+    },
+    {
+      "id": "forge_safety_records",
+      "name": "Forge Safety Training Records",
+      "description": "Create fake safety certification documents for workers",
+      "cost_savings": 95000,
+      "detection_risk": 0.4,
+      "reputation_penalty": 0.25,
+      "fine_amount": 350000,
+      "story": "Safety training costs are eating profits. A consultant offers to provide 'complete' safety records for all workers without actual training."
+    },
+    {
+      "id": "bribe_permit_officer",
+      "name": "Bribe Local Permit Officer",
+      "description": "Pay regional official to fast-track permit applications",
+      "cost_savings": 200000,
+      "detection_risk": 0.3,
+      "reputation_penalty": 0.2,
+      "fine_amount": 750000,
+      "story": "The local permit officer hints that $25K could ensure your applications get priority processing while competitors wait months."
+    },
+    {
+      "id": "high_grade_only",
+      "name": "High-Grade Only the Best Trees",
+      "description": "Selectively harvest only premium logs, leaving slash and small trees",
+      "cost_savings": 280000,
+      "detection_risk": 0.6,
+      "reputation_penalty": 0.3,
+      "fine_amount": 420000,
+      "story": "Focus only on high-value old growth and premium logs. Leave the rest as 'wildlife trees' even though your permit requires full harvest."
+    },
+    {
+      "id": "falsify_silviculture",
+      "name": "Falsify Silviculture Reports",
+      "description": "Report tree planting and maintenance that was never done",
+      "cost_savings": 160000,
+      "detection_risk": 0.3,
+      "reputation_penalty": 0.2,
+      "fine_amount": 480000,
+      "story": "Submit fake silviculture reports claiming you planted and tended seedlings. Government inspections are rare in remote areas."
+    },
+    {
+      "id": "wildlife_closure_violation",
+      "name": "Harvest During Wildlife Closure",
+      "description": "Continue operations during seasonal wildlife protection periods",
+      "cost_savings": 340000,
+      "detection_risk": 0.5,
+      "reputation_penalty": 0.4,
+      "fine_amount": 680000,
+      "story": "Caribou calving season shuts down operations for 2 months. Continue harvesting in 'uninhabited' areas to meet contract deadlines."
+    },
+    {
+      "id": "modify_emissions",
+      "name": "Modify Equipment Emission Controls",
+      "description": "Remove emissions equipment to increase equipment power and fuel efficiency",
+      "cost_savings": 120000,
+      "detection_risk": 0.2,
+      "reputation_penalty": 0.1,
+      "fine_amount": 300000,
+      "story": "Removing emissions controls increases equipment power 15% and saves $120K annually in fuel costs. Inspections are infrequent."
+    },
+    {
+      "id": "banned_herbicides",
+      "name": "Use Banned Herbicides",
+      "description": "Apply cheaper prohibited chemicals for vegetation management",
+      "cost_savings": 190000,
+      "detection_risk": 0.4,
+      "reputation_penalty": 0.35,
+      "fine_amount": 570000,
+      "story": "Banned herbicides are 70% cheaper and more effective than approved alternatives. A supplier offers 'no questions asked' bulk chemicals."
+    },
+    {
+      "id": "overweight_trucks",
+      "name": "Exceed Truck Weight Limits",
+      "description": "Overload logging trucks to reduce transportation costs",
+      "cost_savings": 240000,
+      "detection_risk": 0.3,
+      "reputation_penalty": 0.15,
+      "fine_amount": 360000,
+      "story": "Loading trucks 20% over weight limit reduces trips by 20%. Most weigh scales are predictable and avoidable."
+    },
+    {
+      "id": "black_market_timber",
+      "name": "Sell Timber to Black Market",
+      "description": "Sell premium logs to unregistered mills at higher prices",
+      "cost_savings": 380000,
+      "detection_risk": 0.4,
+      "reputation_penalty": 0.25,
+      "fine_amount": 760000,
+      "story": "Unregistered mills pay 30% above market rates for premium logs. No paperwork, no stumpage tracking, cash payments."
+    },
+    {
+      "id": "fake_consultation",
+      "name": "Fake First Nations Consultation",
+      "description": "Forge consultation documents claiming Indigenous agreement",
+      "cost_savings": 250000,
+      "detection_risk": 0.6,
+      "reputation_penalty": 0.7,
+      "fine_amount": 1200000,
+      "story": "Create fake meeting minutes and agreements to satisfy consultation requirements. Avoid actual negotiations that could delay operations."
+    },
+    {
+      "id": "crown_land_trespass",
+      "name": "Harvest Crown Land Without Permits",
+      "description": "Cut valuable timber on adjacent Crown land assuming no one will notice",
+      "cost_savings": 420000,
+      "detection_risk": 0.5,
+      "reputation_penalty": 0.4,
+      "fine_amount": 1050000,
+      "story": "Crown land boundaries are poorly marked. Extend harvest into valuable adjacent stands and claim 'boundary confusion' if caught."
+    },
+    {
+      "id": "illegal_asbestos_disposal",
+      "name": "Dispose of Asbestos Insulation Illegally",
+      "description": "Bury old camp building asbestos instead of proper hazmat disposal",
+      "cost_savings": 75000,
+      "detection_risk": 0.2,
+      "reputation_penalty": 0.2,
+      "fine_amount": 225000,
+      "story": "Demolishing old camp buildings reveals asbestos insulation. Proper disposal costs $75K. Just bury it deep in a remote clearcut."
+    }
+  ],
+  "complex_operations": [
+    {
+      "id": "cra_deception_network",
+      "name": "The CRA Deception Network",
+      "description": "Multi-year tax evasion scheme using shell companies and offshore accounts",
+      "story": "A forensic accountant with mob connections offers to set up an elaborate tax evasion network. Start small with simple deductions, escalate to offshore money laundering.",
+      "total_profit": 8500000,
+      "base_risk": 0.2,
+      "complexity": "multi-stage",
+      "stages": [
+        {
+          "name": "Stage 1: Creative Deductions",
+          "description": "Inflate equipment costs and claim personal expenses as business costs",
+          "profit": 350000,
+          "risk_increase": 0.1,
+          "cost": 15000,
+          "story": "Start with 'aggressive' but seemingly legitimate tax strategies. Claim your truck, cottage, and family vacations as business expenses."
+        },
+        {
+          "name": "Stage 2: Shell Company Network",
+          "description": "Create fake consulting companies to shift profits and avoid taxes",
+          "profit": 850000,
+          "risk_increase": 0.15,
+          "cost": 50000,
+          "story": "Set up 3 shell companies that 'provide consulting services' to your forestry operation. Channel profits through these companies to avoid corporate tax."
+        },
+        {
+          "name": "Stage 3: Offshore Banking",
+          "description": "Move profits to Cayman Islands accounts to avoid all Canadian taxes",
+          "profit": 2400000,
+          "risk_increase": 0.25,
+          "cost": 100000,
+          "story": "Open accounts in the Cayman Islands. Route all major contracts through offshore companies. CRA has limited ability to track foreign accounts."
+        },
+        {
+          "name": "Stage 4: International Money Laundering",
+          "description": "Partner with international criminal organizations to clean massive profits",
+          "profit": 4900000,
+          "risk_increase": 0.4,
+          "cost": 200000,
+          "story": "The accountant introduces you to Eastern European crime syndicates. They'll launder unlimited money for 15% commission. No questions asked."
+        }
+      ]
+    },
+    {
+      "id": "timber_revenue_phantom",
+      "name": "The Timber Revenue Phantom",
+      "description": "Systematically under-report timber sales to avoid stumpage fees and income tax",
+      "story": "Your mill contact suggests under-reporting actual timber volumes and prices. Start with small discrepancies, escalate to completely fake invoicing systems.",
+      "total_profit": 6200000,
+      "base_risk": 0.3,
+      "complexity": "multi-stage",
+      "stages": [
+        {
+          "name": "Stage 1: Volume Underreporting",
+          "description": "Report 20% less volume than actually harvested",
+          "profit": 400000,
+          "risk_increase": 0.1,
+          "cost": 25000,
+          "story": "Simple scale manipulation. Report 80,000m3 when you actually harvested 100,000m3. Saves massive stumpage fees."
+        },
+        {
+          "name": "Stage 2: Price Manipulation",
+          "description": "Create fake lower-price contracts while receiving higher payments under the table",
+          "profit": 950000,
+          "risk_increase": 0.15,
+          "cost": 60000,
+          "story": "Mills officially pay you $70/m3 but secretly add $25/m3 in cash payments. Government only sees the $70 rate for tax purposes."
+        },
+        {
+          "name": "Stage 3: Double-Invoice System",
+          "description": "Maintain completely separate accounting systems for real vs reported sales",
+          "profit": 2100000,
+          "risk_increase": 0.3,
+          "cost": 120000,
+          "story": "Two complete sets of books. Official records show modest profits. Real records show you're making 3x more than reported to CRA."
+        },
+        {
+          "name": "Stage 4: Cryptocurrency Conversion",
+          "description": "Convert all unreported profits to Bitcoin to hide wealth permanently",
+          "profit": 2750000,
+          "risk_increase": 0.35,
+          "cost": 180000,
+          "story": "Convert all hidden cash to Bitcoin through untraceable exchanges. Wealth becomes virtually impossible for CRA to discover or seize."
+        }
+      ]
+    },
+    {
+      "id": "cocaine_highway_express",
+      "name": "The Cocaine Highway Express",
+      "description": "Use logging roads and equipment to transport drugs across Canada-US border",
+      "story": "Colombian cartel contacts you through a mutual 'friend'. They need remote transportation corridors. Start with small loads, build to major trafficking operation.",
+      "total_profit": 12000000,
+      "base_risk": 0.4,
+      "complexity": "multi-stage",
+      "stages": [
+        {
+          "name": "Stage 1: Single Load Test",
+          "description": "Transport one 50kg cocaine shipment hidden in logging truck",
+          "profit": 500000,
+          "risk_increase": 0.15,
+          "cost": 25000,
+          "story": "Prove reliability with one test shipment. $500K for driving a truck from the border to Vancouver. What could go wrong?"
+        },
+        {
+          "name": "Stage 2: Regular Smuggling Route",
+          "description": "Establish weekly shipments using modified logging equipment",
+          "profit": 2500000,
+          "risk_increase": 0.25,
+          "cost": 100000,
+          "story": "Build hidden compartments in logging trailers. Weekly runs carrying 200kg per trip. Cartel provides protection and logistics."
+        },
+        {
+          "name": "Stage 3: Distribution Network",
+          "description": "Use your worker network to distribute drugs throughout BC interior",
+          "profit": 4500000,
+          "risk_increase": 0.4,
+          "cost": 200000,
+          "story": "Recruit desperate workers as dealers. Control distribution from Prince George to Kamloops. Massive profits but workers become liabilities."
+        },
+        {
+          "name": "Stage 4: International Cartel Partnership",
+          "description": "Become Canadian distribution hub for South American drug cartels",
+          "profit": 4500000,
+          "risk_increase": 0.6,
+          "cost": 400000,
+          "story": "Full partnership with Colombian cartels. Move 2 tonnes monthly. $50M+ annual revenue but you're now a major international criminal."
+        }
+      ]
+    },
+    {
+      "id": "toxic_waste_empire",
+      "name": "The Toxic Waste Empire",
+      "description": "Become illegal toxic waste disposal site for industries across Western Canada",
+      "story": "Chemical companies desperately need somewhere to dump toxic waste. Your remote forestland could be worth millions as an illegal dump site.",
+      "total_profit": 7800000,
+      "base_risk": 0.3,
+      "complexity": "multi-stage",
+      "stages": [
+        {
+          "name": "Stage 1: Industrial Sludge Disposal",
+          "description": "Accept contaminated soil and industrial sludge for 'disposal'",
+          "profit": 600000,
+          "risk_increase": 0.1,
+          "cost": 50000,
+          "story": "Chemical companies pay $200/tonne to dump contaminated soil. Just bury it in remote clearcuts. Easy money."
+        },
+        {
+          "name": "Stage 2: Hazardous Chemical Storage",
+          "description": "Store banned pesticides and industrial chemicals in hidden bunkers",
+          "profit": 1400000,
+          "risk_increase": 0.2,
+          "cost": 150000,
+          "story": "Build underground storage for chemicals too dangerous for legal disposal. Pesticide companies pay millions to hide banned substances."
+        },
+        {
+          "name": "Stage 3: Radioactive Waste Facility",
+          "description": "Accept low-level radioactive waste from medical and research facilities",
+          "profit": 2800000,
+          "risk_increase": 0.35,
+          "cost": 300000,
+          "story": "Hospitals and research labs generate radioactive waste. Legal disposal costs $50,000+ per container. You'll take it for $10,000."
+        },
+        {
+          "name": "Stage 4: International Toxic Hub",
+          "description": "Accept toxic waste shipments from US and Asia via secret import network",
+          "profit": 3000000,
+          "risk_increase": 0.5,
+          "cost": 500000,
+          "story": "Partner with international waste brokers. Accept shipments from Asia and USA. Your land becomes North America's toxic dump."
+        }
+      ]
+    },
+    {
+      "id": "government_takeover",
+      "name": "The Government Takeover",
+      "description": "Systematically corrupt BC government officials to control forestry policy",
+      "story": "A lobbyist offers to 'influence' key government decision-makers. Start with small bribes, escalate to controlling entire ministries.",
+      "total_profit": 9500000,
+      "base_risk": 0.4,
+      "complexity": "multi-stage",
+      "stages": [
+        {
+          "name": "Stage 1: Local Official Bribes",
+          "description": "Bribe regional forestry officials for permit advantages",
+          "profit": 800000,
+          "risk_increase": 0.15,
+          "cost": 100000,
+          "story": "Start with regional permit officers. $20K per official ensures your permits get approved first while competitors wait."
+        },
+        {
+          "name": "Stage 2: Ministry Infiltration",
+          "description": "Place paid agents in key positions within BC Ministry of Forests",
+          "profit": 2200000,
+          "risk_increase": 0.25,
+          "cost": 300000,
+          "story": "Fund sympathetic candidates for senior ministry positions. $300K investment gets you inside information and policy influence."
+        },
+        {
+          "name": "Stage 3: Legislative Control",
+          "description": "Bribe MLAs to vote for forestry-friendly legislation",
+          "profit": 3500000,
+          "risk_increase": 0.4,
+          "cost": 600000,
+          "story": "Buy votes in the BC Legislature. $50K per MLA ensures favorable forestry legislation. Control environmental and indigenous policies."
+        },
+        {
+          "name": "Stage 4: Premier's Office",
+          "description": "Corrupt the Premier's Chief of Staff to control provincial policy",
+          "profit": 3000000,
+          "risk_increase": 0.6,
+          "cost": 1000000,
+          "story": "The ultimate prize: the Premier's Chief of Staff. $1M secures unprecedented policy control but exposes you to federal investigation."
+        }
+      ]
+    }
+  ],
+  "bribery_layers": [
+    {
+      "layer": 1,
+      "name": "Bribe investigating officers",
+      "cost": 300000,
+      "fine_multiplier": 0.3,
+      "reputation_penalty_multiplier": 0.5,
+      "success_chance": 0.6,
+      "description": "Attempt to corrupt front-line investigators",
+      "warning": "Bribing police officers is a serious federal crime",
+      "detection_risk_base": 0.5
+    },
+    {
+      "layer": 2,
+      "name": "Bribe senior officials",
+      "cost": 800000,
+      "fine_multiplier": 0.2,
+      "reputation_penalty_multiplier": 0.3,
+      "success_chance": 0.7,
+      "description": "Corrupt senior law enforcement officials",
+      "warning": "Corrupting senior officials triggers federal investigations",
+      "detection_risk_base": 0.6,
+      "budget_requirement": 1000000
+    },
+    {
+      "layer": 3,
+      "name": "Bribe judges and prosecutors",
+      "cost": 1500000,
+      "fine_multiplier": 0.1,
+      "reputation_penalty_multiplier": 0.2,
+      "success_chance": 0.8,
+      "description": "Corrupt the judicial system itself",
+      "warning": "Bribing judges is treason-level corruption",
+      "detection_risk_base": 0.7,
+      "budget_requirement": 2500000
+    },
+    {
+      "layer": 4,
+      "name": "Political protection network",
+      "cost": 3000000,
+      "fine_multiplier": 0.05,
+      "reputation_penalty_multiplier": 0.1,
+      "success_chance": 0.9,
+      "description": "Buy protection from federal politicians",
+      "warning": "Political corruption at this level makes you an enemy of the state",
+      "detection_risk_base": 0.8,
+      "budget_requirement": 5000000
+    }
+  ],
+  "detection_sources": [
+    "Forest Practices Board inspector",
+    "Employee whistleblower",
+    "Routine government audit",
+    "Drone surveillance",
+    "First Nations monitoring patrol",
+    "RCMP undercover operation",
+    "CRA tax investigation",
+    "Government surveillance program",
+    "Rival criminal organization tip-off",
+    "Investigative journalist exposure"
+  ],
+  "ongoing_consequences": {
+    "blackmail_chance_quarterly": 0.3,
+    "blackmail_amount_range": [100000, 500000],
+    "exposure_on_refusal_chance": 0.6,
+    "exposure_reputation_penalty": 0.3,
+    "exposure_fine_range": [500000, 1500000]
+  },
+  "legal_defense_options": [
+    {
+      "name": "Accept full legal consequences",
+      "cost": 0,
+      "fine_multiplier": 1.0,
+      "success_chance": 1.0
+    },
+    {
+      "name": "Hire top criminal defense lawyers",
+      "cost": 500000,
+      "fine_multiplier": 0.6,
+      "success_chance": 0.7
+    }
+  ]
+}

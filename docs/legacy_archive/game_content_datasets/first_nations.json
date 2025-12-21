@@ -1,0 +1,209 @@
+{
+  "category": "First Nations Relations",
+  "description": "First Nations consultation system and anger events",
+  "consultation_approaches": [
+    {
+      "id": "comprehensive",
+      "label": "Conduct comprehensive consultations with all Nations",
+      "cost_multiplier": 2.0,
+      "effects": {
+        "relationship_gain": 0.2,
+        "reputation_gain": 0.2,
+        "permit_bonus": 0.15,
+        "agreement_guaranteed": true
+      }
+    },
+    {
+      "id": "individual",
+      "label": "Schedule individual meetings with each Nation",
+      "cost_multiplier": 1.0,
+      "effects": {
+        "relationship_gain": 0.1,
+        "reputation_gain": 0.1,
+        "permit_bonus": 0.05,
+        "agreement_chance": 0.7
+      }
+    },
+    {
+      "id": "minimal",
+      "label": "Send formal notification letters only (minimal compliance)",
+      "cost": 2000,
+      "effects": {
+        "relationship_loss": 0.2,
+        "reputation_loss": 0.2,
+        "permit_bonus": -0.1,
+        "agreement_lost": true
+      }
+    },
+    {
+      "id": "delay",
+      "label": "Delay consultations (risk deteriorating relationships)",
+      "effects": {
+        "relationship_loss": 0.3,
+        "reputation_loss": 0.3,
+        "permit_bonus": -0.2,
+        "social_license_lost": true
+      }
+    }
+  ],
+  "anger_events": [
+    {
+      "id": "social_media_outrage",
+      "title": "Social Media Outrage",
+      "description": "A viral TikTok video shows your equipment near a traditional fishing spot",
+      "trigger_reason": "Cultural site disrespect",
+      "relationship_penalty": 0.3,
+      "reputation_penalty": 0.2,
+      "response_options": [
+        {
+          "label": "Issue public apology and relocate operations",
+          "cost": 25000,
+          "relationship_recovery": 0.2,
+          "reputation_recovery": 0.1,
+          "success_chance": 0.8
+        },
+        {
+          "label": "Ignore the controversy",
+          "cost": 0,
+          "relationship_recovery": -0.1,
+          "reputation_recovery": -0.1,
+          "success_chance": 1.0
+        }
+      ]
+    },
+    {
+      "id": "sacred_site_disturbance",
+      "title": "Sacred Site Disturbance",
+      "description": "Your crews unknowingly harvested near a sacred burial ground, causing deep offense",
+      "trigger_reason": "Sacred site violation",
+      "relationship_penalty": 0.4,
+      "reputation_penalty": 0.3,
+      "response_options": [
+        {
+          "label": "Immediately halt operations and seek elder guidance",
+          "cost": 50000,
+          "relationship_recovery": 0.3,
+          "reputation_recovery": 0.2,
+          "success_chance": 0.9
+        },
+        {
+          "label": "Offer compensation and continue operations",
+          "cost": 30000,
+          "relationship_recovery": 0.1,
+          "reputation_recovery": 0.0,
+          "success_chance": 0.5
+        },
+        {
+          "label": "Claim ignorance and deny responsibility",
+          "cost": 0,
+          "relationship_recovery": -0.2,
+          "reputation_recovery": -0.2,
+          "success_chance": 1.0
+        }
+      ]
+    },
+    {
+      "id": "water_contamination",
+      "title": "Water Source Contamination",
+      "description": "Sediment from your logging roads has contaminated a creek used for drinking water",
+      "trigger_reason": "Environmental damage",
+      "relationship_penalty": 0.35,
+      "reputation_penalty": 0.25,
+      "response_options": [
+        {
+          "label": "Install water filtration systems and remediate the creek",
+          "cost": 75000,
+          "relationship_recovery": 0.25,
+          "reputation_recovery": 0.15,
+          "success_chance": 0.85
+        },
+        {
+          "label": "Provide temporary water supplies only",
+          "cost": 15000,
+          "relationship_recovery": 0.05,
+          "reputation_recovery": 0.0,
+          "success_chance": 0.6
+        }
+      ]
+    },
+    {
+      "id": "medicine_plants_destroyed",
+      "title": "Traditional Medicine Plants Destroyed",
+      "description": "Your operations destroyed a grove of rare medicinal plants used by healers for generations",
+      "trigger_reason": "Cultural resource destruction",
+      "relationship_penalty": 0.25,
+      "reputation_penalty": 0.15,
+      "response_options": [
+        {
+          "label": "Fund a traditional medicine restoration project",
+          "cost": 40000,
+          "relationship_recovery": 0.2,
+          "reputation_recovery": 0.1,
+          "success_chance": 0.75
+        },
+        {
+          "label": "Offer monetary compensation to affected families",
+          "cost": 20000,
+          "relationship_recovery": 0.1,
+          "reputation_recovery": 0.05,
+          "success_chance": 0.5
+        }
+      ]
+    },
+    {
+      "id": "treaty_violation",
+      "title": "Treaty Rights Violation",
+      "description": "Your harvest blocks overlap with treaty-protected hunting grounds during peak season",
+      "trigger_reason": "Treaty violation",
+      "relationship_penalty": 0.5,
+      "reputation_penalty": 0.35,
+      "response_options": [
+        {
+          "label": "Immediately withdraw and renegotiate boundaries",
+          "cost": 60000,
+          "relationship_recovery": 0.3,
+          "reputation_recovery": 0.2,
+          "success_chance": 0.8
+        },
+        {
+          "label": "Propose shared access agreement",
+          "cost": 30000,
+          "relationship_recovery": 0.15,
+          "reputation_recovery": 0.1,
+          "success_chance": 0.6
+        },
+        {
+          "label": "Challenge the treaty interpretation in court",
+          "cost": 100000,
+          "relationship_recovery": -0.3,
+          "reputation_recovery": -0.2,
+          "success_chance": 0.3
+        }
+      ]
+    },
+    {
+      "id": "archaeological_damage",
+      "title": "Archaeological Site Damage",
+      "description": "Your road construction crew damaged ancient petroglyphs that weren't in the survey",
+      "trigger_reason": "Heritage site damage",
+      "relationship_penalty": 0.4,
+      "reputation_penalty": 0.3,
+      "response_options": [
+        {
+          "label": "Hire archaeologists and fund full restoration",
+          "cost": 80000,
+          "relationship_recovery": 0.25,
+          "reputation_recovery": 0.2,
+          "success_chance": 0.7
+        },
+        {
+          "label": "Document the damage and pay fines",
+          "cost": 35000,
+          "relationship_recovery": 0.0,
+          "reputation_recovery": -0.05,
+          "success_chance": 1.0
+        }
+      ]
+    }
+  ]
+}

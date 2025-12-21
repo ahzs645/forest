@@ -1,0 +1,48 @@
+{
+  "category": "Forest Certifications",
+  "description": "Available certification programs for sustainable forestry",
+  "certifications": [
+    {
+      "id": "FSC",
+      "name": "Forest Stewardship Council (FSC)",
+      "initial_cost": 150000,
+      "annual_cost": 25000,
+      "revenue_premium": 0.2,
+      "reputation_bonus": 0.15,
+      "requirements": {
+        "reputation_minimum": 0.6,
+        "biodiversity_minimum": 0.5
+      },
+      "description": "Most rigorous certification, highest market premium"
+    },
+    {
+      "id": "PEFC",
+      "name": "Programme for Endorsement of Forest Certification (PEFC)",
+      "initial_cost": 100000,
+      "annual_cost": 18000,
+      "revenue_premium": 0.15,
+      "reputation_bonus": 0.1,
+      "requirements": {
+        "reputation_minimum": 0.4
+      },
+      "description": "International standard, moderate requirements"
+    },
+    {
+      "id": "SFI",
+      "name": "Sustainable Forestry Initiative (SFI)",
+      "initial_cost": 80000,
+      "annual_cost": 15000,
+      "revenue_premium": 0.12,
+      "reputation_bonus": 0.08,
+      "requirements": {
+        "reputation_minimum": 0.3
+      },
+      "description": "North American standard, accessible entry point"
+    }
+  ],
+  "mechanics": {
+    "audit_compliance": "Annual audits check if requirements still met",
+    "loss_penalty": "Losing certification causes 0.3 reputation loss",
+    "stacking": "Multiple certifications can be held simultaneously"
+  }
+}

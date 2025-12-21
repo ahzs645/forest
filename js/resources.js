@@ -5,6 +5,16 @@
 
 // Field resource definitions
 export const FIELD_RESOURCES = {
+  budget: {
+    id: 'budget',
+    name: 'Cash',
+    unit: '$',
+    shortLabel: 'CASH',
+    baseDaily: 0,
+    max: 8000,
+    warning: 1500,
+    critical: 400
+  },
   fuel: {
     id: 'fuel',
     name: 'Fuel',
@@ -16,6 +26,7 @@ export const FIELD_RESOURCES = {
     critical: 15,          // Critical threshold
     paceModifiers: {
       resting: 0,
+      camp_work: 0.8,
       slow: 2,             // Reduced from 3
       normal: 3,           // Reduced from 5
       fast: 5,             // Reduced from 8
@@ -58,6 +69,7 @@ export const FIELD_RESOURCES = {
     critical: 20,
     paceModifiers: {
       resting: 0,
+      camp_work: 0.4,
       slow: 1,
       normal: 2,
       fast: 3,
@@ -125,6 +137,7 @@ export const DESK_RESOURCES = {
  */
 export function createFieldResources(options = {}) {
   return {
+    budget: options.budget ?? 3000,
     fuel: options.fuel ?? 150,      // Increased from 100
     food: options.food ?? 60,       // Increased from 40
     equipment: options.equipment ?? 100,

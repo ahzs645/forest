@@ -1,0 +1,110 @@
+{
+  "category": "Forest Management Planning",
+  "description": "20-year Forest Management Plan system required for commercial operations",
+  "phases": {
+    "PLANNING": {
+      "name": "Strategic Planning Phase",
+      "duration_quarters": 2,
+      "cost": 150000,
+      "activities": ["Inventory assessment", "Stakeholder consultation", "Environmental baseline"],
+      "description": "Develop comprehensive 20-year forest management strategy"
+    },
+    "DEVELOPMENT": {
+      "name": "Plan Development Phase",
+      "duration_quarters": 3,
+      "cost": 250000,
+      "activities": ["Detailed planning", "Impact assessments", "Public consultation"],
+      "description": "Create detailed tactical plans and operational procedures"
+    },
+    "APPROVAL": {
+      "name": "Government Approval Phase",
+      "duration_quarters": 2,
+      "cost": 75000,
+      "activities": ["Government review", "Final public comment", "Regulatory approval"],
+      "description": "Submit plan for government approval and public review"
+    },
+    "IMPLEMENTATION": {
+      "name": "Implementation Phase",
+      "duration_quarters": 4,
+      "cost": 100000,
+      "activities": ["Staff training", "System setup", "Operational procedures"],
+      "description": "Implement approved management plan and monitoring systems"
+    },
+    "MONITORING": {
+      "name": "Monitoring & Adaptive Management",
+      "duration_quarters": 20,
+      "cost_per_year": 50000,
+      "activities": ["Performance monitoring", "Adaptive management", "Annual reporting"],
+      "description": "Monitor plan effectiveness and adapt strategies as needed"
+    }
+  },
+  "requirements": {
+    "inventory_completion": 0.85,
+    "stakeholder_consultation_sessions": 3,
+    "environmental_assessment": true,
+    "first_nations_engagement_sessions": 2,
+    "public_consultation_days": 60,
+    "scientific_review": true
+  },
+  "planning_approaches": [
+    {
+      "id": "comprehensive",
+      "name": "Comprehensive Planning Approach",
+      "cost": 400000,
+      "timeline_quarters": 11,
+      "quality_score": 0.9,
+      "approval_likelihood": 0.9,
+      "description": "Highest quality, includes all optional components"
+    },
+    {
+      "id": "balanced",
+      "name": "Balanced Planning Approach",
+      "cost": 280000,
+      "timeline_quarters": 9,
+      "quality_score": 0.8,
+      "approval_likelihood": 0.75,
+      "description": "Good quality while managing costs effectively"
+    },
+    {
+      "id": "cost_efficient",
+      "name": "Cost-Efficient Planning Approach",
+      "cost": 180000,
+      "timeline_quarters": 7,
+      "quality_score": 0.65,
+      "approval_likelihood": 0.6,
+      "description": "Meets minimum requirements at lowest cost, higher risk of delays"
+    }
+  ],
+  "enhancement_options": [
+    {
+      "name": "Advanced Ecological Modeling",
+      "cost": 65000,
+      "approval_bonus": 0.15
+    },
+    {
+      "name": "Additional Stakeholder Workshops",
+      "cost": 35000,
+      "community_support_bonus": 0.1
+    },
+    {
+      "name": "Digital Monitoring Systems",
+      "cost": 85000,
+      "efficiency_bonus": 0.2
+    },
+    {
+      "name": "Climate Risk Assessment",
+      "cost": 45000,
+      "climate_adaptation": true
+    },
+    {
+      "name": "Wildlife Habitat Enhancement Plan",
+      "cost": 55000,
+      "biodiversity_bonus": 0.1
+    }
+  ],
+  "approval_benefits": {
+    "permit_bonus": 0.2,
+    "reputation_bonus": 0.15,
+    "aac_increase": 0.1
+  }
+}

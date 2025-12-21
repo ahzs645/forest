@@ -1,0 +1,104 @@
+{
+  "generatedAt": "2025-12-15T22:02:54.609Z",
+  "srcRoot": "/Users/ahmadjalil/Downloads/New Folder With Items/game_content_datasets",
+  "outputs": {
+    "fieldEvents": 18,
+    "deskEvents": 27,
+    "glossaryTerms": 18,
+    "illegalActs": 52
+  },
+  "archivedFiles": [
+    {
+      "file": "bc_interior_context.json",
+      "bytes": 9560
+    },
+    {
+      "file": "ceo_profiles.json",
+      "bytes": 2352
+    },
+    {
+      "file": "ceo_system_expanded.json",
+      "bytes": 12024
+    },
+    {
+      "file": "certifications.json",
+      "bytes": 1470
+    },
+    {
+      "file": "competitive_market.json",
+      "bytes": 3211
+    },
+    {
+      "file": "events_policy_natural.json",
+      "bytes": 2567
+    },
+    {
+      "file": "events_wacky.json",
+      "bytes": 2581
+    },
+    {
+      "file": "field_issues.json",
+      "bytes": 21709
+    },
+    {
+      "file": "first_nations.json",
+      "bytes": 6549
+    },
+    {
+      "file": "forest_management_planning.json",
+      "bytes": 3451
+    },
+    {
+      "file": "forester_roles.json",
+      "bytes": 14431
+    },
+    {
+      "file": "glossary.json",
+      "bytes": 3612
+    },
+    {
+      "file": "illegal_activities_enhanced.json",
+      "bytes": 20947
+    },
+    {
+      "file": "illegal_activities.json",
+      "bytes": 4334
+    },
+    {
+      "file": "illegal_acts_v3.json",
+      "bytes": 16345
+    },
+    {
+      "file": "liaison_types.json",
+      "bytes": 689
+    },
+    {
+      "file": "operating_areas.json",
+      "bytes": 4249
+    },
+    {
+      "file": "permits.json",
+      "bytes": 2470
+    },
+    {
+      "file": "story_arcs.json",
+      "bytes": 9623
+    },
+    {
+      "file": "strategic_management.json",
+      "bytes": 4674
+    },
+    {
+      "file": "workplace_safety.json",
+      "bytes": 5484
+    }
+  ],
+  "notes": [
+    "Converted 4 wacky events → field event pool.",
+    "Converted 7 policy/natural events → desk event pool.",
+    "Converted 17 field issues (incl. chained) → field/desk pools (split by role).",
+    "Imported 52 illegal acts as a data deck (spawned dynamically in-game).",
+    "Converted 6 safety incidents → desk event pool (rare).",
+    "Imported 18 glossary terms."
+  ]
+}
