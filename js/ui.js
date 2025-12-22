@@ -480,6 +480,7 @@ export class TerminalUI {
       <div class="location-info">${data.description || ''}</div>
       ${data.terrain ? `<div class="location-info">Terrain: ${data.terrain}</div>` : ''}
       ${data.weather ? `<div class="location-weather">Weather: ${data.weather}</div>` : ''}
+      ${data.phase ? `<div class="location-info">Phase: ${data.phase}</div>` : ''}
       ${data.hazards?.length ? `<div class="location-info">Hazards: ${data.hazards.join(', ')}</div>` : ''}
     `;
   }
@@ -555,7 +556,7 @@ export class TerminalUI {
       this.updateLocationPanel({
         name: `Day ${journey.day} of ${journey.deadline}`,
         description: `${journey.deadline - journey.day} days remaining`,
-        weather: journey.currentPhase
+        phase: journey.currentPhase
       });
     }
   }
@@ -564,7 +565,9 @@ export class TerminalUI {
     if (journey.journeyType === 'field') {
       return Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
     } else {
-      return Math.round((journey.day / journey.deadline) * 100);
+      const target = journey.permits?.target || 0;
+      if (target <= 0) return 0;
+      return Math.round((journey.permits.approved / target) * 100);
     }
   }
 

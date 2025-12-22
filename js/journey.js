@@ -147,6 +147,7 @@ export function createFieldJourney(options = {}) {
     pace: 'normal',
     weather: getRandomWeather(blocks[0], 1),
     temperature: 'cool',
+    travelDelayHours: 0,
 
     // Party
     crew: crew || generateCrew(5, 'field'),
@@ -171,6 +172,9 @@ export function createFieldJourney(options = {}) {
 export function createDeskJourney(options = {}) {
   const { roleId, areaId, companyName, crewName, crew, role, area } = options;
   const effectiveAreaId = areaId || area?.id;
+  const targetPermits = 10;
+  const submittedPermits = 8;
+  const backlogPermits = Math.max(0, targetPermits - submittedPermits);
 
   return {
     journeyType: 'desk',
@@ -187,8 +191,9 @@ export function createDeskJourney(options = {}) {
 
     // Permit pipeline
     permits: {
-      target: 10,
-      submitted: 8,
+      target: targetPermits,
+      submitted: submittedPermits,
+      backlog: backlogPermits,
       inReview: 0,
       needsRevision: 0,
       approved: 0,
@@ -269,8 +274,10 @@ function travelDistanceForDay(journey, paceId) {
   const terrain = TERRAIN_TYPES[currentBlock?.terrain] || TERRAIN_TYPES.flat;
   const weatherMod = journey.weather?.travelModifier || 1;
 
+  const delayHours = Math.min(8, Math.max(0, journey.travelDelayHours || 0));
+  const timeModifier = Math.max(0, 1 - delayHours / 8);
   const variance = 1 + (Math.random() * 2 - 1) * DAILY_TRAVEL_VARIANCE;
-  const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance;
+  const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance * timeModifier;
   return Math.max(0, distance);
 }
 
@@ -331,7 +338,8 @@ export function calculateTravelDistance(journey, paceId) {
  */
 export function executeFieldDay(journey, paceId) {
   const messages = [];
-  const pace = PACE_OPTIONS[paceId] || PACE_OPTIONS.normal;
+  let effectivePaceId = paceId;
+  let pace = PACE_OPTIONS[paceId] || PACE_OPTIONS.normal;
 
   // Track previous progress for milestone detection
   const prevProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
@@ -339,12 +347,25 @@ export function executeFieldDay(journey, paceId) {
   const startBlock = getCurrentBlock(journey);
   const weatherToday = journey.weather;
 
+  // Block travel if fuel or equipment is depleted
+  if (pace.distanceMultiplier > 0) {
+    if (journey.resources.fuel <= 0) {
+      messages.push('No fuel left. The crew stays in camp.');
+      effectivePaceId = 'camp_work';
+      pace = PACE_OPTIONS.camp_work;
+    } else if (journey.resources.equipment <= 0) {
+      messages.push('Critical equipment failure. The crew stays in camp.');
+      effectivePaceId = 'camp_work';
+      pace = PACE_OPTIONS.camp_work;
+    }
+  }
+
   // Calculate travel
-  const travelInfo = calculateTravelDistance(journey, paceId);
+  const travelInfo = calculateTravelDistance(journey, effectivePaceId);
 
   // Update distance
   journey.distanceTraveled = Math.min(journey.totalDistance, journey.distanceTraveled + travelInfo.distance);
-  journey.pace = paceId;
+  journey.pace = effectivePaceId;
 
   // Calculate new progress
   const newProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
@@ -352,7 +373,7 @@ export function executeFieldDay(journey, paceId) {
   if (travelInfo.distance > 0) {
     messages.push(`Traveled ${travelInfo.distance} km at ${pace.name} pace.`);
   } else {
-    if (paceId === 'resting') {
+    if (effectivePaceId === 'resting') {
       messages.push('The crew made camp and rested for the day.');
     } else {
       messages.push('The crew stayed in camp for the day.');
@@ -399,7 +420,7 @@ export function executeFieldDay(journey, paceId) {
   const terrain = currentBlock?.terrain || 'flat';
   const consumption = calculateFieldConsumption(
     {
-      pace: paceId,
+      pace: effectivePaceId,
       terrain,
       weather: journey.temperature,
       weatherCondition: journey.weather
@@ -425,8 +446,8 @@ export function executeFieldDay(journey, paceId) {
 
   // Process crew daily updates
   const conditions = {
-    restDay: paceId === 'resting',
-    gruelingPace: paceId === 'grueling',
+    restDay: effectivePaceId === 'resting',
+    gruelingPace: effectivePaceId === 'grueling',
     lowFood: journey.resources.food <= 5,
     coldWeather: journey.temperature === 'cold' || journey.temperature === 'freezing'
   };
@@ -461,7 +482,7 @@ export function executeFieldDay(journey, paceId) {
   // Check for game over conditions
   const resourceStatus = checkResourceStatus(journey.resources, FIELD_RESOURCES);
 
-  if (resourceStatus.depleted.some(d => d.id === 'fuel') && (PACE_OPTIONS[paceId]?.distanceMultiplier ?? 1) > 0) {
+  if (resourceStatus.depleted.some(d => d.id === 'fuel') && (PACE_OPTIONS[effectivePaceId]?.distanceMultiplier ?? 1) > 0) {
     journey.isGameOver = true;
     journey.gameOverReason = 'OUT OF FUEL - The crew is stranded.';
     messages.push(journey.gameOverReason);
@@ -477,6 +498,7 @@ export function executeFieldDay(journey, paceId) {
   journey.day++;
   journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day);
   journey.temperature = getTemperature(journey.weather, getCurrentBlock(journey));
+  journey.travelDelayHours = 0;
 
   // Log the day with more detail
   journey.log.push({
@@ -562,20 +584,24 @@ function processPermitWork(journey) {
   }
 
   journey.hoursRemaining -= hoursUsed;
-  journey.resources.energy -= 10;
+  journey.resources.energy = Math.max(0, journey.resources.energy - 10);
 
   // Move permits through pipeline
   if (journey.permits.submitted > 0) {
     journey.permits.submitted--;
     journey.permits.inReview++;
     messages.push('Submitted a permit package for review.');
+  } else if (journey.permits.backlog > 0) {
+    journey.permits.backlog--;
+    journey.permits.submitted++;
+    messages.push('Prepared a new permit package for submission.');
   }
 
   // Random chance to advance review
   if (journey.permits.inReview > 0 && Math.random() < 0.4) {
     journey.permits.inReview--;
     if (Math.random() < 0.7) {
-      journey.permits.approved++;
+      journey.permits.approved = Math.min(journey.permits.target, journey.permits.approved + 1);
       messages.push('A permit was approved!');
     } else {
       journey.permits.needsRevision++;
@@ -606,8 +632,8 @@ function holdStakeholderMeeting(journey, stakeholder = 'ministry') {
   }
 
   journey.hoursRemaining -= hoursUsed;
-  journey.resources.energy -= 15;
-  journey.resources.politicalCapital -= 2;
+  journey.resources.energy = Math.max(0, journey.resources.energy - 15);
+  journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
 
   const sh = journey.stakeholders[stakeholder];
   if (sh) {
@@ -619,7 +645,7 @@ function holdStakeholderMeeting(journey, stakeholder = 'ministry') {
     // Good relations speed up permits
     if (sh.mood >= 70 && journey.permits.inReview > 0 && Math.random() < 0.3) {
       journey.permits.inReview--;
-      journey.permits.approved++;
+      journey.permits.approved = Math.min(journey.permits.target, journey.permits.approved + 1);
       messages.push('The meeting helped push a permit through!');
     }
   }
@@ -634,7 +660,7 @@ function handleCrisis(journey, crisis = {}) {
   const messages = [];
 
   journey.hoursRemaining = 0; // Crises consume the day
-  journey.resources.energy -= 30;
+  journey.resources.energy = Math.max(0, journey.resources.energy - 30);
 
   messages.push('Spent the day managing the crisis.');
 
@@ -644,8 +670,8 @@ function handleCrisis(journey, crisis = {}) {
     journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 5);
   } else {
     messages.push('The crisis escalated despite your efforts.');
-    journey.resources.politicalCapital -= 10;
-    journey.resources.budget -= 2000;
+    journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 10);
+    journey.resources.budget = Math.max(0, journey.resources.budget - 2000);
   }
 
   return { journey, messages };
@@ -664,7 +690,7 @@ function boostTeamMorale(journey) {
   }
 
   journey.hoursRemaining -= hoursUsed;
-  journey.resources.budget -= 100; // Coffee and snacks
+  journey.resources.budget = Math.max(0, journey.resources.budget - 100); // Coffee and snacks
 
   for (const member of journey.crew) {
     if (member.isActive) {
@@ -754,7 +780,9 @@ export function getJourneyProgress(journey) {
   if (journey.journeyType === 'field') {
     return Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
   } else {
-    return Math.round((journey.day / journey.deadline) * 100);
+    const target = journey.permits?.target || 0;
+    if (target <= 0) return 0;
+    return Math.round((journey.permits.approved / target) * 100);
   }
 }
 
@@ -787,6 +815,29 @@ export function getFieldProgressInfo(journey) {
     totalBlocks: journey.blocks.length,
     blockProgress: Math.min(100, blockProgress)
   };
+}
+
+/**
+ * Sync block index with total distance traveled
+ * @param {Object} journey - Journey state
+ * @returns {Object|null} Current block
+ */
+export function syncBlocksFromDistance(journey) {
+  const blocks = journey.blocks || [];
+  if (!blocks.length) return null;
+
+  let latestIndex = 0;
+  for (let i = 0; i < blocks.length; i++) {
+    const distanceToBlock = getCumulativeDistanceToIndex(blocks, i);
+    if (journey.distanceTraveled + 1e-6 >= distanceToBlock) {
+      latestIndex = i;
+      continue;
+    }
+    break;
+  }
+
+  journey.currentBlockIndex = latestIndex;
+  return blocks[latestIndex] || blocks[0] || null;
 }
 
 /**

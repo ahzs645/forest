@@ -6,7 +6,7 @@
 import { FIELD_EVENTS, getApplicableFieldEvents, selectRandomFieldEvent } from './data/fieldEvents.js';
 import { DESK_EVENTS, getApplicableDeskEvents, selectRandomDeskEvent } from './data/deskEvents.js';
 import { applyRandomInjury, applyStatusEffect } from './crew.js';
-import { PACE_OPTIONS } from './journey.js';
+import { PACE_OPTIONS, syncBlocksFromDistance } from './journey.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
 import { LEGACY_ILLEGAL_ACTS } from './data/legacyIllegalActs.js';
 
@@ -219,9 +219,21 @@ export function resolveEvent(journey, event, option) {
     }
   }
 
+  // Handle time cost for field events
+  if (journey.journeyType === 'field' && typeof option.timeUsed === 'number') {
+    const hours = Math.max(0, Math.min(8, option.timeUsed));
+    journey.travelDelayHours = Math.min(8, (journey.travelDelayHours || 0) + hours);
+    if (hours > 0) {
+      messages.push(`Lost ${hours} hours dealing with the situation.`);
+    }
+  }
+
   // Handle permit effects (desk)
   if (option.effects?.permits_approved) {
-    journey.permits.approved += option.effects.permits_approved;
+    journey.permits.approved = Math.min(
+      journey.permits.target,
+      journey.permits.approved + option.effects.permits_approved
+    );
     messages.push(`Permits approved: ${journey.permits.approved}/${journey.permits.target}`);
   }
 
@@ -296,6 +308,9 @@ function applyEventEffects(journey, effects, messages) {
     }
     if (typeof effects.timeUsed === 'number') {
       journey.hoursRemaining = Math.max(0, journey.hoursRemaining - effects.timeUsed);
+      if (effects.timeUsed > 0) {
+        messages.push(`Time used: ${effects.timeUsed}h.`);
+      }
     }
   }
 
@@ -303,8 +318,10 @@ function applyEventEffects(journey, effects, messages) {
   if (effects.progress) {
     if (journey.journeyType === 'field') {
       journey.distanceTraveled = Math.max(0, journey.distanceTraveled + effects.progress);
+      syncBlocksFromDistance(journey);
+    } else {
+      applyDeskProgress(journey, effects.progress, messages);
     }
-    // For desk, progress affects permit pipeline speed
   }
 
   // Crew-wide effects
@@ -445,7 +462,7 @@ export function checkScheduledEvents(journey) {
  * @param {Object} event - Event object
  * @returns {Object} Display-ready event info
  */
-export function formatEventForDisplay(event) {
+export function formatEventForDisplay(event, journeyType = 'field') {
   return {
     title: event.title,
     description: event.description,
@@ -454,7 +471,7 @@ export function formatEventForDisplay(event) {
     options: event.options.map((opt, index) => ({
       index: index + 1,
       label: opt.label,
-      hint: getOptionHint(opt)
+      hint: getOptionHint(opt, journeyType)
     }))
   };
 }
@@ -462,8 +479,9 @@ export function formatEventForDisplay(event) {
 /**
  * Generate a hint about an option's effects
  */
-function getOptionHint(option) {
+function getOptionHint(option, journeyType) {
   const hints = [];
+  const isField = journeyType === 'field';
 
   if (option.effects) {
     // Resource costs
@@ -480,10 +498,12 @@ function getOptionHint(option) {
       hints.push(option.effects.firstAid > 0 ? `+${option.effects.firstAid} med` : `${option.effects.firstAid} med`);
     }
     if (option.effects.budget !== undefined) {
-      const budgetStr = Math.abs(option.effects.budget) >= 1000
-        ? `$${Math.round(option.effects.budget/1000)}k`
-        : `$${option.effects.budget}`;
-      hints.push(option.effects.budget > 0 ? budgetStr : budgetStr);
+      const amount = option.effects.budget;
+      const budgetStr = Math.abs(amount) >= 1000
+        ? `$${Math.round(Math.abs(amount) / 1000)}k`
+        : `$${Math.abs(amount)}`;
+      const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
+      hints.push(`${sign}${budgetStr}`);
     }
 
     // Crew effects
@@ -496,7 +516,15 @@ function getOptionHint(option) {
 
     // Progress effects
     if (option.effects.progress !== undefined && option.effects.progress !== 0) {
-      hints.push(option.effects.progress > 0 ? `+${option.effects.progress} km` : `${option.effects.progress} km`);
+      const unit = isField ? ' km' : ' progress';
+      hints.push(option.effects.progress > 0
+        ? `+${option.effects.progress}${unit}`
+        : `${option.effects.progress}${unit}`);
+    }
+    if (option.effects.permits_approved !== undefined) {
+      const amount = option.effects.permits_approved;
+      const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
+      hints.push(`${sign}${Math.abs(amount)} permits`);
     }
   }
 
@@ -507,11 +535,78 @@ function getOptionHint(option) {
   }
 
   // Time cost
-  if (option.timeUsed) {
-    hints.push(`-${option.timeUsed}h`);
+  const timeUsed = option.timeUsed ?? option.effects?.timeUsed;
+  if (typeof timeUsed === 'number' && timeUsed > 0) {
+    hints.push(`-${timeUsed}h`);
   }
 
   return hints.length > 0 ? hints.join(', ') : 'Safe choice';
+}
+
+function applyDeskProgress(journey, progressPoints, messages) {
+  if (!journey.permits) return;
+
+  const target = journey.permits.target || 0;
+  const magnitude = Math.round(Math.abs(progressPoints) / 10);
+  if (magnitude <= 0) return;
+
+  let remaining = magnitude;
+  let moved = 0;
+
+  if (progressPoints > 0) {
+    while (remaining > 0 && journey.permits.inReview > 0 && (target <= 0 || journey.permits.approved < target)) {
+      journey.permits.inReview--;
+      journey.permits.approved = target > 0
+        ? Math.min(target, journey.permits.approved + 1)
+        : journey.permits.approved + 1;
+      remaining--;
+      moved++;
+    }
+
+    while (remaining > 0) {
+      if (journey.permits.submitted === 0 && journey.permits.backlog > 0) {
+        journey.permits.backlog--;
+        journey.permits.submitted++;
+      }
+      if (journey.permits.submitted > 0) {
+        journey.permits.submitted--;
+        journey.permits.inReview++;
+        remaining--;
+        moved++;
+        continue;
+      }
+      break;
+    }
+
+    if (moved > 0) {
+      messages.push(`Permit pipeline accelerated (+${moved}).`);
+    }
+  } else {
+    while (remaining > 0 && journey.permits.inReview > 0) {
+      journey.permits.inReview--;
+      journey.permits.needsRevision++;
+      remaining--;
+      moved++;
+    }
+
+    while (remaining > 0 && journey.permits.approved > 0) {
+      journey.permits.approved--;
+      journey.permits.needsRevision++;
+      remaining--;
+      moved++;
+    }
+
+    while (remaining > 0 && journey.permits.submitted > 0) {
+      journey.permits.submitted--;
+      journey.permits.backlog = (journey.permits.backlog || 0) + 1;
+      remaining--;
+      moved++;
+    }
+
+    if (moved > 0) {
+      messages.push(`Permit pipeline slowed (-${moved}).`);
+    }
+  }
 }
 
 /**
@@ -519,6 +614,6 @@ function getOptionHint(option) {
  * @param {Object} option - Event option
  * @returns {string} Formatted effect preview
  */
-export function formatOptionEffects(option) {
-  return getOptionHint(option);
+export function formatOptionEffects(option, journeyType = 'field') {
+  return getOptionHint(option, journeyType);
 }

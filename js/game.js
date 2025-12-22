@@ -5,10 +5,10 @@
 
 import { TerminalUI } from './ui.js';
 import { FORESTER_ROLES, OPERATING_AREAS } from './data/index.js';
-import { generateCrew, processDailyUpdate, getCrewDisplayInfo, healCrewMember, removeStatusEffect, applyRandomInjury, crewHasSkill } from './crew.js';
+import { generateCrew, processDailyUpdate, getCrewDisplayInfo, healCrewMember, removeStatusEffect, applyRandomInjury, crewHasRole } from './crew.js';
 import { createFieldJourney, createDeskJourney, executeFieldDay, executeDeskDay, PACE_OPTIONS, DESK_ACTIONS, getFieldProgressInfo, formatJourneyLog } from './journey.js';
 import { checkForEvent, resolveEvent, formatEventForDisplay, checkScheduledEvents } from './events.js';
-import { calculateDeskConsumption, applyConsumption, getFormattedResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
+import { calculateDeskConsumption, applyConsumption, applyDeskRegen, getFormattedResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
 
 class ForestryTrailGame {
   constructor() {
@@ -266,14 +266,20 @@ class ForestryTrailGame {
 
     const actionOptions = [];
 
-    // Travel actions
-    for (const [id, pace] of Object.entries(PACE_OPTIONS)) {
-      if (id === 'resting' || id === 'camp_work') continue;
-      actionOptions.push({
-        label: `Travel ${pace.name}`,
-        description: `${Math.round(pace.distanceMultiplier * 100)}% pace`,
-        value: id
-      });
+    const canTravel = journey.resources.fuel > 0 && journey.resources.equipment > 0;
+
+    if (canTravel) {
+      // Travel actions
+      for (const [id, pace] of Object.entries(PACE_OPTIONS)) {
+        if (id === 'resting' || id === 'camp_work') continue;
+        actionOptions.push({
+          label: `Travel ${pace.name}`,
+          description: `${Math.round(pace.distanceMultiplier * 100)}% pace`,
+          value: id
+        });
+      }
+    } else {
+      this.ui.writeWarning('Travel is impossible without fuel and functioning equipment.');
     }
 
     // Camp actions
@@ -450,7 +456,7 @@ class ForestryTrailGame {
 
   async _handleMaintenance() {
     const journey = this.journey;
-    const hasMechanic = crewHasSkill(journey.crew, 'mechanic');
+    const hasMechanic = crewHasRole(journey.crew, 'mechanic');
     const cash = journey.resources.budget || 0;
 
     const options = [
@@ -527,6 +533,8 @@ class ForestryTrailGame {
   async _runDeskDay() {
     const journey = this.journey;
     const daysRemaining = journey.deadline - journey.day;
+    let meetingsToday = 0;
+    let crisisMode = daysRemaining <= 5;
 
     // Check for random event at start of day
     const event = checkForEvent(journey);
@@ -546,7 +554,8 @@ class ForestryTrailGame {
       const permitProgress = Math.round((journey.permits.approved / journey.permits.target) * 100);
       this.ui.write(`Days Remaining: ${journey.deadline - journey.day}`);
       this.ui.write(`Permits: ${journey.permits.approved}/${journey.permits.target} approved (${permitProgress}%)`);
-      this.ui.write(`Pipeline: ${journey.permits.submitted} submitted, ${journey.permits.inReview} in review`);
+      const backlog = journey.permits.backlog || 0;
+      this.ui.write(`Pipeline: ${journey.permits.submitted} submitted, ${journey.permits.inReview} in review, ${journey.permits.needsRevision} revisions, ${backlog} backlog`);
       this.ui.write('');
 
       // Show resources
@@ -561,6 +570,11 @@ class ForestryTrailGame {
 
       // Show crew/team status
       this._displayCrewStatus();
+
+      if (journey.resources.energy <= 0) {
+        this.ui.writeWarning('The team is exhausted. You end the day early.');
+        break;
+      }
 
       // Build action options - only show actions we have time for
       this.ui.writeDivider('WHAT DO YOU DO?');
@@ -607,6 +621,13 @@ class ForestryTrailGame {
         }
       }
 
+      if (actionId === 'stakeholder_meeting') {
+        meetingsToday += 1;
+      }
+      if (actionId === 'crisis_management') {
+        crisisMode = true;
+      }
+
       // Update status panels
       this.ui.updateAllStatus(this.journey);
 
@@ -622,15 +643,13 @@ class ForestryTrailGame {
 
     try {
       // Apply daily resource consumption
-      const activeCrewCount = journey.crew.filter(m => m.isActive).length || 1;
       const consumption = calculateDeskConsumption({
-        daysRemaining,
-        crewMorale: journey.crew.reduce((sum, m) => sum + (m.isActive ? m.morale : 0), 0) / activeCrewCount,
-        hoursWorked: 8 - journey.hoursRemaining
-      }, activeCrewCount);
+        meetings: meetingsToday,
+        crisisMode
+      });
 
       const consumptionResult = applyConsumption(journey.resources, consumption, DESK_RESOURCES);
-      journey.resources = consumptionResult.resources;
+      journey.resources = applyDeskRegen(consumptionResult.resources);
 
       if (consumptionResult.warnings.length > 0) {
         for (const warning of consumptionResult.warnings) {
@@ -645,6 +664,7 @@ class ForestryTrailGame {
       // Advance to next day
       journey.day++;
       journey.hoursRemaining = 8;
+      journey.currentPhase = this._getDeskPhase(journey);
 
       // Update status panels
       this.ui.updateAllStatus(this.journey);
@@ -658,7 +678,7 @@ class ForestryTrailGame {
   }
 
   async _handleEvent(event) {
-    const formatted = formatEventForDisplay(event);
+    const formatted = formatEventForDisplay(event, this.journey?.journeyType);
 
     this.ui.write('');
     this.ui.writeHeader(`EVENT: ${formatted.title}`);
@@ -666,15 +686,30 @@ class ForestryTrailGame {
     this.ui.write('');
 
     // Build options with effect previews
-    const options = formatted.options.map((opt, index) => ({
-      label: opt.label,
-      description: opt.hint ? `[${opt.hint}]` : '',
-      value: index
-    }));
+    const options = formatted.options.map((opt, index) => {
+      const raw = event.options[index] || {};
+      const requirement = raw.requiresRole ? `Requires ${this._formatRoleName(raw.requiresRole)}` : '';
+      const pieces = [];
+      if (opt.hint) pieces.push(opt.hint);
+      if (requirement) pieces.push(requirement);
+      return {
+        label: opt.label,
+        description: pieces.length ? `[${pieces.join(' | ')}]` : '',
+        value: index
+      };
+    });
 
-    const choice = await this.ui.promptChoice('What do you do?', options);
-    const optionIndex = typeof choice.value === 'number' ? choice.value : 0;
-    const selectedOption = event.options[optionIndex];
+    let selectedOption = null;
+    while (!selectedOption) {
+      const choice = await this.ui.promptChoice('What do you do?', options);
+      const optionIndex = typeof choice.value === 'number' ? choice.value : 0;
+      const candidate = event.options[optionIndex];
+      if (candidate?.requiresRole && !crewHasRole(this.journey.crew, candidate.requiresRole)) {
+        this.ui.writeWarning(`You need a ${this._formatRoleName(candidate.requiresRole)} to do that.`);
+        continue;
+      }
+      selectedOption = candidate;
+    }
 
     // Resolve event
     const result = resolveEvent(this.journey, event, selectedOption);
@@ -706,6 +741,23 @@ class ForestryTrailGame {
     this.ui.write('');
   }
 
+  _getDeskPhase(journey) {
+    const day = journey.day;
+    const deadline = journey.deadline || 30;
+    const phaseLength = Math.max(1, Math.floor(deadline / 3));
+
+    if (day > deadline - 4) return 'crunch';
+    if (day > phaseLength * 2) return 'approval';
+    if (day > phaseLength) return 'review';
+    return 'planning';
+  }
+
+  _formatRoleName(roleId) {
+    if (!roleId) return 'specialist';
+    const formatted = roleId.replace(/[_-]+/g, ' ').trim();
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  }
+
   _miniBar(value, width = 5) {
     const filled = Math.round((value / 100) * width);
     return '█'.repeat(filled) + '░'.repeat(width - filled);
@@ -714,10 +766,11 @@ class ForestryTrailGame {
   _updateCrewConditions() {
     const journey = this.journey;
     const conditions = {
-      isResting: journey.pace === 'resting',
-      hasFood: journey.journeyType === 'field' ? journey.resources.food > 0 : true,
-      hasFirstAid: journey.journeyType === 'field' ? journey.resources.firstAid > 0 : true,
-      weatherSeverity: journey.weather?.severity || 0
+      restDay: journey.journeyType === 'desk' || journey.pace === 'resting',
+      gruelingPace: journey.pace === 'grueling',
+      lowFood: journey.journeyType === 'field' ? journey.resources.food <= 0 : false,
+      coldWeather: journey.journeyType === 'field' && (journey.temperature === 'cold' || journey.temperature === 'freezing'),
+      shelter: journey.journeyType === 'desk'
     };
 
     for (const member of journey.crew) {
@@ -753,6 +806,18 @@ class ForestryTrailGame {
   _checkEndConditions() {
     const journey = this.journey;
     const activeCrewCount = journey.crew.filter(m => m.isActive).length;
+
+    if (journey.isGameOver) {
+      this.gameOver = true;
+      journey.endReason = journey.gameOverReason || 'Operations halted';
+      return;
+    }
+
+    if (journey.isComplete) {
+      this.victory = true;
+      journey.endReason = journey.endReason || 'Expedition completed!';
+      return;
+    }
 
     // Universal: No crew left
     if (activeCrewCount === 0) {

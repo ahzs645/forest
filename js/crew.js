@@ -344,6 +344,16 @@ export function crewHasSkill(crew, skill) {
 }
 
 /**
+ * Check if crew has a specific role
+ * @param {Object[]} crew - Array of crew members
+ * @param {string} roleId - Role ID to check
+ * @returns {boolean} True if any active member has the role
+ */
+export function crewHasRole(crew, roleId) {
+  return crew.some(member => member.isActive && member.role === roleId);
+}
+
+/**
  * Apply random injury to a crew member
  * @param {Object} member - Crew member
  * @param {string} severity - 'minor', 'moderate', or 'severe'
