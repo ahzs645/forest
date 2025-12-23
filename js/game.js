@@ -6,7 +6,7 @@
 import { TerminalUI } from './ui.js';
 import { FORESTER_ROLES, OPERATING_AREAS } from './data/index.js';
 import { generateCrew, processDailyUpdate, getCrewDisplayInfo, healCrewMember, removeStatusEffect, applyRandomInjury, crewHasRole } from './crew.js';
-import { createFieldJourney, createDeskJourney, executeFieldDay, executeDeskDay, PACE_OPTIONS, DESK_ACTIONS, getFieldProgressInfo, formatJourneyLog } from './journey.js';
+import { createFieldJourney, createDeskJourney, executeFieldDay, executeDeskDay, PACE_OPTIONS, DESK_ACTIONS, getFieldProgressInfo, formatJourneyLog, FIELD_SHIFT_HOURS } from './journey.js';
 import { checkForEvent, resolveEvent, formatEventForDisplay, checkScheduledEvents } from './events.js';
 import { calculateDeskConsumption, applyConsumption, applyDeskRegen, getFormattedResourceStatus, FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
 
@@ -158,8 +158,9 @@ class ForestryTrailGame {
 
     // Journey-specific intro
     if (journeyType === 'field') {
-      this.ui.write(`Mission: Travel ${this.journey.totalDistance}km through ${this.journey.blocks.length} forest blocks.`);
-      this.ui.write('Manage your fuel, food, and equipment. Keep your crew healthy.');
+      this.ui.write(`Mission: Survey ${this.journey.totalDistance} km of traverse across ${this.journey.blocks.length} forest blocks.`);
+      this.ui.write(`Each shift is about ${FIELD_SHIFT_HOURS} hours. The crew returns to camp nightly.`);
+      this.ui.write('Manage fuel, food, and equipment while keeping radio contact.');
       this.ui.write('');
       this.ui.write('Starting supplies:');
       this.ui.write(`  Cash: $${this.journey.resources.budget.toLocaleString()}`);
@@ -223,7 +224,7 @@ class ForestryTrailGame {
     const progressInfo = getFieldProgressInfo(journey);
 
     this.ui.clear();
-    this.ui.writeHeader(`DAY ${journey.day} - ${currentBlock?.name || 'Unknown Territory'}`);
+    this.ui.writeHeader(`SHIFT ${journey.day} - ${currentBlock?.name || 'Unknown Territory'}`);
 
     // Show current status with visual progress bar
     const progressBarWidth = 20;
@@ -231,10 +232,10 @@ class ForestryTrailGame {
     const progressBar = '█'.repeat(filledWidth) + '░'.repeat(progressBarWidth - filledWidth);
 
     this.ui.write(`Journey: [${progressBar}] ${progressInfo.overallProgress}%`);
-    this.ui.write(`Distance: ${journey.distanceTraveled}/${journey.totalDistance} km`);
-    this.ui.write(`Blocks: ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks} completed`);
+    this.ui.write(`Traverse: ${journey.distanceTraveled}/${journey.totalDistance} km`);
+    this.ui.write(`Blocks: ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks} surveyed`);
     if (progressInfo.nextBlock !== 'Destination') {
-      this.ui.write(`Next stop: ${progressInfo.nextBlock} (${progressInfo.distanceToNextBlock} km away)`);
+      this.ui.write(`Next block: ${progressInfo.nextBlock} (${progressInfo.distanceToNextBlock} km of traverse)`);
     } else {
       this.ui.write(`Final destination ahead!`);
     }
@@ -269,17 +270,17 @@ class ForestryTrailGame {
     const canTravel = journey.resources.fuel > 0 && journey.resources.equipment > 0;
 
     if (canTravel) {
-      // Travel actions
+      // Shift pacing options
       for (const [id, pace] of Object.entries(PACE_OPTIONS)) {
         if (id === 'resting' || id === 'camp_work') continue;
         actionOptions.push({
-          label: `Travel ${pace.name}`,
-          description: `${Math.round(pace.distanceMultiplier * 100)}% pace`,
+          label: `${pace.name} shift`,
+          description: `${Math.round(pace.distanceMultiplier * 100)}% coverage`,
           value: id
         });
       }
     } else {
-      this.ui.writeWarning('Travel is impossible without fuel and functioning equipment.');
+      this.ui.writeWarning('Field coverage is impossible without fuel and functioning equipment.');
     }
 
     // Camp actions
@@ -294,7 +295,7 @@ class ForestryTrailGame {
       value: 'forage'
     });
     actionOptions.push({
-      label: 'Maintenance Day (Camp Work)',
+      label: 'Maintenance Shift (Camp Work)',
       description: 'Improve equipment condition; costs cash or sweat',
       value: 'maintain'
     });
@@ -681,8 +682,9 @@ class ForestryTrailGame {
     const formatted = formatEventForDisplay(event, this.journey?.journeyType);
 
     this.ui.write('');
-    this.ui.writeHeader(`EVENT: ${formatted.title}`);
-    this.ui.write(event.description);
+    const headerLabel = event.reporter ? 'RADIO CHECK' : 'EVENT';
+    this.ui.writeHeader(`${headerLabel}: ${formatted.title}`);
+    this.ui.write(formatted.description);
     this.ui.write('');
 
     // Build options with effect previews
@@ -898,9 +900,9 @@ class ForestryTrailGame {
 
     if (journey.journeyType === 'field') {
       const progressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-      this.ui.write(`Distance Traveled: ${journey.distanceTraveled}/${journey.totalDistance} km (${progressPct}%)`);
-      this.ui.write(`Days Elapsed: ${journey.day - 1}`);
-      this.ui.write(`Blocks Completed: ${journey.currentBlockIndex}/${journey.blocks.length}`);
+      this.ui.write(`Traverse Covered: ${journey.distanceTraveled}/${journey.totalDistance} km (${progressPct}%)`);
+      this.ui.write(`Shifts Elapsed: ${journey.day - 1}`);
+      this.ui.write(`Blocks Surveyed: ${journey.currentBlockIndex}/${journey.blocks.length}`);
     } else {
       this.ui.write(`Permits Approved: ${journey.permits.approved}/${journey.permits.target}`);
       this.ui.write(`Days Used: ${journey.day - 1}/${journey.deadline}`);
@@ -934,8 +936,9 @@ class ForestryTrailGame {
       this.ui.write('');
       this.ui.writeDivider('KEY EVENTS');
       const highlights = journey.log.slice(-5);
+      const dayLabel = journey.journeyType === 'field' ? 'Shift' : 'Day';
       for (const entry of highlights) {
-        this.ui.write(`Day ${entry.day}: ${entry.eventTitle || entry.type}`);
+        this.ui.write(`${dayLabel} ${entry.day}: ${entry.eventTitle || entry.type}`);
       }
     }
 

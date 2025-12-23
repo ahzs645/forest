@@ -21,6 +21,9 @@ const blocksData = loadJSON('./js/data/json/field/blocks.json');
 const fieldEventsData = loadJSON('./js/data/json/field/events.json');
 const deskEventsData = loadJSON('./js/data/json/desk/events.json');
 
+const FIELD_SHIFT_HOURS = 9;
+const FIELD_DISTANCE_SCALE = 0.5;
+
 // Import static JS data (roles and areas don't use JSON)
 import { FORESTER_ROLES } from './js/data/roles.js';
 import { OPERATING_AREAS } from './js/data/operatingAreas.js';
@@ -92,6 +95,16 @@ const getBlocksForArea = (areaId) => {
   return blocksData['fort-st-john-plateau'];
 };
 
+const scaleBlocksForShifts = (blocks) => {
+  return blocks.map((block) => {
+    const scaled = Math.round(block.distance * FIELD_DISTANCE_SCALE * 10) / 10;
+    return {
+      ...block,
+      distance: Math.max(0.5, scaled)
+    };
+  });
+};
+
 const randomFrom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // Crew generation
@@ -118,7 +131,7 @@ const generateCrew = (count, journeyType) => {
 
 // Journey creation
 const createFieldJourney = ({ crewName, role, area, crew }) => {
-  const blocks = getBlocksForArea(area.id);
+  const blocks = scaleBlocksForShifts(getBlocksForArea(area.id));
   const totalDistance = blocks.reduce((sum, b) => sum + b.distance, 0);
 
   return {
@@ -206,10 +219,11 @@ const runFieldDay = async () => {
   const currentBlock = journey.blocks[journey.currentBlockIndex];
 
   clear();
-  printHeader(`DAY ${journey.day} - ${currentBlock?.name || 'Unknown'}`);
+  printHeader(`SHIFT ${journey.day} - ${currentBlock?.name || 'Unknown'}`);
 
   const progressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-  print(`Progress: ${journey.distanceTraveled}/${journey.totalDistance} km (${progressPct}%)`);
+  print(`Progress: ${journey.distanceTraveled}/${journey.totalDistance} km traverse (${progressPct}%)`);
+  print(`Shift length: ~${FIELD_SHIFT_HOURS} hours`);
   print(`Weather: ${journey.weather?.name || 'Clear'}`);
   print(`Terrain: ${currentBlock?.terrain || 'unknown'}`);
 
@@ -229,9 +243,15 @@ const runFieldDay = async () => {
   // Random event check
   const event = checkForEvent();
   if (event) {
-    printDivider('EVENT');
+    const activeCrew = journey.crew.filter(m => m.isActive);
+    const reporter = activeCrew.length ? randomFrom(activeCrew) : null;
+    printDivider(reporter ? 'RADIO CHECK' : 'EVENT');
     print(`\n⚠️  ${event.title}`);
-    print(event.description);
+    if (reporter) {
+      print(`${reporter.name} (${reporter.role}) radios in: ${event.description}`);
+    } else {
+      print(event.description);
+    }
     print('');
 
     const choice = await choose('What do you do?', event.options.map(o => ({
@@ -249,10 +269,10 @@ const runFieldDay = async () => {
   printDivider('WHAT DO YOU DO?');
 
   const action = await choose('Choose your action:', [
-    { label: 'Travel at normal pace', description: 'Standard speed and consumption' },
-    { label: 'Travel quickly', description: 'Faster but uses more resources' },
-    { label: 'Travel carefully', description: 'Slower but safer' },
-    { label: 'Rest here', description: 'Crew heals, uses less food' }
+    { label: 'Standard recon shift', description: 'Typical coverage and consumption' },
+    { label: 'Extended recon shift', description: 'More coverage, more fatigue' },
+    { label: 'Cautious recon shift', description: 'Less coverage, lower risk' },
+    { label: 'Rest & reset', description: 'Crew heals, uses less food' }
   ]);
 
   // Process action
@@ -261,23 +281,23 @@ const runFieldDay = async () => {
   let foodUsed = 0;
 
   switch (action.label) {
-    case 'Travel at normal pace':
-      distanceGained = 15 + Math.floor(Math.random() * 10);
+    case 'Standard recon shift':
+      distanceGained = 8 + Math.floor(Math.random() * 5);
       fuelUsed = 8;
       foodUsed = 3;
       break;
-    case 'Travel quickly':
-      distanceGained = 25 + Math.floor(Math.random() * 10);
+    case 'Extended recon shift':
+      distanceGained = 12 + Math.floor(Math.random() * 6);
       fuelUsed = 15;
       foodUsed = 4;
       journey.crew.forEach(m => { if (m.isActive) m.morale -= 5; });
       break;
-    case 'Travel carefully':
-      distanceGained = 8 + Math.floor(Math.random() * 5);
+    case 'Cautious recon shift':
+      distanceGained = 5 + Math.floor(Math.random() * 3);
       fuelUsed = 5;
       foodUsed = 2;
       break;
-    case 'Rest here':
+    case 'Rest & reset':
       distanceGained = 0;
       fuelUsed = 0;
       foodUsed = 1;
@@ -287,7 +307,7 @@ const runFieldDay = async () => {
           m.morale = Math.min(100, m.morale + 15);
         }
       });
-      print('\nThe crew rests and recovers.');
+      print('\nThe crew stands down and recovers.');
       break;
   }
 
@@ -297,7 +317,7 @@ const runFieldDay = async () => {
   journey.resources.food = Math.max(0, journey.resources.food - foodUsed);
 
   if (distanceGained > 0) {
-    print(`\nTraveled ${distanceGained} km today.`);
+    print(`\nCovered ${distanceGained} km of traverse this shift.`);
   }
 
   // Check block progress
@@ -474,9 +494,9 @@ const showEndScreen = async () => {
 
   if (journey.journeyType === 'field') {
     const progressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-    print(`Distance Traveled: ${journey.distanceTraveled}/${journey.totalDistance} km (${progressPct}%)`);
-    print(`Days Elapsed: ${journey.day - 1}`);
-    print(`Blocks Completed: ${journey.currentBlockIndex + 1}/${journey.blocks.length}`);
+    print(`Traverse Covered: ${journey.distanceTraveled}/${journey.totalDistance} km (${progressPct}%)`);
+    print(`Shifts Elapsed: ${journey.day - 1}`);
+    print(`Blocks Surveyed: ${journey.currentBlockIndex + 1}/${journey.blocks.length}`);
   } else {
     print(`Permits Approved: ${journey.permits.approved}/${journey.permits.target}`);
     print(`Days Used: ${journey.day - 1}/${journey.deadline}`);
@@ -556,7 +576,8 @@ const main = async () => {
   print('');
 
   if (journeyType === 'field') {
-    print(`Mission: Travel ${journey.totalDistance}km through ${journey.blocks.length} forest blocks.`);
+    print(`Mission: Survey ${journey.totalDistance} km of traverse across ${journey.blocks.length} forest blocks.`);
+    print(`Each shift is about ${FIELD_SHIFT_HOURS} hours. Crew returns to camp nightly.`);
   } else {
     print(`Mission: Approve ${journey.permits.target} permits within ${journey.deadline} days.`);
   }

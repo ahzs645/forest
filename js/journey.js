@@ -15,17 +15,19 @@ import {
   FIELD_RESOURCES,
   DESK_RESOURCES
 } from './resources.js';
-import { getBlocksForArea, getTotalDistance, getRandomWeather, getTemperature, TERRAIN_TYPES } from './data/blocks.js';
+import { getBlocksForArea, getRandomWeather, getTemperature, TERRAIN_TYPES } from './data/blocks.js';
 
-const BASE_DAILY_TRAVEL_KM = 16;
+export const FIELD_SHIFT_HOURS = 9;
+const FIELD_DISTANCE_SCALE = 0.5;
+const BASE_DAILY_TRAVEL_KM = 9;
 const DAILY_TRAVEL_VARIANCE = 0.12;
 
 // Pace definitions
 export const PACE_OPTIONS = {
   resting: {
     id: 'resting',
-    name: 'Rest',
-    description: 'Stay put and recover',
+    name: 'Rest & Reset',
+    description: 'Stand down and recover',
     distanceMultiplier: 0,
     healthBonus: 10,
     moraleBonus: 8,
@@ -33,8 +35,8 @@ export const PACE_OPTIONS = {
   },
   camp_work: {
     id: 'camp_work',
-    name: 'Camp Work',
-    description: 'Stay put and handle camp tasks',
+    name: 'Camp Tasks',
+    description: 'Stationary prep and upkeep',
     distanceMultiplier: 0,
     healthBonus: 2,
     moraleBonus: -1,
@@ -42,8 +44,8 @@ export const PACE_OPTIONS = {
   },
   slow: {
     id: 'slow',
-    name: 'Slow & Steady',
-    description: 'Take it easy, conserve resources',
+    name: 'Cautious Recon',
+    description: 'Lower coverage, lower risk',
     distanceMultiplier: 0.6,
     healthBonus: 2,
     moraleBonus: 2,
@@ -51,8 +53,8 @@ export const PACE_OPTIONS = {
   },
   normal: {
     id: 'normal',
-    name: 'Normal Pace',
-    description: 'Standard travel speed',
+    name: 'Standard Recon',
+    description: 'Typical shift coverage',
     distanceMultiplier: 1.0,
     healthBonus: 0,
     moraleBonus: 0,
@@ -60,8 +62,8 @@ export const PACE_OPTIONS = {
   },
   fast: {
     id: 'fast',
-    name: 'Push Hard',
-    description: 'Cover more ground, wear down faster',
+    name: 'Extended Recon',
+    description: 'Cover more ground, more wear',
     distanceMultiplier: 1.4,
     healthBonus: -3,
     moraleBonus: -5,
@@ -69,8 +71,8 @@ export const PACE_OPTIONS = {
   },
   grueling: {
     id: 'grueling',
-    name: 'Grueling',
-    description: 'Maximum speed at great cost',
+    name: 'Max Effort',
+    description: 'Long shift at high cost',
     distanceMultiplier: 1.8,
     healthBonus: -8,
     moraleBonus: -12,
@@ -125,8 +127,8 @@ export const DESK_ACTIONS = {
 export function createFieldJourney(options = {}) {
   const { roleId, areaId, companyName, crewName, crew, role, area } = options;
   const effectiveAreaId = areaId || area?.id;
-  const blocks = getBlocksForArea(effectiveAreaId);
-  const totalDistance = getTotalDistance(effectiveAreaId);
+  const blocks = scaleBlocksForShifts(getBlocksForArea(effectiveAreaId));
+  const totalDistance = blocks.reduce((sum, block) => sum + block.distance, 0);
 
   return {
     journeyType: 'field',
@@ -162,6 +164,16 @@ export function createFieldJourney(options = {}) {
     log: [],
     decisions: []
   };
+}
+
+function scaleBlocksForShifts(blocks = []) {
+  return blocks.map((block) => {
+    const scaled = Math.round(block.distance * FIELD_DISTANCE_SCALE * 10) / 10;
+    return {
+      ...block,
+      distance: Math.max(0.5, scaled)
+    };
+  });
 }
 
 /**
@@ -371,12 +383,12 @@ export function executeFieldDay(journey, paceId) {
   const newProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
 
   if (travelInfo.distance > 0) {
-    messages.push(`Traveled ${travelInfo.distance} km at ${pace.name} pace.`);
+    messages.push(`Covered ${travelInfo.distance} km of traverse at ${pace.name} pace.`);
   } else {
     if (effectivePaceId === 'resting') {
-      messages.push('The crew made camp and rested for the day.');
+      messages.push('The crew stood down and recovered this shift.');
     } else {
-      messages.push('The crew stayed in camp for the day.');
+      messages.push('The crew stayed in camp for the shift.');
     }
   }
 
@@ -412,7 +424,7 @@ export function executeFieldDay(journey, paceId) {
   // Check for victory
   if (journey.distanceTraveled >= journey.totalDistance || journey.currentBlockIndex >= journey.blocks.length - 1) {
     journey.isComplete = true;
-    messages.push('You have reached your destination!');
+    messages.push('You have completed the block sequence!');
   }
 
   // Calculate resource consumption
@@ -509,8 +521,8 @@ export function executeFieldDay(journey, paceId) {
     location: getCurrentBlock(journey)?.name || startBlock?.name || 'Unknown',
     weather: weatherToday?.name || 'Unknown',
     summary: travelInfo.distance > 0
-      ? `Traveled ${travelInfo.distance} km (${pace.name})`
-      : (paceId === 'resting' ? 'Rested for the day' : 'Camp work day')
+      ? `Covered ${travelInfo.distance} km (${pace.name})`
+      : (paceId === 'resting' ? 'Rested for the shift' : 'Camp tasks for the shift')
   });
 
   // Log milestone if reached
@@ -850,6 +862,7 @@ export function formatJourneyLog(journey) {
     return [];
   }
 
+  const dayLabel = journey.journeyType === 'field' ? 'Shift' : 'Day';
   const typeIcons = {
     travel: '→',
     event: '!',
@@ -859,6 +872,7 @@ export function formatJourneyLog(journey) {
 
   return journey.log.map(entry => ({
     day: entry.day,
+    dayLabel,
     icon: typeIcons[entry.type] || '·',
     type: entry.type,
     summary: entry.summary || entry.eventTitle || entry.action || 'Unknown',

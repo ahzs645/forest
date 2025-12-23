@@ -10,6 +10,23 @@ import { PACE_OPTIONS, syncBlocksFromDistance } from './journey.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
 import { LEGACY_ILLEGAL_ACTS } from './data/legacyIllegalActs.js';
 
+const GENERIC_RADIO_TASKS = [
+  'cruising a transect',
+  'checking access lines',
+  'flagging boundaries',
+  'scouting terrain',
+  'marking hazards'
+];
+
+const RADIO_TASKS_BY_ROLE = {
+  driver: ['checking access roads', 'shuttling gear', 'moving fuel drums'],
+  mechanic: ['inspecting the ATV', 'tuning saws', 'fixing a winch line'],
+  medic: ['running a safety sweep', 'checking med kits', 'monitoring fatigue'],
+  faller: ['clearing danger trees', 'opening a sight line', 'topping hazard snags'],
+  bucker: ['measuring stems', 'bucking windthrow', 'tagging log decks'],
+  spotter: ['flagging boundaries', 'scouting slope breaks', 'logging wildlife sign']
+};
+
 /**
  * Check if a random event should occur
  * @param {Object} journey - Current journey state
@@ -17,7 +34,9 @@ import { LEGACY_ILLEGAL_ACTS } from './data/legacyIllegalActs.js';
  */
 export function checkForEvent(journey) {
   const event = journey.journeyType === 'field' ? checkFieldEvent(journey) : checkDeskEvent(journey);
-  if (event) return event;
+  if (event) {
+    return journey.journeyType === 'field' ? attachFieldReporter(event, journey) : event;
+  }
   return maybeCreateTemptationEvent(journey);
 }
 
@@ -73,6 +92,29 @@ function checkDeskEvent(journey) {
     stressModifier: stressModifier * moraleModifier,
     crisisMode: daysRemaining < 3
   });
+}
+
+function attachFieldReporter(event, journey) {
+  if (!event || event.type === 'temptation') return event;
+  const reporter = pickRandomCrewMember(journey.crew);
+  if (!reporter) return event;
+
+  return {
+    ...event,
+    reporter: {
+      id: reporter.id,
+      name: reporter.name,
+      role: reporter.roleName || reporter.role || 'Crew',
+      roleId: reporter.role,
+      task: getRadioTask(reporter)
+    }
+  };
+}
+
+function getRadioTask(member) {
+  const roleId = member.role || member.roleId;
+  const tasks = RADIO_TASKS_BY_ROLE[roleId] || GENERIC_RADIO_TASKS;
+  return tasks[Math.floor(Math.random() * tasks.length)];
 }
 
 function maybeCreateTemptationEvent(journey) {
@@ -463,9 +505,17 @@ export function checkScheduledEvents(journey) {
  * @returns {Object} Display-ready event info
  */
 export function formatEventForDisplay(event, journeyType = 'field') {
+  const reporter = journeyType === 'field' ? event.reporter : null;
+  const roleLabel = reporter?.role || 'Crew';
+  const taskClause = reporter?.task ? ` while ${reporter.task}` : '';
+  const description = reporter
+    ? `${reporter.name} (${roleLabel})${taskClause} radios in: ${event.description}`
+    : event.description;
+  const title = event.title;
+
   return {
-    title: event.title,
-    description: event.description,
+    title,
+    description,
     severity: event.severity,
     type: event.type,
     options: event.options.map((opt, index) => ({
@@ -516,7 +566,7 @@ function getOptionHint(option, journeyType) {
 
     // Progress effects
     if (option.effects.progress !== undefined && option.effects.progress !== 0) {
-      const unit = isField ? ' km' : ' progress';
+      const unit = isField ? ' km traverse' : ' progress';
       hints.push(option.effects.progress > 0
         ? `+${option.effects.progress}${unit}`
         : `${option.effects.progress}${unit}`);

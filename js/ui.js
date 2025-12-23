@@ -19,6 +19,7 @@ export class TerminalUI {
     this.submitBtn = document.getElementById('submit-btn');
 
     // Status bar elements
+    this.dayLabel = document.getElementById('day-label');
     this.dayValue = document.getElementById('day-value');
     this.progressValue = document.getElementById('progress-value');
     this.crewValue = document.getElementById('crew-value');
@@ -530,6 +531,9 @@ export class TerminalUI {
    */
   updateAllStatus(journey) {
     // Status bar
+    if (this.dayLabel) {
+      this.dayLabel.textContent = journey.journeyType === 'field' ? 'SHIFT' : 'DAY';
+    }
     this.updateStatusBar({
       day: journey.day,
       progress: this._calculateProgress(journey),
@@ -646,7 +650,7 @@ export class TerminalUI {
         <p>[ESC] - Close panels</p>
         <br>
         <p><strong>Field Roles:</strong></p>
-        <p>Travel through forest blocks. Manage fuel, food, and equipment.</p>
+        <p>Survey forest blocks during 8-9 hour shifts. Keep radio contact while managing fuel, food, and equipment.</p>
         <br>
         <p><strong>Desk Roles:</strong></p>
         <p>Process permits against a deadline. Manage budget and stakeholders.</p>
@@ -752,8 +756,9 @@ export class TerminalUI {
     const logHtml = logEntries.map(entry => {
       const icon = entry.icon || '·';
       const detail = entry.detail ? ` - ${entry.detail}` : '';
+      const dayLabel = entry.dayLabel || 'Day';
       return `<div class="log-entry log-${entry.type}">
-        <span class="log-day">Day ${entry.day}</span>
+        <span class="log-day">${dayLabel} ${entry.day}</span>
         <span class="log-icon">${icon}</span>
         <span class="log-summary">${entry.summary}${detail}</span>
       </div>`;
@@ -867,11 +872,11 @@ export class TerminalUI {
     const progressBarText = this._makeProgressBar(progress, 20);
 
     const lines = [
-      `Day ${journey.day} | ${block?.name || 'Unknown'}`,
+      `Shift ${journey.day} | ${block?.name || 'Unknown'}`,
       `Weather: ${journey.weather?.name || 'Clear'}`,
       '',
       `Progress: ${progressBarText} ${progress}%`,
-      `Distance: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km`,
+      `Traverse: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km`,
       '',
       `Crew: ${getActiveCrewCount(journey.crew)}/${journey.crew.length} active`,
       `Morale: ${Math.round(getAverageMorale(journey.crew))}%`
@@ -922,6 +927,9 @@ export class TerminalUI {
     this.closeModal();
 
     // Reset status bar
+    if (this.dayLabel) {
+      this.dayLabel.textContent = 'DAY';
+    }
     this.updateStatusBar({
       day: 1,
       progress: 0,
