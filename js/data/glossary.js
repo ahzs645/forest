@@ -49,4 +49,44 @@ export const GLOSSARY_TERMS = [
     description:
       "Protected buffer adjacent to streams, lakes, or wetlands that maintains shade, bank stability, and aquatic habitat.",
   },
+  {
+    term: "Annual Allowable Cut (AAC)",
+    description:
+      "The volume of timber that can legally be harvested from a defined area each year, determined by the Chief Forester.",
+  },
+  {
+    term: "Stumpage",
+    description:
+      "Fees paid to the provincial government for the right to harvest timber from Crown land.",
+  },
+  {
+    term: "Cutting Permit",
+    description:
+      "Authorization from the Ministry of Forests to harvest timber from a specific area under specific conditions.",
+  },
+  {
+    term: "FREP",
+    description:
+      "Forest and Range Evaluation Program - BC's monitoring program for forest and range practices effectiveness.",
+  },
+  {
+    term: "First Nations Consultation",
+    description:
+      "Legal requirement to engage with Indigenous communities whose traditional territories overlap with proposed forestry activities.",
+  },
+  {
+    term: "Old Growth Management Area (OGMA)",
+    description:
+      "Designated areas where old-growth forest attributes are maintained through harvest restrictions.",
+  },
+  {
+    term: "Mountain Pine Beetle (MPB)",
+    description:
+      "Bark beetle species that has caused massive mortality in BC's lodgepole pine forests since the 1990s.",
+  },
+  {
+    term: "Salvage Logging",
+    description:
+      "Harvesting of timber damaged by fire, insects, disease, or windthrow before it loses economic value.",
+  },
 ];

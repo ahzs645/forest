@@ -9,6 +9,15 @@ import { FIELD_RESOURCES, DESK_RESOURCES, getResourcePercentage } from './resour
 import { GLOSSARY_TERMS } from './data/glossary.js';
 import { LEGACY_GLOSSARY_TERMS } from './data/legacyGlossary.js';
 
+// Role icons mapping (ASCII/text symbols)
+const ROLE_ICONS = {
+  planner: '[P]',
+  permitter: '[/]',
+  recce: '[R]',
+  silviculture: '[S]',
+  default: '[*]'
+};
+
 export class TerminalUI {
   constructor() {
     // DOM elements
@@ -45,12 +54,19 @@ export class TerminalUI {
     this.modalBody = document.getElementById('modal-body');
     this.modalActions = document.getElementById('modal-actions');
 
+    // Landing screen elements
+    this.landingScreen = document.getElementById('landing-screen');
+    this.newGameBtn = document.getElementById('new-game-btn');
+    this.loadGameBtn = document.getElementById('load-game-btn');
+    this.helpLandingBtn = document.getElementById('help-landing-btn');
+    this.settingsBtn = document.getElementById('settings-btn');
+
     // Initialization overlay elements
     this.initOverlay = document.getElementById('init-overlay');
     this.introStep = document.getElementById('intro-step');
     this.roleStep = document.getElementById('role-step');
     this.areaStep = document.getElementById('area-step');
-    this.initProgress = document.getElementById('init-progress');
+    this.initZoneDisplay = document.getElementById('init-zone-display');
     this.crewNameInput = document.getElementById('crew-name-input');
     this.introContinueBtn = document.getElementById('intro-continue-btn');
     this.roleContinueBtn = document.getElementById('role-continue-btn');
@@ -73,6 +89,7 @@ export class TerminalUI {
 
     // Initialize event listeners
     this._initEventListeners();
+    this._initLandingScreen();
     this._initIntroFlow();
   }
 
@@ -173,6 +190,73 @@ export class TerminalUI {
     });
   }
 
+  _initLandingScreen() {
+    if (!this.landingScreen) return;
+
+    // New Game button
+    this.newGameBtn?.addEventListener('click', () => {
+      this._hideLandingScreen();
+      if (this._resolveNewGame) {
+        this._resolveNewGame();
+        this._resolveNewGame = null;
+      }
+    });
+
+    // Load Game button (placeholder for now)
+    this.loadGameBtn?.addEventListener('click', () => {
+      this.showModal({
+        title: 'LOAD DATA',
+        content: 'Save/Load functionality coming soon.',
+        actions: [{ label: 'OK', primary: true }]
+      });
+    });
+
+    // Help button on landing
+    this.helpLandingBtn?.addEventListener('click', () => {
+      this.showHelp();
+    });
+
+    // Settings button (placeholder)
+    this.settingsBtn?.addEventListener('click', () => {
+      this.showModal({
+        title: 'SETTINGS',
+        content: 'Settings menu coming soon.',
+        actions: [{ label: 'OK', primary: true }]
+      });
+    });
+
+    // Keyboard shortcuts on landing
+    document.addEventListener('keydown', (e) => {
+      if (!this.landingScreen || this.landingScreen.hidden) return;
+      if (this.isModalOpen()) return;
+
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        this.newGameBtn?.click();
+      } else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        this.loadGameBtn?.click();
+      } else if (e.key === 'h' || e.key === 'H') {
+        e.preventDefault();
+        this.helpLandingBtn?.click();
+      }
+    });
+  }
+
+  _showLandingScreen() {
+    if (this.landingScreen) {
+      this.landingScreen.hidden = false;
+      this.landingScreen.style.display = 'flex';
+    }
+  }
+
+  _hideLandingScreen() {
+    if (this.landingScreen) {
+      this.landingScreen.hidden = true;
+      this.landingScreen.style.display = 'none';
+    }
+  }
+
   _initIntroFlow() {
     if (!this.initOverlay) return;
 
@@ -186,12 +270,18 @@ export class TerminalUI {
 
     if (this.areaContinueBtn) {
       this.areaContinueBtn.addEventListener('click', () => {
+        const payload = this._buildInitPayload();
+        this._hideInitOverlay();
+
+        // Try to resolve the promise first
         if (this._resolveInitFlow) {
-          const payload = this._buildInitPayload();
-          this._hideInitOverlay();
-          this._resolveInitFlow(payload);
+          const resolve = this._resolveInitFlow;
           this._resolveInitFlow = null;
+          resolve(payload);
         }
+
+        // Always dispatch the fallback event as a safety net
+        window.dispatchEvent(new CustomEvent('initFlowComplete', { detail: payload }));
       });
     }
   }
@@ -208,29 +298,23 @@ export class TerminalUI {
     stepOrder.forEach(({ id, el }) => {
       if (!el) return;
       const isMatch = id === step;
-      el.hidden = !isMatch;
+      // Use only class-based toggling (CSS handles display)
       el.classList.toggle('active', isMatch);
+      // Remove hidden attribute to let CSS control display
+      el.removeAttribute('hidden');
     });
-
-    if (this.initProgress) {
-      const activeIndex = stepOrder.findIndex((entry) => entry.id === step);
-      this.initProgress.querySelectorAll('.progress-dot').forEach((dot) => {
-        const dotStep = dot.dataset.step;
-        const dotIndex = stepOrder.findIndex((entry) => entry.id === dotStep);
-        dot.classList.toggle('active', dotStep === step);
-        dot.classList.toggle('complete', dotIndex < activeIndex);
-      });
-    }
   }
 
   _showInitOverlay() {
     if (!this.initOverlay) return;
     this.initOverlay.hidden = false;
+    this.initOverlay.style.display = 'flex';
   }
 
   _hideInitOverlay() {
     if (!this.initOverlay) return;
     this.initOverlay.hidden = true;
+    this.initOverlay.style.display = 'none';
   }
 
   _buildInitPayload() {
@@ -253,19 +337,37 @@ export class TerminalUI {
     roles.forEach((role, index) => {
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = `role-card ${this._initState.roleId === role.id ? 'selected' : ''}`;
+      const isSelected = this._initState.roleId === role.id;
+      card.className = `role-card ${isSelected ? 'selected' : ''}`;
+
+      const icon = ROLE_ICONS[role.id] || ROLE_ICONS.default;
+
       card.innerHTML = `
-        <div class="role-id">0${index + 1}</div>
-        <h3>${role.name}</h3>
-        <p class="role-desc">${role.description}</p>
-        <div class="role-tags">${role.tasks
-          ?.slice(0, 2)
-          .map((task) => `<span class="pill">${task.title}</span>`)
-          .join('') || ''}</div>
+        <div class="role-icon-box">
+          <span class="role-icon">${icon}</span>
+        </div>
+        <div class="role-info">
+          <div class="role-header">
+            <span class="role-id">0${index + 1} ::</span>
+            <h3 class="role-name">${role.name.toUpperCase()}</h3>
+          </div>
+          <p class="role-desc">${role.description}</p>
+        </div>
       `;
       card.addEventListener('click', () => {
         this._initState.roleId = role.id;
         this._renderRoleCards(roles);
+        // Update zone display based on role ID (new journey types)
+        if (this.initZoneDisplay) {
+          const journeyTypeLabels = {
+            recce: 'RECON_OPS',
+            silviculture: 'SILV_OPS',
+            planner: 'PLANNING',
+            permitter: 'PERMITTING'
+          };
+          const modeLabel = journeyTypeLabels[role.id] || (role.journeyType === 'field' ? 'FIELD_OPS' : 'DESK_OPS');
+          this.initZoneDisplay.textContent = `MODE: ${modeLabel}`;
+        }
       });
 
       this.roleGrid.appendChild(card);
@@ -438,6 +540,14 @@ export class TerminalUI {
   }
 
   async runInitializationFlow({ roles = [], areas = [], defaultCrewName = 'The Timber Wolves' } = {}) {
+    // Show landing screen first and wait for New Game click
+    if (this.landingScreen) {
+      this._showLandingScreen();
+      await new Promise((resolve) => {
+        this._resolveNewGame = resolve;
+      });
+    }
+
     if (!this.initOverlay) {
       return { crewName: defaultCrewName, role: roles[0], area: areas[0] };
     }
@@ -459,8 +569,20 @@ export class TerminalUI {
     this._switchInitStep('intro');
     this._showInitOverlay();
 
+    // Update initial zone display based on role ID
+    if (this.initZoneDisplay && roles[0]) {
+      const journeyTypeLabels = {
+        recce: 'RECON_OPS',
+        silviculture: 'SILV_OPS',
+        planner: 'PLANNING',
+        permitter: 'PERMITTING'
+      };
+      const modeLabel = journeyTypeLabels[roles[0].id] || (roles[0].journeyType === 'field' ? 'FIELD_OPS' : 'DESK_OPS');
+      this.initZoneDisplay.textContent = `MODE: ${modeLabel}`;
+    }
+
+    // Store resolve function for the areaContinueBtn click handler
     return new Promise((resolve) => {
-      this._resolveInitFlow = null;
       this._resolveInitFlow = resolve;
     });
   }
@@ -699,11 +821,25 @@ export class TerminalUI {
     if (this.progressValue) {
       this.progressValue.textContent = `${data.progress || 0}%`;
     }
-    if (this.crewValue) {
-      this.crewValue.textContent = `${data.crewActive || 0}/${data.crewTotal || 5}`;
-    }
-    if (this.moraleValue) {
-      this.moraleValue.textContent = `${data.morale || 0}%`;
+
+    // Check for protagonist mode vs crew mode
+    if (data.protagonist) {
+      // Protagonist mode - show energy
+      if (this.crewValue) {
+        this.crewValue.textContent = `${data.protagonist.energy || 0}%`;
+      }
+      if (this.moraleValue) {
+        const stressLevel = data.protagonist.stress > 70 ? 'HIGH' : data.protagonist.stress > 40 ? 'MED' : 'LOW';
+        this.moraleValue.textContent = stressLevel;
+      }
+    } else {
+      // Crew mode - traditional display
+      if (this.crewValue) {
+        this.crewValue.textContent = `${data.crewActive || 0}/${data.crewTotal || 5}`;
+      }
+      if (this.moraleValue) {
+        this.moraleValue.textContent = `${data.morale || 0}%`;
+      }
     }
   }
 
@@ -745,6 +881,66 @@ export class TerminalUI {
 
       this.crewPanel.appendChild(div);
     }
+  }
+
+  /**
+   * Update the protagonist panel (for protagonist modes)
+   * @param {Object} protagonist - Protagonist state
+   */
+  updateProtagonistPanel(protagonist) {
+    if (!this.crewPanel) return;
+
+    this.crewPanel.innerHTML = '';
+
+    if (!protagonist) {
+      this.crewPanel.innerHTML = '<div class="panel-placeholder">You</div>';
+      return;
+    }
+
+    // Create protagonist status display
+    const div = document.createElement('div');
+    div.className = 'protagonist-status';
+
+    // Determine stress level for styling
+    const stressLevel = protagonist.stress > 70 ? 'critical' : protagonist.stress > 40 ? 'stressed' : '';
+
+    div.innerHTML = `
+      <div class="protagonist-header">YOUR STATUS</div>
+      <div class="protagonist-stat">
+        <span class="stat-label">Energy:</span>
+        <span class="stat-value">${progressBar(protagonist.energy, 10, true)}</span>
+      </div>
+      <div class="protagonist-stat ${stressLevel}">
+        <span class="stat-label">Stress:</span>
+        <span class="stat-value">${progressBar(protagonist.stress, 10, true)}</span>
+      </div>
+      <div class="protagonist-stat">
+        <span class="stat-label">Reputation:</span>
+        <span class="stat-value">${protagonist.reputation || 50}</span>
+      </div>
+    `;
+
+    // Add expertise if available
+    if (protagonist.expertise) {
+      const expertiseDiv = document.createElement('div');
+      expertiseDiv.className = 'protagonist-expertise';
+      expertiseDiv.innerHTML = '<div class="expertise-header">EXPERTISE</div>';
+
+      for (const [skill, value] of Object.entries(protagonist.expertise)) {
+        const skillName = skill.charAt(0).toUpperCase() + skill.slice(1);
+        const skillDiv = document.createElement('div');
+        skillDiv.className = 'expertise-skill';
+        skillDiv.innerHTML = `
+          <span class="skill-name">${skillName}:</span>
+          <span class="skill-value">${value}</span>
+        `;
+        expertiseDiv.appendChild(skillDiv);
+      }
+
+      div.appendChild(expertiseDiv);
+    }
+
+    this.crewPanel.appendChild(div);
   }
 
   /**
@@ -800,7 +996,18 @@ export class TerminalUI {
       return;
     }
 
+    // Build season display if available
+    let seasonHtml = '';
+    if (data.season) {
+      const seasonIcons = { spring: '🌱', summer: '☀️', fall: '🍂', winter: '❄️' };
+      const seasonNames = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' };
+      const icon = seasonIcons[data.season.currentSeason] || '';
+      const name = seasonNames[data.season.currentSeason] || data.season.currentSeason;
+      seasonHtml = `<div class="location-season">${icon} ${name} Y${data.season.year}</div>`;
+    }
+
     this.locationPanel.innerHTML = `
+      ${seasonHtml}
       <div class="location-name">${data.name || 'Unknown'}</div>
       <div class="location-info">${data.description || ''}</div>
       ${data.terrain ? `<div class="location-info">Terrain: ${data.terrain}</div>` : ''}
@@ -854,48 +1061,122 @@ export class TerminalUI {
    * @param {Object} journey - Journey state
    */
   updateAllStatus(journey) {
-    // Status bar
+    // Status bar - label varies by journey type
     if (this.dayLabel) {
-      this.dayLabel.textContent = journey.journeyType === 'field' ? 'SHIFT' : 'DAY';
+      const isFieldType = journey.journeyType === 'field' || journey.journeyType === 'recon';
+      this.dayLabel.textContent = isFieldType ? 'SHIFT' : 'DAY';
     }
-    this.updateStatusBar({
-      day: journey.day,
-      progress: this._calculateProgress(journey),
-      crewActive: getActiveCrewCount(journey.crew),
-      crewTotal: journey.crew.length,
-      morale: Math.round(getAverageMorale(journey.crew))
-    });
 
-    // Panels
-    this.updateCrewPanel(journey.crew);
-    this.updateResourcesPanel(journey.resources, journey.journeyType);
+    // Check for protagonist mode vs crew mode
+    const isProtagonistMode = journey.protagonist && (!journey.crew || journey.crew.length === 0);
 
-    // Location
-    if (journey.journeyType === 'field') {
-      const block = journey.blocks?.[journey.currentBlockIndex];
-      this.updateLocationPanel({
-        name: block?.name || 'Unknown Location',
-        description: block?.description,
-        terrain: block?.terrain,
-        weather: journey.weather?.name,
-        hazards: block?.hazards
+    if (isProtagonistMode) {
+      // Protagonist mode - show energy instead of crew
+      this.updateStatusBar({
+        day: journey.day,
+        progress: this._calculateProgress(journey),
+        crewActive: null,  // Signal protagonist mode
+        crewTotal: null,
+        morale: null,
+        protagonist: journey.protagonist
       });
+      // Show protagonist panel instead of crew panel
+      this.updateProtagonistPanel(journey.protagonist);
     } else {
-      this.updateLocationPanel({
-        name: `Day ${journey.day} of ${journey.deadline}`,
-        description: `${journey.deadline - journey.day} days remaining`,
-        phase: journey.currentPhase
+      // Crew mode - traditional display
+      this.updateStatusBar({
+        day: journey.day,
+        progress: this._calculateProgress(journey),
+        crewActive: getActiveCrewCount(journey.crew),
+        crewTotal: journey.crew?.length || 0,
+        morale: Math.round(getAverageMorale(journey.crew))
       });
+      // Panels
+      this.updateCrewPanel(journey.crew);
+    }
+
+    // Resource panel type mapping
+    const resourceType = (journey.journeyType === 'field' || journey.journeyType === 'recon') ? 'field' : 'desk';
+    this.updateResourcesPanel(journey.resources, resourceType);
+
+    // Location panel varies by journey type
+    switch (journey.journeyType) {
+      case 'recon':
+      case 'field':
+        const block = journey.blocks?.[journey.currentBlockIndex];
+        this.updateLocationPanel({
+          name: block?.name || 'Unknown Location',
+          description: block?.description,
+          terrain: block?.terrain,
+          weather: journey.weather?.name,
+          hazards: block?.hazards,
+          season: journey.season
+        });
+        break;
+
+      case 'silviculture':
+        this.updateLocationPanel({
+          name: `Silviculture Program`,
+          description: `Day ${journey.day}`,
+          phase: journey.season?.currentSeason || 'Active',
+          season: journey.season
+        });
+        break;
+
+      case 'planning':
+        const phaseLabels = {
+          data_gathering: 'Data Gathering',
+          analysis: 'Analysis',
+          stakeholder_review: 'Stakeholder Review',
+          ministerial_approval: 'Ministerial Approval'
+        };
+        this.updateLocationPanel({
+          name: `Strategic Planning`,
+          description: `Phase: ${phaseLabels[journey.plan?.phase] || 'Planning'}`,
+          phase: journey.plan?.phase,
+          season: journey.season
+        });
+        break;
+
+      case 'permitting':
+      case 'desk':
+      default:
+        this.updateLocationPanel({
+          name: `Day ${journey.day} of ${journey.deadline}`,
+          description: `${journey.deadline - journey.day} days remaining`,
+          phase: journey.currentPhase,
+          season: journey.season
+        });
+        break;
     }
   }
 
   _calculateProgress(journey) {
-    if (journey.journeyType === 'field') {
-      return Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-    } else {
-      const target = journey.permits?.target || 0;
-      if (target <= 0) return 0;
-      return Math.round((journey.permits.approved / target) * 100);
+    switch (journey.journeyType) {
+      case 'recon':
+      case 'field':
+        if (!journey.totalDistance) return 0;
+        return Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+
+      case 'silviculture':
+        // Progress based on planting and surveys
+        if (!journey.planting?.blocksToPlant) return 0;
+        const plantingDone = journey.planting.blocksPlanted || 0;
+        const surveysDone = journey.surveys?.freeGrowingComplete || 0;
+        const surveysTarget = journey.surveys?.freeGrowingTarget || 1;
+        return Math.round(((plantingDone / journey.planting.blocksToPlant) * 50) +
+                         ((surveysDone / surveysTarget) * 50));
+
+      case 'planning':
+        // Progress based on ministerial confidence
+        return journey.plan?.ministerialConfidence || 0;
+
+      case 'permitting':
+      case 'desk':
+      default:
+        const target = journey.permits?.target || 0;
+        if (target <= 0) return 0;
+        return Math.round((journey.permits.approved / target) * 100);
     }
   }
 
@@ -1250,6 +1531,7 @@ export class TerminalUI {
     this.closeStatusPanel();
     this.closeModal();
     this._hideInitOverlay();
+    this._hideLandingScreen();
 
     // Reset status bar
     if (this.dayLabel) {
@@ -1267,5 +1549,17 @@ export class TerminalUI {
     this.updateCrewPanel([]);
     this.updateResourcesPanel({}, 'field');
     this.updateLocationPanel({});
+
+    // Reset init state
+    this._initState = { roleId: null, areaId: null };
+  }
+
+  /**
+   * Show landing screen for restart
+   */
+  showLandingForRestart() {
+    this._showLandingScreen();
+    this._hideInitOverlay();
+    this.closeModal();
   }
 }
