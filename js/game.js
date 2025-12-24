@@ -81,42 +81,25 @@ class ForestryTrailGame {
     this.gameOver = false;
     this.victory = false;
 
-    // Title screen
-    this.ui.writeHeader('BC FORESTRY TRAIL');
+    const init = await this.ui.runInitializationFlow({
+      defaultCrewName: 'The Timber Wolves',
+      roles: FORESTER_ROLES,
+      areas: OPERATING_AREAS
+    });
+
+    const crewName = init?.crewName || 'The Timber Wolves';
+    const role = init?.role || FORESTER_ROLES[0];
+    const area = init?.area || OPERATING_AREAS[0];
+
+    this.ui.clear();
+    this.ui.writeHeader('BC FORESTRY OPERATIONS SYSTEM');
+    this.ui.write('System online. Deployment package confirmed.');
     this.ui.write('');
-    this.ui.write('The year is 2024. You have been assigned to lead');
-    this.ui.write('a forestry operation in northern British Columbia.');
+    this.ui.write(`Crew Handle: ${crewName}`);
+    this.ui.write(`Role: ${role.name}`);
+    this.ui.write(`Operating Area: ${area.name}`);
+    this.ui.write(`BEC Zone: ${area.becZone}`);
     this.ui.write('');
-    this.ui.write('Your decisions will determine whether your crew');
-    this.ui.write('completes their mission... or faces disaster.');
-    this.ui.write('');
-
-    // Character creation
-    const crewName = await this.ui.promptText('Name your crew:', 'The Timber Wolves');
-
-    // Role selection
-    this.ui.writeDivider('SELECT YOUR ROLE');
-    const roleOptions = FORESTER_ROLES.map(role => ({
-      label: role.name,
-      description: role.description,
-      value: role.id
-    }));
-
-    const roleChoice = await this.ui.promptChoice('What is your specialization?', roleOptions);
-    const roleId = roleChoice.value || roleChoice.label.toLowerCase().replace(/\s+/g, '_');
-    const role = FORESTER_ROLES.find(r => r.id === roleId) || FORESTER_ROLES[0];
-
-    // Area selection
-    this.ui.writeDivider('SELECT OPERATING AREA');
-    const areaOptions = OPERATING_AREAS.map(area => ({
-      label: area.name,
-      description: area.description,
-      value: area.id
-    }));
-
-    const areaChoice = await this.ui.promptChoice('Where will you operate?', areaOptions);
-    const areaId = areaChoice.value || areaChoice.label.toLowerCase().replace(/\s+/g, '_');
-    const area = OPERATING_AREAS.find(a => a.id === areaId) || OPERATING_AREAS[0];
 
     // Create journey based on role type
     const journeyType = role.journeyType || 'field';

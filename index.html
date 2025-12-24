@@ -9,6 +9,127 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div id="init-overlay" class="init-overlay" hidden>
+      <div class="init-frame">
+        <div class="init-topline">
+          <div class="init-brand">BC_FORESTRY_SIM // v1.4</div>
+          <div class="init-coordinates">LAT: 53.7°N | LON: -122.7°W | STATUS: ONLINE</div>
+        </div>
+
+        <div class="init-progress" id="init-progress">
+          <div class="progress-dot active" data-step="intro">
+            <span class="dot-index">01</span>
+            <span class="dot-label">Crew Handle</span>
+          </div>
+          <div class="progress-dot" data-step="role">
+            <span class="dot-index">02</span>
+            <span class="dot-label">Role Selection</span>
+          </div>
+          <div class="progress-dot" data-step="area">
+            <span class="dot-index">03</span>
+            <span class="dot-label">Operating Area</span>
+          </div>
+        </div>
+
+        <section id="intro-step" class="init-step">
+          <div class="init-grid intro-grid">
+            <div class="intro-panel">
+              <p class="eyebrow">TERMINAL // ID-88X</p>
+              <h2 class="init-title">SYSTEM READY</h2>
+              <p class="lede">
+                Welcome, Operator. You have been assigned to the BC Forestry Operations System.
+                Confirm your crew and initialize the simulation to proceed.
+              </p>
+              <ul class="system-checks">
+                <li><span class="check">•</span> Loading BEC Zones........................................ OK</li>
+                <li><span class="check">•</span> Calibrating harvesting links............................ UPDATED</li>
+                <li><span class="check">•</span> Checking market rates................................... OK</li>
+                <li><span class="check">•</span> Establishing connection to HQ........................... CONNECTED</li>
+              </ul>
+
+              <label class="field-label" for="crew-name-input">Crew Handle</label>
+              <div class="field-row">
+                <input id="crew-name-input" class="init-input" type="text" value="The Timber Wolves" />
+                <button id="intro-continue-btn" class="init-primary" type="button">[> Initialize Role]</button>
+              </div>
+            </div>
+
+            <div class="intro-visual">
+              <div class="visual-header">
+                <span class="pill">NORTHERN CANOPY SIM</span>
+                <span class="pill">BUILD 1.4.0</span>
+              </div>
+              <div class="visual-body">
+                <div class="visual-signal">SIGNAL: STABLE</div>
+                <div class="visual-caption">SUSTAINABILITY THROUGH DATA</div>
+                <div class="visual-grid">
+                  <div>
+                    <p class="muted">CURRENT FOCUS</p>
+                    <p class="value">Resource Integrity</p>
+                  </div>
+                  <div>
+                    <p class="muted">SIM TYPE</p>
+                    <p class="value">Field / Desk Hybrid</p>
+                  </div>
+                  <div>
+                    <p class="muted">NETWORK</p>
+                    <p class="value">BC_FORESTRY_NET</p>
+                  </div>
+                  <div>
+                    <p class="muted">DATE</p>
+                    <p class="value">Q3 // FY24</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="role-step" class="init-step" hidden>
+          <header class="step-header">
+            <div>
+              <p class="eyebrow">SYSTEM INITIALIZATION // USER_ALLOCATION</p>
+              <h2 class="init-title">Select your operational specialization</h2>
+            </div>
+            <div class="step-meta">
+              <span class="pill">OPERATOR CLASS</span>
+              <span class="pill">CREW SIZE: 5</span>
+            </div>
+          </header>
+
+          <div id="role-grid" class="card-grid"></div>
+
+          <footer class="step-footer">
+            <button id="role-glossary-btn" class="init-ghost" type="button">[?] Glossary Assist</button>
+            <button id="role-continue-btn" class="init-primary" type="button">[> Confirm Role]</button>
+          </footer>
+        </section>
+
+        <section id="area-step" class="init-step" hidden>
+          <header class="step-header">
+            <div>
+              <p class="eyebrow">SYSTEM ALERT: SELECT OPERATING THEATRE</p>
+              <h2 class="init-title">Connect to an operating area to deploy</h2>
+            </div>
+            <div class="step-meta">
+              <span class="pill">DATA LINK // SECURE</span>
+              <span class="pill">GLOSSARY READY</span>
+            </div>
+          </header>
+
+          <div class="area-grid">
+            <div id="area-list" class="area-list" role="list"></div>
+            <div class="area-detail" id="area-detail"></div>
+          </div>
+
+          <footer class="step-footer">
+            <button id="area-glossary-btn" class="init-ghost" type="button">[?] Glossary Assist</button>
+            <button id="area-continue-btn" class="init-primary" type="button">[> Initialize Deployment]</button>
+          </footer>
+        </section>
+      </div>
+    </div>
+
     <div class="game-wrapper">
       <!-- Main game screen -->
       <main class="game-screen">

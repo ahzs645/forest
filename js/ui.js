@@ -45,15 +45,35 @@ export class TerminalUI {
     this.modalBody = document.getElementById('modal-body');
     this.modalActions = document.getElementById('modal-actions');
 
+    // Initialization overlay elements
+    this.initOverlay = document.getElementById('init-overlay');
+    this.introStep = document.getElementById('intro-step');
+    this.roleStep = document.getElementById('role-step');
+    this.areaStep = document.getElementById('area-step');
+    this.initProgress = document.getElementById('init-progress');
+    this.crewNameInput = document.getElementById('crew-name-input');
+    this.introContinueBtn = document.getElementById('intro-continue-btn');
+    this.roleContinueBtn = document.getElementById('role-continue-btn');
+    this.areaContinueBtn = document.getElementById('area-continue-btn');
+    this.roleGrid = document.getElementById('role-grid');
+    this.roleGlossaryBtn = document.getElementById('role-glossary-btn');
+    this.areaList = document.getElementById('area-list');
+    this.areaDetail = document.getElementById('area-detail');
+    this.areaGlossaryBtn = document.getElementById('area-glossary-btn');
+
     // State
     this._pending = null;
     this._choiceHandler = null;
     this._keyHandler = null;
     this._onRestart = null;
     this._isPanelOpen = false;
+    this._initState = { roleId: null, areaId: null };
+    this._roleGlossaryTerms = [];
+    this._areaGlossaryTerms = [];
 
     // Initialize event listeners
     this._initEventListeners();
+    this._initIntroFlow();
   }
 
   _initEventListeners() {
@@ -100,6 +120,18 @@ export class TerminalUI {
       this.glossaryBtn.addEventListener('click', () => this.showGlossary());
     }
 
+    if (this.roleGlossaryBtn) {
+      this.roleGlossaryBtn.addEventListener('click', () => {
+        this._openContextGlossary('Role Glossary', this._roleGlossaryTerms);
+      });
+    }
+
+    if (this.areaGlossaryBtn) {
+      this.areaGlossaryBtn.addEventListener('click', () => {
+        this._openContextGlossary('Operating Area Glossary', this._areaGlossaryTerms);
+      });
+    }
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       // Number keys for choices
@@ -138,6 +170,298 @@ export class TerminalUI {
           this.closeStatusPanel();
         }
       }
+    });
+  }
+
+  _initIntroFlow() {
+    if (!this.initOverlay) return;
+
+    this.introContinueBtn?.addEventListener('click', () => {
+      this._switchInitStep('role');
+    });
+
+    this.roleContinueBtn?.addEventListener('click', () => {
+      this._switchInitStep('area');
+    });
+
+    if (this.areaContinueBtn) {
+      this.areaContinueBtn.addEventListener('click', () => {
+        if (this._resolveInitFlow) {
+          const payload = this._buildInitPayload();
+          this._hideInitOverlay();
+          this._resolveInitFlow(payload);
+          this._resolveInitFlow = null;
+        }
+      });
+    }
+  }
+
+  _switchInitStep(step) {
+    if (!this.initOverlay) return;
+
+    const stepOrder = [
+      { id: 'intro', el: this.introStep },
+      { id: 'role', el: this.roleStep },
+      { id: 'area', el: this.areaStep }
+    ];
+
+    stepOrder.forEach(({ id, el }) => {
+      if (!el) return;
+      const isMatch = id === step;
+      el.hidden = !isMatch;
+      el.classList.toggle('active', isMatch);
+    });
+
+    if (this.initProgress) {
+      const activeIndex = stepOrder.findIndex((entry) => entry.id === step);
+      this.initProgress.querySelectorAll('.progress-dot').forEach((dot) => {
+        const dotStep = dot.dataset.step;
+        const dotIndex = stepOrder.findIndex((entry) => entry.id === dotStep);
+        dot.classList.toggle('active', dotStep === step);
+        dot.classList.toggle('complete', dotIndex < activeIndex);
+      });
+    }
+  }
+
+  _showInitOverlay() {
+    if (!this.initOverlay) return;
+    this.initOverlay.hidden = false;
+  }
+
+  _hideInitOverlay() {
+    if (!this.initOverlay) return;
+    this.initOverlay.hidden = true;
+  }
+
+  _buildInitPayload() {
+    const crewName = this.crewNameInput?.value?.trim() || 'The Timber Wolves';
+    const role = this._initRoles?.find((r) => r.id === this._initState.roleId) || this._initRoles?.[0];
+    const area = this._initAreas?.find((a) => a.id === this._initState.areaId) || this._initAreas?.[0];
+
+    return {
+      crewName,
+      role,
+      area,
+    };
+  }
+
+  _renderRoleCards(roles = []) {
+    if (!this.roleGrid) return;
+
+    this.roleGrid.innerHTML = '';
+
+    roles.forEach((role, index) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `role-card ${this._initState.roleId === role.id ? 'selected' : ''}`;
+      card.innerHTML = `
+        <div class="role-id">0${index + 1}</div>
+        <h3>${role.name}</h3>
+        <p class="role-desc">${role.description}</p>
+        <div class="role-tags">${role.tasks
+          ?.slice(0, 2)
+          .map((task) => `<span class="pill">${task.title}</span>`)
+          .join('') || ''}</div>
+      `;
+      card.addEventListener('click', () => {
+        this._initState.roleId = role.id;
+        this._renderRoleCards(roles);
+      });
+
+      this.roleGrid.appendChild(card);
+    });
+  }
+
+  _setRoleGlossaryTerms() {
+    this._roleGlossaryTerms = ['Silviculture', 'Referral', 'Hydrology Assessment']
+      .map((term) => this._findGlossaryTerm(term))
+      .filter(Boolean);
+
+    this._syncGlossaryButtonState(this.roleGlossaryBtn, this._roleGlossaryTerms);
+  }
+
+  _renderAreaList(areas = []) {
+    if (!this.areaList) return;
+    this.areaList.innerHTML = '';
+
+    areas.forEach((area, index) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `area-item ${this._initState.areaId === area.id ? 'selected' : ''}`;
+      item.setAttribute('role', 'listitem');
+      item.innerHTML = `
+        <div class="area-number">[${String(index + 1).padStart(2, '0')}]</div>
+        <div>
+          <strong>${area.name}</strong>
+          <div class="muted">${area.description}</div>
+        </div>
+      `;
+      item.addEventListener('click', () => {
+        this._initState.areaId = area.id;
+        this._renderAreaList(areas);
+        this._renderAreaDetail(area);
+        this._renderAreaGlossary(area);
+      });
+
+      this.areaList.appendChild(item);
+    });
+  }
+
+  _renderAreaDetail(area) {
+    if (!this.areaDetail || !area) return;
+
+    this.areaDetail.innerHTML = '';
+
+    const title = document.createElement('h3');
+    title.textContent = area.name;
+    this.areaDetail.appendChild(title);
+
+    const desc = document.createElement('p');
+    desc.textContent = area.description;
+    desc.className = 'muted';
+    this.areaDetail.appendChild(desc);
+
+    const meta = document.createElement('div');
+    meta.className = 'area-meta';
+    meta.innerHTML = `
+      <div>
+        <div class="detail-label">BEC ZONE</div>
+        <div class="detail-value">${area.becZone}</div>
+      </div>
+      <div>
+        <div class="detail-label">DOMINANT SPECIES</div>
+        <div class="detail-value">${area.dominantTrees?.join(', ')}</div>
+      </div>
+      <div>
+        <div class="detail-label">COMMUNITIES</div>
+        <div class="detail-value">${area.communities?.join(', ')}</div>
+      </div>
+    `;
+    this.areaDetail.appendChild(meta);
+
+    if (area.focusTopics?.length) {
+      const focus = document.createElement('div');
+      focus.innerHTML = '<div class="detail-label">FOCUS TOPICS</div>';
+      const chips = document.createElement('div');
+      chips.className = 'chip-row';
+      area.focusTopics.forEach((topic) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = topic;
+        chips.appendChild(chip);
+      });
+      focus.appendChild(chips);
+      this.areaDetail.appendChild(focus);
+    }
+
+    if (area.indigenousPartners?.length) {
+      const partners = document.createElement('div');
+      partners.innerHTML = '<div class="detail-label">INDIGENOUS PARTNERS</div>';
+      const chips = document.createElement('div');
+      chips.className = 'chip-row';
+      area.indigenousPartners.forEach((partner) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = partner;
+        chips.appendChild(chip);
+      });
+      partners.appendChild(chips);
+      this.areaDetail.appendChild(partners);
+    }
+  }
+
+  _renderAreaGlossary(area) {
+    const entries = [this._findGlossaryTerm('BEC Zone'), this._findGlossaryTerm('Riparian Reserve')].filter(Boolean);
+
+    if (area?.tags?.includes('wildfire')) {
+      const wildfire = this._findGlossaryTerm('Wildfire Hazard Abatement');
+      if (wildfire) entries.push(wildfire);
+    }
+
+    this._areaGlossaryTerms = entries;
+    this._syncGlossaryButtonState(this.areaGlossaryBtn, this._areaGlossaryTerms);
+  }
+
+  _syncGlossaryButtonState(button, terms = []) {
+    if (!button) return;
+    const hasEntries = Array.isArray(terms) && terms.length > 0;
+    button.disabled = !hasEntries;
+    button.setAttribute('aria-disabled', hasEntries ? 'false' : 'true');
+  }
+
+  _openContextGlossary(title, terms = []) {
+    const entries = Array.isArray(terms) ? terms : [];
+
+    if (!entries.length) {
+      this.showModal({
+        title,
+        content: '<p>No glossary terms available yet.</p>',
+        actions: [{ label: 'Close', primary: true }]
+      });
+      return;
+    }
+
+    this.openModal({
+      title,
+      dismissible: true,
+      buildContent: (container) => {
+        const list = document.createElement('div');
+        list.className = 'modal-glossary-list';
+
+        entries.forEach((term) => {
+          const row = document.createElement('div');
+          row.className = 'modal-glossary-term';
+
+          const termTitle = document.createElement('div');
+          termTitle.className = 'modal-glossary-title';
+          termTitle.textContent = term.term;
+
+          const desc = document.createElement('div');
+          desc.className = 'modal-glossary-desc';
+          desc.textContent = term.description;
+
+          row.appendChild(termTitle);
+          row.appendChild(desc);
+          list.appendChild(row);
+        });
+
+        container.appendChild(list);
+      },
+      actions: [{ label: 'Close', primary: true, onSelect: () => this.closeModal() }]
+    });
+  }
+
+  _findGlossaryTerm(term) {
+    return (
+      GLOSSARY_TERMS.find((entry) => entry.term === term) || LEGACY_GLOSSARY_TERMS.find((entry) => entry.term === term)
+    );
+  }
+
+  async runInitializationFlow({ roles = [], areas = [], defaultCrewName = 'The Timber Wolves' } = {}) {
+    if (!this.initOverlay) {
+      return { crewName: defaultCrewName, role: roles[0], area: areas[0] };
+    }
+
+    this._initRoles = roles;
+    this._initAreas = areas;
+    this._initState.roleId = roles[0]?.id;
+    this._initState.areaId = areas[0]?.id;
+
+    if (this.crewNameInput) {
+      this.crewNameInput.value = defaultCrewName;
+    }
+
+    this._renderRoleCards(roles);
+    this._setRoleGlossaryTerms();
+    this._renderAreaList(areas);
+    this._renderAreaDetail(areas[0]);
+    this._renderAreaGlossary(areas[0]);
+    this._switchInitStep('intro');
+    this._showInitOverlay();
+
+    return new Promise((resolve) => {
+      this._resolveInitFlow = null;
+      this._resolveInitFlow = resolve;
     });
   }
 
@@ -925,6 +1249,7 @@ export class TerminalUI {
     this._hideInput();
     this.closeStatusPanel();
     this.closeModal();
+    this._hideInitOverlay();
 
     // Reset status bar
     if (this.dayLabel) {
