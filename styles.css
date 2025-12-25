@@ -1921,15 +1921,14 @@ body {
 }
 
 .role-icon-box {
-  width: 36px;
-  height: 36px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.5);
   border: 1px solid var(--border-color);
   flex-shrink: 0;
-  font-family: var(--font-mono);
 }
 
 .role-card.selected .role-icon-box {
@@ -1938,9 +1937,9 @@ body {
 }
 
 .role-icon {
-  font-size: 14px;
-  font-weight: bold;
+  font-size: 32px;
   color: var(--fg-main);
+  line-height: 1;
 }
 
 .role-card.selected .role-icon {
@@ -2314,12 +2313,12 @@ body {
   }
 
   .role-icon-box {
-    width: 32px;
-    height: 32px;
+    width: 48px;
+    height: 48px;
   }
 
   .role-icon {
-    font-size: 12px;
+    font-size: 26px;
   }
 
   .role-name {
@@ -2396,5 +2395,910 @@ body {
 
   .check-status {
     padding-left: var(--space-sm);
+  }
+}
+
+/* ==========================================
+   DISPLAY MODE SYSTEM
+   Classic/Modern toggle support
+   ========================================== */
+
+/* Default state (no attribute) = classic mode */
+.stat-cards,
+.field-sidebar {
+  display: none;
+}
+
+/* Classic Mode - Hide modern elements */
+body[data-display-mode="classic"] .stat-cards,
+body[data-display-mode="classic"] .field-sidebar {
+  display: none !important;
+}
+
+body[data-display-mode="classic"] .status-bar {
+  display: flex;
+}
+
+body[data-display-mode="classic"] .choices--modern {
+  display: none !important;
+}
+
+/* Modern Mode - Hide classic, show modern */
+body[data-display-mode="modern"] .status-bar {
+  display: none;
+}
+
+body[data-display-mode="modern"] .stat-cards {
+  display: flex;
+}
+
+body[data-display-mode="modern"] .choices--classic {
+  display: none !important;
+}
+
+body[data-display-mode="modern"] .choices--modern {
+  display: grid;
+}
+
+/* ==========================================
+   MODERN MODE: STAT CARDS
+   ========================================== */
+
+.status-area {
+  flex-shrink: 0;
+}
+
+.stat-cards {
+  display: none;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  min-width: 100px;
+  border-radius: 4px;
+}
+
+.stat-card-label {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  letter-spacing: 0.5px;
+}
+
+.stat-card-value {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  color: var(--fg-bright);
+}
+
+.stat-card-bar {
+  height: 4px;
+  background: var(--bg-input);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.stat-card-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+/* ==========================================
+   MODERN MODE: DECISION CARDS
+   ========================================== */
+
+.choices--classic {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.choices--modern {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+/* Wider screens: horizontal card layout */
+@media (min-width: 700px) {
+  .choices--modern {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+  }
+
+  .choices--modern .decision-card {
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
+  }
+}
+
+.decision-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: rgba(0, 20, 10, 0.7);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--border-color);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-mono);
+  color: var(--fg-main);
+}
+
+.decision-card:hover,
+.decision-card:focus {
+  border-color: var(--accent);
+  border-left-color: var(--accent);
+  background: rgba(0, 255, 153, 0.05);
+  outline: none;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.card-kbd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(0, 255, 153, 0.15);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: bold;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.5px;
+}
+
+.card-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+
+.decision-card:hover .card-checkbox {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-label {
+  display: block;
+  font-weight: bold;
+  color: var(--fg-bright);
+  font-size: var(--font-size-base);
+  margin-bottom: var(--space-xs);
+}
+
+.card-hint {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+
+/* ==========================================
+   MODERN MODE: FIELD SIDEBAR LAYOUT
+   ========================================== */
+
+.field-sidebar {
+  display: none;
+  width: 260px;
+  background: var(--bg-panel);
+  border-right: 2px solid var(--border-color);
+  padding: var(--space-md);
+  flex-direction: column;
+  gap: var(--space-md);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+body[data-display-mode="modern"] .game-wrapper.layout--field .field-sidebar {
+  display: flex;
+}
+
+.sidebar-section {
+  border: 1px solid var(--border-color);
+  padding: var(--space-sm);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-title {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  letter-spacing: 1px;
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px dashed var(--border-color);
+}
+
+/* Progress Ring */
+.progress-display {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-sm);
+}
+
+.progress-ring {
+  position: relative;
+  width: 100px;
+  height: 100px;
+}
+
+.progress-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-ring .progress-bg {
+  fill: none;
+  stroke: var(--bg-input);
+  stroke-width: 8;
+}
+
+.progress-ring .progress-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 283;
+  stroke-dashoffset: 283;
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.progress-ring .progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  color: var(--fg-bright);
+}
+
+/* Sidebar Resources */
+.sidebar-resources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sidebar-resource {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sidebar-resource-label {
+  flex: 0 0 60px;
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+}
+
+.sidebar-resource-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-input);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sidebar-resource-fill {
+  height: 100%;
+  background: var(--fg-main);
+  transition: width 0.3s ease;
+}
+
+.sidebar-resource-fill.low {
+  background: var(--fg-warning);
+}
+
+.sidebar-resource-fill.critical {
+  background: var(--fg-danger);
+}
+
+.sidebar-resource-value {
+  width: 40px;
+  text-align: right;
+  font-size: var(--font-size-xs);
+}
+
+/* Sidebar Location */
+.sidebar-location {
+  font-size: var(--font-size-sm);
+  color: var(--fg-muted);
+}
+
+/* ==========================================
+   MODERN MODE: DESK HEADER LAYOUT
+   ========================================== */
+
+body[data-display-mode="modern"] .game-wrapper.layout--desk .stat-cards {
+  justify-content: flex-start;
+  padding: var(--space-md);
+  gap: var(--space-md);
+}
+
+body[data-display-mode="modern"] .game-wrapper.layout--desk .stat-card {
+  flex: 1;
+  max-width: 180px;
+}
+
+/* ==========================================
+   SETTINGS MODAL STYLES
+   ========================================== */
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.settings-label {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  letter-spacing: 1px;
+}
+
+.settings-toggle-group {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm);
+}
+
+.settings-toggle-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  color: var(--fg-main);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-toggle-btn:hover {
+  border-color: var(--fg-dim);
+}
+
+.settings-toggle-btn.active {
+  border-color: var(--accent);
+  background: rgba(0, 255, 153, 0.1);
+}
+
+.settings-toggle-btn .toggle-icon {
+  font-size: var(--font-size-lg);
+}
+
+.settings-toggle-btn .toggle-label {
+  font-weight: bold;
+  color: var(--fg-bright);
+}
+
+.settings-toggle-btn .toggle-desc {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+}
+
+/* ==========================================
+   MOBILE RESPONSIVE: MODERN MODE
+   ========================================== */
+
+@media (max-width: 700px) {
+  /* Cards stack vertically on mobile */
+  .choices--modern {
+    grid-template-columns: 1fr;
+  }
+
+  /* Field sidebar becomes bottom drawer on mobile */
+  body[data-display-mode="modern"] .game-wrapper.layout--field {
+    flex-direction: column;
+  }
+
+  body[data-display-mode="modern"] .game-wrapper.layout--field .field-sidebar {
+    width: 100%;
+    max-height: 180px;
+    border-right: none;
+    border-top: 2px solid var(--border-color);
+    order: 2;
+  }
+
+  /* Stat cards scroll horizontally on mobile */
+  .stat-cards {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-bottom: var(--space-sm);
+  }
+
+  .stat-card {
+    flex-shrink: 0;
+    min-width: 100px;
+  }
+
+  /* Decision cards full width */
+  .decision-card {
+    padding: var(--space-sm);
+  }
+}
+
+/* ==========================================
+   MODERN MODE: HEADER BAR
+   ========================================== */
+
+.modern-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: linear-gradient(180deg, rgba(0, 40, 20, 0.95) 0%, rgba(0, 25, 12, 0.98) 100%);
+  border-bottom: 2px solid var(--accent);
+  gap: var(--space-md);
+  flex-shrink: 0;
+}
+
+body[data-display-mode="modern"] .modern-header {
+  display: flex;
+}
+
+.modern-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.modern-logo {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  color: var(--accent);
+  background: rgba(0, 255, 153, 0.1);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
+.modern-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modern-title {
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  color: var(--fg-bright);
+  letter-spacing: 1px;
+}
+
+.modern-subtitle {
+  font-size: var(--font-size-xs);
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+
+.modern-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.context-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+}
+
+.badge-icon {
+  font-size: var(--font-size-sm);
+}
+
+.badge-label {
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-value {
+  color: var(--fg-bright);
+  font-weight: bold;
+}
+
+.modern-settings-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--fg-main);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modern-settings-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ==========================================
+   MODERN MODE: METRICS SIDEBAR
+   ========================================== */
+
+.metrics-sidebar {
+  display: none;
+  width: 240px;
+  background: linear-gradient(90deg, rgba(0, 30, 15, 0.95) 0%, rgba(0, 20, 10, 0.9) 100%);
+  border-right: 1px solid var(--border-color);
+  padding: var(--space-md);
+  flex-direction: column;
+  gap: var(--space-md);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+body[data-display-mode="modern"] .metrics-sidebar {
+  display: flex;
+}
+
+.metrics-header {
+  font-size: var(--font-size-xs);
+  font-weight: bold;
+  color: var(--accent);
+  letter-spacing: 1px;
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metric-label {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: var(--font-size-sm);
+  font-weight: bold;
+  color: var(--fg-bright);
+}
+
+.metric-bar {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.metric-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, #00cc88 100%);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.metric-fill.stress {
+  background: linear-gradient(90deg, #ff6b6b 0%, #ff4444 100%);
+}
+
+.metric-fill.low {
+  background: linear-gradient(90deg, #ffaa00 0%, #ff8800 100%);
+}
+
+.metric-fill.critical {
+  background: linear-gradient(90deg, #ff4444 0%, #cc0000 100%);
+}
+
+.metrics-extra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--border-color);
+}
+
+.metrics-directive {
+  margin-top: auto;
+  padding: var(--space-sm);
+  background: rgba(0, 255, 153, 0.05);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
+.directive-header {
+  font-size: var(--font-size-xs);
+  font-weight: bold;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-xs);
+}
+
+.directive-text {
+  font-size: var(--font-size-xs);
+  color: var(--fg-main);
+  line-height: 1.5;
+}
+
+/* ==========================================
+   MODERN MODE: HIDE CLASSIC ELEMENTS
+   ========================================== */
+
+body[data-display-mode="modern"] .classic-only {
+  display: none !important;
+}
+
+body[data-display-mode="modern"] .header {
+  display: none;
+}
+
+body[data-display-mode="modern"] .status-area {
+  display: none;
+}
+
+/* Hide side panel in modern mode (replaced by metrics sidebar) */
+body[data-display-mode="modern"] .side-panel {
+  display: none !important;
+}
+
+body[data-display-mode="modern"] .panel-backdrop {
+  display: none !important;
+}
+
+/* ==========================================
+   MODERN MODE: GAME WRAPPER LAYOUT
+   ========================================== */
+
+body[data-display-mode="modern"] .game-wrapper {
+  display: grid;
+  grid-template-areas:
+    "header header"
+    "sidebar main"
+    "footer footer";
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body[data-display-mode="modern"] .modern-header {
+  grid-area: header;
+}
+
+body[data-display-mode="modern"] .metrics-sidebar {
+  grid-area: sidebar;
+}
+
+body[data-display-mode="modern"] .game-screen {
+  grid-area: main;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+body[data-display-mode="modern"] .footer-hotkeys {
+  grid-area: footer;
+}
+
+/* Hide side-panel trigger buttons in modern mode (use sidebar instead) */
+body[data-display-mode="modern"] #status-btn {
+  display: none;
+}
+
+/* ==========================================
+   MODERN MODE: FOOTER HOTKEY BAR
+   ========================================== */
+
+.footer-hotkeys {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(0, 15, 8, 0.95);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+body[data-display-mode="modern"] .footer-hotkeys {
+  display: flex;
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--fg-dim);
+}
+
+.footer-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.footer-btn:hover {
+  color: var(--accent);
+  border-color: var(--border-color);
+}
+
+.footer-key {
+  color: var(--fg-dim);
+}
+
+.footer-btn:hover .footer-key {
+  color: var(--accent);
+}
+
+.footer-label {
+  color: inherit;
+}
+
+.footer-status {
+  letter-spacing: 0.5px;
+}
+
+.footer-indicator {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ==========================================
+   MODERN MODE: TERMINAL LOG STYLING
+   ========================================== */
+
+body[data-display-mode="modern"] .terminal {
+  background: rgba(0, 10, 5, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin: var(--space-md);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+body[data-display-mode="modern"] .terminal::before {
+  content: '> SYSTEM LOG';
+  display: block;
+  padding: var(--space-xs) var(--space-sm);
+  margin: calc(-1 * var(--space-md));
+  margin-bottom: var(--space-sm);
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid var(--border-color);
+  font-size: var(--font-size-xs);
+  color: var(--accent);
+  letter-spacing: 0.5px;
+  border-radius: 6px 6px 0 0;
+}
+
+/* ==========================================
+   MODERN MODE: MOBILE RESPONSIVE
+   ========================================== */
+
+@media (max-width: 900px) {
+  .modern-header {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .modern-header-right {
+    flex-wrap: wrap;
+  }
+
+  .context-badge {
+    padding: var(--space-xs);
+  }
+
+  .badge-label {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  body[data-display-mode="modern"] .game-wrapper {
+    grid-template-areas:
+      "header"
+      "main"
+      "footer";
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  body[data-display-mode="modern"] .metrics-sidebar {
+    display: none;
+  }
+
+  .modern-header-left .modern-title-group {
+    display: none;
+  }
+
+  .footer-left {
+    gap: var(--space-sm);
+  }
+
+  .footer-btn {
+    padding: var(--space-xs);
+    font-size: 10px;
+  }
+
+  .footer-status {
+    display: none;
   }
 }

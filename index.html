@@ -187,10 +187,77 @@
     </div>
 
     <div class="game-wrapper">
+      <!-- Modern mode: Header bar -->
+      <header id="modern-header" class="modern-header">
+        <div class="modern-header-left">
+          <span class="modern-logo">[&gt;_</span>
+          <div class="modern-title-group">
+            <span class="modern-title">FORESTRY_OPS_SIM</span>
+            <span class="modern-subtitle">SYSTEM ONLINE</span>
+          </div>
+        </div>
+        <div class="modern-header-right">
+          <div class="context-badge" id="badge-season">
+            <span class="badge-icon">📅</span>
+            <span class="badge-label">SEASON:</span>
+            <span class="badge-value" id="badge-season-value">FALL</span>
+          </div>
+          <div class="context-badge" id="badge-role">
+            <span class="badge-icon">👤</span>
+            <span class="badge-label">ROLE:</span>
+            <span class="badge-value" id="badge-role-value">PLANNER</span>
+          </div>
+          <div class="context-badge" id="badge-zone">
+            <span class="badge-icon">📍</span>
+            <span class="badge-label">ZONE:</span>
+            <span class="badge-value" id="badge-zone-value">PRINCE GEORGE</span>
+          </div>
+          <button id="modern-settings-btn" class="modern-settings-btn" type="button" aria-label="Settings">⚙</button>
+        </div>
+      </header>
+
+      <!-- Modern mode: Left metrics sidebar -->
+      <aside id="metrics-sidebar" class="metrics-sidebar">
+        <div class="metrics-header">SYSTEM METRICS</div>
+        <div class="metric-item">
+          <div class="metric-row">
+            <span class="metric-label">OPS PROGRESS</span>
+            <span class="metric-value" id="metric-progress-value">0%</span>
+          </div>
+          <div class="metric-bar"><div class="metric-fill" id="metric-progress-fill" style="width: 0%"></div></div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-row">
+            <span class="metric-label">ENERGY</span>
+            <span class="metric-value" id="metric-energy-value">100%</span>
+          </div>
+          <div class="metric-bar"><div class="metric-fill" id="metric-energy-fill" style="width: 100%"></div></div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-row">
+            <span class="metric-label">STRESS</span>
+            <span class="metric-value" id="metric-stress-value">0%</span>
+          </div>
+          <div class="metric-bar"><div class="metric-fill stress" id="metric-stress-fill" style="width: 0%"></div></div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-row">
+            <span class="metric-label">BUDGET</span>
+            <span class="metric-value" id="metric-budget-value">100%</span>
+          </div>
+          <div class="metric-bar"><div class="metric-fill" id="metric-budget-fill" style="width: 100%"></div></div>
+        </div>
+        <div id="metrics-extra" class="metrics-extra"></div>
+        <div class="metrics-directive">
+          <div class="directive-header">ACTIVE DIRECTIVE</div>
+          <div class="directive-text" id="directive-text">Complete your assigned objectives while managing resources efficiently.</div>
+        </div>
+      </aside>
+
       <!-- Main game screen -->
       <main class="game-screen">
-        <!-- Header with title and actions -->
-        <header class="header">
+        <!-- Classic mode: Header with title and actions -->
+        <header class="header classic-only">
           <h1 class="header-title">BC FORESTRY TRAIL</h1>
           <div class="header-actions">
             <button id="status-btn" class="header-btn" type="button" aria-label="View status">
@@ -208,23 +275,49 @@
           </div>
         </header>
 
-        <!-- Quick status bar (always visible) -->
-        <div id="status-bar" class="status-bar">
-          <div class="status-item">
-            <span class="status-label" id="day-label">DAY</span>
-            <span id="day-value" class="status-value">1</span>
+        <!-- Status display area (adapts between modes) -->
+        <div id="status-area" class="status-area">
+          <!-- Classic: Status bar -->
+          <div id="status-bar" class="status-bar">
+            <div class="status-item">
+              <span class="status-label" id="day-label">DAY</span>
+              <span id="day-value" class="status-value">1</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">PROGRESS</span>
+              <span id="progress-value" class="status-value">0%</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">CREW</span>
+              <span id="crew-value" class="status-value">5/5</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">MORALE</span>
+              <span id="morale-value" class="status-value">75%</span>
+            </div>
           </div>
-          <div class="status-item">
-            <span class="status-label">PROGRESS</span>
-            <span id="progress-value" class="status-value">0%</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">CREW</span>
-            <span id="crew-value" class="status-value">5/5</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">MORALE</span>
-            <span id="morale-value" class="status-value">75%</span>
+
+          <!-- Modern: Stat cards (for desk modes header layout) -->
+          <div id="stat-cards" class="stat-cards">
+            <div class="stat-card" data-stat="day">
+              <div class="stat-card-label" id="stat-day-label">DAY</div>
+              <div class="stat-card-value" id="stat-day-value">1</div>
+            </div>
+            <div class="stat-card" data-stat="progress">
+              <div class="stat-card-label">PROGRESS</div>
+              <div class="stat-card-value" id="stat-progress-value">0%</div>
+              <div class="stat-card-bar">
+                <div class="stat-card-fill" id="stat-progress-fill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="stat-card" data-stat="crew">
+              <div class="stat-card-label">CREW</div>
+              <div class="stat-card-value" id="stat-crew-value">5/5</div>
+            </div>
+            <div class="stat-card" data-stat="morale">
+              <div class="stat-card-label">MORALE</div>
+              <div class="stat-card-value" id="stat-morale-value">75%</div>
+            </div>
           </div>
         </div>
 
@@ -278,6 +371,24 @@
 
       <!-- Panel backdrop (mobile) -->
       <div id="panel-backdrop" class="panel-backdrop" hidden></div>
+
+      <!-- Modern mode: Footer hotkey bar -->
+      <footer class="footer-hotkeys">
+        <div class="footer-left">
+          <button type="button" class="footer-btn" id="footer-glossary-btn">
+            <span class="footer-key">[G]</span>
+            <span class="footer-label">GLOSSARY</span>
+          </button>
+          <button type="button" class="footer-btn" id="footer-restart-btn">
+            <span class="footer-key">[R]</span>
+            <span class="footer-label">RESTART</span>
+          </button>
+        </div>
+        <div class="footer-right">
+          <span class="footer-status">SECURE CONNECTION // BC_FORESTRY_NODE</span>
+          <span class="footer-indicator"></span>
+        </div>
+      </footer>
     </div>
 
     <!-- Modal dialog -->

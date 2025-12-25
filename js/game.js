@@ -22,8 +22,14 @@ import { runSilvicultureDay } from './modes/silviculture.js';
 import { runPlanningDay } from './modes/planning.js';
 import { runPermittingDay } from './modes/permitting.js';
 
+// Import display mode manager
+import { displayMode } from './displayMode.js';
+
 class ForestryTrailGame {
   constructor() {
+    // Apply display mode early (before UI renders)
+    displayMode.apply();
+
     this.ui = new TerminalUI();
     this.journey = null;
     this.gameOver = false;
