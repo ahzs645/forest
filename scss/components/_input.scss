@@ -1,0 +1,74 @@
+// =============================================
+// Input Components
+// =============================================
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.input-prompt {
+  color: var(--fg-bright);
+  font-weight: bold;
+}
+
+.text-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--fg-main);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  outline: none;
+
+  &::placeholder {
+    color: var(--fg-dim);
+  }
+}
+
+// Init input
+.init-input {
+  width: 100%;
+  background: var(--bg-input);
+  color: var(--fg-main);
+  border: 1px solid var(--border-color);
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(0, 255, 153, 0.2);
+  }
+}
+
+.field-label {
+  display: block;
+  color: var(--fg-label);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-xs);
+  letter-spacing: 1px;
+}
+
+.field-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.crew-input-section {
+  padding: var(--space-md) 0;
+
+  .field-label {
+    margin-bottom: var(--space-sm);
+  }
+}

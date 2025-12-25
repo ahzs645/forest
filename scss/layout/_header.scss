@@ -1,0 +1,45 @@
+// =============================================
+// Header Layout
+// =============================================
+@use '../abstracts' as *;
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-height);
+  padding: 0 var(--space-md);
+  background: var(--bg-panel);
+  border-bottom: 2px solid var(--border-color);
+  flex-shrink: 0;
+
+  @include mobile-down {
+    padding: 0 var(--space-sm);
+  }
+}
+
+.header-title {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--fg-bright);
+  text-shadow: 0 0 10px var(--glow);
+
+  @include mobile-down {
+    font-size: var(--font-size-base);
+  }
+
+  @include small-down {
+    font-size: var(--font-size-sm);
+    letter-spacing: 1px;
+  }
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--space-sm);
+
+  @include small-down {
+    gap: 4px;
+  }
+}

@@ -1,0 +1,31 @@
+// =============================================
+// Glossary Component
+// =============================================
+
+.glossary-panel {
+  flex: 1;
+  min-width: 280px;
+  border: 1px solid var(--border-color);
+  padding: var(--space-md);
+  background: rgba(0, 0, 0, 0.3);
+
+  h4 {
+    margin-bottom: var(--space-sm);
+    color: var(--fg-label);
+    letter-spacing: 1px;
+  }
+}
+
+.glossary-term {
+  margin-bottom: var(--space-sm);
+}
+
+.glossary-term-title {
+  color: var(--fg-bright);
+  font-size: var(--font-size-sm);
+}
+
+.glossary-term-desc {
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+}

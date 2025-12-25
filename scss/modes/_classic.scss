@@ -1,0 +1,25 @@
+// =============================================
+// Classic Mode Styles
+// =============================================
+
+// Default state (no attribute) = classic mode
+.stat-cards,
+.field-sidebar {
+  display: none;
+}
+
+// Classic Mode - Hide modern elements
+body[data-display-mode="classic"] {
+  .stat-cards,
+  .field-sidebar {
+    display: none !important;
+  }
+
+  .status-bar {
+    display: flex;
+  }
+
+  .choices--modern {
+    display: none !important;
+  }
+}

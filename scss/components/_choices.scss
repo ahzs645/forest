@@ -1,0 +1,158 @@
+// =============================================
+// Choice Buttons / Decision Cards
+// =============================================
+@use '../abstracts' as *;
+
+// Base choices container
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+// Classic mode choices
+.choices--classic {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.choice-btn {
+  display: block;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--fg-main);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover,
+  &:focus {
+    border-color: var(--fg-main);
+    background: rgba(51, 255, 51, 0.1);
+    outline: none;
+    box-shadow: 0 0 10px var(--glow);
+  }
+
+  &:active {
+    background: rgba(51, 255, 51, 0.2);
+  }
+}
+
+.choice-label {
+  display: block;
+  font-weight: bold;
+}
+
+.choice-hint {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  margin-top: var(--space-xs);
+}
+
+// Modern mode decision cards
+.choices--modern {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+
+  @include mobile-up {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+
+    .decision-card {
+      flex: 1;
+      min-width: 200px;
+      max-width: 320px;
+    }
+  }
+}
+
+.decision-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: rgba(0, 20, 10, 0.7);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--border-color);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-mono);
+  color: var(--fg-main);
+
+  &:hover,
+  &:focus {
+    border-color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(0, 255, 153, 0.05);
+    outline: none;
+
+    .card-checkbox {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.card-kbd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(0, 255, 153, 0.15);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: bold;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.5px;
+}
+
+.card-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+
+.card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-label {
+  display: block;
+  font-weight: bold;
+  color: var(--fg-bright);
+  font-size: var(--font-size-base);
+  margin-bottom: var(--space-xs);
+}
+
+.card-hint {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  line-height: 1.5;
+}

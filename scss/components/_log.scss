@@ -1,0 +1,50 @@
+// =============================================
+// Journey Log Component
+// =============================================
+
+.log-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px dotted var(--border-color);
+  font-size: var(--font-size-sm);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.log-day {
+  color: var(--fg-dim);
+  min-width: 50px;
+}
+
+.log-icon {
+  width: 16px;
+  text-align: center;
+}
+
+.log-event .log-icon {
+  color: var(--fg-warning);
+}
+
+.log-milestone .log-icon {
+  color: var(--fg-positive);
+}
+
+.log-arrival .log-icon {
+  color: var(--fg-bright);
+}
+
+.log-summary {
+  flex: 1;
+}

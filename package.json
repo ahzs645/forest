@@ -11,6 +11,7 @@
     "import:legacy": "node scripts/import-legacy-content.mjs"
   },
   "devDependencies": {
+    "sass": "^1.97.1",
     "vite": "^5.4.0"
   }
 }

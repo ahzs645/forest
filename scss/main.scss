@@ -1,0 +1,24 @@
+// =============================================
+// BC Forestry Trail - Main SCSS Entry Point
+// =============================================
+
+// 1. Abstracts - Variables, mixins, functions
+@use 'abstracts';
+
+// 2. Base - Reset, typography, utilities
+@use 'base';
+
+// 3. Layout - Game wrapper, header, game screen
+@use 'layout';
+
+// 4. Components - Reusable UI components
+@use 'components';
+
+// 5. Screens - Landing, init overlay
+@use 'screens';
+
+// 6. Modes - Classic/Modern display modes
+@use 'modes';
+
+// 7. Responsive - Mobile breakpoints
+@use 'responsive';

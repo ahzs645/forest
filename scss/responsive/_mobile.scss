@@ -1,0 +1,65 @@
+// =============================================
+// Mobile Responsive Styles
+// =============================================
+@use '../abstracts' as *;
+
+// Tablet
+@include tablet-down {
+  :root {
+    --panel-width: 280px;
+  }
+}
+
+// Mobile
+@include mobile-down {
+  .header-btn {
+    font-size: var(--font-size-xs);
+    padding: 2px 6px;
+  }
+
+  .status-bar {
+    padding: 0 var(--space-sm);
+  }
+
+  .status-label {
+    font-size: 10px;
+  }
+
+  .status-value {
+    font-size: var(--font-size-xs);
+  }
+
+  .terminal {
+    padding: var(--space-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  .choice-btn {
+    padding: var(--space-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  .close-btn {
+    display: block;
+  }
+
+  .field-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+// Small mobile
+@include small-down {
+  .status-bar {
+    height: auto;
+    padding: var(--space-xs) var(--space-sm);
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .status-item {
+    flex: 1;
+    min-width: 60px;
+  }
+}

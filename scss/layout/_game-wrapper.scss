@@ -1,0 +1,14 @@
+// =============================================
+// Game Wrapper Layout
+// =============================================
+@use '../abstracts' as *;
+
+.game-wrapper {
+  display: flex;
+  min-height: 100vh;
+  max-width: 100vw;
+
+  @include mobile-down {
+    flex-direction: column;
+  }
+}

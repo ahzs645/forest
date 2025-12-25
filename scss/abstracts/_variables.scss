@@ -1,0 +1,51 @@
+// =============================================
+// SCSS Variables / Design Tokens
+// =============================================
+
+// CSS Custom Properties (available in runtime)
+:root {
+  // Colors - Classic terminal green on black
+  --bg-dark: #0a0a0a;
+  --bg-panel: #0d1a0d;
+  --bg-input: #050a05;
+  --fg-main: #33ff33;
+  --fg-dim: #1a8c1a;
+  --fg-bright: #66ff66;
+  --fg-warning: #ffcc00;
+  --fg-danger: #ff4444;
+  --fg-positive: #44ff88;
+  --border-color: #1a5c1a;
+  --border-bright: #33ff33;
+  --glow: rgba(51, 255, 51, 0.3);
+  --bg-overlay: #040b04;
+  --card: rgba(16, 32, 16, 0.85);
+  --card-strong: rgba(20, 48, 20, 0.95);
+  --fg-muted: #66b566;
+  --fg-label: #77ff77;
+  --accent: #00ff99;
+  --accent-2: #00d87a;
+
+  // Typography
+  --font-mono: 'Courier New', Courier, 'Lucida Console', monospace;
+  --font-size-base: 16px;
+  --font-size-sm: 14px;
+  --font-size-xs: 12px;
+  --font-size-lg: 18px;
+
+  // Spacing
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+
+  // Layout
+  --header-height: 48px;
+  --status-bar-height: 40px;
+  --panel-width: 320px;
+}
+
+// SCSS Variables (compile-time only)
+$breakpoint-tablet: 900px;
+$breakpoint-mobile: 700px;
+$breakpoint-small: 400px;
+$breakpoint-xs: 380px;

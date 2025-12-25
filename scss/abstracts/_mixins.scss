@@ -1,0 +1,142 @@
+// =============================================
+// SCSS Mixins
+// =============================================
+
+// Responsive breakpoints
+@mixin tablet-down {
+  @media (max-width: 900px) {
+    @content;
+  }
+}
+
+@mixin mobile-down {
+  @media (max-width: 700px) {
+    @content;
+  }
+}
+
+@mixin small-down {
+  @media (max-width: 400px) {
+    @content;
+  }
+}
+
+@mixin xs-down {
+  @media (max-width: 380px) {
+    @content;
+  }
+}
+
+@mixin mobile-up {
+  @media (min-width: 701px) {
+    @content;
+  }
+}
+
+@mixin tablet-up {
+  @media (min-width: 640px) {
+    @content;
+  }
+}
+
+// Flexbox helpers
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+// Button reset
+@mixin button-reset {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+// Card/panel base
+@mixin panel-base {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+}
+
+// Terminal glow effect
+@mixin terminal-glow {
+  text-shadow: 0 0 10px var(--glow);
+}
+
+// Interactive hover state
+@mixin hover-glow {
+  transition: all 0.15s ease;
+
+  &:hover,
+  &:focus {
+    border-color: var(--fg-main);
+    background: rgba(51, 255, 51, 0.1);
+    outline: none;
+  }
+}
+
+// Primary button gradient
+@mixin primary-button {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: #001a0a;
+  border: 1px solid var(--border-bright);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0, 255, 153, 0.35);
+
+  &:hover,
+  &:focus {
+    filter: brightness(1.1);
+    outline: none;
+  }
+}
+
+// Ghost button
+@mixin ghost-button {
+  background: transparent;
+  color: var(--fg-main);
+  border: 1px dashed var(--border-color);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+
+  &:hover,
+  &:focus {
+    border-color: var(--border-bright);
+    color: var(--fg-bright);
+    outline: none;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// Visually hidden
+@mixin visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}

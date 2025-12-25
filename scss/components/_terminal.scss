@@ -1,0 +1,97 @@
+// =============================================
+// Terminal Component
+// =============================================
+
+.terminal {
+  flex: 1;
+  padding: var(--space-md);
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg-dark);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--bg-panel);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+
+    &:hover {
+      background: var(--fg-dim);
+    }
+  }
+}
+
+// Terminal content styles
+.term-line {
+  margin-bottom: var(--space-sm);
+  word-wrap: break-word;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.term-header {
+  font-weight: bold;
+  color: var(--fg-bright);
+  margin: var(--space-md) 0 var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.term-divider {
+  margin: var(--space-md) 0;
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--border-color);
+  color: var(--fg-dim);
+  text-align: center;
+  letter-spacing: 2px;
+  font-size: var(--font-size-sm);
+}
+
+.term-box {
+  margin: var(--space-md) 0;
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-panel);
+  white-space: pre;
+  font-size: var(--font-size-sm);
+  overflow-x: auto;
+}
+
+.term-warning {
+  color: var(--fg-warning);
+}
+
+.term-danger {
+  color: var(--fg-danger);
+}
+
+.term-positive {
+  color: var(--fg-positive);
+}
+
+.term-dim {
+  color: var(--fg-dim);
+}
+
+// ASCII art pre-formatted text
+.ascii-box {
+  font-family: var(--font-mono);
+  white-space: pre;
+  line-height: 1.2;
+  font-size: var(--font-size-sm);
+}
+
+// Progress bar text
+.progress-text {
+  font-family: var(--font-mono);
+}
