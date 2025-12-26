@@ -3,6 +3,12 @@
 // =============================================
 @use '../abstracts' as *;
 
+// Hide modern-only elements in classic mode
+.decision-header,
+.command-input {
+  display: none;
+}
+
 // Base choices container
 .choices {
   display: flex;

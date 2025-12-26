@@ -190,31 +190,46 @@
       <!-- Modern mode: Header bar -->
       <header id="modern-header" class="modern-header">
         <div class="modern-header-left">
-          <span class="modern-logo">[&gt;_</span>
+          <span class="modern-logo-icon">🌲</span>
           <div class="modern-title-group">
-            <span class="modern-title">FORESTRY_OPS_SIM</span>
-            <span class="modern-subtitle">SYSTEM ONLINE</span>
+            <span class="modern-title">BC FORESTRY SIMULATOR</span>
+            <span class="modern-subtitle">TERMINAL V1.0 // CONNECTED</span>
           </div>
         </div>
         <div class="modern-header-right">
-          <div class="context-badge" id="badge-season">
-            <span class="badge-icon">📅</span>
-            <span class="badge-label">SEASON:</span>
-            <span class="badge-value" id="badge-season-value">FALL</span>
-          </div>
-          <div class="context-badge" id="badge-role">
-            <span class="badge-icon">👤</span>
-            <span class="badge-label">ROLE:</span>
-            <span class="badge-value" id="badge-role-value">PLANNER</span>
-          </div>
-          <div class="context-badge" id="badge-zone">
-            <span class="badge-icon">📍</span>
-            <span class="badge-label">ZONE:</span>
-            <span class="badge-value" id="badge-zone-value">PRINCE GEORGE</span>
+          <div class="system-status-badge">
+            <span class="status-dot"></span>
+            <span>SYSTEM ONLINE</span>
           </div>
           <button id="modern-settings-btn" class="modern-settings-btn" type="button" aria-label="Settings">⚙</button>
         </div>
       </header>
+
+      <!-- Modern mode: Stat cards row -->
+      <div id="modern-stats-row" class="modern-stats-row">
+        <div class="modern-stat-card">
+          <span class="stat-card-label">CURRENT YEAR</span>
+          <span class="stat-card-value" id="modern-year-value">2025</span>
+        </div>
+        <div class="modern-stat-card">
+          <span class="stat-card-label">FUNDS</span>
+          <span class="stat-card-value" id="modern-funds-value">$80,000</span>
+        </div>
+        <div class="modern-stat-card">
+          <span class="stat-card-label">ECO-HEALTH</span>
+          <div class="stat-card-progress">
+            <span class="stat-card-value" id="modern-eco-value">85%</span>
+            <div class="stat-card-bar"><div class="stat-card-fill" id="modern-eco-fill" style="width: 85%"></div></div>
+          </div>
+        </div>
+        <div class="modern-stat-card">
+          <span class="stat-card-label">ZONE</span>
+          <div class="stat-card-zone">
+            <span class="zone-icon">🌲</span>
+            <span class="stat-card-value" id="modern-zone-value">Sub-Boreal Spruce</span>
+          </div>
+        </div>
+      </div>
 
       <!-- Modern mode: Left metrics sidebar -->
       <aside id="metrics-sidebar" class="metrics-sidebar">
@@ -321,11 +336,25 @@
           </div>
         </div>
 
-        <!-- Terminal output area -->
-        <div id="terminal" class="terminal" role="log" aria-live="polite"></div>
+        <!-- Terminal window (modern mode has window chrome) -->
+        <div id="terminal-window" class="terminal-window">
+          <div class="terminal-window-header">
+            <div class="window-dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <span class="terminal-file-path" id="terminal-file-path">/VAR/LOG/SYSTEM.LOG</span>
+          </div>
+          <div id="terminal" class="terminal" role="log" aria-live="polite"></div>
+        </div>
 
-        <!-- Action area (buttons and input) -->
+        <!-- Decision area (buttons and input) -->
         <div id="action-area" class="action-area">
+          <div id="decision-header" class="decision-header">
+            <span class="decision-icon">⚡</span>
+            <span class="decision-title" id="decision-title">AWAITING INPUT</span>
+          </div>
           <div id="choices" class="choices"></div>
           <div id="input-wrapper" class="input-wrapper" hidden>
             <span class="input-prompt">&gt;</span>
@@ -340,6 +369,10 @@
               aria-label="Text input"
             />
             <button id="submit-btn" class="submit-btn" type="button">[ENTER]</button>
+          </div>
+          <div id="command-input" class="command-input">
+            <span class="command-prompt">&gt; Awaiting command input...</span>
+            <button id="execute-btn" class="execute-btn" type="button">EXECUTE</button>
           </div>
         </div>
       </main>
