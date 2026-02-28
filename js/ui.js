@@ -13,6 +13,7 @@
 
 import { displayMode } from './displayMode.js';
 import { getActiveCrewCount, getAverageMorale } from './crew.js';
+import { getRunningGrade } from './scoring.js';
 
 // Import all mixins
 import {
@@ -286,6 +287,9 @@ export class TerminalUI {
     // Check for protagonist mode vs crew mode
     const isProtagonistMode = journey.protagonist && (!journey.crew || journey.crew.length === 0);
 
+    // Running performance grade
+    const runningGrade = getRunningGrade(journey);
+
     if (isProtagonistMode) {
       // Protagonist mode - show energy instead of crew
       this.updateStatusBar({
@@ -294,7 +298,8 @@ export class TerminalUI {
         crewActive: null,
         crewTotal: null,
         morale: null,
-        protagonist: journey.protagonist
+        protagonist: journey.protagonist,
+        grade: runningGrade
       });
       this.updateProtagonistPanel(journey.protagonist);
     } else {
@@ -304,7 +309,8 @@ export class TerminalUI {
         progress: this._calculateProgress(journey),
         crewActive: getActiveCrewCount(journey.crew),
         crewTotal: journey.crew?.length || 0,
-        morale: Math.round(getAverageMorale(journey.crew))
+        morale: Math.round(getAverageMorale(journey.crew)),
+        grade: runningGrade
       });
       this.updateCrewPanel(journey.crew);
     }

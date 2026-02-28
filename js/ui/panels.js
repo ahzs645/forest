@@ -43,6 +43,11 @@ export const PanelsMixin = {
         this.moraleValue.textContent = `${data.morale || 0}%`;
       }
     }
+
+    // Running grade display (append to progress if available)
+    if (data.grade && this.progressValue) {
+      this.progressValue.textContent = `${data.progress || 0}% [${data.grade}]`;
+    }
   },
 
   /**

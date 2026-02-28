@@ -7,7 +7,8 @@
 
 import { TerminalUI } from './ui.js';
 import { FORESTER_ROLES, OPERATING_AREAS } from './data/index.js';
-import { generateCrew, processDailyUpdate, getCrewDisplayInfo, crewHasRole } from './crew.js';
+import { generateCrew, generateCrewMember, processDailyUpdate, getCrewDisplayInfo, crewHasRole, awardCrewExperience } from './crew.js';
+import { FIELD_ROLES, DESK_ROLES } from './data/crewNames.js';
 import {
   createJourney,
   formatJourneyLog,
@@ -15,7 +16,10 @@ import {
 } from './journey.js';
 import { checkScheduledEvents, formatEventForDisplay, resolveEvent } from './events.js';
 import { getCurrentSeasonInfo } from './season.js';
-import { calculateScore, formatScoreDisplay } from './scoring.js';
+import { calculateScore, formatScoreDisplay, getRunningGrade, saveHighScore, getHighScores } from './scoring.js';
+import { resetFieldEventCooldowns } from './data/fieldEvents.js';
+import { resetDeskEventCooldowns } from './data/deskEvents.js';
+import { getRandomWeather } from './data/blocks.js';
 
 // Import mode runners
 import { runReconDay } from './modes/recon.js';
@@ -40,6 +44,21 @@ function applyDifficultyMultipliers(journey, difficulty) {
   for (const key of Object.keys(r)) {
     if (typeof r[key] === 'number') {
       r[key] = Math.round(r[key] * resourceMult);
+    }
+  }
+
+  // Easy: crew is more resilient, won't quit unless morale is very low
+  if (difficulty === 'easy') {
+    journey.crewQuitThreshold = 5; // only quit below 5 morale
+    journey.eventFrequencyMod = 0.7; // fewer events
+  }
+
+  // Hard: crew quits easier, more events, tighter deadlines
+  if (difficulty === 'hard') {
+    journey.crewQuitThreshold = 20; // quit below 20 morale
+    journey.eventFrequencyMod = 1.4; // more events
+    if (journey.deadline) {
+      journey.deadline = Math.max(15, journey.deadline - 5); // tighter deadline
     }
   }
 }
@@ -163,9 +182,57 @@ class ForestryTrailGame {
     this.ui.write(`Difficulty: ${diffLabel}`);
     this.ui.write('');
 
-    // Create journey using factory function (routes by roleId)
+    // Reset event cooldowns for new game
+    resetFieldEventCooldowns();
+    resetDeskEventCooldowns();
+
+    // Crew selection — player picks 5 from available roles
     const legacyJourneyType = role.journeyType || 'field';
-    const crew = generateCrew(5, legacyJourneyType);
+    const isFieldRole = legacyJourneyType === 'field';
+    const availableRoles = isFieldRole ? FIELD_ROLES : DESK_ROLES;
+
+    // Only offer crew selection for journey types that have crew
+    const protagonistModes = ['planning', 'permitting'];
+    const isProtagonist = protagonistModes.includes(role.id === 'planner' ? 'planning' : role.id === 'permitter' ? 'permitting' : '');
+    let crew;
+
+    if (isProtagonist) {
+      crew = []; // Protagonist modes have no crew
+    } else {
+      this.ui.clear();
+      this.ui.writeHeader('ASSEMBLE YOUR CREW');
+      this.ui.write('Choose 5 crew members from the available roster.');
+      this.ui.write('Each role provides unique skills. Choose wisely.');
+      this.ui.write('');
+
+      const selectedRoles = [];
+      for (let pick = 1; pick <= 5; pick++) {
+        const roleOptions = availableRoles.map(r => ({
+          label: `${r.name}`,
+          description: `${r.description} | Skills: ${r.skills.join(', ')}`,
+          value: r.id
+        }));
+
+        const picked = await this.ui.promptChoice(
+          `Pick crew member ${pick}/5:`,
+          roleOptions
+        );
+
+        const chosenRole = availableRoles.find(r => r.id === picked.value);
+        const member = generateCrewMember(legacyJourneyType, chosenRole);
+        // Ensure unique names
+        while (selectedRoles.some(m => m.name === member.name)) {
+          const names = ['Riley', 'Jordan', 'Casey', 'Morgan', 'Taylor', 'Alex', 'Quinn', 'Drew', 'Sage', 'Blake', 'Robin', 'Dana'];
+          member.name = names[Math.floor(Math.random() * names.length)];
+        }
+        selectedRoles.push(member);
+        this.ui.write(`  ${pick}. ${member.name} — ${chosenRole.name} (Health: ${member.health}, Morale: ${member.morale})`);
+      }
+      crew = selectedRoles;
+      this.ui.write('');
+      this.ui.write('Crew assembled. Preparing deployment...');
+      this.ui.write('');
+    }
 
     this.journey = createJourney({
       crewName,
@@ -301,6 +368,14 @@ class ForestryTrailGame {
     this.ui.write('');
     for (const msg of result.messages) {
       this.ui.write(msg);
+    }
+
+    // Award crew experience for handling events
+    const activeCrew = this.journey.crew?.filter(m => m.isActive) || [];
+    if (activeCrew.length > 0) {
+      const randomMember = activeCrew[Math.floor(Math.random() * activeCrew.length)];
+      const xpMsg = awardCrewExperience(randomMember);
+      if (xpMsg) this.ui.write(xpMsg);
     }
 
     // Check for game-ending events
@@ -528,10 +603,23 @@ class ForestryTrailGame {
 
     // --- Scoring ---
     const scoreResult = calculateScore(journey, this.victory);
+    saveHighScore(scoreResult, journey);
     this.ui.writeDivider('PERFORMANCE REVIEW');
     const scoreLines = formatScoreDisplay(scoreResult);
     for (const line of scoreLines) {
       this.ui.write(line);
+    }
+
+    // Show high scores
+    const highScores = getHighScores();
+    if (highScores.length > 1) {
+      this.ui.write('');
+      this.ui.writeDivider('HIGH SCORES');
+      for (let i = 0; i < Math.min(5, highScores.length); i++) {
+        const hs = highScores[i];
+        const v = hs.victory ? 'W' : 'L';
+        this.ui.write(`  ${i + 1}. ${hs.grade} (${hs.score}) - ${hs.crewName} [${hs.role}] ${hs.area} (${v})`);
+      }
     }
 
     this.ui.write('');

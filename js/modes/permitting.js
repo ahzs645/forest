@@ -111,10 +111,7 @@ export async function runPermittingDay(game) {
     // Update status panels
     ui.updateAllStatus(journey);
 
-    // Brief pause between actions
-    if (journey.hoursRemaining > 0) {
-      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
-    }
+    // Auto-continue between actions (no friction prompt)
   }
 
   // End of day processing

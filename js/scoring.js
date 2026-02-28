@@ -282,3 +282,115 @@ function makeBar(value, width) {
   const filled = Math.round((value / 100) * width);
   return '\u2588'.repeat(filled) + '\u2591'.repeat(width - filled);
 }
+
+/**
+ * Get a running grade estimate for in-game display
+ * @param {Object} journey - Current journey state
+ * @returns {string} Grade estimate like "B-" or "C+"
+ */
+export function getRunningGrade(journey) {
+  if (!journey) return '?';
+
+  // Simplified mid-game estimate based on available metrics
+  let score = 50;
+
+  // Crew welfare component
+  const crew = journey.crew || [];
+  const activeCrew = crew.filter(m => m.isActive);
+  if (crew.length > 0) {
+    const survivalRate = activeCrew.length / crew.length;
+    score += (survivalRate - 0.5) * 20;
+    if (activeCrew.length > 0) {
+      const avgMorale = activeCrew.reduce((s, m) => s + m.morale, 0) / activeCrew.length;
+      score += (avgMorale - 50) / 10;
+    }
+  }
+
+  // Resource health
+  const r = journey.resources || {};
+  if (r.fuel !== undefined) {
+    if (r.fuel > 20) score += 5;
+    if (r.fuel <= 5) score -= 10;
+  }
+  if (r.food !== undefined) {
+    if (r.food > 10) score += 5;
+    if (r.food <= 3) score -= 10;
+  }
+  if (r.budget !== undefined) {
+    if (r.budget > 5000) score += 5;
+    if (r.budget <= 0) score -= 15;
+  }
+
+  // Progress bonus
+  switch (journey.journeyType) {
+    case 'recon':
+    case 'field': {
+      const progress = journey.totalDistance > 0 ? journey.distanceTraveled / journey.totalDistance : 0;
+      const dayEfficiency = journey.day > 0 ? progress / (journey.day / 30) : 0;
+      score += dayEfficiency * 15;
+      break;
+    }
+    case 'permitting':
+    case 'desk': {
+      const permitRate = journey.permits?.target > 0 ? journey.permits.approved / journey.permits.target : 0;
+      const dayRate = journey.deadline > 0 ? journey.day / journey.deadline : 1;
+      if (permitRate >= dayRate) score += 10;
+      else score -= 5;
+      break;
+    }
+    case 'planning': {
+      const conf = journey.plan?.ministerialConfidence || 0;
+      score += conf / 10;
+      break;
+    }
+  }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  const grade = getLetterGrade(score);
+  const modifier = score % 15 > 10 ? '+' : score % 15 < 5 ? '-' : '';
+  return `${grade}${modifier}`;
+}
+
+// ---- High Score Persistence ----
+
+const HIGH_SCORE_KEY = 'forestryTrail_highScores';
+
+/**
+ * Save a high score to localStorage
+ * @param {Object} scoreResult - From calculateScore()
+ * @param {Object} journey - Journey state
+ */
+export function saveHighScore(scoreResult, journey) {
+  try {
+    const scores = getHighScores();
+    scores.push({
+      score: scoreResult.totalScore,
+      grade: scoreResult.grade,
+      victory: scoreResult.victory,
+      role: journey.roleId || journey.journeyType,
+      area: journey.area?.name || 'Unknown',
+      crewName: journey.companyName || 'Unknown',
+      day: journey.day,
+      date: new Date().toISOString().split('T')[0]
+    });
+    // Keep top 10
+    scores.sort((a, b) => b.score - a.score);
+    scores.length = Math.min(scores.length, 10);
+    localStorage.setItem(HIGH_SCORE_KEY, JSON.stringify(scores));
+  } catch {
+    // localStorage unavailable, silently fail
+  }
+}
+
+/**
+ * Get high scores from localStorage
+ * @returns {Object[]} Array of high score entries
+ */
+export function getHighScores() {
+  try {
+    const raw = localStorage.getItem(HIGH_SCORE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}

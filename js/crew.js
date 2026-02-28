@@ -572,6 +572,45 @@ export function getCrewDisplayInfo(member) {
     status,
     effects,
     isActive: member.isActive,
-    workCapacity: getWorkCapacity(member)
+    workCapacity: getWorkCapacity(member),
+    experience: member.experience || 0,
+    earnedTraits: member.earnedTraits || []
   };
+}
+
+/**
+ * Award experience to a crew member. After 5 successful events,
+ * the crew member earns a permanent positive trait.
+ * @param {Object} member - Crew member
+ * @param {number} amount - XP amount (default 1)
+ * @returns {Object|null} Message about new trait, or null
+ */
+export function awardCrewExperience(member, amount = 1) {
+  if (!member || !member.isActive) return null;
+
+  if (!member.experience) member.experience = 0;
+  if (!member.earnedTraits) member.earnedTraits = [];
+
+  member.experience += amount;
+
+  // Every 5 XP, earn a trait
+  if (member.experience >= 5 && member.earnedTraits.length === 0) {
+    const trait = pickRandom(TRAITS.positive);
+    if (trait && !member.traits.includes(trait.id)) {
+      member.traits.push(trait.id);
+      member.earnedTraits.push(trait.id);
+      return `${member.name} has gained the "${trait.name}" trait from experience!`;
+    }
+  }
+  if (member.experience >= 12 && member.earnedTraits.length <= 1) {
+    const available = TRAITS.positive.filter(t => !member.traits.includes(t.id));
+    if (available.length > 0) {
+      const trait = pickRandom(available);
+      member.traits.push(trait.id);
+      member.earnedTraits.push(trait.id);
+      return `${member.name} is now a veteran — gained "${trait.name}"!`;
+    }
+  }
+
+  return null;
 }

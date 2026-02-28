@@ -23,7 +23,7 @@ import {
   FIELD_RESOURCES,
   DESK_RESOURCES
 } from './resources.js';
-import { getBlocksForArea, getRandomWeather, getTemperature, TERRAIN_TYPES } from './data/blocks.js';
+import { getBlocksForArea, getRandomWeather, getTemperature, getWeatherForecast, TERRAIN_TYPES } from './data/blocks.js';
 import { createSeasonState, advanceDay, getSeasonModifiers, getCurrentSeasonInfo } from './season.js';
 
 export const FIELD_SHIFT_HOURS = 9;
@@ -855,10 +855,11 @@ export function executeFieldDay(journey, paceId) {
     messages.push(journey.gameOverReason);
   }
 
-  // Update weather for next day
+  // Update weather for next day with forecast
   journey.day++;
   journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day);
   journey.temperature = getTemperature(journey.weather, getCurrentBlock(journey));
+  journey.weatherForecast = getWeatherForecast(getCurrentBlock(journey), journey.day);
   journey.travelDelayHours = 0;
 
   // Log the day with more detail

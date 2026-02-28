@@ -122,6 +122,23 @@ export function getTemperature(weather, block) {
 }
 
 /**
+ * Generate a weather forecast for the next day (50% accurate)
+ * @param {Object} block - Current block
+ * @param {number} day - Current day
+ * @returns {string} Forecast text (may be inaccurate)
+ */
+export function getWeatherForecast(block, day) {
+  const actual = getRandomWeather(block, day + 1);
+  // 50% chance the forecast is accurate
+  if (Math.random() < 0.5) {
+    return actual.name;
+  }
+  // Otherwise give adjacent weather
+  const vague = ['Clear skies', 'Partly cloudy', 'Possible rain', 'Unsettled conditions', 'Variable weather'];
+  return vague[Math.floor(Math.random() * vague.length)];
+}
+
+/**
  * Check if a block has any dangerous hazards active
  * @param {Object} block - Block to check
  * @param {Object} weather - Current weather

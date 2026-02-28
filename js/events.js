@@ -299,14 +299,37 @@ export function resolveEvent(journey, event, option) {
     messages.push(`Permits approved: ${journey.permits.approved}/${journey.permits.target}`);
   }
 
-  // Handle scheduled events
+  // Handle scheduled events (supports both string and {id, daysDelay} format)
   if (option.schedulesEvent) {
     if (!journey.scheduledEvents) journey.scheduledEvents = [];
-    journey.scheduledEvents.push({
-      eventId: option.schedulesEvent,
-      triggerDay: journey.day + (option.scheduledDelay || 3)
-    });
+    if (typeof option.schedulesEvent === 'string') {
+      journey.scheduledEvents.push({
+        eventId: option.schedulesEvent,
+        triggerDay: journey.day + (option.scheduledDelay || 3)
+      });
+    } else if (option.schedulesEvent.id) {
+      journey.scheduledEvents.push({
+        eventId: option.schedulesEvent.id,
+        triggerDay: journey.day + (option.schedulesEvent.daysDelay || 3)
+      });
+    }
     messages.push('This may have consequences later...');
+  }
+
+  // Also check event-level scheduling (for events that always chain)
+  if (event.schedulesEvent) {
+    if (!journey.scheduledEvents) journey.scheduledEvents = [];
+    if (typeof event.schedulesEvent === 'string') {
+      journey.scheduledEvents.push({
+        eventId: event.schedulesEvent,
+        triggerDay: journey.day + (event.scheduledDelay || 3)
+      });
+    } else if (event.schedulesEvent.id) {
+      journey.scheduledEvents.push({
+        eventId: event.schedulesEvent.id,
+        triggerDay: journey.day + (event.schedulesEvent.daysDelay || 3)
+      });
+    }
   }
 
   // Log the event
@@ -548,8 +571,22 @@ export function formatEventForDisplay(event, journeyType = 'field') {
 
 /**
  * Generate a hint about an option's effects
+ * Returns vague hint for hidden outcomes, detailed hints otherwise
  */
 function getOptionHint(option, journeyType) {
+  // Hidden outcomes get vague hints instead of exact numbers
+  if (option.hiddenOutcome) {
+    if (option.riskInjury) return 'Risky';
+    if (option.effects) {
+      const hasNeg = Object.values(option.effects).some(v => v < 0);
+      const hasPos = Object.values(option.effects).some(v => v > 0);
+      if (hasNeg && hasPos) return 'Mixed consequences';
+      if (hasNeg) return 'Costly';
+      if (hasPos) return 'Potentially beneficial';
+    }
+    return 'Uncertain outcome';
+  }
+
   const hints = [];
   const isField = isFieldJourney(journeyType);
 

@@ -134,9 +134,7 @@ export async function runSilvicultureDay(game) {
 
     ui.updateAllStatus(journey);
 
-    if (journey.hoursRemaining > 0) {
-      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
-    }
+    // Auto-continue between actions (no friction prompt)
   }
 
   // End of day processing
@@ -284,6 +282,38 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods) {
     });
   }
 
+  // Winter-specific actions — make winter productive instead of dead time
+  if (currentSeason === 'winter') {
+    if (hoursLeft >= 3) {
+      actionOptions.push({
+        label: 'Plan Next Season (3h)',
+        description: 'Optimize block layouts and seedling orders for spring. Boosts spring efficiency.',
+        value: 'winter_plan'
+      });
+    }
+    if (hoursLeft >= 2) {
+      actionOptions.push({
+        label: 'Negotiate Contracts (2h)',
+        description: 'Lock in contractor rates for next season. Saves budget.',
+        value: 'winter_negotiate'
+      });
+    }
+    if (hoursLeft >= 2) {
+      actionOptions.push({
+        label: 'Order Seedlings (2h)',
+        description: 'Place seedling orders early for better stock selection.',
+        value: 'winter_seedlings'
+      });
+    }
+    if (hoursLeft >= 1) {
+      actionOptions.push({
+        label: 'Equipment Maintenance (1h)',
+        description: 'Off-season repairs and prep.',
+        value: 'winter_maintenance'
+      });
+    }
+  }
+
   // Team briefing
   if (journey.crew && journey.crew.length > 0 && hoursLeft >= 1) {
     actionOptions.push({
@@ -343,9 +373,88 @@ async function processAction(game, actionId, currentSeason, seasonMods) {
       journey.hoursRemaining -= 1;
       break;
 
+    // Winter-specific actions
+    case 'winter_plan':
+      handleWinterPlanning(game);
+      journey.hoursRemaining -= 3;
+      break;
+
+    case 'winter_negotiate':
+      handleWinterNegotiate(game);
+      journey.hoursRemaining -= 2;
+      break;
+
+    case 'winter_seedlings':
+      handleWinterSeedlings(game);
+      journey.hoursRemaining -= 2;
+      break;
+
+    case 'winter_maintenance':
+      handleWinterMaintenance(game);
+      journey.hoursRemaining -= 1;
+      break;
+
     default:
       break;
   }
+}
+
+/**
+ * Winter action: Plan next season layouts for a spring efficiency bonus
+ */
+function handleWinterPlanning(game) {
+  const { ui, journey } = game;
+  if (!journey.winterPlanningBonus) journey.winterPlanningBonus = 0;
+  journey.winterPlanningBonus += 0.05; // +5% planting efficiency in spring per planning session
+  journey.resources.budget -= 200;
+
+  ui.write('Block layout optimization complete.');
+  ui.writePositive(`Spring planting efficiency will be +${Math.round(journey.winterPlanningBonus * 100)}% from winter planning.`);
+}
+
+/**
+ * Winter action: Negotiate contractor rates to save budget
+ */
+function handleWinterNegotiate(game) {
+  const { ui, journey } = game;
+  const savings = 1000 + Math.floor(Math.random() * 2000);
+  journey.resources.budget += savings;
+
+  // Also boost contractor morale — they appreciate being locked in early
+  for (const c of journey.contractors) {
+    if (c.isActive) c.morale = Math.min(100, c.morale + 5);
+  }
+
+  ui.write(`Contract negotiations secured a $${savings.toLocaleString()} savings.`);
+  ui.writePositive('Contractors appreciate the early commitment.');
+}
+
+/**
+ * Winter action: Order seedlings early for better selection
+ */
+function handleWinterSeedlings(game) {
+  const { ui, journey } = game;
+  const bonusSeedlings = 5000 + Math.floor(Math.random() * 10000);
+  journey.resources.seedlings += bonusSeedlings;
+  journey.resources.budget -= 1500;
+
+  ui.write(`Early order secured ${bonusSeedlings.toLocaleString()} additional seedlings of premium stock.`);
+  ui.writePositive('Better root quality means higher survival rates.');
+}
+
+/**
+ * Winter action: Equipment maintenance during off-season
+ */
+function handleWinterMaintenance(game) {
+  const { ui, journey } = game;
+  journey.resources.budget -= 300;
+
+  // Boost contractor productivity (well-maintained gear)
+  for (const c of journey.contractors) {
+    if (c.isActive) c.productivity = Math.min(100, c.productivity + 3);
+  }
+
+  ui.write('Equipment overhauled and ready for spring deployment.');
 }
 
 /**

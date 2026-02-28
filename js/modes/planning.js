@@ -65,9 +65,7 @@ export async function runPlanningDay(game) {
 
     ui.updateAllStatus(journey);
 
-    if (journey.hoursRemaining > 0) {
-      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
-    }
+    // Auto-continue between actions (no friction prompt)
   }
 
   // End of day
@@ -323,32 +321,91 @@ async function processAction(game, actionValue) {
       break;
 
     case 'values': {
-      // Values workshop with tradeoffs (Phase 4.1)
-      const choices = [
-        { label: 'Emphasize Biodiversity', description: '+8 bio, -3 timber', value: 'bio' },
-        { label: 'Emphasize Timber Supply', description: '+8 timber, -3 bio', value: 'timber_v' },
-        { label: 'Emphasize Community', description: '+8 community, -3 FN values', value: 'community' },
-        { label: 'Emphasize First Nations', description: '+8 FN values, -3 community', value: 'fn' },
-        { label: 'Balanced Approach (5h total)', description: '+3 all values', value: 'balanced' }
+      // Values workshop as stakeholder negotiation scene
+      const stakeholders = [
+        {
+          name: 'Margaret Chen, Regional Biologist',
+          argument: '"We\'ve already lost 40% of old-growth in this TSA. If we don\'t protect riparian corridors now, the spotted owl recovery plan fails."',
+          focus: 'bio',
+          friendly: '+8 bio, -3 timber',
+          oppose: 'pushback from industry',
+          personality: 'passionate'
+        },
+        {
+          name: 'Dave Kowalski, Licensee Rep',
+          argument: '"Mills are closing. My people need timber volume or they\'re out of work by spring. The AAC can handle more harvest."',
+          focus: 'timber_v',
+          friendly: '+8 timber, -3 bio',
+          oppose: 'environmental blowback',
+          personality: 'pragmatic'
+        },
+        {
+          name: 'Sarah Running Bear, Hereditary Chief Delegate',
+          argument: '"These are our territories. Your \'consultation\' means nothing if the plan doesn\'t reflect our stewardship values. We want co-management."',
+          focus: 'fn',
+          friendly: '+8 FN values, -3 community',
+          oppose: 'political complications',
+          personality: 'firm'
+        },
+        {
+          name: 'Tom Mercer, Community Forest Board',
+          argument: '"Tourism and recreation bring more money than logging now. The community needs trails, viewscapes, and non-timber values recognized."',
+          focus: 'community',
+          friendly: '+8 community, -3 FN values',
+          oppose: 'reduced Nation support',
+          personality: 'diplomatic'
+        }
       ];
-      const pick = await ui.promptChoice('Choose values focus:', choices);
+
+      const speaker = stakeholders[Math.floor(Math.random() * stakeholders.length)];
+      ui.write('');
+      ui.writeHeader('VALUES WORKSHOP');
+      ui.write(`${speaker.name} takes the floor:`);
+      ui.write(speaker.argument);
+      ui.write('');
+
+      const choices = [
+        { label: `Support their position`, description: speaker.friendly, value: speaker.focus },
+        { label: 'Acknowledge but pivot', description: '+5 to their value, no penalty', value: 'acknowledge' },
+        { label: 'Push back diplomatically', description: '-2 political capital, +3 all other values', value: 'pushback' },
+        { label: 'Call for balanced approach (5h total)', description: '+3 all values', value: 'balanced' }
+      ];
+      const pick = await ui.promptChoice('How do you respond?', choices);
 
       switch (pick.value) {
         case 'bio':
           journey.values.biodiversity = Math.min(100, journey.values.biodiversity + 8);
           journey.values.timberSupply = Math.max(0, journey.values.timberSupply - 3);
+          ui.write(`You align with ${speaker.name.split(',')[0]}. Biodiversity priorities strengthened.`);
           break;
         case 'timber_v':
           journey.values.timberSupply = Math.min(100, journey.values.timberSupply + 8);
           journey.values.biodiversity = Math.max(0, journey.values.biodiversity - 3);
+          ui.write(`You back the industry position. Timber supply priorities strengthened.`);
           break;
         case 'community':
           journey.values.communityNeeds = Math.min(100, journey.values.communityNeeds + 8);
           journey.values.firstNationsValues = Math.max(0, journey.values.firstNationsValues - 3);
+          ui.write('Community interests advanced. Some tension with Nation delegates.');
           break;
         case 'fn':
           journey.values.firstNationsValues = Math.min(100, journey.values.firstNationsValues + 8);
           journey.values.communityNeeds = Math.max(0, journey.values.communityNeeds - 3);
+          ui.write('First Nations stewardship values elevated. Community board looks uneasy.');
+          break;
+        case 'acknowledge':
+          journey.values[{bio: 'biodiversity', timber_v: 'timberSupply', fn: 'firstNationsValues', community: 'communityNeeds'}[speaker.focus] || 'biodiversity'] =
+            Math.min(100, (journey.values[{bio: 'biodiversity', timber_v: 'timberSupply', fn: 'firstNationsValues', community: 'communityNeeds'}[speaker.focus] || 'biodiversity']) + 5);
+          ui.write(`You acknowledge the concern without committing. ${speaker.name.split(',')[0]} nods, reserving judgment.`);
+          break;
+        case 'pushback':
+          journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
+          const otherValues = ['biodiversity', 'timberSupply', 'communityNeeds', 'firstNationsValues'];
+          const speakerKey = {bio: 'biodiversity', timber_v: 'timberSupply', fn: 'firstNationsValues', community: 'communityNeeds'}[speaker.focus];
+          for (const v of otherValues) {
+            if (v !== speakerKey) journey.values[v] = Math.min(100, journey.values[v] + 3);
+          }
+          ui.write(`You diplomatically redirect. ${speaker.name.split(',')[0]} is frustrated but the other stakeholders are pleased.`);
           break;
         case 'balanced':
           journey.values.biodiversity = Math.min(100, journey.values.biodiversity + 3);
@@ -356,12 +413,12 @@ async function processAction(game, actionValue) {
           journey.values.communityNeeds = Math.min(100, journey.values.communityNeeds + 3);
           journey.values.firstNationsValues = Math.min(100, journey.values.firstNationsValues + 3);
           journey.hoursRemaining -= 2; // Extra 2h for balanced (total 5h)
+          ui.write('A long session, but everyone leaves feeling heard. Incremental progress on all fronts.');
           break;
       }
 
       journey.hoursRemaining -= 3;
       applyProtagonistCost(journey, { energy: 10, stress: 5 });
-      ui.write('Values workshop completed. Balance updated.');
       break;
     }
 

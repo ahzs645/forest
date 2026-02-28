@@ -403,5 +403,695 @@
         "effects": { "relationships": -5 }
       }
     ]
+  },
+  {
+    "id": "journalist_controversy",
+    "title": "Journalist Calls About Forestry Controversy",
+    "type": "stakeholder",
+    "severity": "major",
+    "probability": 0.05,
+    "description": "A journalist from a national outlet is on the phone. They have photos of a cutblock near a salmon-bearing creek and want your comment before the piece runs tonight.",
+    "options": [
+      {
+        "label": "No comment",
+        "outcome": "The story runs with \"declined to comment.\" Safe legally, but the public reads silence as guilt. Social media piles on.",
+        "effects": { "relationships": -12, "politicalCapital": -8 },
+        "hiddenOutcome": true
+      },
+      {
+        "label": "Give a detailed on-the-record statement",
+        "outcome": "You explain the science, the setback distances, the monitoring plan. The journalist uses two sentences out of context. But some readers notice the nuance.",
+        "effects": { "timeUsed": 3, "relationships": 5, "politicalCapital": -3, "compliance": 5 }
+      },
+      {
+        "label": "Redirect to PR department",
+        "outcome": "PR sends a boilerplate response. The story is bland. Your ministry contact calls to ask why you didn't handle it yourself.",
+        "effects": { "politicalCapital": -6, "relationships": -3 }
+      }
+    ]
+  },
+  {
+    "id": "competing_budget_claim",
+    "title": "Competing Department Wants Your Budget",
+    "type": "political",
+    "severity": "major",
+    "probability": 0.06,
+    "description": "The Wildfire Division is arguing to the executive that your silviculture monitoring budget should be reallocated to their prevention program. They have a compelling case and political momentum.",
+    "options": [
+      {
+        "label": "Fight it with data and lobbying",
+        "outcome": "You spend days building a counter-case and calling in favors. You keep most of your budget, but your political capital reserves are drained.",
+        "effects": { "timeUsed": 6, "budget": -1000, "politicalCapital": -12, "progress": -3 }
+      },
+      {
+        "label": "Propose a compromise split",
+        "outcome": "You offer 30% of the disputed line item. Both sides save face. Your team grumbles about doing more with less.",
+        "effects": { "budget": -4500, "crew_morale": -5, "politicalCapital": 3 }
+      },
+      {
+        "label": "Concede gracefully",
+        "outcome": "You give up the budget line with a public statement of support. The executive remembers your professionalism. Your work plan takes a hit.",
+        "effects": { "budget": -9000, "progress": -12, "politicalCapital": 10, "relationships": 5 }
+      }
+    ]
+  },
+  {
+    "id": "stakeholder_retirement",
+    "title": "Key Stakeholder Retirement",
+    "type": "stakeholder",
+    "severity": "moderate",
+    "probability": 0.05,
+    "description": "The regional biologist who has been your strongest ally for fifteen years just announced retirement. She knows every sensitive site, every handshake deal, every unwritten rule.",
+    "options": [
+      {
+        "label": "Host a farewell event",
+        "outcome": "You organize a proper send-off with speeches and gifts. She's moved. Before she leaves, she shares her private notes on every sensitive file. Invaluable.",
+        "effects": { "budget": -2000, "timeUsed": 4, "relationships": 12, "compliance": 5 }
+      },
+      {
+        "label": "Send a card and a gift",
+        "outcome": "A nice gesture. She appreciates it. You get a polite email back and a promise to be available by phone. She mostly isn't.",
+        "effects": { "budget": -100, "relationships": 2 }
+      },
+      {
+        "label": "Let it pass without ceremony",
+        "outcome": "You're busy. She notices. When her replacement calls with questions, she doesn't suggest they reach out to you.",
+        "effects": { "relationships": -10, "politicalCapital": -5 }
+      }
+    ]
+  },
+  {
+    "id": "whistleblower_allegation",
+    "title": "Whistleblower Allegation",
+    "type": "compliance",
+    "severity": "major",
+    "probability": 0.04,
+    "description": "An anonymous letter alleges that a contractor falsified replanting data on three cutblocks last season. The letter includes dates and block numbers that match your records.",
+    "options": [
+      {
+        "label": "Investigate thoroughly in-house",
+        "outcome": "You pull the files, visit the sites, interview the contractor. Two of the three allegations check out. You report the findings honestly. It costs you time and a contractor relationship, but your integrity is on the record.",
+        "effects": { "timeUsed": 8, "budget": -3000, "compliance": 15, "relationships": -5, "politicalCapital": 8 }
+      },
+      {
+        "label": "Quietly bury it",
+        "outcome": "You file the letter and hope it goes away. For three months, it does. Then the whistleblower goes to the media.",
+        "effects": { "compliance": -15, "politicalCapital": -5 },
+        "hiddenOutcome": true,
+        "schedulesEvent": "whistleblower_media_leak"
+      },
+      {
+        "label": "Forward to compliance division",
+        "outcome": "You pass it up the chain with a cover memo. The investigation takes six months. Your name stays clean, but the contractor keeps working until findings are in.",
+        "effects": { "timeUsed": 2, "compliance": 5, "politicalCapital": -3 }
+      }
+    ]
+  },
+  {
+    "id": "whistleblower_media_leak",
+    "title": "Whistleblower Story Breaks in Media",
+    "type": "compliance",
+    "severity": "major",
+    "probability": 0,
+    "description": "The same allegations you received anonymously have now been published in a provincial newspaper. The article mentions that your office received the complaint months ago. The ministry is asking questions.",
+    "options": [
+      {
+        "label": "Come clean and launch an immediate investigation",
+        "outcome": "You acknowledge the delay and throw resources at it. The damage is done but you stop the bleeding. Trust recovery will take a long time.",
+        "effects": { "timeUsed": 8, "budget": -5000, "compliance": 8, "relationships": -10, "politicalCapital": -15 }
+      },
+      {
+        "label": "Claim the letter was under review",
+        "outcome": "A half-truth. Some people buy it. The journalist doesn't. A follow-up story questions your office's processes.",
+        "effects": { "compliance": -8, "relationships": -8, "politicalCapital": -10 }
+      },
+      {
+        "label": "Resign from the file",
+        "outcome": "You ask to be reassigned. It's an admission of failure but limits further damage to you personally. Your team is left holding the bag.",
+        "effects": { "crew_morale": -20, "politicalCapital": -8, "progress": -15 }
+      }
+    ]
+  },
+  {
+    "id": "audit_scheduled",
+    "title": "Audit Scheduled",
+    "type": "compliance",
+    "severity": "minor",
+    "probability": 0.07,
+    "description": "A formal letter arrives: your district has been selected for a comprehensive compliance audit in three days. This time, it's not a surprise -- but the timeline is tight.",
+    "options": [
+      {
+        "label": "Drop everything and prepare",
+        "outcome": "You pull the team off regular work for three days of file organization and documentation review. When the auditors arrive, you're ready.",
+        "effects": { "timeUsed": 6, "progress": -8, "compliance": 10 },
+        "schedulesEvent": { "id": "auditor_arrives", "daysDelay": 3 }
+      },
+      {
+        "label": "Prepare what you can during normal hours",
+        "outcome": "You do what you can without disrupting operations. Some gaps will be visible but nothing catastrophic.",
+        "effects": { "timeUsed": 3, "compliance": 3 },
+        "schedulesEvent": { "id": "auditor_arrives", "daysDelay": 3 }
+      },
+      {
+        "label": "Request a postponement",
+        "outcome": "You cite operational pressures. They push it back two weeks. But you're now flagged as uncooperative.",
+        "effects": { "politicalCapital": -8, "compliance": -3 }
+      }
+    ]
+  },
+  {
+    "id": "auditor_arrives",
+    "title": "Auditor Arrives",
+    "type": "compliance",
+    "severity": "moderate",
+    "probability": 0,
+    "description": "The audit team is here. Three auditors, two days on-site. They want to see everything: permits, referral logs, consultation records, silviculture prescriptions.",
+    "options": [
+      {
+        "label": "Full transparency -- open the files",
+        "outcome": "You give them unrestricted access. They find a few minor issues but commend your openness. Final report is fair.",
+        "effects": { "timeUsed": 8, "compliance": 12, "politicalCapital": 5 }
+      },
+      {
+        "label": "Guided tour -- show them what's ready",
+        "outcome": "You steer them through the strong files first. They notice the steering. Some pointed questions follow.",
+        "effects": { "timeUsed": 6, "compliance": 3, "politicalCapital": -3 }
+      },
+      {
+        "label": "Assign your weakest team member as liaison",
+        "outcome": "They fumble questions and can't find documents. The auditors write it up as a systemic issue. You shouldn't have delegated this one.",
+        "effects": { "timeUsed": 2, "compliance": -10, "politicalCapital": -8, "crew_morale": -5 }
+      }
+    ]
+  },
+  {
+    "id": "fn_leadership_change",
+    "title": "First Nation Leadership Change",
+    "type": "stakeholder",
+    "severity": "moderate",
+    "probability": 0.05,
+    "description": "Election results are in: the First Nation community you work most closely with has a new Chief and Council. The previous Chief was a strong ally. The new one is an unknown quantity.",
+    "options": [
+      {
+        "label": "Request an introductory meeting immediately",
+        "outcome": "You reach out within days. The new Chief appreciates the initiative but is guarded. A formal meeting is set.",
+        "effects": { "timeUsed": 2, "relationships": 5, "politicalCapital": -2 },
+        "schedulesEvent": { "id": "new_chief_meeting", "daysDelay": 2 }
+      },
+      {
+        "label": "Send a congratulatory letter and wait",
+        "outcome": "A professional approach. The letter is acknowledged. Weeks pass before any substantive contact.",
+        "effects": { "relationships": -3 }
+      },
+      {
+        "label": "Continue business as usual",
+        "outcome": "You proceed with existing agreements. The new Chief hears about this through staff and feels disrespected.",
+        "effects": { "relationships": -10, "politicalCapital": -5 }
+      }
+    ]
+  },
+  {
+    "id": "new_chief_meeting",
+    "title": "New Chief Requests Meeting",
+    "type": "stakeholder",
+    "severity": "moderate",
+    "probability": 0,
+    "description": "The new Chief arrives at your office with two councillors. They have a list of concerns about current operations, outstanding commitments, and a new vision for co-management.",
+    "options": [
+      {
+        "label": "Listen for the full session, take notes, commit to follow-up",
+        "outcome": "Three hours later, you have a clear picture of their priorities. Some are costly. All are legitimate. A working relationship begins to form.",
+        "effects": { "timeUsed": 4, "relationships": 12, "politicalCapital": 5 }
+      },
+      {
+        "label": "Present your existing plans and ask for their input",
+        "outcome": "You show your work. They feel consulted but not heard. The tone is professional but cool.",
+        "effects": { "timeUsed": 3, "relationships": 3 }
+      },
+      {
+        "label": "Set firm boundaries on what's negotiable",
+        "outcome": "You're honest about constraints. They respect the candor but push back hard on two items. The meeting ends tense.",
+        "effects": { "timeUsed": 2, "relationships": -5, "politicalCapital": -3, "compliance": 3 }
+      }
+    ]
+  },
+  {
+    "id": "media_forestry_controversy",
+    "title": "Story Published About Your Operations",
+    "type": "stakeholder",
+    "severity": "major",
+    "probability": 0.04,
+    "description": "A story has been published about your operations. The angle depends on how past media inquiries were handled. Today's version focuses on old-growth harvesting near a community watershed.",
+    "options": [
+      {
+        "label": "Issue a detailed public rebuttal",
+        "outcome": "You publish a point-by-point response with maps and data. Forestry professionals applaud. The general public finds it defensive.",
+        "effects": { "timeUsed": 6, "relationships": -3, "politicalCapital": -5, "compliance": 5 }
+      },
+      {
+        "label": "Invite the journalist to a site tour",
+        "outcome": "Bold move. They accept. The follow-up piece is more balanced. Your team is nervous the whole time.",
+        "effects": { "timeUsed": 4, "budget": -500, "relationships": 8, "crew_morale": -3 },
+        "hiddenOutcome": true
+      },
+      {
+        "label": "Let it blow over",
+        "outcome": "You don't respond. The story cycles out of the news in a week, but it lives on in Google searches forever.",
+        "effects": { "relationships": -5, "politicalCapital": -3 }
+      }
+    ]
+  },
+  {
+    "id": "industry_award_nomination",
+    "title": "Industry Award Nomination",
+    "type": "positive",
+    "severity": "positive",
+    "probability": 0.04,
+    "description": "Your district has been nominated for the Provincial Forestry Excellence Award for your consultation framework with First Nations. The ceremony is next month.",
+    "options": [
+      {
+        "label": "Accept and attend the ceremony",
+        "outcome": "You and two team members attend. Win or lose, the recognition boosts team pride. The First Nation partners are pleased to be mentioned.",
+        "effects": { "budget": -1500, "crew_morale": 12, "relationships": 8, "politicalCapital": 5 }
+      },
+      {
+        "label": "Accept but send a team member instead",
+        "outcome": "Your senior analyst represents the district. She does well. The team notices you didn't go yourself.",
+        "effects": { "budget": -800, "crew_morale": 5, "politicalCapital": 2 }
+      },
+      {
+        "label": "Decline the nomination",
+        "outcome": "You cite humility and the team's preference to keep their heads down. Some think you're being strategic. Others think you're foolish.",
+        "effects": { "crew_morale": -3, "politicalCapital": -5 }
+      }
+    ]
+  },
+  {
+    "id": "mentor_advice",
+    "title": "Mentor Offers Advice",
+    "type": "positive",
+    "severity": "positive",
+    "probability": 0.06,
+    "description": "Your former supervisor -- now retired -- calls out of the blue. She's heard about your challenges through the grapevine and offers to buy you lunch and talk things through.",
+    "options": [
+      {
+        "label": "Accept and take the full afternoon",
+        "outcome": "Over two hours, she shares hard-won wisdom about navigating ministry politics, managing burnout, and picking your battles. You return to the office with clarity.",
+        "effects": { "timeUsed": 4, "budget": -30, "crew_morale": 5, "politicalCapital": 3 }
+      },
+      {
+        "label": "Accept but keep it short",
+        "outcome": "A quick coffee. She gives you one key insight about a pending file that saves you a week of headaches.",
+        "effects": { "timeUsed": 1, "progress": 5 }
+      },
+      {
+        "label": "Decline -- too busy right now",
+        "outcome": "She understands. The offer probably won't come again in the same way. You handle things alone.",
+        "effects": {}
+      }
+    ]
+  },
+  {
+    "id": "team_milestone",
+    "title": "Team Celebrates Milestone",
+    "type": "positive",
+    "severity": "positive",
+    "probability": 0.07,
+    "description": "Your team just processed their 100th referral this fiscal year -- a district record. Someone brought in a cake. The mood is light for the first time in weeks.",
+    "options": [
+      {
+        "label": "Join the celebration and give a short speech",
+        "outcome": "You acknowledge each person's contribution. Someone tears up. The team bonds. Afternoon productivity is zero but nobody cares.",
+        "effects": { "timeUsed": 2, "crew_morale": 15, "relationships": 3 }
+      },
+      {
+        "label": "Celebrate briefly and refocus on the backlog",
+        "outcome": "You have cake, say congrats, then remind everyone about the 50 referrals still pending. The mood deflates slightly.",
+        "effects": { "timeUsed": 1, "crew_morale": 5, "progress": 3 }
+      },
+      {
+        "label": "Skip it -- you have a meeting",
+        "outcome": "You wave from your office doorway. The team celebrates without you. They notice.",
+        "effects": { "crew_morale": -5 }
+      }
+    ]
+  },
+  {
+    "id": "data_breach_scare",
+    "title": "Data Breach Scare",
+    "type": "technical",
+    "severity": "major",
+    "probability": 0.04,
+    "description": "IT Security calls: a laptop with sensitive consultation records was left in a truck overnight. It might have been accessed. Encryption status is unclear.",
+    "options": [
+      {
+        "label": "Report immediately and notify affected parties",
+        "outcome": "You file the breach report within the hour and call every affected First Nation. It turns out the laptop was encrypted. The panic was unnecessary, but your response earns respect.",
+        "effects": { "timeUsed": 6, "relationships": 8, "compliance": 10, "politicalCapital": 3 },
+        "hiddenOutcome": true
+      },
+      {
+        "label": "Investigate quietly before reporting",
+        "outcome": "You check the encryption status first. It's encrypted -- no breach. But you delayed the mandatory report by four hours. Someone notices.",
+        "effects": { "timeUsed": 3, "compliance": -8, "politicalCapital": -5 }
+      },
+      {
+        "label": "Have IT wipe the laptop remotely",
+        "outcome": "The data is destroyed. Problem solved -- except you just wiped active case files. Two weeks of work is gone.",
+        "effects": { "progress": -12, "compliance": -3 }
+      }
+    ]
+  },
+  {
+    "id": "contractor_dispute",
+    "title": "Contractor Billing Dispute",
+    "type": "compliance",
+    "severity": "moderate",
+    "probability": 0.07,
+    "description": "Your primary silviculture contractor submitted an invoice $18,000 over the agreed contract price. They claim extra work was verbally authorized by a field supervisor. Your supervisor doesn't remember it that way.",
+    "options": [
+      {
+        "label": "Pay the full amount to preserve the relationship",
+        "outcome": "You process the invoice. The contractor is happy. Finance flags it in their quarterly review. Your budget takes the hit.",
+        "effects": { "budget": -18000, "relationships": 5, "compliance": -5 },
+        "hiddenOutcome": true
+      },
+      {
+        "label": "Negotiate a compromise",
+        "outcome": "After two tense meetings, you agree to pay half. Both sides feel they gave up too much. The contractor will think twice before doing extras without written approval.",
+        "effects": { "timeUsed": 4, "budget": -9000, "relationships": -3 }
+      },
+      {
+        "label": "Reject the overage and cite the contract",
+        "outcome": "You send a firm letter. The contractor is furious. They finish current obligations but won't bid on your next contract. Finding a replacement in this region won't be easy.",
+        "effects": { "relationships": -12, "politicalCapital": 3, "compliance": 5 }
+      }
+    ]
+  },
+  {
+    "id": "wildfire_threat",
+    "title": "Wildfire Approaching Operations Area",
+    "type": "technical",
+    "severity": "major",
+    "probability": 0.04,
+    "description": "Fire weather is extreme. A wildfire 30 km from your active cutblock is growing. Evacuation hasn't been ordered yet, but the wind forecast is bad.",
+    "options": [
+      {
+        "label": "Preemptively shut down operations and evacuate",
+        "outcome": "You pull everyone out a day before the order comes. Costs production but everyone is safe. The fire turns and misses the block entirely. Was it the right call? Yes. Will people question it? Also yes.",
+        "effects": { "progress": -15, "crew_morale": 5, "budget": -3000, "politicalCapital": -3 },
+        "hiddenOutcome": true
+      },
+      {
+        "label": "Continue with enhanced monitoring",
+        "outcome": "You keep working but double the fire watch. The wind shifts favorably. No evacuation needed. You got lucky and you know it.",
+        "effects": { "progress": 3, "crew_morale": -8 }
+      },
+      {
+        "label": "Request official guidance from the ministry",
+        "outcome": "By the time the guidance comes, you've lost a full day waiting. The recommendation is to continue with caution. Bureaucracy at its finest.",
+        "effects": { "timeUsed": 8, "progress": -5, "politicalCapital": -3 }
+      }
+    ]
+  },
+  {
+    "id": "training_opportunity",
+    "title": "Professional Development Opportunity",
+    "type": "team",
+    "severity": "minor",
+    "probability": 0.08,
+    "description": "A three-day Indigenous consultation training workshop is being offered next month. It's highly regarded but expensive, and you'd need to send at least two people to make it worthwhile.",
+    "options": [
+      {
+        "label": "Send two team members and attend yourself",
+        "outcome": "Three of you spend three days learning. The team brings back concrete improvements to consultation processes. Operations slow while you're away.",
+        "effects": { "budget": -4500, "timeUsed": 6, "crew_morale": 8, "compliance": 8, "relationships": 5, "progress": -8 }
+      },
+      {
+        "label": "Send two junior staff members",
+        "outcome": "Good development opportunity for them. They return energized with new ideas, some practical, some less so.",
+        "effects": { "budget": -3000, "crew_morale": 5, "compliance": 5, "progress": -3 }
+      },
+      {
+        "label": "Pass on it this year",
+        "outcome": "Budget preserved. Your team's consultation skills remain where they are. The district next door sends four people and won't stop talking about it.",
+        "effects": { "crew_morale": -3 }
+      }
+    ]
+  },
+  {
+    "id": "interagency_turf_war",
+    "title": "Interagency Jurisdiction Dispute",
+    "type": "political",
+    "severity": "moderate",
+    "probability": 0.05,
+    "description": "The provincial environmental assessment office claims your latest referral should have gone through their process, not yours. They're cc'ing the Deputy Minister.",
+    "options": [
+      {
+        "label": "Concede jurisdiction and hand over the file",
+        "outcome": "You give up the file. It will take them six months to process what you could have done in six weeks. But it's technically their call.",
+        "effects": { "progress": -12, "politicalCapital": 5, "compliance": 5 }
+      },
+      {
+        "label": "Push back with a legal interpretation",
+        "outcome": "Your reading of the legislation supports your position. Theirs supports theirs. It escalates to the ADM level. You spend weeks in meetings instead of doing work.",
+        "effects": { "timeUsed": 8, "politicalCapital": -10, "progress": -5, "compliance": 3 }
+      },
+      {
+        "label": "Propose joint processing",
+        "outcome": "A creative solution. Both offices contribute. It takes longer than either would alone but creates a precedent for collaboration. Or a precedent for confusion.",
+        "effects": { "timeUsed": 4, "relationships": 5, "progress": -8, "politicalCapital": 3 }
+      }
+    ]
+  },
+  {
+    "id": "elder_knowledge_offer",
+    "title": "Elder Offers Traditional Knowledge",
+    "type": "stakeholder",
+    "severity": "moderate",
+    "probability": 0.05,
+    "description": "A respected Elder from a partner Nation offers to share traditional ecological knowledge about a watershed you're planning to log. This information isn't in any database. She wants assurances about how it will be used.",
+    "options": [
+      {
+        "label": "Accept with a formal data-sharing agreement",
+        "outcome": "You work with the Nation's governance team to draft an agreement. It takes three weeks but the knowledge shared changes your harvest plan fundamentally. Two culturally significant sites are protected.",
+        "effects": { "timeUsed": 6, "budget": -2000, "relationships": 15, "compliance": 10, "progress": -10 }
+      },
+      {
+        "label": "Accept informally with verbal assurances",
+        "outcome": "She shares some information. It's helpful but incomplete -- she's holding back without a formal agreement. You adjust plans slightly.",
+        "effects": { "timeUsed": 2, "relationships": 5, "compliance": 3 }
+      },
+      {
+        "label": "Decline -- regulatory process doesn't require it",
+        "outcome": "Technically true. The Elder is deeply offended. Word spreads. Future consultation with this Nation becomes adversarial.",
+        "effects": { "relationships": -15, "politicalCapital": -8 }
+      }
+    ]
+  },
+  {
+    "id": "equipment_failure_office",
+    "title": "Critical Equipment Failure",
+    "type": "technical",
+    "severity": "moderate",
+    "probability": 0.07,
+    "description": "The large-format plotter that prints your operational maps just died. Repair estimate: two weeks. A replacement would be faster but costs $12,000. You have permit submissions due in four days.",
+    "options": [
+      {
+        "label": "Buy a replacement immediately",
+        "outcome": "New plotter arrives in two days. Maps printed, permits submitted on time. Finance asks pointed questions about unbudgeted capital purchases.",
+        "effects": { "budget": -12000, "compliance": 5, "politicalCapital": -3 }
+      },
+      {
+        "label": "Use a print shop in town",
+        "outcome": "You send files to the local print shop. Quality is acceptable but not great. Cost is moderate. You lose a day to file formatting issues.",
+        "effects": { "budget": -800, "timeUsed": 4, "progress": -3 }
+      },
+      {
+        "label": "Submit digital-only and request accommodation",
+        "outcome": "You ask the ministry if they'll accept digital maps. They will, reluctantly. It sets a precedent they're not thrilled about.",
+        "effects": { "compliance": -3, "politicalCapital": -5 }
+      }
+    ]
+  },
+  {
+    "id": "anonymous_tip_poaching",
+    "title": "Anonymous Tip About Poaching",
+    "type": "compliance",
+    "severity": "moderate",
+    "probability": 0.05,
+    "description": "A note slipped under your door reports illegal hunting in one of your active cutblocks. The description matches a vehicle belonging to a contractor's crew member.",
+    "options": [
+      {
+        "label": "Report to Conservation Officer Service",
+        "outcome": "You pass it along with the details. COS investigates. The contractor is furious that you didn't come to them first. The crew member is charged.",
+        "effects": { "timeUsed": 2, "relationships": -8, "compliance": 10, "politicalCapital": 3 },
+        "schedulesEvent": { "id": "contractor_fallout", "daysDelay": 3 }
+      },
+      {
+        "label": "Confront the contractor directly",
+        "outcome": "You raise it privately. The contractor fires the crew member immediately. No official record. The problem is solved but nothing is documented.",
+        "effects": { "timeUsed": 2, "relationships": 3, "compliance": -5 },
+        "hiddenOutcome": true
+      },
+      {
+        "label": "Increase site monitoring but take no direct action",
+        "outcome": "You add patrols. The activity stops. You'll never know if the tip was accurate. The note-leaver expected more.",
+        "effects": { "budget": -1000, "compliance": 2 }
+      }
+    ]
+  },
+  {
+    "id": "contractor_fallout",
+    "title": "Contractor Demands Meeting After Investigation",
+    "type": "stakeholder",
+    "severity": "moderate",
+    "probability": 0,
+    "description": "The contractor whose crew member was charged is at your office door. He's angry. He says your report cost him a good worker and damaged his reputation. He wants to know why you didn't call him first.",
+    "options": [
+      {
+        "label": "Explain your legal obligations calmly",
+        "outcome": "You walk through the reporting requirements. He doesn't like it but understands. The professional relationship survives, barely.",
+        "effects": { "timeUsed": 2, "relationships": -3, "compliance": 5 }
+      },
+      {
+        "label": "Apologize for the process and offer future courtesy",
+        "outcome": "You promise to give him a heads-up in the future before reporting. It's a promise that could come back to bite you.",
+        "effects": { "relationships": 5, "compliance": -8 },
+        "hiddenOutcome": true
+      },
+      {
+        "label": "Stand firm and end the conversation",
+        "outcome": "You tell him you'd do the same thing again. He storms out. His bid on your next contract will be 30% higher, if he bids at all.",
+        "effects": { "relationships": -10, "politicalCapital": 5, "compliance": 8, "budget": -3000 }
+      }
+    ]
+  },
+  {
+    "id": "grant_opportunity",
+    "title": "Unexpected Grant Opportunity",
+    "type": "positive",
+    "severity": "positive",
+    "probability": 0.05,
+    "description": "A federal climate adaptation fund just opened applications. Your riparian restoration project is a perfect fit. Deadline is in five days.",
+    "options": [
+      {
+        "label": "Drop everything and write the application",
+        "outcome": "You and your best writer spend three days on a strong submission. It's funded. $45,000 in new money for riparian work. Regular work falls behind.",
+        "effects": { "timeUsed": 6, "budget": 45000, "progress": -8, "crew_morale": 8 },
+        "hiddenOutcome": true
+      },
+      {
+        "label": "Submit a quick application with existing materials",
+        "outcome": "You cobble together something from old project descriptions. It's technically complete but uninspiring. Reviewed but not funded.",
+        "effects": { "timeUsed": 2 }
+      },
+      {
+        "label": "Pass -- can't afford the time right now",
+        "outcome": "The money goes to another district. Your riparian project stays unfunded. Sometimes the right call still feels wrong.",
+        "effects": {}
+      }
+    ]
+  },
+  {
+    "id": "office_renovation_disruption",
+    "title": "Surprise Office Renovation",
+    "type": "technical",
+    "severity": "minor",
+    "probability": 0.06,
+    "description": "Facilities just announced they're replacing the HVAC system. Your floor will be without climate control for a week. It's July. Temperatures are forecast to hit 35 degrees.",
+    "options": [
+      {
+        "label": "Set up temporary workspace in the field office",
+        "outcome": "You relocate the team to the cramped field office. Internet is slow, printer doesn't work, but you're functional and cool.",
+        "effects": { "progress": -5, "crew_morale": -3, "budget": -500 }
+      },
+      {
+        "label": "Allow remote work for the week",
+        "outcome": "Everyone works from home. Productivity varies wildly. Some people thrive. Others are unreachable by Wednesday.",
+        "effects": { "progress": -3, "crew_morale": 8 }
+      },
+      {
+        "label": "Buy portable AC units and power through",
+        "outcome": "You buy three units on a corporate card. The office is tolerable. The noise makes phone calls impossible. Finance adds it to your ledger.",
+        "effects": { "budget": -1800, "crew_morale": -5 }
+      }
+    ]
+  },
+  {
+    "id": "species_at_risk_discovery",
+    "title": "Species at Risk Discovered",
+    "type": "compliance",
+    "severity": "major",
+    "probability": 0.04,
+    "description": "A biologist conducting pre-harvest surveys found a northern goshawk nest in a cutblock scheduled for harvest next month. This triggers federal species-at-risk protections. The harvest plan, contractor mobilization, and timber sale revenue are all at stake.",
+    "options": [
+      {
+        "label": "Halt the harvest and redesign the block",
+        "outcome": "You pull the block from the schedule, establish a buffer zone, and redesign. The right thing ecologically. The timber sale volume drops by 15%. The contractor idles equipment for two weeks at your cost.",
+        "effects": { "budget": -8000, "progress": -15, "compliance": 15, "relationships": 8 }
+      },
+      {
+        "label": "Apply for an exception permit",
+        "outcome": "The legislation allows exceptions in limited circumstances. Your application takes two months. It's denied. You've lost the season.",
+        "effects": { "timeUsed": 8, "progress": -20, "politicalCapital": -8, "compliance": -5 },
+        "hiddenOutcome": true
+      },
+      {
+        "label": "Verify the identification before acting",
+        "outcome": "You send a second biologist. The ID is confirmed. You've lost three days but now have bulletproof documentation for whatever you decide next.",
+        "effects": { "timeUsed": 3, "budget": -1500, "compliance": 5 }
+      }
+    ]
+  },
+  {
+    "id": "intern_excellent_work",
+    "title": "Intern Produces Outstanding Analysis",
+    "type": "positive",
+    "severity": "positive",
+    "probability": 0.06,
+    "description": "Your summer intern, working on a side project, has produced a spatial analysis that identifies $200,000 in potential cost savings across your road maintenance program. The analysis is solid. The presentation needs work.",
+    "options": [
+      {
+        "label": "Present it to senior management with the intern",
+        "outcome": "You bring the intern to the director's meeting. She's nervous but impressive. The savings are real. Your district looks innovative. The intern gets a job offer.",
+        "effects": { "crew_morale": 10, "politicalCapital": 8, "budget": 5000, "timeUsed": 3 }
+      },
+      {
+        "label": "Present it yourself and credit the intern",
+        "outcome": "You polish the presentation and deliver it. You mention the intern's contribution. Some credit flows down. Most flows to you.",
+        "effects": { "politicalCapital": 5, "budget": 5000, "crew_morale": 3 }
+      },
+      {
+        "label": "Sit on it until the methodology is bulletproof",
+        "outcome": "You ask for more validation. By the time it's ready, budget season is over. The savings are implemented next year. The intern's contract has ended.",
+        "effects": { "compliance": 3 }
+      }
+    ]
+  },
+  {
+    "id": "cross_cultural_misunderstanding",
+    "title": "Cross-Cultural Miscommunication",
+    "type": "stakeholder",
+    "severity": "moderate",
+    "probability": 0.06,
+    "description": "A field crew inadvertently cleared brush from an area that a First Nation identifies as a ceremonial site. It wasn't marked on any maps. The community is upset. The damage is mostly to understory vegetation -- recoverable, but symbolically significant.",
+    "options": [
+      {
+        "label": "Personally visit the community to apologize",
+        "outcome": "You drive three hours, sit with the Chief and Elders, listen, and apologize without excuses. They appreciate the sincerity. A restoration plan is agreed to. The relationship heals slowly.",
+        "effects": { "timeUsed": 8, "budget": -5000, "relationships": 10, "compliance": 5, "politicalCapital": 3 }
+      },
+      {
+        "label": "Send a formal letter of apology with a restoration offer",
+        "outcome": "The letter is well-written. The community acknowledges it. But a letter is paper, not presence. The relationship remains strained.",
+        "effects": { "timeUsed": 2, "budget": -3000, "relationships": -3, "compliance": 3 }
+      },
+      {
+        "label": "Point out the site wasn't mapped and offer to map it now",
+        "outcome": "Technically accurate. Relationally catastrophic. The community sees it as blaming them for your crew's actions. Consultation on three other projects is now in jeopardy.",
+        "effects": { "relationships": -15, "politicalCapital": -10, "progress": -10 }
+      }
+    ]
   }
 ]

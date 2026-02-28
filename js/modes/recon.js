@@ -3,10 +3,29 @@
  * Field-based reconnaissance operations with crew mechanics
  */
 
-import { getCrewDisplayInfo, healCrewMember, removeStatusEffect, applyRandomInjury, crewHasRole, getCrewComment } from '../crew.js';
+import { getCrewDisplayInfo, healCrewMember, removeStatusEffect, applyRandomInjury, crewHasRole, getCrewComment, awardCrewExperience } from '../crew.js';
 import { executeFieldDay, PACE_OPTIONS, getFieldProgressInfo } from '../journey.js';
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
 import { getFormattedResourceStatus, FIELD_RESOURCES } from '../resources.js';
+
+// Block discovery flavor text — unique finds that reward exploration
+const BLOCK_DISCOVERIES = [
+  { text: 'Your crew discovers a stand of old-growth western red cedar — massive trunks untouched for centuries.', effect: 'morale', value: 12, compliance: 3 },
+  { text: 'GPS survey reveals an unmapped creek crossing. This will change the access planning.', effect: 'data', value: 5 },
+  { text: 'Old survey markers from the 1970s found nailed to a spruce. Historical data confirmed.', effect: 'data', value: 3 },
+  { text: 'An abandoned trapper\'s cabin in fair condition. Could serve as emergency shelter.', effect: 'shelter', value: 1 },
+  { text: 'Rare plant species identified — lady\'s slipper orchid. Flagged for protection.', effect: 'morale', value: 8, compliance: 5 },
+  { text: 'A natural mineral lick with fresh ungulate tracks everywhere. Great wildlife data.', effect: 'morale', value: 6 },
+  { text: 'Crew finds a cache of forgotten equipment — jerry cans and tools in a weathered tarp.', effect: 'supplies', fuel: 10, equipment: 5 },
+  { text: 'Eagle nest spotted in a veteran Douglas fir. Noted as a wildlife tree retention.', effect: 'morale', value: 5, compliance: 2 },
+  { text: 'Fresh bear den signs near the cutblock boundary. Critical safety information documented.', effect: 'data', value: 4 },
+  { text: 'Crystal-clear spring bubbling from the hillside. The crew fills water bottles and rests.', effect: 'morale', value: 10 },
+  { text: 'Petroglyphs on a rock face near the creek. Cultural heritage site flagged for protection.', effect: 'cultural', value: 8, compliance: 8 },
+  { text: 'Excellent viewpoint overlooking the entire valley. Perfect for landscape-level assessment.', effect: 'data', value: 6 },
+  { text: 'Patch of wild huckleberries — the crew takes a welcome snack break.', effect: 'food', value: 3 },
+  { text: 'Signs of recent wildfire — regeneration study opportunity identified.', effect: 'data', value: 5 },
+  { text: 'Beaver dam complex creating wetland habitat. Noted for hydrological assessment.', effect: 'data', value: 4, compliance: 3 }
+];
 
 /**
  * Run a recon day (enhanced field day with survey mechanics)
@@ -22,6 +41,45 @@ export async function runReconDay(game) {
   if (journey.currentBlockIndex > (journey.blocksAssessed || 0)) {
     journey.blocksAssessed = journey.currentBlockIndex;
     ui.write(`Block assessment complete. Total blocks assessed: ${journey.blocksAssessed}`);
+
+    // Block discovery chance (35% on each new block)
+    if (Math.random() < 0.35) {
+      if (!journey._usedDiscoveries) journey._usedDiscoveries = [];
+      const available = BLOCK_DISCOVERIES.filter((_, i) => !journey._usedDiscoveries.includes(i));
+      if (available.length > 0) {
+        const idx = BLOCK_DISCOVERIES.indexOf(available[Math.floor(Math.random() * available.length)]);
+        const discovery = BLOCK_DISCOVERIES[idx];
+        journey._usedDiscoveries.push(idx);
+        ui.write('');
+        ui.writePositive(`DISCOVERY: ${discovery.text}`);
+
+        // Apply discovery effects
+        if (discovery.effect === 'morale' && journey.crew) {
+          for (const m of journey.crew) {
+            if (m.isActive) m.morale = Math.min(100, m.morale + (discovery.value || 5));
+          }
+        }
+        if (discovery.effect === 'supplies') {
+          if (discovery.fuel) journey.resources.fuel += discovery.fuel;
+          if (discovery.equipment) journey.resources.equipment = Math.min(100, journey.resources.equipment + discovery.equipment);
+        }
+        if (discovery.effect === 'food') {
+          journey.resources.food += (discovery.value || 3);
+        }
+        if (discovery.compliance) {
+          // Track for scoring
+          if (!journey.complianceBonus) journey.complianceBonus = 0;
+          journey.complianceBonus += discovery.compliance;
+        }
+
+        // Award XP to spotter if present
+        const spotter = journey.crew?.find(m => m.isActive && m.role === 'spotter');
+        if (spotter) {
+          const xpMsg = awardCrewExperience(spotter);
+          if (xpMsg) ui.write(xpMsg);
+        }
+      }
+    }
   }
 }
 
@@ -196,10 +254,7 @@ async function runFieldDay(game) {
 
     ui.updateAllStatus(journey);
 
-    // If there are still hours, prompt between actions
-    if (journey.hoursRemaining > 0) {
-      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
-    }
+    // Auto-continue between actions (no friction prompt)
   }
 
   // End of day — if we haven't traveled, still advance the day
@@ -237,8 +292,17 @@ function displayDayHeader(ui, journey) {
   const progressBar = '\u2588'.repeat(filledWidth) + '\u2591'.repeat(progressBarWidth - filledWidth);
   ui.write(`[${progressBar}] ${progressInfo.overallProgress}% | ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
 
-  // Weather and terrain
-  ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'} | Hours: ${journey.hoursRemaining || 0}h`);
+  // Weather, terrain, and forecast
+  const weatherName = journey.weather?.name || 'Clear';
+  const terrainName = currentBlock?.terrain || 'unknown';
+  const forecast = journey.weatherForecast ? ` | Tomorrow: ${journey.weatherForecast}` : '';
+  ui.write(`Weather: ${weatherName} | Terrain: ${terrainName} | Hours: ${journey.hoursRemaining || 0}h${forecast}`);
+
+  // Travel conditions modifier
+  const weatherMod = journey.weather?.travelModifier || 1;
+  const conditionPct = Math.round(weatherMod * 100);
+  const conditionLabel = conditionPct >= 90 ? 'GOOD' : conditionPct >= 60 ? 'FAIR' : conditionPct >= 40 ? 'POOR' : 'SEVERE';
+  ui.write(`Travel Conditions: ${conditionLabel} (${conditionPct}% of normal speed)`);
   ui.write('');
 
   // Compact resources
