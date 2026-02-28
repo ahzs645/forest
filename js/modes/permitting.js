@@ -393,8 +393,14 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode) {
     ui.writeDanger('An error occurred. Please try again.');
   }
 
-  // Pause before next day
-  await ui.promptChoice('', [{ label: 'Start next day...', value: 'next' }]);
+  // Contextual continue with deadline info (Phase 6.1)
+  const daysLeft = journey.deadline - journey.day;
+  const permitPct = journey.permits.target > 0
+    ? Math.round((journey.permits.approved / journey.permits.target) * 100) : 0;
+  const continueLabel = daysLeft > 0
+    ? `Start next day... (${daysLeft} days left, ${permitPct}% approved)`
+    : 'Start next day... (DEADLINE)';
+  await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
 }
 
 /**

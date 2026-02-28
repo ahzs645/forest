@@ -1,73 +1,39 @@
 /**
  * Planning Mode Runner
  * Protagonist-based strategic planning for landscape-level forest plans
- * YOU are the Strategic Planner - no crew, just resources and decisions
+ * Multi-action days with values tradeoffs
  */
 
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
 
 /**
- * Run a planning day (landscape plan development mode)
+ * Run a planning day with multi-action system
  * @param {Object} game - Game instance
  */
 export async function runPlanningDay(game) {
   const { ui, journey } = game;
   const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
 
-  ui.clear();
-  ui.writeHeader(`DAY ${journey.day} - STRATEGIC PLANNING`);
-
-  if (seasonInfo) {
-    ui.write(`${seasonInfo.icon} ${seasonInfo.name} - Year ${seasonInfo.year}`);
-  }
-  ui.write('');
-
-  // Show protagonist status (if using protagonist model)
-  if (journey.protagonist) {
-    displayProtagonistStatus(ui, journey.protagonist);
+  // Reset hours for new day
+  if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
+    journey.hoursRemaining = 8;
   }
 
-  // Show plan phase
-  const phaseNames = {
-    data_gathering: 'Data Gathering',
-    analysis: 'Analysis',
-    stakeholder_review: 'Stakeholder Review',
-    ministerial_approval: 'Ministerial Approval'
-  };
+  // Apply daily values consequences (Phase 4.1)
+  applyValuesConsequences(journey);
 
-  ui.writeDivider(`PHASE: ${phaseNames[journey.plan.phase] || journey.plan.phase}`);
-  ui.write(`Data Completeness: ${journey.plan.dataCompleteness}%`);
-  ui.write(`Analysis Quality: ${journey.plan.analysisQuality}%`);
-  ui.write(`Stakeholder Buy-in: ${journey.plan.stakeholderBuyIn}%`);
-  ui.write(`Ministerial Confidence: ${journey.plan.ministerialConfidence}%`);
-  ui.write('');
-
-  // Show values balance
-  ui.writeDivider('VALUES BALANCE');
-  ui.write(`Biodiversity: ${journey.values.biodiversity}%`);
-  ui.write(`Timber Supply: ${journey.values.timberSupply}%`);
-  ui.write(`Community Needs: ${journey.values.communityNeeds}%`);
-  ui.write(`First Nations: ${journey.values.firstNationsValues}%`);
-  ui.write('');
-
-  // Show resources
-  ui.writeDivider('RESOURCES');
-  ui.write(`Budget: $${journey.resources.budget.toLocaleString()}`);
-  ui.write(`Political Capital: ${journey.resources.politicalCapital}`);
-  ui.write(`Data Credits: ${journey.resources.dataCredits}`);
-  ui.write(`Hours Remaining: ${journey.hoursRemaining}`);
-  ui.write('');
-
-  // Check for event
+  // Check for event at start of day
   const event = checkForEvent(journey);
   if (event) {
+    displayPlanningHeader(ui, journey, seasonInfo);
     await handleEvent(game, event);
     if (game.gameOver) return;
   }
 
-  // Check protagonist energy if using protagonist model
+  // Check protagonist energy
   if (journey.protagonist && journey.protagonist.energy <= 0) {
+    displayPlanningHeader(ui, journey, seasonInfo);
     ui.writeWarning('You are exhausted. Taking the day to recover.');
     journey.protagonist.energy = 30;
     journey.protagonist.stress = Math.max(0, journey.protagonist.stress - 20);
@@ -75,118 +41,211 @@ export async function runPlanningDay(game) {
     return;
   }
 
-  // Actions based on phase
-  const actionOptions = buildActionOptions(journey);
+  // Multi-action loop (Phase 2.3)
+  while (journey.hoursRemaining > 0) {
+    displayPlanningHeader(ui, journey, seasonInfo);
 
-  const action = await ui.promptChoice('Choose your action:', actionOptions);
+    // Check protagonist energy mid-day
+    if (journey.protagonist && journey.protagonist.energy <= 0) {
+      ui.writeWarning('You are exhausted. The rest of the day is lost to recovery.');
+      journey.protagonist.energy = 15;
+      break;
+    }
 
-  // Process action
-  await processAction(game, action.value);
+    const actionOptions = buildActionOptions(journey);
 
-  // End of day processing
-  if (journey.hoursRemaining <= 0 || action.value === 'end') {
-    await advanceToNextDay(game);
+    const action = await ui.promptChoice(`${journey.hoursRemaining}h remaining:`, actionOptions);
+
+    if (action.value === 'end') {
+      break;
+    }
+
+    ui.write('');
+    await processAction(game, action.value);
+
+    ui.updateAllStatus(journey);
+
+    if (journey.hoursRemaining > 0) {
+      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
+    }
   }
+
+  // End of day
+  await advanceToNextDay(game);
 
   // Check game over conditions
   checkGameOver(game);
 
   ui.updateAllStatus(journey);
-  await ui.promptChoice('', [{ label: 'Continue...', value: 'next' }]);
+
+  // Contextual continue (Phase 6.1)
+  const phaseNames = {
+    data_gathering: 'Data Gathering',
+    analysis: 'Analysis',
+    stakeholder_review: 'Stakeholder Review',
+    ministerial_approval: 'Ministerial Approval'
+  };
+  const continueLabel = `Continue... (Phase: ${phaseNames[journey.plan.phase] || journey.plan.phase}, Day ${journey.day})`;
+  await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
 }
 
 /**
- * Display protagonist status
- * @param {Object} ui - UI instance
- * @param {Object} protagonist - Protagonist state
+ * Display compact planning header (Phase 6.2)
  */
-function displayProtagonistStatus(ui, protagonist) {
-  ui.writeDivider('YOUR STATUS');
+function displayPlanningHeader(ui, journey, seasonInfo) {
+  ui.clear();
+  ui.writeHeader(`DAY ${journey.day} - STRATEGIC PLANNING`);
 
-  // Energy bar
-  const energyBar = createBar(protagonist.energy, 10);
-  ui.write(`Energy: [${energyBar}] ${protagonist.energy}%`);
+  if (seasonInfo) {
+    ui.write(`${seasonInfo.icon} ${seasonInfo.name} - Year ${seasonInfo.year} | Hours: ${journey.hoursRemaining}h`);
+  }
+  ui.write('');
 
-  // Stress level
-  const stressLevel = protagonist.stress > 70 ? 'HIGH' : protagonist.stress > 40 ? 'MODERATE' : 'LOW';
-  ui.write(`Stress: ${stressLevel} (${protagonist.stress}%)`);
-
-  // Reputation
-  ui.write(`Reputation: ${protagonist.reputation}`);
-
-  // Expertise
-  if (protagonist.expertise) {
-    const skills = Object.entries(protagonist.expertise)
-      .map(([skill, value]) => `${capitalize(skill)}: ${value}`)
-      .join(' | ');
-    ui.write(`Expertise: ${skills}`);
+  // Protagonist status
+  if (journey.protagonist) {
+    const energyBar = createBar(journey.protagonist.energy, 10);
+    const stressLevel = journey.protagonist.stress > 70 ? 'HIGH' : journey.protagonist.stress > 40 ? 'MODERATE' : 'LOW';
+    ui.write(`Energy: [${energyBar}] ${journey.protagonist.energy}% | Stress: ${stressLevel} (${journey.protagonist.stress}%) | Rep: ${journey.protagonist.reputation}`);
   }
 
+  // Phase and plan metrics
+  const phaseNames = {
+    data_gathering: 'Data Gathering',
+    analysis: 'Analysis',
+    stakeholder_review: 'Stakeholder Review',
+    ministerial_approval: 'Ministerial Approval'
+  };
+  ui.write(`Phase: ${phaseNames[journey.plan.phase] || journey.plan.phase}`);
+  ui.write(`Data: ${journey.plan.dataCompleteness}% | Analysis: ${journey.plan.analysisQuality}% | Buy-in: ${journey.plan.stakeholderBuyIn}% | Confidence: ${journey.plan.ministerialConfidence}%`);
+
+  // Values balance (Phase 4.1 - these now matter)
+  ui.write(`Values: Bio ${journey.values.biodiversity}% | Timber ${journey.values.timberSupply}% | Community ${journey.values.communityNeeds}% | FN ${journey.values.firstNationsValues}%`);
+
+  // Resources
+  ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Political Capital: ${journey.resources.politicalCapital} | Data: ${journey.resources.dataCredits}`);
   ui.write('');
 }
 
 /**
+ * Apply daily consequences from values imbalance (Phase 4.1)
+ */
+function applyValuesConsequences(journey) {
+  // Low values create daily penalties
+  if (journey.values.biodiversity < 30) {
+    journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 2);
+  }
+  if (journey.values.timberSupply < 30) {
+    journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);
+  }
+  if (journey.values.firstNationsValues < 30 && journey.plan.phase === 'stakeholder_review') {
+    // Stalls stakeholder phase progress
+    journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 3);
+  }
+  if (journey.values.communityNeeds < 30 && journey.protagonist) {
+    journey.protagonist.stress = Math.min(100, journey.protagonist.stress + 3);
+  }
+}
+
+/**
  * Build action options based on current phase and resources
- * @param {Object} journey - Journey state
- * @returns {Array} Action options
  */
 function buildActionOptions(journey) {
   const actionOptions = [];
   const hoursLeft = journey.hoursRemaining || 8;
 
+  // Phase-specific primary actions
   if (journey.plan.phase === 'data_gathering' && journey.resources.dataCredits > 0 && hoursLeft >= 3) {
     actionOptions.push({
-      label: 'Gather Data',
-      description: 'Compile LiDAR, inventory, and baseline data (3 hrs)',
+      label: 'Gather Data (3h)',
+      description: 'Compile LiDAR, inventory, and baseline data',
       value: 'gather_data'
     });
   }
 
   if (journey.plan.phase === 'analysis' && hoursLeft >= 4) {
     actionOptions.push({
-      label: 'Run Analysis',
-      description: 'Spatial analysis and modeling (4 hrs)',
+      label: 'Run Analysis (4h)',
+      description: 'Spatial analysis and modeling',
       value: 'analyze'
     });
   }
 
   if (journey.plan.phase === 'stakeholder_review' && hoursLeft >= 4) {
-    actionOptions.push({
-      label: 'Stakeholder Session',
-      description: 'Host consultation session (4 hrs)',
-      value: 'stakeholder'
-    });
+    // Check values gate (Phase 4.1)
+    const valuesOk = journey.values.biodiversity >= 25 && journey.values.timberSupply >= 25 &&
+      journey.values.communityNeeds >= 25 && journey.values.firstNationsValues >= 25;
+    if (valuesOk) {
+      actionOptions.push({
+        label: 'Stakeholder Session (4h)',
+        description: 'Host consultation session',
+        value: 'stakeholder'
+      });
+    } else {
+      actionOptions.push({
+        label: 'Stakeholder Session (BLOCKED)',
+        description: 'All values must be ≥25% to proceed',
+        value: 'stakeholder_blocked'
+      });
+    }
   }
 
   if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 6) {
+    const valuesOk = journey.values.biodiversity >= 25 && journey.values.timberSupply >= 25 &&
+      journey.values.communityNeeds >= 25 && journey.values.firstNationsValues >= 25;
+    if (valuesOk) {
+      actionOptions.push({
+        label: 'Prepare Submission (6h)',
+        description: 'Package plan for ministry',
+        value: 'submit'
+      });
+    } else {
+      actionOptions.push({
+        label: 'Prepare Submission (BLOCKED)',
+        description: 'All values must be ≥25% to submit',
+        value: 'submit_blocked'
+      });
+    }
+  }
+
+  // Values workshop - now with tradeoffs (Phase 4.1)
+  if (hoursLeft >= 3) {
     actionOptions.push({
-      label: 'Prepare Submission',
-      description: 'Package plan for ministry (6 hrs)',
-      value: 'submit'
+      label: 'Values Workshop (3h)',
+      description: 'Balance competing interests (tradeoffs required)',
+      value: 'values'
     });
   }
 
-  // Always available actions
+  // Timber assessment (new - Phase 4.1)
   if (hoursLeft >= 3) {
     actionOptions.push({
-      label: 'Values Workshop',
-      description: 'Balance competing interests (3 hrs)',
-      value: 'values'
+      label: 'Timber Assessment (3h)',
+      description: 'Assess timber supply (+timber, -biodiversity)',
+      value: 'timber'
+    });
+  }
+
+  // Quick actions (Phase 2.3)
+  if (hoursLeft >= 1) {
+    actionOptions.push({
+      label: 'Check Email (1h)',
+      description: 'Handle correspondence (random small effect)',
+      value: 'email'
     });
   }
 
   if (hoursLeft >= 2) {
     actionOptions.push({
-      label: 'Network',
-      description: 'Build political capital (2 hrs)',
+      label: 'Network (2h)',
+      description: 'Build political capital',
       value: 'network'
     });
   }
 
   if (hoursLeft >= 2 && journey.protagonist) {
     actionOptions.push({
-      label: 'Take a Break',
-      description: 'Reduce stress, recover energy (2 hrs)',
+      label: 'Take a Break (2h)',
+      description: 'Reduce stress, recover energy',
       value: 'rest'
     });
   }
@@ -202,8 +261,6 @@ function buildActionOptions(journey) {
 
 /**
  * Process a selected action
- * @param {Object} game - Game instance
- * @param {string} actionValue - Selected action value
  */
 async function processAction(game, actionValue) {
   const { ui, journey } = game;
@@ -217,7 +274,7 @@ async function processAction(game, actionValue) {
       ui.write(`Data gathering progressed. Completeness: ${journey.plan.dataCompleteness}%`);
       if (journey.plan.dataCompleteness >= 80) {
         journey.plan.phase = 'analysis';
-        ui.write('Data phase complete! Moving to Analysis.');
+        ui.writePositive('Data phase complete! Moving to Analysis.');
       }
       break;
 
@@ -228,7 +285,7 @@ async function processAction(game, actionValue) {
       ui.write(`Analysis progressed. Quality: ${journey.plan.analysisQuality}%`);
       if (journey.plan.analysisQuality >= 80) {
         journey.plan.phase = 'stakeholder_review';
-        ui.write('Analysis complete! Moving to Stakeholder Review.');
+        ui.writePositive('Analysis complete! Moving to Stakeholder Review.');
       }
       break;
 
@@ -237,15 +294,20 @@ async function processAction(game, actionValue) {
       journey.resources.politicalCapital -= 5;
       journey.hoursRemaining -= 4;
       applyProtagonistCost(journey, { energy: 20, stress: 15 });
-      // Increase reputation on success
       if (journey.protagonist) {
         journey.protagonist.reputation = Math.min(100, journey.protagonist.reputation + 3);
       }
       ui.write(`Stakeholder buy-in improved to ${journey.plan.stakeholderBuyIn}%`);
       if (journey.plan.stakeholderBuyIn >= 75) {
         journey.plan.phase = 'ministerial_approval';
-        ui.write('Stakeholder review complete! Moving to Ministerial Approval.');
+        ui.writePositive('Stakeholder review complete! Moving to Ministerial Approval.');
       }
+      break;
+
+    case 'stakeholder_blocked':
+    case 'submit_blocked':
+      ui.writeWarning('Cannot proceed. All four values (biodiversity, timber, community, First Nations) must be at least 25%.');
+      ui.write('Use Values Workshop or Timber Assessment to rebalance.');
       break;
 
     case 'submit':
@@ -260,17 +322,80 @@ async function processAction(game, actionValue) {
       }
       break;
 
-    case 'values':
-      journey.values.biodiversity = Math.min(100, journey.values.biodiversity + 5);
-      journey.values.communityNeeds = Math.min(100, journey.values.communityNeeds + 5);
-      journey.values.firstNationsValues = Math.min(100, journey.values.firstNationsValues + 5);
+    case 'values': {
+      // Values workshop with tradeoffs (Phase 4.1)
+      const choices = [
+        { label: 'Emphasize Biodiversity', description: '+8 bio, -3 timber', value: 'bio' },
+        { label: 'Emphasize Timber Supply', description: '+8 timber, -3 bio', value: 'timber_v' },
+        { label: 'Emphasize Community', description: '+8 community, -3 FN values', value: 'community' },
+        { label: 'Emphasize First Nations', description: '+8 FN values, -3 community', value: 'fn' },
+        { label: 'Balanced Approach (5h total)', description: '+3 all values', value: 'balanced' }
+      ];
+      const pick = await ui.promptChoice('Choose values focus:', choices);
+
+      switch (pick.value) {
+        case 'bio':
+          journey.values.biodiversity = Math.min(100, journey.values.biodiversity + 8);
+          journey.values.timberSupply = Math.max(0, journey.values.timberSupply - 3);
+          break;
+        case 'timber_v':
+          journey.values.timberSupply = Math.min(100, journey.values.timberSupply + 8);
+          journey.values.biodiversity = Math.max(0, journey.values.biodiversity - 3);
+          break;
+        case 'community':
+          journey.values.communityNeeds = Math.min(100, journey.values.communityNeeds + 8);
+          journey.values.firstNationsValues = Math.max(0, journey.values.firstNationsValues - 3);
+          break;
+        case 'fn':
+          journey.values.firstNationsValues = Math.min(100, journey.values.firstNationsValues + 8);
+          journey.values.communityNeeds = Math.max(0, journey.values.communityNeeds - 3);
+          break;
+        case 'balanced':
+          journey.values.biodiversity = Math.min(100, journey.values.biodiversity + 3);
+          journey.values.timberSupply = Math.min(100, journey.values.timberSupply + 3);
+          journey.values.communityNeeds = Math.min(100, journey.values.communityNeeds + 3);
+          journey.values.firstNationsValues = Math.min(100, journey.values.firstNationsValues + 3);
+          journey.hoursRemaining -= 2; // Extra 2h for balanced (total 5h)
+          break;
+      }
+
       journey.hoursRemaining -= 3;
       applyProtagonistCost(journey, { energy: 10, stress: 5 });
-      ui.write('Values workshop improved stakeholder alignment.');
+      ui.write('Values workshop completed. Balance updated.');
+      break;
+    }
+
+    case 'timber':
+      // New timber assessment action (Phase 4.1)
+      journey.values.timberSupply = Math.min(100, journey.values.timberSupply + 15);
+      journey.values.biodiversity = Math.max(0, journey.values.biodiversity - 5);
+      journey.hoursRemaining -= 3;
+      applyProtagonistCost(journey, { energy: 10, stress: 5 });
+      ui.write(`Timber supply assessment completed. Timber: ${journey.values.timberSupply}%, Biodiversity: ${journey.values.biodiversity}%`);
       break;
 
+    case 'email': {
+      // Quick email check with random effect (Phase 2.3)
+      journey.hoursRemaining -= 1;
+      applyProtagonistCost(journey, { energy: 3, stress: 2 });
+      const roll = Math.random();
+      if (roll < 0.3) {
+        journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + 3);
+        ui.write('Useful data attachment in an email. Data completeness +3%.');
+      } else if (roll < 0.5) {
+        journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 2);
+        ui.write('Supportive email from a stakeholder. Political capital +2.');
+      } else if (roll < 0.7) {
+        applyProtagonistCost(journey, { energy: 0, stress: 5 });
+        ui.write('Angry email from a licensee. Stress increased.');
+      } else {
+        ui.write('Nothing urgent in the inbox.');
+      }
+      break;
+    }
+
     case 'network':
-      journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 8);
+      journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 5);
       journey.hoursRemaining -= 2;
       applyProtagonistCost(journey, { energy: 8, stress: 3 });
       if (journey.protagonist) {
@@ -293,14 +418,8 @@ async function processAction(game, actionValue) {
   }
 }
 
-/**
- * Apply protagonist costs (energy, stress)
- * @param {Object} journey - Journey state
- * @param {Object} costs - { energy, stress }
- */
 function applyProtagonistCost(journey, costs) {
   if (!journey.protagonist) return;
-
   if (costs.energy) {
     journey.protagonist.energy = Math.max(0, journey.protagonist.energy - costs.energy);
   }
@@ -309,10 +428,6 @@ function applyProtagonistCost(journey, costs) {
   }
 }
 
-/**
- * Advance to next day
- * @param {Object} game - Game instance
- */
 async function advanceToNextDay(game) {
   const { ui, journey } = game;
 
@@ -337,10 +452,6 @@ async function advanceToNextDay(game) {
   }
 }
 
-/**
- * Check game over conditions
- * @param {Object} game - Game instance
- */
 function checkGameOver(game) {
   const journey = game.journey;
 
@@ -354,18 +465,12 @@ function checkGameOver(game) {
     journey.gameOverReason = 'Lost political support';
   }
 
-  // Protagonist burnout
   if (journey.protagonist && journey.protagonist.stress >= 100) {
     journey.isGameOver = true;
     journey.gameOverReason = 'Burnout - you need to step back from this project';
   }
 }
 
-/**
- * Handle an event
- * @param {Object} game - Game instance
- * @param {Object} event - Event to handle
- */
 async function handleEvent(game, event) {
   const { ui, journey } = game;
   const formatted = formatEventForDisplay(event, journey.journeyType);
@@ -375,9 +480,7 @@ async function handleEvent(game, event) {
   ui.write(formatted.description);
   ui.write('');
 
-  // Build options
   const options = formatted.options.map((opt, index) => {
-    const raw = event.options[index] || {};
     const pieces = [];
     if (opt.hint) pieces.push(opt.hint);
     return {
@@ -404,23 +507,7 @@ async function handleEvent(game, event) {
   }
 }
 
-/**
- * Create a visual progress bar
- * @param {number} value - Current value (0-100)
- * @param {number} width - Bar width in characters
- * @returns {string} Progress bar string
- */
 function createBar(value, width) {
   const filled = Math.round((value / 100) * width);
   return '█'.repeat(filled) + '░'.repeat(width - filled);
-}
-
-/**
- * Capitalize first letter
- * @param {string} str - String to capitalize
- * @returns {string} Capitalized string
- */
-function capitalize(str) {
-  if (!str) return '';
-  return str.charAt(0).toUpperCase() + str.slice(1);
 }

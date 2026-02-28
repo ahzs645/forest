@@ -10,6 +10,18 @@ import { PACE_OPTIONS, syncBlocksFromDistance } from './journey.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from './resources.js';
 import { LEGACY_ILLEGAL_ACTS } from './data/legacyIllegalActs.js';
 
+// Journey type categories — used to route events and effects correctly
+const FIELD_JOURNEY_TYPES = new Set(['field', 'recon', 'silviculture']);
+const DESK_JOURNEY_TYPES = new Set(['desk', 'permitting', 'planning']);
+
+function isFieldJourney(journeyType) {
+  return FIELD_JOURNEY_TYPES.has(journeyType);
+}
+
+function isDeskJourney(journeyType) {
+  return DESK_JOURNEY_TYPES.has(journeyType);
+}
+
 const GENERIC_RADIO_TASKS = [
   'cruising a transect',
   'checking access lines',
@@ -33,9 +45,10 @@ const RADIO_TASKS_BY_ROLE = {
  * @returns {Object|null} Event to resolve or null
  */
 export function checkForEvent(journey) {
-  const event = journey.journeyType === 'field' ? checkFieldEvent(journey) : checkDeskEvent(journey);
+  const isField = isFieldJourney(journey.journeyType);
+  const event = isField ? checkFieldEvent(journey) : checkDeskEvent(journey);
   if (event) {
-    return journey.journeyType === 'field' ? attachFieldReporter(event, journey) : event;
+    return isField ? attachFieldReporter(event, journey) : event;
   }
   return maybeCreateTemptationEvent(journey);
 }
@@ -83,9 +96,16 @@ function checkDeskEvent(journey) {
   const daysRemaining = journey.deadline - journey.day;
   const stressModifier = daysRemaining < 5 ? 1.5 : daysRemaining < 10 ? 1.2 : 1;
 
-  // Low morale increases negative events
-  const avgMorale = journey.crew.reduce((sum, m) => sum + (m.isActive ? m.morale : 0), 0) /
-    journey.crew.filter(m => m.isActive).length || 50;
+  // Low morale increases negative events (handle protagonist-only modes without crew)
+  let avgMorale = 50;
+  if (journey.crew && journey.crew.length > 0) {
+    const active = journey.crew.filter(m => m.isActive);
+    avgMorale = active.length > 0
+      ? active.reduce((sum, m) => sum + m.morale, 0) / active.length
+      : 50;
+  } else if (journey.protagonist) {
+    avgMorale = 100 - (journey.protagonist.stress || 0);
+  }
   const moraleModifier = avgMorale < 40 ? 1.3 : 1;
 
   return selectRandomDeskEvent(applicableEvents, {
@@ -122,7 +142,7 @@ function maybeCreateTemptationEvent(journey) {
     return null;
   }
 
-  const chance = journey.journeyType === 'desk' ? 0.03 : 0.04;
+  const chance = isDeskJourney(journey.journeyType) ? 0.03 : 0.04;
   if (Math.random() > chance) return null;
 
   const roleId = journey.roleId || journey.role?.id;
@@ -136,7 +156,7 @@ function maybeCreateTemptationEvent(journey) {
   const act = pool[Math.floor(Math.random() * pool.length)];
   if (!act) return null;
 
-  const isDesk = journey.journeyType === 'desk';
+  const isDesk = isDeskJourney(journey.journeyType);
   const baseGain = isDesk ? 3500 : 650;
   const swing = isDesk ? 2500 : 550;
   const gain = Math.max(0, Math.round(baseGain + (Math.random() * 2 - 1) * swing));
@@ -262,7 +282,7 @@ export function resolveEvent(journey, event, option) {
   }
 
   // Handle time cost for field events
-  if (journey.journeyType === 'field' && typeof option.timeUsed === 'number') {
+  if (isFieldJourney(journey.journeyType) && typeof option.timeUsed === 'number') {
     const hours = Math.max(0, Math.min(8, option.timeUsed));
     journey.travelDelayHours = Math.min(8, (journey.travelDelayHours || 0) + hours);
     if (hours > 0) {
@@ -306,7 +326,7 @@ export function resolveEvent(journey, event, option) {
  */
 function applyEventEffects(journey, effects, messages) {
   // Resource effects (field)
-  if (journey.journeyType === 'field') {
+  if (isFieldJourney(journey.journeyType)) {
     if (typeof effects.budget === 'number') {
       journey.resources.budget = Math.max(0,
         Math.min(FIELD_RESOURCES.budget.max, journey.resources.budget + effects.budget));
@@ -338,7 +358,7 @@ function applyEventEffects(journey, effects, messages) {
   }
 
   // Resource effects (desk)
-  if (journey.journeyType === 'desk') {
+  if (isDeskJourney(journey.journeyType)) {
     if (typeof effects.budget === 'number') {
       journey.resources.budget = Math.max(0,
         Math.min(DESK_RESOURCES.budget.max, journey.resources.budget + effects.budget));
@@ -358,7 +378,7 @@ function applyEventEffects(journey, effects, messages) {
 
   // Progress effects
   if (effects.progress) {
-    if (journey.journeyType === 'field') {
+    if (isFieldJourney(journey.journeyType)) {
       journey.distanceTraveled = Math.max(0, journey.distanceTraveled + effects.progress);
       syncBlocksFromDistance(journey);
     } else {
@@ -391,7 +411,7 @@ function applyEventEffects(journey, effects, messages) {
   // Compliance/relationships (legacy compatibility)
   if (effects.compliance) {
     // Map to political capital for desk or just note for field
-    if (journey.journeyType === 'desk') {
+    if (isDeskJourney(journey.journeyType)) {
       journey.resources.politicalCapital = Math.max(0,
         Math.min(100, journey.resources.politicalCapital + effects.compliance));
     }
@@ -399,7 +419,7 @@ function applyEventEffects(journey, effects, messages) {
 
   if (effects.relationships) {
     // Affect stakeholder moods for desk
-    if (journey.journeyType === 'desk') {
+    if (isDeskJourney(journey.journeyType)) {
       for (const key of Object.keys(journey.stakeholders)) {
         journey.stakeholders[key].mood = Math.max(0,
           Math.min(100, journey.stakeholders[key].mood + Math.floor(effects.relationships / 2)));
@@ -478,7 +498,7 @@ function pickMultipleCrewMembers(crew, count) {
  * @returns {Object|null} Event or null
  */
 export function getEventById(eventId, journeyType) {
-  const events = journeyType === 'field' ? FIELD_EVENTS : DESK_EVENTS;
+  const events = isFieldJourney(journeyType) ? FIELD_EVENTS : DESK_EVENTS;
   return events.find(e => e.id === eventId) || null;
 }
 
@@ -505,7 +525,7 @@ export function checkScheduledEvents(journey) {
  * @returns {Object} Display-ready event info
  */
 export function formatEventForDisplay(event, journeyType = 'field') {
-  const reporter = journeyType === 'field' ? event.reporter : null;
+  const reporter = isFieldJourney(journeyType) ? event.reporter : null;
   const roleLabel = reporter?.role || 'Crew';
   const taskClause = reporter?.task ? ` while ${reporter.task}` : '';
   const description = reporter
@@ -531,7 +551,7 @@ export function formatEventForDisplay(event, journeyType = 'field') {
  */
 function getOptionHint(option, journeyType) {
   const hints = [];
-  const isField = journeyType === 'field';
+  const isField = isFieldJourney(journeyType);
 
   if (option.effects) {
     // Resource costs

@@ -3,7 +3,7 @@
  * Field-based reconnaissance operations with crew mechanics
  */
 
-import { getCrewDisplayInfo, healCrewMember, removeStatusEffect, applyRandomInjury, crewHasRole } from '../crew.js';
+import { getCrewDisplayInfo, healCrewMember, removeStatusEffect, applyRandomInjury, crewHasRole, getCrewComment } from '../crew.js';
 import { executeFieldDay, PACE_OPTIONS, getFieldProgressInfo } from '../journey.js';
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
 import { getFormattedResourceStatus, FIELD_RESOURCES } from '../resources.js';
@@ -26,141 +26,326 @@ export async function runReconDay(game) {
 }
 
 /**
- * Run a field day with travel, events, and actions
+ * Run a field day with multi-action system
+ * Players get 9 hours per shift, travel costs 4-6h, camp actions fill remaining time
  * @param {Object} game - Game instance
  */
 async function runFieldDay(game) {
   const { ui, journey } = game;
+
+  // Initialize hours for the day
+  if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
+    journey.hoursRemaining = 9;
+  }
+
+  let hasTraveled = false;
+
+  // Check for random event at start of day
+  const event = checkForEvent(journey);
+  if (event) {
+    displayDayHeader(ui, journey);
+    await handleEvent(game, event);
+    if (game.gameOver) return;
+  }
+
+  // Check for weather-forced camp day (Phase 3.3)
+  const weatherForcesCamp = journey.weather &&
+    (journey.weather.id === 'storm' || journey.weather.id === 'heavy_snow');
+
+  if (weatherForcesCamp) {
+    displayDayHeader(ui, journey);
+    ui.writeDanger(`${journey.weather.name} has grounded all operations. The crew hunkers down.`);
+    ui.write('');
+    journey.hoursRemaining = 0;
+    const result = executeFieldDay(journey, 'resting');
+    for (const msg of result.messages) ui.write(msg);
+    ui.updateAllStatus(journey);
+
+    // Contextual continue (Phase 6.1)
+    const nextBlock = journey.blocks[journey.currentBlockIndex];
+    await ui.promptChoice('', [{
+      label: `Continue... (Tomorrow: ${nextBlock?.name || 'Unknown'})`,
+      value: 'next'
+    }]);
+    return;
+  }
+
+  // Multi-action loop: keep going while hours remain
+  while (journey.hoursRemaining > 0) {
+    const currentBlock = journey.blocks[journey.currentBlockIndex];
+
+    displayDayHeader(ui, journey);
+
+    // Build action options based on remaining hours and state
+    const actionOptions = [];
+    const canTravel = !hasTraveled && journey.resources.fuel > 0 && journey.resources.equipment > 0;
+
+    if (canTravel) {
+      // Travel options (4-6 hours depending on pace)
+      actionOptions.push({
+        label: 'Cautious Recon (4h)',
+        description: '60% coverage, low risk',
+        value: 'slow'
+      });
+      if (journey.hoursRemaining >= 5) {
+        actionOptions.push({
+          label: 'Standard Recon (5h)',
+          description: '100% coverage, normal risk',
+          value: 'normal'
+        });
+      }
+      if (journey.hoursRemaining >= 6) {
+        actionOptions.push({
+          label: 'Extended Recon (6h)',
+          description: '140% coverage, higher risk',
+          value: 'fast'
+        });
+      }
+      if (journey.hoursRemaining >= 8) {
+        actionOptions.push({
+          label: 'Max Effort (8h)',
+          description: '180% coverage, grueling',
+          value: 'grueling'
+        });
+      }
+    }
+
+    // Camp actions (available anytime)
+    if (journey.hoursRemaining >= 2) {
+      actionOptions.push({
+        label: 'Forage & Scout (2h)',
+        description: 'Find supplies; small injury risk',
+        value: 'forage'
+      });
+      actionOptions.push({
+        label: 'Maintenance (2h)',
+        description: 'Repair equipment',
+        value: 'maintain'
+      });
+    }
+
+    // Scouting (Phase 4.3)
+    if (journey.hoursRemaining >= 2 && journey.currentBlockIndex < journey.blocks.length - 1) {
+      actionOptions.push({
+        label: 'Scout Ahead (2h)',
+        description: 'Reveal next block conditions',
+        value: 'scout'
+      });
+    }
+
+    const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
+    if (hasAnyInjured && journey.resources.firstAid > 0 && journey.hoursRemaining >= 1) {
+      actionOptions.push({
+        label: 'Triage (1h)',
+        description: 'Treat an injured crew member',
+        value: 'triage'
+      });
+    }
+
+    if (currentBlock?.hasSupply && journey.hoursRemaining >= 2) {
+      actionOptions.push({
+        label: 'Resupply (2h)',
+        description: 'Buy fuel, food, repairs, kits',
+        value: 'resupply'
+      });
+    }
+
+    actionOptions.push({
+      label: 'Rest & End Shift',
+      description: 'Recover health/morale, end the day',
+      value: 'end_shift'
+    });
+
+    const action = await ui.promptChoice(`${journey.hoursRemaining}h remaining:`, actionOptions);
+    const actionId = action.value || 'end_shift';
+
+    ui.write('');
+
+    // Process the chosen action
+    if (actionId === 'end_shift') {
+      // End the shift early with rest benefits
+      const result = executeFieldDay(journey, 'resting');
+      for (const msg of result.messages) ui.write(msg);
+      journey.hoursRemaining = 0;
+      break;
+    }
+
+    if (['slow', 'normal', 'fast', 'grueling'].includes(actionId)) {
+      // Travel action — costs hours based on pace
+      const hoursCost = { slow: 4, normal: 5, fast: 6, grueling: 8 };
+      journey.hoursRemaining -= hoursCost[actionId];
+      const result = executeFieldDay(journey, actionId);
+      for (const msg of result.messages) ui.write(msg);
+      hasTraveled = true;
+    } else if (actionId === 'forage') {
+      journey.hoursRemaining -= 2;
+      applyForageResults(ui, journey);
+    } else if (actionId === 'maintain') {
+      journey.hoursRemaining -= 2;
+      await handleMaintenance(game);
+    } else if (actionId === 'triage') {
+      journey.hoursRemaining -= 1;
+      await handleTriage(game);
+    } else if (actionId === 'resupply') {
+      journey.hoursRemaining -= 2;
+      await handleResupply(game, currentBlock);
+    } else if (actionId === 'scout') {
+      journey.hoursRemaining -= 2;
+      handleScoutAhead(ui, journey);
+    }
+
+    ui.updateAllStatus(journey);
+
+    // If there are still hours, prompt between actions
+    if (journey.hoursRemaining > 0) {
+      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
+    }
+  }
+
+  // End of day — if we haven't traveled, still advance the day
+  if (!hasTraveled) {
+    const result = executeFieldDay(journey, 'camp_work');
+    for (const msg of result.messages) ui.write(msg);
+  }
+
+  ui.updateAllStatus(journey);
+
+  // Contextual continue with next-day info (Phase 6.1)
+  const nextBlock = journey.blocks[journey.currentBlockIndex];
+  const continueLabel = nextBlock
+    ? `Continue... (Next: ${nextBlock.name}, ${nextBlock.terrain})`
+    : 'Continue...';
+  await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
+}
+
+/**
+ * Display compact day header with status (Phase 6.2)
+ */
+function displayDayHeader(ui, journey) {
   const currentBlock = journey.blocks[journey.currentBlockIndex];
   const progressInfo = getFieldProgressInfo(journey);
 
   ui.clear();
   ui.writeHeader(`SHIFT ${journey.day} - ${currentBlock?.name || 'Unknown Territory'}`);
 
-  // Show current status with visual progress bar
+  // ASCII block map (Phase 5.4)
+  ui.write(buildBlockMap(journey));
+
+  // Compact progress line
   const progressBarWidth = 20;
   const filledWidth = Math.round((progressInfo.overallProgress / 100) * progressBarWidth);
-  const progressBar = '█'.repeat(filledWidth) + '░'.repeat(progressBarWidth - filledWidth);
+  const progressBar = '\u2588'.repeat(filledWidth) + '\u2591'.repeat(progressBarWidth - filledWidth);
+  ui.write(`[${progressBar}] ${progressInfo.overallProgress}% | ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
 
-  ui.write(`Journey: [${progressBar}] ${progressInfo.overallProgress}%`);
-  ui.write(`Traverse: ${journey.distanceTraveled}/${journey.totalDistance} km`);
-  ui.write(`Blocks: ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks} surveyed`);
-  if (progressInfo.nextBlock !== 'Destination') {
-    ui.write(`Next block: ${progressInfo.nextBlock} (${progressInfo.distanceToNextBlock} km of traverse)`);
-  } else {
-    ui.write(`Final destination ahead!`);
-  }
-  ui.write('');
-  ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'}`);
+  // Weather and terrain
+  ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'} | Hours: ${journey.hoursRemaining || 0}h`);
   ui.write('');
 
-  // Show resources
-  ui.writeDivider('SUPPLIES');
-  const resourceStatus = getFormattedResourceStatus(journey.resources, FIELD_RESOURCES);
-  for (const [, status] of Object.entries(resourceStatus)) {
-    const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
-    ui.write(`${icon} ${status.label}: ${status.display}`);
-  }
-  ui.write('');
+  // Compact resources
+  const r = journey.resources;
+  ui.write(`FUEL: ${Math.round(r.fuel)} | FOOD: ${Math.round(r.food)} | EQUIP: ${Math.round(r.equipment)}% | MEDS: ${r.firstAid} | CASH: $${Math.round(r.budget).toLocaleString()}`);
 
-  // Show crew status
+  // Crew summary
   displayCrewStatus(ui, journey);
 
-  // Check for random event
-  const event = checkForEvent(journey);
-  if (event) {
-    await handleEvent(game, event);
-    if (game.gameOver) return;
-  }
-
-  // Daily action choice
-  ui.writeDivider('WHAT DO YOU DO?');
-
-  const actionOptions = [];
-
-  const canTravel = journey.resources.fuel > 0 && journey.resources.equipment > 0;
-
-  if (canTravel) {
-    // Shift pacing options
-    for (const [id, pace] of Object.entries(PACE_OPTIONS)) {
-      if (id === 'resting' || id === 'camp_work') continue;
-      actionOptions.push({
-        label: `${pace.name} shift`,
-        description: `${Math.round(pace.distanceMultiplier * 100)}% coverage`,
-        value: id
-      });
+  // Crew dialogue (Phase 5.1)
+  const activeCrew = journey.crew.filter(m => m.isActive);
+  if (activeCrew.length > 0) {
+    const speaker = activeCrew[Math.floor(Math.random() * activeCrew.length)];
+    const comment = getCrewComment(speaker, journey);
+    if (comment) {
+      ui.write(comment);
+      ui.write('');
     }
-  } else {
-    ui.writeWarning('Field coverage is impossible without fuel and functioning equipment.');
+  }
+}
+
+/**
+ * Build ASCII block progress map (Phase 5.4)
+ * Shows block-by-block journey with current position marker
+ */
+function buildBlockMap(journey) {
+  const blocks = journey.blocks || [];
+  const currentIdx = journey.currentBlockIndex;
+
+  // Show at most 7 blocks centered on current position
+  const windowSize = 7;
+  let startIdx = Math.max(0, currentIdx - 3);
+  let endIdx = Math.min(blocks.length, startIdx + windowSize);
+  startIdx = Math.max(0, endIdx - windowSize);
+
+  const parts = [];
+  if (startIdx > 0) parts.push('...');
+
+  for (let i = startIdx; i < endIdx; i++) {
+    const block = blocks[i];
+    const shortName = abbreviateBlockName(block.name);
+    const supplyMarker = block.hasSupply ? '*' : '';
+
+    if (i === currentIdx) {
+      parts.push(`>>>${shortName}${supplyMarker}<<<`);
+    } else if (i < currentIdx) {
+      parts.push(`[${shortName}${supplyMarker}]`);
+    } else {
+      parts.push(`(${shortName}${supplyMarker})`);
+    }
   }
 
-  // Camp actions
-  actionOptions.push({
-    label: 'Make Camp (Rest)',
-    description: 'Recover health and morale',
-    value: 'resting'
-  });
-  actionOptions.push({
-    label: 'Forage & Scout (Camp Work)',
-    description: 'Try to find supplies; small injury risk',
-    value: 'forage'
-  });
-  actionOptions.push({
-    label: 'Maintenance Shift (Camp Work)',
-    description: 'Improve equipment condition; costs cash or sweat',
-    value: 'maintain'
-  });
+  if (endIdx < blocks.length) parts.push('...');
 
-  const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
-  if (hasAnyInjured && journey.resources.firstAid > 0) {
-    actionOptions.push({
-      label: 'Triage (Camp Work)',
-      description: 'Use a first aid kit to treat someone',
-      value: 'triage'
-    });
+  return parts.join('\u2500');
+}
+
+/**
+ * Abbreviate a block name to ~8 chars for the map
+ */
+function abbreviateBlockName(name) {
+  if (!name) return '???';
+  if (name.length <= 8) return name;
+  // Take first word, truncate if needed
+  const words = name.split(/[\s-]+/);
+  if (words[0].length <= 8) return words[0];
+  return name.substring(0, 7) + '.';
+}
+
+/**
+ * Scout ahead to reveal next block conditions (Phase 4.3)
+ */
+function handleScoutAhead(ui, journey) {
+  const nextIndex = journey.currentBlockIndex + 1;
+  if (nextIndex >= journey.blocks.length) {
+    ui.write('You are at the final block. No further scouting needed.');
+    return;
   }
 
-  if (currentBlock?.hasSupply) {
-    actionOptions.push({
-      label: 'Trading Post / Resupply (Camp Work)',
-      description: 'Buy fuel, rations, repairs, and kits',
-      value: 'resupply'
-    });
+  const nextBlock = journey.blocks[nextIndex];
+  const hasSpotter = journey.crew.some(m => m.isActive && m.role === 'spotter');
+
+  ui.writeHeader('SCOUT REPORT');
+  ui.write(`Next: ${nextBlock.name}`);
+  ui.write(`Terrain: ${nextBlock.terrain} | Distance: ${nextBlock.distance} km`);
+  ui.write(`Description: ${nextBlock.description}`);
+
+  if (nextBlock.hazards && nextBlock.hazards.length > 0) {
+    ui.writeWarning(`Hazards: ${nextBlock.hazards.join(', ')}`);
   }
 
-  const action = await ui.promptChoice('Choose your action:', actionOptions);
-  const actionId = action.value || 'normal';
-
-  ui.write('');
-
-  // Execute the day (field updates, consumption, weather/day advancement all live in executeFieldDay)
-  if (actionId === 'resupply') {
-    await handleResupply(game, currentBlock);
-    const result = executeFieldDay(journey, 'camp_work');
-    for (const msg of result.messages) ui.write(msg);
-  } else if (actionId === 'triage') {
-    await handleTriage(game);
-    const result = executeFieldDay(journey, 'camp_work');
-    for (const msg of result.messages) ui.write(msg);
-  } else if (actionId === 'maintain') {
-    await handleMaintenance(game);
-    const result = executeFieldDay(journey, 'camp_work');
-    for (const msg of result.messages) ui.write(msg);
-  } else if (actionId === 'forage') {
-    const result = executeFieldDay(journey, 'camp_work');
-    for (const msg of result.messages) ui.write(msg);
-    applyForageResults(ui, journey);
-  } else {
-    const paceId = actionId;
-    const result = executeFieldDay(journey, paceId);
-    for (const msg of result.messages) ui.write(msg);
+  if (nextBlock.hasSupply) {
+    ui.writePositive('Supply point available at this location.');
   }
 
-  // Update status panels to reflect changes
-  ui.updateAllStatus(journey);
-
-  // Small pause
-  await ui.promptChoice('', [{ label: 'Continue...', value: 'next' }]);
+  if (hasSpotter) {
+    // Bonus info from spotter
+    const blocksAhead = journey.blocks.slice(nextIndex + 1, nextIndex + 3);
+    if (blocksAhead.length > 0) {
+      const supplyBlocks = blocksAhead.filter(b => b.hasSupply);
+      if (supplyBlocks.length > 0) {
+        ui.writePositive(`Spotter reports supply point at ${supplyBlocks[0].name} (${supplyBlocks[0].distance} km ahead).`);
+      } else {
+        ui.write('Spotter sees no supply points in the next few blocks.');
+      }
+    }
+  }
 }
 
 /**

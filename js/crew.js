@@ -412,6 +412,135 @@ export function boostMorale(crew, amount = 10) {
 }
 
 /**
+ * Get a contextual comment from a crew member (~30% chance per call)
+ * Comments are based on current journey conditions, health, morale, weather, etc.
+ * @param {Object} member - Crew member
+ * @param {Object} journey - Current journey state
+ * @returns {string|null} Comment string or null if no comment
+ */
+export function getCrewComment(member, journey) {
+  if (!member || !member.isActive) return null;
+  if (Math.random() > 0.30) return null;
+
+  const comments = [];
+
+  // Low morale comments
+  if (member.morale < 25) {
+    comments.push(
+      'Are we there yet?',
+      "I didn't sign up for this.",
+      'Starting to wonder if this was worth it.'
+    );
+  } else if (member.morale < 45) {
+    comments.push(
+      "It's been a long haul.",
+      'Could use a break soon.'
+    );
+  }
+
+  // Low health comments
+  if (member.health < 40) {
+    comments.push(
+      'I could really use a rest day, boss.',
+      "I'm not feeling great out here."
+    );
+  }
+
+  // Good conditions
+  if (member.health > 80 && member.morale > 70) {
+    comments.push(
+      'Beautiful day for fieldwork.',
+      'Making good time out here.',
+      "This is why I got into forestry."
+    );
+  }
+
+  // Weather-specific (field journeys)
+  if (journey.weather) {
+    const wId = journey.weather.id || '';
+    if (wId === 'heavy_rain' || wId === 'storm') {
+      comments.push(
+        "This rain won't let up.",
+        "Can't see two metres ahead in this."
+      );
+    }
+    if (wId === 'heavy_snow' || wId === 'freezing') {
+      comments.push(
+        'Watch your step in this ice.',
+        "Fingers are going numb even in my gloves."
+      );
+    }
+    if (wId === 'clear') {
+      comments.push(
+        'Clear skies — good visibility today.'
+      );
+    }
+  }
+
+  // Near destination (field modes)
+  if (journey.totalDistance && journey.distanceTraveled) {
+    const progress = journey.distanceTraveled / journey.totalDistance;
+    if (progress > 0.85) {
+      comments.push(
+        'I can smell the finish line.',
+        'Almost home — keep pushing.'
+      );
+    }
+  }
+
+  // Low food
+  if (journey.resources?.food !== undefined && journey.resources.food < 10) {
+    comments.push(
+      "Anyone got a granola bar? I'm starving.",
+      'Rations are getting thin.'
+    );
+  }
+
+  // Low fuel
+  if (journey.resources?.fuel !== undefined && journey.resources.fuel < 20) {
+    comments.push(
+      "We're running on fumes here.",
+      'Better find a supply point soon.'
+    );
+  }
+
+  // Role-specific comments
+  if (member.role === 'driver') {
+    comments.push(
+      "Roads are getting rough up ahead.",
+      'Transmission is holding — for now.'
+    );
+  } else if (member.role === 'medic') {
+    const injured = journey.crew?.filter(m => m.isActive && m.statusEffects?.length > 0).length || 0;
+    if (injured > 0) {
+      comments.push(
+        `Got ${injured} crew needing attention.`,
+        'We should do triage when we get the chance.'
+      );
+    } else {
+      comments.push('Everyone looks healthy. Knock on wood.');
+    }
+  } else if (member.role === 'spotter') {
+    comments.push(
+      'Terrain ahead looks manageable.',
+      'Keep your eyes open for wildlife.'
+    );
+  } else if (member.role === 'mechanic') {
+    if (journey.resources?.equipment !== undefined && journey.resources.equipment < 50) {
+      comments.push(
+        "Equipment's held together with duct tape.",
+        'We need to stop for maintenance soon.'
+      );
+    }
+  }
+
+  if (comments.length === 0) return null;
+
+  const comment = comments[Math.floor(Math.random() * comments.length)];
+  return `[Crew] ${member.name} (${member.roleName}): "${comment}"`;
+}
+
+/**
  * Get a display-friendly status summary for a crew member
  * @param {Object} member - Crew member
  * @returns {Object} Display info

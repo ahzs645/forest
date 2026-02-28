@@ -243,10 +243,472 @@
       "features": ["destination", "remote"]
     }
   ],
-  "areaMapping": {
-    "bulkley-valley": "fort-st-john-plateau",
-    "fraser-plateau": "fort-st-john-plateau",
-    "skeena-nass": "muskwa-foothills",
-    "tahltan-highland": "muskwa-foothills"
-  }
+  "bulkley-valley": [
+    {
+      "id": "blk-1",
+      "name": "Smithers Yard",
+      "description": "Mill yard on the edge of Smithers. Hudson Bay Mountain looms above town like a postcard.",
+      "distance": 0,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["town", "mill_yard"]
+    },
+    {
+      "id": "blk-2",
+      "name": "Telkwa River Bridge",
+      "description": "Single-lane log bridge over the Telkwa. The timbers creak under a loaded truck.",
+      "distance": 12,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["river_crossing", "bridge_weight"],
+      "features": ["river", "bridge"]
+    },
+    {
+      "id": "blk-3",
+      "name": "Ranch Gate",
+      "description": "The FSR cuts through open ranch land. Close the gate behind you or hear about it later.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["cattle", "ranch_interface"],
+      "features": ["ranch", "grassland"]
+    },
+    {
+      "id": "blk-4",
+      "name": "Wet'suwet'en Territory Marker",
+      "description": "Entering Cas Yikh house territory. Protocol requires notification before operations begin.",
+      "distance": 10,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["cultural_protocol"],
+      "features": ["first_nation", "culturally_modified_trees"]
+    },
+    {
+      "id": "blk-5",
+      "name": "Birch Bench Camp",
+      "description": "Crew camp tucked into a stand of paper birch. Good water from the creek below.",
+      "distance": 15,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["base_camp", "creek"]
+    },
+    {
+      "id": "blk-6",
+      "name": "VQO Ridgeline",
+      "description": "This ridge is visible from Highway 16. Every stump placement matters for the visual quality objective.",
+      "distance": 16,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["visual_constraint", "grade"],
+      "features": ["visual_quality_zone", "viewpoint"]
+    },
+    {
+      "id": "blk-7",
+      "name": "Water Intake Buffer",
+      "description": "Community water intake 200 m downslope. Sediment control is not optional here.",
+      "distance": 12,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["water_intake", "erosion"],
+      "features": ["watershed", "community_water"]
+    },
+    {
+      "id": "blk-8",
+      "name": "Spruce-Birch Mixedwood",
+      "description": "Classic SBSmc2 stand. Hybrid spruce and birch fighting for canopy position in every gap.",
+      "distance": 18,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["windthrow", "hang_ups"],
+      "features": ["mixedwood", "spruce_forest"]
+    },
+    {
+      "id": "blk-9",
+      "name": "Decker Lake Road Junction",
+      "description": "FSR junction with a fuel cache and radio repeater. Contractor trucks resupply here.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": ["traffic"],
+      "features": ["fuel_cache", "radio_repeater"]
+    },
+    {
+      "id": "blk-10",
+      "name": "Morice River Overlook",
+      "description": "The road climbs above the Morice valley. Coho spawning channels glint silver far below.",
+      "distance": 16,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["grade", "wildlife"],
+      "features": ["viewpoint", "salmon_river"]
+    },
+    {
+      "id": "blk-11",
+      "name": "Foggy Bench",
+      "description": "Valley fog pools here most mornings. Visibility under 50 m until it burns off by ten.",
+      "distance": 13,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["fog", "moose"],
+      "features": ["wetland_buffer"]
+    },
+    {
+      "id": "blk-12",
+      "name": "Block BV-12 - Escarpment Edge",
+      "description": "Destination block perched on the Bulkley escarpment. The view is worth the drive.",
+      "distance": 12,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["destination", "visual_quality_zone"]
+    }
+  ],
+  "fraser-plateau": [
+    {
+      "id": "frs-1",
+      "name": "Hixon Staging",
+      "description": "Gravel lot south of Prince George where the crew musters. Coffee from the gas station across the road.",
+      "distance": 0,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["town", "gas_station"]
+    },
+    {
+      "id": "frs-2",
+      "name": "Blackwater Road",
+      "description": "Long straight FSR through beetle-killed pine. Grey snags line both sides like a dead army.",
+      "distance": 20,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["snag_hazard", "falling_timber"],
+      "features": ["beetle_kill"]
+    },
+    {
+      "id": "frs-3",
+      "name": "Old Burn Edge",
+      "description": "2017 wildfire scar starts here. Fireweed and lodgepole regen carpet the charred ground.",
+      "distance": 15,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["snag_hazard", "ash_pits"],
+      "features": ["burn_recovery", "wildfire_scar"]
+    },
+    {
+      "id": "frs-4",
+      "name": "Lheidli T'enneh Camp",
+      "description": "Camp at the edge of Lheidli T'enneh traditional territory. Collaborative monitoring underway.",
+      "distance": 16,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["first_nation", "base_camp"]
+    },
+    {
+      "id": "frs-5",
+      "name": "Pine Plantation Corridor",
+      "description": "Rows of 15-year-old planted pine from the first salvage wave. Spacing audit country.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["brush"],
+      "features": ["plantation", "beetle_recovery"]
+    },
+    {
+      "id": "frs-6",
+      "name": "Dry Creek Gully",
+      "description": "A seasonal creek bed that turns into a washout after rain. Culvert is undersized.",
+      "distance": 12,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["washout", "erosion"],
+      "features": ["creek", "dry_conditions"]
+    },
+    {
+      "id": "frs-7",
+      "name": "Plateau Overlook",
+      "description": "Open SBSwk1 bench with views across fifty kilometres of rolling green and grey. Wind never stops.",
+      "distance": 18,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["wind", "exposure"],
+      "features": ["viewpoint", "plateau"]
+    },
+    {
+      "id": "frs-8",
+      "name": "Wildfire Guard Station",
+      "description": "BC Wildfire Service forward cache. Fuel, water, and a sat phone if things go sideways.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["fire_cache", "fuel_cache"]
+    },
+    {
+      "id": "frs-9",
+      "name": "Aspen Blowdown",
+      "description": "A winter windstorm flattened this aspen stand. Chainsaw work just to get through.",
+      "distance": 16,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["windthrow", "deadfall"],
+      "features": ["blowdown"]
+    },
+    {
+      "id": "frs-10",
+      "name": "Nazko Road Junction",
+      "description": "Where the main FSR meets the Nazko road. Occasional ranch traffic and dust clouds.",
+      "distance": 15,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["dust", "traffic"],
+      "features": ["road_junction"]
+    },
+    {
+      "id": "frs-11",
+      "name": "Block FP-11 - Resilience Trial",
+      "description": "Destination block in a wildfire resilience trial area. Mixed-species planting and fuel breaks.",
+      "distance": 12,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["destination", "wildfire_resilience"]
+    }
+  ],
+  "skeena-nass": [
+    {
+      "id": "skn-1",
+      "name": "Terrace Log Sort",
+      "description": "Sorting yard on the Skeena floodplain. Rain drips off everything. Always.",
+      "distance": 0,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["town", "log_sort"]
+    },
+    {
+      "id": "skn-2",
+      "name": "Skeena River Crossing",
+      "description": "Steel bridge over the grey-green Skeena. Spring freshet can close this for days.",
+      "distance": 14,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["river_crossing", "flood"],
+      "features": ["river", "bridge", "salmon_river"]
+    },
+    {
+      "id": "skn-3",
+      "name": "Hemlock Canyon",
+      "description": "Deep-cut canyon draped in old-growth western hemlock. Moss hangs a metre thick from every branch.",
+      "distance": 12,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["grade", "falling_timber"],
+      "features": ["old_growth", "canyon"]
+    },
+    {
+      "id": "skn-4",
+      "name": "Gitanyow Checkpoint",
+      "description": "Gitanyow forest stewardship checkpoint. Permits verified and cultural sites confirmed.",
+      "distance": 16,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["first_nation", "base_camp"]
+    },
+    {
+      "id": "skn-5",
+      "name": "Karst Sinkhole Bench",
+      "description": "Limestone karst topography with sinkholes and disappearing streams. Watch your step off the road.",
+      "distance": 15,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["karst_collapse", "hidden_cavities"],
+      "features": ["karst", "sensitive_area"]
+    },
+    {
+      "id": "skn-6",
+      "name": "Salmon Creek Crossing",
+      "description": "Class A fish stream with coho and steelhead. In-stream work window is July 15 to August 31. Period.",
+      "distance": 18,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["fish_timing", "river_crossing"],
+      "features": ["salmon_stream", "fish_habitat"]
+    },
+    {
+      "id": "skn-7",
+      "name": "Redcedar Bottom",
+      "description": "Valley-bottom redcedar stand so thick sunlight barely reaches the ground. Cathedral-quiet.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["windthrow", "hang_ups"],
+      "features": ["old_growth", "cedar_stand"]
+    },
+    {
+      "id": "skn-8",
+      "name": "Nass Camp",
+      "description": "Nisga'a Lisims government liaison camp at the head of the Nass valley. Resupply by truck weekly.",
+      "distance": 16,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["first_nation", "remote_camp"]
+    },
+    {
+      "id": "skn-9",
+      "name": "Fog Ridge",
+      "description": "Coastal fog banks roll in from the west and stall on this ridge. Visibility can drop to zero.",
+      "distance": 12,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["fog", "grade", "exposure"],
+      "features": ["ridge", "coastal_influence"]
+    },
+    {
+      "id": "skn-10",
+      "name": "Spruce-Hemlock Bluffs",
+      "description": "Sitka spruce and hemlock on exposed bluffs above the river. Wind-shaped crowns lean inland.",
+      "distance": 18,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["wind", "falling_timber"],
+      "features": ["bluff", "spruce_forest"]
+    },
+    {
+      "id": "skn-11",
+      "name": "Lava Bed Flats",
+      "description": "Nisga'a Memorial Lava Bed edges the road. Volcanic rock and thin soils make for rough going.",
+      "distance": 14,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["rough_surface", "tire_damage"],
+      "features": ["lava_beds", "cultural_site"]
+    },
+    {
+      "id": "skn-12",
+      "name": "Block SN-12 - Nass Headwaters",
+      "description": "Destination block in the upper Nass. Rain-soaked CWH at its finest. Bring an extra dry bag.",
+      "distance": 13,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["destination", "coastal_influence"]
+    }
+  ],
+  "tahltan-highland": [
+    {
+      "id": "thl-1",
+      "name": "Dease Lake Compound",
+      "description": "Government compound at Dease Lake. The fuel truck comes twice a month if the road holds.",
+      "distance": 0,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["town", "fuel_cache"]
+    },
+    {
+      "id": "thl-2",
+      "name": "Telegraph Creek Road",
+      "description": "Notorious single-lane road carved into canyon walls. Switchbacks with 500 m drops.",
+      "distance": 22,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["grade", "rockslide", "narrow"],
+      "features": ["canyon", "switchbacks"]
+    },
+    {
+      "id": "thl-3",
+      "name": "Stikine River Crossing",
+      "description": "Reaction ferry across the Stikine. Current runs fast with glacial melt. Ferry shuts at dusk.",
+      "distance": 18,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["river_crossing", "glacial_current"],
+      "features": ["river", "ferry"]
+    },
+    {
+      "id": "thl-4",
+      "name": "Tahltan Village Camp",
+      "description": "Camp near Tahltan Nation village. Elders consult on cedar harvest boundaries each season.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["first_nation", "base_camp", "cedar_harvest"]
+    },
+    {
+      "id": "thl-5",
+      "name": "Glacial Moraine",
+      "description": "Unstable glacial till deposited by a retreating glacier. Boulders shift without warning.",
+      "distance": 16,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["rockslide", "subsidence"],
+      "features": ["glacial_terrain", "moraine"]
+    },
+    {
+      "id": "thl-6",
+      "name": "Subalpine Parkland",
+      "description": "Sparse Engelmann spruce and subalpine fir in wind-blasted parkland. Tree line is close.",
+      "distance": 15,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["exposure", "weather"],
+      "features": ["alpine", "subalpine_forest"]
+    },
+    {
+      "id": "thl-7",
+      "name": "Ealue Lake Cache",
+      "description": "Fly-in supply cache on Ealue Lake. Bush plane drops gear when the ceiling lifts.",
+      "distance": 20,
+      "terrain": "hilly",
+      "hasSupply": true,
+      "hazards": ["weather_delay"],
+      "features": ["remote_camp", "bush_plane", "lake"]
+    },
+    {
+      "id": "thl-8",
+      "name": "Willow Scrub Plateau",
+      "description": "Dense willow and dwarf birch across a windswept plateau. Grizzly country through and through.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["grizzly", "brush"],
+      "features": ["scrub", "wildlife"]
+    },
+    {
+      "id": "thl-9",
+      "name": "Outburst Channel",
+      "description": "Glacial lake outburst flood channel. The last event stripped the road to bedrock.",
+      "distance": 16,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["glacial_outburst", "washout"],
+      "features": ["glacial_terrain", "flood_channel"]
+    },
+    {
+      "id": "thl-10",
+      "name": "Wolverine Pass",
+      "description": "High pass above tree line. Snow possible any month. Named after the residents, not the comic book.",
+      "distance": 12,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["exposure", "snow", "grade"],
+      "features": ["pass", "alpine"]
+    },
+    {
+      "id": "thl-11",
+      "name": "Block TH-11 - Highland Bench",
+      "description": "Destination block on a subarctic bench. The most remote timber in the province, bar none.",
+      "distance": 15,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["destination", "remote"]
+    }
+  ]
 }

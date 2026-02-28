@@ -20,7 +20,7 @@ export const FIELD_RESOURCES = {
     name: 'Fuel',
     unit: 'gallons',
     shortLabel: 'FUEL',
-    baseDaily: 3,          // Base daily consumption (reduced from 5)
+    baseDaily: 4,          // Base daily consumption
     max: 200,              // Maximum capacity (increased from 150)
     warning: 40,           // Warning threshold
     critical: 15,          // Critical threshold
@@ -45,7 +45,7 @@ export const FIELD_RESOURCES = {
     name: 'Food Rations',
     unit: 'person-days',
     shortLabel: 'FOOD',
-    baseDaily: 0.8,        // Per crew member per day (reduced from 1)
+    baseDaily: 1.0,        // Per crew member per day
     max: 80,               // Maximum storage (increased from 60)
     warning: 20,
     critical: 8,
@@ -63,7 +63,7 @@ export const FIELD_RESOURCES = {
     name: 'Equipment Condition',
     unit: '%',
     shortLabel: 'EQUIP',
-    baseDaily: 2,          // Base condition loss per travel day
+    baseDaily: 3,          // Base condition loss per travel day
     max: 100,
     warning: 40,
     critical: 20,
@@ -102,7 +102,7 @@ export const DESK_RESOURCES = {
     name: 'Budget',
     unit: '$',
     shortLabel: 'BUDGET',
-    baseDaily: 1000,       // Daily operational cost
+    baseDaily: 1200,       // Daily operational cost
     max: 100000,
     warning: 15000,
     critical: 5000
@@ -112,7 +112,7 @@ export const DESK_RESOURCES = {
     name: 'Political Capital',
     unit: 'points',
     shortLabel: 'POL.CAP',
-    baseDaily: 1,          // Natural decay per day
+    baseDaily: 2,          // Natural decay per day
     max: 100,
     warning: 25,
     critical: 10
@@ -137,11 +137,11 @@ export const DESK_RESOURCES = {
  */
 export function createFieldResources(options = {}) {
   return {
-    budget: options.budget ?? 3000,
-    fuel: options.fuel ?? 150,      // Increased from 100
-    food: options.food ?? 60,       // Increased from 40
-    equipment: options.equipment ?? 100,
-    firstAid: options.firstAid ?? 10  // Increased from 8
+    budget: options.budget ?? 2000,
+    fuel: options.fuel ?? 80,
+    food: options.food ?? 35,
+    equipment: options.equipment ?? 85,
+    firstAid: options.firstAid ?? 6
   };
 }
 
@@ -152,8 +152,8 @@ export function createFieldResources(options = {}) {
  */
 export function createDeskResources(options = {}) {
   return {
-    budget: options.budget ?? 50000,
-    politicalCapital: options.politicalCapital ?? 50,
+    budget: options.budget ?? 35000,
+    politicalCapital: options.politicalCapital ?? 40,
     energy: options.energy ?? 100
   };
 }

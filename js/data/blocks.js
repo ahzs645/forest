@@ -15,16 +15,19 @@ export const TERRAIN_TYPES = weatherData.terrain;
 // Export block data
 export const FORT_ST_JOHN_BLOCKS = blocksData['fort-st-john-plateau'];
 export const MUSKWA_BLOCKS = blocksData['muskwa-foothills'];
+export const BULKLEY_BLOCKS = blocksData['bulkley-valley'];
+export const FRASER_BLOCKS = blocksData['fraser-plateau'];
+export const SKEENA_BLOCKS = blocksData['skeena-nass'];
+export const TAHLTAN_BLOCKS = blocksData['tahltan-highland'];
 
 // Map area IDs to block sets
 export const AREA_BLOCKS = {
   'fort-st-john-plateau': FORT_ST_JOHN_BLOCKS,
   'muskwa-foothills': MUSKWA_BLOCKS,
-  // Default blocks for other areas (using mapping from JSON)
-  'bulkley-valley': blocksData[blocksData.areaMapping['bulkley-valley']] || FORT_ST_JOHN_BLOCKS,
-  'fraser-plateau': blocksData[blocksData.areaMapping['fraser-plateau']] || FORT_ST_JOHN_BLOCKS,
-  'skeena-nass': blocksData[blocksData.areaMapping['skeena-nass']] || MUSKWA_BLOCKS,
-  'tahltan-highland': blocksData[blocksData.areaMapping['tahltan-highland']] || MUSKWA_BLOCKS
+  'bulkley-valley': BULKLEY_BLOCKS,
+  'fraser-plateau': FRASER_BLOCKS,
+  'skeena-nass': SKEENA_BLOCKS,
+  'tahltan-highland': TAHLTAN_BLOCKS
 };
 
 /**
