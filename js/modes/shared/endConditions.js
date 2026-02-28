@@ -53,8 +53,9 @@ export function checkSilvicultureEndConditions(journey) {
     return { gameOver: true, reason: 'Budget exhausted - program cancelled' };
   }
 
-  // Game over: No contractor capacity
-  if (journey.resources.contractorCapacity <= 0 && journey.planting.seedlingsPlanted < journey.planting.seedlingsAllocated) {
+  // Game over: No contractor capacity and not enough planting done
+  if (journey.resources.contractorCapacity <= 0 &&
+      journey.planting.blocksPlanted < journey.planting.blocksToPlant) {
     return { gameOver: true, reason: 'No contractor capacity remaining' };
   }
 

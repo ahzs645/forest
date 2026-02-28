@@ -15,6 +15,7 @@ import {
 } from './journey.js';
 import { checkScheduledEvents, formatEventForDisplay, resolveEvent } from './events.js';
 import { getCurrentSeasonInfo } from './season.js';
+import { calculateScore, formatScoreDisplay } from './scoring.js';
 
 // Import mode runners
 import { runReconDay } from './modes/recon.js';
@@ -24,6 +25,24 @@ import { runPermittingDay } from './modes/permitting.js';
 
 // Import display mode manager
 import { displayMode } from './displayMode.js';
+
+/**
+ * Apply difficulty multipliers to journey resources
+ * @param {Object} journey - Journey state
+ * @param {string} difficulty - 'easy', 'normal', or 'hard'
+ */
+function applyDifficultyMultipliers(journey, difficulty) {
+  if (difficulty === 'normal') return;
+
+  const resourceMult = difficulty === 'easy' ? 1.3 : 0.8;
+  const r = journey.resources;
+
+  for (const key of Object.keys(r)) {
+    if (typeof r[key] === 'number') {
+      r[key] = Math.round(r[key] * resourceMult);
+    }
+  }
+}
 
 class ForestryTrailGame {
   constructor() {
@@ -120,6 +139,18 @@ class ForestryTrailGame {
     const role = init?.role || FORESTER_ROLES[0];
     const area = init?.area || OPERATING_AREAS[0];
 
+    // Difficulty selection (Phase 6.3)
+    this.ui.clear();
+    this.ui.writeHeader('SELECT DIFFICULTY');
+    this.ui.write('Choose your challenge level:');
+    this.ui.write('');
+    const difficultyChoice = await this.ui.promptChoice('Difficulty:', [
+      { label: 'Greenhorn (Easy)', description: 'More resources, fewer events. Learn the ropes.', value: 'easy' },
+      { label: 'Journeyman (Normal)', description: 'Standard challenge. Balanced experience.', value: 'normal' },
+      { label: 'Old Growth (Hard)', description: 'Fewer resources, more events. For veterans.', value: 'hard' }
+    ]);
+    const difficulty = difficultyChoice.value || 'normal';
+
     this.ui.clear();
     this.ui.writeHeader('BC FORESTRY OPERATIONS SYSTEM');
     this.ui.write('System online. Deployment package confirmed.');
@@ -128,6 +159,8 @@ class ForestryTrailGame {
     this.ui.write(`Role: ${role.name}`);
     this.ui.write(`Operating Area: ${area.name}`);
     this.ui.write(`BEC Zone: ${area.becZone}`);
+    const diffLabel = difficulty === 'easy' ? 'Greenhorn' : difficulty === 'hard' ? 'Old Growth' : 'Journeyman';
+    this.ui.write(`Difficulty: ${diffLabel}`);
     this.ui.write('');
 
     // Create journey using factory function (routes by roleId)
@@ -140,6 +173,10 @@ class ForestryTrailGame {
       area,
       crew
     });
+
+    // Apply difficulty multipliers
+    this.journey.difficulty = difficulty;
+    applyDifficultyMultipliers(this.journey, difficulty);
 
     // Show starting info
     this.ui.write('');
@@ -471,93 +508,118 @@ class ForestryTrailGame {
 
   async _showEndScreen() {
     this.ui.clear();
+    const journey = this.journey;
+    const areaName = journey.area?.name || 'the operating area';
+    const crewName = journey.companyName || 'The crew';
+    const daysUsed = journey.day - 1;
 
+    // --- Narrative Epilogue ---
     if (this.victory) {
       this.ui.writeHeader('EXPEDITION SUCCESSFUL');
       this.ui.write('');
-      this.ui.write(this.journey.endReason);
+      this.ui.write(this._buildVictoryNarrative(journey, areaName, crewName, daysUsed));
     } else {
       this.ui.writeHeader('EXPEDITION FAILED');
       this.ui.write('');
-      this.ui.writeWarning(this.journey.endReason);
+      this.ui.write(this._buildDefeatNarrative(journey, areaName, crewName, daysUsed));
+    }
+
+    this.ui.write('');
+
+    // --- Scoring ---
+    const scoreResult = calculateScore(journey, this.victory);
+    this.ui.writeDivider('PERFORMANCE REVIEW');
+    const scoreLines = formatScoreDisplay(scoreResult);
+    for (const line of scoreLines) {
+      this.ui.write(line);
     }
 
     this.ui.write('');
     this.ui.writeDivider('FINAL STATISTICS');
 
-    const journey = this.journey;
-
     switch (journey.journeyType) {
       case 'recon':
-      case 'field':
+      case 'field': {
         const fieldProgressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-        this.ui.write(`Traverse Covered: ${journey.distanceTraveled}/${journey.totalDistance} km (${fieldProgressPct}%)`);
-        this.ui.write(`Shifts Elapsed: ${journey.day - 1}`);
+        this.ui.write(`Traverse Covered: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km (${fieldProgressPct}%)`);
+        this.ui.write(`Shifts Elapsed: ${daysUsed}`);
         this.ui.write(`Blocks Surveyed: ${journey.currentBlockIndex}/${journey.blocks.length}`);
         if (journey.blocksAssessed !== undefined) {
           this.ui.write(`Blocks Assessed: ${journey.blocksAssessed}`);
         }
         break;
-
-      case 'silviculture':
+      }
+      case 'silviculture': {
         const plantingPct = Math.round((journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
         this.ui.write(`Seedlings Planted: ${journey.planting.seedlingsPlanted.toLocaleString()}/${journey.planting.seedlingsAllocated.toLocaleString()} (${plantingPct}%)`);
         this.ui.write(`Blocks Planted: ${journey.planting.blocksPlanted}/${journey.planting.blocksToPlant}`);
         this.ui.write(`Brushing Complete: ${journey.brushing.hectaresComplete}/${journey.brushing.hectaresTarget} ha`);
         this.ui.write(`Free-Growing Surveys: ${journey.surveys.freeGrowingComplete}/${journey.surveys.freeGrowingTarget}`);
-        this.ui.write(`Days Elapsed: ${journey.day - 1}`);
-        this.ui.write(`Budget Remaining: $${journey.resources.budget.toLocaleString()}`);
+        this.ui.write(`Days Elapsed: ${daysUsed}`);
+        this.ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
         break;
-
+      }
       case 'planning':
         this.ui.write(`Final Phase: ${journey.plan.phase}`);
         this.ui.write(`Data Completeness: ${journey.plan.dataCompleteness}%`);
         this.ui.write(`Analysis Quality: ${journey.plan.analysisQuality}%`);
         this.ui.write(`Stakeholder Buy-in: ${journey.plan.stakeholderBuyIn}%`);
         this.ui.write(`Ministerial Confidence: ${journey.plan.ministerialConfidence}%`);
-        this.ui.write(`Days Elapsed: ${journey.day - 1}`);
-        this.ui.write(`Budget Remaining: $${journey.resources.budget.toLocaleString()}`);
+        this.ui.write(`Days Elapsed: ${daysUsed}`);
+        this.ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
         break;
 
       case 'permitting':
       case 'desk':
       default:
         this.ui.write(`Permits Approved: ${journey.permits.approved}/${journey.permits.target}`);
-        this.ui.write(`Days Used: ${journey.day - 1}/${journey.deadline}`);
-        this.ui.write(`Budget Remaining: $${journey.resources.budget.toLocaleString()}`);
+        this.ui.write(`Days Used: ${daysUsed}/${journey.deadline}`);
+        this.ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
         break;
     }
 
-    this.ui.write('');
-    this.ui.writeDivider('CREW FATE');
+    // --- Crew Fate (narrative) ---
+    if (journey.crew?.length > 0) {
+      this.ui.write('');
+      this.ui.writeDivider('CREW FATE');
 
-    for (const member of journey.crew) {
-      const info = getCrewDisplayInfo(member);
-      let fate;
-      if (!member.isActive) {
-        if (member.health <= 0) {
-          fate = 'Died during expedition';
-        } else if (member.morale <= 0) {
-          fate = 'Quit the expedition';
+      for (const member of journey.crew) {
+        const info = getCrewDisplayInfo(member);
+        let fate;
+        if (!member.isActive) {
+          if (member.isDead) {
+            fate = 'Lost to the wilderness. Their sacrifice will be remembered.';
+          } else if (member.hasQuit) {
+            fate = 'Packed their bags and headed home early.';
+          } else {
+            fate = 'Evacuated for medical care.';
+          }
+        } else if (this.victory) {
+          if (member.health > 80 && member.morale > 70) {
+            fate = 'Returned triumphant and in high spirits.';
+          } else if (member.health < 40) {
+            fate = 'Completed the journey, but battered and bruised.';
+          } else {
+            fate = 'Completed the journey.';
+          }
         } else {
-          fate = 'Evacuated for medical care';
+          fate = 'Awaits rescue.';
         }
-      } else if (this.victory) {
-        fate = 'Completed the journey';
-      } else {
-        fate = 'Stranded';
+        this.ui.write(`${info.name} (${info.role}): ${fate}`);
       }
-      this.ui.write(`${info.name} (${info.role}): ${fate}`);
     }
 
-    // Show journey log highlights
+    // --- Key Events ---
     if (journey.log?.length > 0) {
-      this.ui.write('');
-      this.ui.writeDivider('KEY EVENTS');
-      const highlights = journey.log.slice(-5);
-      const dayLabel = journey.journeyType === 'field' ? 'Shift' : 'Day';
-      for (const entry of highlights) {
-        this.ui.write(`${dayLabel} ${entry.day}: ${entry.eventTitle || entry.type}`);
+      const eventHighlights = journey.log.filter(e => e.type === 'event' || e.type === 'milestone');
+      if (eventHighlights.length > 0) {
+        this.ui.write('');
+        this.ui.writeDivider('KEY EVENTS');
+        const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon' ? 'Shift' : 'Day';
+        const toShow = eventHighlights.slice(-5);
+        for (const entry of toShow) {
+          this.ui.write(`${dayLabel} ${entry.day}: ${entry.eventTitle || entry.summary || entry.type}`);
+        }
       }
     }
 
@@ -567,6 +629,64 @@ class ForestryTrailGame {
     // Wait for restart
     await this.ui.promptChoice('', [{ label: 'New Expedition', value: 'restart' }]);
     this.start();
+  }
+
+  _buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
+    const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
+    const seasonName = seasonInfo ? seasonInfo.name.toLowerCase() : 'the season';
+
+    switch (journey.journeyType) {
+      case 'recon':
+      case 'field': {
+        const blocksCount = journey.blocks?.length || 0;
+        const activeCrew = journey.crew.filter(m => m.isActive).length;
+        return `${crewName} completed the ${journey.totalDistance} km traverse through ${areaName} as ${seasonName} settled in. ` +
+          `${activeCrew} crew members surveyed all ${blocksCount} blocks over ${daysUsed} shifts. ` +
+          `The reconnaissance data will guide forest operations in this area for years to come.`;
+      }
+      case 'silviculture':
+        return `After ${daysUsed} days of hard work, the silviculture program in ${areaName} reached its targets. ` +
+          `${journey.planting.blocksPlanted} blocks planted, ${journey.surveys.freeGrowingComplete} free-growing surveys completed. ` +
+          `A new generation of trees will rise from this ground.`;
+      case 'planning':
+        return `The landscape plan for ${areaName} received ministerial approval after ${daysUsed} days of analysis, ` +
+          `stakeholder engagement, and careful balancing of competing values. ` +
+          `The plan will shape forestry operations in the region for the next decade.`;
+      case 'permitting':
+      case 'desk':
+        return `${journey.permits.approved} permits approved out of ${journey.permits.target} targeted. ` +
+          `The permit pipeline in ${areaName} is flowing smoothly after ${daysUsed} days of diligent processing ` +
+          `and relationship building.`;
+      default:
+        return journey.endReason || 'Expedition completed successfully.';
+    }
+  }
+
+  _buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
+    const reason = journey.endReason || journey.gameOverReason || 'The expedition ground to a halt.';
+
+    switch (journey.journeyType) {
+      case 'recon':
+      case 'field': {
+        const progress = journey.totalDistance > 0
+          ? Math.round((journey.distanceTraveled / journey.totalDistance) * 100) : 0;
+        const lastBlock = journey.blocks?.[journey.currentBlockIndex]?.name || 'an unknown location';
+        return `The expedition stalled at ${lastBlock}, ${progress}% of the way through the traverse. ` +
+          `${reason} After ${daysUsed} shifts, ${crewName} could go no further.`;
+      }
+      case 'silviculture':
+        return `The silviculture program in ${areaName} fell short of its targets after ${daysUsed} days. ` +
+          `${reason} The unplanted blocks will need to wait for next season.`;
+      case 'planning':
+        return `The landscape plan for ${areaName} failed to achieve approval after ${daysUsed} days. ` +
+          `${reason} The planning process will need to restart with a new approach.`;
+      case 'permitting':
+      case 'desk':
+        return `The permitting office in ${areaName} could not meet its targets. ` +
+          `${reason} After ${daysUsed} days, the backlog remains.`;
+      default:
+        return reason;
+    }
   }
 
   /**

@@ -138,7 +138,7 @@ export function createSilvicultureJourney(options = {}) {
 
     // Surveys
     surveys: {
-      freeGrowingTarget: 8,
+      freeGrowingTarget: 5,
       freeGrowingComplete: 0,
       regenerationSurveys: 0
     },
@@ -148,9 +148,9 @@ export function createSilvicultureJourney(options = {}) {
 
     // Resources
     resources: {
-      budget: 150000,
+      budget: 100000,
       seedlings: 250000,
-      contractorCapacity: 200,
+      contractorCapacity: 250,
       equipment: 100,
       nurseryCredit: 50
     },
@@ -263,8 +263,8 @@ export function createPlanningJourney(options = {}) {
 
     // Resources (no crew-related)
     resources: {
-      budget: 80000,
-      politicalCapital: 50,
+      budget: 50000,
+      politicalCapital: 40,
       dataCredits: 100,
       consultantDays: 30
     },
