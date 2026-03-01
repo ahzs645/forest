@@ -93,7 +93,9 @@ function checkDeskEvent(journey) {
   const applicableEvents = getApplicableDeskEvents(journey.currentPhase);
 
   // Calculate modifiers based on stress level
-  const daysRemaining = journey.deadline - journey.day;
+  const daysRemaining = Number.isFinite(journey.deadline)
+    ? journey.deadline - journey.day
+    : 30;
   const stressModifier = daysRemaining < 5 ? 1.5 : daysRemaining < 10 ? 1.2 : 1;
 
   // Low morale increases negative events (handle protagonist-only modes without crew)
@@ -107,11 +109,31 @@ function checkDeskEvent(journey) {
     avgMorale = 100 - (journey.protagonist.stress || 0);
   }
   const moraleModifier = avgMorale < 40 ? 1.3 : 1;
+  const typeMultipliers = getDeskEventTypeMultipliers(journey);
 
   return selectRandomDeskEvent(applicableEvents, {
     stressModifier: stressModifier * moraleModifier,
-    crisisMode: daysRemaining < 3
+    crisisMode: daysRemaining < 3,
+    typeMultipliers
   });
+}
+
+function getDeskEventTypeMultipliers(journey) {
+  const multipliers = {};
+
+  if (journey.journeyType !== 'planning') return multipliers;
+
+  const activeBias = journey.blockPlanning?.activeEventBias;
+  if (!activeBias || typeof activeBias !== 'object') return multipliers;
+
+  const allowedTypes = ['stakeholder', 'compliance', 'technical', 'political', 'policy', 'issue'];
+  for (const eventType of allowedTypes) {
+    const value = Number(activeBias[eventType]);
+    if (!Number.isFinite(value)) continue;
+    multipliers[eventType] = Math.max(0.75, Math.min(2.5, value));
+  }
+
+  return multipliers;
 }
 
 function attachFieldReporter(event, journey) {

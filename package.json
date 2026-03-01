@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "play": "node cli-game.js",
-    "import:legacy": "node scripts/import-legacy-content.mjs"
+    "import:legacy": "node scripts/import-legacy-content.mjs",
+    "refresh:planning-blocks": "node scripts/generate-planning-block-options.mjs"
   },
   "devDependencies": {
     "sass": "^1.97.1",

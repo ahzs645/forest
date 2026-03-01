@@ -24,6 +24,7 @@ import {
   DESK_RESOURCES
 } from './resources.js';
 import { getBlocksForArea, getRandomWeather, getTemperature, TERRAIN_TYPES } from './data/blocks.js';
+import { getPlanningCadenceDays } from './data/planningBlocks.js';
 import { createSeasonState, advanceDay, getSeasonModifiers, getCurrentSeasonInfo } from './season.js';
 
 export const FIELD_SHIFT_HOURS = 9;
@@ -201,6 +202,7 @@ export function createPlanningJourney(options = {}) {
   const { roleId, areaId, companyName, crewName, role, area } = options;
   const effectiveAreaId = areaId || area?.id;
   const effectiveRoleId = roleId || role?.id || 'planner';
+  const cadenceDays = getPlanningCadenceDays();
 
   return {
     journeyType: 'planning',
@@ -243,6 +245,17 @@ export function createPlanningJourney(options = {}) {
       timberSupply: 50,
       communityNeeds: 50,
       firstNationsValues: 50
+    },
+
+    // Real-data block selection cadence and active impacts
+    blockPlanning: {
+      cadenceDays,
+      nextSelectionDay: 1,
+      activeBlockId: null,
+      activeBlock: null,
+      activeSummary: null,
+      activeEventBias: null,
+      history: []
     },
 
     // Cutblock queue

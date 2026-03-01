@@ -27,16 +27,18 @@ export function getApplicableDeskEvents(phase) {
  * @returns {Object|null} Selected event or null
  */
 export function selectRandomDeskEvent(events, modifiers = {}) {
-  const { stressModifier = 1, crisisMode = false } = modifiers;
+  const { stressModifier = 1, crisisMode = false, typeMultipliers = {} } = modifiers;
 
   // In crisis mode, negative events more likely
   const crisisMultiplier = crisisMode ? 1.5 : 1;
 
   for (const event of events) {
-    let adjustedProb = event.probability * stressModifier;
+    const typeMultiplier = Number(typeMultipliers?.[event.type]) || 1;
+    let adjustedProb = event.probability * stressModifier * typeMultiplier;
     if (event.severity !== 'positive') {
       adjustedProb *= crisisMultiplier;
     }
+    adjustedProb = Math.max(0, Math.min(0.95, adjustedProb));
     if (Math.random() < adjustedProb) {
       return event;
     }

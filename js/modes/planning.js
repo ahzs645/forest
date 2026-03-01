@@ -6,6 +6,7 @@
 
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
+import { pickPlanningBlockOptions, summarizePlanningBlock } from '../data/planningBlocks.js';
 
 /**
  * Run a planning day with multi-action system
@@ -19,6 +20,9 @@ export async function runPlanningDay(game) {
   if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
     journey.hoursRemaining = 8;
   }
+
+  // Periodic real-data block decision: selected block influences events and values.
+  await maybePromptForBlockSelection(game, seasonInfo);
 
   // Apply daily values consequences (Phase 4.1)
   applyValuesConsequences(journey);
@@ -123,7 +127,79 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
 
   // Resources
   ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Political Capital: ${journey.resources.politicalCapital} | Data: ${journey.resources.dataCredits}`);
+
+  if (journey.blockPlanning?.activeSummary) {
+    ui.write(`Active Block: ${journey.blockPlanning.activeSummary}`);
+    if (journey.blockPlanning.nextSelectionDay) {
+      ui.write(`Next block review: Day ${journey.blockPlanning.nextSelectionDay}`);
+    }
+  }
   ui.write('');
+}
+
+async function maybePromptForBlockSelection(game, seasonInfo) {
+  const { ui, journey } = game;
+  const plannerState = journey.blockPlanning;
+  if (!plannerState) return;
+  if (journey.day < (plannerState.nextSelectionDay || 1)) return;
+
+  const options = pickPlanningBlockOptions(journey.areaId, plannerState.history, 3);
+  if (!options.length) return;
+
+  displayPlanningHeader(ui, journey, seasonInfo);
+  ui.writeHeader('CUTBLOCK PRIORITY DECISION');
+  ui.write('Choose which real block/opening to prioritize for the next planning window.');
+  ui.write('');
+
+  const promptOptions = options.map((block) => {
+    const timber = Math.round(block?.metrics?.timberOpportunity || 0);
+    const eco = Math.round(block?.metrics?.biodiversitySensitivity || 0);
+    const fn = Math.round(block?.metrics?.firstNationsSensitivity || 0);
+    const areaHa = Number(block.areaHa || 0).toFixed(1);
+    const source = block.sourceType === 'planned-cutblock' ? 'Planned Cutblock' : 'Untreated Opening';
+    return {
+      label: `${source}: ${block.label}`,
+      description: `${areaHa} ha | ${block.adminDistrict} | Timber ${timber} | Eco ${eco} | FN ${fn}`,
+      value: block.id
+    };
+  });
+
+  const selected = await ui.promptChoice('Select active block focus:', promptOptions);
+  const chosen = options.find((block) => block.id === selected.value) || options[0];
+  applySelectedBlockImpact(journey, chosen);
+
+  ui.write('');
+  ui.writePositive(`Active focus selected: ${chosen.label}`);
+  ui.write(chosen.summary);
+  ui.write(`Values shift -> Bio ${formatDelta(chosen.valueEffects.biodiversity)} | Timber ${formatDelta(chosen.valueEffects.timberSupply)} | Community ${formatDelta(chosen.valueEffects.communityNeeds)} | FN ${formatDelta(chosen.valueEffects.firstNationsValues)}`);
+  await ui.promptChoice('', [{ label: 'Continue to day planning...', value: 'next' }]);
+}
+
+function formatDelta(value) {
+  const num = Number(value || 0);
+  return num > 0 ? `+${num}` : `${num}`;
+}
+
+function applySelectedBlockImpact(journey, block) {
+  if (!journey.blockPlanning || !block) return;
+
+  const state = journey.blockPlanning;
+  state.activeBlockId = block.id;
+  state.activeBlock = block;
+  state.activeSummary = summarizePlanningBlock(block);
+  state.activeEventBias = block.eventBias || null;
+  state.history = Array.isArray(state.history) ? [...state.history, block.id].slice(-30) : [block.id];
+  state.nextSelectionDay = journey.day + (state.cadenceDays || 3);
+
+  const effects = block.valueEffects || {};
+  journey.values.biodiversity = clampValue(journey.values.biodiversity + (effects.biodiversity || 0));
+  journey.values.timberSupply = clampValue(journey.values.timberSupply + (effects.timberSupply || 0));
+  journey.values.communityNeeds = clampValue(journey.values.communityNeeds + (effects.communityNeeds || 0));
+  journey.values.firstNationsValues = clampValue(journey.values.firstNationsValues + (effects.firstNationsValues || 0));
+}
+
+function clampValue(value) {
+  return Math.max(0, Math.min(100, value));
 }
 
 /**

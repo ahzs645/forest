@@ -54,6 +54,14 @@ Each run makes heuristic decisions that prioritise balanced performance.
 
 The interactive version is a static site; no build step is required. Open `index.html` directly or serve the folder with any static server. Game content is organized under `js/data/` with dedicated modules for roles, operating areas, and dynamic issues, making it easy to extend forester duties or add new geography.
 
+### Refresh planning block intelligence data
+
+Planning mode now includes periodic real-data cutblock/opening choices per operating area. To refresh the local snapshot from BC OpenMaps layers, run:
+
+```bash
+node scripts/generate-planning-block-options.mjs
+```
+
 ## Future directions
 
 Curious about where the simulator could head next? Check out [`docs/future_directions.md`](docs/future_directions.md) for a curated list of mechanics, humour, and accessibility enhancements inspired by community feedback.
