@@ -22,6 +22,7 @@ import { runReconDay } from './modes/recon.js';
 import { runSilvicultureDay } from './modes/silviculture.js';
 import { runPlanningDay } from './modes/planning.js';
 import { runPermittingDay } from './modes/permitting.js';
+import { checkEndConditions as evaluateEndConditions } from './modes/shared/endConditions.js';
 
 // Import display mode manager
 import { displayMode } from './displayMode.js';
@@ -388,121 +389,20 @@ class ForestryTrailGame {
   }
 
   _checkEndConditions() {
-    const journey = this.journey;
-    const activeCrewCount = journey.crew.filter(m => m.isActive).length;
-
-    if (journey.isGameOver) {
-      this.gameOver = true;
-      journey.endReason = journey.gameOverReason || 'Operations halted';
+    const result = evaluateEndConditions(this.journey);
+    if (!result) {
       return;
     }
 
-    if (journey.isComplete) {
+    if (result.gameOver) {
+      this.gameOver = true;
+      this.journey.endReason = result.reason || this.journey.gameOverReason || 'Operations halted';
+      return;
+    }
+
+    if (result.victory) {
       this.victory = true;
-      journey.endReason = journey.endReason || 'Expedition completed!';
-      return;
-    }
-
-    // Universal: No crew left
-    if (activeCrewCount === 0) {
-      this.gameOver = true;
-      journey.endReason = 'All crew members lost';
-      return;
-    }
-
-    // Check conditions based on journey type
-    switch (journey.journeyType) {
-      case 'recon':
-      case 'field':
-        // Victory: Reached destination
-        if (journey.distanceTraveled >= journey.totalDistance) {
-          this.victory = true;
-          journey.endReason = 'Expedition completed!';
-          return;
-        }
-        // Game over: Stranded (no fuel, no food)
-        if (journey.resources.fuel <= 0 && journey.resources.food <= 0) {
-          this.gameOver = true;
-          journey.endReason = 'Stranded with no supplies';
-          return;
-        }
-        break;
-
-      case 'silviculture':
-        // Victory: Met regeneration targets
-        if (journey.planting.blocksPlanted >= journey.planting.blocksToPlant &&
-            journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget) {
-          this.victory = true;
-          journey.endReason = 'Regeneration targets achieved!';
-          return;
-        }
-        // Game over: Budget depleted
-        if (journey.resources.budget <= 0) {
-          this.gameOver = true;
-          journey.endReason = 'Budget exhausted - program cancelled';
-          return;
-        }
-        // Game over: No contractor capacity
-        if (journey.resources.contractorCapacity <= 0 && journey.planting.seedlingsPlanted < journey.planting.seedlingsAllocated) {
-          this.gameOver = true;
-          journey.endReason = 'No contractor capacity remaining';
-          return;
-        }
-        break;
-
-      case 'planning':
-        // Victory: Ministerial approval achieved
-        if (journey.plan.ministerialConfidence >= 80) {
-          this.victory = true;
-          journey.endReason = 'Landscape plan approved by Ministry!';
-          return;
-        }
-        // Game over: Budget or political capital depleted
-        if (journey.resources.budget <= 0) {
-          this.gameOver = true;
-          journey.endReason = 'Budget exhausted';
-          return;
-        }
-        if (journey.resources.politicalCapital <= 0) {
-          this.gameOver = true;
-          journey.endReason = 'Lost political support';
-          return;
-        }
-        break;
-
-      case 'permitting':
-      case 'desk':
-      default:
-        // Victory: Met permit target
-        if (journey.permits.approved >= journey.permits.target) {
-          this.victory = true;
-          journey.endReason = 'Permit targets achieved!';
-          return;
-        }
-        // Game over: Deadline passed
-        if (journey.day > journey.deadline) {
-          if (journey.permits.approved >= journey.permits.target * 0.8) {
-            this.victory = true;
-            journey.endReason = 'Deadline reached with acceptable progress';
-          } else {
-            this.gameOver = true;
-            journey.endReason = 'Failed to meet deadline';
-          }
-          return;
-        }
-        // Game over: Budget depleted
-        if (journey.resources.budget <= 0) {
-          this.gameOver = true;
-          journey.endReason = 'Budget exhausted';
-          return;
-        }
-        // Game over: Political capital gone
-        if (journey.resources.politicalCapital <= 0) {
-          this.gameOver = true;
-          journey.endReason = 'Lost political support - removed from position';
-          return;
-        }
-        break;
+      this.journey.endReason = result.reason || this.journey.endReason || 'Expedition completed!';
     }
   }
 

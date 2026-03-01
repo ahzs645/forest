@@ -9,10 +9,11 @@
  * @returns {Object|null} End condition result or null
  */
 export function checkReconEndConditions(journey) {
+  const crewBasedMode = !journey.protagonist;
   const activeCrewCount = journey.crew?.filter(m => m.isActive).length || 0;
 
   // No crew left
-  if (activeCrewCount === 0) {
+  if (crewBasedMode && activeCrewCount === 0) {
     return { gameOver: true, reason: 'All crew members lost' };
   }
 
@@ -35,10 +36,11 @@ export function checkReconEndConditions(journey) {
  * @returns {Object|null} End condition result or null
  */
 export function checkSilvicultureEndConditions(journey) {
+  const crewBasedMode = !journey.protagonist;
   const activeCrewCount = journey.crew?.filter(m => m.isActive).length || 0;
 
   // No crew left (if crew-based)
-  if (journey.crew && activeCrewCount === 0) {
+  if (crewBasedMode && activeCrewCount === 0) {
     return { gameOver: true, reason: 'All crew members lost' };
   }
 
