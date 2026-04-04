@@ -1,4 +1,3 @@
-import legacyIllegalActs from './json/legacy/illegalActs.json';
+import legacyIllegalActs from "./json/legacy/illegalActs.json" with { type: "json" };
 
 export const LEGACY_ILLEGAL_ACTS = Array.isArray(legacyIllegalActs?.illegal_acts) ? legacyIllegalActs.illegal_acts : [];
-
