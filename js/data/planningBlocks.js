@@ -3,7 +3,7 @@
  * Provides real-data block options for strategic planning mode.
  */
 
-import blockOptionsData from './json/planning/blockOptions.json';
+import blockOptionsData from "./json/planning/blockOptions.json" with { type: "json" };
 
 const DEFAULT_CADENCE_DAYS = 3;
 

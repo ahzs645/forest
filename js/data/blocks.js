@@ -4,8 +4,8 @@
  */
 
 // Import data from JSON files (Vite handles JSON imports natively)
-import weatherData from './json/field/weather.json';
-import blocksData from './json/field/blocks.json';
+import weatherData from "./json/field/weather.json" with { type: "json" };
+import blocksData from "./json/field/blocks.json" with { type: "json" };
 
 // Export weather conditions
 export const WEATHER_CONDITIONS = weatherData.conditions;

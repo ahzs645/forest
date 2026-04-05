@@ -54,7 +54,7 @@ function scoreOption(effects) {
 }
 
 function formatHistoryEntry(entry) {
-  const prefix = entry.type === "issue" ? "Issue" : "Task";
+  const prefix = entry.type === "issue" ? "Issue" : entry.type === "system" ? "System" : "Task";
   const delta = formatMetricDelta(entry.effects);
   return `${prefix} (${entry.round}): ${entry.title} -> ${entry.option}${delta ? ` [${delta}]` : ""}`;
 }
