@@ -8,6 +8,7 @@ import {
   createInitialState,
   getRoleTasks,
   applyEffects,
+  applyRoundConsequences,
   drawIssue,
   buildSummary,
 } from './js/engine.js';
@@ -77,6 +78,7 @@ for (const role of FORESTER_ROLES) {
           round,
         });
       }
+      applyRoundConsequences(state);
     }
 
     const summary = buildSummary(state);
