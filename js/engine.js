@@ -5,6 +5,7 @@ import {
 } from "./data/index.js";
 
 export const SEASONS = ["Spring Planning", "Summer Field", "Fall Integration", "Winter Review"];
+const ISSUE_REPEAT_COOLDOWN_ROUNDS = 2;
 
 export function findRole(roleId) {
   return FORESTER_ROLES.find((role) => role.id === roleId);
@@ -37,6 +38,7 @@ export function createInitialState({ companyName, roleId, areaId }) {
     history: [],
     flags: {},
     pendingIssues: [],
+    issueHistory: [],
     timeline: [
       {
         round: 0,
@@ -62,7 +64,10 @@ export function applyEffects(state, effects = {}, source) {
   }
   for (const key of Object.keys(metrics)) {
     if (delta[key] !== undefined) {
-      metrics[key] = clamp(metrics[key] + delta[key], 0, 100);
+      const value = Number(delta[key]);
+      const adjustedDelta = Number.isFinite(value) ? applyDiminishingReturns(metrics[key], value) : 0;
+      delta[key] = adjustedDelta;
+      metrics[key] = clamp(metrics[key] + adjustedDelta, 0, 100);
     }
   }
   if (source) {
@@ -103,15 +108,18 @@ export function drawIssue(state, rng = Math.random) {
   }
 
   const pool = ISSUE_LIBRARY.filter((issue) => issueMatchesContext(issue, state, tags));
-  if (!pool.length) {
+  const freshPool = pool.filter((issue) => !isIssueInCooldown(state, issue.id));
+  const selectablePool = freshPool.length ? freshPool : pool;
+
+  if (!selectablePool.length) {
     return null;
   }
 
-  const weightedPool = pool.map((issue) => ({ issue, weight: issueWeight(issue, state, { tags, season }) }));
+  const weightedPool = selectablePool.map((issue) => ({ issue, weight: issueWeight(issue, state, { tags, season }) }));
   const totalWeight = weightedPool.reduce((sum, entry) => sum + entry.weight, 0);
   if (totalWeight <= 0) {
-    const index = Math.floor(rng() * pool.length);
-    return pool[index];
+    const index = Math.floor(rng() * selectablePool.length);
+    return selectablePool[index];
   }
 
   let roll = rng() * totalWeight;
@@ -151,7 +159,8 @@ export function buildSummary(state) {
   }
 
   let overall;
-  if (averages >= 75) {
+  const balancedExcellence = Object.values(metrics).every((value) => value >= 65);
+  if (averages >= 82 && balancedExcellence) {
     overall = `Outstanding season – the ${role.name} kept the ${area.name} program balanced.`;
   } else if (averages >= 60) {
     overall = `Solid performance with room to fine-tune priorities next cycle.`;
@@ -218,6 +227,35 @@ function weightedAverage(metrics) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function applyDiminishingReturns(currentMetric, delta) {
+  if (delta <= 0) {
+    return delta;
+  }
+
+  if (currentMetric >= 90) {
+    return Math.max(1, Math.floor(delta * 0.35));
+  }
+  if (currentMetric >= 75) {
+    return Math.max(1, Math.floor(delta * 0.6));
+  }
+  return delta;
+}
+
+function isIssueInCooldown(state, issueId) {
+  if (!issueId || !Array.isArray(state?.history) || !state.history.length) {
+    return false;
+  }
+
+  const currentRound = Number(state.round || 1);
+  return state.history.some((entry) => {
+    if (entry?.type !== "issue" || entry.id !== issueId) {
+      return false;
+    }
+    const roundsAgo = currentRound - Number(entry.round || 0);
+    return roundsAgo > 0 && roundsAgo <= ISSUE_REPEAT_COOLDOWN_ROUNDS;
+  });
 }
 
 function issueMatchesContext(issue, state, tags) {
