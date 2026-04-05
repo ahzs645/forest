@@ -5,6 +5,7 @@ import {
   createInitialState,
   getRoleTasks,
   applyEffects,
+  applyRoundConsequences,
   drawIssue,
   buildSummary,
   formatMetricDelta,
@@ -99,6 +100,7 @@ for (let run = 1; run <= runs; run++) {
         round,
       });
     }
+    applyRoundConsequences(state);
   }
 
   const summary = buildSummary(state);

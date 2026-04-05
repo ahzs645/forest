@@ -6,6 +6,9 @@ import {
 
 export const SEASONS = ["Spring Planning", "Summer Field", "Fall Integration", "Winter Review"];
 const ISSUE_REPEAT_COOLDOWN_ROUNDS = 2;
+const BUDGET_ATTRITION_THRESHOLD = 25;
+const RELATIONSHIP_TRUST_THRESHOLD = 35;
+const COMPLIANCE_AUDIT_THRESHOLD = 40;
 
 export function findRole(roleId) {
   return FORESTER_ROLES.find((role) => role.id === roleId);
@@ -65,7 +68,10 @@ export function applyEffects(state, effects = {}, source) {
   for (const key of Object.keys(metrics)) {
     if (delta[key] !== undefined) {
       const value = Number(delta[key]);
-      const adjustedDelta = Number.isFinite(value) ? applyDiminishingReturns(metrics[key], value) : 0;
+      let adjustedDelta = Number.isFinite(value) ? applyDiminishingReturns(metrics[key], value) : 0;
+      if (state.flags?.trustDeficitActive && key === "relationships" && adjustedDelta > 0) {
+        adjustedDelta = Math.max(1, Math.floor(adjustedDelta * 0.5));
+      }
       delta[key] = adjustedDelta;
       metrics[key] = clamp(metrics[key] + adjustedDelta, 0, 100);
     }
@@ -73,6 +79,83 @@ export function applyEffects(state, effects = {}, source) {
   if (source) {
     state.history.push({ ...source, effects: delta });
   }
+}
+
+export function applyRoundConsequences(state) {
+  if (!state?.metrics || !state?.flags) {
+    return [];
+  }
+
+  const consequences = [];
+  const { metrics, flags } = state;
+  const round = Number(state.round || 0);
+
+  if (metrics.budget < BUDGET_ATTRITION_THRESHOLD) {
+    flags.lowBudgetStreak = Number(flags.lowBudgetStreak || 0) + 1;
+  } else {
+    flags.lowBudgetStreak = 0;
+  }
+
+  if (metrics.compliance < COMPLIANCE_AUDIT_THRESHOLD) {
+    flags.lowComplianceStreak = Number(flags.lowComplianceStreak || 0) + 1;
+  } else {
+    flags.lowComplianceStreak = 0;
+  }
+
+  if (metrics.relationships < RELATIONSHIP_TRUST_THRESHOLD) {
+    flags.trustDeficitActive = true;
+  } else if (metrics.relationships >= RELATIONSHIP_TRUST_THRESHOLD + 10) {
+    flags.trustDeficitActive = false;
+  }
+
+  if (flags.lowBudgetStreak >= 2) {
+    applyEffects(
+      state,
+      { progress: -6, relationships: -4 },
+      {
+        type: "consequence",
+        id: "contractor-attrition",
+        title: "Contractor attrition from sustained budget stress",
+        option: "Deferred scopes and partner pullback",
+        round,
+      },
+    );
+    flags.contractorAttritionActive = true;
+    consequences.push("contractor-attrition");
+  }
+
+  if (flags.trustDeficitActive) {
+    applyEffects(
+      state,
+      { compliance: -3 },
+      {
+        type: "consequence",
+        id: "trust-deficit",
+        title: "Low-trust environment limited high-confidence pathways",
+        option: "Escalated approvals and slower collaboration",
+        round,
+      },
+    );
+    consequences.push("trust-deficit");
+  }
+
+  if (flags.lowComplianceStreak >= 2) {
+    applyEffects(
+      state,
+      { budget: -6, progress: -4 },
+      {
+        type: "consequence",
+        id: "audit-escalation",
+        title: "Audit escalation after repeated compliance drops",
+        option: "Emergency documentation and stoppage delays",
+        round,
+      },
+    );
+    flags.auditEscalationActive = true;
+    consequences.push("audit-escalation");
+  }
+
+  return consequences;
 }
 
 export function getRoleTasks(state) {
