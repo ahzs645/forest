@@ -7,7 +7,7 @@ import {
 import {
   createInitialState,
   getRoleTasks,
-  applyEffects,
+  applyOptionOutcome,
   applyRoundConsequences,
   drawIssue,
   buildSummary,
@@ -59,7 +59,7 @@ for (const role of FORESTER_ROLES) {
       const tasks = getRoleTasks(state);
       for (const task of tasks) {
         const option = chooseOption(task.options);
-        applyEffects(state, option.effects, {
+        applyOptionOutcome(state, option, {
           type: 'task',
           id: task.id,
           title: task.title,
@@ -70,7 +70,7 @@ for (const role of FORESTER_ROLES) {
       const issue = drawIssue(state, rng);
       if (issue) {
         const option = chooseOption(issue.options);
-        applyEffects(state, option.effects, {
+        applyOptionOutcome(state, option, {
           type: 'issue',
           id: issue.id,
           title: issue.title,

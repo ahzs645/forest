@@ -4,7 +4,7 @@ import { FORESTER_ROLES, OPERATING_AREAS } from "./js/data/index.js";
 import {
   createInitialState,
   getRoleTasks,
-  applyEffects,
+  applyOptionOutcome,
   applyRoundConsequences,
   drawIssue,
   buildSummary,
@@ -81,7 +81,7 @@ for (let run = 1; run <= runs; run++) {
     const tasks = getRoleTasks(state);
     for (const task of tasks) {
       const option = chooseOption(task.options);
-      applyEffects(state, option.effects, {
+      applyOptionOutcome(state, option, {
         type: "task",
         id: task.id,
         title: task.title,
@@ -92,7 +92,7 @@ for (let run = 1; run <= runs; run++) {
     const issue = drawIssue(state);
     if (issue) {
       const option = chooseOption(issue.options);
-      applyEffects(state, option.effects, {
+      applyOptionOutcome(state, option, {
         type: "issue",
         id: issue.id,
         title: issue.title,
