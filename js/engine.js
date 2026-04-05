@@ -81,6 +81,16 @@ export function applyEffects(state, effects = {}, source) {
   }
 }
 
+export function applyOptionOutcome(state, option = {}, source) {
+  if (!state || !option) {
+    return;
+  }
+
+  applyEffects(state, option.effects || {}, source);
+  applyOptionFlags(state, option);
+  applyScheduledIssues(state, option);
+}
+
 export function applyRoundConsequences(state) {
   if (!state?.metrics || !state?.flags) {
     return [];
@@ -172,6 +182,13 @@ export function drawIssue(state, rng = Math.random) {
   const season = SEASONS[seasonIndex];
 
   if (Array.isArray(state.pendingIssues)) {
+    for (const pending of state.pendingIssues) {
+      if (!pending || typeof pending.delay !== "number") {
+        continue;
+      }
+      pending.delay = Math.max(0, pending.delay - 1);
+    }
+
     for (let i = 0; i < state.pendingIssues.length; i++) {
       const pending = state.pendingIssues[i];
       if (!pending) continue;
@@ -480,4 +497,41 @@ function futureOutlook(metrics, trends, area) {
     pieces.push("Trajectory is stable. Consider experimenting with innovation pilots next year.");
   }
   return pieces;
+}
+
+function applyOptionFlags(state, option) {
+  if (!state.flags) {
+    state.flags = {};
+  }
+
+  if (option.setFlags && typeof option.setFlags === "object") {
+    for (const [flag, value] of Object.entries(option.setFlags)) {
+      state.flags[flag] = Boolean(value);
+    }
+  }
+
+  if (Array.isArray(option.clearFlags)) {
+    for (const flag of option.clearFlags) {
+      delete state.flags[flag];
+    }
+  }
+}
+
+function applyScheduledIssues(state, option) {
+  const schedule = option.scheduleIssues;
+  if (!schedule || !schedule.id) {
+    return;
+  }
+
+  if (!Array.isArray(state.pendingIssues)) {
+    state.pendingIssues = [];
+  }
+
+  const existing = state.pendingIssues.find((pending) => pending?.id === schedule.id);
+  const delay = Math.max(0, Number(schedule.delay || 0));
+  if (existing) {
+    existing.delay = Math.min(existing.delay ?? delay, delay);
+    return;
+  }
+  state.pendingIssues.push({ id: schedule.id, delay });
 }
