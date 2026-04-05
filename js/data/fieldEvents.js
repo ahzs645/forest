@@ -4,8 +4,8 @@
  */
 
 // Import data from JSON (Vite handles JSON imports natively)
-import eventsData from './json/field/events.json';
-import legacyEventsData from './json/legacy/fieldEvents.json';
+import eventsData from "./json/field/events.json" with { type: "json" };
+import legacyEventsData from "./json/legacy/fieldEvents.json" with { type: "json" };
 
 // Export events
 export const FIELD_EVENTS = [...eventsData, ...(legacyEventsData || [])];
