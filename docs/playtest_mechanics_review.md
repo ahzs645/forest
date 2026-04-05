@@ -61,3 +61,20 @@ Date: 2026-04-02
 - Re-run `node test_strategies.js` and target fewer capped metrics (especially compliance/relationships).
 - Re-run `node cli.mjs --runs 20 --rounds 4` and verify broader spread of summary outcomes.
 - Track issue diversity per run (target: no identical issue in consecutive rounds unless chained).
+
+## Implemented tuning pass (2026-04-04)
+
+Implemented in `js/engine.js`:
+
+- **Diminishing returns for positive gains** once metrics are already high:
+  - 75+ metric: positive effects reduced to 60%.
+  - 90+ metric: positive effects reduced to 35%.
+- **Issue repeat cooldown**:
+  - The same issue is now filtered out for the next 2 rounds when alternatives exist.
+- **Stricter “Outstanding” summary gate**:
+  - Requires weighted average >= 82 *and* every metric >= 65.
+
+Re-test snapshot:
+
+- `node cli.mjs --runs 8 --rounds 4 --log` shifted outcomes from mostly “Outstanding” to mostly “Solid performance with room to fine-tune priorities next cycle.”
+- `node test_strategies.js` still trends strong, but no longer hard-caps most combinations at 100 across compliance/relationships, indicating healthier spread.
