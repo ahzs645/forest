@@ -1,0 +1,110 @@
+/**
+ * Journey Intro Display
+ * Role-specific intro text shown at journey start
+ */
+
+import { FIELD_SHIFT_HOURS } from '../journey/constants.js';
+import { getCurrentSeasonInfo } from '../season.js';
+
+/**
+ * Show journey-specific intro based on journey type
+ * @param {Object} ui - TerminalUI instance
+ * @param {Object} journey - Journey state
+ */
+export function showJourneyIntro(ui, journey) {
+  const journeyType = journey.journeyType;
+
+  // Show season info if available
+  if (journey.season) {
+    const seasonInfo = getCurrentSeasonInfo(journey.season);
+    ui.write(`Season: ${seasonInfo.icon} ${seasonInfo.name} - Year ${seasonInfo.year}`);
+    ui.write('');
+  }
+
+  switch (journeyType) {
+    case 'recon':
+      ui.write(`Mission: Survey ${journey.totalDistance} km of traverse across ${journey.blocks.length} forest blocks.`);
+      ui.write(`Each shift is about ${FIELD_SHIFT_HOURS} hours. Complete the survey before the season ends.`);
+      ui.write('Manage fuel, food, and equipment while documenting hazards and cultural sites.');
+      ui.write('');
+      ui.write('Starting supplies:');
+      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Fuel: ${journey.resources.fuel} gallons`);
+      ui.write(`  Food: ${journey.resources.food} days worth`);
+      ui.write(`  Equipment: ${journey.resources.equipment}% condition`);
+      ui.write(`  GPS Units: ${journey.resources.gpsUnits || 5}`);
+      break;
+
+    case 'silviculture':
+      ui.write(`Mission: Meet regeneration targets for the ${journey.planting.blocksToPlant} blocks in your program.`);
+      ui.write('Manage planting contractors, herbicide applications, and survival surveys.');
+      ui.write('Spring is critical for planting. Summer for brushing. Fall for assessments.');
+      ui.write('');
+      ui.write('Program targets:');
+      ui.write(`  Seedlings to plant: ${journey.planting.seedlingsAllocated.toLocaleString()}`);
+      ui.write(`  Brushing hectares: ${journey.brushing.hectaresTarget} ha`);
+      ui.write(`  Free-growing surveys: ${journey.surveys.freeGrowingTarget}`);
+      ui.write('');
+      ui.write('Starting resources:');
+      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Seedling inventory: ${journey.resources.seedlings?.toLocaleString() || 0}`);
+      ui.write(`  Contractor capacity: ${journey.resources.contractorCapacity} days`);
+      break;
+
+    case 'planning':
+      ui.write(`Mission: Achieve ministerial approval for a landscape-level forest plan within ${journey.deadline} days.`);
+      ui.write('Progress through phases: Data Gathering → Analysis → Stakeholder Review → Ministerial Approval');
+      ui.write('Balance values: biodiversity, timber supply, community needs, First Nations interests.');
+      ui.write('');
+      ui.write('Current phase: Data Gathering');
+      ui.write(`  Cutblocks to plan: ${journey.cutblocks.proposed}`);
+      ui.write('');
+      ui.write('Starting resources:');
+      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Political Capital: ${journey.resources.politicalCapital}`);
+      ui.write(`  Data Credits: ${journey.resources.dataCredits}`);
+      ui.write(`  Consultant Days: ${journey.resources.consultantDays}`);
+      break;
+
+    case 'permitting':
+      ui.write(`Mission: Complete ${journey.permits.target} permit approvals within ${journey.deadline} days.`);
+      ui.write('Manage the permit pipeline: drafting → referral → review → approval.');
+      ui.write('Build stakeholder relationships to smooth the approval process.');
+      ui.write('');
+      ui.write('Permit pipeline:');
+      ui.write(`  Target: ${journey.permits.target} approvals`);
+      ui.write(`  In backlog: ${journey.permits.backlog}`);
+      ui.write(`  Submitted: ${journey.permits.submitted}`);
+      ui.write(`  In review: ${journey.permits.inReview}`);
+      ui.write('');
+      ui.write('Starting resources:');
+      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Political Capital: ${journey.resources.politicalCapital}`);
+      break;
+
+    case 'field':
+      ui.write(`Mission: Survey ${journey.totalDistance} km of traverse across ${journey.blocks.length} forest blocks.`);
+      ui.write(`Each shift is about ${FIELD_SHIFT_HOURS} hours. The crew returns to camp nightly.`);
+      ui.write('Manage fuel, food, and equipment while keeping radio contact.');
+      ui.write('');
+      ui.write('Starting supplies:');
+      ui.write(`  Cash: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Fuel: ${journey.resources.fuel} gallons`);
+      ui.write(`  Food: ${journey.resources.food} days worth`);
+      ui.write(`  Equipment: ${journey.resources.equipment}% condition`);
+      ui.write(`  First Aid: ${journey.resources.firstAid} kits`);
+      break;
+
+    case 'desk':
+    default:
+      ui.write(`Mission: Complete permit approvals within ${journey.deadline} days.`);
+      ui.write(`Target: ${journey.permits.target} permits approved.`);
+      ui.write('Manage your budget, political capital, and team energy.');
+      ui.write('');
+      ui.write('Starting resources:');
+      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Political Capital: ${journey.resources.politicalCapital}`);
+      ui.write(`  Daily Energy: ${journey.hoursRemaining} hours`);
+      break;
+  }
+}
