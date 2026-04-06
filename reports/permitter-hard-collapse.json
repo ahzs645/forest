@@ -1,0 +1,589 @@
+{
+  "strategy": "collapse",
+  "runCount": 10,
+  "generatedAt": "2026-04-06T02:05:43.707Z",
+  "summary": [
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "runs": 10,
+      "winRate": 0,
+      "avgDays": 12.6,
+      "commonFailReasons": [
+        {
+          "reason": "Lost political support - removed from position",
+          "count": 8
+        },
+        {
+          "reason": "Budget exhausted",
+          "count": 2
+        }
+      ],
+      "dominantChoices": [
+        {
+          "label": "Handle Crisis",
+          "count": 91
+        },
+        {
+          "label": "Stakeholder Meeting",
+          "count": 39
+        },
+        {
+          "label": "Ask to reschedule",
+          "count": 20
+        },
+        {
+          "label": "Explain the regulatory constraints",
+          "count": 19
+        },
+        {
+          "label": "Take a Break",
+          "count": 11
+        },
+        {
+          "label": "Redirect to the ministry",
+          "count": 9
+        },
+        {
+          "label": "Blame the previous administration",
+          "count": 9
+        },
+        {
+          "label": "Escalate to management",
+          "count": 8
+        }
+      ],
+      "dominantActions": [
+        {
+          "label": "Handle Crisis",
+          "count": 91
+        },
+        {
+          "label": "Stakeholder Meeting",
+          "count": 39
+        },
+        {
+          "label": "Take a Break",
+          "count": 11
+        },
+        {
+          "label": "Team Building",
+          "count": 2
+        }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7000,
+      "outcome": "failure",
+      "reason": "Lost political support - removed from position",
+      "daysUsed": 23,
+      "choiceCounts": {
+        "Handle Crisis": 17,
+        "Stakeholder Meeting": 6,
+        "Ask to reschedule": 4,
+        "Escalate to management": 3,
+        "Explain the regulatory constraints": 3,
+        "Decline to comment": 2,
+        "Take a Break": 1,
+        "Redirect to the ministry": 1,
+        "Wait and see": 1,
+        "Take the shortcut": 1,
+        "Push back deadlines": 1,
+        "Defer pending capacity review": 1,
+        "Join industry pushback": 1,
+        "Wish them well and plan transition": 1,
+        "Blame the previous administration": 1,
+        "Stay focused": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Ask to reschedule": 4,
+          "Escalate to management": 3,
+          "Explain the regulatory constraints": 3,
+          "Decline to comment": 2,
+          "Redirect to the ministry": 1,
+          "Wait and see": 1,
+          "Take the shortcut": 1,
+          "Push back deadlines": 1,
+          "Defer pending capacity review": 1,
+          "Join industry pushback": 1,
+          "Wish them well and plan transition": 1,
+          "Blame the previous administration": 1,
+          "Stay focused": 1
+        },
+        "action": {
+          "Handle Crisis": 17,
+          "Stakeholder Meeting": 6,
+          "Take a Break": 1
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 17,
+        "Stakeholder Meeting": 6,
+        "Take a Break": 1
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 24,
+        "permitsApproved": 0,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7001,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 8,
+      "choiceCounts": {
+        "Handle Crisis": 6,
+        "Stakeholder Meeting": 2,
+        "Ask to reschedule": 1,
+        "Blame the previous administration": 1,
+        "Wait and see": 1,
+        "Bring in HR": 1,
+        "Explain the regulatory constraints": 1,
+        "Accept and adjust plans": 1,
+        "Full cooperation with investigation, implement all safety recommendations": 1,
+        "Team Building": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Ask to reschedule": 1,
+          "Blame the previous administration": 1,
+          "Wait and see": 1,
+          "Bring in HR": 1,
+          "Explain the regulatory constraints": 1,
+          "Accept and adjust plans": 1,
+          "Full cooperation with investigation, implement all safety recommendations": 1
+        },
+        "action": {
+          "Handle Crisis": 6,
+          "Stakeholder Meeting": 2,
+          "Team Building": 1
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 6,
+        "Stakeholder Meeting": 2,
+        "Team Building": 1
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 9,
+        "permitsApproved": 0,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7002,
+      "outcome": "failure",
+      "reason": "Lost political support - removed from position",
+      "daysUsed": 8,
+      "choiceCounts": {
+        "Handle Crisis": 6,
+        "Ask to reschedule": 2,
+        "Stakeholder Meeting": 2,
+        "Stay focused": 1,
+        "Blame the previous administration": 1,
+        "Rebuild from field notes": 1,
+        "Redirect to the ministry": 1,
+        "Explain the regulatory constraints": 1,
+        "Take a Break": 1,
+        "Join industry pushback": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Ask to reschedule": 2,
+          "Stay focused": 1,
+          "Blame the previous administration": 1,
+          "Rebuild from field notes": 1,
+          "Redirect to the ministry": 1,
+          "Explain the regulatory constraints": 1,
+          "Join industry pushback": 1
+        },
+        "action": {
+          "Handle Crisis": 6,
+          "Stakeholder Meeting": 2,
+          "Take a Break": 1
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 6,
+        "Stakeholder Meeting": 2,
+        "Take a Break": 1
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 9,
+        "permitsApproved": 0,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7003,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 29,
+      "choiceCounts": {
+        "Handle Crisis": 18,
+        "Stakeholder Meeting": 13,
+        "Explain the regulatory constraints": 6,
+        "Take a Break": 4,
+        "Escalate to management": 3,
+        "Ask to reschedule": 2,
+        "Redirect to the ministry": 2,
+        "Accept and adjust plans": 2,
+        "Decline to comment": 2,
+        "Rebuild from field notes": 2,
+        "Defer pending capacity review": 1,
+        "Refuse and keep it clean": 1,
+        "Stay focused": 1,
+        "Wait and see": 1,
+        "Celebrate with the team": 1,
+        "Wish them well and plan transition": 1,
+        "Blame the previous administration": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Explain the regulatory constraints": 6,
+          "Escalate to management": 3,
+          "Ask to reschedule": 2,
+          "Redirect to the ministry": 2,
+          "Accept and adjust plans": 2,
+          "Decline to comment": 2,
+          "Rebuild from field notes": 2,
+          "Defer pending capacity review": 1,
+          "Refuse and keep it clean": 1,
+          "Stay focused": 1,
+          "Wait and see": 1,
+          "Celebrate with the team": 1,
+          "Wish them well and plan transition": 1,
+          "Blame the previous administration": 1
+        },
+        "action": {
+          "Handle Crisis": 18,
+          "Stakeholder Meeting": 13,
+          "Take a Break": 4
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 18,
+        "Stakeholder Meeting": 13,
+        "Take a Break": 4
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 30,
+        "permitsApproved": 0,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7004,
+      "outcome": "failure",
+      "reason": "Lost political support - removed from position",
+      "daysUsed": 3,
+      "choiceCounts": {
+        "Handle Crisis": 3,
+        "Ask to reschedule": 1,
+        "Join industry pushback": 1,
+        "Redirect to the ministry": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Ask to reschedule": 1,
+          "Join industry pushback": 1,
+          "Redirect to the ministry": 1
+        },
+        "action": {
+          "Handle Crisis": 3
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 3
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 4,
+        "permitsApproved": 1,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7005,
+      "outcome": "failure",
+      "reason": "Lost political support - removed from position",
+      "daysUsed": 15,
+      "choiceCounts": {
+        "Handle Crisis": 11,
+        "Stakeholder Meeting": 4,
+        "Ask to reschedule": 3,
+        "Explain the regulatory constraints": 2,
+        "Take a Break": 2,
+        "Push back deadlines": 2,
+        "Escalate to management": 1,
+        "Rebuild from field notes": 1,
+        "Celebrate with the team": 1,
+        "Accept and adjust plans": 1,
+        "Decline to comment": 1,
+        "Redirect to the ministry": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Ask to reschedule": 3,
+          "Explain the regulatory constraints": 2,
+          "Push back deadlines": 2,
+          "Escalate to management": 1,
+          "Rebuild from field notes": 1,
+          "Celebrate with the team": 1,
+          "Accept and adjust plans": 1,
+          "Decline to comment": 1,
+          "Redirect to the ministry": 1
+        },
+        "action": {
+          "Handle Crisis": 11,
+          "Stakeholder Meeting": 4,
+          "Take a Break": 2
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 11,
+        "Stakeholder Meeting": 4,
+        "Take a Break": 2
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 16,
+        "permitsApproved": 0,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7006,
+      "outcome": "failure",
+      "reason": "Lost political support - removed from position",
+      "daysUsed": 8,
+      "choiceCounts": {
+        "Handle Crisis": 6,
+        "Stakeholder Meeting": 3,
+        "Redirect to the ministry": 2,
+        "Take a Break": 2,
+        "Ask to reschedule": 1,
+        "Escalate to management": 1,
+        "Blame the previous administration": 1,
+        "Explain the regulatory constraints": 1,
+        "Bring in HR": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Redirect to the ministry": 2,
+          "Ask to reschedule": 1,
+          "Escalate to management": 1,
+          "Blame the previous administration": 1,
+          "Explain the regulatory constraints": 1,
+          "Bring in HR": 1
+        },
+        "action": {
+          "Handle Crisis": 6,
+          "Stakeholder Meeting": 3,
+          "Take a Break": 2
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 6,
+        "Stakeholder Meeting": 3,
+        "Take a Break": 2
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 9,
+        "permitsApproved": 2,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7007,
+      "outcome": "failure",
+      "reason": "Lost political support - removed from position",
+      "daysUsed": 8,
+      "choiceCounts": {
+        "Handle Crisis": 6,
+        "Stakeholder Meeting": 2,
+        "Ask to reschedule": 1,
+        "Explain the regulatory constraints": 1,
+        "Take a Break": 1,
+        "Stay focused": 1,
+        "Redirect to the ministry": 1,
+        "Rebuild from field notes": 1,
+        "Push back deadlines": 1,
+        "Blame the previous administration": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Ask to reschedule": 1,
+          "Explain the regulatory constraints": 1,
+          "Stay focused": 1,
+          "Redirect to the ministry": 1,
+          "Rebuild from field notes": 1,
+          "Push back deadlines": 1,
+          "Blame the previous administration": 1
+        },
+        "action": {
+          "Handle Crisis": 6,
+          "Stakeholder Meeting": 2,
+          "Take a Break": 1
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 6,
+        "Stakeholder Meeting": 2,
+        "Take a Break": 1
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 9,
+        "permitsApproved": 0,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7008,
+      "outcome": "failure",
+      "reason": "Lost political support - removed from position",
+      "daysUsed": 8,
+      "choiceCounts": {
+        "Handle Crisis": 7,
+        "Blame the previous administration": 2,
+        "Stakeholder Meeting": 2,
+        "Ask to reschedule": 1,
+        "Explain the regulatory constraints": 1,
+        "Stay focused": 1,
+        "Wait and see": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Blame the previous administration": 2,
+          "Ask to reschedule": 1,
+          "Explain the regulatory constraints": 1,
+          "Stay focused": 1,
+          "Wait and see": 1
+        },
+        "action": {
+          "Handle Crisis": 7,
+          "Stakeholder Meeting": 2
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 7,
+        "Stakeholder Meeting": 2
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 9,
+        "permitsApproved": 0,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "permitter",
+      "difficulty": "hard",
+      "seed": 7009,
+      "outcome": "failure",
+      "reason": "Lost political support - removed from position",
+      "daysUsed": 16,
+      "choiceCounts": {
+        "Handle Crisis": 11,
+        "Stakeholder Meeting": 5,
+        "Ask to reschedule": 4,
+        "Explain the regulatory constraints": 3,
+        "Defer pending capacity review": 2,
+        "Join industry pushback": 1,
+        "Fund aerial surveys and joint response now": 1,
+        "Team Building": 1,
+        "Celebrate with the team": 1,
+        "Wait and see": 1,
+        "Blame the previous administration": 1,
+        "Rebuild from field notes": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Ask to reschedule": 4,
+          "Explain the regulatory constraints": 3,
+          "Defer pending capacity review": 2,
+          "Join industry pushback": 1,
+          "Fund aerial surveys and joint response now": 1,
+          "Celebrate with the team": 1,
+          "Wait and see": 1,
+          "Blame the previous administration": 1,
+          "Rebuild from field notes": 1
+        },
+        "action": {
+          "Handle Crisis": 11,
+          "Stakeholder Meeting": 5,
+          "Team Building": 1
+        }
+      },
+      "actionCounts": {
+        "Handle Crisis": 11,
+        "Stakeholder Meeting": 5,
+        "Team Building": 1
+      },
+      "finalState": {
+        "journeyType": "permitting",
+        "progress": 17,
+        "permitsApproved": 0,
+        "permitsTarget": 15,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    }
+  ]
+}

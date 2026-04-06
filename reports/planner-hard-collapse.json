@@ -1,0 +1,668 @@
+{
+  "strategy": "collapse",
+  "runCount": 10,
+  "generatedAt": "2026-04-06T02:05:43.716Z",
+  "summary": [
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "runs": 10,
+      "winRate": 0,
+      "avgDays": 14.2,
+      "commonFailReasons": [
+        {
+          "reason": "Lost political support",
+          "count": 9
+        },
+        {
+          "reason": "Cabinet window closed before approval",
+          "count": 1
+        }
+      ],
+      "dominantChoices": [
+        {
+          "label": "Timber Assessment",
+          "count": 267
+        },
+        {
+          "label": "Check Email",
+          "count": 247
+        },
+        {
+          "label": "Explain the regulatory constraints",
+          "count": 20
+        },
+        {
+          "label": "Redirect to the ministry",
+          "count": 19
+        },
+        {
+          "label": "Ask to reschedule",
+          "count": 16
+        },
+        {
+          "label": "Blame the previous administration",
+          "count": 14
+        },
+        {
+          "label": "Escalate to management",
+          "count": 13
+        },
+        {
+          "label": "Planned Cutblock: M02604 88 MTD538 1",
+          "count": 11
+        }
+      ],
+      "dominantActions": [
+        {
+          "label": "Timber Assessment",
+          "count": 267
+        },
+        {
+          "label": "Check Email",
+          "count": 247
+        }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7000,
+      "outcome": "failure",
+      "reason": "Lost political support",
+      "daysUsed": 8,
+      "choiceCounts": {
+        "Timber Assessment": 15,
+        "Check Email": 15,
+        "Planned Cutblock: M02604 88 MTD538 1": 1,
+        "Ask to reschedule": 1,
+        "Redirect to the ministry": 1,
+        "Join industry pushback": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Escalate to management": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Wait and see": 1,
+        "Bring in HR": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 1,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1
+        },
+        "event": {
+          "Ask to reschedule": 1,
+          "Redirect to the ministry": 1,
+          "Join industry pushback": 1,
+          "Escalate to management": 1,
+          "Wait and see": 1,
+          "Bring in HR": 1
+        },
+        "action": {
+          "Timber Assessment": 15,
+          "Check Email": 15
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 15,
+        "Check Email": 15
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 9,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7001,
+      "outcome": "failure",
+      "reason": "Cabinet window closed before approval",
+      "daysUsed": 19,
+      "choiceCounts": {
+        "Timber Assessment": 34,
+        "Check Email": 32,
+        "Push back deadlines": 3,
+        "Redirect to the ministry": 3,
+        "Planned Cutblock: M02604 88 MTD538 1": 2,
+        "Escalate to management": 2,
+        "Explain the regulatory constraints": 2,
+        "Blame the previous administration": 2,
+        "Wait and see": 1,
+        "Ask to reschedule": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Rebuild from field notes": 1,
+        "Planned Cutblock: M02526 86 MTD812 1": 1,
+        "Planned Cutblock: M02630 131 MTE076 1": 1,
+        "Defer pending capacity review": 1,
+        "Planned Cutblock: M02526 128 MTE055 1": 1,
+        "Accept and adjust plans": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 2,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1,
+          "Planned Cutblock: M02526 86 MTD812 1": 1,
+          "Planned Cutblock: M02630 131 MTE076 1": 1,
+          "Planned Cutblock: M02526 128 MTE055 1": 1
+        },
+        "event": {
+          "Push back deadlines": 3,
+          "Redirect to the ministry": 3,
+          "Escalate to management": 2,
+          "Explain the regulatory constraints": 2,
+          "Blame the previous administration": 2,
+          "Wait and see": 1,
+          "Ask to reschedule": 1,
+          "Rebuild from field notes": 1,
+          "Defer pending capacity review": 1,
+          "Accept and adjust plans": 1
+        },
+        "action": {
+          "Timber Assessment": 34,
+          "Check Email": 32
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 34,
+        "Check Email": 32
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 20,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7002,
+      "outcome": "failure",
+      "reason": "Lost political support",
+      "daysUsed": 11,
+      "choiceCounts": {
+        "Timber Assessment": 21,
+        "Check Email": 20,
+        "Redirect to the ministry": 2,
+        "Decline to comment": 2,
+        "Planned Cutblock: M02604 88 MTD538 1": 1,
+        "Escalate to management": 1,
+        "Ask to reschedule": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Explain the regulatory constraints": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Bring in HR": 1,
+        "Planned Cutblock: M02526 86 MTD812 1": 1,
+        "Join industry pushback": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 1,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1,
+          "Planned Cutblock: M02526 86 MTD812 1": 1
+        },
+        "event": {
+          "Redirect to the ministry": 2,
+          "Decline to comment": 2,
+          "Escalate to management": 1,
+          "Ask to reschedule": 1,
+          "Explain the regulatory constraints": 1,
+          "Bring in HR": 1,
+          "Join industry pushback": 1
+        },
+        "action": {
+          "Timber Assessment": 21,
+          "Check Email": 20
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 21,
+        "Check Email": 20
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 12,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7003,
+      "outcome": "failure",
+      "reason": "Lost political support",
+      "daysUsed": 16,
+      "choiceCounts": {
+        "Timber Assessment": 31,
+        "Check Email": 28,
+        "Ask to reschedule": 4,
+        "Explain the regulatory constraints": 3,
+        "Blame the previous administration": 2,
+        "Planned Cutblock: M02604 88 MTD538 1": 1,
+        "Redirect to the ministry": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Push back deadlines": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Planned Cutblock: M02526 86 MTD812 1": 1,
+        "Wish them well and plan transition": 1,
+        "Planned Cutblock: M02630 131 MTE076 1": 1,
+        "Escalate to management": 1,
+        "Planned Cutblock: M02526 128 MTE055 1": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 1,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1,
+          "Planned Cutblock: M02526 86 MTD812 1": 1,
+          "Planned Cutblock: M02630 131 MTE076 1": 1,
+          "Planned Cutblock: M02526 128 MTE055 1": 1
+        },
+        "event": {
+          "Ask to reschedule": 4,
+          "Explain the regulatory constraints": 3,
+          "Blame the previous administration": 2,
+          "Redirect to the ministry": 1,
+          "Push back deadlines": 1,
+          "Wish them well and plan transition": 1,
+          "Escalate to management": 1
+        },
+        "action": {
+          "Timber Assessment": 31,
+          "Check Email": 28
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 31,
+        "Check Email": 28
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 17,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7004,
+      "outcome": "failure",
+      "reason": "Lost political support",
+      "daysUsed": 11,
+      "choiceCounts": {
+        "Timber Assessment": 18,
+        "Check Email": 16,
+        "Explain the regulatory constraints": 2,
+        "Ask to reschedule": 2,
+        "Escalate to management": 2,
+        "Planned Cutblock: M02604 88 MTD538 1": 1,
+        "Rebuild from field notes": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Join industry pushback": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Redirect to the ministry": 1,
+        "Defer pending capacity review": 1,
+        "Planned Cutblock: M02526 86 MTD812 1": 1,
+        "Stay focused": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 1,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1,
+          "Planned Cutblock: M02526 86 MTD812 1": 1
+        },
+        "event": {
+          "Explain the regulatory constraints": 2,
+          "Ask to reschedule": 2,
+          "Escalate to management": 2,
+          "Rebuild from field notes": 1,
+          "Join industry pushback": 1,
+          "Redirect to the ministry": 1,
+          "Defer pending capacity review": 1,
+          "Stay focused": 1
+        },
+        "action": {
+          "Timber Assessment": 18,
+          "Check Email": 16
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 18,
+        "Check Email": 16
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 12,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7005,
+      "outcome": "failure",
+      "reason": "Lost political support",
+      "daysUsed": 13,
+      "choiceCounts": {
+        "Timber Assessment": 25,
+        "Check Email": 23,
+        "Explain the regulatory constraints": 2,
+        "Planned Cutblock: M02604 88 MTD538 1": 1,
+        "Bring in HR": 1,
+        "Redirect to the ministry": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Wish them well and plan transition": 1,
+        "Ask to reschedule": 1,
+        "Escalate to management": 1,
+        "Planned Cutblock: M02526 86 MTD812 1": 1,
+        "Take the shortcut": 1,
+        "Planned Cutblock: M02630 131 MTE076 1": 1,
+        "Join industry pushback": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 1,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1,
+          "Planned Cutblock: M02526 86 MTD812 1": 1,
+          "Planned Cutblock: M02630 131 MTE076 1": 1
+        },
+        "action": {
+          "Timber Assessment": 25,
+          "Check Email": 23
+        },
+        "event": {
+          "Explain the regulatory constraints": 2,
+          "Bring in HR": 1,
+          "Redirect to the ministry": 1,
+          "Wish them well and plan transition": 1,
+          "Ask to reschedule": 1,
+          "Escalate to management": 1,
+          "Take the shortcut": 1,
+          "Join industry pushback": 1
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 25,
+        "Check Email": 23
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 14,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7006,
+      "outcome": "failure",
+      "reason": "Lost political support",
+      "daysUsed": 18,
+      "choiceCounts": {
+        "Timber Assessment": 35,
+        "Check Email": 33,
+        "Blame the previous administration": 3,
+        "Redirect to the ministry": 3,
+        "Ask to reschedule": 2,
+        "Explain the regulatory constraints": 2,
+        "Planned Cutblock: M02604 88 MTD538 1": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Push back deadlines": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Wish them well and plan transition": 1,
+        "Planned Cutblock: M02526 86 MTD812 1": 1,
+        "Planned Cutblock: M02630 131 MTE076 1": 1,
+        "Escalate to management": 1,
+        "Stay focused": 1,
+        "Planned Cutblock: M02526 128 MTE055 1": 1,
+        "Decline to comment": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 1,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1,
+          "Planned Cutblock: M02526 86 MTD812 1": 1,
+          "Planned Cutblock: M02630 131 MTE076 1": 1,
+          "Planned Cutblock: M02526 128 MTE055 1": 1
+        },
+        "event": {
+          "Blame the previous administration": 3,
+          "Redirect to the ministry": 3,
+          "Ask to reschedule": 2,
+          "Explain the regulatory constraints": 2,
+          "Push back deadlines": 1,
+          "Wish them well and plan transition": 1,
+          "Escalate to management": 1,
+          "Stay focused": 1,
+          "Decline to comment": 1
+        },
+        "action": {
+          "Timber Assessment": 35,
+          "Check Email": 33
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 35,
+        "Check Email": 33
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 19,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7007,
+      "outcome": "failure",
+      "reason": "Lost political support",
+      "daysUsed": 18,
+      "choiceCounts": {
+        "Timber Assessment": 34,
+        "Check Email": 31,
+        "Blame the previous administration": 4,
+        "Explain the regulatory constraints": 3,
+        "Redirect to the ministry": 2,
+        "Escalate to management": 2,
+        "Bring in HR": 2,
+        "Ask to reschedule": 2,
+        "Planned Cutblock: M02604 88 MTD538 1": 1,
+        "Stay focused": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Planned Cutblock: M02526 86 MTD812 1": 1,
+        "Planned Cutblock: M02630 131 MTE076 1": 1,
+        "Planned Cutblock: M02526 128 MTE055 1": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 1,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1,
+          "Planned Cutblock: M02526 86 MTD812 1": 1,
+          "Planned Cutblock: M02630 131 MTE076 1": 1,
+          "Planned Cutblock: M02526 128 MTE055 1": 1
+        },
+        "event": {
+          "Blame the previous administration": 4,
+          "Explain the regulatory constraints": 3,
+          "Redirect to the ministry": 2,
+          "Escalate to management": 2,
+          "Bring in HR": 2,
+          "Ask to reschedule": 2,
+          "Stay focused": 1
+        },
+        "action": {
+          "Timber Assessment": 34,
+          "Check Email": 31
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 34,
+        "Check Email": 31
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 19,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7008,
+      "outcome": "failure",
+      "reason": "Lost political support",
+      "daysUsed": 18,
+      "choiceCounts": {
+        "Timber Assessment": 34,
+        "Check Email": 31,
+        "Redirect to the ministry": 3,
+        "Explain the regulatory constraints": 3,
+        "Blame the previous administration": 3,
+        "Push back deadlines": 2,
+        "Escalate to management": 2,
+        "Planned Cutblock: M02604 88 MTD538 1": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Planned Cutblock: M02526 86 MTD812 1": 1,
+        "Ask to reschedule": 1,
+        "Planned Cutblock: M02630 131 MTE076 1": 1,
+        "Accept and adjust plans": 1,
+        "Planned Cutblock: M02526 128 MTE055 1": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 1,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1,
+          "Planned Cutblock: M02526 86 MTD812 1": 1,
+          "Planned Cutblock: M02630 131 MTE076 1": 1,
+          "Planned Cutblock: M02526 128 MTE055 1": 1
+        },
+        "event": {
+          "Redirect to the ministry": 3,
+          "Explain the regulatory constraints": 3,
+          "Blame the previous administration": 3,
+          "Push back deadlines": 2,
+          "Escalate to management": 2,
+          "Ask to reschedule": 1,
+          "Accept and adjust plans": 1
+        },
+        "action": {
+          "Timber Assessment": 34,
+          "Check Email": 31
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 34,
+        "Check Email": 31
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 19,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "planner",
+      "difficulty": "hard",
+      "seed": 7009,
+      "outcome": "failure",
+      "reason": "Lost political support",
+      "daysUsed": 10,
+      "choiceCounts": {
+        "Timber Assessment": 20,
+        "Check Email": 18,
+        "Join industry pushback": 2,
+        "Explain the regulatory constraints": 2,
+        "Redirect to the ministry": 2,
+        "Planned Cutblock: M02604 88 MTD538 1": 1,
+        "Planned Cutblock: M02526 126 MTE050 1": 1,
+        "Ask to reschedule": 1,
+        "Planned Cutblock: M02630 130 MTE073 1": 1,
+        "Decline to comment": 1,
+        "Planned Cutblock: M02526 86 MTD812 1": 1
+      },
+      "choiceBreakdown": {
+        "block_focus": {
+          "Planned Cutblock: M02604 88 MTD538 1": 1,
+          "Planned Cutblock: M02526 126 MTE050 1": 1,
+          "Planned Cutblock: M02630 130 MTE073 1": 1,
+          "Planned Cutblock: M02526 86 MTD812 1": 1
+        },
+        "event": {
+          "Join industry pushback": 2,
+          "Explain the regulatory constraints": 2,
+          "Redirect to the ministry": 2,
+          "Ask to reschedule": 1,
+          "Decline to comment": 1
+        },
+        "action": {
+          "Timber Assessment": 20,
+          "Check Email": 18
+        }
+      },
+      "actionCounts": {
+        "Timber Assessment": 20,
+        "Check Email": 18
+      },
+      "finalState": {
+        "journeyType": "planning",
+        "progress": 11,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": "data_gathering",
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,1159 @@
+{
+  "strategy": "collapse",
+  "runCount": 25,
+  "generatedAt": "2026-04-06T02:05:25.697Z",
+  "summary": [
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "runs": 25,
+      "winRate": 0.88,
+      "avgDays": 11.6,
+      "commonFailReasons": [
+        {
+          "reason": "OUT OF FUEL - The crew is stranded.",
+          "count": 2
+        },
+        {
+          "reason": "ALL CREW LOST - No one remains to continue the journey.",
+          "count": 1
+        }
+      ],
+      "dominantChoices": [
+        {
+          "label": "Max Effort",
+          "count": 143
+        },
+        {
+          "label": "Rest & End Shift",
+          "count": 143
+        },
+        {
+          "label": "Risky Shortcut",
+          "count": 141
+        },
+        {
+          "label": "Short Rations and Push On",
+          "count": 117
+        },
+        {
+          "label": "Push through to the next block",
+          "count": 3
+        },
+        {
+          "label": "Make up time!",
+          "count": 3
+        },
+        {
+          "label": "Hand-clear a path",
+          "count": 3
+        },
+        {
+          "label": "Find an alternate route",
+          "count": 3
+        }
+      ],
+      "dominantActions": [
+        {
+          "label": "Max Effort",
+          "count": 143
+        },
+        {
+          "label": "Rest & End Shift",
+          "count": 143
+        }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7000,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5,
+        "Push through to the next block": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "event": {
+          "Push through to the next block": 1
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7001,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5,
+        "Shift to night operations with heavy patrols": 1,
+        "Try to pass slowly": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "event": {
+          "Shift to night operations with heavy patrols": 1,
+          "Try to pass slowly": 1
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7002,
+      "outcome": "failure",
+      "reason": "ALL CREW LOST - No one remains to continue the journey.",
+      "daysUsed": 14,
+      "choiceCounts": {
+        "Risky Shortcut": 7,
+        "Max Effort": 7,
+        "Rest & End Shift": 7,
+        "Short Rations and Push On": 6,
+        "Wait for help": 1,
+        "Push through anyway": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 7
+        },
+        "action": {
+          "Max Effort": 7,
+          "Rest & End Shift": 7
+        },
+        "rationing": {
+          "Short Rations and Push On": 6
+        },
+        "event": {
+          "Wait for help": 1,
+          "Push through anyway": 1
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 7,
+        "Rest & End Shift": 7
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 15,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7003,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 11,
+      "choiceCounts": {
+        "Risky Shortcut": 5,
+        "Max Effort": 5,
+        "Rest & End Shift": 5,
+        "Short Rations and Push On": 4,
+        "Make up time!": 1,
+        "Hand-clear a path": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 5,
+          "Rest & End Shift": 5
+        },
+        "event": {
+          "Make up time!": 1,
+          "Hand-clear a path": 1
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 5,
+        "Rest & End Shift": 5
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 12,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7004,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 14,
+      "choiceCounts": {
+        "Max Effort": 7,
+        "Rest & End Shift": 7,
+        "Risky Shortcut": 6,
+        "Short Rations and Push On": 6,
+        "Push through to the next block": 1,
+        "Go back and search": 1,
+        "Wait for help": 1,
+        "Make up time!": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Push through to the next block": 1,
+          "Go back and search": 1,
+          "Wait for help": 1,
+          "Make up time!": 1
+        },
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 7,
+          "Rest & End Shift": 7
+        },
+        "rationing": {
+          "Short Rations and Push On": 6
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 7,
+        "Rest & End Shift": 7
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 15,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7005,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5,
+        "Trade alien technology for Earth wood samples": 1,
+        "Find an alternate route": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Trade alien technology for Earth wood samples": 1,
+          "Find an alternate route": 1
+        },
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7006,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Risky Shortcut": 5,
+        "Short Rations and Push On": 5,
+        "Build a bypass": 1,
+        "Find an alternate route": 1,
+        "Make up time!": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Build a bypass": 1,
+          "Find an alternate route": 1,
+          "Make up time!": 1
+        },
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7007,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 10,
+      "choiceCounts": {
+        "Risky Shortcut": 5,
+        "Max Effort": 5,
+        "Rest & End Shift": 5,
+        "Short Rations and Push On": 4,
+        "Call for tow truck": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Call for tow truck": 1
+        },
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 5,
+          "Rest & End Shift": 5
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 5,
+        "Rest & End Shift": 5
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 11,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7008,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 10,
+      "choiceCounts": {
+        "Risky Shortcut": 5,
+        "Max Effort": 5,
+        "Rest & End Shift": 5,
+        "Short Rations and Push On": 4,
+        "Fire a warning shot": 1,
+        "Find another crossing": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 5,
+          "Rest & End Shift": 5
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        },
+        "event": {
+          "Fire a warning shot": 1,
+          "Find another crossing": 1
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 5,
+        "Rest & End Shift": 5
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 11,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7009,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 4,
+        "Stay focused": 1,
+        "Grab the food supplies": 1,
+        "Trade for food": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Stay focused": 1,
+          "Grab the food supplies": 1,
+          "Trade for food": 1
+        },
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7010,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 10,
+      "choiceCounts": {
+        "Risky Shortcut": 5,
+        "Max Effort": 5,
+        "Rest & End Shift": 5,
+        "Short Rations and Push On": 4,
+        "Call for tow truck": 1,
+        "Trade for supplies": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Call for tow truck": 1,
+          "Trade for supplies": 1
+        },
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 5,
+          "Rest & End Shift": 5
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 5,
+        "Rest & End Shift": 5
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 11,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7011,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 10,
+      "choiceCounts": {
+        "Risky Shortcut": 5,
+        "Max Effort": 5,
+        "Rest & End Shift": 5,
+        "Short Rations and Push On": 4
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 5,
+          "Rest & End Shift": 5
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 5,
+        "Rest & End Shift": 5
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 11,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7012,
+      "outcome": "failure",
+      "reason": "OUT OF FUEL - The crew is stranded.",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5,
+        "Send runner for parts": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        },
+        "event": {
+          "Send runner for parts": 1
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7013,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5,
+        "Grab the food supplies": 1,
+        "Push through to the next block": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        },
+        "event": {
+          "Grab the food supplies": 1,
+          "Push through to the next block": 1
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7014,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7015,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7016,
+      "outcome": "failure",
+      "reason": "OUT OF FUEL - The crew is stranded.",
+      "daysUsed": 11,
+      "choiceCounts": {
+        "Risky Shortcut": 5,
+        "Max Effort": 5,
+        "Rest & End Shift": 5,
+        "Short Rations and Push On": 4,
+        "Send runner for parts": 1,
+        "Send them out for medical care": 1,
+        "Hand-clear a path": 1,
+        "Find another crossing": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Send runner for parts": 1,
+          "Send them out for medical care": 1,
+          "Hand-clear a path": 1,
+          "Find another crossing": 1
+        },
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 5,
+          "Rest & End Shift": 5
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 5,
+        "Rest & End Shift": 5
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 12,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7017,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5,
+        "Send them out for medical care": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        },
+        "event": {
+          "Send them out for medical care": 1
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7018,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 10,
+      "choiceCounts": {
+        "Risky Shortcut": 5,
+        "Max Effort": 5,
+        "Rest & End Shift": 5,
+        "Short Rations and Push On": 4
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 5,
+          "Rest & End Shift": 5
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 5,
+        "Rest & End Shift": 5
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 11,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7019,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5,
+        "Hand-clear a path": 1,
+        "Fire a warning shot": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Hand-clear a path": 1,
+          "Fire a warning shot": 1
+        },
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7020,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5,
+        "Relocate operations for the day": 1,
+        "Find an alternate route": 1
+      },
+      "choiceBreakdown": {
+        "event": {
+          "Relocate operations for the day": 1,
+          "Find an alternate route": 1
+        },
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7021,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 12,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 13,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7022,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 13,
+      "choiceCounts": {
+        "Risky Shortcut": 6,
+        "Max Effort": 6,
+        "Rest & End Shift": 6,
+        "Short Rations and Push On": 5,
+        "Call for tow truck": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 6
+        },
+        "action": {
+          "Max Effort": 6,
+          "Rest & End Shift": 6
+        },
+        "rationing": {
+          "Short Rations and Push On": 5
+        },
+        "event": {
+          "Call for tow truck": 1
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 6,
+        "Rest & End Shift": 6
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 14,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7023,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 10,
+      "choiceCounts": {
+        "Risky Shortcut": 5,
+        "Max Effort": 5,
+        "Rest & End Shift": 5,
+        "Short Rations and Push On": 4,
+        "Relocate operations for the day": 1
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 5,
+          "Rest & End Shift": 5
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        },
+        "event": {
+          "Relocate operations for the day": 1
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 5,
+        "Rest & End Shift": 5
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 11,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    },
+    {
+      "role": "recce",
+      "difficulty": "hard",
+      "seed": 7024,
+      "outcome": "success",
+      "reason": "Expedition completed!",
+      "daysUsed": 10,
+      "choiceCounts": {
+        "Risky Shortcut": 5,
+        "Max Effort": 5,
+        "Rest & End Shift": 5,
+        "Short Rations and Push On": 4
+      },
+      "choiceBreakdown": {
+        "route": {
+          "Risky Shortcut": 5
+        },
+        "action": {
+          "Max Effort": 5,
+          "Rest & End Shift": 5
+        },
+        "rationing": {
+          "Short Rations and Push On": 4
+        }
+      },
+      "actionCounts": {
+        "Max Effort": 5,
+        "Rest & End Shift": 5
+      },
+      "finalState": {
+        "journeyType": "recon",
+        "progress": 11,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 0
+      }
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import { progressBar, box, PROGRESS } from '../ascii.js';
 import { displayMode } from '../displayMode.js';
 import { getCrewDisplayInfo, getActiveCrewCount, getAverageMorale } from '../crew.js';
 import { FIELD_RESOURCES, DESK_RESOURCES, getResourcePercentage } from '../resources.js';
+import { getOperationalProgress } from '../journey.js';
 
 /**
  * Panel management mixin
@@ -284,20 +285,30 @@ export const PanelsMixin = {
    * @returns {string} ASCII art status display
    */
   renderDeskStatusBox(journey) {
-    const daysRemaining = journey.deadline - journey.day;
-    const approvalRate = journey.permits.target > 0
-      ? Math.round((journey.permits.approved / journey.permits.target) * 100)
-      : 0;
-
+    const hasPermits = Boolean(journey.permits?.target);
+    const daysRemaining = Number.isFinite(journey.deadline) ? journey.deadline - journey.day : null;
+    const progress = getOperationalProgress(journey);
     const lines = [
-      `Day ${journey.day} of ${journey.deadline} | ${daysRemaining} days remaining`,
-      '',
-      `Permits: ${journey.permits.approved}/${journey.permits.target} approved (${approvalRate}%)`,
-      `Pipeline: ${journey.permits.submitted} submitted, ${journey.permits.inReview} in review`,
-      '',
-      `Team: ${getActiveCrewCount(journey.crew)}/${journey.crew.length} active`,
-      `Budget: $${Math.round(journey.resources.budget).toLocaleString()}`
+      Number.isFinite(journey.deadline)
+        ? `Day ${journey.day} of ${journey.deadline} | ${daysRemaining} days remaining`
+        : `Day ${journey.day} | ${journey.plan?.phase || journey.currentPhase || 'operations'}`,
+      ''
     ];
+
+    if (hasPermits) {
+      const approvalRate = journey.permits.target > 0
+        ? Math.round((journey.permits.approved / journey.permits.target) * 100)
+        : 0;
+      lines.push(`Permits: ${journey.permits.approved}/${journey.permits.target} approved (${approvalRate}%)`);
+      lines.push(`Pipeline: ${journey.permits.submitted} submitted, ${journey.permits.inReview} in review`);
+    } else {
+      lines.push(`Progress: ${progress}% complete`);
+      lines.push(`Phase: ${journey.plan?.phase || journey.currentPhase || 'planning'}`);
+    }
+
+    lines.push('');
+    lines.push(`Team: ${getActiveCrewCount(journey.crew)}/${journey.crew?.length || 0} active`);
+    lines.push(`Budget: $${Math.round(journey.resources.budget).toLocaleString()}`);
 
     return box(lines, { double: true, title: 'STATUS' });
   },

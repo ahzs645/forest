@@ -108,3 +108,25 @@ test('recon mode victory uses fully surveyed block count for the final checkpoin
     reason: 'Expedition completed!'
   });
 });
+
+test('recon mode completion wins even if failure flags are also set on the final shift', () => {
+  const reconJourney = {
+    journeyType: 'recon',
+    isComplete: true,
+    isGameOver: true,
+    endReason: 'Expedition completed!',
+    gameOverReason: 'All crew members lost',
+    crew: [{ isActive: false }],
+    blocks: [{}, {}, {}],
+    currentBlockIndex: 2,
+    blocksAssessed: 3,
+    distanceTraveled: 18,
+    totalDistance: 18,
+    resources: { fuel: 0, food: 0 }
+  };
+
+  assert.deepEqual(checkEndConditions(reconJourney), {
+    victory: true,
+    reason: 'Expedition completed!'
+  });
+});

@@ -5,6 +5,7 @@
 
 import { displayMode } from '../displayMode.js';
 import { getActiveCrewCount, getAverageMorale } from '../crew.js';
+import { getOperationalProgress } from '../journey.js';
 
 /**
  * Modern UI mixin
@@ -136,32 +137,7 @@ export const ModernUIMixin = {
    * @returns {number} Progress percentage
    */
   _calculateProgress(journey) {
-    switch (journey.journeyType) {
-      case 'recon':
-      case 'field':
-        if (!journey.totalDistance) return 0;
-        return Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-
-      case 'silviculture':
-        // Progress based on planting and surveys
-        if (!journey.planting?.blocksToPlant) return 0;
-        const plantingDone = journey.planting.blocksPlanted || 0;
-        const surveysDone = journey.surveys?.freeGrowingComplete || 0;
-        const surveysTarget = journey.surveys?.freeGrowingTarget || 1;
-        return Math.round(((plantingDone / journey.planting.blocksToPlant) * 50) +
-                         ((surveysDone / surveysTarget) * 50));
-
-      case 'planning':
-        // Progress based on ministerial confidence
-        return journey.plan?.ministerialConfidence || 0;
-
-      case 'permitting':
-      case 'desk':
-      default:
-        const target = journey.permits?.target || 0;
-        if (target <= 0) return 0;
-        return Math.round((journey.permits.approved / target) * 100);
-    }
+    return getOperationalProgress(journey);
   },
 
   /**

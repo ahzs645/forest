@@ -7,10 +7,25 @@ const ROLE_RUNS = [
   { name: 'silviculture', roleIndex: 3, areaIndex: 3, seed: 1004 }
 ];
 
+const DIFFICULTIES = [
+  { name: 'easy', label: 'Greenhorn', seedOffset: 0 },
+  { name: 'normal', label: 'Journeyman', seedOffset: 100 },
+  { name: 'hard', label: 'Old Growth', seedOffset: 200 }
+];
+
+const TEST_RUNS = ROLE_RUNS.flatMap((role) =>
+  DIFFICULTIES.map((difficulty) => ({
+    ...role,
+    difficulty: difficulty.name,
+    difficultyLabel: difficulty.label,
+    seed: role.seed + difficulty.seedOffset
+  }))
+);
+
 test.describe.configure({ mode: 'serial' });
 
-for (const run of ROLE_RUNS) {
-  test(`${run.name} mode can complete a browser playthrough without runtime errors`, async ({ page }) => {
+for (const run of TEST_RUNS) {
+  test(`${run.name} (${run.difficulty}) can complete a browser playthrough without runtime errors`, async ({ page }) => {
     const runtimeErrors = [];
 
     page.on('pageerror', (error) => runtimeErrors.push(error.message));
@@ -37,6 +52,7 @@ for (const run of ROLE_RUNS) {
     await page.click('#role-continue-btn');
     await page.locator('.area-item').nth(run.areaIndex).click();
     await page.click('#area-continue-btn');
+    await page.locator('#choices button').filter({ hasText: run.difficultyLabel }).click();
 
     const result = await autoPlayToEnd(page, run.name);
 
@@ -89,7 +105,7 @@ function pickChoice(labels, terminalText, strategyName) {
     return pickReconChoice(labels, terminalText);
   }
 
-  const sharedPriorities = ['Journeyman', 'Begin Journey', 'Continue'];
+  const sharedPriorities = ['Greenhorn', 'Journeyman', 'Old Growth', 'Begin Journey', 'Continue'];
   const planningPriorities = getPlanningPriorities(terminalText);
   const strategyPriorities = {
     planner: planningPriorities,
@@ -255,20 +271,31 @@ function extractElapsedDays(text) {
 function assertModeSpecificExpectations(modeName, terminalText) {
   switch (modeName) {
     case 'planner': {
-      expect(terminalText).toMatch(/Final Phase:\s*ministerial_approval/);
-      expect(extractStat(terminalText, 'Data Completeness')).toBeGreaterThanOrEqual(80);
-      expect(extractStat(terminalText, 'Analysis Quality')).toBeGreaterThanOrEqual(80);
-      expect(extractStat(terminalText, 'Stakeholder Buy-in')).toBeGreaterThanOrEqual(75);
-      expect(extractStat(terminalText, 'Ministerial Confidence')).toBeGreaterThanOrEqual(80);
+      expect(terminalText).toMatch(/Final Phase:\s*(data_gathering|analysis|stakeholder_review|ministerial_approval)/);
+      if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
+        expect(terminalText).toMatch(/Final Phase:\s*ministerial_approval/);
+        expect(extractStat(terminalText, 'Data Completeness')).toBeGreaterThanOrEqual(80);
+        expect(extractStat(terminalText, 'Analysis Quality')).toBeGreaterThanOrEqual(80);
+        expect(extractStat(terminalText, 'Stakeholder Buy-in')).toBeGreaterThanOrEqual(75);
+        expect(extractStat(terminalText, 'Ministerial Confidence')).toBeGreaterThanOrEqual(80);
+      } else {
+        expect(terminalText).toMatch(/failed to achieve approval|Budget exhausted|Lost political support|Burnout/i);
+      }
       break;
     }
     case 'permitter': {
       const approved = extractPair(terminalText, 'Permits Approved');
-      expect(approved.current).toBeGreaterThanOrEqual(Math.ceil(approved.total * 0.8));
+      expect(approved.current).toBeLessThanOrEqual(approved.total);
+      if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
+        expect(approved.current).toBeGreaterThanOrEqual(Math.ceil(approved.total * 0.8));
+      } else {
+        expect(terminalText).toMatch(/could not meet its targets|Budget exhausted|Lost political support|Burnout/i);
+      }
       break;
     }
     case 'recce': {
       const surveyed = extractPair(terminalText, 'Blocks Surveyed');
+      expect(surveyed.current).toBeLessThanOrEqual(surveyed.total);
       if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
         expect(surveyed.current).toBe(surveyed.total);
       } else {
@@ -279,11 +306,13 @@ function assertModeSpecificExpectations(modeName, terminalText) {
     case 'silviculture': {
       const planted = extractPair(terminalText, 'Blocks Planted');
       const surveys = extractPair(terminalText, 'Free-Growing Surveys');
+      expect(planted.current).toBeLessThanOrEqual(planted.total);
+      expect(surveys.current).toBeLessThanOrEqual(surveys.total);
       if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
         expect(planted.current).toBeGreaterThanOrEqual(planted.total);
         expect(surveys.current).toBeGreaterThanOrEqual(surveys.total);
       } else {
-        expect(terminalText).toMatch(/Budget exhausted/i);
+        expect(terminalText).toMatch(/fell short of its targets|Budget exhausted|No contractor capacity/i);
         expect(planted.current).toBeLessThanOrEqual(planted.total);
       }
       break;

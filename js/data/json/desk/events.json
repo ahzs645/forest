@@ -360,6 +360,7 @@
     "type": "positive",
     "severity": "positive",
     "probability": 0.08,
+    "journeyTypes": ["permitting", "desk"],
     "description": "The ministry fast-tracked one of your applications. Approved ahead of schedule!",
     "options": [
       {

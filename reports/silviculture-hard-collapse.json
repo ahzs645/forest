@@ -1,0 +1,545 @@
+{
+  "strategy": "collapse",
+  "runCount": 10,
+  "generatedAt": "2026-04-06T02:05:43.745Z",
+  "summary": [
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "runs": 10,
+      "winRate": 0,
+      "avgDays": 35.2,
+      "commonFailReasons": [
+        {
+          "reason": "Budget exhausted",
+          "count": 10
+        }
+      ],
+      "dominantChoices": [
+        {
+          "label": "Contractor Meeting",
+          "count": 1396
+        },
+        {
+          "label": "Mountain Pine Planters",
+          "count": 1396
+        },
+        {
+          "label": "Herbicide Application",
+          "count": 203
+        },
+        {
+          "label": "Team Briefing",
+          "count": 79
+        },
+        {
+          "label": "Grant rest day",
+          "count": 45
+        },
+        {
+          "label": "Take the shortcut",
+          "count": 21
+        },
+        {
+          "label": "Send medic",
+          "count": 10
+        },
+        {
+          "label": "Inspect & retrain",
+          "count": 10
+        }
+      ],
+      "dominantActions": [
+        {
+          "label": "Contractor Meeting",
+          "count": 1396
+        },
+        {
+          "label": "Herbicide Application",
+          "count": 203
+        },
+        {
+          "label": "Team Briefing",
+          "count": 79
+        }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7000,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 39,
+      "choiceCounts": {
+        "Contractor Meeting": 158,
+        "Mountain Pine Planters": 158,
+        "Herbicide Application": 20,
+        "Team Briefing": 9,
+        "Grant rest day": 4,
+        "Take the shortcut": 3,
+        "Send medic": 2,
+        "Pay retention": 1,
+        "Inspect & retrain": 1
+      },
+      "choiceBreakdown": {
+        "action": {
+          "Contractor Meeting": 158,
+          "Herbicide Application": 20,
+          "Team Briefing": 9
+        },
+        "other": {
+          "Mountain Pine Planters": 158,
+          "Grant rest day": 4,
+          "Send medic": 2,
+          "Pay retention": 1,
+          "Inspect & retrain": 1
+        },
+        "event": {
+          "Take the shortcut": 3
+        }
+      },
+      "actionCounts": {
+        "Contractor Meeting": 158,
+        "Herbicide Application": 20,
+        "Team Briefing": 9
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 40,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    },
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7001,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 7,
+      "choiceCounts": {
+        "Herbicide Application": 21,
+        "Team Briefing": 7,
+        "Take the shortcut": 1
+      },
+      "choiceBreakdown": {
+        "action": {
+          "Herbicide Application": 21,
+          "Team Briefing": 7
+        },
+        "event": {
+          "Take the shortcut": 1
+        }
+      },
+      "actionCounts": {
+        "Herbicide Application": 21,
+        "Team Briefing": 7
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 8,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    },
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7002,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 26,
+      "choiceCounts": {
+        "Contractor Meeting": 95,
+        "Mountain Pine Planters": 95,
+        "Herbicide Application": 20,
+        "Team Briefing": 6,
+        "Grant rest day": 5,
+        "Take the shortcut": 2,
+        "Inspect & retrain": 1,
+        "Send medic": 1
+      },
+      "choiceBreakdown": {
+        "other": {
+          "Mountain Pine Planters": 95,
+          "Grant rest day": 5,
+          "Inspect & retrain": 1,
+          "Send medic": 1
+        },
+        "action": {
+          "Contractor Meeting": 95,
+          "Herbicide Application": 20,
+          "Team Briefing": 6
+        },
+        "event": {
+          "Take the shortcut": 2
+        }
+      },
+      "actionCounts": {
+        "Contractor Meeting": 95,
+        "Herbicide Application": 20,
+        "Team Briefing": 6
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 27,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    },
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7003,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 28,
+      "choiceCounts": {
+        "Contractor Meeting": 105,
+        "Mountain Pine Planters": 105,
+        "Herbicide Application": 20,
+        "Team Briefing": 6,
+        "Grant rest day": 6,
+        "Pay retention": 2,
+        "Send medic": 1,
+        "Inspect & retrain": 1,
+        "Take the shortcut": 1
+      },
+      "choiceBreakdown": {
+        "action": {
+          "Contractor Meeting": 105,
+          "Herbicide Application": 20,
+          "Team Briefing": 6
+        },
+        "other": {
+          "Mountain Pine Planters": 105,
+          "Grant rest day": 6,
+          "Pay retention": 2,
+          "Send medic": 1,
+          "Inspect & retrain": 1
+        },
+        "event": {
+          "Take the shortcut": 1
+        }
+      },
+      "actionCounts": {
+        "Contractor Meeting": 105,
+        "Herbicide Application": 20,
+        "Team Briefing": 6
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 29,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    },
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7004,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 31,
+      "choiceCounts": {
+        "Contractor Meeting": 117,
+        "Mountain Pine Planters": 117,
+        "Herbicide Application": 22,
+        "Team Briefing": 7,
+        "Grant rest day": 4,
+        "Take the shortcut": 3,
+        "Pay retention": 2,
+        "Inspect & retrain": 1
+      },
+      "choiceBreakdown": {
+        "action": {
+          "Contractor Meeting": 117,
+          "Herbicide Application": 22,
+          "Team Briefing": 7
+        },
+        "other": {
+          "Mountain Pine Planters": 117,
+          "Grant rest day": 4,
+          "Pay retention": 2,
+          "Inspect & retrain": 1
+        },
+        "event": {
+          "Take the shortcut": 3
+        }
+      },
+      "actionCounts": {
+        "Contractor Meeting": 117,
+        "Herbicide Application": 22,
+        "Team Briefing": 7
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 32,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    },
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7005,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 40,
+      "choiceCounts": {
+        "Contractor Meeting": 164,
+        "Mountain Pine Planters": 164,
+        "Herbicide Application": 20,
+        "Team Briefing": 8,
+        "Grant rest day": 5,
+        "Take the shortcut": 2,
+        "Inspect & retrain": 1,
+        "Send medic": 1,
+        "Upgrade camp": 1
+      },
+      "choiceBreakdown": {
+        "action": {
+          "Contractor Meeting": 164,
+          "Herbicide Application": 20,
+          "Team Briefing": 8
+        },
+        "other": {
+          "Mountain Pine Planters": 164,
+          "Grant rest day": 5,
+          "Inspect & retrain": 1,
+          "Send medic": 1,
+          "Upgrade camp": 1
+        },
+        "event": {
+          "Take the shortcut": 2
+        }
+      },
+      "actionCounts": {
+        "Contractor Meeting": 164,
+        "Herbicide Application": 20,
+        "Team Briefing": 8
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 41,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    },
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7006,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 49,
+      "choiceCounts": {
+        "Contractor Meeting": 208,
+        "Mountain Pine Planters": 208,
+        "Herbicide Application": 21,
+        "Team Briefing": 7,
+        "Grant rest day": 5,
+        "Send medic": 1,
+        "Take the shortcut": 1,
+        "Inspect & retrain": 1,
+        "Upgrade camp": 1
+      },
+      "choiceBreakdown": {
+        "action": {
+          "Contractor Meeting": 208,
+          "Herbicide Application": 21,
+          "Team Briefing": 7
+        },
+        "other": {
+          "Mountain Pine Planters": 208,
+          "Grant rest day": 5,
+          "Send medic": 1,
+          "Inspect & retrain": 1,
+          "Upgrade camp": 1
+        },
+        "event": {
+          "Take the shortcut": 1
+        }
+      },
+      "actionCounts": {
+        "Contractor Meeting": 208,
+        "Herbicide Application": 21,
+        "Team Briefing": 7
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 50,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    },
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7007,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 47,
+      "choiceCounts": {
+        "Contractor Meeting": 201,
+        "Mountain Pine Planters": 201,
+        "Herbicide Application": 18,
+        "Team Briefing": 8,
+        "Grant rest day": 3,
+        "Pay retention": 2,
+        "Inspect & retrain": 2,
+        "Take the shortcut": 2
+      },
+      "choiceBreakdown": {
+        "other": {
+          "Mountain Pine Planters": 201,
+          "Grant rest day": 3,
+          "Pay retention": 2,
+          "Inspect & retrain": 2
+        },
+        "action": {
+          "Contractor Meeting": 201,
+          "Herbicide Application": 18,
+          "Team Briefing": 8
+        },
+        "event": {
+          "Take the shortcut": 2
+        }
+      },
+      "actionCounts": {
+        "Contractor Meeting": 201,
+        "Herbicide Application": 18,
+        "Team Briefing": 8
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 48,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    },
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7008,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 38,
+      "choiceCounts": {
+        "Contractor Meeting": 151,
+        "Mountain Pine Planters": 151,
+        "Herbicide Application": 22,
+        "Team Briefing": 9,
+        "Grant rest day": 5,
+        "Take the shortcut": 4,
+        "Inspect & retrain": 1
+      },
+      "choiceBreakdown": {
+        "action": {
+          "Contractor Meeting": 151,
+          "Herbicide Application": 22,
+          "Team Briefing": 9
+        },
+        "other": {
+          "Mountain Pine Planters": 151,
+          "Grant rest day": 5,
+          "Inspect & retrain": 1
+        },
+        "event": {
+          "Take the shortcut": 4
+        }
+      },
+      "actionCounts": {
+        "Contractor Meeting": 151,
+        "Herbicide Application": 22,
+        "Team Briefing": 9
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 39,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    },
+    {
+      "role": "silviculture",
+      "difficulty": "hard",
+      "seed": 7009,
+      "outcome": "failure",
+      "reason": "Budget exhausted",
+      "daysUsed": 47,
+      "choiceCounts": {
+        "Contractor Meeting": 197,
+        "Mountain Pine Planters": 197,
+        "Herbicide Application": 19,
+        "Team Briefing": 12,
+        "Grant rest day": 8,
+        "Send medic": 4,
+        "Pay retention": 2,
+        "Take the shortcut": 2,
+        "Inspect & retrain": 1
+      },
+      "choiceBreakdown": {
+        "action": {
+          "Contractor Meeting": 197,
+          "Herbicide Application": 19,
+          "Team Briefing": 12
+        },
+        "other": {
+          "Mountain Pine Planters": 197,
+          "Grant rest day": 8,
+          "Send medic": 4,
+          "Pay retention": 2,
+          "Inspect & retrain": 1
+        },
+        "event": {
+          "Take the shortcut": 2
+        }
+      },
+      "actionCounts": {
+        "Contractor Meeting": 197,
+        "Herbicide Application": 19,
+        "Team Briefing": 12
+      },
+      "finalState": {
+        "journeyType": "silviculture",
+        "progress": 48,
+        "permitsApproved": 0,
+        "permitsTarget": 0,
+        "planningPhase": null,
+        "planting": 0,
+        "plantingTarget": 15
+      }
+    }
+  ]
+}

@@ -38,11 +38,21 @@ function applyDifficultyMultipliers(journey, difficulty) {
 
   const resourceMult = difficulty === 'easy' ? 1.3 : 0.8;
   const r = journey.resources;
+  const excludedKeys = new Set();
+
+  if (journey.journeyType === 'silviculture') {
+    // Seedlings define the regeneration target; scaling them makes hard mode unwinnable.
+    excludedKeys.add('seedlings');
+  }
 
   for (const key of Object.keys(r)) {
-    if (typeof r[key] === 'number') {
+    if (!excludedKeys.has(key) && typeof r[key] === 'number') {
       r[key] = Math.round(r[key] * resourceMult);
     }
+  }
+
+  if (journey.journeyType === 'planning' && Number.isFinite(journey.deadline)) {
+    journey.deadline += difficulty === 'easy' ? 2 : -1;
   }
 }
 
@@ -636,7 +646,7 @@ class ForestryTrailGame {
         break;
 
       case 'planning':
-        this.ui.write('Mission: Develop and achieve ministerial approval for a landscape-level forest plan.');
+        this.ui.write(`Mission: Achieve ministerial approval for a landscape-level forest plan within ${journey.deadline} days.`);
         this.ui.write('Progress through phases: Data Gathering → Analysis → Stakeholder Review → Ministerial Approval');
         this.ui.write('Balance values: biodiversity, timber supply, community needs, First Nations interests.');
         this.ui.write('');

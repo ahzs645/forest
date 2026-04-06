@@ -7,6 +7,7 @@
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
 import { crewHasRole } from '../crew.js';
+import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 
 // Contractor event templates (Phase 4.2)
 const CONTRACTOR_EVENTS = [
@@ -70,6 +71,7 @@ export async function runSilvicultureDay(game) {
   const { ui, journey } = game;
   const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
   const currentSeason = seasonInfo?.id || 'summer';
+  const progressBeforeDay = getOperationalProgress(journey);
 
   // Initialize hours for the day
   if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
@@ -134,9 +136,6 @@ export async function runSilvicultureDay(game) {
 
     ui.updateAllStatus(journey);
 
-    if (journey.hoursRemaining > 0) {
-      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
-    }
   }
 
   // End of day processing
@@ -180,6 +179,12 @@ export async function runSilvicultureDay(game) {
 
   ui.updateAllStatus(journey);
 
+  const milestoneMessages = [];
+  recordProgressMilestones(journey, progressBeforeDay, milestoneMessages, Math.max(1, journey.day - 1));
+  for (const message of milestoneMessages) {
+    ui.writePositive(message);
+  }
+
   // Contextual continue (Phase 6.1)
   const nextSeasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
   const contractorHint = journey.contractors.filter(c => c.isActive && c.morale < 40).length;
@@ -202,11 +207,11 @@ function displaySilvicultureHeader(ui, journey, seasonInfo) {
   ui.write('');
 
   // Compact program status
-  const plantPct = Math.round((journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
-  const brushPct = Math.round((journey.brushing.hectaresComplete / journey.brushing.hectaresTarget) * 100);
-  const surveyPct = Math.round((journey.surveys.freeGrowingComplete / journey.surveys.freeGrowingTarget) * 100);
+  const plantPct = Math.round(Math.min(1, journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
+  const brushPct = Math.round(Math.min(1, journey.brushing.hectaresComplete / journey.brushing.hectaresTarget) * 100);
+  const surveyPct = Math.round(Math.min(1, journey.surveys.freeGrowingComplete / journey.surveys.freeGrowingTarget) * 100);
 
-  ui.write(`Plant: ${plantPct}% (${journey.planting.blocksPlanted}/${journey.planting.blocksToPlant} blocks) | Brush: ${brushPct}% | Survey: ${surveyPct}% (${journey.surveys.freeGrowingComplete}/${journey.surveys.freeGrowingTarget})`);
+  ui.write(`Plant: ${plantPct}% (${Math.min(journey.planting.blocksPlanted, journey.planting.blocksToPlant)}/${journey.planting.blocksToPlant} blocks) | Brush: ${brushPct}% | Survey: ${surveyPct}% (${Math.min(journey.surveys.freeGrowingComplete, journey.surveys.freeGrowingTarget)}/${journey.surveys.freeGrowingTarget})`);
 
   // Compact contractors
   const contractorStatus = journey.contractors
@@ -228,7 +233,11 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods) {
 
   // Planting - primarily spring, marginally in summer/fall, impossible in winter
   const plantingEff = seasonMods?.plantingEfficiency ?? 1.0;
-  if (plantingEff > 0 && journey.resources.seedlings > 0 && journey.resources.contractorCapacity > 0 && hoursLeft >= 4) {
+  if (plantingEff > 0 &&
+      journey.resources.seedlings > 0 &&
+      journey.resources.contractorCapacity > 0 &&
+      journey.planting.blocksPlanted < journey.planting.blocksToPlant &&
+      hoursLeft >= 4) {
     const seasonNote = plantingEff >= 1.2 ? ' (peak season!)' : plantingEff < 1.0 ? ' (reduced efficiency)' : '';
     actionOptions.push({
       label: `Deploy Planting Crew (4h)${seasonNote}`,
@@ -246,7 +255,10 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods) {
 
   // Herbicide - primarily summer
   const brushingEff = seasonMods?.brushingEfficiency ?? 1.0;
-  if (journey.resources.contractorCapacity > 0 && hoursLeft >= 3 && currentSeason !== 'winter') {
+  if (journey.resources.contractorCapacity > 0 &&
+      journey.brushing.hectaresComplete < journey.brushing.hectaresTarget &&
+      hoursLeft >= 3 &&
+      currentSeason !== 'winter') {
     const seasonNote = brushingEff >= 1.2 ? ' (peak season!)' : '';
     actionOptions.push({
       label: `Herbicide Application (3h)${seasonNote}`,
@@ -257,7 +269,9 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods) {
 
   // Survey - best in fall, not in winter
   const surveyEff = seasonMods?.surveyEfficiency ?? 1.0;
-  if (currentSeason !== 'winter' && hoursLeft >= 3) {
+  if (currentSeason !== 'winter' &&
+      journey.surveys.freeGrowingComplete < journey.surveys.freeGrowingTarget &&
+      hoursLeft >= 3) {
     const seasonNote = surveyEff >= 1.2 ? ' (peak season!)' : '';
     actionOptions.push({
       label: `Conduct Survey (3h)${seasonNote}`,
@@ -310,8 +324,9 @@ async function processAction(game, actionId, currentSeason, seasonMods) {
 
   switch (actionId) {
     case 'plant':
-      await handlePlanting(game, seasonMods);
-      journey.hoursRemaining -= 4;
+      if (await handlePlanting(game, seasonMods)) {
+        journey.hoursRemaining -= 4;
+      }
       break;
 
     case 'plant_disabled':
@@ -319,13 +334,15 @@ async function processAction(game, actionId, currentSeason, seasonMods) {
       break;
 
     case 'herbicide':
-      await handleHerbicide(game, seasonMods);
-      journey.hoursRemaining -= 3;
+      if (await handleHerbicide(game, seasonMods)) {
+        journey.hoursRemaining -= 3;
+      }
       break;
 
     case 'survey':
-      await handleSurvey(game, seasonMods);
-      journey.hoursRemaining -= 3;
+      if (await handleSurvey(game, seasonMods)) {
+        journey.hoursRemaining -= 3;
+      }
       break;
 
     case 'inspect':
@@ -355,18 +372,33 @@ async function handlePlanting(game, seasonMods) {
   const { ui, journey } = game;
   const plantingEff = seasonMods?.plantingEfficiency ?? 1.0;
 
+  if (journey.planting.blocksPlanted >= journey.planting.blocksToPlant) {
+    ui.write('All planting blocks are already complete. Shift effort elsewhere.');
+    return false;
+  }
+
   const activeContractors = journey.contractors.filter(c => c.isActive && c.specialty === 'planting');
   const avgProductivity = activeContractors.length > 0
     ? activeContractors.reduce((sum, c) => sum + c.productivity, 0) / activeContractors.length
     : 50;
 
   const baseSeedlings = 15000;
+  const seedlingsRemaining = Math.max(0, journey.planting.seedlingsAllocated - journey.planting.seedlingsPlanted);
   const seedlingsToPlant = Math.min(
     Math.round(baseSeedlings * (avgProductivity / 100) * plantingEff),
-    journey.resources.seedlings
+    journey.resources.seedlings,
+    seedlingsRemaining
   );
 
-  journey.planting.seedlingsPlanted += seedlingsToPlant;
+  if (seedlingsToPlant <= 0) {
+    ui.writeWarning('No seedlings remain for this planting block.');
+    return false;
+  }
+
+  journey.planting.seedlingsPlanted = Math.min(
+    journey.planting.seedlingsAllocated,
+    journey.planting.seedlingsPlanted + seedlingsToPlant
+  );
   journey.resources.seedlings -= seedlingsToPlant;
   journey.resources.contractorCapacity -= 5;
   journey.resources.budget -= 3000;
@@ -379,13 +411,19 @@ async function handlePlanting(game, seasonMods) {
   }
 
   // Check if block is complete
-  const seedlingsPerBlock = Math.ceil(journey.planting.seedlingsAllocated / journey.planting.blocksToPlant);
-  const blocksCompleted = Math.floor(journey.planting.seedlingsPlanted / seedlingsPerBlock);
+  const plantingRatio = journey.planting.seedlingsAllocated > 0
+    ? journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated
+    : 0;
+  const blocksCompleted = journey.planting.seedlingsPlanted >= journey.planting.seedlingsAllocated
+    ? journey.planting.blocksToPlant
+    : Math.floor(plantingRatio * journey.planting.blocksToPlant);
 
   if (blocksCompleted > journey.planting.blocksPlanted) {
-    journey.planting.blocksPlanted = blocksCompleted;
-    ui.writePositive(`Block ${blocksCompleted} planting complete!`);
+    journey.planting.blocksPlanted = Math.min(blocksCompleted, journey.planting.blocksToPlant);
+    ui.writePositive(`Block ${journey.planting.blocksPlanted} planting complete!`);
   }
+
+  return true;
 }
 
 /**
@@ -395,17 +433,31 @@ async function handleHerbicide(game, seasonMods) {
   const { ui, journey } = game;
   const brushingEff = seasonMods?.brushingEfficiency ?? 1.0;
 
+  if (journey.brushing.hectaresComplete >= journey.brushing.hectaresTarget) {
+    ui.write('Competing vegetation target already treated. Save the spray budget.');
+    return false;
+  }
+
   const activeContractors = journey.contractors.filter(c => c.isActive && c.specialty === 'brushing');
   const avgProductivity = activeContractors.length > 0
     ? activeContractors.reduce((sum, c) => sum + c.productivity, 0) / activeContractors.length
     : 50;
 
   const baseHectares = 30;
-  const hectaresTreated = Math.round(
-    baseHectares * (avgProductivity / 100) * brushingEff * (0.8 + Math.random() * 0.4)
+  const hectaresTreated = Math.min(
+    Math.max(0, journey.brushing.hectaresTarget - journey.brushing.hectaresComplete),
+    Math.round(baseHectares * (avgProductivity / 100) * brushingEff * (0.8 + Math.random() * 0.4))
   );
 
-  journey.brushing.hectaresComplete += hectaresTreated;
+  if (hectaresTreated <= 0) {
+    ui.write('No brushing hectares remain on the current program map.');
+    return false;
+  }
+
+  journey.brushing.hectaresComplete = Math.min(
+    journey.brushing.hectaresTarget,
+    journey.brushing.hectaresComplete + hectaresTreated
+  );
   journey.resources.contractorCapacity -= 3;
   journey.resources.budget -= 2000;
 
@@ -413,6 +465,8 @@ async function handleHerbicide(game, seasonMods) {
   if (brushingEff >= 1.2) {
     ui.writePositive('Summer heat improved herbicide effectiveness!');
   }
+
+  return true;
 }
 
 /**
@@ -421,6 +475,11 @@ async function handleHerbicide(game, seasonMods) {
 async function handleSurvey(game, seasonMods) {
   const { ui, journey } = game;
   const surveyEff = seasonMods?.surveyEfficiency ?? 1.0;
+
+  if (journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget) {
+    ui.write('Free-growing survey target already met. Better spend the day planting or stabilizing contractors.');
+    return false;
+  }
 
   journey.surveys.regenerationSurveys++;
   journey.resources.budget -= 500;
@@ -432,7 +491,10 @@ async function handleSurvey(game, seasonMods) {
   const successChance = Math.min(0.85, baseChance * surveyEff);
 
   if (Math.random() < successChance) {
-    journey.surveys.freeGrowingComplete++;
+    journey.surveys.freeGrowingComplete = Math.min(
+      journey.surveys.freeGrowingTarget,
+      journey.surveys.freeGrowingComplete + 1
+    );
     ui.writePositive('Survey complete - block declared free-growing!');
     if (surveyEff >= 1.2) {
       ui.write('Fall conditions provided ideal assessment conditions.');
@@ -440,6 +502,8 @@ async function handleSurvey(game, seasonMods) {
   } else {
     ui.write('Survey complete - more monitoring needed.');
   }
+
+  return true;
 }
 
 /**

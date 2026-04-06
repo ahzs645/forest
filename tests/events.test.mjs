@@ -99,6 +99,42 @@ test('planning events advance the active phase instead of no-oping against permi
   assert.equal(journey.protagonist.reputation, 56);
 });
 
+test('planning mode ignores permit-only approval effects instead of crashing on missing permit data', () => {
+  const journey = {
+    journeyType: 'planning',
+    day: 3,
+    log: [],
+    hoursRemaining: 8,
+    resources: {
+      budget: 47000,
+      politicalCapital: 44
+    },
+    protagonist: {
+      reputation: 50
+    },
+    plan: {
+      phase: 'analysis',
+      dataCompleteness: 80,
+      analysisQuality: 40,
+      stakeholderBuyIn: 55,
+      ministerialConfidence: 48
+    }
+  };
+
+  const result = resolveEvent(journey, { id: 'permit_approved_early', title: 'Early Permit Approval' }, {
+    label: 'Use momentum to push others',
+    effects: {
+      permits_approved: 1,
+      progress: 5,
+      politicalCapital: 3
+    }
+  });
+
+  assert.equal(journey.plan.analysisQuality, 48);
+  assert.equal(journey.resources.politicalCapital, 47);
+  assert.ok(result.messages.some((message) => message.includes('Analysis quality improved')));
+});
+
 test('silviculture random-event check stays safe without recon block data', () => {
   const originalRandom = Math.random;
   Math.random = () => 0.99;

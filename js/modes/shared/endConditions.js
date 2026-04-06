@@ -25,14 +25,14 @@ export function checkReconEndConditions(journey) {
   const totalBlocks = journey.blocks?.length || 0;
   const surveyedBlocks = getSurveyedBlockCount(journey);
 
+  // Victory: objective completed. Reaching the destination should count even if the crew limps over the line.
+  if ((totalBlocks > 0 && surveyedBlocks >= totalBlocks) || (totalBlocks === 0 && journey.distanceTraveled >= journey.totalDistance)) {
+    return { victory: true, reason: 'Expedition completed!' };
+  }
+
   // No crew left
   if (crewBasedMode && activeCrewCount === 0) {
     return { gameOver: true, reason: 'All crew members lost' };
-  }
-
-  // Victory: Reached destination
-  if ((totalBlocks > 0 && surveyedBlocks >= totalBlocks) || (totalBlocks === 0 && journey.distanceTraveled >= journey.totalDistance)) {
-    return { victory: true, reason: 'Expedition completed!' };
   }
 
   // Game over: Stranded (no fuel, no food)
@@ -86,6 +86,10 @@ export function checkPlanningEndConditions(journey) {
   // Victory: Ministerial approval achieved
   if (isPlanningApprovalReady(journey)) {
     return { victory: true, reason: 'Landscape plan approved by Ministry!' };
+  }
+
+  if (Number.isFinite(journey.deadline) && journey.day > journey.deadline) {
+    return { gameOver: true, reason: 'Cabinet window closed before approval' };
   }
 
   // Game over: Budget depleted
@@ -150,13 +154,12 @@ export function checkPermittingEndConditions(journey) {
  * @returns {Object|null} End condition result or null
  */
 export function checkEndConditions(journey) {
-  // Check journey flags first
-  if (journey.isGameOver) {
-    return { gameOver: true, reason: journey.gameOverReason || 'Operations halted' };
-  }
-
   if (journey.isComplete) {
     return { victory: true, reason: journey.endReason || 'Expedition completed!' };
+  }
+
+  if (journey.isGameOver) {
+    return { gameOver: true, reason: journey.gameOverReason || 'Operations halted' };
   }
 
   // Check by journey type

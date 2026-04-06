@@ -93,10 +93,11 @@ function scoreSilvicultureSpeed(journey) {
 
 function scorePlanningSpeed(journey) {
   const daysUsed = journey.day - 1;
-  const optimalDays = 25;
+  const deadline = journey.deadline || 18;
+  const optimalDays = Math.max(8, Math.round(deadline * 0.75));
   const ratio = optimalDays / Math.max(1, daysUsed);
   const score = Math.min(100, Math.round(ratio * 75));
-  return { score, label: `${daysUsed} days` };
+  return { score, label: `${daysUsed}/${deadline} days used` };
 }
 
 function scorePermittingSpeed(journey) {

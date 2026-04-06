@@ -54,6 +54,37 @@ export function checkForEvent(journey) {
   return maybeCreateTemptationEvent(journey);
 }
 
+function getDifficultyEventModifier(journey) {
+  switch (journey?.difficulty) {
+    case 'easy':
+      return 0.75;
+    case 'hard':
+      return 1.35;
+    default:
+      return 1;
+  }
+}
+
+function eventSupportsJourney(event, journey) {
+  if (!event) {
+    return false;
+  }
+
+  if (Array.isArray(event.journeyTypes) && event.journeyTypes.length > 0) {
+    return event.journeyTypes.includes(journey?.journeyType);
+  }
+
+  const requiresPermitPipeline = event.options?.some(
+    (option) => typeof option?.effects?.permits_approved === 'number'
+  );
+
+  if (requiresPermitPipeline && !journey?.permits) {
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Check for field events
  * @param {Object} journey - Field journey state
@@ -79,9 +110,10 @@ function checkFieldEvent(journey) {
   const paceModifier = getPaceEventModifier(journey.pace);
   const terrainModifier = getTerrainEventModifier(currentBlock?.terrain);
   const weatherModifier = getWeatherEventModifier(journey.weather?.id);
+  const difficultyModifier = getDifficultyEventModifier(journey);
 
   // Combined modifier
-  const totalModifier = paceModifier * terrainModifier * weatherModifier;
+  const totalModifier = paceModifier * terrainModifier * weatherModifier * difficultyModifier;
 
   // Select event with modified probabilities
   return selectRandomFieldEvent(applicableEvents, {
@@ -96,7 +128,10 @@ function checkFieldEvent(journey) {
  * @returns {Object|null} Event or null
  */
 function checkDeskEvent(journey) {
-  const applicableEvents = filterRecentEvents(journey, getApplicableDeskEvents(journey.currentPhase));
+  const applicableEvents = filterRecentEvents(
+    journey,
+    getApplicableDeskEvents(journey.currentPhase).filter((event) => eventSupportsJourney(event, journey))
+  );
 
   // Calculate modifiers based on stress level
   const daysRemaining = Number.isFinite(journey.deadline)
@@ -116,9 +151,10 @@ function checkDeskEvent(journey) {
   }
   const moraleModifier = avgMorale < 40 ? 1.3 : 1;
   const typeMultipliers = getDeskEventTypeMultipliers(journey);
+  const difficultyModifier = getDifficultyEventModifier(journey);
 
   return selectRandomDeskEvent(applicableEvents, {
-    stressModifier: stressModifier * moraleModifier,
+    stressModifier: stressModifier * moraleModifier * difficultyModifier,
     crisisMode: daysRemaining < 3,
     typeMultipliers
   });
@@ -185,7 +221,7 @@ function maybeCreateTemptationEvent(journey) {
     return null;
   }
 
-  const chance = isDeskJourney(journey.journeyType) ? 0.03 : 0.04;
+  const chance = (isDeskJourney(journey.journeyType) ? 0.03 : 0.04) * getDifficultyEventModifier(journey);
   if (Math.random() > chance) return null;
 
   const roleId = journey.roleId || journey.role?.id;
@@ -334,7 +370,7 @@ export function resolveEvent(journey, event, option) {
   }
 
   // Handle permit effects (desk)
-  if (option.effects?.permits_approved) {
+  if (typeof option.effects?.permits_approved === 'number' && journey.permits) {
     journey.permits.approved = Math.min(
       journey.permits.target,
       journey.permits.approved + option.effects.permits_approved
@@ -751,6 +787,16 @@ function getOptionHint(option, journeyType) {
     }
     if (option.effects.crew_morale !== undefined) {
       hints.push(option.effects.crew_morale > 0 ? `+${option.effects.crew_morale} morale` : `${option.effects.crew_morale} morale`);
+    }
+
+    if (option.effects.relationships !== undefined) {
+      hints.push(option.effects.relationships > 0 ? `+${option.effects.relationships} relations` : `${option.effects.relationships} relations`);
+    }
+    if (option.effects.compliance !== undefined) {
+      hints.push(option.effects.compliance > 0 ? `+${option.effects.compliance} compliance` : `${option.effects.compliance} compliance`);
+    }
+    if (option.effects.politicalCapital !== undefined) {
+      hints.push(option.effects.politicalCapital > 0 ? `+${option.effects.politicalCapital} capital` : `${option.effects.politicalCapital} capital`);
     }
 
     // Progress effects

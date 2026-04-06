@@ -261,9 +261,6 @@ async function runFieldDay(game) {
     ui.updateAllStatus(journey);
 
     // If there are still hours, prompt between actions
-    if (journey.hoursRemaining > 0) {
-      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
-    }
   }
 
   // End of day — if we haven't traveled, still advance the day
@@ -297,7 +294,7 @@ function displayDayHeader(ui, journey) {
 
   // Compact progress line
   const progressBarWidth = 20;
-  const filledWidth = Math.round((progressInfo.overallProgress / 100) * progressBarWidth);
+  const filledWidth = Math.max(0, Math.min(progressBarWidth, Math.round((progressInfo.overallProgress / 100) * progressBarWidth)));
   const progressBar = '\u2588'.repeat(filledWidth) + '\u2591'.repeat(progressBarWidth - filledWidth);
   ui.write(`[${progressBar}] ${progressInfo.overallProgress}% | ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
 

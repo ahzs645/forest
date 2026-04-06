@@ -48,6 +48,64 @@ const ROLE_JOURNEY_TYPES = {
   permitter: 'permitting'
 };
 
+const JOURNEY_MILESTONES = [25, 50, 75, 90];
+const MILESTONE_COPY = {
+  recon: {
+    25: 'Quarter of the traverse complete. The crew is settling into the bush rhythm.',
+    50: 'Halfway there. The route map finally looks beatable.',
+    75: 'Three-quarters complete. Every fuel drum and dry sock matters now.',
+    90: 'Final push. The extraction point is almost within sight.'
+  },
+  field: {
+    25: 'Quarter of the traverse complete. The crew is settling into the bush rhythm.',
+    50: 'Halfway there. The route map finally looks beatable.',
+    75: 'Three-quarters complete. Every fuel drum and dry sock matters now.',
+    90: 'Final push. The extraction point is almost within sight.'
+  },
+  silviculture: {
+    25: 'The first wave of regeneration is taking hold across the program.',
+    50: 'Half the silviculture campaign is established. Momentum is finally visible.',
+    75: 'The season is bending your way. One more strong push could finish the contract cleanly.',
+    90: 'Final block pressure. Every contractor call and survey day matters now.'
+  },
+  planning: {
+    25: 'The planning wall has shape now. The expedition no longer feels theoretical.',
+    50: 'Half the plan is standing. Stakeholders can finally see where this is headed.',
+    75: 'Cabinet binders are stacking up. Approval country is finally in sight.',
+    90: 'Last mile to sign-off. One clean submission could carry the plan over the line.'
+  },
+  permitting: {
+    25: 'The permit queue is finally moving. The office can feel the pace change.',
+    50: 'Half the approvals are within reach. The backlog is starting to blink first.',
+    75: 'The deadline board looks winnable now. A few clean reviews could finish the job.',
+    90: 'Final permit sprint. One more run through the pipeline could seal the season.'
+  },
+  desk: {
+    25: 'The permit queue is finally moving. The office can feel the pace change.',
+    50: 'Half the approvals are within reach. The backlog is starting to blink first.',
+    75: 'The deadline board looks winnable now. A few clean reviews could finish the job.',
+    90: 'Final permit sprint. One more run through the pipeline could seal the season.'
+  }
+};
+
+function clampRatio(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function safeProgressRatio(current, target) {
+  if (!Number.isFinite(target) || target <= 0) {
+    return 0;
+  }
+
+  return clampRatio((Number(current) || 0) / target);
+}
+
+function getJourneyMilestoneCopy(journeyType, threshold) {
+  return MILESTONE_COPY[journeyType]?.[threshold]
+    || MILESTONE_COPY.field?.[threshold]
+    || `Reached ${threshold}% of the expedition.`;
+}
+
 /**
  * Factory function to create the appropriate journey type
  * Routes to specialized journey creators based on role
@@ -223,6 +281,7 @@ export function createPlanningJourney(options = {}) {
     // Season integration
     season: createSeasonState(effectiveRoleId),
     day: 1,
+    deadline: 20,
     hoursRemaining: 8,
 
     // Protagonist state - YOU are the planner
@@ -243,8 +302,8 @@ export function createPlanningJourney(options = {}) {
       phaseDaysRemaining: 20,
       dataCompleteness: 0,
       analysisQuality: 0,
-      stakeholderBuyIn: 50,
-      ministerialConfidence: 50
+      stakeholderBuyIn: 35,
+      ministerialConfidence: 20
     },
 
     // Values being balanced
@@ -752,7 +811,7 @@ export function executeFieldDay(journey, paceId) {
   let pace = PACE_OPTIONS[paceId] || PACE_OPTIONS.normal;
 
   // Track previous progress for milestone detection
-  const prevProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+  const prevProgress = getOperationalProgress(journey);
   const dayNumber = journey.day;
   const startBlock = getCurrentBlock(journey);
   const nextBlockAtStart = getNextBlock(journey);
@@ -779,9 +838,6 @@ export function executeFieldDay(journey, paceId) {
   journey.distanceTraveled = Math.min(journey.totalDistance, journey.distanceTraveled + travelInfo.distance);
   journey.pace = effectivePaceId;
 
-  // Calculate new progress
-  const newProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-
   if (travelInfo.distance > 0) {
     messages.push(`Covered ${travelInfo.distance} km of traverse at ${pace.name} pace.`);
   } else {
@@ -792,23 +848,7 @@ export function executeFieldDay(journey, paceId) {
     }
   }
 
-  // Check for milestone achievements
-  if (!journey.milestonesReached) journey.milestonesReached = [];
-
-  const milestones = [
-    { threshold: 25, message: 'Quarter of the journey complete! The crew is settling into the routine.' },
-    { threshold: 50, message: 'Halfway there! The destination feels within reach.' },
-    { threshold: 75, message: 'Three-quarters done! The end is in sight.' },
-    { threshold: 90, message: 'Almost there! Just a little further...' }
-  ];
-
-  for (const milestone of milestones) {
-    if (prevProgress < milestone.threshold && newProgress >= milestone.threshold &&
-        !journey.milestonesReached.includes(milestone.threshold)) {
-      messages.push(`*** MILESTONE: ${milestone.message} ***`);
-      journey.milestonesReached.push(milestone.threshold);
-    }
-  }
+  recordProgressMilestones(journey, prevProgress, messages, dayNumber);
 
   const arrivals = advanceBlocksForDistance(journey);
   if (arrivals.length > 0) {
@@ -936,17 +976,6 @@ export function executeFieldDay(journey, paceId) {
       ? `Covered ${travelInfo.distance} km (${pace.name})`
       : (paceId === 'resting' ? 'Rested for the shift' : 'Camp tasks for the shift')
   });
-
-  // Log milestone if reached
-  const lastMilestone = journey.milestonesReached?.[journey.milestonesReached.length - 1];
-  if (lastMilestone && !journey.log.some(l => l.type === 'milestone' && l.threshold === lastMilestone)) {
-    journey.log.push({
-      day: dayNumber,
-      type: 'milestone',
-      threshold: lastMilestone,
-      summary: `Reached ${lastMilestone}% of journey`
-    });
-  }
 
   // Log block arrival
   if (arrivals.length > 0) {
@@ -1094,6 +1123,22 @@ export function executeDeskDay(journey, actionId, actionParams = {}) {
   }
 }
 
+function applyDeskEffort(journey, { energy = 0, stress = 0 }) {
+  if (journey.protagonist) {
+    if (energy) {
+      journey.protagonist.energy = Math.max(0, (journey.protagonist.energy || 0) - energy);
+    }
+    if (stress) {
+      journey.protagonist.stress = Math.min(100, (journey.protagonist.stress || 0) + stress);
+    }
+    return;
+  }
+
+  if (typeof journey.resources?.energy === 'number' && energy) {
+    journey.resources.energy = Math.max(0, journey.resources.energy - energy);
+  }
+}
+
 /**
  * Process permit paperwork
  */
@@ -1107,7 +1152,7 @@ function processPermitWork(journey) {
   }
 
   journey.hoursRemaining -= hoursUsed;
-  journey.resources.energy = Math.max(0, journey.resources.energy - 10);
+  applyDeskEffort(journey, { energy: 10, stress: 4 });
 
   // Move permits through pipeline
   if (journey.permits.submitted > 0) {
@@ -1155,10 +1200,10 @@ function holdStakeholderMeeting(journey, stakeholder = 'ministry') {
   }
 
   journey.hoursRemaining -= hoursUsed;
-  journey.resources.energy = Math.max(0, journey.resources.energy - 15);
+  applyDeskEffort(journey, { energy: 15, stress: 6 });
   journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
 
-  const sh = journey.stakeholders[stakeholder];
+  const sh = journey.stakeholders?.[stakeholder];
   if (sh) {
     sh.meetings++;
     const moodChange = 10 + Math.floor(Math.random() * 10);
@@ -1170,6 +1215,29 @@ function holdStakeholderMeeting(journey, stakeholder = 'ministry') {
       journey.permits.inReview--;
       journey.permits.approved = Math.min(journey.permits.target, journey.permits.approved + 1);
       messages.push('The meeting helped push a permit through!');
+    }
+  } else if (journey.relationships && Object.keys(journey.relationships).length > 0) {
+    const relationshipKey = stakeholder === 'community' ? 'agencies' : stakeholder;
+    if (typeof journey.relationships[relationshipKey] === 'number') {
+      const moodChange = 6 + Math.floor(Math.random() * 8);
+      journey.relationships[relationshipKey] = Math.min(100, journey.relationships[relationshipKey] + moodChange);
+      messages.push(`Met with ${stakeholder}. Working relationship improved by ${moodChange}.`);
+    } else {
+      messages.push(`Met with ${stakeholder}. The conversation bought you a little more breathing room.`);
+    }
+
+    const capitalGain = stakeholder === 'ministry' ? 4 : 2;
+    journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + capitalGain);
+    messages.push(`Political capital stabilized (+${capitalGain}).`);
+
+    if (journey.permits?.inReview > 0 && Math.random() < 0.25) {
+      journey.permits.inReview--;
+      journey.permits.approved = Math.min(journey.permits.target, journey.permits.approved + 1);
+      messages.push('The meeting helped push a permit through!');
+    } else if ((journey.permits?.inReferral || 0) > 0 && Math.random() < 0.35) {
+      journey.permits.inReferral--;
+      journey.permits.inReview++;
+      messages.push('The meeting unstuck one referral and moved it into review.');
     }
   }
 
@@ -1183,7 +1251,7 @@ function handleCrisis(journey, crisis = {}) {
   const messages = [];
 
   journey.hoursRemaining = 0; // Crises consume the day
-  journey.resources.energy = Math.max(0, journey.resources.energy - 30);
+  applyDeskEffort(journey, { energy: 30, stress: 14 });
 
   messages.push('Spent the day managing the crisis.');
 
@@ -1215,13 +1283,18 @@ function boostTeamMorale(journey) {
   journey.hoursRemaining -= hoursUsed;
   journey.resources.budget = Math.max(0, journey.resources.budget - 100); // Coffee and snacks
 
-  for (const member of journey.crew) {
-    if (member.isActive) {
-      member.morale = Math.min(100, member.morale + 15);
+  if (journey.crew?.length) {
+    for (const member of journey.crew) {
+      if (member.isActive) {
+        member.morale = Math.min(100, member.morale + 15);
+      }
     }
+    messages.push('Team morale has improved.');
+  } else if (journey.protagonist) {
+    journey.protagonist.energy = Math.min(100, (journey.protagonist.energy || 0) + 8);
+    journey.protagonist.stress = Math.max(0, (journey.protagonist.stress || 0) - 6);
+    messages.push('You calm the office, reset expectations, and recover a little energy.');
   }
-
-  messages.push('Team morale has improved.');
   return { journey, messages };
 }
 
@@ -1232,9 +1305,13 @@ function endDeskDay(journey) {
   const messages = [];
 
   // Daily resource consumption
+  const meetings = journey.stakeholders
+    ? Object.values(journey.stakeholders).reduce((sum, s) => sum + s.meetings, 0)
+    : 0;
+
   const consumption = calculateDeskConsumption({
     overtime: 8 - journey.hoursRemaining > 8 ? 8 - journey.hoursRemaining - 8 : 0,
-    meetings: Object.values(journey.stakeholders).reduce((sum, s) => sum + s.meetings, 0)
+    meetings
   });
 
   const result = applyConsumption(journey.resources, consumption, DESK_RESOURCES);
@@ -1300,13 +1377,81 @@ function endDeskDay(journey) {
  * @returns {number} Progress 0-100
  */
 export function getJourneyProgress(journey) {
-  if (journey.journeyType === 'field') {
-    return Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-  } else {
-    const target = journey.permits?.target || 0;
-    if (target <= 0) return 0;
-    return Math.round((journey.permits.approved / target) * 100);
+  return getOperationalProgress(journey);
+}
+
+export function getOperationalProgress(journey) {
+  switch (journey?.journeyType) {
+    case 'recon':
+    case 'field': {
+      const totalBlocks = journey?.blocks?.length || 0;
+      if (totalBlocks > 0) {
+        return Math.round(safeProgressRatio(getSurveyedBlockCount(journey), totalBlocks) * 100);
+      }
+      if (!journey?.totalDistance) {
+        return 0;
+      }
+      return Math.round(safeProgressRatio(journey.distanceTraveled, journey.totalDistance) * 100);
+    }
+
+    case 'silviculture': {
+      const plantingRatio = safeProgressRatio(journey?.planting?.blocksPlanted, journey?.planting?.blocksToPlant);
+      const surveyRatio = safeProgressRatio(journey?.surveys?.freeGrowingComplete, journey?.surveys?.freeGrowingTarget);
+      const brushingRatio = safeProgressRatio(journey?.brushing?.hectaresComplete, journey?.brushing?.hectaresTarget);
+      return Math.round((plantingRatio * 0.65 + surveyRatio * 0.25 + brushingRatio * 0.10) * 100);
+    }
+
+    case 'planning': {
+      const plan = journey?.plan || {};
+      const phaseProgress = [
+        safeProgressRatio(plan.dataCompleteness, 80),
+        safeProgressRatio(plan.analysisQuality, 80),
+        safeProgressRatio(plan.stakeholderBuyIn, 75),
+        safeProgressRatio(plan.ministerialConfidence, 80)
+      ];
+      return Math.round((phaseProgress.reduce((sum, value) => sum + value, 0) / phaseProgress.length) * 100);
+    }
+
+    case 'permitting':
+    case 'desk':
+      return Math.round(safeProgressRatio(journey?.permits?.approved, journey?.permits?.target) * 100);
+
+    default:
+      return 0;
   }
+}
+
+export function recordProgressMilestones(journey, previousProgress, messages = [], dayNumber = journey?.day) {
+  if (!journey) {
+    return [];
+  }
+
+  const currentProgress = getOperationalProgress(journey);
+  if (!journey.milestonesReached) {
+    journey.milestonesReached = [];
+  }
+  if (!journey.log) {
+    journey.log = [];
+  }
+
+  const reached = [];
+  for (const threshold of JOURNEY_MILESTONES) {
+    if (previousProgress >= threshold || currentProgress < threshold || journey.milestonesReached.includes(threshold)) {
+      continue;
+    }
+
+    journey.milestonesReached.push(threshold);
+    journey.log.push({
+      day: dayNumber,
+      type: 'milestone',
+      threshold,
+      summary: `Reached ${threshold}% of the expedition`
+    });
+    messages.push(`*** MILESTONE: ${getJourneyMilestoneCopy(journey.journeyType, threshold)} ***`);
+    reached.push(threshold);
+  }
+
+  return reached;
 }
 
 /**
@@ -1428,16 +1573,17 @@ export function getJourneySummary(journey) {
       morale: Math.round(getAverageMorale(journey.crew))
     };
   } else {
+    const hasPermits = Boolean(journey.permits?.target);
     return {
       type: 'desk',
       day: journey.day,
       deadline: journey.deadline,
-      daysRemaining: journey.deadline - journey.day,
+      daysRemaining: Number.isFinite(journey.deadline) ? journey.deadline - journey.day : null,
       progress: getJourneyProgress(journey),
-      permitsApproved: journey.permits.approved,
-      permitsTarget: journey.permits.target,
+      permitsApproved: hasPermits ? journey.permits.approved : 0,
+      permitsTarget: hasPermits ? journey.permits.target : 0,
       crewActive: getActiveCrewCount(journey.crew),
-      crewTotal: journey.crew.length,
+      crewTotal: journey.crew?.length || 0,
       morale: Math.round(getAverageMorale(journey.crew))
     };
   }

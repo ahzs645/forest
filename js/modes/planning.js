@@ -8,6 +8,7 @@ import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
 import { pickPlanningBlockOptions, summarizePlanningBlock } from '../data/planningBlocks.js';
 import { isPlanningApprovalReady } from './shared/endConditions.js';
+import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 
 /**
  * Run a planning day with multi-action system
@@ -16,6 +17,7 @@ import { isPlanningApprovalReady } from './shared/endConditions.js';
 export async function runPlanningDay(game) {
   const { ui, journey } = game;
   const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
+  const progressBeforeDay = getOperationalProgress(journey);
 
   // Reset hours for new day
   if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
@@ -70,9 +72,6 @@ export async function runPlanningDay(game) {
 
     ui.updateAllStatus(journey);
 
-    if (journey.hoursRemaining > 0) {
-      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
-    }
   }
 
   // End of day
@@ -82,6 +81,12 @@ export async function runPlanningDay(game) {
   checkGameOver(game);
 
   ui.updateAllStatus(journey);
+
+  const milestoneMessages = [];
+  recordProgressMilestones(journey, progressBeforeDay, milestoneMessages, Math.max(1, journey.day - 1));
+  for (const message of milestoneMessages) {
+    ui.writePositive(message);
+  }
 
   // Contextual continue (Phase 6.1)
   const phaseNames = {
@@ -99,7 +104,10 @@ export async function runPlanningDay(game) {
  */
 function displayPlanningHeader(ui, journey, seasonInfo) {
   ui.clear();
-  ui.writeHeader(`DAY ${journey.day} - STRATEGIC PLANNING`);
+  const deadlineLabel = Number.isFinite(journey.deadline)
+    ? `DAY ${journey.day} of ${journey.deadline} - STRATEGIC PLANNING`
+    : `DAY ${journey.day} - STRATEGIC PLANNING`;
+  ui.writeHeader(deadlineLabel);
 
   if (seasonInfo) {
     ui.write(`${seasonInfo.icon} ${seasonInfo.name} - Year ${seasonInfo.year} | Hours: ${journey.hoursRemaining}h`);
@@ -121,6 +129,9 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
     ministerial_approval: 'Ministerial Approval'
   };
   ui.write(`Phase: ${phaseNames[journey.plan.phase] || journey.plan.phase}`);
+  if (Number.isFinite(journey.deadline)) {
+    ui.write(`Days Remaining: ${Math.max(0, journey.deadline - journey.day)}`);
+  }
   ui.write(`Data: ${journey.plan.dataCompleteness}% | Analysis: ${journey.plan.analysisQuality}% | Buy-in: ${journey.plan.stakeholderBuyIn}% | Confidence: ${journey.plan.ministerialConfidence}%`);
 
   // Values balance (Phase 4.1 - these now matter)
@@ -249,8 +260,8 @@ function buildActionOptions(journey) {
 
   if (journey.plan.phase === 'stakeholder_review' && hoursLeft >= 4) {
     // Check values gate (Phase 4.1)
-    const valuesOk = journey.values.biodiversity >= 25 && journey.values.timberSupply >= 25 &&
-      journey.values.communityNeeds >= 25 && journey.values.firstNationsValues >= 25;
+    const deficits = getValuesGateDeficits(journey);
+    const valuesOk = deficits.length === 0;
     if (valuesOk) {
       actionOptions.push({
         label: 'Stakeholder Session (4h)',
@@ -260,15 +271,15 @@ function buildActionOptions(journey) {
     } else {
       actionOptions.push({
         label: 'Stakeholder Session (BLOCKED)',
-        description: 'All values must be ≥25% to proceed',
+        description: `Needs: ${formatValuesGateDeficits(deficits)}`,
         value: 'stakeholder_blocked'
       });
     }
   }
 
   if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 6) {
-    const valuesOk = journey.values.biodiversity >= 25 && journey.values.timberSupply >= 25 &&
-      journey.values.communityNeeds >= 25 && journey.values.firstNationsValues >= 25;
+    const deficits = getValuesGateDeficits(journey);
+    const valuesOk = deficits.length === 0;
     if (valuesOk) {
       actionOptions.push({
         label: 'Prepare Submission (6h)',
@@ -278,7 +289,7 @@ function buildActionOptions(journey) {
     } else {
       actionOptions.push({
         label: 'Prepare Submission (BLOCKED)',
-        description: 'All values must be ≥25% to submit',
+        description: `Needs: ${formatValuesGateDeficits(deficits)}`,
         value: 'submit_blocked'
       });
     }
@@ -344,10 +355,11 @@ async function processAction(game, actionValue) {
 
   switch (actionValue) {
     case 'gather_data':
-      journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + 15);
+      journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + 10);
       journey.resources.dataCredits -= 10;
+      journey.resources.budget = Math.max(0, journey.resources.budget - 900);
       journey.hoursRemaining -= 3;
-      applyProtagonistCost(journey, { energy: 10, stress: 5 });
+      applyProtagonistCost(journey, { energy: 10, stress: 6 });
       ui.write(`Data gathering progressed. Completeness: ${journey.plan.dataCompleteness}%`);
       if (journey.plan.dataCompleteness >= 80) {
         journey.plan.phase = 'analysis';
@@ -356,9 +368,10 @@ async function processAction(game, actionValue) {
       break;
 
     case 'analyze':
-      journey.plan.analysisQuality = Math.min(100, journey.plan.analysisQuality + 20);
+      journey.plan.analysisQuality = Math.min(100, journey.plan.analysisQuality + 15);
+      journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       journey.hoursRemaining -= 4;
-      applyProtagonistCost(journey, { energy: 15, stress: 10 });
+      applyProtagonistCost(journey, { energy: 15, stress: 12 });
       ui.write(`Analysis progressed. Quality: ${journey.plan.analysisQuality}%`);
       if (journey.plan.analysisQuality >= 80) {
         journey.plan.phase = 'stakeholder_review';
@@ -367,10 +380,11 @@ async function processAction(game, actionValue) {
       break;
 
     case 'stakeholder':
-      journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 15);
-      journey.resources.politicalCapital -= 5;
+      journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 10);
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 6);
+      journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       journey.hoursRemaining -= 4;
-      applyProtagonistCost(journey, { energy: 20, stress: 15 });
+      applyProtagonistCost(journey, { energy: 20, stress: 16 });
       if (journey.protagonist) {
         journey.protagonist.reputation = Math.min(100, journey.protagonist.reputation + 3);
       }
@@ -383,14 +397,15 @@ async function processAction(game, actionValue) {
 
     case 'stakeholder_blocked':
     case 'submit_blocked':
-      ui.writeWarning('Cannot proceed. All four values (biodiversity, timber, community, First Nations) must be at least 25%.');
+      ui.writeWarning(`Cannot proceed. Recover these values first: ${formatValuesGateDeficits(getValuesGateDeficits(journey))}.`);
       ui.write('Use Values Workshop or Timber Assessment to rebalance.');
       break;
 
     case 'submit':
-      journey.plan.ministerialConfidence += 25;
+      journey.plan.ministerialConfidence = Math.min(100, journey.plan.ministerialConfidence + 15);
       journey.hoursRemaining -= 6;
-      journey.resources.budget -= 2000;
+      journey.resources.budget = Math.max(0, journey.resources.budget - 2500);
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
       applyProtagonistCost(journey, { energy: 25, stress: 20 });
       ui.write(`Submission prepared. Confidence: ${journey.plan.ministerialConfidence}%`);
       if (isPlanningApprovalReady(journey)) {
@@ -472,7 +487,7 @@ async function processAction(game, actionValue) {
     }
 
     case 'network':
-      journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 5);
+      journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 4);
       journey.hoursRemaining -= 2;
       applyProtagonistCost(journey, { energy: 8, stress: 3 });
       if (journey.protagonist) {
@@ -505,8 +520,39 @@ function applyProtagonistCost(journey, costs) {
   }
 }
 
+function getValuesGateDeficits(journey) {
+  const values = journey?.values || {};
+  return [
+    { label: 'Bio', value: values.biodiversity ?? 0 },
+    { label: 'Timber', value: values.timberSupply ?? 0 },
+    { label: 'Community', value: values.communityNeeds ?? 0 },
+    { label: 'FN', value: values.firstNationsValues ?? 0 }
+  ].filter((entry) => entry.value < 25);
+}
+
+function formatValuesGateDeficits(deficits) {
+  if (!deficits.length) return 'all values ready';
+  return deficits.map((entry) => `${entry.label} ${entry.value}%`).join(', ');
+}
+
 async function advanceToNextDay(game) {
   const { ui, journey } = game;
+
+  journey.resources.budget = Math.max(0, journey.resources.budget - 750);
+  if (journey.plan.phase !== 'ministerial_approval') {
+    journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);
+  }
+
+  const daysRemainingBeforeAdvance = Number.isFinite(journey.deadline)
+    ? journey.deadline - journey.day
+    : null;
+  if (daysRemainingBeforeAdvance !== null && daysRemainingBeforeAdvance <= 4 && journey.plan.phase !== 'ministerial_approval') {
+    journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
+    if (journey.protagonist) {
+      journey.protagonist.stress = Math.min(100, journey.protagonist.stress + 6);
+    }
+    ui.writeWarning('The cabinet window is closing. Delays are starting to cost political support.');
+  }
 
   journey.day++;
   journey.hoursRemaining = 8;
@@ -527,6 +573,8 @@ async function advanceToNextDay(game) {
       ui.write(`Season changed to ${transition.newSeason}`);
     }
   }
+
+  ui.write(`Daily planning overhead: -$750${journey.plan.phase !== 'ministerial_approval' ? ', political capital -1' : ''}.`);
 }
 
 function checkGameOver(game) {

@@ -7,6 +7,7 @@
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
 import { calculateDeskConsumption, applyConsumption, applyDeskRegen, getFormattedResourceStatus, DESK_RESOURCES } from '../resources.js';
 import { executeDeskDay, DESK_ACTIONS } from '../journey.js';
+import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 
 /**
  * Run a permitting day (permit processing with referral tracking)
@@ -15,6 +16,7 @@ import { executeDeskDay, DESK_ACTIONS } from '../journey.js';
 export async function runPermittingDay(game) {
   const { ui, journey } = game;
   const daysRemaining = journey.deadline - journey.day;
+  const progressBeforeDay = getOperationalProgress(journey);
   let meetingsToday = 0;
   let crisisMode = daysRemaining <= 5;
 
@@ -111,14 +113,10 @@ export async function runPermittingDay(game) {
     // Update status panels
     ui.updateAllStatus(journey);
 
-    // Brief pause between actions
-    if (journey.hoursRemaining > 0) {
-      await ui.promptChoice('', [{ label: 'Continue working...', value: 'next' }]);
-    }
   }
 
   // End of day processing
-  await endOfDayProcessing(game, meetingsToday, crisisMode);
+  await endOfDayProcessing(game, meetingsToday, crisisMode, progressBeforeDay);
 }
 
 /**
@@ -285,12 +283,14 @@ async function processAction(game, actionId) {
           if (journey.relationships) {
             journey.relationships.nations = Math.min(100, journey.relationships.nations + 3);
           }
+          journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 2);
           ui.write('Referral complete - permit moved to ministry review.');
         } else {
           ui.write('Referral still in progress. Maintained good communication.');
           if (journey.relationships) {
             journey.relationships.nations = Math.min(100, journey.relationships.nations + 1);
           }
+          journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 1);
         }
       }
       return;
@@ -348,7 +348,7 @@ function applyProtagonistCost(journey, costs) {
  * @param {number} meetingsToday - Number of meetings held
  * @param {boolean} crisisMode - Whether in crisis mode
  */
-async function endOfDayProcessing(game, meetingsToday, crisisMode) {
+async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBeforeDay) {
   const { ui, journey } = game;
 
   ui.write('');
@@ -357,6 +357,20 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode) {
   try {
     // Process permit pipeline (automatic advancement)
     processPermitPipeline(ui, journey);
+
+    if ((journey.permits.inReferral || 0) >= 3) {
+      const drag = Math.min(3, Math.ceil(journey.permits.inReferral / 2));
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - drag);
+      if (journey.protagonist) {
+        journey.protagonist.stress = Math.min(100, journey.protagonist.stress + drag * 2);
+      }
+      ui.writeWarning(`Referral bottlenecks are piling up. Political capital -${drag}.`);
+    }
+
+    if (journey.day >= Math.max(10, journey.deadline - 10) && (journey.permits.backlog || 0) >= 4) {
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
+      ui.writeWarning('Senior leadership is pressing for queue reduction. Political capital -2.');
+    }
 
     // Apply daily resource consumption (legacy support)
     if (!journey.protagonist) {
@@ -388,6 +402,12 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode) {
 
     // Update status panels
     ui.updateAllStatus(journey);
+
+    const milestoneMessages = [];
+    recordProgressMilestones(journey, progressBeforeDay, milestoneMessages, Math.max(1, journey.day - 1));
+    for (const message of milestoneMessages) {
+      ui.writePositive(message);
+    }
   } catch (error) {
     console.error('End of day processing error:', error);
     ui.writeDanger('An error occurred. Please try again.');
