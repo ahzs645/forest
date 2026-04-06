@@ -45,8 +45,15 @@ export async function handleResupply(ui, journey, block) {
 
   while (true) {
     const money = journey.resources.budget || 0;
+    const affordableOffers = offers.filter((offer) => money >= offer.cost);
+
+    if (affordableOffers.length === 0) {
+      ui.writeWarning('You cannot afford anything at this stop. Better keep moving.');
+      break;
+    }
+
     const options = [
-      ...offers.map(o => ({
+      ...affordableOffers.map(o => ({
         label: `${o.label} ($${o.cost})`,
         description: o.description,
         value: o.id
@@ -57,13 +64,8 @@ export async function handleResupply(ui, journey, block) {
     const choice = await ui.promptChoice(`Buy supplies (cash: $${Math.round(money).toLocaleString()}):`, options);
     if (choice.value === 'done') break;
 
-    const offer = offers.find(o => o.id === choice.value);
+    const offer = affordableOffers.find(o => o.id === choice.value);
     if (!offer) continue;
-
-    if (money < offer.cost) {
-      ui.writeWarning('Not enough cash for that.');
-      continue;
-    }
 
     journey.resources.budget = Math.max(0, money - offer.cost);
     offer.apply();

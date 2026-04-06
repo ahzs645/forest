@@ -7,11 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "serve:e2e": "vite build && vite preview --host 127.0.0.1 --port 4173 --strictPort",
+    "test": "node --test tests/*.test.mjs",
+    "test:e2e": "playwright test",
+    "test:all": "npm run test && npm run test:e2e",
     "play": "node cli-game.js",
     "import:legacy": "node scripts/import-legacy-content.mjs",
     "refresh:planning-blocks": "node scripts/generate-planning-block-options.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "sass": "^1.97.1",
     "vite": "^5.4.0"
   }

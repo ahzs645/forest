@@ -1,0 +1,326 @@
+import { test, expect } from '@playwright/test';
+
+const ROLE_RUNS = [
+  { name: 'planner', roleIndex: 0, areaIndex: 0, seed: 1001 },
+  { name: 'permitter', roleIndex: 1, areaIndex: 1, seed: 1002 },
+  { name: 'recce', roleIndex: 2, areaIndex: 2, seed: 1003 },
+  { name: 'silviculture', roleIndex: 3, areaIndex: 3, seed: 1004 }
+];
+
+test.describe.configure({ mode: 'serial' });
+
+for (const run of ROLE_RUNS) {
+  test(`${run.name} mode can complete a browser playthrough without runtime errors`, async ({ page }) => {
+    const runtimeErrors = [];
+
+    page.on('pageerror', (error) => runtimeErrors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') {
+        runtimeErrors.push(message.text());
+      }
+    });
+
+    await page.addInitScript((seedStart) => {
+      let seed = seedStart;
+      Math.random = () => {
+        seed = (1664525 * seed + 1013904223) >>> 0;
+        return seed / 0x100000000;
+      };
+    }, run.seed);
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.click('#new-game-btn');
+    await page.click('#intro-continue-btn');
+    await page.locator('.role-card').nth(run.roleIndex).click();
+    await page.click('#role-continue-btn');
+    await page.locator('.area-item').nth(run.areaIndex).click();
+    await page.click('#area-continue-btn');
+
+    const result = await autoPlayToEnd(page, run.name);
+
+    expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
+    expect(result.ended).toBeTruthy();
+    expect(result.terminalText).toMatch(/EXPEDITION (SUCCESSFUL|FAILED)/);
+    expect(extractElapsedDays(result.terminalText)).toBeGreaterThan(0);
+    assertModeSpecificExpectations(run.name, result.terminalText);
+  });
+}
+
+async function autoPlayToEnd(page, strategyName, maxSteps = 280) {
+  for (let step = 0; step < maxSteps; step++) {
+    const terminalText = await page.locator('#terminal').innerText();
+    if (isEndScreen(terminalText)) {
+      return { ended: true, steps: step, terminalText };
+    }
+
+    await page.waitForSelector('#choices button', { timeout: 15000 });
+    const buttons = page.locator('#choices button');
+    const labels = await buttons.evaluateAll((nodes) =>
+      nodes.map((node) => node.innerText.replace(/\s+/g, ' ').trim())
+    );
+
+    if (labels.length === 1 && labels[0].includes('New Expedition')) {
+      return {
+        ended: true,
+        steps: step,
+        terminalText: await page.locator('#terminal').innerText()
+      };
+    }
+
+    const choiceIndex = pickChoice(labels, terminalText, strategyName);
+    await buttons.nth(choiceIndex).click();
+  }
+
+  return {
+    ended: false,
+    steps: maxSteps,
+    terminalText: await page.locator('#terminal').innerText()
+  };
+}
+
+function pickChoice(labels, terminalText, strategyName) {
+  if (labels.length === 1) {
+    return 0;
+  }
+
+  if (strategyName === 'recce') {
+    return pickReconChoice(labels, terminalText);
+  }
+
+  const sharedPriorities = ['Journeyman', 'Begin Journey', 'Continue'];
+  const planningPriorities = getPlanningPriorities(terminalText);
+  const strategyPriorities = {
+    planner: planningPriorities,
+    permitter: [
+      'Address Revisions',
+      'Follow Up on Referrals',
+      'Submit Permit',
+      'Draft Permit Application',
+      'Process Permits',
+      'Stakeholder Meeting',
+      'Team Building',
+      'Take a Break',
+      'End Day Early'
+    ],
+    silviculture: [
+      'Deploy Planting Crew',
+      'Conduct Survey',
+      'Contractor Meeting',
+      'Site Inspection',
+      'Herbicide Application',
+      'Team Briefing',
+      'Upgrade camp',
+      'Inspect & retrain',
+      'Send medic',
+      'Grant rest day',
+      'Pay retention',
+      'End Day'
+    ]
+  };
+
+  const priorities = [...sharedPriorities, ...(strategyPriorities[strategyName] || [])];
+
+  for (const priority of priorities) {
+    const index = labels.findIndex((label) => label.includes(priority));
+    if (index !== -1) {
+      return index;
+    }
+  }
+
+  return 0;
+}
+
+function pickReconChoice(labels, terminalText) {
+  const hpLabels = labels
+    .map((label, index) => {
+      const match = label.match(/\((\d+)% HP/);
+      return match ? { index, hp: Number(match[1]) } : null;
+    })
+    .filter(Boolean);
+  if (hpLabels.length) {
+    hpLabels.sort((left, right) => left.hp - right.hp);
+    return hpLabels[0].index;
+  }
+
+  const food = extractResource(terminalText, 'FOOD');
+  const fuel = extractResource(terminalText, 'FUEL');
+  const equipment = extractResource(terminalText, 'EQUIP');
+  const meds = extractResource(terminalText, 'MEDS');
+  const injuredMatch = terminalText.match(/\|\s*(\d+)\s+injured/);
+  const injuredCount = injuredMatch ? Number(injuredMatch[1]) : 0;
+
+  if (labels.some((label) => label.includes('Safe Detour')) || labels.some((label) => label.includes('Stay Mainline'))) {
+    if (food <= 10) {
+      return findFirstMatching(labels, ['Stay Mainline', 'Safe Detour', 'Risky Shortcut']);
+    }
+    return findFirstMatching(labels, ['Stay Mainline', 'Safe Detour', 'Risky Shortcut']);
+  }
+
+  if (labels.some((label) => label.includes('Hunt & Forage Before Moving')) ||
+      labels.some((label) => label.includes('Keep Full Rations')) ||
+      labels.some((label) => label.includes('Short Rations and Push On'))) {
+    if (food <= 10) {
+      return findFirstMatching(labels, ['Hunt & Forage Before Moving', 'Keep Full Rations', 'Short Rations and Push On']);
+    }
+    return findFirstMatching(labels, ['Keep Full Rations', 'Hunt & Forage Before Moving', 'Short Rations and Push On']);
+  }
+
+  if (terminalText.includes('RESUPPLY')) {
+    if (food <= 18) {
+      return findFirstMatching(labels, ['Rations Crate', 'Fuel Drum', 'Field Repair', 'First Aid Kit', 'Done']);
+    }
+    if (fuel <= 30) {
+      return findFirstMatching(labels, ['Fuel Drum', 'Rations Crate', 'Field Repair', 'First Aid Kit', 'Done']);
+    }
+    if (equipment <= 45) {
+      return findFirstMatching(labels, ['Field Repair', 'Fuel Drum', 'Rations Crate', 'First Aid Kit', 'Done']);
+    }
+    if (meds <= 2) {
+      return findFirstMatching(labels, ['First Aid Kit', 'Rations Crate', 'Fuel Drum', 'Field Repair', 'Done']);
+    }
+    return findFirstMatching(labels, ['Done']);
+  }
+
+  if (food <= 12) {
+    return findFirstMatching(labels, ['Resupply', 'Forage & Hunt', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+  }
+
+  if (fuel <= 25 || equipment <= 35) {
+    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Standard Recon', 'Cautious Recon', 'Forage & Hunt', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+  }
+
+  if (injuredCount >= 2 && meds > 0) {
+    return findFirstMatching(labels, ['Triage', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Forage & Hunt', 'Rest & End Shift']);
+  }
+
+  return findFirstMatching(labels, ['Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Forage & Hunt', 'Triage', 'Rest & End Shift']);
+}
+
+function getPlanningPriorities(terminalText) {
+  const phaseMatch = terminalText.match(/Phase:\s*([A-Za-z ]+)/);
+  const phase = phaseMatch ? phaseMatch[1].trim() : '';
+  const valuesBlocked = terminalText.includes('BLOCKED') || terminalText.includes('All values must be');
+
+  if (phase === 'Data Gathering') {
+    return valuesBlocked
+      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Gather Data', 'Network', 'Check Email', 'Take a Break', 'End Day']
+      : ['Gather Data', 'Network', 'Check Email', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'End Day'];
+  }
+
+  if (phase === 'Analysis') {
+    return valuesBlocked
+      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Run Analysis', 'Network', 'Check Email', 'Take a Break', 'End Day']
+      : ['Run Analysis', 'Network', 'Check Email', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'End Day'];
+  }
+
+  if (phase === 'Stakeholder Review') {
+    return valuesBlocked
+      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Stakeholder Session', 'Network', 'Check Email', 'Take a Break', 'End Day']
+      : ['Stakeholder Session', 'Balanced Approach', 'Emphasize First Nations', 'Values Workshop', 'Network', 'Check Email', 'Take a Break', 'End Day'];
+  }
+
+  if (phase === 'Ministerial Approval') {
+    return valuesBlocked
+      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Prepare Submission', 'Network', 'Check Email', 'Take a Break', 'End Day']
+      : ['Prepare Submission', 'Balanced Approach', 'Emphasize First Nations', 'Values Workshop', 'Network', 'Check Email', 'Take a Break', 'End Day'];
+  }
+
+  return [
+    'Gather Data',
+    'Run Analysis',
+    'Stakeholder Session',
+    'Prepare Submission',
+    'Balanced Approach',
+    'Emphasize First Nations',
+    'Emphasize Biodiversity',
+    'Values Workshop',
+    'Network',
+    'Check Email',
+    'Take a Break',
+    'End Day'
+  ];
+}
+
+function isEndScreen(text) {
+  return text.includes('EXPEDITION SUCCESSFUL') || text.includes('EXPEDITION FAILED');
+}
+
+function extractElapsedDays(text) {
+  const match = text.match(/(?:Days Elapsed|Days Used|Shifts Elapsed):\s*(\d+)/);
+  return match ? Number(match[1]) : 0;
+}
+
+function assertModeSpecificExpectations(modeName, terminalText) {
+  switch (modeName) {
+    case 'planner': {
+      expect(terminalText).toMatch(/Final Phase:\s*ministerial_approval/);
+      expect(extractStat(terminalText, 'Data Completeness')).toBeGreaterThanOrEqual(80);
+      expect(extractStat(terminalText, 'Analysis Quality')).toBeGreaterThanOrEqual(80);
+      expect(extractStat(terminalText, 'Stakeholder Buy-in')).toBeGreaterThanOrEqual(75);
+      expect(extractStat(terminalText, 'Ministerial Confidence')).toBeGreaterThanOrEqual(80);
+      break;
+    }
+    case 'permitter': {
+      const approved = extractPair(terminalText, 'Permits Approved');
+      expect(approved.current).toBeGreaterThanOrEqual(Math.ceil(approved.total * 0.8));
+      break;
+    }
+    case 'recce': {
+      const surveyed = extractPair(terminalText, 'Blocks Surveyed');
+      if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
+        expect(surveyed.current).toBe(surveyed.total);
+      } else {
+        expect(surveyed.current).toBeLessThan(surveyed.total);
+      }
+      break;
+    }
+    case 'silviculture': {
+      const planted = extractPair(terminalText, 'Blocks Planted');
+      const surveys = extractPair(terminalText, 'Free-Growing Surveys');
+      if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
+        expect(planted.current).toBeGreaterThanOrEqual(planted.total);
+        expect(surveys.current).toBeGreaterThanOrEqual(surveys.total);
+      } else {
+        expect(terminalText).toMatch(/Budget exhausted/i);
+        expect(planted.current).toBeLessThanOrEqual(planted.total);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+function extractStat(text, label) {
+  const match = text.match(new RegExp(`${escapeRegExp(label)}:\\s*(\\d+)`));
+  return match ? Number(match[1]) : 0;
+}
+
+function extractPair(text, label) {
+  const match = text.match(new RegExp(`${escapeRegExp(label)}:\\s*(\\d+)\\/(\\d+)`));
+  return {
+    current: match ? Number(match[1]) : 0,
+    total: match ? Number(match[2]) : 0
+  };
+}
+
+function extractResource(text, label) {
+  const match = text.match(new RegExp(`${escapeRegExp(label)}:\\s*(\\d+)`));
+  return match ? Number(match[1]) : Number.POSITIVE_INFINITY;
+}
+
+function findFirstMatching(labels, priorities) {
+  for (const priority of priorities) {
+    const index = labels.findIndex((label) => label.includes(priority));
+    if (index !== -1) {
+      return index;
+    }
+  }
+  return 0;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

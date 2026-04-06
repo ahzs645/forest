@@ -64,6 +64,15 @@
     "description": "Violently ill. Cannot work.",
     "canTravel": false
   },
+  "dysentery": {
+    "name": "Dysentery",
+    "duration": 4,
+    "healthDrain": 4,
+    "moraleEffect": -6,
+    "workCapacity": 0,
+    "description": "Severe stomach illness. Needs rest and clean water.",
+    "canTravel": false
+  },
   "hypothermia": {
     "name": "Hypothermia",
     "duration": 2,
@@ -99,5 +108,14 @@
     "workCapacity": 0.7,
     "description": "Anxious and overwhelmed.",
     "canTravel": true
+  },
+  "infection": {
+    "name": "Infection",
+    "duration": 4,
+    "healthDrain": 4,
+    "moraleEffect": -5,
+    "workCapacity": 0.2,
+    "description": "An untreated condition is getting worse.",
+    "canTravel": false
   }
 }

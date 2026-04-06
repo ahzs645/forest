@@ -14,6 +14,8 @@ import {
 } from './data/crewNames.js';
 
 let crewIdCounter = 0;
+const INJURY_EFFECT_IDS = new Set(['broken_leg', 'broken_arm', 'sprained_ankle', 'concussion']);
+const ILLNESS_EFFECT_IDS = new Set(['flu', 'cold', 'food_poisoning', 'dysentery', 'hypothermia', 'exhaustion', 'infection']);
 
 /**
  * Generate a unique crew member ID
@@ -67,6 +69,8 @@ export function generateCrewMember(journeyType, roleOverride = null) {
     traits,
     statusEffects: [], // Array of { effectId, daysRemaining }
     daysIncapacitated: 0,
+    untreatedSeriousDays: 0,
+    lastTreatedDay: null,
     isActive: true,
     isDead: false,
     hasQuit: false
@@ -188,7 +192,10 @@ export function processDailyUpdate(member, conditions = {}) {
 
     // Apply health drain
     if (effectDef.healthDrain > 0) {
-      member.health -= effectDef.healthDrain;
+      const healthDrain = conditions.restDay
+        ? Math.max(0, effectDef.healthDrain - 2)
+        : effectDef.healthDrain;
+      member.health -= healthDrain;
       if (member.health < 0) member.health = 0;
     }
 
@@ -199,6 +206,9 @@ export function processDailyUpdate(member, conditions = {}) {
 
     // Decrement duration
     effect.daysRemaining--;
+    if (conditions.restDay && effectDef.healthDrain > 0 && effect.daysRemaining > 0) {
+      effect.daysRemaining--;
+    }
     if (effect.daysRemaining <= 0) {
       effectsToRemove.push(effect.effectId);
     }
@@ -216,8 +226,45 @@ export function processDailyUpdate(member, conditions = {}) {
     return def && def.healthDrain > 0;
   });
 
+  const activeEffectIds = member.statusEffects.map((effect) => effect.effectId);
+  const wasTreatedToday = Number.isFinite(conditions.currentDay) && member.lastTreatedDay === conditions.currentDay;
+  const hasUntreatedInjury = activeEffectIds.some((effectId) => INJURY_EFFECT_IDS.has(effectId));
+  const hasUntreatedIllness = activeEffectIds.some((effectId) => ILLNESS_EFFECT_IDS.has(effectId));
+
+  if (hasSeriousEffect) {
+    member.untreatedSeriousDays = wasTreatedToday
+      ? 0
+      : Number(member.untreatedSeriousDays || 0) + 1;
+  } else {
+    member.untreatedSeriousDays = 0;
+  }
+
+  const worseningPressure =
+    (conditions.lowFood ? 1 : 0) +
+    (conditions.shortRations ? 1 : 0) +
+    (conditions.coldWeather ? 1 : 0) +
+    (conditions.gruelingPace ? 1 : 0);
+
+  if (!wasTreatedToday && member.untreatedSeriousDays >= 2 && worseningPressure > 0) {
+    const worseningChance = Math.min(0.7, 0.1 * member.untreatedSeriousDays + 0.08 * worseningPressure);
+    const worseningEffect = activeEffectIds.includes('food_poisoning') ? 'dysentery' : 'infection';
+
+    if ((hasUntreatedInjury || hasUntreatedIllness) &&
+        !activeEffectIds.includes(worseningEffect) &&
+        Math.random() < worseningChance) {
+      const result = applyStatusEffect(member, worseningEffect);
+      if (result.message) {
+        messages.push(`${result.message} The condition is getting worse.`);
+      }
+    }
+  }
+
+  if ((activeEffectIds.includes('infection') || activeEffectIds.includes('dysentery')) && !conditions.restDay) {
+    member.health = Math.max(0, member.health - 2);
+  }
+
   if (!hasSeriousEffect && member.health < member.maxHealth) {
-    member.health = Math.min(member.maxHealth, member.health + 5);
+    member.health = Math.min(member.maxHealth, member.health + (conditions.restDay ? 7 : 5));
   }
 
   // Morale adjustments based on conditions
@@ -230,6 +277,10 @@ export function processDailyUpdate(member, conditions = {}) {
   if (conditions.lowFood) {
     member.morale = Math.max(0, member.morale - 3);
     member.health = Math.max(0, member.health - 2);
+  }
+  if (conditions.shortRations) {
+    member.morale = Math.max(0, member.morale - 4);
+    member.health = Math.max(0, member.health - 1);
   }
   if (conditions.coldWeather && !conditions.shelter) {
     member.morale = Math.max(0, member.morale - 2);
@@ -393,6 +444,46 @@ export function healCrewMember(member, healAmount = 20) {
   return {
     member,
     message: `${member.name} is already at full health.`
+  };
+}
+
+/**
+ * Treat a crew member's condition.
+ * Severe illnesses and injuries are stabilized first and may need multiple days of care.
+ * @param {Object} member - Crew member
+ * @param {string} effectId - Status effect ID
+ * @param {number|null} currentDay - Current journey day
+ * @returns {Object} Result message and whether the effect fully cleared
+ */
+export function treatCrewCondition(member, effectId, currentDay = null) {
+  const status = member.statusEffects.find((effect) => effect.effectId === effectId);
+  if (!status) {
+    return { member, message: null, cleared: false };
+  }
+
+  const effectDef = STATUS_EFFECTS[effectId];
+  const isSevere = effectDef && (effectDef.healthDrain >= 3 || effectDef.canTravel === false);
+
+  if (currentDay !== null) {
+    member.lastTreatedDay = currentDay;
+  }
+  member.untreatedSeriousDays = 0;
+
+  if (isSevere && status.daysRemaining > 1) {
+    status.daysRemaining -= 1;
+    member.morale = Math.min(100, member.morale + 3);
+    return {
+      member,
+      cleared: false,
+      message: `${member.name}'s ${effectDef.name.toLowerCase()} is stabilized, but they still need rest.`
+    };
+  }
+
+  const removed = removeStatusEffect(member, effectId);
+  return {
+    member,
+    cleared: true,
+    message: removed.message || `${member.name}'s condition has stabilized.`
   };
 }
 

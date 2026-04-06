@@ -165,7 +165,15 @@ export function createDeskResources(options = {}) {
  * @returns {Object} Resource consumption amounts
  */
 export function calculateFieldConsumption(conditions = {}, crewCount = 5) {
-  const { pace = 'normal', terrain = 'flat', weather = 'cool', weatherCondition = null } = conditions;
+  const {
+    pace = 'normal',
+    terrain = 'flat',
+    weather = 'cool',
+    weatherCondition = null,
+    rationFactor = 1,
+    routeFuelMultiplier = 1,
+    routeEquipmentMultiplier = 1
+  } = conditions;
   const consumption = {};
 
   // Weather modifiers for fuel and equipment
@@ -200,12 +208,14 @@ export function calculateFieldConsumption(conditions = {}, crewCount = 5) {
   // Apply weather modifier
   const weatherId = weatherCondition?.id || weather;
   fuelUse *= weatherFuelModifiers[weatherId] ?? 1;
+  fuelUse *= routeFuelMultiplier;
   consumption.fuel = Math.round(fuelUse * 10) / 10;
 
   // Food consumption (uses temperature via weather param)
   const foodDef = FIELD_RESOURCES.food;
   let foodUse = crewCount * foodDef.baseDaily;
   foodUse *= foodDef.weatherModifiers[weather] ?? 1;
+  foodUse *= rationFactor;
   consumption.food = Math.round(foodUse * 10) / 10;
 
   // Equipment wear (only when traveling)
@@ -215,6 +225,7 @@ export function calculateFieldConsumption(conditions = {}, crewCount = 5) {
     equipWear *= equipDef.terrainModifiers[terrain] ?? 1;
     // Apply weather modifier
     equipWear *= weatherEquipModifiers[weatherId] ?? 1;
+    equipWear *= routeEquipmentMultiplier;
     consumption.equipment = Math.round(equipWear * 10) / 10;
   } else {
     consumption.equipment = 0;

@@ -3,10 +3,62 @@
  * Field-based reconnaissance operations with crew mechanics
  */
 
-import { getCrewDisplayInfo, healCrewMember, removeStatusEffect, applyRandomInjury, crewHasRole, getCrewComment } from '../crew.js';
-import { executeFieldDay, PACE_OPTIONS, getFieldProgressInfo } from '../journey.js';
+import {
+  applyRandomInjury,
+  applyStatusEffect,
+  crewHasRole,
+  getCrewComment,
+  getCrewDisplayInfo,
+  healCrewMember,
+  treatCrewCondition
+} from '../crew.js';
+import { executeFieldDay, getFieldProgressInfo, getSurveyedBlockCount } from '../journey.js';
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
-import { getFormattedResourceStatus, FIELD_RESOURCES } from '../resources.js';
+import { FIELD_RESOURCES } from '../resources.js';
+
+const TREATMENT_PRIORITY = [
+  'infection',
+  'dysentery',
+  'food_poisoning',
+  'hypothermia',
+  'concussion',
+  'broken_leg',
+  'broken_arm',
+  'exhaustion',
+  'sprained_ankle',
+  'flu',
+  'cold'
+];
+
+const ROUTE_PRESETS = {
+  detour: {
+    label: 'Safe Detour',
+    shortLabel: 'detour',
+    distanceMultiplier: 0.82,
+    fuelMultiplier: 1.18,
+    equipmentMultiplier: 0.88,
+    injuryRisk: 0.03,
+    moraleDelta: 1
+  },
+  mainline: {
+    label: 'Stay Mainline',
+    shortLabel: 'mainline',
+    distanceMultiplier: 1,
+    fuelMultiplier: 1,
+    equipmentMultiplier: 1,
+    injuryRisk: 0.08,
+    moraleDelta: 0
+  },
+  shortcut: {
+    label: 'Risky Shortcut',
+    shortLabel: 'shortcut',
+    distanceMultiplier: 1.24,
+    fuelMultiplier: 0.92,
+    equipmentMultiplier: 1.28,
+    injuryRisk: 0.22,
+    moraleDelta: -2
+  }
+};
 
 /**
  * Run a recon day (enhanced field day with survey mechanics)
@@ -19,8 +71,9 @@ export async function runReconDay(game) {
   await runFieldDay(game);
 
   // Track blocks assessed (recon-specific tracking)
-  if (journey.currentBlockIndex > (journey.blocksAssessed || 0)) {
-    journey.blocksAssessed = journey.currentBlockIndex;
+  const surveyedBlocks = getSurveyedBlockCount(journey);
+  if (surveyedBlocks > (journey.blocksAssessed || 0)) {
+    journey.blocksAssessed = surveyedBlocks;
     ui.write(`Block assessment complete. Total blocks assessed: ${journey.blocksAssessed}`);
   }
 }
@@ -70,40 +123,51 @@ async function runFieldDay(game) {
     return;
   }
 
+  if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.warning) {
+    displayDayHeader(ui, journey);
+    await maybeHandleFoodDecision(game);
+  }
+
   // Multi-action loop: keep going while hours remain
   while (journey.hoursRemaining > 0) {
     const currentBlock = journey.blocks[journey.currentBlockIndex];
+    const canTravel = !hasTraveled && journey.resources.fuel > 0 && journey.resources.equipment > 0;
+
+    if (canTravel && journey.currentBlockIndex < journey.blocks.length - 1 && journey.routePlan?.day !== journey.day) {
+      displayDayHeader(ui, journey);
+      await maybePromptRouteChoice(game, currentBlock);
+    }
 
     displayDayHeader(ui, journey);
 
     // Build action options based on remaining hours and state
     const actionOptions = [];
-    const canTravel = !hasTraveled && journey.resources.fuel > 0 && journey.resources.equipment > 0;
 
     if (canTravel) {
+      const routeSuffix = journey.routePlan ? ` via ${journey.routePlan.shortLabel}` : '';
       // Travel options (4-6 hours depending on pace)
       actionOptions.push({
-        label: 'Cautious Recon (4h)',
+        label: `Cautious Recon${routeSuffix} (4h)`,
         description: '60% coverage, low risk',
         value: 'slow'
       });
       if (journey.hoursRemaining >= 5) {
         actionOptions.push({
-          label: 'Standard Recon (5h)',
+          label: `Standard Recon${routeSuffix} (5h)`,
           description: '100% coverage, normal risk',
           value: 'normal'
         });
       }
       if (journey.hoursRemaining >= 6) {
         actionOptions.push({
-          label: 'Extended Recon (6h)',
+          label: `Extended Recon${routeSuffix} (6h)`,
           description: '140% coverage, higher risk',
           value: 'fast'
         });
       }
       if (journey.hoursRemaining >= 8) {
         actionOptions.push({
-          label: 'Max Effort (8h)',
+          label: `Max Effort${routeSuffix} (8h)`,
           description: '180% coverage, grueling',
           value: 'grueling'
         });
@@ -113,8 +177,8 @@ async function runFieldDay(game) {
     // Camp actions (available anytime)
     if (journey.hoursRemaining >= 2) {
       actionOptions.push({
-        label: 'Forage & Scout (2h)',
-        description: 'Find supplies; small injury risk',
+        label: 'Forage & Hunt (2h)',
+        description: 'Search for food and salvage; moderate risk',
         value: 'forage'
       });
       actionOptions.push({
@@ -179,7 +243,7 @@ async function runFieldDay(game) {
       hasTraveled = true;
     } else if (actionId === 'forage') {
       journey.hoursRemaining -= 2;
-      applyForageResults(ui, journey);
+      applyForageResults(ui, journey, 'forage');
     } else if (actionId === 'maintain') {
       journey.hoursRemaining -= 2;
       await handleMaintenance(game);
@@ -239,6 +303,13 @@ function displayDayHeader(ui, journey) {
 
   // Weather and terrain
   ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'} | Hours: ${journey.hoursRemaining || 0}h`);
+  const routeText = journey.routePlan
+    ? `${journey.routePlan.label}`
+    : 'Route undecided';
+  const rationText = journey.rationPlan?.mode === 'short'
+    ? `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
+    : 'Full rations';
+  ui.write(`Route: ${routeText} | Rations: ${rationText}`);
   ui.write('');
 
   // Compact resources
@@ -306,6 +377,183 @@ function abbreviateBlockName(name) {
   const words = name.split(/[\s-]+/);
   if (words[0].length <= 8) return words[0];
   return name.substring(0, 7) + '.';
+}
+
+function ensureRationPlan(journey) {
+  if (!journey.rationPlan) {
+    journey.rationPlan = {
+      mode: 'normal',
+      shortRationStreak: 0,
+      lastDecisionDay: 0
+    };
+  }
+
+  return journey.rationPlan;
+}
+
+function formatTerrainLabel(terrainId) {
+  if (!terrainId) return 'unknown';
+  return terrainId
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getRouteHazardSummary(currentBlock, nextBlock, weather) {
+  const hazardSet = new Set([
+    ...(currentBlock?.hazards || []),
+    ...(nextBlock?.hazards || [])
+  ]);
+  const details = [];
+
+  if (nextBlock?.terrain) {
+    details.push(`${formatTerrainLabel(nextBlock.terrain)} terrain`);
+  }
+  if (hazardSet.size > 0) {
+    details.push(`hazards: ${Array.from(hazardSet).slice(0, 2).join(', ')}`);
+  }
+  if (weather?.dangerous) {
+    details.push(weather.name.toLowerCase());
+  }
+  if (nextBlock?.hasSupply) {
+    details.push('supply point ahead');
+  }
+
+  return details.length > 0
+    ? `${nextBlock?.name || 'Next block'} ahead: ${details.join(' | ')}.`
+    : '';
+}
+
+function buildRoutePlan(choiceId, journey, currentBlock, nextBlock) {
+  const preset = ROUTE_PRESETS[choiceId] || ROUTE_PRESETS.mainline;
+  const terrainLabel = formatTerrainLabel(nextBlock?.terrain || currentBlock?.terrain || 'unknown').toLowerCase();
+  const hazardCount = (currentBlock?.hazards?.length || 0) + (nextBlock?.hazards?.length || 0);
+  let note = 'You hold to the existing line and keep the crew on a steady tempo.';
+
+  if (choiceId === 'detour') {
+    note = `You swing wide around the roughest ${terrainLabel} and lose time, but the crew gets a cleaner line.`;
+  } else if (choiceId === 'shortcut') {
+    note = `You cut a rough shortcut through the ${terrainLabel}, gambling that the extra speed is worth the wear.`;
+  } else if (hazardCount > 0) {
+    note = `You stay on the mainline and thread through the hazards instead of giving up time on a detour.`;
+  }
+
+  return {
+    ...preset,
+    day: journey.day,
+    note
+  };
+}
+
+function chooseTreatmentEffect(member) {
+  const activeEffects = (member.statusEffects || []).map((effect) => effect.effectId);
+
+  for (const effectId of TREATMENT_PRIORITY) {
+    if (activeEffects.includes(effectId)) {
+      return effectId;
+    }
+  }
+
+  return activeEffects[0] || null;
+}
+
+async function maybeHandleFoodDecision(game) {
+  const { ui, journey } = game;
+  const rations = ensureRationPlan(journey);
+
+  if (rations.lastDecisionDay === journey.day) {
+    return;
+  }
+
+  if ((journey.resources.food || 0) > FIELD_RESOURCES.food.warning) {
+    return;
+  }
+
+  const foodLevel = journey.resources.food || 0;
+  const prompt = foodLevel <= FIELD_RESOURCES.food.critical
+    ? 'Food stores are critically low. Decide how to handle the crew\'s meals.'
+    : 'Food stores are running thin. Decide how to handle rations today.';
+  const options = [];
+
+  if ((journey.hoursRemaining || 0) >= 2) {
+    options.push({
+      label: 'Hunt & Forage Before Moving (2h)',
+      description: 'Best chance to restock food, but it can cost time, blood, or clean meat',
+      value: 'hunt'
+    });
+  }
+
+  options.push(
+    {
+      label: 'Keep Full Rations',
+      description: 'Normal food use; keeps the crew steadier if you can afford it',
+      value: 'full'
+    },
+    {
+      label: 'Short Rations and Push On',
+      description: 'Use 65% portions today; the crew will feel it',
+      value: 'short'
+    }
+  );
+
+  const choice = await ui.promptChoice(prompt, options);
+  rations.lastDecisionDay = journey.day;
+
+  if (choice.value === 'hunt') {
+    rations.mode = 'normal';
+    rations.shortRationStreak = 0;
+    journey.hoursRemaining = Math.max(0, (journey.hoursRemaining || 0) - 2);
+    ui.write('You burn the first part of the shift trying to fill the food bins before pushing deeper.');
+    applyForageResults(ui, journey, 'hunt');
+    ui.write('');
+    return;
+  }
+
+  if (choice.value === 'short') {
+    rations.mode = 'short';
+    rations.shortRationStreak = Number(rations.shortRationStreak || 0) + 1;
+    ui.writeWarning(`Short rations ordered. This makes ${rations.shortRationStreak} reduced-meal day${rations.shortRationStreak === 1 ? '' : 's'} in a row.`);
+    ui.write('');
+    return;
+  }
+
+  rations.mode = 'normal';
+  rations.shortRationStreak = 0;
+  ui.write('You keep the crew on full rations and accept the extra draw on supplies.');
+  ui.write('');
+}
+
+async function maybePromptRouteChoice(game, currentBlock) {
+  const { ui, journey } = game;
+  const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
+
+  if (!nextBlock) {
+    return;
+  }
+
+  const hazardSummary = getRouteHazardSummary(currentBlock, nextBlock, journey.weather);
+  const choice = await ui.promptChoice(
+    hazardSummary || `Choose today's route to ${nextBlock.name}.`,
+    [
+      {
+        label: 'Safe Detour',
+        description: 'Lower injury risk, lower wear, slower progress, higher fuel burn',
+        value: 'detour'
+      },
+      {
+        label: 'Stay Mainline',
+        description: 'Balanced progress, wear, and risk',
+        value: 'mainline'
+      },
+      {
+        label: 'Risky Shortcut',
+        description: 'Faster progress and less fuel, but more wear and mishap risk',
+        value: 'shortcut'
+      }
+    ]
+  );
+
+  journey.routePlan = buildRoutePlan(choice.value, journey, currentBlock, nextBlock);
 }
 
 /**
@@ -387,8 +635,15 @@ export async function handleResupply(game, block) {
 
   while (true) {
     const money = journey.resources.budget || 0;
+    const affordableOffers = offers.filter((offer) => money >= offer.cost);
+
+    if (affordableOffers.length === 0) {
+      ui.writeWarning('You cannot afford anything at this stop. Better keep moving.');
+      break;
+    }
+
     const options = [
-      ...offers.map(o => ({
+      ...affordableOffers.map(o => ({
         label: `${o.label} ($${o.cost})`,
         description: o.description,
         value: o.id
@@ -399,13 +654,8 @@ export async function handleResupply(game, block) {
     const choice = await ui.promptChoice(`Buy supplies (cash: $${Math.round(money).toLocaleString()}):`, options);
     if (choice.value === 'done') break;
 
-    const offer = offers.find(o => o.id === choice.value);
+    const offer = affordableOffers.find(o => o.id === choice.value);
     if (!offer) continue;
-
-    if (money < offer.cost) {
-      ui.writeWarning('Not enough cash for that.');
-      continue;
-    }
 
     journey.resources.budget = Math.max(0, money - offer.cost);
     offer.apply();
@@ -450,11 +700,14 @@ export async function handleTriage(game) {
   journey.resources.firstAid = Math.max(0, (journey.resources.firstAid || 0) - 1);
 
   if ((target.statusEffects?.length || 0) > 0) {
-    const effectId = target.statusEffects[0].effectId;
-    const removed = removeStatusEffect(target, effectId);
-    if (removed.message) ui.writePositive(removed.message);
-    const healed = healCrewMember(target, 15);
+    const effectId = chooseTreatmentEffect(target);
+    const treated = treatCrewCondition(target, effectId, journey.day);
+    if (treated.message) ui.writePositive(treated.message);
+    const healed = healCrewMember(target, treated.cleared ? 14 : 8);
     if (healed.message) ui.writePositive(healed.message);
+    if (!treated.cleared) {
+      ui.write('They are stabilized for now, but this will take another treatment day or a rest shift to finish.');
+    }
   } else {
     const healed = healCrewMember(target, 25);
     if (healed.message) ui.writePositive(healed.message);
@@ -514,12 +767,17 @@ export async function handleMaintenance(game) {
  * Apply forage results - finding supplies in the field
  * @param {Object} ui - UI instance
  * @param {Object} journey - Journey state
+ * @param {string} strategy - 'forage' or 'hunt'
  */
-function applyForageResults(ui, journey) {
+function applyForageResults(ui, journey, strategy = 'forage') {
   const active = journey.crew.filter(m => m.isActive).length || 1;
-  const foodFound = Math.round((6 + Math.random() * 10) * (active / 5));
-  const fuelFound = Math.random() < 0.25 ? Math.round(5 + Math.random() * 10) : 0;
-  const cashFound = Math.random() < 0.15 ? Math.round(120 + Math.random() * 480) : 0;
+  const isHunt = strategy === 'hunt';
+  const spotterBonus = crewHasRole(journey.crew, 'spotter') ? 1.1 : 1;
+  const foodBase = isHunt ? 10 : 6;
+  const foodVariance = isHunt ? 12 : 10;
+  const foodFound = Math.round((foodBase + Math.random() * foodVariance) * (active / 5) * spotterBonus);
+  const fuelFound = !isHunt && Math.random() < 0.25 ? Math.round(5 + Math.random() * 10) : 0;
+  const cashFound = !isHunt && Math.random() < 0.15 ? Math.round(120 + Math.random() * 480) : 0;
 
   journey.resources.food = Math.min(FIELD_RESOURCES.food.max, journey.resources.food + foodFound);
   if (fuelFound > 0) {
@@ -530,17 +788,31 @@ function applyForageResults(ui, journey) {
   }
 
   ui.write('');
-  ui.writeHeader('FORAGE RESULTS');
+  ui.writeHeader(isHunt ? 'HUNT RESULTS' : 'FORAGE RESULTS');
   ui.writePositive(`Found food: +${foodFound} rations`);
   if (fuelFound > 0) ui.writePositive(`Recovered fuel: +${fuelFound} gallons`);
   if (cashFound > 0) ui.writePositive(`Sold salvage: +$${cashFound.toLocaleString()}`);
+  if (isHunt) {
+    ui.write('The crew spends extra time tracking sign, dressing game, and packing meat back to camp.');
+  }
 
-  if (Math.random() < 0.12) {
+  const complicationRoll = Math.random();
+  const injuryChance = isHunt ? 0.18 : 0.12;
+  const illnessChance = isHunt ? 0.10 : 0.05;
+  if (complicationRoll < injuryChance) {
     const activeCrew = journey.crew.filter(m => m.isActive);
     const victim = activeCrew.length ? activeCrew[Math.floor(Math.random() * activeCrew.length)] : null;
     if (victim) {
-      const injury = applyRandomInjury(victim, 'minor');
-      ui.writeWarning(`Foraging accident! ${injury.message}`);
+      const injury = applyRandomInjury(victim, isHunt ? 'moderate' : 'minor');
+      ui.writeWarning(`${isHunt ? 'Hunting' : 'Foraging'} accident! ${injury.message}`);
+    }
+  } else if (complicationRoll < injuryChance + illnessChance) {
+    const activeCrew = journey.crew.filter(m => m.isActive);
+    const victim = activeCrew.length ? activeCrew[Math.floor(Math.random() * activeCrew.length)] : null;
+    if (victim) {
+      const illnessId = isHunt && Math.random() < 0.5 ? 'food_poisoning' : 'dysentery';
+      const illness = applyStatusEffect(victim, illnessId);
+      ui.writeWarning(`Bad field prep catches up with the crew. ${illness.message}`);
     }
   }
 }

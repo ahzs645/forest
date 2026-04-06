@@ -11,7 +11,15 @@
  * Legacy types 'field' and 'desk' are still supported for backward compatibility.
  */
 
-import { generateCrew, processDailyUpdate, getActiveCrewCount, getAverageMorale } from './crew.js';
+import {
+  applyRandomInjury,
+  applyStatusEffect,
+  generateCrew,
+  getActiveCrewCount,
+  getAverageMorale,
+  getTotalWorkCapacity,
+  processDailyUpdate
+} from './crew.js';
 import {
   createFieldResources,
   createDeskResources,
@@ -512,6 +520,17 @@ export function createFieldJourney(options = {}) {
     weather: getRandomWeather(blocks[0], 1),
     temperature: 'cool',
     travelDelayHours: 0,
+    routePlan: null,
+    rationPlan: {
+      mode: 'normal',
+      shortRationStreak: 0,
+      lastDecisionDay: 0
+    },
+    resourcePressure: {
+      fuel: 0,
+      food: 0,
+      equipment: 0
+    },
 
     // Party
     crew: crew || generateCrew(5, 'field'),
@@ -647,12 +666,29 @@ function travelDistanceForDay(journey, paceId) {
   const currentBlock = getCurrentBlock(journey);
   const terrain = TERRAIN_TYPES[currentBlock?.terrain] || TERRAIN_TYPES.flat;
   const weatherMod = journey.weather?.travelModifier || 1;
+  const routeMod = journey.routePlan?.distanceMultiplier ?? 1;
+  const crewTravelMod = getCrewTravelModifier(journey);
 
   const delayHours = Math.min(8, Math.max(0, journey.travelDelayHours || 0));
   const timeModifier = Math.max(0, 1 - delayHours / 8);
   const variance = 1 + (Math.random() * 2 - 1) * DAILY_TRAVEL_VARIANCE;
-  const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance * timeModifier;
+  const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance * timeModifier * routeMod * crewTravelMod;
   return Math.max(0, distance);
+}
+
+function getCrewTravelModifier(journey) {
+  const activeCrew = getActiveCrewCount(journey.crew);
+  if (activeCrew <= 0) {
+    return 0;
+  }
+
+  const totalCapacity = getTotalWorkCapacity(journey.crew);
+  const averageCapacity = totalCapacity / activeCrew;
+  return Math.max(0.45, Math.min(1, 0.5 + averageCapacity * 0.5));
+}
+
+function getRationFactor(journey) {
+  return journey.rationPlan?.mode === 'short' ? 0.65 : 1;
 }
 
 function advanceBlocksForDistance(journey) {
@@ -719,7 +755,9 @@ export function executeFieldDay(journey, paceId) {
   const prevProgress = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
   const dayNumber = journey.day;
   const startBlock = getCurrentBlock(journey);
+  const nextBlockAtStart = getNextBlock(journey);
   const weatherToday = journey.weather;
+  const routePlan = journey.routePlan || null;
 
   // Block travel if fuel or equipment is depleted
   if (pace.distanceMultiplier > 0) {
@@ -797,7 +835,10 @@ export function executeFieldDay(journey, paceId) {
       pace: effectivePaceId,
       terrain,
       weather: journey.temperature,
-      weatherCondition: journey.weather
+      weatherCondition: journey.weather,
+      rationFactor: getRationFactor(journey),
+      routeFuelMultiplier: routePlan?.fuelMultiplier ?? 1,
+      routeEquipmentMultiplier: routePlan?.equipmentMultiplier ?? 1
     },
     getActiveCrewCount(journey.crew)
   );
@@ -822,8 +863,10 @@ export function executeFieldDay(journey, paceId) {
   const conditions = {
     restDay: effectivePaceId === 'resting',
     gruelingPace: effectivePaceId === 'grueling',
+    shortRations: journey.rationPlan?.mode === 'short',
     lowFood: journey.resources.food <= 5,
-    coldWeather: journey.temperature === 'cold' || journey.temperature === 'freezing'
+    coldWeather: journey.temperature === 'cold' || journey.temperature === 'freezing',
+    currentDay: journey.day
   };
 
   for (const member of journey.crew) {
@@ -853,8 +896,11 @@ export function executeFieldDay(journey, paceId) {
     messages.push(...updateResult.messages);
   }
 
+  applyRoutePlanConsequences(journey, routePlan, effectivePaceId, startBlock, nextBlockAtStart, messages);
+
   // Check for game over conditions
   const resourceStatus = checkResourceStatus(journey.resources, FIELD_RESOURCES);
+  applyFieldHardships(journey, resourceStatus, messages);
 
   if (resourceStatus.depleted.some(d => d.id === 'fuel') && (PACE_OPTIONS[effectivePaceId]?.distanceMultiplier ?? 1) > 0) {
     journey.isGameOver = true;
@@ -873,6 +919,10 @@ export function executeFieldDay(journey, paceId) {
   journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day);
   journey.temperature = getTemperature(journey.weather, getCurrentBlock(journey));
   journey.travelDelayHours = 0;
+  journey.routePlan = null;
+  if (journey.rationPlan) {
+    journey.rationPlan.mode = 'normal';
+  }
 
   // Log the day with more detail
   journey.log.push({
@@ -910,6 +960,105 @@ export function executeFieldDay(journey, paceId) {
   }
 
   return { journey, messages };
+}
+
+function applyRoutePlanConsequences(journey, routePlan, paceId, fromBlock, toBlock, messages) {
+  if (!routePlan || (PACE_OPTIONS[paceId]?.distanceMultiplier ?? 0) <= 0) {
+    return;
+  }
+
+  const activeCrew = journey.crew.filter((member) => member.isActive);
+  if (activeCrew.length === 0) {
+    return;
+  }
+
+  if (routePlan.moraleDelta) {
+    for (const member of activeCrew) {
+      member.morale = Math.max(0, Math.min(100, member.morale + routePlan.moraleDelta));
+    }
+  }
+
+  if (routePlan.note) {
+    messages.push(routePlan.note);
+  }
+
+  if (routePlan.injuryRisk > 0) {
+    const hazardCount =
+      (fromBlock?.hazards?.length || 0) +
+      (toBlock?.hazards?.length || 0);
+    const paceRisk = paceId === 'grueling' ? 0.1 : paceId === 'fast' ? 0.05 : 0;
+    const actualRisk = Math.min(0.75, routePlan.injuryRisk + hazardCount * 0.04 + paceRisk);
+
+    if (Math.random() < actualRisk) {
+      const victim = activeCrew[Math.floor(Math.random() * activeCrew.length)];
+      const severity = actualRisk >= 0.4 ? 'severe' : 'moderate';
+      const result = applyRandomInjury(victim, severity);
+      messages.push(`Route mishap! ${result.message}`);
+    }
+  }
+}
+
+function applyFieldHardships(journey, resourceStatus, messages) {
+  if (!journey?.resources || typeof journey.resources.food !== 'number') {
+    return;
+  }
+
+  const pressure = journey.resourcePressure || (journey.resourcePressure = {
+    fuel: 0,
+    food: 0,
+    equipment: 0
+  });
+
+  const criticalIds = new Set([
+    ...resourceStatus.depleted.map((entry) => entry.id),
+    ...resourceStatus.critical.map((entry) => entry.id)
+  ]);
+
+  for (const resourceId of ['fuel', 'food', 'equipment']) {
+    pressure[resourceId] = criticalIds.has(resourceId)
+      ? Number(pressure[resourceId] || 0) + 1
+      : 0;
+  }
+
+  if (pressure.food >= 2) {
+    messages.push('Rationing has set in. The crew is visibly weakening from sustained shortages.');
+    for (const member of journey.crew) {
+      if (!member.isActive) continue;
+      member.health = Math.max(0, member.health - 4);
+      member.morale = Math.max(0, member.morale - 6);
+
+      if (pressure.food >= 3 && journey.resources.food <= FIELD_RESOURCES.food.critical) {
+        const result = applyStatusEffect(member, 'exhaustion');
+        if (result.message) {
+          messages.push(result.message);
+        }
+      }
+    }
+  }
+
+  if (pressure.equipment >= 2) {
+    messages.push('Failing gear is slowing camp tasks and turning routine work into injury bait.');
+    for (const member of journey.crew) {
+      if (!member.isActive) continue;
+      member.morale = Math.max(0, member.morale - 4);
+    }
+
+    if (pressure.equipment >= 3) {
+      const victim = journey.crew.find((member) => member.isActive);
+      if (victim) {
+        const result = applyStatusEffect(victim, 'sprained_ankle');
+        if (result.message) {
+          messages.push(result.message);
+        }
+      }
+    }
+  }
+
+  if (pressure.fuel >= 2 && typeof journey.resources.budget === 'number') {
+    const scavengingCost = 120 * pressure.fuel;
+    journey.resources.budget = Math.max(0, journey.resources.budget - scavengingCost);
+    messages.push(`Emergency fuel scavenging burned $${scavengingCost.toLocaleString()} in cash and favors.`);
+  }
 }
 
 /**
@@ -1212,6 +1361,22 @@ export function syncBlocksFromDistance(journey) {
 
   journey.currentBlockIndex = latestIndex;
   return blocks[latestIndex] || blocks[0] || null;
+}
+
+/**
+ * Get the number of blocks that have been visited/surveyed so far.
+ * This is intentionally 1-based so the final summary can reflect that the
+ * starting block counts once the crew has actually begun the traverse.
+ * @param {Object} journey - Journey state
+ * @returns {number} Count of surveyed blocks
+ */
+export function getSurveyedBlockCount(journey) {
+  const totalBlocks = journey?.blocks?.length || 0;
+  if (!totalBlocks) return 0;
+
+  const currentIndex = Math.max(0, Number(journey?.currentBlockIndex || 0));
+  const trackedBlocks = Math.max(0, Number(journey?.blocksAssessed || 0));
+  return Math.min(totalBlocks, Math.max(trackedBlocks, currentIndex + 1));
 }
 
 /**

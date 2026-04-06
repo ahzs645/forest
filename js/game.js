@@ -11,7 +11,8 @@ import { generateCrew, processDailyUpdate, getCrewDisplayInfo, crewHasRole } fro
 import {
   createJourney,
   formatJourneyLog,
-  FIELD_SHIFT_HOURS
+  FIELD_SHIFT_HOURS,
+  getSurveyedBlockCount
 } from './journey.js';
 import { checkScheduledEvents, formatEventForDisplay, resolveEvent } from './events.js';
 import { getCurrentSeasonInfo } from './season.js';
@@ -441,9 +442,10 @@ class ForestryTrailGame {
       case 'recon':
       case 'field': {
         const fieldProgressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+        const surveyedBlocks = getSurveyedBlockCount(journey);
         this.ui.write(`Traverse Covered: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km (${fieldProgressPct}%)`);
         this.ui.write(`Shifts Elapsed: ${daysUsed}`);
-        this.ui.write(`Blocks Surveyed: ${journey.currentBlockIndex}/${journey.blocks.length}`);
+        this.ui.write(`Blocks Surveyed: ${surveyedBlocks}/${journey.blocks.length}`);
         if (journey.blocksAssessed !== undefined) {
           this.ui.write(`Blocks Assessed: ${journey.blocksAssessed}`);
         }

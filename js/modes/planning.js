@@ -7,6 +7,7 @@
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
 import { pickPlanningBlockOptions, summarizePlanningBlock } from '../data/planningBlocks.js';
+import { isPlanningApprovalReady } from './shared/endConditions.js';
 
 /**
  * Run a planning day with multi-action system
@@ -392,7 +393,7 @@ async function processAction(game, actionValue) {
       journey.resources.budget -= 2000;
       applyProtagonistCost(journey, { energy: 25, stress: 20 });
       ui.write(`Submission prepared. Confidence: ${journey.plan.ministerialConfidence}%`);
-      if (journey.plan.ministerialConfidence >= 80) {
+      if (isPlanningApprovalReady(journey)) {
         journey.isComplete = true;
         journey.endReason = 'Landscape plan approved by Ministry!';
       }

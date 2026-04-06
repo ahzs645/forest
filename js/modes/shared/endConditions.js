@@ -3,6 +3,17 @@
  * Victory and game-over logic for all modes
  */
 
+import { getSurveyedBlockCount } from '../../journey.js';
+
+export function isPlanningApprovalReady(journey) {
+  const plan = journey?.plan || {};
+  return plan.phase === 'ministerial_approval' &&
+    (plan.dataCompleteness || 0) >= 80 &&
+    (plan.analysisQuality || 0) >= 80 &&
+    (plan.stakeholderBuyIn || 0) >= 75 &&
+    (plan.ministerialConfidence || 0) >= 80;
+}
+
 /**
  * Check end conditions for recon/field journey
  * @param {Object} journey - Journey state
@@ -11,6 +22,8 @@
 export function checkReconEndConditions(journey) {
   const crewBasedMode = !journey.protagonist;
   const activeCrewCount = journey.crew?.filter(m => m.isActive).length || 0;
+  const totalBlocks = journey.blocks?.length || 0;
+  const surveyedBlocks = getSurveyedBlockCount(journey);
 
   // No crew left
   if (crewBasedMode && activeCrewCount === 0) {
@@ -18,7 +31,7 @@ export function checkReconEndConditions(journey) {
   }
 
   // Victory: Reached destination
-  if (journey.distanceTraveled >= journey.totalDistance) {
+  if ((totalBlocks > 0 && surveyedBlocks >= totalBlocks) || (totalBlocks === 0 && journey.distanceTraveled >= journey.totalDistance)) {
     return { victory: true, reason: 'Expedition completed!' };
   }
 
@@ -71,7 +84,7 @@ export function checkSilvicultureEndConditions(journey) {
  */
 export function checkPlanningEndConditions(journey) {
   // Victory: Ministerial approval achieved
-  if (journey.plan.ministerialConfidence >= 80) {
+  if (isPlanningApprovalReady(journey)) {
     return { victory: true, reason: 'Landscape plan approved by Ministry!' };
   }
 

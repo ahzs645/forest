@@ -13,6 +13,7 @@ import { LEGACY_ILLEGAL_ACTS } from './data/legacyIllegalActs.js';
 // Journey type categories — used to route events and effects correctly
 const FIELD_JOURNEY_TYPES = new Set(['field', 'recon', 'silviculture']);
 const DESK_JOURNEY_TYPES = new Set(['desk', 'permitting', 'planning']);
+const EVENT_REPEAT_COOLDOWN = 2;
 
 function isFieldJourney(journeyType) {
   return FIELD_JOURNEY_TYPES.has(journeyType);
@@ -59,15 +60,20 @@ export function checkForEvent(journey) {
  * @returns {Object|null} Event or null
  */
 function checkFieldEvent(journey) {
-  const currentBlock = journey.blocks[journey.currentBlockIndex];
-  const pace = PACE_OPTIONS[journey.pace] || PACE_OPTIONS.normal;
+  if (journey.journeyType === 'silviculture' && (!Array.isArray(journey.blocks) || journey.blocks.length === 0)) {
+    return null;
+  }
+
+  const currentBlock = Array.isArray(journey.blocks)
+    ? (journey.blocks[journey.currentBlockIndex] || journey.blocks[0] || null)
+    : null;
 
   // Get applicable events for current conditions
-  const applicableEvents = getApplicableFieldEvents({
+  const applicableEvents = filterRecentEvents(journey, getApplicableFieldEvents({
     terrain: currentBlock?.terrain,
     weather: journey.weather?.id,
     hazards: currentBlock?.hazards
-  });
+  }));
 
   // Calculate modifiers
   const paceModifier = getPaceEventModifier(journey.pace);
@@ -90,7 +96,7 @@ function checkFieldEvent(journey) {
  * @returns {Object|null} Event or null
  */
 function checkDeskEvent(journey) {
-  const applicableEvents = getApplicableDeskEvents(journey.currentPhase);
+  const applicableEvents = filterRecentEvents(journey, getApplicableDeskEvents(journey.currentPhase));
 
   // Calculate modifiers based on stress level
   const daysRemaining = Number.isFinite(journey.deadline)
@@ -116,6 +122,21 @@ function checkDeskEvent(journey) {
     crisisMode: daysRemaining < 3,
     typeMultipliers
   });
+}
+
+function filterRecentEvents(journey, events = []) {
+  const recentIds = (journey?.log || [])
+    .filter((entry) => entry?.type === 'event' && entry?.eventId)
+    .slice(-EVENT_REPEAT_COOLDOWN)
+    .map((entry) => entry.eventId);
+
+  if (!recentIds.length) {
+    return events;
+  }
+
+  const recentSet = new Set(recentIds);
+  const filtered = events.filter((event) => event?.id && !recentSet.has(event.id));
+  return filtered.length ? filtered : events;
 }
 
 function getDeskEventTypeMultipliers(journey) {
@@ -349,7 +370,7 @@ export function resolveEvent(journey, event, option) {
 function applyEventEffects(journey, effects, messages) {
   // Resource effects (field)
   if (isFieldJourney(journey.journeyType)) {
-    if (typeof effects.budget === 'number') {
+    if (typeof effects.budget === 'number' && typeof journey.resources?.budget === 'number') {
       journey.resources.budget = Math.max(0,
         Math.min(FIELD_RESOURCES.budget.max, journey.resources.budget + effects.budget));
       if (effects.budget !== 0) {
@@ -358,22 +379,22 @@ function applyEventEffects(journey, effects, messages) {
         messages.push(`Cash: ${label}`);
       }
     }
-    if (typeof effects.fuel === 'number') {
+    if (typeof effects.fuel === 'number' && typeof journey.resources?.fuel === 'number') {
       journey.resources.fuel = Math.max(0,
         Math.min(FIELD_RESOURCES.fuel.max, journey.resources.fuel + effects.fuel));
       if (effects.fuel < 0) messages.push(`Fuel: ${effects.fuel} gallons`);
     }
-    if (typeof effects.food === 'number') {
+    if (typeof effects.food === 'number' && typeof journey.resources?.food === 'number') {
       journey.resources.food = Math.max(0,
         Math.min(FIELD_RESOURCES.food.max, journey.resources.food + effects.food));
       if (effects.food < 0) messages.push(`Food: ${effects.food} days`);
     }
-    if (typeof effects.equipment === 'number') {
+    if (typeof effects.equipment === 'number' && typeof journey.resources?.equipment === 'number') {
       journey.resources.equipment = Math.max(0,
         Math.min(FIELD_RESOURCES.equipment.max, journey.resources.equipment + effects.equipment));
       if (effects.equipment < 0) messages.push(`Equipment: ${effects.equipment}%`);
     }
-    if (typeof effects.firstAid === 'number') {
+    if (typeof effects.firstAid === 'number' && typeof journey.resources?.firstAid === 'number') {
       journey.resources.firstAid = Math.max(0,
         Math.min(FIELD_RESOURCES.firstAid.max, journey.resources.firstAid + effects.firstAid));
     }
@@ -381,12 +402,15 @@ function applyEventEffects(journey, effects, messages) {
 
   // Resource effects (desk)
   if (isDeskJourney(journey.journeyType)) {
-    if (typeof effects.budget === 'number') {
+    if (typeof effects.budget === 'number' && typeof journey.resources?.budget === 'number') {
       journey.resources.budget = Math.max(0,
         Math.min(DESK_RESOURCES.budget.max, journey.resources.budget + effects.budget));
-      if (effects.budget < 0) messages.push(`Budget: $${Math.abs(effects.budget)}`);
+      if (effects.budget !== 0) {
+        const label = effects.budget > 0 ? '+' : '-';
+        messages.push(`Budget: ${label}$${Math.abs(effects.budget).toLocaleString()}`);
+      }
     }
-    if (typeof effects.politicalCapital === 'number') {
+    if (typeof effects.politicalCapital === 'number' && typeof journey.resources?.politicalCapital === 'number') {
       journey.resources.politicalCapital = Math.max(0,
         Math.min(DESK_RESOURCES.politicalCapital.max, journey.resources.politicalCapital + effects.politicalCapital));
     }
@@ -399,13 +423,8 @@ function applyEventEffects(journey, effects, messages) {
   }
 
   // Progress effects
-  if (effects.progress) {
-    if (isFieldJourney(journey.journeyType)) {
-      journey.distanceTraveled = Math.max(0, journey.distanceTraveled + effects.progress);
-      syncBlocksFromDistance(journey);
-    } else {
-      applyDeskProgress(journey, effects.progress, messages);
-    }
+  if (typeof effects.progress === 'number' && effects.progress !== 0) {
+    applyProgressEffects(journey, effects.progress, messages);
   }
 
   // Crew-wide effects
@@ -431,23 +450,151 @@ function applyEventEffects(journey, effects, messages) {
   }
 
   // Compliance/relationships (legacy compatibility)
-  if (effects.compliance) {
-    // Map to political capital for desk or just note for field
-    if (isDeskJourney(journey.journeyType)) {
-      journey.resources.politicalCapital = Math.max(0,
-        Math.min(100, journey.resources.politicalCapital + effects.compliance));
-    }
+  if (typeof effects.compliance === 'number' && effects.compliance !== 0) {
+    applyComplianceEffects(journey, effects.compliance, messages);
   }
 
-  if (effects.relationships) {
-    // Affect stakeholder moods for desk
-    if (isDeskJourney(journey.journeyType)) {
-      for (const key of Object.keys(journey.stakeholders)) {
-        journey.stakeholders[key].mood = Math.max(0,
-          Math.min(100, journey.stakeholders[key].mood + Math.floor(effects.relationships / 2)));
+  if (typeof effects.relationships === 'number' && effects.relationships !== 0) {
+    applyRelationshipEffects(journey, effects.relationships, messages);
+  }
+}
+
+function applyProgressEffects(journey, progressPoints, messages) {
+  switch (journey.journeyType) {
+    case 'planning':
+      applyPlanningProgress(journey, progressPoints, messages);
+      return;
+
+    case 'permitting':
+    case 'desk':
+      applyDeskProgress(journey, progressPoints, messages);
+      return;
+
+    case 'field':
+    case 'recon':
+      if (typeof journey.distanceTraveled === 'number') {
+        journey.distanceTraveled = Math.max(0, journey.distanceTraveled + progressPoints);
+        syncBlocksFromDistance(journey);
+      }
+      return;
+
+    default:
+      return;
+  }
+}
+
+function applyPlanningProgress(journey, progressPoints, messages) {
+  if (!journey.plan) return;
+
+  const amount = Math.max(3, Math.round(Math.abs(progressPoints) * 1.5));
+  let metricKey = 'dataCompleteness';
+  let metricLabel = 'Data readiness';
+
+  switch (journey.plan.phase) {
+    case 'analysis':
+      metricKey = 'analysisQuality';
+      metricLabel = 'Analysis quality';
+      break;
+    case 'stakeholder_review':
+      metricKey = 'stakeholderBuyIn';
+      metricLabel = 'Stakeholder buy-in';
+      break;
+    case 'ministerial_approval':
+      metricKey = 'ministerialConfidence';
+      metricLabel = 'Ministerial confidence';
+      break;
+    default:
+      break;
+  }
+
+  const signedAmount = progressPoints > 0 ? amount : -amount;
+  journey.plan[metricKey] = clampPercent((journey.plan[metricKey] || 0) + signedAmount);
+
+  const direction = progressPoints > 0 ? 'improved' : 'slipped';
+  messages.push(`${metricLabel} ${direction} (${signedAmount > 0 ? '+' : ''}${signedAmount}%).`);
+  advancePlanningPhaseIfReady(journey, messages);
+}
+
+function applyComplianceEffects(journey, delta, messages) {
+  if (isDeskJourney(journey.journeyType) && typeof journey.resources?.politicalCapital === 'number') {
+    journey.resources.politicalCapital = clampPercent(journey.resources.politicalCapital + delta);
+  }
+
+  if (journey.journeyType === 'planning' && journey.plan) {
+    journey.plan.ministerialConfidence = clampPercent(journey.plan.ministerialConfidence + delta);
+    if (journey.protagonist) {
+      journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + Math.ceil(delta / 2));
+    }
+    messages.push(`Ministerial confidence ${delta > 0 ? 'rose' : 'fell'} (${delta > 0 ? '+' : ''}${delta}%).`);
+    advancePlanningPhaseIfReady(journey, messages);
+    return;
+  }
+
+  if (journey.journeyType === 'permitting' && journey.regulations) {
+    journey.regulations.complianceScore = clampPercent((journey.regulations.complianceScore || 0) + delta);
+    messages.push(`Regulatory standing ${delta > 0 ? 'improved' : 'worsened'} (${delta > 0 ? '+' : ''}${delta}).`);
+  }
+}
+
+function applyRelationshipEffects(journey, delta, messages) {
+  const relationshipShift = delta > 0 ? Math.max(1, Math.round(delta / 2)) : Math.min(-1, Math.round(delta / 2));
+
+  if (journey.relationships && typeof journey.relationships === 'object') {
+    for (const key of Object.keys(journey.relationships)) {
+      if (typeof journey.relationships[key] === 'number') {
+        journey.relationships[key] = clampPercent(journey.relationships[key] + relationshipShift);
       }
     }
   }
+
+  if (journey.stakeholders && typeof journey.stakeholders === 'object') {
+    for (const key of Object.keys(journey.stakeholders)) {
+      if (typeof journey.stakeholders[key]?.mood === 'number') {
+        journey.stakeholders[key].mood = clampPercent(journey.stakeholders[key].mood + relationshipShift);
+      }
+    }
+  }
+
+  if (journey.journeyType === 'planning' && journey.plan) {
+    journey.plan.stakeholderBuyIn = clampPercent(journey.plan.stakeholderBuyIn + delta);
+    if (journey.protagonist) {
+      journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + relationshipShift);
+    }
+    advancePlanningPhaseIfReady(journey, messages);
+  }
+
+  messages.push(`Relationships ${delta > 0 ? 'improved' : 'frayed'} (${delta > 0 ? '+' : ''}${delta}).`);
+}
+
+function advancePlanningPhaseIfReady(journey, messages) {
+  if (!journey.plan) return;
+
+  if (journey.plan.phase === 'data_gathering' && journey.plan.dataCompleteness >= 80) {
+    journey.plan.phase = 'analysis';
+    messages.push('Data phase complete! Moving to Analysis.');
+    return;
+  }
+
+  if (journey.plan.phase === 'analysis' && journey.plan.analysisQuality >= 80) {
+    journey.plan.phase = 'stakeholder_review';
+    messages.push('Analysis complete! Moving to Stakeholder Review.');
+    return;
+  }
+
+  if (journey.plan.phase === 'stakeholder_review' && journey.plan.stakeholderBuyIn >= 75) {
+    journey.plan.phase = 'ministerial_approval';
+    messages.push('Stakeholder review complete! Moving to Ministerial Approval.');
+    return;
+  }
+
+  if (journey.plan.phase === 'ministerial_approval' && journey.plan.ministerialConfidence >= 80) {
+    journey.isComplete = true;
+    journey.endReason = 'Landscape plan approved by Ministry!';
+  }
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, value));
 }
 
 /**
