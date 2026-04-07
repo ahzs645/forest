@@ -95,6 +95,17 @@ export function showJourneyIntro(ui, journey) {
       ui.write(`  First Aid: ${journey.resources.firstAid} kits`);
       break;
 
+    case 'manager':
+      ui.write(`Mission: Lead the forestry operations to profitability and sustainability over ${journey.deadline} days.`);
+      ui.write('Manage field crew realities while advancing high-level office initiatives like certifications and hiring CEOs.');
+      ui.write('Balance your budget with reputation and compliance.');
+      ui.write('');
+      ui.write('Strategic overview:');
+      ui.write(`  Initial Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Target Profit: $${journey.targetProfit?.toLocaleString() || 0}`);
+      ui.write(`  Deadline: ${journey.deadline} days`);
+      break;
+
     case 'desk':
     default:
       ui.write(`Mission: Complete permit approvals within ${journey.deadline} days.`);

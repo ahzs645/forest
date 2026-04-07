@@ -3,15 +3,16 @@
  * Creates journey state objects for all game modes
  */
 
-import { FIELD_DISTANCE_SCALE, ROLE_JOURNEY_TYPES } from './constants.js';
-import { generateCrew } from '../crew.js';
+import { FIELD_DISTANCE_SCALE, ROLE_JOURNEY_TYPES } from "./constants.js";
+import { generateCrew } from "../crew.js";
+import { createFieldResources, createDeskResources } from "../resources.js";
 import {
-  createFieldResources,
-  createDeskResources
-} from '../resources.js';
-import { getBlocksForArea, getRandomWeather, getTemperature } from '../data/blocks.js';
-import { getPlanningCadenceDays } from '../data/planningBlocks.js';
-import { createSeasonState } from '../season.js';
+  getBlocksForArea,
+  getRandomWeather,
+  getTemperature,
+} from "../data/blocks.js";
+import { getPlanningCadenceDays } from "../data/planningBlocks.js";
+import { createSeasonState } from "../season.js";
 
 /**
  * Factory function to create the appropriate journey type
@@ -24,18 +25,20 @@ export function createJourney(options = {}) {
   const journeyType = ROLE_JOURNEY_TYPES[roleId];
 
   switch (journeyType) {
-    case 'recon':
+    case "recon":
       return createReconJourney(options);
-    case 'silviculture':
+    case "silviculture":
       return createSilvicultureJourney(options);
-    case 'planning':
+    case "planning":
       return createPlanningJourney(options);
-    case 'permitting':
+    case "permitting":
       return createPermittingJourney(options);
+    case "manager":
+      return createManagerJourney(options);
     default: {
       // Fallback to legacy field/desk based on role's journeyType property
-      const legacyType = options.role?.journeyType || 'field';
-      if (legacyType === 'desk') {
+      const legacyType = options.role?.journeyType || "field";
+      if (legacyType === "desk") {
         return createDeskJourney(options);
       }
       return createFieldJourney(options);
@@ -48,11 +51,11 @@ export function createJourney(options = {}) {
  */
 export function createReconJourney(options = {}) {
   const baseJourney = createFieldJourney(options);
-  const roleId = options.roleId || options.role?.id || 'recce';
+  const roleId = options.roleId || options.role?.id || "recce";
 
   return {
     ...baseJourney,
-    journeyType: 'recon',
+    journeyType: "recon",
 
     // Season integration
     season: createSeasonState(roleId),
@@ -67,8 +70,8 @@ export function createReconJourney(options = {}) {
     resources: {
       ...baseJourney.resources,
       gpsUnits: 5,
-      flaggingTape: 50
-    }
+      flaggingTape: 50,
+    },
   };
 }
 
@@ -78,11 +81,11 @@ export function createReconJourney(options = {}) {
 export function createSilvicultureJourney(options = {}) {
   const { roleId, areaId, companyName, crewName, crew, role, area } = options;
   const effectiveAreaId = areaId || area?.id;
-  const effectiveRoleId = roleId || role?.id || 'silviculture';
+  const effectiveRoleId = roleId || role?.id || "silviculture";
 
   return {
-    journeyType: 'silviculture',
-    companyName: companyName || crewName || 'Unnamed Crew',
+    journeyType: "silviculture",
+    companyName: companyName || crewName || "Unnamed Crew",
     roleId: effectiveRoleId,
     areaId: effectiveAreaId,
     role,
@@ -98,20 +101,20 @@ export function createSilvicultureJourney(options = {}) {
       seedlingsPlanted: 0,
       survivalRate: 85,
       blocksToPlant: 15,
-      blocksPlanted: 0
+      blocksPlanted: 0,
     },
 
     // Brushing/Herbicide
     brushing: {
       hectaresTarget: 500,
-      hectaresComplete: 0
+      hectaresComplete: 0,
     },
 
     // Surveys
     surveys: {
       freeGrowingTarget: 5,
       freeGrowingComplete: 0,
-      regenerationSurveys: 0
+      regenerationSurveys: 0,
     },
 
     // Contractors
@@ -123,11 +126,11 @@ export function createSilvicultureJourney(options = {}) {
       seedlings: 250000,
       contractorCapacity: 250,
       equipment: 100,
-      nurseryCredit: 50
+      nurseryCredit: 50,
     },
 
     // Party
-    crew: crew || generateCrew(4, 'field'),
+    crew: crew || generateCrew(4, "field"),
 
     // State flags
     isComplete: false,
@@ -136,7 +139,7 @@ export function createSilvicultureJourney(options = {}) {
 
     // History
     log: [],
-    decisions: []
+    decisions: [],
   };
 }
 
@@ -144,7 +147,13 @@ export function createSilvicultureJourney(options = {}) {
  * Generate contractor crews for silviculture
  */
 function generateContractors(count) {
-  const names = ['Mountain Pine Planters', 'Northern Regen Co', 'Boreal Silviculture', 'Timber Trail Crew', 'Alpine Reforestation'];
+  const names = [
+    "Mountain Pine Planters",
+    "Northern Regen Co",
+    "Boreal Silviculture",
+    "Timber Trail Crew",
+    "Alpine Reforestation",
+  ];
   const contractors = [];
 
   for (let i = 0; i < count; i++) {
@@ -154,8 +163,8 @@ function generateContractors(count) {
       productivity: 80 + Math.floor(Math.random() * 20),
       morale: 70 + Math.floor(Math.random() * 20),
       crewSize: 8 + Math.floor(Math.random() * 8),
-      specialty: i === 0 ? 'planting' : i === 1 ? 'brushing' : 'survey',
-      isActive: true
+      specialty: i === 0 ? "planting" : i === 1 ? "brushing" : "survey",
+      isActive: true,
     });
   }
 
@@ -169,12 +178,12 @@ function generateContractors(count) {
 export function createPlanningJourney(options = {}) {
   const { roleId, areaId, companyName, crewName, role, area } = options;
   const effectiveAreaId = areaId || area?.id;
-  const effectiveRoleId = roleId || role?.id || 'planner';
+  const effectiveRoleId = roleId || role?.id || "planner";
   const cadenceDays = getPlanningCadenceDays();
 
   return {
-    journeyType: 'planning',
-    companyName: companyName || crewName || 'Strategic Planning Division',
+    journeyType: "planning",
+    companyName: companyName || crewName || "Strategic Planning Division",
     roleId: effectiveRoleId,
     areaId: effectiveAreaId,
     role,
@@ -194,18 +203,18 @@ export function createPlanningJourney(options = {}) {
       expertise: {
         analysis: 50,
         stakeholder: 50,
-        technical: 50
-      }
+        technical: 50,
+      },
     },
 
     // Plan development phases
     plan: {
-      phase: 'data_gathering',
+      phase: "data_gathering",
       phaseDaysRemaining: 20,
       dataCompleteness: 0,
       analysisQuality: 0,
       stakeholderBuyIn: 35,
-      ministerialConfidence: 20
+      ministerialConfidence: 20,
     },
 
     // Values being balanced
@@ -213,7 +222,7 @@ export function createPlanningJourney(options = {}) {
       biodiversity: 50,
       timberSupply: 50,
       communityNeeds: 50,
-      firstNationsValues: 50
+      firstNationsValues: 50,
     },
 
     // Real-data block selection cadence and active impacts
@@ -224,7 +233,7 @@ export function createPlanningJourney(options = {}) {
       activeBlock: null,
       activeSummary: null,
       activeEventBias: null,
-      history: []
+      history: [],
     },
 
     // Cutblock queue
@@ -232,7 +241,7 @@ export function createPlanningJourney(options = {}) {
       proposed: 25,
       approved: 0,
       rejected: 0,
-      inReview: 0
+      inReview: 0,
     },
 
     // Stakeholders
@@ -240,7 +249,7 @@ export function createPlanningJourney(options = {}) {
       ministry: { mood: 50, meetings: 0, lastContact: 0 },
       nations: { mood: 50, meetings: 0, lastContact: 0 },
       community: { mood: 50, meetings: 0, lastContact: 0 },
-      licensees: { mood: 50, meetings: 0, lastContact: 0 }
+      licensees: { mood: 50, meetings: 0, lastContact: 0 },
     },
 
     // Resources (no crew-related)
@@ -248,7 +257,7 @@ export function createPlanningJourney(options = {}) {
       budget: 50000,
       politicalCapital: 40,
       dataCredits: 100,
-      consultantDays: 30
+      consultantDays: 30,
     },
 
     // NO crew for protagonist mode
@@ -261,7 +270,7 @@ export function createPlanningJourney(options = {}) {
 
     // History
     log: [],
-    decisions: []
+    decisions: [],
   };
 }
 
@@ -272,11 +281,11 @@ export function createPlanningJourney(options = {}) {
 export function createPermittingJourney(options = {}) {
   const { roleId, areaId, companyName, crewName, role, area } = options;
   const effectiveAreaId = areaId || area?.id;
-  const effectiveRoleId = roleId || role?.id || 'permitter';
+  const effectiveRoleId = roleId || role?.id || "permitter";
 
   return {
-    journeyType: 'permitting',
-    companyName: companyName || crewName || 'Permitting Office',
+    journeyType: "permitting",
+    companyName: companyName || crewName || "Permitting Office",
     roleId: effectiveRoleId,
     areaId: effectiveAreaId,
     role,
@@ -287,7 +296,7 @@ export function createPermittingJourney(options = {}) {
     day: 1,
     deadline: 30,
     hoursRemaining: 8,
-    currentPhase: 'planning',
+    currentPhase: "planning",
 
     // Protagonist state - YOU are the permitter
     protagonist: {
@@ -297,8 +306,8 @@ export function createPermittingJourney(options = {}) {
       expertise: {
         regulatory: 50,
         stakeholder: 50,
-        technical: 50
-      }
+        technical: 50,
+      },
     },
 
     // Enhanced permit pipeline
@@ -311,27 +320,27 @@ export function createPermittingJourney(options = {}) {
       inReview: 2,
       needsRevision: 0,
       approved: 0,
-      rejected: 0
+      rejected: 0,
     },
 
     // Referral tracking
     referrals: {
       pendingNation: [],
       pendingAgency: [],
-      completed: []
+      completed: [],
     },
 
     // Stakeholder relationships
     relationships: {
       ministry: 50,
       nations: 50,
-      agencies: 50
+      agencies: 50,
     },
 
     // Regulatory tracking
     regulations: {
       recentChanges: [],
-      complianceScore: 80
+      complianceScore: 80,
     },
 
     // Resources (no crew-related)
@@ -347,7 +356,7 @@ export function createPermittingJourney(options = {}) {
 
     // History
     log: [],
-    decisions: []
+    decisions: [],
   };
 }
 
@@ -361,8 +370,8 @@ export function createFieldJourney(options = {}) {
   const totalDistance = blocks.reduce((sum, block) => sum + block.distance, 0);
 
   return {
-    journeyType: 'field',
-    companyName: companyName || crewName || 'Unnamed Crew',
+    journeyType: "field",
+    companyName: companyName || crewName || "Unnamed Crew",
     roleId: roleId || role?.id,
     areaId: effectiveAreaId,
     role,
@@ -376,24 +385,24 @@ export function createFieldJourney(options = {}) {
     blocks,
 
     // Current conditions
-    pace: 'normal',
+    pace: "normal",
     weather: getRandomWeather(blocks[0], 1),
-    temperature: 'cool',
+    temperature: "cool",
     travelDelayHours: 0,
     routePlan: null,
     rationPlan: {
-      mode: 'normal',
+      mode: "normal",
       shortRationStreak: 0,
-      lastDecisionDay: 0
+      lastDecisionDay: 0,
     },
     resourcePressure: {
       fuel: 0,
       food: 0,
-      equipment: 0
+      equipment: 0,
     },
 
     // Party
-    crew: crew || generateCrew(5, 'field'),
+    crew: crew || generateCrew(5, "field"),
     resources: createFieldResources(),
 
     // State flags
@@ -403,7 +412,7 @@ export function createFieldJourney(options = {}) {
 
     // History
     log: [],
-    decisions: []
+    decisions: [],
   };
 }
 
@@ -412,7 +421,7 @@ function scaleBlocksForShifts(blocks = []) {
     const scaled = Math.round(block.distance * FIELD_DISTANCE_SCALE * 10) / 10;
     return {
       ...block,
-      distance: Math.max(0.5, scaled)
+      distance: Math.max(0.5, scaled),
     };
   });
 }
@@ -428,8 +437,8 @@ export function createDeskJourney(options = {}) {
   const backlogPermits = Math.max(0, targetPermits - submittedPermits);
 
   return {
-    journeyType: 'desk',
-    companyName: companyName || crewName || 'Unnamed Team',
+    journeyType: "desk",
+    companyName: companyName || crewName || "Unnamed Team",
     roleId: roleId || role?.id,
     areaId: effectiveAreaId,
     role,
@@ -438,7 +447,7 @@ export function createDeskJourney(options = {}) {
     // Progress
     day: 1,
     deadline: 30,
-    currentPhase: 'planning',
+    currentPhase: "planning",
 
     // Permit pipeline
     permits: {
@@ -448,18 +457,18 @@ export function createDeskJourney(options = {}) {
       inReview: 0,
       needsRevision: 0,
       approved: 0,
-      rejected: 0
+      rejected: 0,
     },
 
     // Stakeholders
     stakeholders: {
       ministry: { mood: 50, meetings: 0 },
       nations: { mood: 50, meetings: 0 },
-      community: { mood: 50, meetings: 0 }
+      community: { mood: 50, meetings: 0 },
     },
 
     // Party
-    crew: crew || generateCrew(5, 'desk'),
+    crew: crew || generateCrew(5, "desk"),
     resources: createDeskResources(),
 
     // Daily time tracking
@@ -472,6 +481,42 @@ export function createDeskJourney(options = {}) {
 
     // History
     log: [],
-    decisions: []
+    decisions: [],
+  };
+}
+
+/**
+ * Creates a manager mode journey
+ * @param {Object} options - Setup options
+ * @returns {Object} Manager journey state
+ */
+export function createManagerJourney(options = {}) {
+  const baseDesk = createDeskResources(options.difficulty);
+  const baseField = createFieldResources(options.difficulty);
+
+  return {
+    ...options,
+    journeyType: "manager",
+    day: 1,
+    metrics: {
+      progress: 50,
+      forestHealth: 50,
+      relationships: 50,
+      compliance: 50,
+      budget: 50,
+      reputation: 50,
+    },
+    resources: {
+      ...baseDesk,
+      ...baseField,
+      budget: 100000, // Higher starting budget for manager
+      politicalCapital: 100,
+    },
+    flags: {},
+    certifications: [],
+    ceo: null,
+    targetProfit: 100000,
+    deadline: 100,
+    history: [],
   };
 }

@@ -13,7 +13,8 @@ export const ROLE_JOURNEY_TYPES = {
   recce: 'recon',
   silviculture: 'silviculture',
   planner: 'planning',
-  permitter: 'permitting'
+  permitter: 'permitting',
+  manager: 'manager'
 };
 
 export const JOURNEY_MILESTONES = [25, 50, 75, 90];
@@ -54,6 +55,12 @@ export const MILESTONE_COPY = {
     50: 'Half the approvals are within reach. The backlog is starting to blink first.',
     75: 'The deadline board looks winnable now. A few clean reviews could finish the job.',
     90: 'Final permit sprint. One more run through the pipeline could seal the season.'
+  },
+  manager: {
+    25: 'First quarter closes. Your strategic direction is taking root.',
+    50: 'Mid-year review. Operations are balanced but challenges loom.',
+    75: 'Entering Q4. Board pressure increases as targets approach.',
+    90: 'Year-end wrap up. Final maneuvers to hit objectives.'
   }
 };
 

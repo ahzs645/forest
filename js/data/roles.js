@@ -352,5 +352,31 @@ export const FORESTER_ROLES = [
       },
     ],
   },
+  {
+    id: "manager",
+    name: "General Manager",
+    journeyType: "manager",
+    description:
+      "Oversee both field operations and strategic desk initiatives, managing CEOs and certifications.",
+    tasks: [
+      {
+        id: "gm_init",
+        title: "Strategic Priorities",
+        prompt: "Establish your primary objective for this term.",
+        options: [
+          {
+            label: "Focus on rapid growth",
+            outcome: "Selected aggressive growth strategy. Expect higher returns but more pushback.",
+            effects: { budget: 20000, reputation: -1, progress: 10 },
+          },
+          {
+            label: "Focus on sustainability",
+            outcome: "Selected sustainable strategy. Operations will be slower but steadier.",
+            effects: { reputation: 3, relationships: 5, budget: -5000 },
+          },
+        ],
+      },
+    ],
+  },
 ];
 
