@@ -191,10 +191,19 @@ export function useGameFlow() {
           rerender();
 
           const after = () => {
+            // Risk-based options show success/fail result
+            const riskResult = opt._riskResult;
+            const outcomeText = riskResult
+              ? riskResult.outcome
+              : (opt.outcome ?? "");
+            const header = riskResult
+              ? (riskResult.success ? "\u2705 Success: " : "\u274c Caught: ") + opt.label
+              : `Outcome: ${opt.label}`;
+
             queueRef.current.unshift({
               type: "message",
-              text: `Outcome: ${opt.label}`,
-              body: `${opt.outcome ?? ""}\n\nEffects applied.`,
+              text: header,
+              body: `${outcomeText}\n\nEffects applied.`,
             });
             processNextRef.current?.();
           };

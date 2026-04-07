@@ -1,7 +1,9 @@
 export { FORESTER_ROLES } from "./roles.js";
 export { OPERATING_AREAS } from "./operatingAreas.js";
 export { ISSUE_LIBRARY } from "./issues.js";
+export { CHAINED_ISSUES } from "./chainedIssues.js";
 export { ILLEGAL_ACTS } from "./illegalActs.js";
+export { MISCHIEF_OPTIONS } from "./mischief.js";
 export { GLOSSARY_TERMS } from "./glossary.js";
 export { LEGACY_GLOSSARY_TERMS } from "./legacyGlossary.js";
 export { LEGACY_ILLEGAL_ACTS } from "./legacyIllegalActs.js";

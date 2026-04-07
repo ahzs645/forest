@@ -2,7 +2,10 @@ import {
   FORESTER_ROLES,
   OPERATING_AREAS,
   ISSUE_LIBRARY,
+  CHAINED_ISSUES,
+  MISCHIEF_OPTIONS,
 } from "./data/index.js";
+import { resolveRisk } from "./risk.js";
 
 export const SEASONS = ["Spring Planning", "Summer Field", "Fall Integration", "Winter Review"];
 const ISSUE_REPEAT_COOLDOWN_ROUNDS = 2;
@@ -83,6 +86,18 @@ export function applyEffects(state, effects = {}, source) {
 
 export function applyOptionOutcome(state, option = {}, source) {
   if (!state || !option) {
+    return;
+  }
+
+  // Risk-based mischief option — resolve probabilistically
+  if (option.risk) {
+    const result = resolveRisk(state, option.risk);
+    applyEffects(state, result.effects, source);
+    if (result.flags) {
+      applyOptionFlags(state, { setFlags: result.flags });
+    }
+    // Store the resolution result on the option so callers can read it
+    option._riskResult = result;
     return;
   }
 
@@ -169,7 +184,15 @@ export function applyRoundConsequences(state) {
 }
 
 export function getRoleTasks(state) {
-  return state.role.tasks || [];
+  const baseTasks = state.role.tasks || [];
+  return baseTasks.map((task) => {
+    const mischief = MISCHIEF_OPTIONS[task.id];
+    if (!mischief) return task;
+    return {
+      ...task,
+      options: [...task.options, mischief],
+    };
+  });
 }
 
 export function drawIssue(state, rng = Math.random) {
@@ -195,7 +218,8 @@ export function drawIssue(state, rng = Math.random) {
       if (typeof pending.delay === "number" && pending.delay > 0) {
         continue;
       }
-      const candidate = ISSUE_LIBRARY.find((issue) => issue.id === pending.id);
+      const candidate = ISSUE_LIBRARY.find((issue) => issue.id === pending.id)
+        || CHAINED_ISSUES.find((issue) => issue.id === pending.id);
       if (candidate && issueMatchesContext(candidate, state, tags)) {
         state.pendingIssues.splice(i, 1);
         return candidate;
@@ -207,7 +231,8 @@ export function drawIssue(state, rng = Math.random) {
     }
   }
 
-  const pool = ISSUE_LIBRARY.filter((issue) => issueMatchesContext(issue, state, tags));
+  const allIssues = [...ISSUE_LIBRARY, ...CHAINED_ISSUES];
+  const pool = allIssues.filter((issue) => issueMatchesContext(issue, state, tags));
   const freshPool = pool.filter((issue) => !isIssueInCooldown(state, issue.id));
   const selectablePool = freshPool.length ? freshPool : pool;
 
