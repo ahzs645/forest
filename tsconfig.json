@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/react",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "strict": false,
+    "noEmit": true,
+    "allowJs": true,
+    "esModuleInterop": true,
+    "lib": ["ES2023"]
+  },
+  "include": ["cli-game.tsx", "tui"],
+  "exclude": ["node_modules"]
+}

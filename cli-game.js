@@ -55,16 +55,25 @@ const statsBox = blessed.box({
   style: { border: { fg: "cyan" } },
 });
 
-const mainBox = blessed.box({
+const fieldRadioBox = blessed.box({
   top: 3,
   left: "25%",
-  width: "45%",
+  width: "75%",
   height: "100%-15",
   label: " {bold}Field Radio{/bold} ",
-  content: "Welcome to BC Forestry Trail.\nPress any key to begin.",
   tags: true,
   border: { type: "line" },
   style: { border: { fg: "yellow" } },
+});
+
+const mainBox = blessed.box({
+  parent: fieldRadioBox,
+  top: 0,
+  left: 0,
+  width: "60%",
+  height: "100%",
+  content: "Welcome to BC Forestry Trail.\nPress any key to begin.",
+  tags: true,
   scrollable: true,
   alwaysScroll: true,
   scrollbar: {
@@ -78,15 +87,13 @@ const mainBox = blessed.box({
 });
 
 const artBox = blessed.box({
-  top: 3,
-  left: "70%",
-  width: "30%",
-  height: "100%-15",
-  label: " {bold}Visuals{/bold} ",
+  parent: fieldRadioBox,
+  top: 0,
+  left: "60%",
+  width: "40%",
+  height: "100%",
   content: "",
   tags: true,
-  border: { type: "line" },
-  style: { border: { fg: "magenta" } },
   padding: {
     left: 1,
     right: 1,
@@ -134,8 +141,7 @@ const overlayBox = blessed.box({
 
 screen.append(headerBox);
 screen.append(statsBox);
-screen.append(mainBox);
-screen.append(artBox);
+screen.append(fieldRadioBox);
 screen.append(optionsList);
 screen.append(overlayBox);
 
