@@ -272,10 +272,12 @@ export function ContentView({ data }: { data: ContentData }) {
                 style={{ fg: C.cyan }}
               />
               {opt.outcome && (
-                <text
-                  content={`   ${opt.outcome}`}
-                  style={{ fg: C.dim }}
-                />
+                <box style={{ paddingLeft: 3 }}>
+                  <text
+                    content={opt.outcome}
+                    style={{ fg: C.dim }}
+                  />
+                </box>
               )}
             </box>
           ))}

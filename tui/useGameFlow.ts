@@ -199,8 +199,10 @@ export function useGameFlow() {
             processNextRef.current?.();
           };
 
-          const anim = matchAnimation(opt.label);
-          anim ? playAnim(anim.frames, anim.delay, after) : after();
+          // Animation overlay disabled for now
+          // const anim = matchAnimation(opt.label);
+          // anim ? playAnim(anim.frames, anim.delay, after) : after();
+          after();
         },
         artText,
       );
