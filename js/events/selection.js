@@ -12,7 +12,7 @@ import {
 } from './constants.js';
 import { FIELD_EVENTS, getApplicableFieldEvents, selectRandomFieldEvent } from '../data/fieldEvents.js';
 import { DESK_EVENTS, getApplicableDeskEvents, selectRandomDeskEvent } from '../data/deskEvents.js';
-import { LEGACY_ILLEGAL_ACTS } from '../data/legacyIllegalActs.js';
+import { ILLEGAL_ACTS } from '../data/illegalActs.js';
 import { PACE_OPTIONS } from '../journey/constants.js';
 
 /**
@@ -188,7 +188,7 @@ function pickRandomCrewMember(crew) {
 }
 
 function maybeCreateTemptationEvent(journey) {
-  if (!Array.isArray(LEGACY_ILLEGAL_ACTS) || LEGACY_ILLEGAL_ACTS.length === 0) {
+  if (!Array.isArray(ILLEGAL_ACTS) || ILLEGAL_ACTS.length === 0) {
     return null;
   }
 
@@ -196,13 +196,13 @@ function maybeCreateTemptationEvent(journey) {
   if (Math.random() > chance) return null;
 
   const roleId = journey.roleId || journey.role?.id;
-  const candidates = LEGACY_ILLEGAL_ACTS.filter((act) => {
+  const candidates = ILLEGAL_ACTS.filter((act) => {
     if (!act) return false;
     if (!Array.isArray(act.roles) || act.roles.length === 0) return true;
     return roleId ? act.roles.includes(roleId) : true;
   });
 
-  const pool = candidates.length ? candidates : LEGACY_ILLEGAL_ACTS;
+  const pool = candidates.length ? candidates : ILLEGAL_ACTS;
   const act = pool[Math.floor(Math.random() * pool.length)];
   if (!act) return null;
 
