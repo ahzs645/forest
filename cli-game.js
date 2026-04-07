@@ -11,6 +11,8 @@ import {
   buildSummary,
   SEASONS,
 } from "./js/engine.js";
+import { ASCII_ART, ANIMATIONS } from "./js/ascii_art.js";
+import * as ExtraAnimations from "./js/animations/index.js";
 
 // Initialize blessed screen
 const screen = blessed.screen({
@@ -44,7 +46,7 @@ const headerBox = blessed.box({
 const statsBox = blessed.box({
   top: 3,
   left: 0,
-  width: "30%",
+  width: "25%",
   height: "100%-3",
   label: " {bold}Dashboard{/bold} ",
   content: "Awaiting game start...",
@@ -55,8 +57,8 @@ const statsBox = blessed.box({
 
 const mainBox = blessed.box({
   top: 3,
-  left: "30%",
-  width: "70%",
+  left: "25%",
+  width: "45%",
   height: "100%-15",
   label: " {bold}Field Radio{/bold} ",
   content: "Welcome to BC Forestry Trail.\nPress any key to begin.",
@@ -75,10 +77,26 @@ const mainBox = blessed.box({
   }
 });
 
+const artBox = blessed.box({
+  top: 3,
+  left: "70%",
+  width: "30%",
+  height: "100%-15",
+  label: " {bold}Visuals{/bold} ",
+  content: "",
+  tags: true,
+  border: { type: "line" },
+  style: { border: { fg: "magenta" } },
+  padding: {
+    left: 1,
+    right: 1,
+  }
+});
+
 const optionsList = blessed.list({
   bottom: 0,
-  left: "30%",
-  width: "70%",
+  left: "25%",
+  width: "75%",
   height: 12,
   label: " {bold}Options{/bold} (Use Arrow Keys & Enter) ",
   keys: true,
@@ -97,14 +115,57 @@ const optionsList = blessed.list({
   }
 });
 
+const overlayBox = blessed.box({
+  top: "center",
+  left: "center",
+  width: "50%",
+  height: "50%",
+  label: " {bold}Animation{/bold} ",
+  content: "",
+  tags: true,
+  border: { type: "line" },
+  style: { border: { fg: "green" }, bg: "black" },
+  hidden: true,
+  padding: {
+    left: 1,
+    right: 1,
+  }
+});
+
 screen.append(headerBox);
 screen.append(statsBox);
 screen.append(mainBox);
+screen.append(artBox);
 screen.append(optionsList);
+screen.append(overlayBox);
 
 // Game State
 let gameState = null;
 let currentPhaseQueue = []; // array of { type, data }
+
+function playAnimation(frames, delay, targetBox, onComplete) {
+  let frameIndex = 0;
+
+  if (targetBox === overlayBox) {
+    overlayBox.show();
+    overlayBox.setFront();
+  }
+
+  const intervalId = setInterval(() => {
+    if (frameIndex < frames.length) {
+      targetBox.setContent(`\n${frames[frameIndex]}`);
+      screen.render();
+      frameIndex++;
+    } else {
+      clearInterval(intervalId);
+      if (targetBox === overlayBox) {
+        overlayBox.hide();
+        screen.render();
+      }
+      if (onComplete) onComplete();
+    }
+  }, delay);
+}
 
 function renderStats() {
   if (!gameState) {
@@ -178,6 +239,45 @@ function runNextPhase() {
 
   const phase = currentPhaseQueue.shift();
 
+  // Determine ambient art based on phase text
+  let ambientArtKey = null;
+  let customArtFrame = null;
+  const phaseText = phase.text || (phase.data ? (phase.data.title + " " + phase.data.description) : "");
+  const lowerText = phaseText.toLowerCase();
+
+  if (lowerText.includes("bear") || lowerText.includes("wildlife")) {
+    ambientArtKey = "bear";
+  } else if (lowerText.includes("moose")) {
+    customArtFrame = ExtraAnimations.mooseAnimation[0];
+  } else if (lowerText.includes("eagle") || lowerText.includes("bird")) {
+    customArtFrame = ExtraAnimations.eagleAnimation[0];
+  } else if (lowerText.includes("rain")) {
+    ambientArtKey = "rain";
+  } else if (lowerText.includes("snow") || (gameState && SEASONS[gameState.round - 1] === "Winter")) {
+    ambientArtKey = "snow";
+  } else if (lowerText.includes("fire") || lowerText.includes("burn")) {
+    customArtFrame = ExtraAnimations.wildfireAnimation[0];
+  } else if (lowerText.includes("camp") || phase.type === "message" && lowerText.includes("welcome")) {
+    ambientArtKey = "campfire";
+  } else if (lowerText.includes("harvest") || lowerText.includes("cut")) {
+    ambientArtKey = "tree";
+  } else if (lowerText.includes("transport") || lowerText.includes("haul")) {
+    ambientArtKey = "truck";
+  } else if (lowerText.includes("river") || lowerText.includes("water")) {
+    customArtFrame = ExtraAnimations.riverAnimation[0];
+  } else if (lowerText.includes("morning") || lowerText.includes("dawn")) {
+    customArtFrame = ExtraAnimations.sunrisesetAnimation[0];
+  }
+
+  if (customArtFrame) {
+    artBox.setContent(`\n${customArtFrame}`);
+  } else if (ambientArtKey && ASCII_ART[ambientArtKey]) {
+    artBox.setContent(`\n${ASCII_ART[ambientArtKey][0]}`);
+  } else {
+    artBox.setContent("");
+  }
+  screen.render();
+
   if (phase.type === "message") {
     mainBox.setContent(phase.text);
     optionsList.setItems([" [Continue] "]);
@@ -217,8 +317,35 @@ function runNextPhase() {
 
       renderStats();
 
-      currentPhaseQueue.unshift({ type: "message", text: resultText });
-      runNextPhase();
+      const runNext = () => {
+        currentPhaseQueue.unshift({ type: "message", text: resultText });
+        runNextPhase();
+      };
+
+      const optionText = selectedOption.label.toLowerCase();
+      if (optionText.includes("harvest") || optionText.includes("cut") || optionText.includes("fell")) {
+        playAnimation(ANIMATIONS.treeFalling, 200, overlayBox, runNext);
+      } else if (optionText.includes("chainsaw")) {
+        playAnimation(ExtraAnimations.chainsawAnimation, 200, overlayBox, runNext);
+      } else if (optionText.includes("transport") || optionText.includes("haul") || optionText.includes("truck")) {
+        playAnimation(ANIMATIONS.truckDriving, 200, overlayBox, runNext);
+      } else if (optionText.includes("fly") || optionText.includes("helicopter") || optionText.includes("air")) {
+        playAnimation(ExtraAnimations.helicopterAnimation, 200, overlayBox, runNext);
+      } else if (optionText.includes("plant") || optionText.includes("seed")) {
+        playAnimation(ExtraAnimations.treePlantingAnimation, 300, overlayBox, runNext);
+      } else if (optionText.includes("drone") || optionText.includes("survey")) {
+        playAnimation(ExtraAnimations.droneAnimation, 200, overlayBox, runNext);
+      } else if (optionText.includes("radio") || optionText.includes("call")) {
+        playAnimation(ExtraAnimations.walkieTalkieAnimation, 300, overlayBox, runNext);
+      } else if (optionText.includes("map") || optionText.includes("plan")) {
+        playAnimation(ExtraAnimations.mapAnimation, 400, overlayBox, runNext);
+      } else if (optionText.includes("compass") || optionText.includes("navigate")) {
+        playAnimation(ExtraAnimations.compassAnimation, 300, overlayBox, runNext);
+      } else if (optionText.includes("walk") || optionText.includes("hike") || optionText.includes("boot")) {
+        playAnimation(ExtraAnimations.bootAnimation, 300, overlayBox, runNext);
+      } else {
+        runNext();
+      }
     });
   } else if (phase.type === "consequences") {
     phase.execute();
