@@ -93,6 +93,7 @@ export function resolveEvent(journey, event, option) {
     messages.push('This may have consequences later...');
   }
 
+  if (!journey.log) journey.log = [];
   journey.log.push({
     day: journey.day,
     type: 'event',

@@ -10,18 +10,27 @@
       {
         "label": "Drop everything and assist",
         "outcome": "You spend the day pulling files and answering questions. They seem satisfied.",
-        "effects": { "timeUsed": 6, "politicalCapital": 5, "compliance": 8 }
+        "effects": {
+          "timeUsed": 6,
+          "politicalCapital": 5,
+          "compliance": 8
+        }
       },
       {
         "label": "Ask to reschedule",
         "outcome": "They agree to come back next week. You have time to prepare... or worry.",
-        "effects": { "politicalCapital": -5 },
+        "effects": {
+          "politicalCapital": -5
+        },
         "schedulesEvent": "audit_followup"
       },
       {
         "label": "Delegate to your team",
         "outcome": "Karen handles it. She finds a few gaps but smooths them over.",
-        "effects": { "timeUsed": 2, "crew_morale": -5 }
+        "effects": {
+          "timeUsed": 2,
+          "crew_morale": -5
+        }
       }
     ]
   },
@@ -36,17 +45,27 @@
       {
         "label": "Present a remediation package",
         "outcome": "You hand over a clean package with clear corrective actions. The tone softens.",
-        "effects": { "timeUsed": 4, "budget": -2000, "politicalCapital": 6 }
+        "effects": {
+          "timeUsed": 4,
+          "budget": -2000,
+          "politicalCapital": 6
+        }
       },
       {
         "label": "Ask for more time (again)",
         "outcome": "They note the pattern. You buy a little time, but credibility drops.",
-        "effects": { "politicalCapital": -8 }
+        "effects": {
+          "politicalCapital": -8
+        }
       },
       {
         "label": "Throw the team under the bus",
         "outcome": "It deflects blame short term. Internally, morale and trust take a hit.",
-        "effects": { "timeUsed": 2, "crew_morale": -10, "politicalCapital": -4 }
+        "effects": {
+          "timeUsed": 2,
+          "crew_morale": -10,
+          "politicalCapital": -4
+        }
       }
     ]
   },
@@ -61,17 +80,26 @@
       {
         "label": "Accept findings and remediate",
         "outcome": "You allocate budget to fix the gaps. It's the mature response.",
-        "effects": { "budget": -3000, "compliance": 10 }
+        "effects": {
+          "budget": -3000,
+          "compliance": 10
+        }
       },
       {
         "label": "Request reconsideration",
         "outcome": "You push back respectfully. Some findings reduced but relationships strain.",
-        "effects": { "politicalCapital": -8, "compliance": 5 }
+        "effects": {
+          "politicalCapital": -8,
+          "compliance": 5
+        }
       },
       {
         "label": "Blame the previous administration",
         "outcome": "Classic move. It works politically but colleagues notice.",
-        "effects": { "compliance": 3, "relationships": -10 }
+        "effects": {
+          "compliance": 3,
+          "relationships": -10
+        }
       }
     ]
   },
@@ -86,17 +114,28 @@
       {
         "label": "Listen and apologize",
         "outcome": "You hear them out. By the end, tensions have eased. A site visit is promised.",
-        "effects": { "timeUsed": 2, "relationships": 8, "politicalCapital": -3 }
+        "effects": {
+          "timeUsed": 2,
+          "relationships": 8,
+          "politicalCapital": -3
+        }
       },
       {
         "label": "Explain the regulatory constraints",
         "outcome": "You walk through the rules. They understand but feel dismissed.",
-        "effects": { "timeUsed": 1, "relationships": -5 }
+        "effects": {
+          "timeUsed": 1,
+          "relationships": -5
+        }
       },
       {
         "label": "Offer to halt operations pending review",
         "outcome": "A dramatic gesture. It costs production but rebuilds trust.",
-        "effects": { "progress": -15, "relationships": 15, "politicalCapital": 5 }
+        "effects": {
+          "progress": -15,
+          "relationships": 15,
+          "politicalCapital": 5
+        }
       }
     ]
   },
@@ -105,23 +144,33 @@
     "title": "Community Complaint",
     "type": "stakeholder",
     "severity": "minor",
-    "probability": 0.10,
+    "probability": 0.1,
     "description": "A petition from the local community lands on your desk. Concerns about truck traffic.",
     "options": [
       {
         "label": "Schedule a town hall meeting",
         "outcome": "You set up an evening session. Good turnout, reasonable discussion.",
-        "effects": { "timeUsed": 4, "budget": -500, "relationships": 8 }
+        "effects": {
+          "timeUsed": 4,
+          "budget": -500,
+          "relationships": 8
+        }
       },
       {
         "label": "Send a written response",
         "outcome": "A detailed letter explaining safety measures. Polite but distant.",
-        "effects": { "timeUsed": 2, "relationships": 2 }
+        "effects": {
+          "timeUsed": 2,
+          "relationships": 2
+        }
       },
       {
         "label": "Redirect to the ministry",
         "outcome": "You forward it to the proper authority. Not your problem now.",
-        "effects": { "politicalCapital": -5, "relationships": -5 }
+        "effects": {
+          "politicalCapital": -5,
+          "relationships": -5
+        }
       }
     ]
   },
@@ -136,17 +185,26 @@
       {
         "label": "Give a full interview",
         "outcome": "You spend an hour explaining the complexities. Story is balanced.",
-        "effects": { "timeUsed": 3, "relationships": 5, "politicalCapital": -5 }
+        "effects": {
+          "timeUsed": 3,
+          "relationships": 5,
+          "politicalCapital": -5
+        }
       },
       {
         "label": "Provide a written statement only",
         "outcome": "Controlled messaging. The story runs with minimal quotes.",
-        "effects": { "timeUsed": 1 }
+        "effects": {
+          "timeUsed": 1
+        }
       },
       {
         "label": "Decline to comment",
         "outcome": "\"Company declined to comment.\" Never looks great.",
-        "effects": { "relationships": -8, "politicalCapital": -3 }
+        "effects": {
+          "relationships": -8,
+          "politicalCapital": -3
+        }
       }
     ]
   },
@@ -161,17 +219,25 @@
       {
         "label": "Switch to paper backup",
         "outcome": "Old school but functional. Productivity drops but work continues.",
-        "effects": { "progress": -5 }
+        "effects": {
+          "progress": -5
+        }
       },
       {
         "label": "Send everyone home early",
         "outcome": "Nothing can be done without the system. Team appreciates the break.",
-        "effects": { "timeUsed": 8, "crew_morale": 10 }
+        "effects": {
+          "timeUsed": 8,
+          "crew_morale": 10
+        }
       },
       {
         "label": "Escalate to management",
         "outcome": "You make noise. IT prioritizes your fix. Still lost half a day.",
-        "effects": { "timeUsed": 4, "politicalCapital": -3 }
+        "effects": {
+          "timeUsed": 4,
+          "politicalCapital": -3
+        }
       }
     ]
   },
@@ -186,18 +252,26 @@
       {
         "label": "Rebuild from field notes",
         "outcome": "Painful work but you reconstruct the data. Lost two days.",
-        "effects": { "progress": -10, "timeUsed": 8 }
+        "effects": {
+          "progress": -10,
+          "timeUsed": 8
+        }
       },
       {
         "label": "Request extension from ministry",
         "outcome": "They grant it but note the delay in your file.",
-        "effects": { "compliance": -5, "politicalCapital": -3 }
+        "effects": {
+          "compliance": -5,
+          "politicalCapital": -3
+        }
       },
       {
         "label": "Submit with old data and notes",
         "outcome": "It might pass review. It might not.",
-        "effects": { "compliance": -8 },
-        "riskRejection": 0.30
+        "effects": {
+          "compliance": -8
+        },
+        "riskRejection": 0.3
       }
     ]
   },
@@ -212,17 +286,26 @@
       {
         "label": "Accept and adjust plans",
         "outcome": "You revise the work plan. Some projects will wait.",
-        "effects": { "budget": -8000, "progress": -10 }
+        "effects": {
+          "budget": -8000,
+          "progress": -10
+        }
       },
       {
         "label": "Fight for restoration",
         "outcome": "You make the case upstairs. Partial restoration granted.",
-        "effects": { "budget": -4000, "politicalCapital": -10 }
+        "effects": {
+          "budget": -4000,
+          "politicalCapital": -10
+        }
       },
       {
         "label": "Find alternative funding",
         "outcome": "You scramble for grants and partnerships. Stressful but effective.",
-        "effects": { "crew_morale": -10, "budget": -2000 }
+        "effects": {
+          "crew_morale": -10,
+          "budget": -2000
+        }
       }
     ]
   },
@@ -237,17 +320,26 @@
       {
         "label": "Comply immediately",
         "outcome": "Extra paperwork but you stay ahead of enforcement.",
-        "effects": { "timeUsed": 4, "compliance": 8 }
+        "effects": {
+          "timeUsed": 4,
+          "compliance": 8
+        }
       },
       {
         "label": "Request grandfathering",
         "outcome": "Existing permits exempted. New ones still need the extra work.",
-        "effects": { "politicalCapital": -5, "compliance": 3 }
+        "effects": {
+          "politicalCapital": -5,
+          "compliance": 3
+        }
       },
       {
         "label": "Join industry pushback",
         "outcome": "You sign onto the letter. Implementation delayed.",
-        "effects": { "politicalCapital": -8, "relationships": -5 }
+        "effects": {
+          "politicalCapital": -8,
+          "relationships": -5
+        }
       }
     ]
   },
@@ -262,17 +354,25 @@
       {
         "label": "Rush pending items through",
         "outcome": "You push hard to get things approved before the change.",
-        "effects": { "progress": 8, "politicalCapital": -5 }
+        "effects": {
+          "progress": 8,
+          "politicalCapital": -5
+        }
       },
       {
         "label": "Prepare a transition briefing",
         "outcome": "Good relationship management. The new contact appreciates it.",
-        "effects": { "timeUsed": 4, "relationships": 8 }
+        "effects": {
+          "timeUsed": 4,
+          "relationships": 8
+        }
       },
       {
         "label": "Wait and see",
         "outcome": "Things slow down during the transition. Expected.",
-        "effects": { "progress": -5 }
+        "effects": {
+          "progress": -5
+        }
       }
     ]
   },
@@ -281,23 +381,31 @@
     "title": "Team Conflict",
     "type": "team",
     "severity": "minor",
-    "probability": 0.10,
+    "probability": 0.1,
     "description": "Two of your team members had a heated argument in the break room. Tensions are high.",
     "options": [
       {
         "label": "Mediate directly",
         "outcome": "You sit them down together. Issues aired, partial resolution.",
-        "effects": { "timeUsed": 2, "crew_morale": -5 }
+        "effects": {
+          "timeUsed": 2,
+          "crew_morale": -5
+        }
       },
       {
         "label": "Assign them to separate projects",
         "outcome": "Physical distance helps. Underlying issue remains.",
-        "effects": { "progress": -3 }
+        "effects": {
+          "progress": -3
+        }
       },
       {
         "label": "Bring in HR",
         "outcome": "Formal process begins. Professional but cold.",
-        "effects": { "crew_morale": -10, "politicalCapital": -3 }
+        "effects": {
+          "crew_morale": -10,
+          "politicalCapital": -3
+        }
       }
     ]
   },
@@ -312,18 +420,25 @@
       {
         "label": "Counter-offer with raise",
         "outcome": "They stay. Budget takes a hit but continuity preserved.",
-        "effects": { "budget": -5000, "crew_morale": 5 }
+        "effects": {
+          "budget": -5000,
+          "crew_morale": 5
+        }
       },
       {
         "label": "Wish them well and plan transition",
         "outcome": "Professional departure. Knowledge transfer happens. It's not the same.",
-        "effects": { "progress": -8 },
+        "effects": {
+          "progress": -8
+        },
         "crewLoss": true
       },
       {
         "label": "Guilt trip about timing",
         "outcome": "They stay an extra month but relations sour. Then they're gone.",
-        "effects": { "crew_morale": -15 },
+        "effects": {
+          "crew_morale": -15
+        },
         "crewLoss": true,
         "delayed": true
       }
@@ -340,17 +455,25 @@
       {
         "label": "Redistribute workload",
         "outcome": "Those present pick up slack. Tiring but manageable.",
-        "effects": { "crew_morale": -5 }
+        "effects": {
+          "crew_morale": -5
+        }
       },
       {
         "label": "Push back deadlines",
         "outcome": "You notify stakeholders of delays. Understanding varies.",
-        "effects": { "progress": -5, "relationships": -3 }
+        "effects": {
+          "progress": -5,
+          "relationships": -3
+        }
       },
       {
         "label": "Bring in temps",
         "outcome": "Agency staff fill the gap. Quality suffers but output continues.",
-        "effects": { "budget": -1500, "compliance": -3 }
+        "effects": {
+          "budget": -1500,
+          "compliance": -3
+        }
       }
     ]
   },
@@ -360,23 +483,37 @@
     "type": "positive",
     "severity": "positive",
     "probability": 0.08,
-    "journeyTypes": ["permitting", "desk"],
+    "journeyTypes": [
+      "permitting",
+      "desk"
+    ],
     "description": "The ministry fast-tracked one of your applications. Approved ahead of schedule!",
     "options": [
       {
         "label": "Celebrate with the team",
         "outcome": "You buy everyone coffee. Morale soars.",
-        "effects": { "permits_approved": 1, "crew_morale": 10, "budget": -50 }
+        "effects": {
+          "permits_approved": 1,
+          "crew_morale": 10,
+          "budget": -50
+        }
       },
       {
         "label": "Use momentum to push others",
         "outcome": "You leverage the goodwill to accelerate other applications.",
-        "effects": { "permits_approved": 1, "progress": 5, "politicalCapital": 3 }
+        "effects": {
+          "permits_approved": 1,
+          "progress": 5,
+          "politicalCapital": 3
+        }
       },
       {
         "label": "Document what worked",
         "outcome": "You analyze why it went smoothly. Lessons for next time.",
-        "effects": { "permits_approved": 1, "compliance": 5 }
+        "effects": {
+          "permits_approved": 1,
+          "compliance": 5
+        }
       }
     ]
   },
@@ -391,17 +528,124 @@
       {
         "label": "Accept enthusiastically",
         "outcome": "A collaborative approach begins. Slower but richer outcomes.",
-        "effects": { "relationships": 15, "progress": -5, "politicalCapital": 8 }
+        "effects": {
+          "relationships": 15,
+          "progress": -5,
+          "politicalCapital": 8
+        }
       },
       {
         "label": "Accept with conditions",
         "outcome": "You set boundaries on scope. Partnership starts carefully.",
-        "effects": { "relationships": 8, "politicalCapital": -3 }
+        "effects": {
+          "relationships": 8,
+          "politicalCapital": -3
+        }
       },
       {
         "label": "Defer pending capacity review",
         "outcome": "You punt to later. Opportunity may not come again.",
-        "effects": { "relationships": -5 }
+        "effects": {
+          "relationships": -5
+        }
+      }
+    ]
+  },
+  {
+    "id": "first_nations_consultation",
+    "title": "First Nations Consultation Phase",
+    "type": "stakeholders",
+    "severity": "moderate",
+    "probability": 0.15,
+    "description": "It is time to engage with local First Nations regarding upcoming harvest plans. How will you approach consultation?",
+    "options": [
+      {
+        "label": "Conduct comprehensive consultations with all Nations",
+        "outcome": "You proceeded with the comprehensive approach. Cost: $10000.",
+        "effects": {
+          "relationships": 20,
+          "reputation": 20,
+          "budget": -10000
+        }
+      },
+      {
+        "label": "Schedule individual meetings with each Nation",
+        "outcome": "You proceeded with the individual approach. Cost: $5000.",
+        "effects": {
+          "relationships": 10,
+          "reputation": 10,
+          "budget": -5000
+        }
+      },
+      {
+        "label": "Send formal notification letters only (minimal compliance)",
+        "outcome": "You proceeded with the minimal approach. Cost: $2000.",
+        "effects": {
+          "relationships": 20,
+          "reputation": 20,
+          "budget": -2000
+        }
+      },
+      {
+        "label": "Delay consultations (risk deteriorating relationships)",
+        "outcome": "You proceeded with the delay approach. Cost: $0.",
+        "effects": {
+          "relationships": 30,
+          "reputation": 30,
+          "budget": 0
+        }
+      }
+    ]
+  },
+  {
+    "id": "story_arc_ancientGrove_stage1_protect",
+    "title": "Eco-tourism Opportunity",
+    "type": "narrative",
+    "severity": "moderate",
+    "probability": 0,
+    "description": "A local entrepreneur wants to create an eco-tourism venture around the protected grove",
+    "options": [
+      {
+        "label": "Invest $40,000",
+        "outcome": "You decided to Invest $40,000.",
+        "effects": {
+          "reputation": 10,
+          "budget": -40000
+        }
+      },
+      {
+        "label": "Decline",
+        "outcome": "You decided to Decline.",
+        "effects": {
+          "reputation": 0,
+          "budget": 0
+        }
+      }
+    ]
+  },
+  {
+    "id": "story_arc_ancientGrove_stage1_harvest",
+    "title": "Environmental Protest",
+    "type": "narrative",
+    "severity": "moderate",
+    "probability": 0,
+    "description": "Activists blockade the road to the grove, demanding its preservation",
+    "options": [
+      {
+        "label": "Negotiate and offer partial protection",
+        "outcome": "You decided to Negotiate and offer partial protection.",
+        "effects": {
+          "reputation": 5,
+          "budget": 0
+        }
+      },
+      {
+        "label": "Call law enforcement to clear the blockade",
+        "outcome": "You decided to Call law enforcement to clear the blockade.",
+        "effects": {
+          "reputation": -15,
+          "budget": -20000
+        }
       }
     ]
   }

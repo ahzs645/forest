@@ -111,6 +111,34 @@ export function checkPlanningEndConditions(journey) {
 }
 
 /**
+ * Check end conditions for manager journey (protagonist mode)
+ * @param {Object} journey - Journey state
+ * @returns {Object|null} End condition result or null
+ */
+export function checkManagerEndConditions(journey) {
+  // Victory: Completed all terms (e.g., 100 days)
+  if (journey.day > journey.deadline) {
+    if (journey.resources.budget > 0 && (journey.metrics.reputation || 50) > 40) {
+      return { victory: true, reason: 'Successfully led the company through the term!' };
+    } else {
+      return { gameOver: true, reason: 'Term ended with poor performance' };
+    }
+  }
+
+  // Game over: Budget depleted
+  if (journey.resources.budget <= 0) {
+    return { gameOver: true, reason: 'Budget exhausted - operations halted' };
+  }
+
+  // Game over: Poor reputation
+  if ((journey.metrics.reputation || 50) <= 0) {
+    return { gameOver: true, reason: 'Lost all public and board trust' };
+  }
+
+  return null;
+}
+
+/**
  * Check end conditions for permitting journey (protagonist mode)
  * @param {Object} journey - Journey state
  * @returns {Object|null} End condition result or null
@@ -177,6 +205,9 @@ export function checkEndConditions(journey) {
     case 'permitting':
     case 'desk':
       return checkPermittingEndConditions(journey);
+
+    case 'manager':
+      return checkManagerEndConditions(journey);
 
     default:
       return null;

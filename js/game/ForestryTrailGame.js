@@ -23,6 +23,7 @@ import { runReconDay } from '../modes/recon.js';
 import { runSilvicultureDay } from '../modes/silviculture.js';
 import { runPlanningDay } from '../modes/planning.js';
 import { runPermittingDay } from '../modes/permitting.js';
+import { runManagerDay } from '../modes/manager.js';
 import { checkEndConditions as evaluateEndConditions } from '../modes/shared/endConditions.js';
 
 // Import display mode manager
@@ -231,6 +232,9 @@ export class ForestryTrailGame {
             break;
           case 'permitting':
             await runPermittingDay(this);
+            break;
+          case 'manager':
+            await runManagerDay(this);
             break;
           case 'field':
             await runReconDay(this);
