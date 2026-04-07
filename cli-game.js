@@ -12,6 +12,7 @@ import {
   SEASONS,
 } from "./js/engine.js";
 import { ASCII_ART, ANIMATIONS } from "./js/ascii_art.js";
+import * as ExtraAnimations from "./js/animations/index.js";
 
 // Initialize blessed screen
 const screen = blessed.screen({
@@ -240,24 +241,37 @@ function runNextPhase() {
 
   // Determine ambient art based on phase text
   let ambientArtKey = null;
+  let customArtFrame = null;
   const phaseText = phase.text || (phase.data ? (phase.data.title + " " + phase.data.description) : "");
   const lowerText = phaseText.toLowerCase();
 
   if (lowerText.includes("bear") || lowerText.includes("wildlife")) {
     ambientArtKey = "bear";
+  } else if (lowerText.includes("moose")) {
+    customArtFrame = ExtraAnimations.mooseAnimation[0];
+  } else if (lowerText.includes("eagle") || lowerText.includes("bird")) {
+    customArtFrame = ExtraAnimations.eagleAnimation[0];
   } else if (lowerText.includes("rain")) {
     ambientArtKey = "rain";
   } else if (lowerText.includes("snow") || (gameState && SEASONS[gameState.round - 1] === "Winter")) {
     ambientArtKey = "snow";
+  } else if (lowerText.includes("fire") || lowerText.includes("burn")) {
+    customArtFrame = ExtraAnimations.wildfireAnimation[0];
   } else if (lowerText.includes("camp") || phase.type === "message" && lowerText.includes("welcome")) {
     ambientArtKey = "campfire";
   } else if (lowerText.includes("harvest") || lowerText.includes("cut")) {
     ambientArtKey = "tree";
   } else if (lowerText.includes("transport") || lowerText.includes("haul")) {
     ambientArtKey = "truck";
+  } else if (lowerText.includes("river") || lowerText.includes("water")) {
+    customArtFrame = ExtraAnimations.riverAnimation[0];
+  } else if (lowerText.includes("morning") || lowerText.includes("dawn")) {
+    customArtFrame = ExtraAnimations.sunrisesetAnimation[0];
   }
 
-  if (ambientArtKey && ASCII_ART[ambientArtKey]) {
+  if (customArtFrame) {
+    artBox.setContent(`\n${customArtFrame}`);
+  } else if (ambientArtKey && ASCII_ART[ambientArtKey]) {
     artBox.setContent(`\n${ASCII_ART[ambientArtKey][0]}`);
   } else {
     artBox.setContent("");
@@ -311,8 +325,24 @@ function runNextPhase() {
       const optionText = selectedOption.label.toLowerCase();
       if (optionText.includes("harvest") || optionText.includes("cut") || optionText.includes("fell")) {
         playAnimation(ANIMATIONS.treeFalling, 200, overlayBox, runNext);
+      } else if (optionText.includes("chainsaw")) {
+        playAnimation(ExtraAnimations.chainsawAnimation, 200, overlayBox, runNext);
       } else if (optionText.includes("transport") || optionText.includes("haul") || optionText.includes("truck")) {
         playAnimation(ANIMATIONS.truckDriving, 200, overlayBox, runNext);
+      } else if (optionText.includes("fly") || optionText.includes("helicopter") || optionText.includes("air")) {
+        playAnimation(ExtraAnimations.helicopterAnimation, 200, overlayBox, runNext);
+      } else if (optionText.includes("plant") || optionText.includes("seed")) {
+        playAnimation(ExtraAnimations.treePlantingAnimation, 300, overlayBox, runNext);
+      } else if (optionText.includes("drone") || optionText.includes("survey")) {
+        playAnimation(ExtraAnimations.droneAnimation, 200, overlayBox, runNext);
+      } else if (optionText.includes("radio") || optionText.includes("call")) {
+        playAnimation(ExtraAnimations.walkieTalkieAnimation, 300, overlayBox, runNext);
+      } else if (optionText.includes("map") || optionText.includes("plan")) {
+        playAnimation(ExtraAnimations.mapAnimation, 400, overlayBox, runNext);
+      } else if (optionText.includes("compass") || optionText.includes("navigate")) {
+        playAnimation(ExtraAnimations.compassAnimation, 300, overlayBox, runNext);
+      } else if (optionText.includes("walk") || optionText.includes("hike") || optionText.includes("boot")) {
+        playAnimation(ExtraAnimations.bootAnimation, 300, overlayBox, runNext);
       } else {
         runNext();
       }
