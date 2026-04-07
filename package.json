@@ -20,5 +20,8 @@
     "@playwright/test": "^1.59.1",
     "sass": "^1.97.1",
     "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81"
   }
 }
