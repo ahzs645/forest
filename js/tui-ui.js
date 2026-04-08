@@ -144,6 +144,8 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;background:${C.bg}}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:${C.dim}44;border-radius:2px}
+/* Focus ring suppression on root — keyboard focus is managed by JS */
+#tui-root:focus{outline:none}
 `;
 
 // ─── TuiUI ────────────────────────────────────────────────────────────────────
@@ -175,6 +177,7 @@ export class TuiUI {
 
     const root = document.createElement('div');
     root.id = 'tui-root';
+    root.tabIndex = -1; // programmatically focusable so arrow keys land here (not scrollable panels)
     root.innerHTML = `
       <div id="tui-header">
         <span>BC Forestry Trail — Terminal Edition</span>
@@ -215,6 +218,7 @@ export class TuiUI {
     });
     document.body.appendChild(modal);
 
+    this._elRoot     = root;
     this._elScroll   = document.getElementById('tui-scroll');
     this._elMetrics  = document.getElementById('tui-metrics');
     this._elOptsList = document.getElementById('tui-opts-list');
@@ -356,6 +360,13 @@ export class TuiUI {
   }
 
   _renderOptions() {
+    // Keep keyboard focus on the non-scrollable root so arrow keys route here,
+    // not to the scrollable content/options panels which would swallow them.
+    const active = document.activeElement?.tagName;
+    if (active !== 'INPUT' && active !== 'TEXTAREA') {
+      this._elRoot.focus();
+    }
+
     this._elOptsList.innerHTML = '';
     this._currentOptions.forEach((opt, i) => {
       const row = document.createElement('div');
@@ -517,6 +528,61 @@ export class TuiUI {
   togglePanel()            {}
   openStatusPanel()        {}
   closeStatusPanel()       {}
+
+  /**
+   * Dashboard update for the TUI game engine (engine.js / useGameFlow).
+   * Uses gs.metrics instead of journey.resources.
+   * @param {Object} gs - Game state from createInitialState()
+   */
+  updateTuiStatus(gs) {
+    if (!gs) return;
+    const { metrics, round, totalRounds, companyName, role, area } = gs;
+    const rows = [];
+
+    rows.push({ label: 'Season', value: `${round ?? 0} / ${totalRounds ?? 4}` });
+    rows.push({ label: 'Progress',     value: `${Math.round(metrics.progress ?? 50)}%`,     bar: metrics.progress ?? 50 });
+    rows.push({ label: 'Forest',       value: `${Math.round(metrics.forestHealth ?? 50)}%`, bar: metrics.forestHealth ?? 50 });
+    rows.push({ label: 'Relations',    value: `${Math.round(metrics.relationships ?? 50)}%`,bar: metrics.relationships ?? 50 });
+    rows.push({ label: 'Compliance',   value: `${Math.round(metrics.compliance ?? 50)}%`,   bar: metrics.compliance ?? 50 });
+    rows.push({ label: 'Budget',       value: `${Math.round(metrics.budget ?? 50)}%`,       bar: metrics.budget ?? 50 });
+
+    if (companyName || role?.name || area?.name) {
+      rows.push({ sep: true });
+      if (companyName)  rows.push({ label: 'Company', value: companyName });
+      if (role?.name)   rows.push({ label: 'Role',    value: role.name });
+      if (area?.name)   rows.push({ label: 'Area',    value: area.name });
+    }
+
+    this._elMetrics.innerHTML = '';
+    for (const row of rows) {
+      if (row.sep) {
+        const sep = document.createElement('div');
+        sep.className = 'tui-dash-sep';
+        sep.textContent = '─'.repeat(20);
+        this._elMetrics.appendChild(sep);
+        continue;
+      }
+      const el = document.createElement('div');
+      el.className = 'tui-metric';
+      el.innerHTML = `<span class="tui-metric-label">${row.label}</span><span class="tui-metric-value">${row.value}</span>`;
+      this._elMetrics.appendChild(el);
+
+      if (row.bar !== undefined) {
+        const clamped = Math.max(0, Math.min(100, row.bar));
+        const wrap = document.createElement('div');
+        wrap.className = 'tui-metric-bar';
+        const fill = document.createElement('div');
+        fill.className = `tui-metric-fill${clamped < 30 ? ' crit' : clamped < 55 ? ' warn' : ''}`;
+        fill.style.width = `${clamped}%`;
+        wrap.appendChild(fill);
+        this._elMetrics.appendChild(wrap);
+      }
+    }
+
+    if (this._elRole && role?.name) {
+      this._elRole.textContent = role.name.toUpperCase() + ' //';
+    }
+  }
 
   // ── Modal ────────────────────────────────────────────────────────────────
 
