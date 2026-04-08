@@ -59,10 +59,10 @@ function applyDifficultyMultipliers(journey, difficulty) {
 }
 
 export class ForestryTrailGame {
-  constructor() {
+  constructor(ui = null) {
     displayMode.apply();
 
-    this.ui = new TerminalUI();
+    this.ui = ui || new TerminalUI();
     this.journey = null;
     this.gameOver = false;
     this.victory = false;
