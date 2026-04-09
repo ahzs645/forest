@@ -11,6 +11,7 @@ import {
   getPlanningAreaBlockPool,
   getPlanningTriageLabel,
   getPlanningTriageScrutinyDelta,
+  getPlanningBlockWaterContext,
   pickPlanningBlockOptions,
   summarizePlanningBlock,
   formatPlanningBlockLabel,
@@ -20,6 +21,138 @@ import { isPlanningApprovalReady } from './shared/endConditions.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
+
+const FOM_PUBLIC_REVIEW_MIN_DAYS = 2;
+const FOM_PUBLIC_REVIEW_COMMENT_LIMIT = 2;
+
+function ensurePlanningFomState(journey) {
+  const blockPlanning = journey.blockPlanning || (journey.blockPlanning = {});
+  const fom = blockPlanning.fom || (blockPlanning.fom = {});
+
+  if (!fom.status) {
+    fom.status = 'draft';
+  }
+  if (!Number.isFinite(fom.reviewDaysRemaining)) {
+    fom.reviewDaysRemaining = 0;
+  }
+  if (!Number.isFinite(fom.commentLoad)) {
+    fom.commentLoad = 0;
+  }
+  if (!Number.isFinite(fom.hydrologyReadiness)) {
+    fom.hydrologyReadiness = 100;
+  }
+  if (!fom.waterGate) {
+    fom.waterGate = 'clear';
+  }
+  if (!fom.waterNote) {
+    fom.waterNote = 'No water gate evaluated yet.';
+  }
+  if (!fom.hydrologyLabel) {
+    fom.hydrologyLabel = 'water timing';
+  }
+  return fom;
+}
+
+function describeReviewState(fom) {
+  if (!fom) return 'Draft';
+  switch (fom.status) {
+    case 'public_review':
+      return `Public review ${Math.max(0, fom.reviewDaysRemaining)}d left`;
+    case 'revision_required':
+      return 'Revision required';
+    case 'approved':
+      return 'Approved';
+    default:
+      return 'Draft';
+  }
+}
+
+function syncFomStateFromActiveBlock(journey, seasonInfo) {
+  const blockPlanning = journey.blockPlanning;
+  if (!blockPlanning?.activeBlock) return ensurePlanningFomState(journey);
+
+  const fom = ensurePlanningFomState(journey);
+  const waterContext = getPlanningBlockWaterContext(blockPlanning.activeBlock, journey.area, seasonInfo);
+  const activeBlockId = blockPlanning.activeBlock.id;
+
+  if (fom.activeBlockId !== activeBlockId) {
+    fom.status = 'draft';
+    fom.reviewDaysRemaining = waterContext.reviewDays;
+    fom.commentLoad = waterContext.commentCount;
+    fom.publicReviewOpenedDay = null;
+    fom.approvedDay = null;
+    fom.revisionNotes = '';
+  }
+
+  fom.activeBlockId = activeBlockId;
+  fom.blockLabel = blockPlanning.activeSummary || blockPlanning.activeBlock.label || blockPlanning.activeBlock.id;
+  fom.waterGate = waterContext.gate;
+  fom.waterNote = waterContext.note;
+  fom.hydrologyLabel = waterContext.hydrologyLabel;
+  fom.hydrologyReadiness = waterContext.readiness;
+  fom.reviewDaysTarget = Math.max(FOM_PUBLIC_REVIEW_MIN_DAYS, waterContext.reviewDays);
+
+  if (fom.status === 'draft' && waterContext.gate !== 'clear') {
+    fom.commentLoad = Math.max(fom.commentLoad, waterContext.commentCount);
+  }
+
+  return fom;
+}
+
+function getFomActionLabel(fom) {
+  switch (fom?.status) {
+    case 'public_review':
+      return 'Update FOM Review (2h)';
+    case 'revision_required':
+      return 'Revise FOM (2h)';
+    case 'approved':
+      return 'Check FOM Record (1h)';
+    default:
+      return 'Open FOM Review (2h)';
+  }
+}
+
+function getFomActionDescription(fom) {
+  switch (fom?.status) {
+    case 'public_review':
+      return `Keep the Forest Operations Map current while public review runs (${Math.max(0, fom.reviewDaysRemaining)}d left).`;
+    case 'revision_required':
+      return 'Address review comments, especially timing and water notes, then resubmit the map.';
+    case 'approved':
+      return 'Confirm the map record and keep the submission package aligned.';
+    default:
+      return 'Publish the Forest Operations Map so the public-review window can open.';
+  }
+}
+
+export function getPlanningSubmissionReadiness(journey, seasonInfo = null) {
+  const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
+  const waterContext = getPlanningBlockWaterContext(journey.blockPlanning?.activeBlock, journey.area, seasonInfo);
+  const reasons = [];
+
+  if (!journey.blockPlanning?.activeBlock) {
+    reasons.push('no active block selected');
+  }
+
+  if (fom.status !== 'approved') {
+    reasons.push(`FOM is ${describeReviewState(fom).toLowerCase()}`);
+  }
+
+  if (waterContext.gate === 'hold') {
+    reasons.push(waterContext.note);
+  }
+
+  if (fom.commentLoad > FOM_PUBLIC_REVIEW_COMMENT_LIMIT) {
+    reasons.push('public review still carries open comments');
+  }
+
+  return {
+    ready: reasons.length === 0,
+    reasons,
+    waterContext,
+    fom,
+  };
+}
 
 /**
  * Run a planning day with multi-action system
@@ -70,7 +203,7 @@ export async function runPlanningDay(game) {
       break;
     }
 
-    const actionOptions = buildActionOptions(journey);
+    const actionOptions = buildActionOptions(journey, seasonInfo);
 
     const action = await ui.promptChoice(`${journey.hoursRemaining}h remaining:`, actionOptions);
 
@@ -79,7 +212,7 @@ export async function runPlanningDay(game) {
     }
 
     ui.write('');
-    await processAction(game, action.value);
+    await processAction(game, action.value, seasonInfo);
 
     ui.updateAllStatus(journey);
 
@@ -172,6 +305,12 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
     ui.write(`Carry-forward: ${discoveryNotes.join(' | ')}`);
   }
 
+  const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
+  if (fom?.activeBlockId) {
+    ui.write(`FOM: ${describeReviewState(fom)} | Water Gate: ${fom.waterGate.toUpperCase()} | ${fom.hydrologyLabel}`);
+    ui.write(`Hydrology Readiness: ${Math.round(fom.hydrologyReadiness)}% | ${fom.waterNote}`);
+  }
+
   if (journey.blockPlanning?.activeSummary) {
     ui.write(`Active Block: ${journey.blockPlanning.activeSummary}`);
     if (journey.blockPlanning.nextSelectionDay) {
@@ -209,23 +348,23 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
   }
   ui.write('');
 
-  const options = pickPlanningBlockOptions(journey.areaId, plannerState.history, 3, triageChoice.value, journey.area);
+  const options = pickPlanningBlockOptions(journey.areaId, plannerState.history, 3, triageChoice.value, journey.area, seasonInfo);
   if (!options.length) return;
 
   const promptOptions = options.map((block) => {
     return {
       label: formatPlanningBlockLabel(block),
-      description: formatPlanningBlockPromptDescription(block, journey.area),
+      description: formatPlanningBlockPromptDescription(block, journey.area, seasonInfo),
       value: block.id
     };
   });
 
   const selected = await ui.promptChoice('Select active block focus:', promptOptions);
   const chosen = options.find((block) => block.id === selected.value) || options[0];
-  applySelectedBlockImpact(journey, chosen, triageChoice.value);
+  applySelectedBlockImpact(journey, chosen, triageChoice.value, seasonInfo);
 }
 
-function applySelectedBlockImpact(journey, block, triageKey = null) {
+function applySelectedBlockImpact(journey, block, triageKey = null, seasonInfo = null) {
   if (!journey.blockPlanning || !block) return;
 
   const state = journey.blockPlanning;
@@ -233,10 +372,11 @@ function applySelectedBlockImpact(journey, block, triageKey = null) {
   state.activeBlock = block;
   state.activeTriage = triageKey;
   state.activeTriageLabel = getPlanningTriageLabel(triageKey);
-  state.activeSummary = summarizePlanningBlock(block, journey.area, triageKey);
+  state.activeSummary = summarizePlanningBlock(block, journey.area, triageKey, seasonInfo);
   state.activeEventBias = block.eventBias || null;
   state.history = Array.isArray(state.history) ? [...state.history, block.id].slice(-30) : [block.id];
   state.nextSelectionDay = journey.day + (state.cadenceDays || 3);
+  syncFomStateFromActiveBlock(journey, seasonInfo);
 
   const effects = block.valueEffects || {};
   journey.values.biodiversity = clampValue(journey.values.biodiversity + (effects.biodiversity || 0));
@@ -272,9 +412,10 @@ function applyValuesConsequences(journey) {
 /**
  * Build action options based on current phase and resources
  */
-function buildActionOptions(journey) {
+function buildActionOptions(journey, seasonInfo = null) {
   const actionOptions = [];
   const hoursLeft = journey.hoursRemaining || 8;
+  const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
 
   // Phase-specific primary actions
   if (journey.plan.phase === 'data_gathering' && journey.resources.dataCredits > 0 && hoursLeft >= 3) {
@@ -315,16 +456,17 @@ function buildActionOptions(journey) {
   if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 6) {
     const deficits = getValuesGateDeficits(journey);
     const valuesOk = deficits.length === 0;
-    if (valuesOk) {
+    const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
+    if (valuesOk && submissionReadiness.ready) {
       actionOptions.push({
         label: 'Prepare Submission (6h)',
-        description: 'Fastest approval push (+18 confidence)',
+        description: 'Fastest approval push (+18 confidence) after the FOM clears public review and water comments.',
         value: 'submit'
       });
     } else {
       actionOptions.push({
         label: 'Prepare Submission (BLOCKED)',
-        description: `Needs: ${formatValuesGateDeficits(deficits)}`,
+        description: `Needs: ${[formatValuesGateDeficits(deficits), ...submissionReadiness.reasons].filter(Boolean).join(' | ')}`,
         value: 'submit_blocked'
       });
     }
@@ -335,6 +477,14 @@ function buildActionOptions(journey) {
       label: 'Ministerial Outreach (2h)',
       description: 'Brief decision-makers and recover confidence up to 78%',
       value: 'outreach'
+    });
+  }
+
+  if (journey.blockPlanning?.activeBlock && hoursLeft >= 2) {
+    actionOptions.push({
+      label: getFomActionLabel(fom),
+      description: getFomActionDescription(fom),
+      value: 'fom_review'
     });
   }
 
@@ -393,7 +543,7 @@ function buildActionOptions(journey) {
 /**
  * Process a selected action
  */
-async function processAction(game, actionValue) {
+async function processAction(game, actionValue, seasonInfo = null) {
   const { ui, journey } = game;
   const discoveryTags = getJourneyDiscoveryTags(journey);
   const discoveryIds = new Set(discoveryTags.map((tag) => tag.id));
@@ -455,13 +605,26 @@ async function processAction(game, actionValue) {
       break;
 
     case 'stakeholder_blocked':
-    case 'submit_blocked':
+    case 'submit_blocked': {
+      const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
       ui.writeWarning(`Cannot proceed. Recover these values first: ${formatValuesGateDeficits(getValuesGateDeficits(journey))}.`);
-      ui.write('Use Values Workshop or Timber Assessment to rebalance.');
+      if (submissionReadiness.reasons.length > 0) {
+        ui.write(`Planning gate: ${submissionReadiness.reasons.join(' | ')}.`);
+      }
+      ui.write('Use Values Workshop, Timber Assessment, or FOM Review to rebalance.');
       break;
+    }
 
     case 'submit':
-      journey.plan.ministerialConfidence = Math.min(100, journey.plan.ministerialConfidence + 18);
+      {
+        const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
+        if (!submissionReadiness.ready) {
+          ui.writeWarning(`Submission blocked: ${submissionReadiness.reasons.join(' | ')}.`);
+          break;
+        }
+        const confidenceGain = submissionReadiness.waterContext.gate === 'clear' ? 18 : 14;
+        journey.plan.ministerialConfidence = Math.min(100, journey.plan.ministerialConfidence + confidenceGain);
+      }
       journey.hoursRemaining -= 6;
       journey.resources.budget = Math.max(0, journey.resources.budget - 2200);
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
@@ -475,6 +638,41 @@ async function processAction(game, actionValue) {
         ui.write(`Still ${gap} point${gap === 1 ? '' : 's'} short of approval-ready confidence.`);
       }
       break;
+
+    case 'fom_review': {
+      const activeBlock = journey.blockPlanning?.activeBlock;
+      if (!activeBlock) {
+        ui.writeWarning('Select a block before opening the Forest Operations Map review.');
+        break;
+      }
+
+      const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
+      if (fom.status === 'approved') {
+        journey.hoursRemaining -= 1;
+        applyProtagonistCost(journey, { energy: 3, stress: 2 });
+        ui.write('Forest Operations Map record checked. The approved review file stays in place.');
+        break;
+      }
+
+      const waterContext = getPlanningBlockWaterContext(activeBlock, journey.area, seasonInfo);
+      const reviewCost = 2;
+      fom.status = 'public_review';
+      fom.reviewDaysRemaining = Math.max(fom.reviewDaysRemaining || 0, waterContext.reviewDays, FOM_PUBLIC_REVIEW_MIN_DAYS);
+      fom.commentLoad = Math.max(fom.commentLoad || 0, waterContext.commentCount);
+      fom.publicReviewOpenedDay = journey.day;
+      fom.lastUpdatedDay = journey.day;
+      fom.hydrologyReadiness = waterContext.readiness;
+      fom.waterGate = waterContext.gate;
+      fom.waterNote = waterContext.note;
+      fom.hydrologyLabel = waterContext.hydrologyLabel;
+
+      journey.hoursRemaining -= reviewCost;
+      applyProtagonistCost(journey, { energy: 6, stress: 5 });
+
+      ui.write(`Forest Operations Map posted for public review.`);
+      ui.write(`Review window: ${fom.reviewDaysRemaining} day${fom.reviewDaysRemaining === 1 ? '' : 's'} | ${fom.waterNote}`);
+      break;
+    }
 
     case 'outreach': {
       const previousConfidence = journey.plan.ministerialConfidence;
@@ -630,6 +828,25 @@ async function advanceToNextDay(game) {
       journey.protagonist.stress = Math.min(100, journey.protagonist.stress + 6);
     }
     ui.writeWarning('The cabinet window is closing. Delays are starting to cost political support.');
+  }
+
+  const fom = journey.blockPlanning?.fom;
+  if (fom?.status === 'public_review') {
+    fom.reviewDaysRemaining = Math.max(0, (fom.reviewDaysRemaining || 0) - 1);
+    if (fom.reviewDaysRemaining <= 0) {
+      if (fom.commentLoad <= FOM_PUBLIC_REVIEW_COMMENT_LIMIT && fom.waterGate !== 'hold') {
+        fom.status = 'approved';
+        fom.commentLoad = 0;
+        fom.approvedDay = journey.day + 1;
+        ui.writePositive('Forest Operations Map cleared public review.');
+      } else {
+        fom.status = 'revision_required';
+        fom.revisionNotes = fom.waterGate === 'hold'
+          ? 'Working-around-water timing comments still need a revision.'
+          : 'Public comments require one more revision pass.';
+        ui.writeWarning(`Forest Operations Map needs revisions: ${fom.revisionNotes}`);
+      }
+    }
   }
 
   journey.day++;

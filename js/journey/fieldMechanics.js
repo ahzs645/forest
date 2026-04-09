@@ -96,6 +96,32 @@ const ACCESS_SENSITIVE_FEATURES = new Set([
   'visual_quality_zone'
 ]);
 
+const ROAD_WEAR_HAZARDS = new Set([
+  'road_damage',
+  'grade',
+  'traffic',
+  'industrial',
+  'tire_damage',
+  'bridge_weight'
+]);
+
+const WATER_SENSITIVE_FEATURES = new Set([
+  'community_water',
+  'watershed',
+  'water_intake',
+  'salmon_river',
+  'fish_habitat'
+]);
+
+const WATER_SENSITIVE_HAZARDS = new Set([
+  'river_crossing',
+  'flood',
+  'washout',
+  'erosion',
+  'bog',
+  'subsidence'
+]);
+
 function normalizeAccessToken(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -143,6 +169,266 @@ function getAccessStance(routePlan, paceId) {
   return 'observe';
 }
 
+function getSeasonId(journey) {
+  return normalizeAccessToken(journey?.season?.currentSeason || null);
+}
+
+function clampObservationScore(value) {
+  return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+}
+
+function getLifecycleBand(score, bands) {
+  for (const band of bands) {
+    if (score <= band.max) {
+      return band;
+    }
+  }
+
+  return bands[bands.length - 1];
+}
+
+function classifyRoadLifecycle(score) {
+  return getLifecycleBand(score, [
+    { max: 12, id: 'good', label: 'Good' },
+    { max: 28, id: 'watch', label: 'Watch' },
+    { max: 48, id: 'rough', label: 'Rough' },
+    { max: 68, id: 'repair_needed', label: 'Repair Needed' },
+    { max: 100, id: 'out_of_service', label: 'Out of Service' }
+  ]);
+}
+
+function classifyCrossingCondition(score) {
+  return getLifecycleBand(score, [
+    { max: 6, id: 'clear_window', label: 'Clear Window' },
+    { max: 14, id: 'timing_sensitive', label: 'Timing Sensitive' },
+    { max: 24, id: 'high_water', label: 'High Water' },
+    { max: 100, id: 'restricted', label: 'Restricted' }
+  ]);
+}
+
+function classifyWatershedPressure(score) {
+  return getLifecycleBand(score, [
+    { max: 4, id: 'low', label: 'Low' },
+    { max: 10, id: 'watch', label: 'Watch' },
+    { max: 18, id: 'elevated', label: 'Elevated' },
+    { max: 100, id: 'critical', label: 'Critical' }
+  ]);
+}
+
+function ensureRoadAssets(journey) {
+  if (!journey) {
+    return { byBlock: {}, observations: [] };
+  }
+
+  if (!journey.roadAssets) {
+    journey.roadAssets = {
+      byBlock: {},
+      observations: []
+    };
+  }
+
+  if (!journey.roadAssets.byBlock) {
+    journey.roadAssets.byBlock = {};
+  }
+
+  if (!Array.isArray(journey.roadAssets.observations)) {
+    journey.roadAssets.observations = [];
+  }
+
+  return journey.roadAssets;
+}
+
+function summarizeInfrastructure(infra) {
+  if (!infra) {
+    return '';
+  }
+
+  const pieces = [];
+  if (infra.roadLifecycleLabel) {
+    pieces.push(`road ${infra.roadLifecycleLabel.toLowerCase()}`);
+  }
+  if (infra.crossingConditionLabel) {
+    pieces.push(`crossing ${infra.crossingConditionLabel.toLowerCase()}`);
+  }
+  if (infra.watershedPressureLabel) {
+    pieces.push(`watershed ${infra.watershedPressureLabel.toLowerCase()}`);
+  }
+
+  return pieces.join('; ');
+}
+
+function buildFieldInfrastructureProfile(block, weather, journey, existingState = null) {
+  const terrain = normalizeAccessToken(block?.terrain);
+  const hazards = new Set((block?.hazards || []).map(normalizeAccessToken).filter(Boolean));
+  const features = new Set((block?.features || []).map(normalizeAccessToken).filter(Boolean));
+  const seasonId = getSeasonId(journey);
+  const paceId = normalizeAccessToken(journey?.pace);
+  const routeLabel = normalizeAccessToken(journey?.routePlan?.shortLabel);
+
+  let roadWear = clampObservationScore(existingState?.roadWear);
+  let crossingWear = clampObservationScore(existingState?.crossingWear);
+  let watershedPressure = clampObservationScore(existingState?.watershedPressure);
+
+  if (terrain === 'steep' || terrain === 'hilly') {
+    roadWear += 2;
+  } else if (terrain === 'river') {
+    roadWear += 1;
+    crossingWear += 3;
+  } else if (terrain === 'muskeg') {
+    roadWear += 1;
+    crossingWear += 1;
+  }
+
+  for (const hazard of hazards) {
+    if (ROAD_WEAR_HAZARDS.has(hazard)) {
+      roadWear += hazard === 'bridge_weight' ? 3 : hazard === 'road_damage' ? 2 : 1;
+    }
+    if (WATER_SENSITIVE_HAZARDS.has(hazard)) {
+      crossingWear += hazard === 'flood' || hazard === 'washout' ? 3 : 2;
+      watershedPressure += 1;
+    }
+    if (hazard === 'fish_timing') {
+      watershedPressure += 1;
+    }
+  }
+
+  for (const feature of features) {
+    if (!WATER_SENSITIVE_FEATURES.has(feature)) {
+      continue;
+    }
+
+    watershedPressure += feature === 'water_intake' || feature === 'community_water' ? 2 : 1;
+    crossingWear += feature === 'water_intake' || feature === 'community_water' ? 1 : 0;
+  }
+
+  if (weather?.id === 'storm' || weather?.id === 'heavy_rain') {
+    roadWear += 2;
+    crossingWear += 3;
+    watershedPressure += 2;
+  } else if (weather?.id === 'heavy_snow') {
+    roadWear += 1;
+    crossingWear += terrain === 'river' || hazards.has('river_crossing') ? 1 : 0;
+  } else if (weather?.id === 'freezing') {
+    roadWear += 1;
+    crossingWear -= terrain === 'river' || hazards.has('river_crossing') ? 2 : 0;
+  } else if (weather?.id === 'fog') {
+    roadWear += 1;
+  }
+
+  if (seasonId === 'spring' && (crossingWear > 0 || watershedPressure > 0)) {
+    crossingWear += 2;
+    watershedPressure += 2;
+  }
+
+  if (seasonId === 'summer' || seasonId === 'fall') {
+    watershedPressure += features.has('community_water') || features.has('water_intake') ? 1 : 0;
+  }
+
+  if (routeLabel === 'shortcut' || paceId === 'grueling' || paceId === 'fast') {
+    roadWear += 1;
+    crossingWear += 1;
+  } else if (routeLabel === 'detour' || paceId === 'slow') {
+    roadWear = Math.max(0, roadWear - 1);
+    crossingWear = Math.max(0, crossingWear - 1);
+  }
+
+  roadWear = clampObservationScore(roadWear);
+  crossingWear = clampObservationScore(crossingWear);
+  watershedPressure = clampObservationScore(watershedPressure);
+
+  const roadLifecycle = classifyRoadLifecycle(roadWear);
+  const crossingCondition = classifyCrossingCondition(crossingWear);
+  const watershedCondition = classifyWatershedPressure(watershedPressure);
+
+  let scrutinyDelta = 0;
+  if (roadLifecycle.id === 'repair_needed') {
+    scrutinyDelta += 1;
+  } else if (roadLifecycle.id === 'out_of_service') {
+    scrutinyDelta += 2;
+  }
+  if (crossingCondition.id === 'high_water') {
+    scrutinyDelta += 1;
+  } else if (crossingCondition.id === 'restricted') {
+    scrutinyDelta += 2;
+  }
+  if (watershedCondition.id === 'critical') {
+    scrutinyDelta += 1;
+  }
+
+  return {
+    roadWear,
+    crossingWear,
+    watershedPressure,
+    roadLifecycleId: roadLifecycle.id,
+    roadLifecycleLabel: roadLifecycle.label,
+    crossingConditionId: crossingCondition.id,
+    crossingConditionLabel: crossingCondition.label,
+    watershedPressureId: watershedCondition.id,
+    watershedPressureLabel: watershedCondition.label,
+    scrutinyDelta,
+    summary: summarizeInfrastructure({
+      roadLifecycleLabel: roadLifecycle.label,
+      crossingConditionLabel: crossingCondition.label,
+      watershedPressureLabel: watershedCondition.label
+    })
+  };
+}
+
+function recordRoadObservation(journey, block, verdict, weather = null) {
+  if (!journey || !block?.id || !verdict) {
+    return null;
+  }
+
+  const roadAssets = ensureRoadAssets(journey);
+  const existing = roadAssets.byBlock[block.id] || null;
+  const profile = buildFieldInfrastructureProfile(block, weather, journey, existing);
+
+  const observation = {
+    blockId: block.id,
+    blockName: block.name || block.id,
+    day: journey.day || null,
+    weatherId: weather?.id || null,
+    verdictId: verdict.id || null,
+    roadWear: profile.roadWear,
+    crossingWear: profile.crossingWear,
+    watershedPressure: profile.watershedPressure,
+    roadLifecycleId: profile.roadLifecycleId,
+    roadLifecycleLabel: profile.roadLifecycleLabel,
+    crossingConditionId: profile.crossingConditionId,
+    crossingConditionLabel: profile.crossingConditionLabel,
+    watershedPressureId: profile.watershedPressureId,
+    watershedPressureLabel: profile.watershedPressureLabel,
+    summary: profile.summary
+  };
+
+  roadAssets.byBlock[block.id] = observation;
+  roadAssets.observations.unshift(observation);
+  if (roadAssets.observations.length > 24) {
+    roadAssets.observations.length = 24;
+  }
+
+  return observation;
+}
+
+export function formatInfrastructureStatus(verdict) {
+  if (!verdict) {
+    return '';
+  }
+
+  const pieces = [];
+  if (verdict.roadLifecycleLabel) {
+    pieces.push(`Road: ${verdict.roadLifecycleLabel}`);
+  }
+  if (verdict.crossingConditionLabel) {
+    pieces.push(`Crossing: ${verdict.crossingConditionLabel}`);
+  }
+  if (verdict.watershedPressureLabel) {
+    pieces.push(`Watershed: ${verdict.watershedPressureLabel}`);
+  }
+
+  return pieces.length > 0 ? pieces.join(' | ') : '';
+}
+
 export function recordAccessVerdict(journey, block, verdict, weather = null) {
   if (!journey || !block?.id || !verdict) {
     return verdict;
@@ -159,6 +445,8 @@ export function recordAccessVerdict(journey, block, verdict, weather = null) {
     day: journey.day || null
   };
 
+  recordRoadObservation(journey, block, verdict, weather);
+
   return journey.accessVerdicts[block.id];
 }
 
@@ -168,6 +456,12 @@ export function getBlockAccessVerdict(block, weather = null, journey = null) {
   const features = new Set((block?.features || []).map(normalizeAccessToken).filter(Boolean));
   const weatherId = normalizeAccessToken(weather?.id);
   const weatherDangerous = Boolean(weather?.dangerous || ['storm', 'heavy_rain', 'heavy_snow', 'freezing'].includes(weatherId));
+  const infrastructure = buildFieldInfrastructureProfile(
+    block,
+    weather,
+    journey,
+    journey?.roadAssets?.byBlock?.[block?.id] || null
+  );
 
   const scores = {
     no_go: 0,
@@ -182,6 +476,36 @@ export function getBlockAccessVerdict(block, weather = null, journey = null) {
     winter_only: [],
     rehab_needed: []
   };
+
+  if (infrastructure.roadLifecycleId === 'rough') {
+    scores.rehab_needed += 1;
+    addUniqueReason(reasons.rehab_needed, 'rough road asset');
+  } else if (infrastructure.roadLifecycleId === 'repair_needed') {
+    scores.rehab_needed += 2;
+    addUniqueReason(reasons.rehab_needed, 'road repair required');
+  } else if (infrastructure.roadLifecycleId === 'out_of_service') {
+    scores.no_go += 1;
+    addUniqueReason(reasons.no_go, 'road out of service');
+  }
+
+  if (infrastructure.crossingConditionId === 'timing_sensitive') {
+    scores.winter_only += 1;
+    addUniqueReason(reasons.winter_only, 'water timing window');
+  } else if (infrastructure.crossingConditionId === 'high_water') {
+    scores.no_go += 1;
+    addUniqueReason(reasons.no_go, 'high water crossing');
+  } else if (infrastructure.crossingConditionId === 'restricted') {
+    scores.no_go += 2;
+    addUniqueReason(reasons.no_go, 'crossing restricted');
+  }
+
+  if (infrastructure.watershedPressureId === 'elevated') {
+    scores.rehab_needed += 1;
+    addUniqueReason(reasons.rehab_needed, 'community watershed watch');
+  } else if (infrastructure.watershedPressureId === 'critical') {
+    scores.no_go += 1;
+    addUniqueReason(reasons.no_go, 'community watershed pressure');
+  }
 
   if (terrain === 'river') {
     scores.winter_only += 1;
@@ -327,7 +651,15 @@ export function getBlockAccessVerdict(block, weather = null, journey = null) {
     summary,
     reasons: reasons[verdictId] || [],
     weatherId: weatherId || null,
-    terrain: terrain || null
+    terrain: terrain || null,
+    roadLifecycleId: infrastructure.roadLifecycleId,
+    roadLifecycleLabel: infrastructure.roadLifecycleLabel,
+    crossingConditionId: infrastructure.crossingConditionId,
+    crossingConditionLabel: infrastructure.crossingConditionLabel,
+    watershedPressureId: infrastructure.watershedPressureId,
+    watershedPressureLabel: infrastructure.watershedPressureLabel,
+    scrutinyDelta: infrastructure.scrutinyDelta,
+    infrastructureSummary: infrastructure.summary
   };
 }
 
@@ -367,7 +699,7 @@ export function applyAccessVerdictPressure(journey, verdict, context = {}) {
     aggressive: 1
   };
 
-  let delta = (baseByVerdict[verdict.id] || 0) + (stanceAdjustment[stance] || 0);
+  let delta = (baseByVerdict[verdict.id] || 0) + (stanceAdjustment[stance] || 0) + (Number(verdict.scrutinyDelta) || 0);
 
   if (verdict.id === 'passable_now' && stance === 'cautious') {
     delta = -1;
@@ -392,7 +724,9 @@ export function formatAccessVerdict(verdict) {
     return 'Access verdict: Passable now';
   }
 
-  return `Access verdict: ${verdict.label}${verdict.summary ? ` - ${verdict.summary}` : ''}`;
+  const base = `Access verdict: ${verdict.label}${verdict.summary ? ` - ${verdict.summary}` : ''}`;
+  const infrastructure = formatInfrastructureStatus(verdict);
+  return infrastructure ? `${base} | ${infrastructure}` : base;
 }
 
 function getCrewTravelModifier(journey) {

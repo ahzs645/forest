@@ -16,6 +16,7 @@ import { getFieldProgressInfo, getSurveyedBlockCount } from '../journey.js';
 import {
   executeFieldDay,
   formatAccessVerdict,
+  formatInfrastructureStatus,
   getBlockAccessVerdict,
   recordAccessVerdict
 } from '../journey/fieldMechanics.js';
@@ -320,6 +321,10 @@ function displayDayHeader(ui, journey) {
     ui.writeDanger(currentAccessLine);
   } else {
     ui.writeWarning(currentAccessLine);
+  }
+  const currentInfrastructureLine = formatInfrastructureStatus(currentAccessVerdict);
+  if (currentInfrastructureLine) {
+    ui.write(currentInfrastructureLine);
   }
 
   const routeText = journey.routePlan
@@ -633,6 +638,10 @@ function handleScoutAhead(ui, journey) {
     ui.writeDanger(accessLine);
   } else {
     ui.writeWarning(accessLine);
+  }
+  const infrastructureLine = formatInfrastructureStatus(accessVerdict);
+  if (infrastructureLine) {
+    ui.write(infrastructureLine);
   }
 
   if (nextBlock.hasSupply) {

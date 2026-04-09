@@ -4,9 +4,11 @@ import assert from 'node:assert/strict';
 import {
   buildPlanningConstraintTriage,
   formatPlanningBlockPromptDescription,
+  getPlanningBlockWaterContext,
   getPlanningTriageScrutinyDelta,
   rankPlanningBlockOptions,
 } from '../js/data/planningBlocks.js';
+import { getPlanningSubmissionReadiness } from '../js/modes/planning.js';
 import { TuiGameController } from '../tui/controller.js';
 
 function advanceFromSetupToFirstPlannerTask(controller) {
@@ -108,7 +110,7 @@ test('planning triage highlights the dominant area constraint and puts it first'
   assert.equal(triage.recommendedKey, 'water');
   assert.equal(triage.options[0].value, 'water');
   assert.match(triage.summary, /karst hydrology/i);
-  assert.match(formatPlanningBlockPromptDescription(blocks[0], area), /Constraints/i);
+  assert.match(formatPlanningBlockPromptDescription(blocks[0], area, { currentSeason: 'spring' }), /Water HOLD/i);
   assert.ok(getPlanningTriageScrutinyDelta('water') < 0);
   assert.ok(getPlanningTriageScrutinyDelta('timber') > 0);
 });
@@ -150,4 +152,82 @@ test('planning triage ranking shifts block order toward the chosen handling styl
 
   assert.equal(rankPlanningBlockOptions(blocks, 'access', area)[0].id, 'access-easy');
   assert.equal(rankPlanningBlockOptions(blocks, 'timber', area)[0].id, 'timber-strong');
+});
+
+test('planning water context holds community watershed blocks and blocks submission until FOM review clears', () => {
+  const area = {
+    id: 'skeena-nass',
+    name: 'Skeena-Nass Transition',
+    tags: ['cwh', 'karst', 'salmon', 'community-water'],
+    zoneSummary: 'Very wet CWH valleys where fish-bearing crossings, saturated slopes, and karst hydrology drive the job.',
+  };
+  const block = {
+    id: 'water-review-1',
+    sourceType: 'planned-cutblock',
+    timberMark: 'E',
+    cutBlockId: '1',
+    adminDistrict: 'Skeena NRD',
+    areaHa: 12.1,
+    plannedHarvestDate: '2026-04-18',
+    indicators: {
+      ogmaNearby: true,
+      whaNoHarvestNearby: true,
+      speciesAtRiskNearby: false,
+      firstNationsReserveNearby: false,
+    },
+    metrics: {
+      timberOpportunity: 50,
+      biodiversitySensitivity: 60,
+      firstNationsSensitivity: 20,
+      technicalComplexity: 24,
+    },
+    valueEffects: {
+      biodiversity: 1,
+      timberSupply: 1,
+      communityNeeds: 0,
+      firstNationsValues: 1,
+    },
+    summary: 'Water-sensitive block in a community watershed',
+  };
+  const season = { currentSeason: 'spring', year: 1 };
+
+  const water = getPlanningBlockWaterContext(block, area, season);
+  assert.equal(water.gate, 'hold');
+  assert.match(water.note, /community watershed hydrology/i);
+  assert.equal(rankPlanningBlockOptions([block, { ...block, id: 'water-review-2', plannedHarvestDate: '2026-08-18', indicators: { ogmaNearby: false, whaNoHarvestNearby: false, speciesAtRiskNearby: false, firstNationsReserveNearby: false } }], 'water', area, season)[0].plannedHarvestDate, '2026-08-18');
+  assert.match(formatPlanningBlockPromptDescription(block, area, season), /Water HOLD/i);
+
+  const journey = {
+    area,
+    season,
+    plan: {
+      phase: 'ministerial_approval',
+      ministerialConfidence: 62,
+    },
+    resources: {
+      budget: 50000,
+      politicalCapital: 10,
+      dataCredits: 10,
+    },
+    values: {
+      biodiversity: 60,
+      timberSupply: 60,
+      communityNeeds: 60,
+      firstNationsValues: 60,
+    },
+    scrutiny: 25,
+    blockPlanning: {
+      activeBlock: block,
+      fom: {
+        status: 'draft',
+        reviewDaysRemaining: water.reviewDays,
+        commentLoad: water.commentCount,
+      },
+    },
+  };
+
+  const readiness = getPlanningSubmissionReadiness(journey, season);
+  assert.equal(readiness.ready, false);
+  assert.match(readiness.reasons.join(' | '), /FOM is draft/i);
+  assert.match(readiness.reasons.join(' | '), /working-around-water/i);
 });

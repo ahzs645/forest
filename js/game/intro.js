@@ -37,7 +37,7 @@ export function showJourneyIntro(ui, journey) {
     case 'recon':
       ui.write(`Mission: Survey ${journey.totalDistance} km of traverse across ${journey.blocks.length} forest blocks.`);
       ui.write(`Each shift is about ${FIELD_SHIFT_HOURS} hours. Complete the survey before the season ends.`);
-      ui.write('Manage fuel, food, and equipment while documenting hazards and cultural sites.');
+      ui.write('Manage fuel, food, and equipment while documenting hazards, cultural sites, and road/crossing condition.');
       ui.write('');
       ui.write('Starting supplies:');
       ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
@@ -67,6 +67,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write(`Mission: Achieve ministerial approval for a landscape-level forest plan within ${journey.deadline} days.`);
       ui.write('Progress through phases: Data Gathering → Analysis → Stakeholder Review → Ministerial Approval');
       ui.write('Balance values: biodiversity, timber supply, community needs, First Nations interests.');
+      ui.write('Final submission now depends on Forest Operations Map review and water-timing readiness.');
       ui.write('');
       ui.write('Current phase: Data Gathering');
       ui.write(`  Cutblocks to plan: ${journey.cutblocks.proposed}`);
@@ -82,6 +83,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write(`Mission: Complete ${journey.permits.target} permit approvals within ${journey.deadline} days.`);
       ui.write('Manage the permit pipeline: drafting → referral → review → approval.');
       ui.write('Build stakeholder relationships to smooth the approval process.');
+      ui.write('Public-review, hydrology, and timing pressure now change how hard the file is to move.');
       ui.write('');
       ui.write('Permit pipeline:');
       ui.write(`  Target: ${journey.permits.target} approvals`);

@@ -17,6 +17,10 @@ const PERMIT_REVISION_PROFILES = [
     title: 'Fish passage detail',
     summary: 'The crossing package needs clearer stream, culvert, and drainage support.',
     tags: ['salmon', 'fish', 'stream', 'river', 'riparian', 'wetland'],
+    pressure: {
+      hydrology: 3,
+      timing: 2
+    },
     clean: {
       hours: 3,
       label: 'Clean up the crossing file',
@@ -40,6 +44,11 @@ const PERMIT_REVISION_PROFILES = [
     title: 'Community watershed note',
     summary: 'The hydrology memo needs stronger protection language.',
     tags: ['watershed', 'drinking-water', 'community-interface', 'water'],
+    pressure: {
+      publicReview: 1,
+      hydrology: 4,
+      timing: 1
+    },
     clean: {
       hours: 3,
       label: 'Rework the watershed package',
@@ -63,6 +72,9 @@ const PERMIT_REVISION_PROFILES = [
     title: 'Consultation record',
     summary: 'The reviewer wants a clearer accommodation trail and map context.',
     tags: ['nations', 'cultural', 'archaeology', 'consultation', 'values'],
+    pressure: {
+      publicReview: 4
+    },
     clean: {
       hours: 3,
       label: 'Tighten the consultation record',
@@ -86,6 +98,9 @@ const PERMIT_REVISION_PROFILES = [
     title: 'Visual quality package',
     summary: 'The layout needs a better public-facing map and sightline explanation.',
     tags: ['visuals', 'recreation', 'trail', 'community-interface'],
+    pressure: {
+      publicReview: 4
+    },
     clean: {
       hours: 3,
       label: 'Redraw the visual package',
@@ -109,6 +124,10 @@ const PERMIT_REVISION_PROFILES = [
     title: 'Access engineering note',
     summary: 'The road package needs clearer access, drainage, and deactivation detail.',
     tags: ['road', 'access', 'steep', 'karst', 'winter-road'],
+    pressure: {
+      hydrology: 1,
+      timing: 3
+    },
     clean: {
       hours: 3,
       label: 'Strengthen the access package',
@@ -132,6 +151,11 @@ const PERMIT_REVISION_PROFILES = [
     title: 'Package completeness',
     summary: 'The file is technically usable, but the reviewer wants a cleaner submission.',
     tags: [],
+    pressure: {
+      publicReview: 1,
+      hydrology: 1,
+      timing: 1
+    },
     clean: {
       hours: 3,
       label: 'Clean up the package',
@@ -154,6 +178,92 @@ const PERMIT_REVISION_PROFILES = [
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
+}
+
+function countSignals(...signals) {
+  return signals.filter(Boolean).length;
+}
+
+function getAreaTagSet(journey) {
+  return new Set((journey?.area?.tags || []).map((tag) => String(tag).toLowerCase()));
+}
+
+function derivePermittingConstraintState(journey) {
+  const areaTags = getAreaTagSet(journey);
+  const discoveryIds = new Set(getJourneyDiscoveryTags(journey).map((tag) => tag.id));
+  const phase = String(journey?.currentPhase || '').toLowerCase();
+  const permits = journey?.permits || {};
+  const needRevisionPressure = Math.min(2, Math.floor((permits.needsRevision || 0) / 2));
+  const referralPressure = Math.min(2, Math.floor((permits.inReferral || 0) / 2));
+
+  const publicReviewSignals = countSignals(
+    areaTags.has('community-interface'),
+    areaTags.has('visuals'),
+    areaTags.has('recreation'),
+    areaTags.has('trail'),
+    areaTags.has('road'),
+    areaTags.has('access'),
+    phase === 'review',
+    phase === 'approval',
+    discoveryIds.has('fom_public_review'),
+    discoveryIds.has('community_visibility')
+  );
+
+  const hydrologySignals = countSignals(
+    areaTags.has('watershed'),
+    areaTags.has('water'),
+    areaTags.has('river'),
+    areaTags.has('riparian'),
+    areaTags.has('wetland'),
+    areaTags.has('salmon'),
+    areaTags.has('fish'),
+    discoveryIds.has('watershed_watch')
+  );
+
+  const timingSignals = countSignals(
+    areaTags.has('timing'),
+    areaTags.has('seasonal'),
+    areaTags.has('salmon'),
+    areaTags.has('floodplain'),
+    areaTags.has('winter-road'),
+    areaTags.has('winter'),
+    areaTags.has('muskeg'),
+    discoveryIds.has('access_rehab')
+  );
+
+  const publicReviewPressure = clampConstraintLevel(publicReviewSignals + needRevisionPressure);
+  const hydrologyPressure = clampConstraintLevel(hydrologySignals + referralPressure);
+  const timingPressure = clampConstraintLevel(timingSignals + (phase === 'crunch' ? 1 : 0));
+  const overallPressure = clampConstraintLevel(publicReviewPressure + hydrologyPressure + timingPressure);
+
+  return {
+    publicReview: publicReviewPressure,
+    hydrology: hydrologyPressure,
+    timing: timingPressure,
+    overall: overallPressure,
+    dominant: getDominantPermittingPressure({
+      publicReview: publicReviewPressure,
+      hydrology: hydrologyPressure,
+      timing: timingPressure
+    })
+  };
+}
+
+function clampConstraintLevel(value) {
+  return Math.max(0, Math.min(4, Math.round(value)));
+}
+
+function getDominantPermittingPressure(pressure) {
+  const entries = Object.entries(pressure);
+  if (!entries.length) return 'package';
+  entries.sort((a, b) => b[1] - a[1]);
+  const [label, value] = entries[0];
+  if (value <= 0) return 'package';
+  return label;
+}
+
+function formatConstraintPressure(state) {
+  return `FOM/Public Review ${state.publicReview}/4 | Hydrology ${state.hydrology}/4 | Water Timing ${state.timing}/4`;
 }
 
 /**
@@ -180,6 +290,8 @@ function ensurePermitRevisionBaseState(journey) {
     journey.scrutiny = clampPercent(Math.round(journey.scrutiny));
   }
 
+  journey.permits.phase3Pressure = derivePermittingConstraintState(journey);
+
   return journey.permits.revisionQueue;
 }
 
@@ -205,9 +317,14 @@ export function ensurePermittingRevisionState(journey) {
   return queue;
 }
 
+export function getPermittingConstraintState(journey) {
+  return derivePermittingConstraintState(journey);
+}
+
 function scoreRevisionProfiles(journey) {
   const areaTags = Array.isArray(journey?.area?.tags) ? journey.area.tags : [];
   const phase = journey?.currentPhase || '';
+  const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
 
   return PERMIT_REVISION_PROFILES
     .map((profile) => {
@@ -216,6 +333,15 @@ function scoreRevisionProfiles(journey) {
         if (areaTags.includes(tag)) score += 3;
       }
       if (phase === 'review' && profile.id !== 'package-completeness') score += 1;
+      if (profile.pressure?.publicReview) {
+        score += pressure.publicReview * profile.pressure.publicReview;
+      }
+      if (profile.pressure?.hydrology) {
+        score += pressure.hydrology * profile.pressure.hydrology;
+      }
+      if (profile.pressure?.timing) {
+        score += pressure.timing * profile.pressure.timing;
+      }
       return { profile, score };
     })
     .sort((a, b) => b.score - a.score)
@@ -364,6 +490,15 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
     messages.push('The file reads cleaner and should draw less scrutiny on the next pass.');
   }
 
+  const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
+  if (ticket.profileId === 'community-watershed' && pressure.hydrology > 0) {
+    messages.push('The watershed response is now lined up with the hydrology concerns on the file.');
+  } else if ((ticket.profileId === 'visual-quality' || ticket.profileId === 'consultation') && pressure.publicReview > 0) {
+    messages.push('The public review package reads more defensible for ministry and external eyes.');
+  } else if (ticket.profileId === 'fish-passage' && pressure.timing > 0) {
+    messages.push('The crossing timing note now matches the in-water and seasonal constraints.');
+  }
+
   return {
     resolved: true,
     mode: selectedMode,
@@ -419,6 +554,7 @@ export async function runPermittingDay(game) {
     ui.write(`  Submitted: ${journey.permits.submitted} | In Referral: ${inReferral}`);
     ui.write(`  In Review: ${journey.permits.inReview} | Needs Revision: ${journey.permits.needsRevision}`);
     ui.write(`  Scrutiny / Heat: ${Math.round(journey.scrutiny || 0)}%`);
+    ui.write(`  Phase 3 Pressure: ${formatConstraintPressure(journey.permits.phase3Pressure || derivePermittingConstraintState(journey))}`);
     if (revisionQueue.length > 0) {
       ui.write(`  Open Deficiencies: ${revisionQueue.length}`);
       for (const ticket of revisionQueue.slice(0, 2)) {
@@ -678,9 +814,17 @@ async function processAction(game, actionId) {
           + Number(discoveryIds.has('community_visibility'))
           + Number(discoveryIds.has('access_rehab'))
         );
-        const referralChance = Math.min(0.6, 0.3 + hotFilePressure * 0.08);
+        const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
+        const referralChance = Math.min(0.75, 0.18
+          + hotFilePressure * 0.06
+          + pressure.publicReview * 0.06
+          + pressure.hydrology * 0.05
+          + pressure.timing * 0.04);
         if (hotFilePressure > 0) {
           journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 1);
+        }
+        if (pressure.overall > 0) {
+          journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + Math.max(0, Math.floor(pressure.overall / 3)));
         }
         if (Math.random() < referralChance) {
           journey.permits.inReferral = (journey.permits.inReferral || 0) + 1;
@@ -855,6 +999,7 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
  */
 function processPermitPipeline(ui, journey) {
   const queue = ensurePermittingRevisionState(journey);
+  const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
 
   // Submitted permits may advance to inReview
   if (journey.permits.submitted > 0) {
@@ -870,7 +1015,12 @@ function processPermitPipeline(ui, journey) {
   if (journey.permits.inReview > 0) {
     const reviewed = Math.ceil(journey.permits.inReview * 0.4);
     const scrutinyPenalty = Math.min(0.25, (journey.scrutiny || 0) / 400);
-    const approvalRate = Math.max(0.45, 0.72 - scrutinyPenalty);
+    const phase3Penalty = Math.min(0.2, (
+      pressure.publicReview * 0.03
+      + pressure.hydrology * 0.025
+      + pressure.timing * 0.02
+    ));
+    const approvalRate = Math.max(0.4, 0.72 - scrutinyPenalty - phase3Penalty);
     const approved = Math.floor(reviewed * approvalRate);
     const revisions = reviewed - approved;
 
@@ -885,7 +1035,8 @@ function processPermitPipeline(ui, journey) {
       for (let i = 0; i < revisions; i++) {
         pushRevisionTicket(journey, queue.length + i, {
           type: 'review',
-          reason: 'returned_for_revision'
+          reason: 'returned_for_revision',
+          pressure: pressure.dominant
         });
       }
       ui.writeWarning(`${revisions} permit(s) returned for revision.`);

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { checkForEvent, resolveEvent } from '../js/events.js';
 import { eventMatchesJourneyContext } from '../js/events/selection.js';
 import {
+  getPermittingConstraintState,
   resolvePermitRevisionResponse,
   seedPermitRevisionTickets
 } from '../js/modes/permitting.js';
@@ -273,6 +274,67 @@ test('permitting revision tickets reflect area context and create actionable def
   assert.match(queue[0].summary, /hydrology/i);
 });
 
+test('permitting phase 3 pressure reflects public review, watershed, and timing constraints', () => {
+  const journey = {
+    day: 9,
+    currentPhase: 'approval',
+    area: {
+      becCode: 'CWHws2',
+      tags: ['watershed', 'community-interface', 'river', 'winter-road']
+    },
+    permits: {
+      needsRevision: 4,
+      inReferral: 2,
+      revisionQueue: []
+    },
+    discoveryTags: [
+      { id: 'community_visibility' },
+      { id: 'watershed_watch' }
+    ]
+  };
+
+  const pressure = getPermittingConstraintState(journey);
+
+  assert.equal(pressure.publicReview, 4);
+  assert.equal(pressure.hydrology, 4);
+  assert.equal(pressure.timing, 1);
+  assert.equal(pressure.dominant, 'publicReview');
+});
+
+test('permitting revision tickets favor hydrology and public review deficiencies when the file is sensitive', () => {
+  const watershedJourney = {
+    day: 10,
+    currentPhase: 'review',
+    area: {
+      becCode: 'CWHws2',
+      tags: ['watershed', 'community-interface', 'river']
+    },
+    permits: {
+      needsRevision: 0,
+      revisionQueue: []
+    }
+  };
+
+  const watershedQueue = seedPermitRevisionTickets(watershedJourney, 1, { type: 'review' });
+  assert.equal(watershedQueue[0].profileId, 'community-watershed');
+
+  const publicReviewJourney = {
+    day: 10,
+    currentPhase: 'review',
+    area: {
+      becCode: 'SBSmc2',
+      tags: ['visuals', 'community-interface', 'recreation']
+    },
+    permits: {
+      needsRevision: 0,
+      revisionQueue: []
+    }
+  };
+
+  const publicReviewQueue = seedPermitRevisionTickets(publicReviewJourney, 1, { type: 'review' });
+  assert.equal(publicReviewQueue[0].profileId, 'visual-quality');
+});
+
 test('permitting revision responses trade time for scrutiny and political capital', () => {
   const cleanJourney = {
     day: 11,
@@ -312,6 +374,7 @@ test('permitting revision responses trade time for scrutiny and political capita
   assert.equal(cleanJourney.permits.submitted, 1);
   assert.equal(cleanJourney.regulations.complianceScore, 75);
   assert.equal(cleanJourney.relationships.agencies, 51);
+  assert.ok(cleanResult.messages.some((message) => /watershed response/i.test(message)));
 
   const fastJourney = {
     day: 11,

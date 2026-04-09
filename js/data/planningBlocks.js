@@ -6,6 +6,8 @@
 import blockOptionsData from "./json/planning/blockOptions.json" with { type: "json" };
 
 const DEFAULT_CADENCE_DAYS = 3;
+const WATER_TIMING_SEASONS = new Set(["spring", "fall"]);
+const WATER_HYDROLOGY_TAGS = new Set(["karst", "salmon", "watershed", "wetland", "community-water"]);
 const PLANNING_TRIAGE_PROFILES = {
   access: {
     label: "Access first",
@@ -97,6 +99,26 @@ function getAreaTags(area) {
   return new Set(Array.isArray(area?.tags) ? area.tags : []);
 }
 
+function getSeasonId(seasonInfo) {
+  return seasonInfo?.currentSeason || seasonInfo?.id || null;
+}
+
+function getSeasonFromMonth(month) {
+  const numericMonth = Number(month);
+  if (!Number.isFinite(numericMonth)) return null;
+  if (numericMonth >= 3 && numericMonth <= 5) return "spring";
+  if (numericMonth >= 6 && numericMonth <= 8) return "summer";
+  if (numericMonth >= 9 && numericMonth <= 11) return "fall";
+  return "winter";
+}
+
+function getPlannedMonth(block) {
+  const date = block?.plannedHarvestDate || block?.approveDate;
+  if (!date) return null;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getUTCMonth() + 1;
+}
+
 function getAreaConstraintPreference(area) {
   const tags = getAreaTags(area);
 
@@ -169,12 +191,66 @@ function getBlockConstraintSignals(block, area = null) {
   return signals.sort((a, b) => b.severity - a.severity || a.label.localeCompare(b.label));
 }
 
+export function getPlanningBlockWaterContext(block, area = null, seasonInfo = null) {
+  const areaTags = getAreaTags(area);
+  const indicators = block?.indicators || {};
+  const plannedMonth = getPlannedMonth(block);
+  const plannedSeason = getSeasonFromMonth(plannedMonth);
+  const currentSeason = getSeasonId(seasonInfo);
+
+  const hydrologyTagCount = [...WATER_HYDROLOGY_TAGS].filter((tag) => areaTags.has(tag)).length;
+  const watershedPressure = Number(areaTags.has("watershed") || areaTags.has("community-water"));
+  const fishPressure = Number(areaTags.has("salmon") || Boolean(indicators.ogmaNearby) || Boolean(indicators.whaNoHarvestNearby));
+  const habitatPressure = Number(areaTags.has("wetland") || areaTags.has("karst") || Boolean(indicators.speciesAtRiskNearby));
+  const timingPressure = Number(
+    watershedPressure * 2 +
+    fishPressure * 2 +
+    habitatPressure +
+    hydrologyTagCount +
+    (plannedSeason && WATER_TIMING_SEASONS.has(plannedSeason) ? 2 : 0) +
+    (currentSeason && WATER_TIMING_SEASONS.has(currentSeason) ? 1 : 0) +
+    (plannedSeason && currentSeason && plannedSeason === currentSeason && WATER_TIMING_SEASONS.has(plannedSeason) ? 1 : 0),
+  );
+
+  const gate = timingPressure >= 6 ? "hold" : timingPressure >= 3 ? "watch" : "clear";
+  const hydrologyLabel = watershedPressure || fishPressure
+    ? "community watershed hydrology"
+    : habitatPressure
+      ? "water and habitat hydrology"
+      : "water timing";
+
+  const note = gate === "hold"
+    ? `${hydrologyLabel} needs a working-around-water review before submission.`
+    : gate === "watch"
+      ? `${hydrologyLabel} is sensitive enough to keep the timing window visible.`
+      : `${hydrologyLabel} is not currently forcing a timing hold.`;
+
+  const readiness = clamp(100 - (timingPressure * 12) - (watershedPressure ? 4 : 0), 20, 100);
+  const reviewDays = gate === "hold" ? 3 : gate === "watch" ? 2 : 1;
+  const rankingBonus = gate === "clear" ? 6 : gate === "watch" ? 1 : -8;
+  const commentCount = gate === "hold" ? 2 : gate === "watch" ? 1 : 0;
+
+  return {
+    sensitive: timingPressure > 0,
+    timingPressure,
+    gate,
+    note,
+    hydrologyLabel,
+    plannedSeason,
+    currentSeason,
+    readiness,
+    reviewDays,
+    rankingBonus,
+    commentCount,
+  };
+}
+
 function summarizeConstraintSignals(signals, maxSignals = 2) {
   if (!signals.length) return "Low-constraint ground";
   return signals.slice(0, maxSignals).map((signal) => signal.label).join(" / ");
 }
 
-function scorePlanningBlockForTriage(block, triageKey, area = null) {
+function scorePlanningBlockForTriage(block, triageKey, area = null, seasonInfo = null) {
   const profile = PLANNING_TRIAGE_PROFILES[triageKey];
   if (!profile) {
     return (Number(block?.metrics?.timberOpportunity || 0) + Number(block?.metrics?.technicalComplexity || 0));
@@ -183,6 +259,7 @@ function scorePlanningBlockForTriage(block, triageKey, area = null) {
   const metrics = block?.metrics || {};
   const indicators = block?.indicators || {};
   const areaTags = getAreaTags(area);
+  const waterContext = getPlanningBlockWaterContext(block, area, seasonInfo);
   let score = 0;
 
   for (const [metricName, weight] of Object.entries(profile.weights)) {
@@ -203,6 +280,14 @@ function scorePlanningBlockForTriage(block, triageKey, area = null) {
 
   if (triageKey === "access") {
     if (areaTags.has("steep") || areaTags.has("remote-camps") || areaTags.has("winter-road") || areaTags.has("glacial")) score -= 2;
+  }
+
+  if (waterContext.sensitive) {
+    score += waterContext.rankingBonus;
+    if (triageKey === "water") {
+      score += waterContext.rankingBonus;
+      score += Math.round(waterContext.readiness / 25);
+    }
   }
 
   return score;
@@ -287,7 +372,7 @@ export function buildPlanningConstraintTriage(areaId, area = null, blocks = []) 
   };
 }
 
-export function formatPlanningBlockPromptDescription(block, area = null) {
+export function formatPlanningBlockPromptDescription(block, area = null, seasonInfo = null) {
   if (!block) return "No block details available.";
 
   const timber = Math.round(block?.metrics?.timberOpportunity || 0);
@@ -297,6 +382,7 @@ export function formatPlanningBlockPromptDescription(block, area = null) {
   const species = formatSpecies(block);
   const timing = block.plannedHarvestYear || block.approveYear;
   const constraints = summarizePlanningBlockConstraints(block, area);
+  const waterContext = getPlanningBlockWaterContext(block, area, seasonInfo);
 
   return [
     `${blockArea} ha`,
@@ -306,6 +392,7 @@ export function formatPlanningBlockPromptDescription(block, area = null) {
     `Eco ${eco}`,
     `FN ${fn}`,
     constraints ? `Constraints ${constraints}` : "",
+    waterContext.sensitive ? `Water ${waterContext.gate.toUpperCase()} - ${waterContext.note}` : "",
     timing ? `Target ${timing}` : "",
   ]
     .filter(Boolean)
@@ -326,7 +413,7 @@ export function getPlanningBlockById(areaId, blockId) {
   return pool.find((block) => block.id === blockId) || null;
 }
 
-export function rankPlanningBlockOptions(blocks = [], triageKey = null, area = null) {
+export function rankPlanningBlockOptions(blocks = [], triageKey = null, area = null, seasonInfo = null) {
   if (!Array.isArray(blocks) || !blocks.length) return [];
   const resolvedArea = area || null;
 
@@ -334,7 +421,7 @@ export function rankPlanningBlockOptions(blocks = [], triageKey = null, area = n
     .map((block, index) => ({
       block,
       index,
-      score: scorePlanningBlockForTriage(block, triageKey, resolvedArea),
+      score: scorePlanningBlockForTriage(block, triageKey, resolvedArea, seasonInfo),
     }))
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .map((entry) => entry.block);
@@ -344,7 +431,7 @@ export function rankPlanningBlockOptions(blocks = [], triageKey = null, area = n
  * Pick a fresh set of candidate block options for the player's area.
  * Prioritizes unseen blocks, then allows repeats when exhausted.
  */
-export function pickPlanningBlockOptions(areaId, historyIds = [], count = 3, triageKey = null, area = null) {
+export function pickPlanningBlockOptions(areaId, historyIds = [], count = 3, triageKey = null, area = null, seasonInfo = null) {
   const pool = getPlanningAreaBlockPool(areaId);
   if (!pool.length) return [];
 
@@ -354,25 +441,29 @@ export function pickPlanningBlockOptions(areaId, historyIds = [], count = 3, tri
   const resolvedArea = getArea(areaId, area);
 
   const rankedUnseen = triageKey
-    ? rankPlanningBlockOptions(randomizeCopy(unseen), triageKey, resolvedArea)
+    ? rankPlanningBlockOptions(randomizeCopy(unseen), triageKey, resolvedArea, seasonInfo)
     : randomizeCopy(unseen).sort((a, b) => {
         const aScore = (a?.metrics?.timberOpportunity || 0) + (a?.metrics?.technicalComplexity || 0);
         const bScore = (b?.metrics?.timberOpportunity || 0) + (b?.metrics?.technicalComplexity || 0);
-        return bScore - aScore;
+        const aWater = getPlanningBlockWaterContext(a, resolvedArea, seasonInfo).rankingBonus;
+        const bWater = getPlanningBlockWaterContext(b, resolvedArea, seasonInfo).rankingBonus;
+        return (bScore + bWater) - (aScore + aWater);
       });
 
   const rankedSeen = triageKey
-    ? rankPlanningBlockOptions(randomizeCopy(seen), triageKey, resolvedArea)
+    ? rankPlanningBlockOptions(randomizeCopy(seen), triageKey, resolvedArea, seasonInfo)
     : randomizeCopy(seen).sort((a, b) => {
         const aScore = (a?.metrics?.biodiversitySensitivity || 0) + (a?.metrics?.firstNationsSensitivity || 0);
         const bScore = (b?.metrics?.biodiversitySensitivity || 0) + (b?.metrics?.firstNationsSensitivity || 0);
-        return bScore - aScore;
+        const aWater = getPlanningBlockWaterContext(a, resolvedArea, seasonInfo).rankingBonus;
+        const bWater = getPlanningBlockWaterContext(b, resolvedArea, seasonInfo).rankingBonus;
+        return (bScore + bWater) - (aScore + aWater);
       });
 
   return [...rankedUnseen, ...rankedSeen].slice(0, clamp(count, 1, 6));
 }
 
-export function summarizePlanningBlock(block, area = null, triageKey = null) {
+export function summarizePlanningBlock(block, area = null, triageKey = null, seasonInfo = null) {
   if (!block) return 'No active block';
   const blockArea = Number(block.areaHa || 0).toFixed(1);
   const timber = Math.round(block?.metrics?.timberOpportunity || 0);
@@ -380,6 +471,7 @@ export function summarizePlanningBlock(block, area = null, triageKey = null) {
   const fn = Math.round(block?.metrics?.firstNationsSensitivity || 0);
   const constraints = summarizePlanningBlockConstraints(block, area);
   const triageLabel = triageKey ? getPlanningTriageLabel(triageKey) : "";
+  const waterContext = getPlanningBlockWaterContext(block, area, seasonInfo);
   return [
     `${formatPlanningBlockLabel(block)} (${blockArea} ha)`,
     formatDistrictName(block.adminDistrict),
@@ -387,6 +479,7 @@ export function summarizePlanningBlock(block, area = null, triageKey = null) {
     `Eco ${eco}`,
     `FN ${fn}`,
     constraints ? `Constraints ${constraints}` : "",
+    waterContext.sensitive ? `Water ${waterContext.gate.toUpperCase()}` : "",
     triageLabel ? `Triage ${triageLabel}` : "",
   ]
     .filter(Boolean)

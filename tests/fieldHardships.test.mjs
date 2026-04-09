@@ -165,3 +165,81 @@ test('field travel surfaces access verdicts when the crew pushes into a bad bloc
     Math.random = originalRandom;
   }
 });
+
+test('field travel records road lifecycle and water timing pressure on sensitive crossings', () => {
+  const journey = makeJourney();
+  journey.blocks = [
+    {
+      id: 'base',
+      name: 'Base Camp',
+      distance: 0,
+      terrain: 'flat',
+      hazards: [],
+      features: ['town']
+    },
+    {
+      id: 'crossing',
+      name: 'Community Watershed Crossing',
+      distance: 0.1,
+      terrain: 'river',
+      hazards: ['river_crossing', 'road_damage', 'grade', 'bridge_weight'],
+      features: ['community_water', 'watershed', 'water_intake']
+    }
+  ];
+  journey.totalDistance = 0.1;
+  journey.currentBlockIndex = 0;
+  journey.distanceTraveled = 0;
+  journey.resources.food = 30;
+  journey.resources.fuel = 50;
+  journey.resources.equipment = 80;
+  journey.weather = {
+    id: 'heavy_rain',
+    name: 'Heavy Rain',
+    dangerous: true,
+    moraleEffect: -1,
+    travelModifier: 1
+  };
+  journey.temperature = 'cool';
+  journey.season.currentSeason = 'spring';
+  journey.routePlan = {
+    day: journey.day,
+    label: 'Stay Mainline',
+    shortLabel: 'mainline',
+    distanceMultiplier: 1,
+    fuelMultiplier: 1,
+    equipmentMultiplier: 1,
+    injuryRisk: 0,
+    moraleDelta: 0
+  };
+  journey.roadAssets = {
+    byBlock: {
+      crossing: {
+        roadWear: 62,
+        crossingWear: 16,
+        watershedPressure: 10
+      }
+    },
+    observations: []
+  };
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+
+  try {
+    const result = executeFieldDay(journey, 'normal');
+    const crossingObservation = journey.roadAssets.byBlock.crossing;
+
+    assert.ok(result.messages.some((message) => /Access verdict: /i.test(message)));
+    assert.ok(result.messages.some((message) => /Road: /i.test(message)));
+    assert.ok(result.messages.some((message) => /Crossing: /i.test(message)));
+    assert.ok(result.messages.some((message) => /Watershed: /i.test(message)));
+    assert.equal(crossingObservation.roadLifecycleId, 'out_of_service');
+    assert.equal(crossingObservation.crossingConditionId, 'restricted');
+    assert.equal(crossingObservation.watershedPressureId, 'critical');
+    assert.equal(journey.accessVerdicts.crossing.roadLifecycleId, 'out_of_service');
+    assert.equal(journey.accessVerdicts.crossing.crossingConditionId, 'restricted');
+    assert.ok(journey.scrutiny >= 3);
+  } finally {
+    Math.random = originalRandom;
+  }
+});

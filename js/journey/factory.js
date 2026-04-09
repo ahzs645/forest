@@ -240,6 +240,16 @@ export function createPlanningJourney(options = {}) {
       activeBlock: null,
       activeSummary: null,
       activeEventBias: null,
+      fom: {
+        status: "draft",
+        reviewDaysRemaining: 0,
+        reviewDaysTarget: 0,
+        commentLoad: 0,
+        hydrologyReadiness: 100,
+        waterGate: "clear",
+        waterNote: "No water gate evaluated yet.",
+        hydrologyLabel: "water timing"
+      },
       history: [],
     },
 
@@ -419,6 +429,10 @@ export function createFieldJourney(options = {}) {
     resources: createFieldResources(),
 
     discoveryTags: [],
+    roadAssets: {
+      byBlock: {},
+      observations: []
+    },
 
     // State flags
     isComplete: false,
