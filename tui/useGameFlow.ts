@@ -6,7 +6,7 @@ type UseGameFlowOptions = {
 };
 
 export function useGameFlow(options: UseGameFlowOptions = {}) {
-  const controllerRef = useRef<TuiGameController>();
+  const controllerRef = useRef<TuiGameController | null>(null);
 
   if (!controllerRef.current) {
     controllerRef.current = new TuiGameController(options);
@@ -22,6 +22,7 @@ export function useGameFlow(options: UseGameFlowOptions = {}) {
   }, [controller, options.onExit]);
 
   return {
+    controller,
     ...snapshot,
     handleKey: (key: any) => controller.handleKey(key),
     restart: () => controller.restart(),

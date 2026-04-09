@@ -4,9 +4,9 @@ A rebuilt, choice-driven forestry operations simulator grounded in northern Brit
 
 ## Play in the browser
 
-Open `index.html` in your browser to launch the retro terminal interface. Tap the on-screen buttons or type numbers/labels to answer prompts — the layout is fully mobile friendly. Use the top-right **Glossary** button to search forestry jargon, and tap any highlighted in-line term to jump straight to its definition. Hit **Restart** (or press `ESC`) to open a confirmation modal before wiping your run and selecting a new crew.
+Open `index.html` in your browser to launch the expedition mode. This is the original crew-based journey simulator with daily mode runners, field risks, and end-of-expedition win/fail states. Tap the on-screen buttons or type numbers/labels to answer prompts — the layout is fully mobile friendly. Use the top-right **Glossary** button to search forestry jargon, and tap any highlighted in-line term to jump straight to its definition. Hit **Restart** (or press `ESC`) to open a confirmation modal before wiping your run and selecting a new crew.
 
-The terminal edition also has a dedicated browser entry point at `tui.html`. It now runs as a React app that mirrors the Bun/OpenTUI layout while sharing the same game-flow controller as the CLI path. It is still fully client-side and can be hosted on GitHub Pages or any other static host without PTYs or a backend terminal server.
+The seasonal strategy TUI also has a dedicated browser entry point at `tui.html`. That React app shares the seasonal metrics engine used by the CLI/TUI controller, not the expedition-mode browser loop. It is fully client-side and can be hosted on GitHub Pages or any other static host without PTYs or a backend terminal server.
 
 ### Forester specializations
 
@@ -60,7 +60,7 @@ Use Vite for local development:
 npm run dev
 ```
 
-Then open `/forest/` for the legacy web app or `/forest/tui.html` for the React terminal edition. Game content is organized under `js/data/` with dedicated modules for roles, operating areas, and dynamic issues, making it easy to extend forester duties or add new geography.
+Then open `/` for expedition mode or `/tui.html` for the seasonal strategy TUI. Production builds still use the `/forest/` base path for GitHub Pages. Game content is organized under `js/data/` with dedicated modules for roles, operating areas, and dynamic issues, making it easy to extend forester duties or add new geography.
 
 ### Refresh planning block intelligence data
 

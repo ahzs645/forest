@@ -24,7 +24,7 @@ function Header() {
     <header className="tui-header">
       <div className="tui-header-title">
         <span className="tui-header-brand">BC Forestry Trail</span>
-        <span className="tui-header-tag">Terminal Edition</span>
+        <span className="tui-header-tag">Seasonal Strategy TUI</span>
       </div>
       <div className="tui-header-help">Press Q to quit</div>
     </header>
@@ -205,8 +205,11 @@ function FieldRadio({ mode, inputText, contentData, art }) {
 }
 
 export default function App() {
-
-  const state = useGameFlow({
+  const {
+    controller,
+    selectOption,
+    ...state
+  } = useGameFlow({
     onExit: () => window.location.assign("./index.html"),
   });
 
@@ -224,7 +227,7 @@ export default function App() {
         event.key.length === 1
       ) {
         event.preventDefault();
-        state.handleKey(toKeyInput(event));
+        controller.handleKey(toKeyInput(event));
       }
     };
 
@@ -233,7 +236,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [state]);
+  }, [controller]);
 
   return (
     <main className="tui-app-shell">
@@ -257,7 +260,7 @@ export default function App() {
             <OptionsPanel
               options={state.options}
               selected={state.selected}
-              onSelect={state.selectOption}
+              onSelect={selectOption}
             />
           </div>
         </div>

@@ -229,8 +229,10 @@ export class TerminalUI {
 
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => {
+      const canUseGameplayShortcuts = this._canUseGameplayShortcuts();
+
       // Number keys for choices (works in both classic and modern mode)
-      if (/^[1-9]$/.test(e.key) && this._choiceHandler) {
+      if (canUseGameplayShortcuts && /^[1-9]$/.test(e.key) && this._choiceHandler) {
         const index = parseInt(e.key, 10) - 1;
         const buttons = this.choices?.querySelectorAll('.choice-btn, .decision-card');
         if (buttons && buttons[index]) {
@@ -240,19 +242,19 @@ export class TerminalUI {
       }
 
       // S for status panel
-      if (e.key === 's' && !this._isInputFocused()) {
+      if (canUseGameplayShortcuts && e.key === 's' && !this._isInputFocused()) {
         e.preventDefault();
         this.togglePanel();
       }
 
       // L for journey log
-      if (e.key === 'l' && !this._isInputFocused()) {
+      if (canUseGameplayShortcuts && e.key === 'l' && !this._isInputFocused()) {
         e.preventDefault();
         if (this._onLogRequest) this._onLogRequest();
       }
 
       // G for glossary
-      if (e.key === 'g' && !this._isInputFocused()) {
+      if (canUseGameplayShortcuts && e.key === 'g' && !this._isInputFocused()) {
         e.preventDefault();
         this.showGlossary();
       }
@@ -266,6 +268,30 @@ export class TerminalUI {
         }
       }
     });
+  }
+
+  /**
+   * Check whether the landing screen is currently visible
+   * @private
+   */
+  _isLandingVisible() {
+    return Boolean(this.landingScreen && !this.landingScreen.hidden);
+  }
+
+  /**
+   * Check whether the initialization overlay is currently visible
+   * @private
+   */
+  _isInitOverlayVisible() {
+    return Boolean(this.initOverlay && !this.initOverlay.hidden);
+  }
+
+  /**
+   * Gameplay-only shortcuts should stay dormant while setup UI is visible
+   * @private
+   */
+  _canUseGameplayShortcuts() {
+    return !this._isLandingVisible() && !this._isInitOverlayVisible();
   }
 
   // ============ Full Status Update ============

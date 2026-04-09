@@ -2,10 +2,18 @@ import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-export default defineConfig({
-  // Base path for GitHub Pages deployment
-  base: '/forest/',
+export default defineConfig(({ command }) => ({
+  // Use the GitHub Pages base in builds, but keep local dev rooted at /
+  base: process.env.VITE_BASE_PATH ?? (command === 'serve' ? '/' : '/forest/'),
   plugins: [react()],
+
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: 'modern',
+      },
+    },
+  },
 
   build: {
     // Output directory
@@ -28,4 +36,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

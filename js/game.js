@@ -4,9 +4,9 @@
  * Two distinct games share this entry point:
  *
  *   (default)  Web game  — ForestryTrailGame + TerminalUI
- *              Oregon Trail-style crew simulation with multiple journey types.
+ *              Expedition-mode crew simulation with multiple journey types.
  *
- *   ?tui       Redirects to the dedicated React terminal edition at tui.html
+ *   ?tui       Redirects to the dedicated seasonal-strategy TUI at tui.html
  */
 
 import { ForestryTrailGame } from './game/ForestryTrailGame.js';

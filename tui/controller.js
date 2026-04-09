@@ -235,7 +235,7 @@ export class TuiGameController {
         item.options.map((option) => option.label),
         (idx) => {
           const option = item.options[idx];
-          applyOptionOutcome(gs, option, {
+          const outcomeResult = applyOptionOutcome(gs, option, {
             type: phase.type,
             id: item.id,
             title: item.title,
@@ -245,8 +245,8 @@ export class TuiGameController {
 
           this.emit();
 
-          const riskResult = option._riskResult;
-          const outcomeText = riskResult ? riskResult.outcome : option.outcome ?? "";
+          const riskResult = outcomeResult?.riskResult ?? null;
+          const outcomeText = outcomeResult?.outcome ?? option.outcome ?? "";
           const heading = riskResult
             ? `${riskResult.success ? "\u2705 Success: " : "\u274c Caught: "}${option.label}`
             : `Outcome: ${option.label}`;

@@ -46,3 +46,38 @@ test('setFlags and clearFlags mutate narrative state through option outcomes', (
   assert.equal(state.flags.temporaryMarker, undefined);
   assert.equal(state.flags.pineBeetleUnchecked, true);
 });
+
+test('risk outcomes are returned to callers without mutating the shared option object', () => {
+  const state = makeSbsPlannerState();
+  const option = {
+    label: 'Try something reckless',
+    risk: {
+      baseSuccess: 0.9,
+      successEffects: { progress: 4, compliance: -2 },
+      failEffects: { progress: -4, compliance: -8 },
+      successOutcome: 'It worked this time.',
+      failOutcome: 'You got caught.',
+      failFlags: { underInvestigation: true },
+    },
+  };
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.05;
+
+  try {
+    const resolution = applyOptionOutcome(state, option, {
+      type: 'task',
+      id: 'reckless-play',
+      title: 'Reckless Play',
+      option: option.label,
+      round: state.round,
+    });
+
+    assert.equal(resolution.riskResult.success, true);
+    assert.equal(resolution.outcome, 'It worked this time.');
+    assert.equal(state.metrics.progress, 54);
+    assert.equal(option._riskResult, undefined);
+  } finally {
+    Math.random = originalRandom;
+  }
+});

@@ -82,28 +82,38 @@ export function applyEffects(state, effects = {}, source) {
   if (source) {
     state.history.push({ ...source, effects: delta });
   }
+  return delta;
 }
 
 export function applyOptionOutcome(state, option = {}, source) {
   if (!state || !option) {
-    return;
+    return null;
   }
 
   // Risk-based mischief option — resolve probabilistically
   if (option.risk) {
     const result = resolveRisk(state, option.risk);
-    applyEffects(state, result.effects, source);
+    const effects = applyEffects(state, result.effects, source);
+    applyOptionFlags(state, option);
     if (result.flags) {
       applyOptionFlags(state, { setFlags: result.flags });
     }
-    // Store the resolution result on the option so callers can read it
-    option._riskResult = result;
-    return;
+    applyScheduledIssues(state, option);
+    return {
+      effects,
+      outcome: result.outcome,
+      riskResult: result,
+    };
   }
 
-  applyEffects(state, option.effects || {}, source);
+  const effects = applyEffects(state, option.effects || {}, source);
   applyOptionFlags(state, option);
   applyScheduledIssues(state, option);
+  return {
+    effects,
+    outcome: option.outcome ?? "",
+    riskResult: null,
+  };
 }
 
 export function applyRoundConsequences(state) {
