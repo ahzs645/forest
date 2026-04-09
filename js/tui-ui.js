@@ -668,7 +668,7 @@ export class TuiUI {
       title: 'GLOSSARY',
       dismissible: true,
       buildContent: (el) => {
-        el.innerHTML = '<p>Full glossary is available in the standard web version.</p><p>Remove <code>?tui</code> from the URL to switch back.</p>';
+        el.innerHTML = '<p>Full glossary is available in the standard web version.</p><p>Open <a href="./index.html">the main web interface</a> to switch back.</p>';
       },
       actions: [{ label: 'Close', primary: true, onSelect: () => this.closeModal() }]
     });
@@ -700,7 +700,7 @@ export class TuiUI {
       title: 'SETTINGS',
       dismissible: true,
       buildContent: (el) => {
-        el.innerHTML = '<p>TUI mode active. Remove <code>?tui</code> from the URL to use the standard interface.</p>';
+        el.innerHTML = '<p>TUI mode active. Open <a href="./index.html">the main web interface</a> to use the standard layout.</p>';
       },
       actions: [{ label: 'Close', primary: true, onSelect: () => this.closeModal() }]
     });

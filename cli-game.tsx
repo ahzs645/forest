@@ -15,7 +15,7 @@ import {
   ContentView,
 } from "./tui/components";
 
-function App() {
+function App({ onExit }: { onExit: () => void }) {
   const {
     mode,
     inputText,
@@ -26,7 +26,7 @@ function App() {
     animFrame,
     gameState,
     handleKey,
-  } = useGameFlow();
+  } = useGameFlow({ onExit });
 
   const { width: cols, height: rows } = useTerminalDimensions();
 
@@ -65,22 +65,25 @@ function App() {
 }
 
 // ── Renderer bootstrap ───────────────────────────────
+let root: ReturnType<typeof createRoot>;
+
 const renderer = await createCliRenderer({
   exitOnCtrlC: false,
   useAlternateScreen: true,
   useMouse: false,
 });
 
-const root = createRoot(renderer);
-root.render(<App />);
-
 let shuttingDown = false;
 function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
-  root.unmount();
+  root?.unmount();
   renderer.destroy();
   process.exit(0);
 }
+
+root = createRoot(renderer);
+root.render(<App onExit={shutdown} />);
+
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

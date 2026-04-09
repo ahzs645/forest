@@ -268,9 +268,7 @@ export class TuiGame {
     if (choice.value === 'replay') {
       await this.start();
     } else {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('tui');
-      window.location.href = url.toString();
+      window.location.assign('./index.html');
     }
   }
 

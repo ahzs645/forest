@@ -1,0 +1,274 @@
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.tui-app-shell {
+  min-height: 100vh;
+  padding: 1rem;
+  background: #0d1117;
+}
+
+.tui-shell {
+  min-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #2d5016;
+  background: #0d1117;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.tui-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  background: #2d5016;
+  border-bottom: 1px solid #2d5016;
+}
+
+.tui-header-title {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+}
+
+.tui-header-brand {
+  margin: 0;
+  color: #e6edf3;
+  font-weight: 700;
+}
+
+.tui-header-tag,
+.tui-header-help {
+  color: #c9d1d9;
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+.tui-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.tui-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-left: 0.65rem;
+}
+
+.tui-panel {
+  border: 1px solid #56d4dd;
+  background: #0d1117;
+  min-width: 0;
+}
+
+.tui-panel-title {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid currentColor;
+  color: #e6edf3;
+  font-weight: 700;
+}
+
+.tui-dashboard {
+  width: 28ch;
+  padding: 0.35rem 0.75rem 0.75rem;
+}
+
+.tui-dashboard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.35rem;
+}
+
+.tui-dashboard-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tui-dashboard-label {
+  color: #7d8590;
+}
+
+.tui-dashboard-value {
+  color: #e6edf3;
+  text-align: right;
+}
+
+.tone-yellow {
+  color: #d29922;
+}
+
+.tone-green {
+  color: #3fb950;
+}
+
+.tone-blue {
+  color: #58a6ff;
+}
+
+.tone-magenta {
+  color: #bc8cff;
+}
+
+.tone-red {
+  color: #f85149;
+}
+
+.tui-field-radio {
+  flex: 1;
+  min-height: 0;
+  border-color: #d29922;
+}
+
+.tui-field-layout {
+  display: flex;
+  height: calc(100% - 2.1rem);
+}
+
+.tui-field-main {
+  flex: 1;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  overflow: auto;
+}
+
+.tui-content-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tui-heading {
+  color: #e6edf3;
+  font-weight: 700;
+}
+
+.tui-subheading {
+  color: #56d4dd;
+  font-weight: 700;
+}
+
+.tui-copy {
+  margin: 0;
+  line-height: 1.55;
+  color: #c9d1d9;
+}
+
+.tui-copy.dim {
+  color: #7d8590;
+}
+
+.tui-copy.preserve {
+  white-space: pre-wrap;
+}
+
+.tui-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tui-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tui-detail-label {
+  color: #56d4dd;
+}
+
+.tui-detail-copy {
+  color: #7d8590;
+  padding-left: 1.5rem;
+  line-height: 1.5;
+}
+
+.tui-name-input,
+.tui-art {
+  margin: 0;
+  white-space: pre;
+  color: #238636;
+  overflow: auto;
+}
+
+.tui-options {
+  border-color: #58a6ff;
+}
+
+.tui-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.6rem 0.75rem 0.75rem;
+}
+
+.tui-option {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #7d8590;
+  text-align: left;
+  font: inherit;
+  padding: 0.3rem 0.45rem;
+  cursor: pointer;
+}
+
+.tui-option:hover {
+  background: rgba(61, 90, 31, 0.18);
+}
+
+.tui-option.selected {
+  background: #3d5a1f;
+  color: #e6edf3;
+}
+
+.tui-overlay {
+  border-color: #3fb950;
+}
+
+.tui-overlay .tui-panel-title {
+  border-bottom-color: #3fb950;
+}
+
+@media (max-width: 720px) {
+  .tui-app-shell {
+    padding: 0;
+  }
+
+  .tui-shell {
+    min-height: 100vh;
+    border: 0;
+  }
+
+  .tui-main,
+  .tui-field-layout {
+    flex-direction: column;
+  }
+
+  .tui-dashboard {
+    width: auto;
+  }
+
+  .tui-stage {
+    padding-left: 0;
+  }
+
+  .tui-art {
+    padding: 0.75rem 1rem 1rem;
+  }
+}

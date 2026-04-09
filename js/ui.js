@@ -83,6 +83,7 @@ export class TerminalUI {
     // Landing screen elements
     this.landingScreen = document.getElementById('landing-screen');
     this.newGameBtn = document.getElementById('new-game-btn');
+    this.tuiModeBtn = document.getElementById('tui-mode-btn');
     this.loadGameBtn = document.getElementById('load-game-btn');
     this.helpLandingBtn = document.getElementById('help-landing-btn');
     this.settingsBtn = document.getElementById('settings-btn');

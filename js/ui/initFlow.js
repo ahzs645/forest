@@ -32,6 +32,10 @@ export const InitFlowMixin = {
       }
     });
 
+    this.tuiModeBtn?.addEventListener('click', () => {
+      window.location.assign('./tui.html');
+    });
+
     // Load Game button (placeholder for now)
     this.loadGameBtn?.addEventListener('click', () => {
       this.showModal({
@@ -64,6 +68,9 @@ export const InitFlowMixin = {
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         this.newGameBtn?.click();
+      } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        this.tuiModeBtn?.click();
       } else if (e.key === 'l' || e.key === 'L') {
         e.preventDefault();
         this.loadGameBtn?.click();
