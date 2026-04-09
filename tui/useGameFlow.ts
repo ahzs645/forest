@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { TuiGameController } from "./controller";
+import { TuiGameController } from "./controller.js";
 
 type UseGameFlowOptions = {
   onExit?: () => void;

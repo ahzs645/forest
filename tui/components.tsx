@@ -2,7 +2,11 @@ import React, { useState, useEffect } from "react";
 import { SEASONS } from "../js/engine.js";
 import { C } from "./palette";
 import type { ContentData } from "./types";
-import type { ArtSequence } from "./art";
+
+type ArtSequence = {
+  frames: string[];
+  delay: number;
+};
 
 // ── Header ───────────────────────────────────────────
 export function Header() {

@@ -8,37 +8,14 @@ import {
   buildSummary,
   SEASONS,
 } from "../js/engine.js";
-import { detectArt, type ArtSequence } from "./art";
-import type { ContentData } from "./types";
+import { detectArt } from "./art.js";
 
-type KeyInput = {
-  ctrl?: boolean;
-  meta?: boolean;
-  name?: string;
-  sequence?: string;
-};
-
-type ControllerOptions = {
-  onExit?: () => void;
-};
-
-type ViewState = {
-  mode: string;
-  inputText: string;
-  contentData: ContentData;
-  options: string[];
-  selected: number;
-  art: ArtSequence | null;
-  animFrame: string | null;
-  gameState: any;
-};
-
-const INITIAL_CONTENT: ContentData = {
+const INITIAL_CONTENT = {
   type: "setup",
   heading: "Welcome to BC Forestry Trail",
 };
 
-function createViewState(): ViewState {
+function createViewState() {
   return {
     mode: "setup-name",
     inputText: "",
@@ -51,7 +28,7 @@ function createViewState(): ViewState {
   };
 }
 
-function snapshotGameState(gs: any) {
+function snapshotGameState(gs) {
   if (!gs) return null;
 
   return {
@@ -68,14 +45,12 @@ function snapshotGameState(gs: any) {
 }
 
 export class TuiGameController {
-  private listeners = new Set<(state: ViewState) => void>();
-  private state = createViewState();
-  private gs: any = null;
-  private queue: any[] = [];
-  private selectCb: ((idx: number) => void) | null = null;
-  private onExit: () => void;
-
-  constructor(options: ControllerOptions = {}) {
+  constructor(options = {}) {
+    this.listeners = new Set();
+    this.state = createViewState();
+    this.gs = null;
+    this.queue = [];
+    this.selectCb = null;
     this.onExit = options.onExit ?? (() => {});
   }
 
@@ -83,13 +58,13 @@ export class TuiGameController {
     return this.state;
   }
 
-  subscribe(listener: (state: ViewState) => void) {
+  subscribe(listener) {
     this.listeners.add(listener);
     listener(this.state);
     return () => this.listeners.delete(listener);
   }
 
-  setOnExit(onExit?: () => void) {
+  setOnExit(onExit) {
     this.onExit = onExit ?? (() => {});
   }
 
@@ -101,12 +76,12 @@ export class TuiGameController {
     this.emit();
   }
 
-  selectOption(index: number) {
+  selectOption(index) {
     if (index < 0 || index >= this.state.options.length) return;
     this.selectCb?.(index);
   }
 
-  handleKey(key: KeyInput) {
+  handleKey(key) {
     if (key.ctrl && key.name === "c") {
       this.onExit();
       return;
@@ -132,24 +107,19 @@ export class TuiGameController {
     this.handleOptionKey(key);
   }
 
-  private emit() {
+  emit() {
     this.state = { ...this.state, gameState: snapshotGameState(this.gs) };
     for (const listener of this.listeners) {
       listener(this.state);
     }
   }
 
-  private setState(next: Partial<ViewState>) {
+  setState(next) {
     this.state = { ...this.state, ...next, gameState: snapshotGameState(this.gs) };
     this.emit();
   }
 
-  private present(
-    data: ContentData,
-    opts: string[],
-    cb: (idx: number) => void,
-    artSeq: ArtSequence | null = null,
-  ) {
+  present(data, opts, cb, artSeq = null) {
     this.selectCb = cb;
     this.setState({
       contentData: data,
@@ -160,7 +130,7 @@ export class TuiGameController {
     });
   }
 
-  private startRound() {
+  startRound() {
     const gs = this.gs;
     gs.round += 1;
     const season = SEASONS[gs.round - 1];
@@ -188,7 +158,7 @@ export class TuiGameController {
           this.queue.unshift({
             type: "message",
             text: "End of Season Consequences",
-            body: cons.map((entry: string) => `- ${entry}`).join("\n"),
+            body: cons.map((entry) => `- ${entry}`).join("\n"),
           });
         }
         this.emit();
@@ -199,7 +169,7 @@ export class TuiGameController {
     this.processNext();
   }
 
-  private processNext() {
+  processNext() {
     const gs = this.gs;
 
     if (this.queue.length === 0) {
@@ -232,7 +202,7 @@ export class TuiGameController {
     const phase = this.queue.shift();
     const phaseText =
       phase.text ??
-      (phase.data ? `${phase.data.title} ${phase.data.description ?? ""}` : "");
+      (phase.data ? `${phase.data.title} ${phase.data.description ?? phase.data.prompt ?? ""}` : "");
     const artText = detectArt(phaseText, gs);
 
     if (phase.type === "message") {
@@ -257,12 +227,12 @@ export class TuiGameController {
           title: item.title,
           description: item.description ?? item.prompt ?? "",
           flavor: phase.type === "issue" ? item.flavor : undefined,
-          optionDetails: item.options.map((option: any) => ({
+          optionDetails: item.options.map((option) => ({
             label: option.label,
             outcome: option.outcome,
           })),
         },
-        item.options.map((option: any) => option.label),
+        item.options.map((option) => option.label),
         (idx) => {
           const option = item.options[idx];
           applyOptionOutcome(gs, option, {
@@ -298,7 +268,7 @@ export class TuiGameController {
     }
   }
 
-  private handleSetupNameKey(key: KeyInput) {
+  handleSetupNameKey(key) {
     if (key.name === "return") {
       const company = this.state.inputText.trim() || "Forest Co-op";
       this.setState({ mode: "setup-role" });
@@ -308,7 +278,7 @@ export class TuiGameController {
           heading: "Select your Specialization",
           subtitle: "Different roles face different challenges.",
         },
-        FORESTER_ROLES.map((role: any) => role.name),
+        FORESTER_ROLES.map((role) => role.name),
         (idx) => {
           const roleId = FORESTER_ROLES[idx].id;
           this.setState({ mode: "setup-area" });
@@ -318,7 +288,7 @@ export class TuiGameController {
               heading: "Select your Operating Area",
               subtitle: "Choose the environment for your operations.",
             },
-            OPERATING_AREAS.map((area: any) => area.name),
+            OPERATING_AREAS.map((area) => area.name),
             (areaIdx) => {
               const areaId = OPERATING_AREAS[areaIdx].id;
               this.gs = createInitialState({
@@ -346,7 +316,7 @@ export class TuiGameController {
     }
   }
 
-  private handleOptionKey(key: KeyInput) {
+  handleOptionKey(key) {
     if (key.name === "up" || key.name === "k") {
       this.setState({ selected: Math.max(0, this.state.selected - 1) });
       return;

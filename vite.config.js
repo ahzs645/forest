@@ -17,6 +17,15 @@ export default defineConfig({
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         tui: fileURLToPath(new URL('./tui.html', import.meta.url)),
       },
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+
+          if (id.includes('react')) return 'react-vendor';
+          if (id.includes('@opentui')) return 'opentui-vendor';
+          return 'vendor';
+        },
+      },
     },
   },
 });
