@@ -298,7 +298,39 @@ test('permitting phase 3 pressure reflects public review, watershed, and timing 
   assert.equal(pressure.publicReview, 4);
   assert.equal(pressure.hydrology, 4);
   assert.equal(pressure.timing, 1);
-  assert.equal(pressure.dominant, 'publicReview');
+  assert.equal(pressure.dominant, 'hydrology');
+});
+
+test('permitting phase 3 pressure picks up explicit road asset engineering pressure', () => {
+  const journey = {
+    day: 9,
+    currentPhase: 'review',
+    roadAssets: {
+      observations: [
+        {
+          blockId: 'blk-road-1',
+          roadLifecycleId: 'repair_needed',
+          roadLifecycleLabel: 'Repair Needed',
+          crossingConditionId: 'restricted',
+          crossingConditionLabel: 'Restricted',
+          watershedPressureId: 'critical',
+          watershedPressureLabel: 'Critical'
+        }
+      ]
+    },
+    permits: {
+      needsRevision: 0,
+      inReferral: 0,
+      revisionQueue: []
+    }
+  };
+
+  const pressure = getPermittingConstraintState(journey);
+
+  assert.equal(pressure.engineering, 4);
+  assert.equal(pressure.hydrology, 4);
+  assert.equal(pressure.timing, 4);
+  assert.equal(pressure.dominant, 'engineering');
 });
 
 test('permitting revision tickets favor hydrology and public review deficiencies when the file is sensitive', () => {
@@ -333,6 +365,58 @@ test('permitting revision tickets favor hydrology and public review deficiencies
 
   const publicReviewQueue = seedPermitRevisionTickets(publicReviewJourney, 1, { type: 'review' });
   assert.equal(publicReviewQueue[0].profileId, 'visual-quality');
+});
+
+test('permitting revision tickets follow road asset intel toward engineering and watershed deficiencies', () => {
+  const engineeringJourney = {
+    day: 10,
+    currentPhase: 'review',
+    roadAssets: {
+      observations: [
+        {
+          blockId: 'blk-road-2',
+          roadLifecycleId: 'repair_needed',
+          roadLifecycleLabel: 'Repair Needed',
+          crossingConditionId: 'restricted',
+          crossingConditionLabel: 'Restricted',
+          watershedPressureId: 'watch',
+          watershedPressureLabel: 'Watch'
+        }
+      ]
+    },
+    permits: {
+      needsRevision: 0,
+      revisionQueue: []
+    }
+  };
+
+  const engineeringQueue = seedPermitRevisionTickets(engineeringJourney, 1, { type: 'review' });
+  assert.equal(engineeringQueue[0].profileId, 'access-engineering');
+
+  const watershedJourney = {
+    day: 10,
+    currentPhase: 'review',
+    roadAssets: {
+      observations: [
+        {
+          blockId: 'blk-road-3',
+          roadLifecycleId: 'good',
+          roadLifecycleLabel: 'Good',
+          crossingConditionId: 'timing_sensitive',
+          crossingConditionLabel: 'Timing Sensitive',
+          watershedPressureId: 'critical',
+          watershedPressureLabel: 'Critical'
+        }
+      ]
+    },
+    permits: {
+      needsRevision: 0,
+      revisionQueue: []
+    }
+  };
+
+  const watershedQueue = seedPermitRevisionTickets(watershedJourney, 1, { type: 'review' });
+  assert.equal(watershedQueue[0].profileId, 'community-watershed');
 });
 
 test('permitting revision responses trade time for scrutiny and political capital', () => {

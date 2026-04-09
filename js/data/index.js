@@ -25,6 +25,14 @@ export {
   getAreaSituationMultipliers,
   getAreaSituationSummary
 } from "./areaSituations.js";
+export {
+  formatRoadAssetSummary,
+  getPermittingRoadAssetContext,
+  getPlanningRoadAssetContext,
+  getRoadAssetAreaSummary,
+  getRoadAssetObservationForBlock,
+  getRoadAssetObservations
+} from "./roadAssetIntel.js";
 
 // Oregon Trail additions - Crew data
 export {

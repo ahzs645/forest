@@ -17,6 +17,10 @@ import {
   formatPlanningBlockLabel,
   formatPlanningBlockPromptDescription,
 } from '../data/planningBlocks.js';
+import {
+  formatRoadAssetSummary,
+  getPlanningRoadAssetContext,
+} from '../data/roadAssetIntel.js';
 import { isPlanningApprovalReady } from './shared/endConditions.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
@@ -50,6 +54,24 @@ function ensurePlanningFomState(journey) {
   if (!fom.hydrologyLabel) {
     fom.hydrologyLabel = 'water timing';
   }
+  if (!Number.isFinite(fom.roadEngineeringReadiness)) {
+    fom.roadEngineeringReadiness = 100;
+  }
+  if (!Number.isFinite(fom.roadEngineeringPressure)) {
+    fom.roadEngineeringPressure = 0;
+  }
+  if (!fom.roadSummary) {
+    fom.roadSummary = '';
+  }
+  if (!fom.roadNote) {
+    fom.roadNote = 'No road-access intel loaded yet.';
+  }
+  if (!Array.isArray(fom.roadBlockerReasons)) {
+    fom.roadBlockerReasons = [];
+  }
+  if (typeof fom.roadBlocker !== 'boolean') {
+    fom.roadBlocker = false;
+  }
   return fom;
 }
 
@@ -73,6 +95,7 @@ function syncFomStateFromActiveBlock(journey, seasonInfo) {
 
   const fom = ensurePlanningFomState(journey);
   const waterContext = getPlanningBlockWaterContext(blockPlanning.activeBlock, journey.area, seasonInfo);
+  const roadContext = getPlanningRoadAssetContext(journey, blockPlanning.activeBlock.id);
   const activeBlockId = blockPlanning.activeBlock.id;
 
   if (fom.activeBlockId !== activeBlockId) {
@@ -91,6 +114,19 @@ function syncFomStateFromActiveBlock(journey, seasonInfo) {
   fom.hydrologyLabel = waterContext.hydrologyLabel;
   fom.hydrologyReadiness = waterContext.readiness;
   fom.reviewDaysTarget = Math.max(FOM_PUBLIC_REVIEW_MIN_DAYS, waterContext.reviewDays);
+  fom.roadSource = roadContext.source;
+  fom.roadSummary = formatRoadAssetSummary(roadContext);
+  fom.roadEngineeringPressure = roadContext.engineeringPressure;
+  fom.roadHydrologyPressure = roadContext.hydrologyPressure;
+  fom.roadTimingPressure = roadContext.timingPressure;
+  fom.roadReviewDays = roadContext.reviewDays;
+  fom.roadCommentLoad = roadContext.commentLoad;
+  fom.roadEngineeringReadiness = Math.max(0, 100 - roadContext.readinessPenalty);
+  fom.roadReadinessPenalty = roadContext.readinessPenalty;
+  fom.roadRankingPenalty = roadContext.rankingPenalty;
+  fom.roadBlocker = roadContext.blocker;
+  fom.roadBlockerReasons = roadContext.blockerReasons || [];
+  fom.roadNote = roadContext.note;
 
   if (fom.status === 'draft' && waterContext.gate !== 'clear') {
     fom.commentLoad = Math.max(fom.commentLoad, waterContext.commentCount);
@@ -99,35 +135,40 @@ function syncFomStateFromActiveBlock(journey, seasonInfo) {
   return fom;
 }
 
-function getFomActionLabel(fom) {
+function getFomActionLabel(fom, roadContext = null) {
+  const roadSuffix = roadContext?.hasData ? ' + Road Review' : '';
   switch (fom?.status) {
     case 'public_review':
-      return 'Update FOM Review (2h)';
+      return `Update FOM Review${roadSuffix} (2h)`;
     case 'revision_required':
-      return 'Revise FOM (2h)';
+      return `Revise FOM${roadSuffix} (2h)`;
     case 'approved':
-      return 'Check FOM Record (1h)';
+      return roadContext?.hasData ? 'Check FOM / Road Record (1h)' : 'Check FOM Record (1h)';
     default:
-      return 'Open FOM Review (2h)';
+      return `Open FOM Review${roadSuffix} (2h)`;
   }
 }
 
-function getFomActionDescription(fom) {
+function getFomActionDescription(fom, roadContext = null) {
+  const roadTail = roadContext?.hasData
+    ? ` Road-access intel: ${roadContext.summary}.`
+    : '';
   switch (fom?.status) {
     case 'public_review':
-      return `Keep the Forest Operations Map current while public review runs (${Math.max(0, fom.reviewDaysRemaining)}d left).`;
+      return `Keep the Forest Operations Map current while public review runs (${Math.max(0, fom.reviewDaysRemaining)}d left).${roadTail}`;
     case 'revision_required':
-      return 'Address review comments, especially timing and water notes, then resubmit the map.';
+      return `Address review comments, especially timing and water notes, then resubmit the map.${roadTail}`;
     case 'approved':
-      return 'Confirm the map record and keep the submission package aligned.';
+      return `Confirm the map record and keep the submission package aligned.${roadTail}`;
     default:
-      return 'Publish the Forest Operations Map so the public-review window can open.';
+      return `Publish the Forest Operations Map so the public-review window can open.${roadTail}`;
   }
 }
 
 export function getPlanningSubmissionReadiness(journey, seasonInfo = null) {
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
   const waterContext = getPlanningBlockWaterContext(journey.blockPlanning?.activeBlock, journey.area, seasonInfo);
+  const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock?.id || null);
   const reasons = [];
 
   if (!journey.blockPlanning?.activeBlock) {
@@ -146,10 +187,15 @@ export function getPlanningSubmissionReadiness(journey, seasonInfo = null) {
     reasons.push('public review still carries open comments');
   }
 
+  if (roadContext.blocker) {
+    reasons.push(`road-engineering blocker: ${roadContext.blockerReasons.join('; ')}`);
+  }
+
   return {
     ready: reasons.length === 0,
     reasons,
     waterContext,
+    roadContext,
     fom,
   };
 }
@@ -309,6 +355,13 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
   if (fom?.activeBlockId) {
     ui.write(`FOM: ${describeReviewState(fom)} | Water Gate: ${fom.waterGate.toUpperCase()} | ${fom.hydrologyLabel}`);
     ui.write(`Hydrology Readiness: ${Math.round(fom.hydrologyReadiness)}% | ${fom.waterNote}`);
+    if (fom.roadSummary) {
+      ui.write(`Road Intel: ${fom.roadSummary}`);
+      ui.write(`Road Engineering Readiness: ${Math.round(fom.roadEngineeringReadiness)}% | ${fom.roadNote}`);
+      if (fom.roadBlocker) {
+        ui.writeWarning(`Road-engineering blocker: ${fom.roadBlockerReasons.join(' | ')}`);
+      }
+    }
   }
 
   if (journey.blockPlanning?.activeSummary) {
@@ -416,6 +469,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   const actionOptions = [];
   const hoursLeft = journey.hoursRemaining || 8;
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
+  const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock?.id || null);
 
   // Phase-specific primary actions
   if (journey.plan.phase === 'data_gathering' && journey.resources.dataCredits > 0 && hoursLeft >= 3) {
@@ -466,7 +520,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     } else {
       actionOptions.push({
         label: 'Prepare Submission (BLOCKED)',
-        description: `Needs: ${[formatValuesGateDeficits(deficits), ...submissionReadiness.reasons].filter(Boolean).join(' | ')}`,
+        description: `Needs: ${[deficits.length ? formatValuesGateDeficits(deficits) : null, ...submissionReadiness.reasons].filter(Boolean).join(' | ')}`,
         value: 'submit_blocked'
       });
     }
@@ -482,8 +536,8 @@ function buildActionOptions(journey, seasonInfo = null) {
 
   if (journey.blockPlanning?.activeBlock && hoursLeft >= 2) {
     actionOptions.push({
-      label: getFomActionLabel(fom),
-      description: getFomActionDescription(fom),
+      label: getFomActionLabel(fom, roadContext),
+      description: getFomActionDescription(fom, roadContext),
       value: 'fom_review'
     });
   }
@@ -607,7 +661,12 @@ async function processAction(game, actionValue, seasonInfo = null) {
     case 'stakeholder_blocked':
     case 'submit_blocked': {
       const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
-      ui.writeWarning(`Cannot proceed. Recover these values first: ${formatValuesGateDeficits(getValuesGateDeficits(journey))}.`);
+      const valueDeficits = getValuesGateDeficits(journey);
+      if (valueDeficits.length > 0) {
+        ui.writeWarning(`Cannot proceed. Recover these values first: ${formatValuesGateDeficits(valueDeficits)}.`);
+      } else {
+        ui.writeWarning('Cannot proceed yet.');
+      }
       if (submissionReadiness.reasons.length > 0) {
         ui.write(`Planning gate: ${submissionReadiness.reasons.join(' | ')}.`);
       }
@@ -647,10 +706,14 @@ async function processAction(game, actionValue, seasonInfo = null) {
       }
 
       const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
+      const roadContext = getPlanningRoadAssetContext(journey, activeBlock.id);
       if (fom.status === 'approved') {
         journey.hoursRemaining -= 1;
         applyProtagonistCost(journey, { energy: 3, stress: 2 });
         ui.write('Forest Operations Map record checked. The approved review file stays in place.');
+        if (roadContext.hasData) {
+          ui.write(`Road-access intel: ${roadContext.summary}.`);
+        }
         break;
       }
 
@@ -671,6 +734,12 @@ async function processAction(game, actionValue, seasonInfo = null) {
 
       ui.write(`Forest Operations Map posted for public review.`);
       ui.write(`Review window: ${fom.reviewDaysRemaining} day${fom.reviewDaysRemaining === 1 ? '' : 's'} | ${fom.waterNote}`);
+      if (roadContext.hasData) {
+        ui.write(`Road-access intel: ${roadContext.summary}.`);
+        if (roadContext.blocker) {
+          ui.writeWarning(`Road-engineering blocker: ${roadContext.blockerReasons.join(' | ')}`);
+        }
+      }
       break;
     }
 

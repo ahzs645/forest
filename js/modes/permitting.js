@@ -10,6 +10,7 @@ import { executeDeskDay, DESK_ACTIONS } from '../journey.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
+import { formatRoadAssetSummary, getPermittingRoadAssetContext } from '../data/roadAssetIntel.js';
 
 const PERMIT_REVISION_PROFILES = [
   {
@@ -125,6 +126,7 @@ const PERMIT_REVISION_PROFILES = [
     summary: 'The road package needs clearer access, drainage, and deactivation detail.',
     tags: ['road', 'access', 'steep', 'karst', 'winter-road'],
     pressure: {
+      engineering: 4,
       hydrology: 1,
       timing: 3
     },
@@ -193,6 +195,7 @@ function derivePermittingConstraintState(journey) {
   const discoveryIds = new Set(getJourneyDiscoveryTags(journey).map((tag) => tag.id));
   const phase = String(journey?.currentPhase || '').toLowerCase();
   const permits = journey?.permits || {};
+  const roadIntel = getPermittingRoadAssetContext(journey);
   const needRevisionPressure = Math.min(2, Math.floor((permits.needsRevision || 0) / 2));
   const referralPressure = Math.min(2, Math.floor((permits.inReferral || 0) / 2));
 
@@ -207,6 +210,14 @@ function derivePermittingConstraintState(journey) {
     phase === 'approval',
     discoveryIds.has('fom_public_review'),
     discoveryIds.has('community_visibility')
+  );
+
+  const engineeringSignals = countSignals(
+    areaTags.has('road'),
+    areaTags.has('access'),
+    areaTags.has('steep'),
+    areaTags.has('karst'),
+    discoveryIds.has('access_rehab')
   );
 
   const hydrologySignals = countSignals(
@@ -231,17 +242,20 @@ function derivePermittingConstraintState(journey) {
     discoveryIds.has('access_rehab')
   );
 
-  const publicReviewPressure = clampConstraintLevel(publicReviewSignals + needRevisionPressure);
-  const hydrologyPressure = clampConstraintLevel(hydrologySignals + referralPressure);
-  const timingPressure = clampConstraintLevel(timingSignals + (phase === 'crunch' ? 1 : 0));
-  const overallPressure = clampConstraintLevel(publicReviewPressure + hydrologyPressure + timingPressure);
+  const engineeringPressure = clampConstraintLevel(engineeringSignals + roadIntel.engineering + needRevisionPressure);
+  const publicReviewPressure = clampConstraintLevel(publicReviewSignals + roadIntel.publicReview + needRevisionPressure);
+  const hydrologyPressure = clampConstraintLevel(hydrologySignals + roadIntel.hydrology + referralPressure);
+  const timingPressure = clampConstraintLevel(timingSignals + roadIntel.timing + (phase === 'crunch' ? 1 : 0));
+  const overallPressure = clampConstraintLevel(engineeringPressure + publicReviewPressure + hydrologyPressure + timingPressure);
 
   return {
+    engineering: engineeringPressure,
     publicReview: publicReviewPressure,
     hydrology: hydrologyPressure,
     timing: timingPressure,
     overall: overallPressure,
     dominant: getDominantPermittingPressure({
+      engineering: engineeringPressure,
       publicReview: publicReviewPressure,
       hydrology: hydrologyPressure,
       timing: timingPressure
@@ -256,14 +270,20 @@ function clampConstraintLevel(value) {
 function getDominantPermittingPressure(pressure) {
   const entries = Object.entries(pressure);
   if (!entries.length) return 'package';
-  entries.sort((a, b) => b[1] - a[1]);
+  const priority = {
+    engineering: 4,
+    hydrology: 3,
+    timing: 2,
+    publicReview: 1
+  };
+  entries.sort((a, b) => (b[1] - a[1]) || ((priority[b[0]] || 0) - (priority[a[0]] || 0)));
   const [label, value] = entries[0];
   if (value <= 0) return 'package';
   return label;
 }
 
 function formatConstraintPressure(state) {
-  return `FOM/Public Review ${state.publicReview}/4 | Hydrology ${state.hydrology}/4 | Water Timing ${state.timing}/4`;
+  return `Engineering ${state?.engineering || 0}/4 | FOM/Public Review ${state?.publicReview || 0}/4 | Hydrology ${state?.hydrology || 0}/4 | Water Timing ${state?.timing || 0}/4`;
 }
 
 /**
@@ -325,6 +345,7 @@ function scoreRevisionProfiles(journey) {
   const areaTags = Array.isArray(journey?.area?.tags) ? journey.area.tags : [];
   const phase = journey?.currentPhase || '';
   const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
+  const roadIntel = getPermittingRoadAssetContext(journey);
 
   return PERMIT_REVISION_PROFILES
     .map((profile) => {
@@ -336,11 +357,31 @@ function scoreRevisionProfiles(journey) {
       if (profile.pressure?.publicReview) {
         score += pressure.publicReview * profile.pressure.publicReview;
       }
+      if (profile.pressure?.engineering) {
+        score += pressure.engineering * profile.pressure.engineering;
+      }
       if (profile.pressure?.hydrology) {
         score += pressure.hydrology * profile.pressure.hydrology;
       }
       if (profile.pressure?.timing) {
         score += pressure.timing * profile.pressure.timing;
+      }
+      if (roadIntel.hasData) {
+        if (profile.id === roadIntel.dominantProfileId) {
+          score += 6;
+        }
+        if (profile.id === 'access-engineering') {
+          score += roadIntel.engineering * 2;
+        }
+        if (profile.id === 'community-watershed') {
+          score += roadIntel.hydrology * 2;
+        }
+        if (profile.id === 'fish-passage') {
+          score += roadIntel.timing * 2;
+        }
+        if (profile.id === 'visual-quality' || profile.id === 'consultation') {
+          score += roadIntel.publicReview;
+        }
       }
       return { profile, score };
     })
@@ -491,8 +532,11 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
   }
 
   const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
+  const roadIntel = getPermittingRoadAssetContext(journey);
   if (ticket.profileId === 'community-watershed' && pressure.hydrology > 0) {
     messages.push('The watershed response is now lined up with the hydrology concerns on the file.');
+  } else if (ticket.profileId === 'access-engineering' && roadIntel.engineering > 0) {
+    messages.push('The road package now lines up with the access engineering issues on the file.');
   } else if ((ticket.profileId === 'visual-quality' || ticket.profileId === 'consultation') && pressure.publicReview > 0) {
     messages.push('The public review package reads more defensible for ministry and external eyes.');
   } else if (ticket.profileId === 'fish-passage' && pressure.timing > 0) {
@@ -555,6 +599,10 @@ export async function runPermittingDay(game) {
     ui.write(`  In Review: ${journey.permits.inReview} | Needs Revision: ${journey.permits.needsRevision}`);
     ui.write(`  Scrutiny / Heat: ${Math.round(journey.scrutiny || 0)}%`);
     ui.write(`  Phase 3 Pressure: ${formatConstraintPressure(journey.permits.phase3Pressure || derivePermittingConstraintState(journey))}`);
+    const roadIntel = getPermittingRoadAssetContext(journey);
+    if (roadIntel.hasData) {
+      ui.write(`  Road Intel: ${formatRoadAssetSummary(roadIntel) || roadIntel.note}`);
+    }
     if (revisionQueue.length > 0) {
       ui.write(`  Open Deficiencies: ${revisionQueue.length}`);
       for (const ticket of revisionQueue.slice(0, 2)) {
@@ -815,16 +863,21 @@ async function processAction(game, actionId) {
           + Number(discoveryIds.has('access_rehab'))
         );
         const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
+        const roadIntel = getPermittingRoadAssetContext(journey);
         const referralChance = Math.min(0.75, 0.18
           + hotFilePressure * 0.06
           + pressure.publicReview * 0.06
           + pressure.hydrology * 0.05
-          + pressure.timing * 0.04);
+          + pressure.timing * 0.04
+          + roadIntel.referralPenalty);
         if (hotFilePressure > 0) {
           journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 1);
         }
         if (pressure.overall > 0) {
           journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + Math.max(0, Math.floor(pressure.overall / 3)));
+        }
+        if (roadIntel.hasData) {
+          journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + Math.max(0, roadIntel.engineering - 1));
         }
         if (Math.random() < referralChance) {
           journey.permits.inReferral = (journey.permits.inReferral || 0) + 1;
@@ -1000,6 +1053,7 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
 function processPermitPipeline(ui, journey) {
   const queue = ensurePermittingRevisionState(journey);
   const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
+  const roadIntel = getPermittingRoadAssetContext(journey);
 
   // Submitted permits may advance to inReview
   if (journey.permits.submitted > 0) {
@@ -1017,10 +1071,12 @@ function processPermitPipeline(ui, journey) {
     const scrutinyPenalty = Math.min(0.25, (journey.scrutiny || 0) / 400);
     const phase3Penalty = Math.min(0.2, (
       pressure.publicReview * 0.03
+      + pressure.engineering * 0.03
       + pressure.hydrology * 0.025
       + pressure.timing * 0.02
     ));
-    const approvalRate = Math.max(0.4, 0.72 - scrutinyPenalty - phase3Penalty);
+    const roadPenalty = Math.min(0.15, roadIntel.approvalPenalty);
+    const approvalRate = Math.max(0.4, 0.72 - scrutinyPenalty - phase3Penalty - roadPenalty);
     const approved = Math.floor(reviewed * approvalRate);
     const revisions = reviewed - approved;
 

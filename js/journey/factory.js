@@ -246,9 +246,13 @@ export function createPlanningJourney(options = {}) {
         reviewDaysTarget: 0,
         commentLoad: 0,
         hydrologyReadiness: 100,
+        roadEngineeringReadiness: 100,
         waterGate: "clear",
         waterNote: "No water gate evaluated yet.",
-        hydrologyLabel: "water timing"
+        hydrologyLabel: "water timing",
+        roadSummary: "",
+        roadNote: "No road or crossing intel is carrying forward yet.",
+        roadBlocker: false
       },
       history: [],
     },
@@ -278,6 +282,10 @@ export function createPlanningJourney(options = {}) {
     },
 
     discoveryTags: [],
+    roadAssets: {
+      byBlock: {},
+      observations: []
+    },
 
     // NO crew for protagonist mode
     crew: [],
@@ -367,6 +375,10 @@ export function createPermittingJourney(options = {}) {
     resources: createDeskResources(),
 
     discoveryTags: [],
+    roadAssets: {
+      byBlock: {},
+      observations: []
+    },
 
     // NO crew for protagonist mode
     crew: [],
