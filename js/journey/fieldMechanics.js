@@ -27,6 +27,373 @@ import {
   FIELD_RESOURCES
 } from '../resources.js';
 import { TERRAIN_TYPES, getRandomWeather, getTemperature } from '../data/blocks.js';
+import { addDiscoveryTags, inferDiscoveryTagsFromAccess } from '../data/discoveryTags.js';
+
+const ACCESS_NO_GO_HAZARDS = new Set([
+  'washout',
+  'glacial_outburst',
+  'karst_collapse',
+  'hidden_cavities',
+  'flood',
+  'cultural_protocol'
+]);
+
+const ACCESS_HELI_HAZARDS = new Set([
+  'rockslide',
+  'glacial_current',
+  'weather_delay',
+  'narrow'
+]);
+
+const ACCESS_WINTER_HAZARDS = new Set([
+  'bog',
+  'subsidence',
+  'permafrost',
+  'road_damage',
+  'river_crossing',
+  'fish_timing',
+  'snow'
+]);
+
+const ACCESS_REHAB_HAZARDS = new Set([
+  'deadfall',
+  'falling_timber',
+  'windthrow',
+  'hang_ups',
+  'brush',
+  'erosion',
+  'tire_damage',
+  'grade',
+  'visual_constraint',
+  'water_intake',
+  'traffic',
+  'industrial',
+  'h2s',
+  'caribou',
+  'restrictions',
+  'wildlife',
+  'moose',
+  'grizzly',
+  'bridge_weight'
+]);
+
+const ACCESS_AIR_FEATURES = new Set([
+  'remote_camp',
+  'helicopter',
+  'bush_plane'
+]);
+
+const ACCESS_SENSITIVE_FEATURES = new Set([
+  'community_water',
+  'watershed',
+  'salmon_river',
+  'fish_habitat',
+  'first_nation',
+  'cultural_site',
+  'culturally_modified_trees',
+  'caribou_habitat',
+  'sensitive_area',
+  'visual_quality_zone'
+]);
+
+function normalizeAccessToken(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function labelizeAccessToken(value) {
+  return normalizeAccessToken(value).replace(/_/g, ' ');
+}
+
+function addUniqueReason(bucket, reason) {
+  if (!reason || bucket.includes(reason)) {
+    return;
+  }
+  bucket.push(reason);
+}
+
+function buildAccessSummary(verdictId, reasons, weather) {
+  const leadReasons = (reasons || []).slice(0, 2).map(labelizeAccessToken).filter(Boolean);
+  const leadText = leadReasons.length > 0 ? leadReasons.join(' and ') : '';
+  const weatherText = weather?.name ? `${labelizeAccessToken(weather.name)} weather` : '';
+  const joined = [leadText, weatherText].filter(Boolean).join(' with ');
+
+  switch (verdictId) {
+    case 'no_go':
+      return joined ? `${joined} makes this a no-go.` : 'This block is a no-go for now.';
+    case 'heli_only':
+      return joined ? `${joined} points to heli-only access.` : 'Heli-only access is the cleanest option here.';
+    case 'winter_only':
+      return joined ? `${joined} reads as winter-only until the ground firms up.` : 'Winter-only access looks safer here.';
+    case 'rehab_needed':
+      return joined ? `${joined} means this block needs rehab before it is cleanly usable.` : 'This block needs rehab before it is cleanly usable.';
+    default:
+      return leadText
+        ? `Routine access for now, with ${leadText} to keep watching.`
+        : 'Routine access for now.';
+  }
+}
+
+function getAccessStance(routePlan, paceId) {
+  if (routePlan?.shortLabel === 'shortcut' || paceId === 'grueling' || paceId === 'fast') {
+    return 'aggressive';
+  }
+  if (routePlan?.shortLabel === 'detour' || paceId === 'slow') {
+    return 'cautious';
+  }
+  return 'observe';
+}
+
+export function recordAccessVerdict(journey, block, verdict, weather = null) {
+  if (!journey || !block?.id || !verdict) {
+    return verdict;
+  }
+
+  if (!journey.accessVerdicts) {
+    journey.accessVerdicts = {};
+  }
+
+  journey.accessVerdicts[block.id] = {
+    ...verdict,
+    weatherId: weather?.id || null,
+    weatherName: weather?.name || null,
+    day: journey.day || null
+  };
+
+  return journey.accessVerdicts[block.id];
+}
+
+export function getBlockAccessVerdict(block, weather = null, journey = null) {
+  const terrain = normalizeAccessToken(block?.terrain);
+  const hazards = new Set((block?.hazards || []).map(normalizeAccessToken).filter(Boolean));
+  const features = new Set((block?.features || []).map(normalizeAccessToken).filter(Boolean));
+  const weatherId = normalizeAccessToken(weather?.id);
+  const weatherDangerous = Boolean(weather?.dangerous || ['storm', 'heavy_rain', 'heavy_snow', 'freezing'].includes(weatherId));
+
+  const scores = {
+    no_go: 0,
+    heli_only: 0,
+    winter_only: 0,
+    rehab_needed: 0
+  };
+
+  const reasons = {
+    no_go: [],
+    heli_only: [],
+    winter_only: [],
+    rehab_needed: []
+  };
+
+  if (terrain === 'river') {
+    scores.winter_only += 1;
+    addUniqueReason(reasons.winter_only, 'river crossing');
+  } else if (terrain === 'steep') {
+    scores.heli_only += 1;
+    scores.rehab_needed += 1;
+    addUniqueReason(reasons.heli_only, 'steep ground');
+  } else if (terrain === 'muskeg') {
+    scores.winter_only += 1;
+    addUniqueReason(reasons.winter_only, 'muskeg');
+  } else if (terrain === 'cutblock') {
+    scores.rehab_needed += 1;
+    addUniqueReason(reasons.rehab_needed, 'active cutblock');
+  } else if (terrain === 'hilly') {
+    scores.rehab_needed += 1;
+  }
+
+  for (const hazard of hazards) {
+    if (ACCESS_NO_GO_HAZARDS.has(hazard)) {
+      scores.no_go += 4;
+      addUniqueReason(reasons.no_go, hazard);
+      continue;
+    }
+
+    if (ACCESS_HELI_HAZARDS.has(hazard)) {
+      scores.heli_only += 3;
+      addUniqueReason(reasons.heli_only, hazard);
+      continue;
+    }
+
+    if (ACCESS_WINTER_HAZARDS.has(hazard)) {
+      scores.winter_only += 2;
+      addUniqueReason(reasons.winter_only, hazard);
+      continue;
+    }
+
+    if (ACCESS_REHAB_HAZARDS.has(hazard)) {
+      scores.rehab_needed += 1;
+      addUniqueReason(reasons.rehab_needed, hazard);
+    }
+  }
+
+  if (features.has('bridge')) {
+    scores.rehab_needed = Math.max(0, scores.rehab_needed - 1);
+  }
+
+  if (ACCESS_AIR_FEATURES.has('remote_camp') && features.has('remote_camp')) {
+    scores.heli_only += 2;
+    addUniqueReason(reasons.heli_only, 'remote camp staging');
+  }
+  if (features.has('helicopter')) {
+    scores.heli_only += 2;
+    addUniqueReason(reasons.heli_only, 'helicopter staging');
+  }
+  if (features.has('bush_plane')) {
+    scores.heli_only += 2;
+    addUniqueReason(reasons.heli_only, 'bush plane staging');
+  }
+
+  for (const feature of features) {
+    if (!ACCESS_SENSITIVE_FEATURES.has(feature)) {
+      continue;
+    }
+
+    if (feature === 'community_water' || feature === 'watershed' || feature === 'salmon_river' || feature === 'fish_habitat') {
+      scores.rehab_needed += 1;
+      addUniqueReason(reasons.rehab_needed, feature);
+      continue;
+    }
+
+    if (feature === 'caribou_habitat' || feature === 'sensitive_area') {
+      scores.winter_only += 1;
+      addUniqueReason(reasons.winter_only, feature);
+      continue;
+    }
+
+    if (feature === 'first_nation' || feature === 'cultural_site' || feature === 'culturally_modified_trees') {
+      scores.rehab_needed += 1;
+      addUniqueReason(reasons.rehab_needed, feature);
+      continue;
+    }
+
+    scores.rehab_needed += 1;
+    addUniqueReason(reasons.rehab_needed, feature);
+  }
+
+  if (weatherId === 'freezing' || weatherId === 'heavy_snow') {
+    const winterSensitive = hazards.has('bog')
+      || hazards.has('subsidence')
+      || hazards.has('permafrost')
+      || hazards.has('road_damage')
+      || hazards.has('river_crossing')
+      || terrain === 'muskeg'
+      || terrain === 'river';
+
+    if (winterSensitive && scores.winter_only > 0 && scores.no_go < 4) {
+      scores.winter_only = Math.max(0, scores.winter_only - 1);
+      addUniqueReason(reasons.winter_only, 'frozen window');
+    }
+  }
+
+  if (weatherId === 'storm' || weatherId === 'heavy_rain') {
+    if (hazards.has('flood') || hazards.has('washout') || hazards.has('erosion') || terrain === 'river') {
+      scores.no_go += 2;
+      addUniqueReason(reasons.no_go, weatherId === 'storm' ? 'storm conditions' : 'heavy rain');
+    } else {
+      scores.heli_only += 1;
+    }
+  }
+
+  if (weatherId === 'fog' && (terrain === 'steep' || terrain === 'river' || features.has('viewpoint'))) {
+    scores.heli_only += 1;
+    addUniqueReason(reasons.heli_only, 'low visibility');
+  }
+
+  if (weatherDangerous && (terrain === 'steep' || terrain === 'river')) {
+    scores.no_go += 1;
+  }
+
+  let verdictId = 'passable_now';
+  if (scores.no_go >= 4) {
+    verdictId = 'no_go';
+  } else if (scores.heli_only >= 4 && scores.heli_only >= scores.winter_only && scores.heli_only >= scores.rehab_needed) {
+    verdictId = 'heli_only';
+  } else if (scores.winter_only >= 3 && scores.winter_only >= scores.rehab_needed) {
+    verdictId = 'winter_only';
+  } else if (scores.rehab_needed >= 2) {
+    verdictId = 'rehab_needed';
+  }
+
+  const summary = buildAccessSummary(verdictId, reasons[verdictId], weather);
+
+  return {
+    id: verdictId,
+    label: {
+      passable_now: 'Passable now',
+      rehab_needed: 'Rehab needed',
+      winter_only: 'Winter-only',
+      heli_only: 'Heli-only',
+      no_go: 'No-go'
+    }[verdictId] || 'Passable now',
+    summary,
+    reasons: reasons[verdictId] || [],
+    weatherId: weatherId || null,
+    terrain: terrain || null
+  };
+}
+
+function recordAccessDiscoveryTags(journey, block, verdict, weather = null) {
+  const tagIds = inferDiscoveryTagsFromAccess(block, verdict, weather);
+  if (!tagIds.length) {
+    return [];
+  }
+
+  return addDiscoveryTags(journey, tagIds, {
+    source: `access:${block?.id || 'unknown'}`,
+    severity: verdict?.id === 'no_go' ? 3 : 2,
+    note: verdict?.summary || null,
+    details: {
+      blockId: block?.id || null,
+      verdict: verdict?.id || null
+    }
+  });
+}
+
+export function applyAccessVerdictPressure(journey, verdict, context = {}) {
+  if (!journey || !verdict?.id) {
+    return 0;
+  }
+
+  const stance = normalizeAccessToken(context.stance || 'observe');
+  const baseByVerdict = {
+    passable_now: 0,
+    rehab_needed: 0,
+    winter_only: 1,
+    heli_only: 2,
+    no_go: 2
+  };
+  const stanceAdjustment = {
+    cautious: -1,
+    observe: 0,
+    aggressive: 1
+  };
+
+  let delta = (baseByVerdict[verdict.id] || 0) + (stanceAdjustment[stance] || 0);
+
+  if (verdict.id === 'passable_now' && stance === 'cautious') {
+    delta = -1;
+  }
+
+  delta = Math.max(-1, Math.min(3, delta));
+
+  if (delta !== 0) {
+    const current = Number(journey.scrutiny ?? journey.heat ?? 0);
+    const next = Math.max(0, current + delta);
+    journey.scrutiny = next;
+    if (Object.prototype.hasOwnProperty.call(journey, 'heat')) {
+      journey.heat = next;
+    }
+  }
+
+  return delta;
+}
+
+export function formatAccessVerdict(verdict) {
+  if (!verdict?.id) {
+    return 'Access verdict: Passable now';
+  }
+
+  return `Access verdict: ${verdict.label}${verdict.summary ? ` - ${verdict.summary}` : ''}`;
+}
 
 function getCrewTravelModifier(journey) {
   const activeCrew = getActiveCrewCount(journey.crew);
@@ -151,6 +518,23 @@ export function executeFieldDay(journey, paceId) {
       messages.push(`Arrived at ${block.name}.`);
       if (block.description) {
         messages.push(block.description);
+      }
+      const accessVerdict = recordAccessVerdict(
+        journey,
+        block,
+        getBlockAccessVerdict(block, weatherToday, journey),
+        weatherToday
+      );
+      recordAccessDiscoveryTags(journey, block, accessVerdict, weatherToday);
+      messages.push(formatAccessVerdict(accessVerdict));
+
+      const scrutinyDelta = applyAccessVerdictPressure(journey, accessVerdict, {
+        stance: getAccessStance(routePlan, effectivePaceId)
+      });
+      if (scrutinyDelta > 0) {
+        messages.push(`Scrutiny rises by ${scrutinyDelta}.`);
+      } else if (scrutinyDelta < 0) {
+        messages.push(`Scrutiny eases by ${Math.abs(scrutinyDelta)}.`);
       }
     }
   }
@@ -278,7 +662,9 @@ export function executeFieldDay(journey, paceId) {
       day: dayNumber,
       type: 'arrival',
       location: arrivedBlock?.name || 'New location',
-      summary: `Arrived at ${arrivedBlock?.name || 'new location'}`
+      summary: arrivedBlock?.id && journey?.accessVerdicts?.[arrivedBlock.id]
+        ? `Arrived at ${arrivedBlock?.name || 'new location'} (${journey.accessVerdicts[arrivedBlock.id].label})`
+        : `Arrived at ${arrivedBlock?.name || 'new location'}`
     });
   }
 

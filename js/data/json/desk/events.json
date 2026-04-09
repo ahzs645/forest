@@ -624,6 +624,160 @@
     ]
   },
   {
+    "id": "community_watershed_red_flag",
+    "title": "Community Watershed Red Flag",
+    "type": "compliance",
+    "severity": "moderate",
+    "probability": 0.05,
+    "roles": ["planner", "permitter"],
+    "areaTags": ["watershed", "community-water"],
+    "description": "A downstream intake concern lands on your desk. What looked like a routine road or block decision is now a sediment, timing, and trust problem.",
+    "options": [
+      {
+        "label": "Pause and co-write a mitigation plan",
+        "outcome": "You slow the file down, walk the drainage with partners, and come back with a package people can actually defend.",
+        "effects": {
+          "progress": -8,
+          "relationships": 8,
+          "compliance": 6
+        }
+      },
+      {
+        "label": "Add stronger erosion controls and keep moving",
+        "outcome": "The file stays alive, but only because the mitigation notes become much sharper.",
+        "effects": {
+          "budget": -2000,
+          "compliance": 4,
+          "progress": 2
+        }
+      },
+      {
+        "label": "Argue the risk is overstated",
+        "outcome": "You protect the schedule for now, but confidence in the file drops immediately.",
+        "effects": {
+          "progress": 4,
+          "relationships": -7,
+          "compliance": -5
+        }
+      }
+    ]
+  },
+  {
+    "id": "caribou_window_revision",
+    "title": "Caribou Timing Window Revision",
+    "type": "stakeholder",
+    "severity": "moderate",
+    "probability": 0.05,
+    "roles": ["planner", "permitter"],
+    "areaTags": ["caribou"],
+    "description": "Updated wildlife direction cuts into your planned access window. The block still works on paper, but not on the calendar you built around it.",
+    "options": [
+      {
+        "label": "Re-sequence the work to alternate ground",
+        "outcome": "You protect the file by moving effort elsewhere, even if the quarter gets less efficient.",
+        "effects": {
+          "progress": -5,
+          "compliance": 6,
+          "relationships": 3
+        }
+      },
+      {
+        "label": "Request a monitored operating window",
+        "outcome": "A narrow access opportunity stays alive under tighter conditions and much closer scrutiny.",
+        "effects": {
+          "progress": 1,
+          "compliance": 3,
+          "relationships": 1
+        }
+      },
+      {
+        "label": "Push back on the revision",
+        "outcome": "You preserve the short-term schedule and spend political capital doing it.",
+        "effects": {
+          "progress": 4,
+          "politicalCapital": -6,
+          "relationships": -5
+        }
+      }
+    ]
+  },
+  {
+    "id": "archaeology_screening_gap",
+    "title": "Archaeology Screening Gap",
+    "type": "technical",
+    "severity": "moderate",
+    "probability": 0.05,
+    "roles": ["planner", "permitter"],
+    "description": "Just before submission, the archaeology screening tells you the package needs stronger overview or permit context than the draft file carried.",
+    "options": [
+      {
+        "label": "Hold the file and bring in the right specialist",
+        "outcome": "You lose time, but the package stops looking careless.",
+        "effects": {
+          "progress": -6,
+          "budget": -2500,
+          "compliance": 7
+        }
+      },
+      {
+        "label": "Revise maps and referral notes internally",
+        "outcome": "You shore up the package enough to keep it moving, though everyone knows the margin got thinner.",
+        "effects": {
+          "timeUsed": 4,
+          "compliance": 3,
+          "progress": 1
+        }
+      },
+      {
+        "label": "Submit and hope the issue stays minor",
+        "outcome": "The file leaves the office on time, but not in the condition you would normally defend.",
+        "effects": {
+          "progress": 5,
+          "compliance": -6
+        }
+      }
+    ]
+  },
+  {
+    "id": "visual_quality_redraft",
+    "title": "Visual Quality Redraft",
+    "type": "technical",
+    "severity": "moderate",
+    "probability": 0.04,
+    "roles": ["planner"],
+    "areaTags": ["visuals", "community-interface"],
+    "description": "A sightline review catches your opening from town and the highway. The layout is efficient, but it is going to read hard on the landscape.",
+    "options": [
+      {
+        "label": "Re-shape the opening and soften the edge",
+        "outcome": "The design gets better and the volume gets a little worse.",
+        "effects": {
+          "progress": -4,
+          "relationships": 5,
+          "compliance": 4
+        }
+      },
+      {
+        "label": "Add screening and phased harvesting notes",
+        "outcome": "You keep most of the schedule and give reviewers something more thoughtful to look at.",
+        "effects": {
+          "budget": -1500,
+          "progress": 1,
+          "compliance": 2
+        }
+      },
+      {
+        "label": "Defend the original shape",
+        "outcome": "You save time in the office and spend credibility doing it.",
+        "effects": {
+          "progress": 3,
+          "relationships": -6,
+          "politicalCapital": -4
+        }
+      }
+    ]
+  },
+  {
     "id": "story_arc_ancientGrove_stage1_harvest",
     "title": "Environmental Protest",
     "type": "narrative",

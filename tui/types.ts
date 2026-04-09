@@ -1,19 +1,35 @@
+export type NoticeData = {
+  heading: string;
+  body?: string;
+  tone?: "info" | "positive" | "warning" | "danger";
+};
+
 /** Structured content for the Field Radio display. */
+type BaseContent = {
+  notice?: NoticeData;
+};
+
 export type ContentData =
-  | { type: "message"; heading?: string; body: string }
+  | (BaseContent & { type: "message"; heading?: string; body: string })
   | {
       type: "task" | "issue";
       title: string;
       description: string;
       flavor?: string;
       optionDetails: { label: string; outcome?: string }[];
+      notice?: NoticeData;
     }
-  | { type: "outcome"; label: string; outcome?: string }
+  | (BaseContent & { type: "outcome"; label: string; outcome?: string })
   | {
       type: "summary";
       heading: string;
       body: string;
       bullets: string[];
+      highlights?: string[];
+      seasonSummaries?: string[];
+      trendLines?: string[];
+      projection?: string[];
       achievements?: string[];
+      notice?: NoticeData;
     }
-  | { type: "setup"; heading: string; subtitle?: string };
+  | (BaseContent & { type: "setup"; heading: string; subtitle?: string });

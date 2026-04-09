@@ -6,9 +6,20 @@
 
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
-import { pickPlanningBlockOptions, summarizePlanningBlock } from '../data/planningBlocks.js';
+import {
+  buildPlanningConstraintTriage,
+  getPlanningAreaBlockPool,
+  getPlanningTriageLabel,
+  getPlanningTriageScrutinyDelta,
+  pickPlanningBlockOptions,
+  summarizePlanningBlock,
+  formatPlanningBlockLabel,
+  formatPlanningBlockPromptDescription,
+} from '../data/planningBlocks.js';
 import { isPlanningApprovalReady } from './shared/endConditions.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
+import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
+import { getAreaSituationSummary } from '../data/areaSituations.js';
 
 /**
  * Run a planning day with multi-action system
@@ -133,12 +144,33 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
     ui.write(`Days Remaining: ${Math.max(0, journey.deadline - journey.day)}`);
   }
   ui.write(`Data: ${journey.plan.dataCompleteness}% | Analysis: ${journey.plan.analysisQuality}% | Buy-in: ${journey.plan.stakeholderBuyIn}% | Confidence: ${journey.plan.ministerialConfidence}%`);
+  if (journey.plan.phase === 'ministerial_approval') {
+    const gap = Math.max(0, 80 - journey.plan.ministerialConfidence);
+    if (gap > 0) {
+      ui.write(`Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Use Ministerial Outreach to recover ground before submission.`);
+    } else {
+      ui.write('Approval threshold reached. A full submission can carry the plan across the line.');
+    }
+  }
 
   // Values balance (Phase 4.1 - these now matter)
   ui.write(`Values: Bio ${journey.values.biodiversity}% | Timber ${journey.values.timberSupply}% | Community ${journey.values.communityNeeds}% | FN ${journey.values.firstNationsValues}%`);
 
   // Resources
   ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Political Capital: ${journey.resources.politicalCapital} | Data: ${journey.resources.dataCredits}`);
+  if (Number.isFinite(journey.scrutiny)) {
+    const scrutiny = Math.round(journey.scrutiny);
+    const scrutinyLevel = scrutiny > 70 ? 'HIGH' : scrutiny > 40 ? 'MODERATE' : 'LOW';
+    ui.write(`Scrutiny: ${scrutiny}% (${scrutinyLevel})`);
+  }
+  const areaSituation = getAreaSituationSummary(journey);
+  if (areaSituation) {
+    ui.write(`Area Situation: ${areaSituation}`);
+  }
+  const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'planner', 2);
+  if (discoveryNotes.length > 0) {
+    ui.write(`Carry-forward: ${discoveryNotes.join(' | ')}`);
+  }
 
   if (journey.blockPlanning?.activeSummary) {
     ui.write(`Active Block: ${journey.blockPlanning.activeSummary}`);
@@ -155,50 +187,53 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
   if (!plannerState) return;
   if (journey.day < (plannerState.nextSelectionDay || 1)) return;
 
-  const options = pickPlanningBlockOptions(journey.areaId, plannerState.history, 3);
-  if (!options.length) return;
-
   displayPlanningHeader(ui, journey, seasonInfo);
   ui.writeHeader('CUTBLOCK PRIORITY DECISION');
-  ui.write('Choose which real block/opening to prioritize for the next planning window.');
+  ui.write('Choose how to triage the area constraints before you lock the next block focus.');
   ui.write('');
 
+  const allBlocks = getPlanningAreaBlockPool(journey.areaId);
+  const triage = buildPlanningConstraintTriage(journey.areaId, journey.area, allBlocks);
+  if (triage.area?.zoneSummary) {
+    ui.write(triage.area.zoneSummary);
+  }
+  ui.write(triage.summary);
+  ui.write('');
+
+  const triageChoice = await ui.promptChoice('Constraint triage:', triage.options);
+  const triageDelta = getPlanningTriageScrutinyDelta(triageChoice.value);
+  if (triageDelta !== 0) {
+    journey.scrutiny = clampValue((journey.scrutiny || 0) + triageDelta);
+    const direction = triageDelta > 0 ? 'rises' : 'eases';
+    ui.write(`Scrutiny ${direction} to ${Math.round(journey.scrutiny)}% as you choose ${getPlanningTriageLabel(triageChoice.value)}.`);
+  }
+  ui.write('');
+
+  const options = pickPlanningBlockOptions(journey.areaId, plannerState.history, 3, triageChoice.value, journey.area);
+  if (!options.length) return;
+
   const promptOptions = options.map((block) => {
-    const timber = Math.round(block?.metrics?.timberOpportunity || 0);
-    const eco = Math.round(block?.metrics?.biodiversitySensitivity || 0);
-    const fn = Math.round(block?.metrics?.firstNationsSensitivity || 0);
-    const areaHa = Number(block.areaHa || 0).toFixed(1);
-    const source = block.sourceType === 'planned-cutblock' ? 'Planned Cutblock' : 'Untreated Opening';
     return {
-      label: `${source}: ${block.label}`,
-      description: `${areaHa} ha | ${block.adminDistrict} | Timber ${timber} | Eco ${eco} | FN ${fn}`,
+      label: formatPlanningBlockLabel(block),
+      description: formatPlanningBlockPromptDescription(block, journey.area),
       value: block.id
     };
   });
 
   const selected = await ui.promptChoice('Select active block focus:', promptOptions);
   const chosen = options.find((block) => block.id === selected.value) || options[0];
-  applySelectedBlockImpact(journey, chosen);
-
-  ui.write('');
-  ui.writePositive(`Active focus selected: ${chosen.label}`);
-  ui.write(chosen.summary);
-  ui.write(`Values shift -> Bio ${formatDelta(chosen.valueEffects.biodiversity)} | Timber ${formatDelta(chosen.valueEffects.timberSupply)} | Community ${formatDelta(chosen.valueEffects.communityNeeds)} | FN ${formatDelta(chosen.valueEffects.firstNationsValues)}`);
-  await ui.promptChoice('', [{ label: 'Continue to day planning...', value: 'next' }]);
+  applySelectedBlockImpact(journey, chosen, triageChoice.value);
 }
 
-function formatDelta(value) {
-  const num = Number(value || 0);
-  return num > 0 ? `+${num}` : `${num}`;
-}
-
-function applySelectedBlockImpact(journey, block) {
+function applySelectedBlockImpact(journey, block, triageKey = null) {
   if (!journey.blockPlanning || !block) return;
 
   const state = journey.blockPlanning;
   state.activeBlockId = block.id;
   state.activeBlock = block;
-  state.activeSummary = summarizePlanningBlock(block);
+  state.activeTriage = triageKey;
+  state.activeTriageLabel = getPlanningTriageLabel(triageKey);
+  state.activeSummary = summarizePlanningBlock(block, journey.area, triageKey);
   state.activeEventBias = block.eventBias || null;
   state.history = Array.isArray(state.history) ? [...state.history, block.id].slice(-30) : [block.id];
   state.nextSelectionDay = journey.day + (state.cadenceDays || 3);
@@ -283,7 +318,7 @@ function buildActionOptions(journey) {
     if (valuesOk) {
       actionOptions.push({
         label: 'Prepare Submission (6h)',
-        description: 'Package plan for ministry',
+        description: 'Fastest approval push (+18 confidence)',
         value: 'submit'
       });
     } else {
@@ -293,6 +328,14 @@ function buildActionOptions(journey) {
         value: 'submit_blocked'
       });
     }
+  }
+
+  if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 2 && journey.plan.ministerialConfidence < 78) {
+    actionOptions.push({
+      label: 'Ministerial Outreach (2h)',
+      description: 'Brief decision-makers and recover confidence up to 78%',
+      value: 'outreach'
+    });
   }
 
   // Values workshop - now with tradeoffs (Phase 4.1)
@@ -352,10 +395,17 @@ function buildActionOptions(journey) {
  */
 async function processAction(game, actionValue) {
   const { ui, journey } = game;
+  const discoveryTags = getJourneyDiscoveryTags(journey);
+  const discoveryIds = new Set(discoveryTags.map((tag) => tag.id));
 
   switch (actionValue) {
     case 'gather_data':
       journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + 10);
+      if (discoveryTags.length > 0) {
+        const bonus = Math.min(3, discoveryTags.length);
+        journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + bonus);
+        ui.write(`Carry-forward field intel sharpened the data package (+${bonus}).`);
+      }
       journey.resources.dataCredits -= 10;
       journey.resources.budget = Math.max(0, journey.resources.budget - 900);
       journey.hoursRemaining -= 3;
@@ -369,6 +419,11 @@ async function processAction(game, actionValue) {
 
     case 'analyze':
       journey.plan.analysisQuality = Math.min(100, journey.plan.analysisQuality + 15);
+      if (discoveryTags.length > 0) {
+        const bonus = Math.min(4, discoveryTags.length * 2);
+        journey.plan.analysisQuality = Math.min(100, journey.plan.analysisQuality + bonus);
+        ui.write(`Existing ground intel tightened the analysis (+${bonus}).`);
+      }
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       journey.hoursRemaining -= 4;
       applyProtagonistCost(journey, { energy: 15, stress: 12 });
@@ -381,6 +436,10 @@ async function processAction(game, actionValue) {
 
     case 'stakeholder':
       journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 10);
+      if (discoveryIds.has('community_visibility') || discoveryIds.has('cultural_hold') || discoveryIds.has('watershed_watch')) {
+        journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
+        ui.write('Concrete field findings gave the stakeholder session more weight (+2 buy-in).');
+      }
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 6);
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       journey.hoursRemaining -= 4;
@@ -402,17 +461,36 @@ async function processAction(game, actionValue) {
       break;
 
     case 'submit':
-      journey.plan.ministerialConfidence = Math.min(100, journey.plan.ministerialConfidence + 15);
+      journey.plan.ministerialConfidence = Math.min(100, journey.plan.ministerialConfidence + 18);
       journey.hoursRemaining -= 6;
-      journey.resources.budget = Math.max(0, journey.resources.budget - 2500);
+      journey.resources.budget = Math.max(0, journey.resources.budget - 2200);
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
       applyProtagonistCost(journey, { energy: 25, stress: 20 });
       ui.write(`Submission prepared. Confidence: ${journey.plan.ministerialConfidence}%`);
       if (isPlanningApprovalReady(journey)) {
         journey.isComplete = true;
         journey.endReason = 'Landscape plan approved by Ministry!';
+      } else {
+        const gap = Math.max(0, 80 - journey.plan.ministerialConfidence);
+        ui.write(`Still ${gap} point${gap === 1 ? '' : 's'} short of approval-ready confidence.`);
       }
       break;
+
+    case 'outreach': {
+      const previousConfidence = journey.plan.ministerialConfidence;
+      journey.plan.ministerialConfidence = Math.min(78, journey.plan.ministerialConfidence + 8);
+      journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
+      journey.resources.budget = Math.max(0, journey.resources.budget - 600);
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);
+      journey.hoursRemaining -= 2;
+      applyProtagonistCost(journey, { energy: 8, stress: 7 });
+
+      const gained = journey.plan.ministerialConfidence - previousConfidence;
+      const gap = Math.max(0, 80 - journey.plan.ministerialConfidence);
+      ui.write(`Briefings improved ministerial confidence by ${gained} points to ${journey.plan.ministerialConfidence}%.`);
+      ui.write(`You are ${gap} point${gap === 1 ? '' : 's'} short of the submission threshold.`);
+      break;
+    }
 
     case 'values': {
       // Values workshop with tradeoffs (Phase 4.1)

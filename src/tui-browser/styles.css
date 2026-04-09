@@ -163,6 +163,17 @@ body {
   font-weight: 700;
 }
 
+.tui-notice {
+  border: 1px solid currentColor;
+  padding: 0.7rem 0.8rem;
+  background: rgba(34, 40, 48, 0.35);
+}
+
+.tui-notice-heading {
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
 .tui-copy {
   margin: 0;
   line-height: 1.55;

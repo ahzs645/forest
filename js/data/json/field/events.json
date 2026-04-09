@@ -782,6 +782,161 @@
     ]
   },
   {
+    "id": "peat_crossing_pumping",
+    "title": "Peat Crossing Starts Pumping",
+    "type": "terrain",
+    "severity": "moderate",
+    "probability": 0.05,
+    "roles": ["recce"],
+    "areaTags": ["peatland", "peace-region"],
+    "becCodes": ["BWBSmw1"],
+    "terrainTrigger": ["muskeg"],
+    "description": "A probe rod drops through the road edge and brown water wells up. The peat mat under the approach is losing strength faster than the road card suggested.",
+    "options": [
+      {
+        "label": "Flag the soft ground and back crews off",
+        "outcome": "You mark the weak spots, limit traffic, and keep the problem from becoming a full blowout.",
+        "effects": {
+          "progress": -4,
+          "equipment": -2
+        }
+      },
+      {
+        "label": "Lay brush and corduroy the approach",
+        "outcome": "The crew spends the shift reinforcing the crossing. It holds, but everyone feels the extra work.",
+        "effects": {
+          "progress": -2,
+          "crew_morale": -4,
+          "equipment": -3
+        }
+      },
+      {
+        "label": "Test it with one light pickup",
+        "outcome": "The pickup squeaks through, but the shoulders slump and the crossing is worse by evening.",
+        "effects": {
+          "progress": 2,
+          "equipment": -8
+        },
+        "riskInjury": 0.1
+      }
+    ]
+  },
+  {
+    "id": "salmon_crossing_red_flag",
+    "title": "Fish Passage Red Flag",
+    "type": "terrain",
+    "severity": "moderate",
+    "probability": 0.04,
+    "roles": ["recce"],
+    "areaTags": ["salmon", "cwh"],
+    "becCodes": ["CWHws2"],
+    "terrainTrigger": ["river"],
+    "description": "The crossing looks rougher on the ground than on the map: fresh scour, perched flow, and salmon visible below the pipe but not above it.",
+    "options": [
+      {
+        "label": "Shut the crossing down and call it in",
+        "outcome": "You stop traffic, document the outlet, and force the fix into the engineering queue before more damage is done.",
+        "effects": {
+          "progress": -5,
+          "equipment": -1
+        }
+      },
+      {
+        "label": "Restrict loads and post a spotter",
+        "outcome": "The crossing survives the day, but everyone knows it is now on borrowed time.",
+        "effects": {
+          "progress": -2,
+          "crew_morale": -3
+        }
+      },
+      {
+        "label": "Keep moving and note it for later",
+        "outcome": "You buy a few production hours, but the crew knows this crossing just became a liability.",
+        "effects": {
+          "progress": 4,
+          "equipment": -5,
+          "crew_morale": -5
+        }
+      }
+    ]
+  },
+  {
+    "id": "smoke_hold",
+    "title": "Smoke Hold at Camp",
+    "type": "weather",
+    "severity": "moderate",
+    "probability": 0.04,
+    "roles": ["recce", "silviculture"],
+    "areaTags": ["wildfire"],
+    "becCodes": ["SBSwk1"],
+    "description": "Smoke settles over camp and the air quality keeps climbing. The block is still there, but the work window is shrinking by the hour.",
+    "options": [
+      {
+        "label": "Stand crews down and switch to low-exposure tasks",
+        "outcome": "You burn the shift on mapping, maintenance, and reporting until the air improves.",
+        "effects": {
+          "progress": -4,
+          "equipment": 2
+        }
+      },
+      {
+        "label": "Run a shortened shift with respirators",
+        "outcome": "Some work gets done, but nobody mistakes it for a normal day.",
+        "effects": {
+          "progress": 2,
+          "crew_morale": -4,
+          "budget": -600
+        }
+      },
+      {
+        "label": "Push full production",
+        "outcome": "The numbers look better by supper, but the crew is drained and the call feels harder to defend.",
+        "effects": {
+          "progress": 5,
+          "crew_morale": -8
+        },
+        "riskInjury": 0.12
+      }
+    ]
+  },
+  {
+    "id": "regen_stress_patch",
+    "title": "Patchy Regen Stress",
+    "type": "forest_health",
+    "severity": "moderate",
+    "probability": 0.05,
+    "roles": ["silviculture"],
+    "areaTags": ["beetle-recovery"],
+    "becCodes": ["SBSwk1"],
+    "description": "A beetle-era planting block looks fine from the road, but the walk-through tells a different story: thin stocking on hot knolls, brush pressure in the draws, and seedlings already losing ground.",
+    "options": [
+      {
+        "label": "Re-stratify the block and hit the worst patches first",
+        "outcome": "You focus effort where survival is slipping fastest and get ahead of the worst failures.",
+        "effects": {
+          "progress": 1,
+          "equipment": -1,
+          "budget": -1200
+        }
+      },
+      {
+        "label": "Order fill-plant and brush follow-up",
+        "outcome": "The prescription gets more expensive, but the stand has a better chance of evening out.",
+        "effects": {
+          "progress": -1,
+          "budget": -2500
+        }
+      },
+      {
+        "label": "Leave it for the formal survey window",
+        "outcome": "You save today's budget and lose time while the weak patches keep declaring themselves.",
+        "effects": {
+          "progress": -3
+        }
+      }
+    ]
+  },
+  {
     "id": "story_arc_ancientGrove_stage0",
     "title": "Discovery of the Ancient Grove",
     "type": "narrative",

@@ -59,6 +59,7 @@ export function createReconJourney(options = {}) {
 
     // Season integration
     season: createSeasonState(roleId),
+    scrutiny: 28,
 
     // Recon-specific tracking
     blocksAssessed: 0,
@@ -72,6 +73,8 @@ export function createReconJourney(options = {}) {
       gpsUnits: 5,
       flaggingTape: 50,
     },
+
+    discoveryTags: [],
   };
 }
 
@@ -93,6 +96,7 @@ export function createSilvicultureJourney(options = {}) {
 
     // Season integration
     season: createSeasonState(effectiveRoleId),
+    scrutiny: 24,
     day: 1,
 
     // Planting Program
@@ -128,6 +132,8 @@ export function createSilvicultureJourney(options = {}) {
       equipment: 100,
       nurseryCredit: 50,
     },
+
+    discoveryTags: [],
 
     // Party
     crew: crew || generateCrew(4, "field"),
@@ -191,6 +197,7 @@ export function createPlanningJourney(options = {}) {
 
     // Season integration
     season: createSeasonState(effectiveRoleId),
+    scrutiny: 34,
     day: 1,
     deadline: 20,
     hoursRemaining: 8,
@@ -260,6 +267,8 @@ export function createPlanningJourney(options = {}) {
       consultantDays: 30,
     },
 
+    discoveryTags: [],
+
     // NO crew for protagonist mode
     crew: [],
 
@@ -293,6 +302,7 @@ export function createPermittingJourney(options = {}) {
 
     // Season integration
     season: createSeasonState(effectiveRoleId),
+    scrutiny: 38,
     day: 1,
     deadline: 30,
     hoursRemaining: 8,
@@ -346,6 +356,8 @@ export function createPermittingJourney(options = {}) {
     // Resources (no crew-related)
     resources: createDeskResources(),
 
+    discoveryTags: [],
+
     // NO crew for protagonist mode
     crew: [],
 
@@ -378,6 +390,7 @@ export function createFieldJourney(options = {}) {
     area,
 
     // Progress
+    scrutiny: 22,
     day: 1,
     currentBlockIndex: 0,
     distanceTraveled: 0,
@@ -404,6 +417,8 @@ export function createFieldJourney(options = {}) {
     // Party
     crew: crew || generateCrew(5, "field"),
     resources: createFieldResources(),
+
+    discoveryTags: [],
 
     // State flags
     isComplete: false,
@@ -445,6 +460,7 @@ export function createDeskJourney(options = {}) {
     area,
 
     // Progress
+    scrutiny: 32,
     day: 1,
     deadline: 30,
     currentPhase: "planning",
@@ -470,6 +486,8 @@ export function createDeskJourney(options = {}) {
     // Party
     crew: crew || generateCrew(5, "desk"),
     resources: createDeskResources(),
+
+    discoveryTags: [],
 
     // Daily time tracking
     hoursRemaining: 8,
@@ -497,6 +515,7 @@ export function createManagerJourney(options = {}) {
   return {
     ...options,
     journeyType: "manager",
+    scrutiny: 36,
     day: 1,
     metrics: {
       progress: 50,
@@ -512,6 +531,7 @@ export function createManagerJourney(options = {}) {
       budget: 100000, // Higher starting budget for manager
       politicalCapital: 100,
     },
+    discoveryTags: [],
     flags: {},
     certifications: [],
     ceo: null,

@@ -8,6 +8,370 @@ import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js
 import { calculateDeskConsumption, applyConsumption, applyDeskRegen, getFormattedResourceStatus, DESK_RESOURCES } from '../resources.js';
 import { executeDeskDay, DESK_ACTIONS } from '../journey.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
+import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
+import { getAreaSituationSummary } from '../data/areaSituations.js';
+
+const PERMIT_REVISION_PROFILES = [
+  {
+    id: 'fish-passage',
+    title: 'Fish passage detail',
+    summary: 'The crossing package needs clearer stream, culvert, and drainage support.',
+    tags: ['salmon', 'fish', 'stream', 'river', 'riparian', 'wetland'],
+    clean: {
+      hours: 3,
+      label: 'Clean up the crossing file',
+      note: 'You rebuild the package with better drawings and hydrology notes.',
+      scrutiny: -3,
+      compliance: 4,
+      relationships: { agencies: 1 }
+    },
+    fast: {
+      hours: 2,
+      label: 'Fast-track the crossing file',
+      note: 'You resubmit quickly and lean on the existing package.',
+      scrutiny: 4,
+      compliance: 1,
+      politicalCapital: -2,
+      relationships: { agencies: -1 }
+    }
+  },
+  {
+    id: 'community-watershed',
+    title: 'Community watershed note',
+    summary: 'The hydrology memo needs stronger protection language.',
+    tags: ['watershed', 'drinking-water', 'community-interface', 'water'],
+    clean: {
+      hours: 3,
+      label: 'Rework the watershed package',
+      note: 'You add a more defensible water-quality response and timing note.',
+      scrutiny: -3,
+      compliance: 5,
+      relationships: { ministry: 1, agencies: 1 }
+    },
+    fast: {
+      hours: 2,
+      label: 'Push the watershed file',
+      note: 'You keep the file moving, but the shorter response draws attention.',
+      scrutiny: 4,
+      compliance: 1,
+      politicalCapital: -1,
+      relationships: { ministry: -1 }
+    }
+  },
+  {
+    id: 'consultation',
+    title: 'Consultation record',
+    summary: 'The reviewer wants a clearer accommodation trail and map context.',
+    tags: ['nations', 'cultural', 'archaeology', 'consultation', 'values'],
+    clean: {
+      hours: 3,
+      label: 'Tighten the consultation record',
+      note: 'You rebuild the record trail and clean up the accommodation notes.',
+      scrutiny: -3,
+      compliance: 4,
+      relationships: { nations: 2, agencies: 1 }
+    },
+    fast: {
+      hours: 2,
+      label: 'Resubmit consultation notes',
+      note: 'You move quickly, but the lighter package leaves more heat behind.',
+      scrutiny: 5,
+      compliance: 1,
+      politicalCapital: -2,
+      relationships: { nations: -2 }
+    }
+  },
+  {
+    id: 'visual-quality',
+    title: 'Visual quality package',
+    summary: 'The layout needs a better public-facing map and sightline explanation.',
+    tags: ['visuals', 'recreation', 'trail', 'community-interface'],
+    clean: {
+      hours: 3,
+      label: 'Redraw the visual package',
+      note: 'You tighten the map set and the file reads as more defensible.',
+      scrutiny: -3,
+      compliance: 3,
+      relationships: { ministry: 1 }
+    },
+    fast: {
+      hours: 2,
+      label: 'Minimal visual edits',
+      note: 'You keep the turnaround short, but the thinner package stays under a microscope.',
+      scrutiny: 4,
+      compliance: 1,
+      politicalCapital: -1,
+      relationships: { ministry: -1 }
+    }
+  },
+  {
+    id: 'access-engineering',
+    title: 'Access engineering note',
+    summary: 'The road package needs clearer access, drainage, and deactivation detail.',
+    tags: ['road', 'access', 'steep', 'karst', 'winter-road'],
+    clean: {
+      hours: 3,
+      label: 'Strengthen the access package',
+      note: 'You tidy up the engineering notes and reduce the reviewer’s concerns.',
+      scrutiny: -2,
+      compliance: 4,
+      relationships: { agencies: 1 }
+    },
+    fast: {
+      hours: 2,
+      label: 'Keep the access package moving',
+      note: 'You push the file through with minimal edits and pay for it in attention.',
+      scrutiny: 4,
+      compliance: 1,
+      politicalCapital: -2,
+      relationships: { agencies: -1 }
+    }
+  },
+  {
+    id: 'package-completeness',
+    title: 'Package completeness',
+    summary: 'The file is technically usable, but the reviewer wants a cleaner submission.',
+    tags: [],
+    clean: {
+      hours: 3,
+      label: 'Clean up the package',
+      note: 'You chase down the missing pieces and make the submission more defensible.',
+      scrutiny: -2,
+      compliance: 3,
+      relationships: { ministry: 1, agencies: 1 }
+    },
+    fast: {
+      hours: 2,
+      label: 'Submit the bare-minimum revision',
+      note: 'You keep momentum, but the lean response adds heat to the file.',
+      scrutiny: 3,
+      compliance: 1,
+      politicalCapital: -1,
+      relationships: { ministry: -1, agencies: -1 }
+    }
+  }
+];
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, value));
+}
+
+/**
+ * Ensure the permitting-specific lazy state exists.
+ * @param {Object} journey - Journey state
+ * @returns {Array} Open revision tickets
+ */
+function ensurePermitRevisionBaseState(journey) {
+  if (!journey.permits) journey.permits = {};
+  if (!Array.isArray(journey.permits.revisionQueue)) {
+    journey.permits.revisionQueue = [];
+  }
+
+  if (!Number.isFinite(journey.permits.revisionSeq)) {
+    journey.permits.revisionSeq = journey.permits.revisionQueue.length;
+  }
+
+  if (!Number.isFinite(journey.scrutiny)) {
+    const compliance = Number.isFinite(journey.regulations?.complianceScore)
+      ? journey.regulations.complianceScore
+      : 65;
+    journey.scrutiny = clampPercent(Math.round(100 - compliance));
+  } else {
+    journey.scrutiny = clampPercent(Math.round(journey.scrutiny));
+  }
+
+  return journey.permits.revisionQueue;
+}
+
+export function ensurePermittingRevisionState(journey) {
+  const queue = ensurePermitRevisionBaseState(journey);
+  const missingTickets = Math.max(0, (journey.permits.needsRevision || 0) - journey.permits.revisionQueue.length);
+  for (let i = 0; i < missingTickets; i++) {
+    const profile = pickRevisionProfile(journey, journey.permits.revisionQueue.length + i);
+    const nextSeq = (journey.permits.revisionSeq || 0) + 1;
+    journey.permits.revisionSeq = nextSeq;
+    journey.permits.revisionQueue.push({
+      id: `revision-${journey.day || 0}-${nextSeq}-${profile.id}`,
+      profileId: profile.id,
+      title: profile.title,
+      summary: profile.summary,
+      clean: profile.clean,
+      fast: profile.fast,
+      sourcePhase: journey.currentPhase || 'review',
+      source: 'sync'
+    });
+  }
+
+  return queue;
+}
+
+function scoreRevisionProfiles(journey) {
+  const areaTags = Array.isArray(journey?.area?.tags) ? journey.area.tags : [];
+  const phase = journey?.currentPhase || '';
+
+  return PERMIT_REVISION_PROFILES
+    .map((profile) => {
+      let score = profile.tags.length === 0 ? 1 : 0;
+      for (const tag of profile.tags) {
+        if (areaTags.includes(tag)) score += 3;
+      }
+      if (phase === 'review' && profile.id !== 'package-completeness') score += 1;
+      return { profile, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.profile);
+}
+
+function pickRevisionProfile(journey, index = 0) {
+  const profiles = scoreRevisionProfiles(journey);
+  if (!profiles.length) {
+    return PERMIT_REVISION_PROFILES[PERMIT_REVISION_PROFILES.length - 1];
+  }
+  return profiles[index % profiles.length];
+}
+
+/**
+ * Seed revision tickets for newly returned permits.
+ * @param {Object} journey - Journey state
+ * @param {number} count - Number of new deficiencies
+ * @param {Object} source - Optional source metadata
+ * @returns {Array} Open revision tickets
+ */
+export function seedPermitRevisionTickets(journey, count = 1, source = {}) {
+  const queue = ensurePermitRevisionBaseState(journey);
+  const total = Math.max(0, Math.floor(count));
+
+  for (let i = 0; i < total; i++) {
+    pushRevisionTicket(journey, queue.length + i, source);
+  }
+
+  return queue;
+}
+
+function pushRevisionTicket(journey, index, source = {}) {
+  const profile = pickRevisionProfile(journey, index);
+  const nextSeq = (journey.permits.revisionSeq || 0) + 1;
+  journey.permits.revisionSeq = nextSeq;
+  const ticket = {
+    id: `revision-${journey.day || 0}-${nextSeq}-${profile.id}`,
+    profileId: profile.id,
+    title: profile.title,
+    summary: profile.summary,
+    clean: profile.clean,
+    fast: profile.fast,
+    sourcePhase: journey.currentPhase || 'review',
+    source: source.type || source.reason || 'review'
+  };
+  journey.permits.revisionQueue.push(ticket);
+  return ticket;
+}
+
+function applyRevisionEffects(journey, effects) {
+  if (!effects) return;
+
+  if (typeof effects.scrutiny === 'number') {
+    journey.scrutiny = clampPercent((journey.scrutiny || 0) + effects.scrutiny);
+  }
+
+  if (typeof effects.compliance === 'number' && typeof journey.regulations?.complianceScore === 'number') {
+    journey.regulations.complianceScore = clampPercent(
+      journey.regulations.complianceScore + effects.compliance
+    );
+  }
+
+  if (typeof effects.politicalCapital === 'number' && typeof journey.resources?.politicalCapital === 'number') {
+    journey.resources.politicalCapital = clampPercent(
+      journey.resources.politicalCapital + effects.politicalCapital
+    );
+  }
+
+  if (effects.relationships && journey.relationships) {
+    for (const [key, delta] of Object.entries(effects.relationships)) {
+      if (typeof journey.relationships[key] === 'number') {
+        journey.relationships[key] = clampPercent(journey.relationships[key] + delta);
+      }
+    }
+  }
+
+  if (typeof effects.reputation === 'number' && journey.protagonist) {
+    journey.protagonist.reputation = clampPercent(
+      (journey.protagonist.reputation || 0) + effects.reputation
+    );
+  }
+}
+
+/**
+ * Resolve a permit revision ticket with a clean or fast response.
+ * @param {Object} journey - Journey state
+ * @param {string|null} ticketId - Optional deficiency id
+ * @param {string} mode - 'clean' or 'fast'
+ * @returns {Object} Result details
+ */
+export function resolvePermitRevisionResponse(journey, ticketId = null, mode = 'clean') {
+  const queue = ensurePermittingRevisionState(journey);
+  const selectedMode = mode === 'fast' ? 'fast' : 'clean';
+  const ticketIndex = ticketId
+    ? queue.findIndex((ticket) => ticket.id === ticketId)
+    : 0;
+  const ticket = ticketIndex >= 0 ? queue[ticketIndex] : null;
+
+  if (!ticket) {
+    return {
+      resolved: false,
+      mode: selectedMode,
+      ticket: null,
+      hoursUsed: 0,
+      messages: ['No open deficiency file was available to respond to.']
+    };
+  }
+
+  const response = ticket[selectedMode] || ticket.clean;
+  const hoursUsed = Math.max(0, response.hours || 0);
+  const availableHours = Number.isFinite(journey.hoursRemaining) ? journey.hoursRemaining : 0;
+
+  if (availableHours < hoursUsed) {
+    return {
+      resolved: false,
+      mode: selectedMode,
+      ticket,
+      hoursUsed: 0,
+      messages: ['Not enough hours remain to address that deficiency today.']
+    };
+  }
+
+  journey.hoursRemaining = availableHours - hoursUsed;
+  applyProtagonistCost(journey, {
+    energy: selectedMode === 'fast' ? 6 : 8,
+    stress: selectedMode === 'fast' ? 7 : 4
+  });
+  applyRevisionEffects(journey, response);
+
+  queue.splice(ticketIndex, 1);
+  if (journey.permits) {
+    journey.permits.needsRevision = Math.max(0, (journey.permits.needsRevision || 0) - 1);
+    journey.permits.submitted = (journey.permits.submitted || 0) + 1;
+  }
+
+  const responseLabel = selectedMode === 'fast' ? 'Quick resubmission' : 'Clean response';
+  const messages = [
+    `${responseLabel} filed for ${ticket.title}.`,
+    response.note
+  ];
+
+  if (selectedMode === 'fast') {
+    messages.push('It keeps the file moving, but it adds heat to the review trail.');
+  } else {
+    messages.push('The file reads cleaner and should draw less scrutiny on the next pass.');
+  }
+
+  return {
+    resolved: true,
+    mode: selectedMode,
+    ticket,
+    hoursUsed,
+    messages
+  };
+}
 
 /**
  * Run a permitting day (permit processing with referral tracking)
@@ -15,6 +379,7 @@ import { getOperationalProgress, recordProgressMilestones } from '../journey.js'
  */
 export async function runPermittingDay(game) {
   const { ui, journey } = game;
+  ensurePermittingRevisionState(journey);
   const daysRemaining = journey.deadline - journey.day;
   const progressBeforeDay = getOperationalProgress(journey);
   let meetingsToday = 0;
@@ -48,10 +413,26 @@ export async function runPermittingDay(game) {
 
     const backlog = journey.permits.backlog || 0;
     const inReferral = journey.permits.inReferral || 0;
+    const revisionQueue = journey.permits.revisionQueue || [];
     ui.write(`Pipeline Status:`);
     ui.write(`  Backlog: ${backlog} | Drafting: ${journey.permits.drafting || 0}`);
     ui.write(`  Submitted: ${journey.permits.submitted} | In Referral: ${inReferral}`);
     ui.write(`  In Review: ${journey.permits.inReview} | Needs Revision: ${journey.permits.needsRevision}`);
+    ui.write(`  Scrutiny / Heat: ${Math.round(journey.scrutiny || 0)}%`);
+    if (revisionQueue.length > 0) {
+      ui.write(`  Open Deficiencies: ${revisionQueue.length}`);
+      for (const ticket of revisionQueue.slice(0, 2)) {
+        ui.write(`    - ${ticket.title}: ${ticket.summary}`);
+      }
+    }
+    const areaSituation = getAreaSituationSummary(journey);
+    if (areaSituation) {
+      ui.write(`  Area Situation: ${areaSituation}`);
+    }
+    const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'permitter', 2);
+    if (discoveryNotes.length > 0) {
+      ui.write(`  Carry-forward: ${discoveryNotes.join(' | ')}`);
+    }
     ui.write('');
 
     // Show relationships (protagonist mode)
@@ -157,6 +538,7 @@ function displayProtagonistStatus(ui, protagonist) {
 function buildActionOptions(journey) {
   const actionOptions = [];
   const hoursLeft = journey.hoursRemaining || 8;
+  const revisionQueue = ensurePermittingRevisionState(journey);
 
   // Permit-specific actions
   if (journey.permits.backlog > 0 && hoursLeft >= 2) {
@@ -175,12 +557,22 @@ function buildActionOptions(journey) {
     });
   }
 
-  if (journey.permits.needsRevision > 0 && hoursLeft >= 3) {
-    actionOptions.push({
-      label: 'Address Revisions',
-      description: '3h - Fix issues on returned permits',
-      value: 'revise_permit'
-    });
+  const openRevisionTickets = revisionQueue.filter((ticket) => ticket && !ticket.resolved);
+  for (const ticket of openRevisionTickets.slice(0, 3)) {
+    if (hoursLeft >= ticket.clean.hours) {
+      actionOptions.push({
+        label: `Clean response: ${ticket.title}`,
+        description: `${ticket.clean.hours}h - cleaner file, lower scrutiny`,
+        value: `revise_permit:${ticket.id}:clean`
+      });
+    }
+    if (hoursLeft >= ticket.fast.hours) {
+      actionOptions.push({
+        label: `Fast-track: ${ticket.title}`,
+        description: `${ticket.fast.hours}h - quicker resubmission, more heat`,
+        value: `revise_permit:${ticket.id}:fast`
+      });
+    }
   }
 
   // Referral management (permitting-specific)
@@ -229,6 +621,36 @@ function buildActionOptions(journey) {
  */
 async function processAction(game, actionId) {
   const { ui, journey } = game;
+  const discoveryIds = new Set(getJourneyDiscoveryTags(journey).map((tag) => tag.id));
+
+  if (typeof actionId === 'string' && actionId.startsWith('revise_permit')) {
+    const [, ticketId, mode] = actionId.split(':');
+    const result = resolvePermitRevisionResponse(journey, ticketId || null, mode || 'clean');
+
+    ui.write('');
+    if (result.messages.length > 0) {
+      const primaryWriter = result.mode === 'fast' ? ui.writeWarning.bind(ui) : ui.writePositive.bind(ui);
+      primaryWriter(result.messages[0]);
+      for (const msg of result.messages.slice(1)) {
+        ui.write(msg);
+      }
+    }
+    return;
+  }
+
+  if (actionId === 'revise_permit') {
+    const result = resolvePermitRevisionResponse(journey, null, 'clean');
+
+    ui.write('');
+    if (result.messages.length > 0) {
+      const primaryWriter = result.mode === 'fast' ? ui.writeWarning.bind(ui) : ui.writePositive.bind(ui);
+      primaryWriter(result.messages[0]);
+      for (const msg of result.messages.slice(1)) {
+        ui.write(msg);
+      }
+    }
+    return;
+  }
 
   // Permit-specific actions
   switch (actionId) {
@@ -250,23 +672,25 @@ async function processAction(game, actionId) {
         applyProtagonistCost(journey, { energy: 5, stress: 3 });
 
         // Some permits go to referral, some to direct review
-        if (Math.random() < 0.3) {
+        const hotFilePressure = (
+          Number(discoveryIds.has('watershed_watch'))
+          + Number(discoveryIds.has('cultural_hold'))
+          + Number(discoveryIds.has('community_visibility'))
+          + Number(discoveryIds.has('access_rehab'))
+        );
+        const referralChance = Math.min(0.6, 0.3 + hotFilePressure * 0.08);
+        if (hotFilePressure > 0) {
+          journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 1);
+        }
+        if (Math.random() < referralChance) {
           journey.permits.inReferral = (journey.permits.inReferral || 0) + 1;
           journey.permits.submitted--;
-          ui.write('Permit submitted - sent for First Nations referral.');
+          ui.write(hotFilePressure > 0
+            ? 'Permit submitted - the hot spots in the file sent it into referral.'
+            : 'Permit submitted - sent for First Nations referral.');
         } else {
           ui.write('Permit submitted for ministry review.');
         }
-      }
-      return;
-
-    case 'revise_permit':
-      if (journey.permits.needsRevision > 0) {
-        journey.permits.needsRevision--;
-        journey.permits.submitted++;
-        journey.hoursRemaining -= 3;
-        applyProtagonistCost(journey, { energy: 12, stress: 8 });
-        ui.write('Permit revisions completed and resubmitted.');
       }
       return;
 
@@ -281,7 +705,8 @@ async function processAction(game, actionId) {
           journey.permits.inReferral--;
           journey.permits.inReview++;
           if (journey.relationships) {
-            journey.relationships.nations = Math.min(100, journey.relationships.nations + 3);
+            const lift = discoveryIds.has('cultural_hold') ? 4 : 3;
+            journey.relationships.nations = Math.min(100, journey.relationships.nations + lift);
           }
           journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 2);
           ui.write('Referral complete - permit moved to ministry review.');
@@ -429,6 +854,8 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
  * @param {Object} journey - Journey state
  */
 function processPermitPipeline(ui, journey) {
+  const queue = ensurePermittingRevisionState(journey);
+
   // Submitted permits may advance to inReview
   if (journey.permits.submitted > 0) {
     const advancing = Math.floor(journey.permits.submitted * 0.3);
@@ -442,7 +869,9 @@ function processPermitPipeline(ui, journey) {
   // InReview permits may be approved or need revision
   if (journey.permits.inReview > 0) {
     const reviewed = Math.ceil(journey.permits.inReview * 0.4);
-    const approved = Math.floor(reviewed * 0.7);
+    const scrutinyPenalty = Math.min(0.25, (journey.scrutiny || 0) / 400);
+    const approvalRate = Math.max(0.45, 0.72 - scrutinyPenalty);
+    const approved = Math.floor(reviewed * approvalRate);
     const revisions = reviewed - approved;
 
     if (approved > 0) {
@@ -453,8 +882,22 @@ function processPermitPipeline(ui, journey) {
     if (revisions > 0) {
       journey.permits.inReview -= revisions;
       journey.permits.needsRevision += revisions;
+      for (let i = 0; i < revisions; i++) {
+        pushRevisionTicket(journey, queue.length + i, {
+          type: 'review',
+          reason: 'returned_for_revision'
+        });
+      }
       ui.writeWarning(`${revisions} permit(s) returned for revision.`);
     }
+  }
+
+  // Keep the revision queue aligned with the backlog if anything drifted.
+  if (journey.permits.needsRevision > queue.length) {
+    seedPermitRevisionTickets(journey, journey.permits.needsRevision - queue.length, {
+      type: 'repair',
+      reason: 'queue_sync'
+    });
   }
 }
 

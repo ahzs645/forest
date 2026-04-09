@@ -154,7 +154,7 @@ function pickCollapseChoice(labels, terminalText, modeName) {
   }
 
   if (modeName === 'planner') {
-    if (labels.some((label) => label.includes('Planned Cutblock:')) || labels.some((label) => label.includes('Untreated Opening:'))) {
+    if (labels.some((label) => label.startsWith('Cutblock ')) || labels.some((label) => label.startsWith('Opening '))) {
       return 0;
     }
     if (labels.some((label) => label.includes('Emphasize Timber Supply'))) {

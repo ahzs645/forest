@@ -5,6 +5,15 @@
 
 import { FIELD_SHIFT_HOURS } from '../journey/constants.js';
 import { getCurrentSeasonInfo } from '../season.js';
+import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
+import { getAreaSituationSummary } from '../data/areaSituations.js';
+
+function formatScrutiny(scrutiny) {
+  const value = Number(scrutiny || 0);
+  if (value >= 70) return `HIGH (${value}%)`;
+  if (value >= 40) return `ELEVATED (${value}%)`;
+  return `LOW (${value}%)`;
+}
 
 /**
  * Show journey-specific intro based on journey type
@@ -13,6 +22,9 @@ import { getCurrentSeasonInfo } from '../season.js';
  */
 export function showJourneyIntro(ui, journey) {
   const journeyType = journey.journeyType;
+  const roleId = journey.roleId || journey.role?.id;
+  const briefing = getRoleAreaBriefing(roleId, journey.area, { maxFinds: 3 });
+  const areaSituation = getAreaSituationSummary(journey);
 
   // Show season info if available
   if (journey.season) {
@@ -117,5 +129,28 @@ export function showJourneyIntro(ui, journey) {
       ui.write(`  Political Capital: ${journey.resources.politicalCapital}`);
       ui.write(`  Daily Energy: ${journey.hoursRemaining} hours`);
       break;
+  }
+
+  if (briefing.zoneSummary || briefing.likelyFinds.length) {
+    ui.write('');
+  }
+
+  if (briefing.zoneSummary) {
+    ui.write(`Zone Reality: ${briefing.zoneSummary}`);
+  }
+
+  if (areaSituation) {
+    ui.write(`Current Area Situation: ${areaSituation}`);
+  }
+
+  if (Number.isFinite(journey.scrutiny)) {
+    ui.write(`Starting Scrutiny: ${formatScrutiny(journey.scrutiny)}`);
+  }
+
+  if (briefing.likelyFinds.length) {
+    ui.write('Likely finds on this assignment:');
+    for (const finding of briefing.likelyFinds) {
+      ui.write(`  - ${finding}`);
+    }
   }
 }

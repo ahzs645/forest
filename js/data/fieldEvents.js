@@ -34,10 +34,11 @@ export function getApplicableFieldEvents(conditions = {}) {
  * @returns {Object|null} Selected event or null
  */
 export function selectRandomFieldEvent(events, modifiers = {}) {
-  const { paceModifier = 1, terrainModifier = 1 } = modifiers;
+  const { paceModifier = 1, terrainModifier = 1, typeMultipliers = {} } = modifiers;
 
   for (const event of events) {
-    const adjustedProb = event.probability * paceModifier * terrainModifier;
+    const typeMultiplier = Number(typeMultipliers?.[event.type]) || 1;
+    const adjustedProb = event.probability * paceModifier * terrainModifier * typeMultiplier;
     if (Math.random() < adjustedProb) {
       return event;
     }

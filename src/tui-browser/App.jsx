@@ -74,12 +74,49 @@ function NameInput({ inputText }) {
   );
 }
 
+function NoticeBlock({ notice }) {
+  if (!notice) return null;
+
+  const toneClass =
+    {
+      info: "blue",
+      positive: "green",
+      warning: "yellow",
+      danger: "red",
+    }[notice.tone || "info"] || "blue";
+
+  return (
+    <div className={`tui-notice tone-${toneClass}`}>
+      <div className="tui-notice-heading">{notice.heading}</div>
+      {notice.body ? <p className="tui-copy preserve">{notice.body}</p> : null}
+    </div>
+  );
+}
+
+function SummarySection({ title, items, tone }) {
+  if (!items?.length) return null;
+
+  return (
+    <>
+      <div className="tui-subheading">{title}</div>
+      <div className="tui-detail-list">
+        {items.map((item) => (
+          <div className={`tui-copy preserve ${tone ? `tone-${tone}` : ""}`} key={`${title}-${item}`}>
+            {item}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function ContentView({ data }) {
   if (!data) return null;
 
   if (data.type === "message") {
     return (
       <div className="tui-content-stack">
+        <NoticeBlock notice={data.notice} />
         {data.heading ? <div className="tui-heading">{data.heading}</div> : null}
         {data.body ? <p className="tui-copy preserve">{data.body}</p> : null}
       </div>
@@ -89,6 +126,7 @@ function ContentView({ data }) {
   if (data.type === "setup") {
     return (
       <div className="tui-content-stack">
+        <NoticeBlock notice={data.notice} />
         <div className="tui-heading">{data.heading}</div>
         {data.subtitle ? <p className="tui-copy dim">{data.subtitle}</p> : null}
       </div>
@@ -98,6 +136,7 @@ function ContentView({ data }) {
   if (data.type === "task" || data.type === "issue") {
     return (
       <div className="tui-content-stack">
+        <NoticeBlock notice={data.notice} />
         <div className="tui-heading">{data.title}</div>
         <p className="tui-copy preserve">{data.description}</p>
         {data.flavor ? <p className="tui-copy dim preserve">{data.flavor}</p> : null}
@@ -117,25 +156,15 @@ function ContentView({ data }) {
   if (data.type === "summary") {
     return (
       <div className="tui-content-stack">
+        <NoticeBlock notice={data.notice} />
         <div className="tui-heading">{data.heading}</div>
         <p className="tui-copy preserve">{data.body}</p>
-        <div className="tui-detail-list">
-          {data.bullets.map((bullet) => (
-            <div className="tui-copy preserve" key={bullet}>
-              • {bullet}
-            </div>
-          ))}
-        </div>
-        {data.achievements?.length ? (
-          <>
-            <div className="tui-subheading">Achievements</div>
-            {data.achievements.map((achievement) => (
-              <div className="tui-copy tone-green" key={achievement}>
-                {achievement}
-              </div>
-            ))}
-          </>
-        ) : null}
+        <SummarySection title="Signals" items={data.bullets} />
+        <SummarySection title="Key Decisions" items={data.highlights} />
+        <SummarySection title="Season Review" items={data.seasonSummaries} />
+        <SummarySection title="Trendlines" items={data.trendLines} />
+        <SummarySection title="Next Year Outlook" items={data.projection} />
+        <SummarySection title="Achievements" items={data.achievements} tone="green" />
       </div>
     );
   }

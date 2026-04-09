@@ -6,6 +6,7 @@ import {
   applyRoundConsequences,
   drawIssue,
   buildSummary,
+  formatMetricDelta,
   SEASONS,
 } from "../js/engine.js";
 import { detectArt } from "./art.js";
@@ -25,6 +26,29 @@ function createViewState() {
     art: null,
     animFrame: null,
     gameState: null,
+  };
+}
+
+function buildOutcomeNotice(option, outcomeResult) {
+  const riskResult = outcomeResult?.riskResult ?? null;
+  const outcomeText = outcomeResult?.outcome ?? option?.outcome ?? "";
+  const deltaText = formatMetricDelta(outcomeResult?.effects || {});
+  const body = [outcomeText, deltaText ? `Effects: ${deltaText}` : ""]
+    .filter(Boolean)
+    .join("\n\n");
+
+  if (riskResult) {
+    return {
+      heading: riskResult.success ? `Success: ${option.label}` : `Caught: ${option.label}`,
+      body,
+      tone: riskResult.success ? "positive" : "danger",
+    };
+  }
+
+  return {
+    heading: `Decision Logged: ${option.label}`,
+    body,
+    tone: "info",
   };
 }
 
@@ -130,7 +154,7 @@ export class TuiGameController {
     });
   }
 
-  startRound() {
+  startRound(notice = null) {
     const gs = this.gs;
     gs.round += 1;
     const season = SEASONS[gs.round - 1];
@@ -152,7 +176,7 @@ export class TuiGameController {
 
     this.queue.push({
       type: "consequences",
-      execute: () => {
+      execute: (queuedNotice) => {
         const cons = applyRoundConsequences(gs);
         if (cons?.length) {
           this.queue.unshift({
@@ -162,19 +186,19 @@ export class TuiGameController {
           });
         }
         this.emit();
-        this.processNext();
+        this.processNext(queuedNotice);
       },
     });
 
-    this.processNext();
+    this.processNext(notice);
   }
 
-  processNext() {
+  processNext(notice = null) {
     const gs = this.gs;
 
     if (this.queue.length === 0) {
       if (gs && gs.round < gs.totalRounds) {
-        this.startRound();
+        this.startRound(notice);
       } else {
         const summary = buildSummary(gs);
         this.setState({ mode: "end" });
@@ -184,7 +208,12 @@ export class TuiGameController {
             heading: "Year End Review",
             body: summary.overall,
             bullets: summary.messages,
+            highlights: summary.highlights,
+            seasonSummaries: summary.legacy?.seasonSummaries,
+            trendLines: summary.legacy?.trendLines,
+            projection: summary.projection,
             achievements: summary.achievements,
+            notice,
           },
           ["Play Again", "Quit"],
           (idx) => {
@@ -211,6 +240,7 @@ export class TuiGameController {
           type: "message",
           heading: phase.text,
           body: phase.body ?? "",
+          notice,
         },
         ["Continue"],
         () => this.processNext(),
@@ -227,6 +257,7 @@ export class TuiGameController {
           title: item.title,
           description: item.description ?? item.prompt ?? "",
           flavor: phase.type === "issue" ? item.flavor : undefined,
+          notice,
           optionDetails: item.options.map((option) => ({
             label: option.label,
             outcome: option.outcome,
@@ -245,18 +276,7 @@ export class TuiGameController {
 
           this.emit();
 
-          const riskResult = outcomeResult?.riskResult ?? null;
-          const outcomeText = outcomeResult?.outcome ?? option.outcome ?? "";
-          const heading = riskResult
-            ? `${riskResult.success ? "\u2705 Success: " : "\u274c Caught: "}${option.label}`
-            : `Outcome: ${option.label}`;
-
-          this.queue.unshift({
-            type: "message",
-            text: heading,
-            body: `${outcomeText}\n\nEffects applied.`,
-          });
-          this.processNext();
+          this.processNext(buildOutcomeNotice(option, outcomeResult));
         },
         artText,
       );
@@ -264,7 +284,7 @@ export class TuiGameController {
     }
 
     if (phase.type === "consequences") {
-      phase.execute();
+      phase.execute(notice);
     }
   }
 

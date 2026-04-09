@@ -3,6 +3,8 @@
  * Handles landing screen and game initialization flow
  */
 
+import { getRoleAreaBriefing } from "../data/roleAreaIntel.js";
+
 // Role icons mapping (Unicode symbols matching reference)
 export const ROLE_ICONS = {
   planner: '☐',      // Empty checkbox - planning/analysis
@@ -11,6 +13,20 @@ export const ROLE_ICONS = {
   silviculture: '☘', // Plant/seedling - silviculture
   default: '◉'
 };
+
+function getAreaScrutinyProfile(area) {
+  const tags = Array.isArray(area?.tags) ? area.tags : [];
+  let score = 20;
+  if (tags.includes('community-interface')) score += 18;
+  if (tags.includes('community-water') || tags.includes('watershed')) score += 16;
+  if (tags.includes('caribou')) score += 12;
+  if (tags.includes('salmon') || tags.includes('karst')) score += 14;
+  if (tags.includes('gas-interface')) score += 10;
+
+  if (score >= 60) return { label: 'HIGH', score };
+  if (score >= 40) return { label: 'ELEVATED', score };
+  return { label: 'LOW', score };
+}
 
 /**
  * Init flow mixin
@@ -227,6 +243,10 @@ export const InitFlowMixin = {
       card.addEventListener('click', () => {
         this._initState.roleId = role.id;
         this._renderRoleCards(roles);
+        const activeArea = this._initAreas?.find((candidate) => candidate.id === this._initState.areaId) || this._initAreas?.[0];
+        if (activeArea) {
+          this._renderAreaDetail(activeArea, role);
+        }
         // Update zone display based on role ID (new journey types)
         if (this.initZoneDisplay) {
           const journeyTypeLabels = {
@@ -279,7 +299,8 @@ export const InitFlowMixin = {
       item.addEventListener('click', () => {
         this._initState.areaId = area.id;
         this._renderAreaList(areas);
-        this._renderAreaDetail(area);
+        const activeRole = this._initRoles?.find((candidate) => candidate.id === this._initState.roleId) || this._initRoles?.[0];
+        this._renderAreaDetail(area, activeRole);
         this._renderAreaGlossary(area);
       });
 
@@ -291,7 +312,7 @@ export const InitFlowMixin = {
    * Render area detail panel
    * @private
    */
-  _renderAreaDetail(area) {
+  _renderAreaDetail(area, role = null) {
     if (!this.areaDetail || !area) return;
 
     this.areaDetail.innerHTML = '';
@@ -320,8 +341,58 @@ export const InitFlowMixin = {
         <div class="detail-label">COMMUNITIES</div>
         <div class="detail-value">${area.communities?.join(', ')}</div>
       </div>
+      <div>
+        <div class="detail-label">BASE SCRUTINY</div>
+        <div class="detail-value">${getAreaScrutinyProfile(area).label}</div>
+      </div>
     `;
     this.areaDetail.appendChild(meta);
+
+    const briefing = getRoleAreaBriefing(role?.id, area, { maxFinds: 4 });
+
+    if (briefing.zoneSummary) {
+      const zoneReality = document.createElement('div');
+      zoneReality.innerHTML = '<div class="detail-label">ZONE REALITY</div>';
+
+      const note = document.createElement('p');
+      note.className = 'detail-note';
+      note.textContent = briefing.zoneSummary;
+      zoneReality.appendChild(note);
+      this.areaDetail.appendChild(zoneReality);
+    }
+
+    if (briefing.seasonalSignals?.length) {
+      const watchouts = document.createElement('div');
+      watchouts.innerHTML = '<div class="detail-label">SEASONAL WATCHOUTS</div>';
+
+      const list = document.createElement('ul');
+      list.className = 'intel-list';
+      briefing.seasonalSignals.slice(0, 3).forEach((signal) => {
+        const item = document.createElement('li');
+        item.textContent = signal;
+        list.appendChild(item);
+      });
+
+      watchouts.appendChild(list);
+      this.areaDetail.appendChild(watchouts);
+    }
+
+    if (briefing.likelyFinds?.length) {
+      const finds = document.createElement('div');
+      const label = role ? `LIKELY FINDS FOR ${role.name.toUpperCase()}` : 'LIKELY FINDS';
+      finds.innerHTML = `<div class="detail-label">${label}</div>`;
+
+      const list = document.createElement('ul');
+      list.className = 'intel-list';
+      briefing.likelyFinds.forEach((finding) => {
+        const item = document.createElement('li');
+        item.textContent = finding;
+        list.appendChild(item);
+      });
+
+      finds.appendChild(list);
+      this.areaDetail.appendChild(finds);
+    }
 
     if (area.focusTopics?.length) {
       const focus = document.createElement('div');
@@ -411,7 +482,7 @@ export const InitFlowMixin = {
     this._renderRoleCards(roles);
     this._setRoleGlossaryTerms();
     this._renderAreaList(areas);
-    this._renderAreaDetail(areas[0]);
+    this._renderAreaDetail(areas[0], roles[0]);
     this._renderAreaGlossary(areas[0]);
     this._switchInitStep('intro');
     this._showInitOverlay();

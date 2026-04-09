@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { checkForEvent, resolveEvent } from '../js/events.js';
+import { eventMatchesJourneyContext } from '../js/events/selection.js';
+import {
+  resolvePermitRevisionResponse,
+  seedPermitRevisionTickets
+} from '../js/modes/permitting.js';
 
 test('permitting events update relationship and compliance tracks without legacy stakeholder state', () => {
   const journey = {
@@ -188,4 +193,198 @@ test('event cooldown skips the most recent repeated desk event when alternatives
   } finally {
     Math.random = originalRandom;
   }
+});
+
+test('contextual event matching honors role, area tags, and BEC code', () => {
+  const journey = {
+    roleId: 'planner',
+    area: {
+      becCode: 'SBSmc2',
+      tags: ['sbs', 'community-interface', 'visuals', 'watershed']
+    }
+  };
+
+  assert.equal(eventMatchesJourneyContext({
+    roles: ['planner'],
+    areaTags: ['visuals'],
+    becCodes: ['SBSmc2']
+  }, journey), true);
+
+  assert.equal(eventMatchesJourneyContext({
+    roles: ['permitter'],
+    areaTags: ['visuals']
+  }, journey), false);
+
+  assert.equal(eventMatchesJourneyContext({
+    roles: ['planner'],
+    areaTags: ['salmon']
+  }, journey), false);
+});
+
+test('contextual field events can require block features', () => {
+  const journey = {
+    roleId: 'recce',
+    area: {
+      becCode: 'CWHws2',
+      tags: ['cwh', 'karst', 'salmon']
+    }
+  };
+  const currentBlock = {
+    features: ['karst', 'destination']
+  };
+
+  assert.equal(eventMatchesJourneyContext({
+    roles: ['recce'],
+    areaTags: ['karst'],
+    requiredBlockFeatures: ['karst']
+  }, journey, { currentBlock }), true);
+
+  assert.equal(eventMatchesJourneyContext({
+    roles: ['recce'],
+    areaTags: ['karst'],
+    requiredBlockFeatures: ['salmon_spawning']
+  }, journey, { currentBlock }), false);
+});
+
+test('permitting revision tickets reflect area context and create actionable deficiencies', () => {
+  const journey = {
+    day: 9,
+    currentPhase: 'review',
+    hoursRemaining: 8,
+    area: {
+      becCode: 'CWHws2',
+      tags: ['watershed', 'community-interface', 'river']
+    },
+    permits: {
+      needsRevision: 0,
+      revisionQueue: []
+    },
+    regulations: {
+      complianceScore: 72
+    }
+  };
+
+  const queue = seedPermitRevisionTickets(journey, 2, { type: 'review' });
+
+  assert.equal(queue.length, 2);
+  assert.equal(queue[0].profileId, 'community-watershed');
+  assert.equal(queue[0].clean.hours, 3);
+  assert.equal(queue[0].fast.hours, 2);
+  assert.match(queue[0].summary, /hydrology/i);
+});
+
+test('permitting revision responses trade time for scrutiny and political capital', () => {
+  const cleanJourney = {
+    day: 11,
+    currentPhase: 'review',
+    hoursRemaining: 8,
+    scrutiny: 30,
+    area: {
+      becCode: 'CWHws2',
+      tags: ['watershed', 'community-interface', 'river']
+    },
+    permits: {
+      needsRevision: 1,
+      submitted: 0,
+      revisionQueue: []
+    },
+    resources: {
+      politicalCapital: 40
+    },
+    regulations: {
+      complianceScore: 70
+    },
+    relationships: {
+      ministry: 50,
+      nations: 50,
+      agencies: 50
+    }
+  };
+
+  seedPermitRevisionTickets(cleanJourney, 1, { type: 'review' });
+  const cleanTicket = cleanJourney.permits.revisionQueue[0];
+  const cleanResult = resolvePermitRevisionResponse(cleanJourney, cleanTicket.id, 'clean');
+
+  assert.equal(cleanResult.resolved, true);
+  assert.equal(cleanJourney.hoursRemaining, 5);
+  assert.equal(cleanJourney.scrutiny, 27);
+  assert.equal(cleanJourney.permits.needsRevision, 0);
+  assert.equal(cleanJourney.permits.submitted, 1);
+  assert.equal(cleanJourney.regulations.complianceScore, 75);
+  assert.equal(cleanJourney.relationships.agencies, 51);
+
+  const fastJourney = {
+    day: 11,
+    currentPhase: 'review',
+    hoursRemaining: 8,
+    scrutiny: 30,
+    area: {
+      becCode: 'CWHws2',
+      tags: ['watershed', 'community-interface', 'river']
+    },
+    permits: {
+      needsRevision: 1,
+      submitted: 0,
+      revisionQueue: []
+    },
+    resources: {
+      politicalCapital: 40
+    },
+    regulations: {
+      complianceScore: 70
+    },
+    relationships: {
+      ministry: 50,
+      nations: 50,
+      agencies: 50
+    }
+  };
+
+  seedPermitRevisionTickets(fastJourney, 1, { type: 'review' });
+  const fastTicket = fastJourney.permits.revisionQueue[0];
+  const fastResult = resolvePermitRevisionResponse(fastJourney, fastTicket.id, 'fast');
+
+  assert.equal(fastResult.resolved, true);
+  assert.equal(fastJourney.hoursRemaining, 6);
+  assert.equal(fastJourney.scrutiny, 34);
+  assert.equal(fastJourney.resources.politicalCapital, 39);
+  assert.equal(fastJourney.permits.needsRevision, 0);
+  assert.equal(fastJourney.permits.submitted, 1);
+  assert.equal(fastJourney.regulations.complianceScore, 71);
+  assert.equal(fastJourney.relationships.ministry, 49);
+});
+
+test('selected events can seed carry-forward discovery tags', () => {
+  const journey = {
+    journeyType: 'permitting',
+    day: 12,
+    log: [],
+    hoursRemaining: 8,
+    discoveryTags: [],
+    permits: {
+      target: 15,
+      approved: 2
+    },
+    resources: {
+      budget: 35000,
+      politicalCapital: 40
+    },
+    relationships: {
+      ministry: 50,
+      nations: 50,
+      agencies: 50
+    },
+    regulations: {
+      complianceScore: 78
+    }
+  };
+
+  const result = resolveEvent(
+    journey,
+    { id: 'visual_quality_redraft', title: 'Visual Quality Redraft' },
+    { label: 'Redraw it', effects: {} }
+  );
+
+  assert.ok(journey.discoveryTags.some((tag) => tag.id === 'community_visibility'));
+  assert.ok(result.messages.some((message) => /Carry-forward intel/i.test(message)));
 });

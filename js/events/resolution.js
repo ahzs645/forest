@@ -7,8 +7,13 @@ import { isFieldJourney, isDeskJourney } from './constants.js';
 import { applyRandomInjury, applyStatusEffect } from '../crew.js';
 import { syncBlocksFromDistance } from '../journey/blockNav.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
+import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
 
 function clampPercent(value) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function clampScrutiny(value) {
   return Math.max(0, Math.min(100, value));
 }
 
@@ -46,6 +51,7 @@ function pickMultipleCrewMembers(crew, count) {
  */
 export function resolveEvent(journey, event, option) {
   const messages = [];
+  const scrutinyBefore = Number(journey.scrutiny || 0);
 
   if (option.outcome) {
     messages.push(option.outcome);
@@ -93,6 +99,14 @@ export function resolveEvent(journey, event, option) {
     messages.push('This may have consequences later...');
   }
 
+  messages.push(...applyDiscoveryTagEffects(journey, event, option));
+
+  const scrutinyDelta = Number(journey.scrutiny || 0) - scrutinyBefore;
+  if (scrutinyDelta !== 0) {
+    const direction = scrutinyDelta > 0 ? 'rose' : 'eased';
+    messages.push(`Scrutiny ${direction} to ${journey.scrutiny}%.`);
+  }
+
   if (!journey.log) journey.log = [];
   journey.log.push({
     day: journey.day,
@@ -109,6 +123,8 @@ export function resolveEvent(journey, event, option) {
  * Apply effects from an event option
  */
 function applyEventEffects(journey, effects, messages) {
+  journey.scrutiny = clampScrutiny(Number(journey.scrutiny || 0));
+
   // Resource effects (field)
   if (isFieldJourney(journey.journeyType)) {
     if (typeof effects.budget === 'number' && typeof journey.resources?.budget === 'number') {
@@ -198,6 +214,62 @@ function applyEventEffects(journey, effects, messages) {
   if (typeof effects.relationships === 'number' && effects.relationships !== 0) {
     applyRelationshipEffects(journey, effects.relationships, messages);
   }
+
+  applyScrutinyEffects(journey, effects);
+}
+
+function applyScrutinyEffects(journey, effects) {
+  let delta = 0;
+
+  if (typeof effects.scrutiny === 'number') {
+    delta += effects.scrutiny;
+  }
+
+  if (typeof effects.compliance === 'number') {
+    delta += effects.compliance < 0 ? Math.abs(effects.compliance) * 1.5 : -Math.max(1, Math.round(effects.compliance * 0.5));
+  }
+
+  if (typeof effects.relationships === 'number') {
+    delta += effects.relationships < 0
+      ? Math.max(1, Math.round(Math.abs(effects.relationships) / 3))
+      : -Math.max(1, Math.round(effects.relationships / 4));
+  }
+
+  if (typeof effects.progress === 'number' && effects.progress > 6) {
+    delta += 1;
+  }
+
+  if (typeof effects.politicalCapital === 'number' && effects.politicalCapital > 4) {
+    delta += 1;
+  }
+
+  if (delta !== 0) {
+    journey.scrutiny = clampScrutiny((journey.scrutiny || 0) + delta);
+  }
+}
+
+function applyDiscoveryTagEffects(journey, event, option) {
+  const effectTags = Array.isArray(option?.effects?.discoveryTags)
+    ? option.effects.discoveryTags
+    : [];
+  const inferredTags = inferDiscoveryTagsFromEvent(event);
+  const tagIds = Array.from(new Set([...effectTags, ...inferredTags]));
+
+  if (!tagIds.length) {
+    return [];
+  }
+
+  const tags = addDiscoveryTags(journey, tagIds, {
+    source: `event:${event?.id || 'unknown'}`,
+    severity: 2,
+    note: event?.title ? `Carry-forward finding from ${event.title}.` : null
+  });
+
+  if (!tags.length) {
+    return [];
+  }
+
+  return [`Carry-forward intel: ${tags.map((tag) => tag.label).join(', ')}.`];
 }
 
 function applyProgressEffects(journey, progressPoints, messages) {

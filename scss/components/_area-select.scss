@@ -109,6 +109,13 @@
   font-size: var(--font-size-sm);
 }
 
+.detail-note {
+  margin: 0;
+  color: var(--fg-main);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -121,6 +128,18 @@
   color: var(--fg-label);
   font-size: var(--font-size-xs);
   background: rgba(0, 255, 51, 0.06);
+}
+
+.intel-list {
+  margin: var(--space-xs) 0 0;
+  padding-left: 1.1rem;
+  color: var(--fg-main);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+
+  li + li {
+    margin-top: 0.35rem;
+  }
 }
 
 .pill {

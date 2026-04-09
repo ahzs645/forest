@@ -14,6 +14,8 @@ import { FIELD_EVENTS, getApplicableFieldEvents, selectRandomFieldEvent } from '
 import { DESK_EVENTS, getApplicableDeskEvents, selectRandomDeskEvent } from '../data/deskEvents.js';
 import { ILLEGAL_ACTS } from '../data/illegalActs.js';
 import { PACE_OPTIONS } from '../journey/constants.js';
+import { getDiscoveryEventTypeMultipliers } from '../data/discoveryTags.js';
+import { getAreaSituationMultipliers } from '../data/areaSituations.js';
 
 /**
  * Check if a random event should occur
@@ -40,6 +42,26 @@ function getDifficultyEventModifier(journey) {
   }
 }
 
+function getScrutinyEventModifier(journey) {
+  const scrutiny = Number(journey?.scrutiny || 0);
+  if (scrutiny >= 75) return 1.45;
+  if (scrutiny >= 55) return 1.2;
+  if (scrutiny <= 20) return 0.9;
+  return 1;
+}
+
+function mergeTypeMultipliers(...groups) {
+  const merged = {};
+  for (const group of groups) {
+    if (!group) continue;
+    for (const [type, value] of Object.entries(group)) {
+      const current = merged[type] || 1;
+      merged[type] = Math.max(0.75, Math.min(2.5, current * Number(value || 1)));
+    }
+  }
+  return merged;
+}
+
 function eventSupportsJourney(event, journey) {
   if (!event) {
     return false;
@@ -60,6 +82,44 @@ function eventSupportsJourney(event, journey) {
   return true;
 }
 
+export function eventMatchesJourneyContext(event, journey, options = {}) {
+  if (!event) {
+    return false;
+  }
+
+  const roleId = journey?.roleId || journey?.role?.id;
+  if (Array.isArray(event.roles) && event.roles.length > 0) {
+    if (!roleId || !event.roles.includes(roleId)) {
+      return false;
+    }
+  }
+
+  const areaTags = Array.isArray(journey?.area?.tags) ? journey.area.tags : [];
+  if (Array.isArray(event.areaTags) && event.areaTags.length > 0) {
+    if (!areaTags.length || !event.areaTags.some((tag) => areaTags.includes(tag))) {
+      return false;
+    }
+  }
+
+  const becCode = journey?.area?.becCode;
+  if (Array.isArray(event.becCodes) && event.becCodes.length > 0) {
+    if (!becCode || !event.becCodes.includes(becCode)) {
+      return false;
+    }
+  }
+
+  const currentBlockFeatures = Array.isArray(options.currentBlock?.features)
+    ? options.currentBlock.features
+    : [];
+  if (Array.isArray(event.requiredBlockFeatures) && event.requiredBlockFeatures.length > 0) {
+    if (!currentBlockFeatures.length || !event.requiredBlockFeatures.some((feature) => currentBlockFeatures.includes(feature))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /**
  * Check for field events
  */
@@ -72,22 +132,36 @@ function checkFieldEvent(journey) {
     ? (journey.blocks[journey.currentBlockIndex] || journey.blocks[0] || null)
     : null;
 
-  const applicableEvents = filterRecentEvents(journey, getApplicableFieldEvents({
-    terrain: currentBlock?.terrain,
-    weather: journey.weather?.id,
-    hazards: currentBlock?.hazards
-  }));
+  const applicableEvents = filterRecentEvents(
+    journey,
+    getApplicableFieldEvents({
+      terrain: currentBlock?.terrain,
+      weather: journey.weather?.id,
+      hazards: currentBlock?.hazards
+    }).filter(
+      (event) => eventSupportsJourney(event, journey)
+        && eventMatchesJourneyContext(event, journey, { currentBlock })
+    )
+  );
 
   const paceModifier = getPaceEventModifier(journey.pace);
   const terrainModifier = getTerrainEventModifier(currentBlock?.terrain);
   const weatherModifier = getWeatherEventModifier(journey.weather?.id);
   const difficultyModifier = getDifficultyEventModifier(journey);
-
-  const totalModifier = paceModifier * terrainModifier * weatherModifier * difficultyModifier;
+  const scrutinyModifier = getScrutinyEventModifier(journey);
+  const areaSituation = getAreaSituationMultipliers(journey, 'field');
+  const discoveryTypeMultipliers = getDiscoveryEventTypeMultipliers(journey, 'field');
+  const totalModifier = paceModifier
+    * terrainModifier
+    * weatherModifier
+    * difficultyModifier
+    * scrutinyModifier
+    * areaSituation.eventMultiplier;
 
   return selectRandomFieldEvent(applicableEvents, {
     paceModifier: totalModifier,
-    terrainModifier: 1
+    terrainModifier: 1,
+    typeMultipliers: mergeTypeMultipliers(areaSituation.typeMultipliers, discoveryTypeMultipliers)
   });
 }
 
@@ -97,7 +171,10 @@ function checkFieldEvent(journey) {
 function checkDeskEvent(journey) {
   const applicableEvents = filterRecentEvents(
     journey,
-    getApplicableDeskEvents(journey.currentPhase).filter((event) => eventSupportsJourney(event, journey))
+    getApplicableDeskEvents(journey.currentPhase).filter(
+      (event) => eventSupportsJourney(event, journey)
+        && eventMatchesJourneyContext(event, journey)
+    )
   );
 
   const daysRemaining = Number.isFinite(journey.deadline)
@@ -116,12 +193,15 @@ function checkDeskEvent(journey) {
   }
   const moraleModifier = avgMorale < 40 ? 1.3 : 1;
   const typeMultipliers = getDeskEventTypeMultipliers(journey);
+  const areaSituation = getAreaSituationMultipliers(journey, 'desk');
+  const discoveryTypeMultipliers = getDiscoveryEventTypeMultipliers(journey, 'desk');
   const difficultyModifier = getDifficultyEventModifier(journey);
+  const scrutinyModifier = getScrutinyEventModifier(journey);
 
   return selectRandomDeskEvent(applicableEvents, {
-    stressModifier: stressModifier * moraleModifier * difficultyModifier,
+    stressModifier: stressModifier * moraleModifier * difficultyModifier * scrutinyModifier * areaSituation.eventMultiplier,
     crisisMode: daysRemaining < 3,
-    typeMultipliers
+    typeMultipliers: mergeTypeMultipliers(typeMultipliers, areaSituation.typeMultipliers, discoveryTypeMultipliers)
   });
 }
 

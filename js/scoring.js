@@ -204,15 +204,21 @@ function scoreReconObjectives(journey, victory) {
 }
 
 function scoreSilvicultureObjectives(journey, victory) {
-  let score = victory ? 60 : 10;
+  let score = victory ? 45 : 10;
   const p = journey.planting || {};
   const s = journey.surveys || {};
+  const b = journey.brushing || {};
   const plantPct = p.blocksToPlant > 0 ? p.blocksPlanted / p.blocksToPlant : 0;
   const surveyPct = s.freeGrowingTarget > 0 ? s.freeGrowingComplete / s.freeGrowingTarget : 0;
-  score += Math.round(plantPct * 20);
-  score += Math.round(surveyPct * 20);
+  const brushPct = b.hectaresTarget > 0 ? b.hectaresComplete / b.hectaresTarget : 0;
+  score += Math.round(plantPct * 25);
+  score += Math.round(surveyPct * 15);
+  score += Math.round(brushPct * 15);
   score = Math.min(100, score);
-  return { score, label: `${p.blocksPlanted}/${p.blocksToPlant} planted, ${s.freeGrowingComplete}/${s.freeGrowingTarget} surveys` };
+  return {
+    score,
+    label: `${p.blocksPlanted}/${p.blocksToPlant} planted, ${s.freeGrowingComplete}/${s.freeGrowingTarget} surveys, ${Math.round(brushPct * 100)}% brush`,
+  };
 }
 
 function scorePlanningObjectives(journey, victory) {

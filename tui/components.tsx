@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { SEASONS } from "../js/engine.js";
 import { C } from "./palette";
-import type { ContentData } from "./types";
+import type { ContentData, NoticeData } from "./types";
 
 type ArtSequence = {
   frames: string[];
@@ -223,12 +223,73 @@ export function NameInput({ inputText }: { inputText: string }) {
   );
 }
 
+function NoticeView({ notice }: { notice?: NoticeData }) {
+  if (!notice) return null;
+
+  const toneMap = {
+    info: C.cyan,
+    positive: C.green,
+    warning: C.yellow,
+    danger: C.red,
+  };
+
+  return (
+    <box
+      border={true}
+      borderStyle="single"
+      borderColor={toneMap[notice.tone || "info"]}
+      style={{
+        flexDirection: "column",
+        paddingLeft: 1,
+        paddingRight: 1,
+        paddingTop: 1,
+        paddingBottom: 1,
+      }}
+    >
+      <text
+        content={notice.heading}
+        style={{ fg: toneMap[notice.tone || "info"], bold: true }}
+      />
+      {notice.body ? (
+        <>
+          <text content="" />
+          <text content={notice.body} style={{ fg: C.white }} />
+        </>
+      ) : null}
+    </box>
+  );
+}
+
+function SummarySection({
+  title,
+  items,
+  color = C.white,
+}: {
+  title: string;
+  items?: string[];
+  color?: string;
+}) {
+  if (!items?.length) return null;
+
+  return (
+    <>
+      <text content="" />
+      <text content={title} style={{ fg: C.yellow, bold: true }} />
+      {items.map((item, index) => (
+        <text key={`${title}-${index}`} content={item} style={{ fg: color }} />
+      ))}
+    </>
+  );
+}
+
 // ── Content View (structured rendering) ──────────────
 export function ContentView({ data }: { data: ContentData }) {
   switch (data.type) {
     case "message":
       return (
         <>
+          <NoticeView notice={data.notice} />
+          {data.notice ? <text content="" /> : null}
           {data.heading && (
             <text content={data.heading} style={{ fg: C.yellow, bold: true }} />
           )}
@@ -244,6 +305,8 @@ export function ContentView({ data }: { data: ContentData }) {
     case "setup":
       return (
         <>
+          <NoticeView notice={data.notice} />
+          {data.notice ? <text content="" /> : null}
           <text content={data.heading} style={{ fg: C.white, bold: true }} />
           {data.subtitle && (
             <>
@@ -258,6 +321,8 @@ export function ContentView({ data }: { data: ContentData }) {
     case "issue":
       return (
         <>
+          <NoticeView notice={data.notice} />
+          {data.notice ? <text content="" /> : null}
           <text content={data.title} style={{ fg: C.yellow, bold: true }} />
           <text content="" />
           <text content={data.description} style={{ fg: C.white }} />
@@ -291,30 +356,17 @@ export function ContentView({ data }: { data: ContentData }) {
     case "summary":
       return (
         <>
+          <NoticeView notice={data.notice} />
+          {data.notice ? <text content="" /> : null}
           <text content={data.heading} style={{ fg: C.yellow, bold: true }} />
           <text content="" />
           <text content={data.body} style={{ fg: C.white }} />
-          <text content="" />
-          {data.bullets.map((b, i) => (
-            <text
-              key={`bullet-${i}`}
-              content={`\u2022 ${b}`}
-              style={{ fg: C.white }}
-            />
-          ))}
-          {data.achievements && data.achievements.length > 0 && (
-            <>
-              <text content="" />
-              <text content="Achievements:" style={{ fg: C.yellow, bold: true }} />
-              {data.achievements.map((a, i) => (
-                <text
-                  key={`ach-${i}`}
-                  content={a}
-                  style={{ fg: C.green }}
-                />
-              ))}
-            </>
-          )}
+          <SummarySection title="Signals:" items={data.bullets} />
+          <SummarySection title="Key Decisions:" items={data.highlights} />
+          <SummarySection title="Season Review:" items={data.seasonSummaries} />
+          <SummarySection title="Trendlines:" items={data.trendLines} />
+          <SummarySection title="Next Year Outlook:" items={data.projection} />
+          <SummarySection title="Achievements:" items={data.achievements} color={C.green} />
         </>
       );
 

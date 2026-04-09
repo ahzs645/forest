@@ -12,9 +12,21 @@ import {
   healCrewMember,
   treatCrewCondition
 } from '../crew.js';
-import { executeFieldDay, getFieldProgressInfo, getSurveyedBlockCount } from '../journey.js';
+import { getFieldProgressInfo, getSurveyedBlockCount } from '../journey.js';
+import {
+  executeFieldDay,
+  formatAccessVerdict,
+  getBlockAccessVerdict,
+  recordAccessVerdict
+} from '../journey/fieldMechanics.js';
 import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
 import { FIELD_RESOURCES } from '../resources.js';
+import {
+  addDiscoveryTags,
+  getDiscoveryTagNotes,
+  inferDiscoveryTagsFromAccess
+} from '../data/discoveryTags.js';
+import { getAreaSituationSummary } from '../data/areaSituations.js';
 
 const TREATMENT_PRIORITY = [
   'infection',
@@ -300,6 +312,16 @@ function displayDayHeader(ui, journey) {
 
   // Weather and terrain
   ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'} | Hours: ${journey.hoursRemaining || 0}h`);
+  const currentAccessVerdict = getBlockAccessVerdict(currentBlock, journey.weather, journey);
+  const currentAccessLine = formatAccessVerdict(currentAccessVerdict);
+  if (currentAccessVerdict.id === 'passable_now') {
+    ui.writePositive(currentAccessLine);
+  } else if (currentAccessVerdict.id === 'no_go' || currentAccessVerdict.id === 'heli_only') {
+    ui.writeDanger(currentAccessLine);
+  } else {
+    ui.writeWarning(currentAccessLine);
+  }
+
   const routeText = journey.routePlan
     ? `${journey.routePlan.label}`
     : 'Route undecided';
@@ -307,6 +329,20 @@ function displayDayHeader(ui, journey) {
     ? `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
     : 'Full rations';
   ui.write(`Route: ${routeText} | Rations: ${rationText}`);
+  const hasScrutiny = Object.prototype.hasOwnProperty.call(journey, 'scrutiny')
+    || Object.prototype.hasOwnProperty.call(journey, 'heat');
+  const scrutinyValue = Number(journey.scrutiny ?? journey.heat ?? 0);
+  if (hasScrutiny && Number.isFinite(scrutinyValue)) {
+    ui.write(`Scrutiny / Heat: ${Math.max(0, scrutinyValue)}`);
+  }
+  const areaSituation = getAreaSituationSummary(journey);
+  if (areaSituation) {
+    ui.write(`Area Situation: ${areaSituation}`);
+  }
+  const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'recce', 2);
+  if (discoveryNotes.length > 0) {
+    ui.write(`Carry-forward: ${discoveryNotes.join(' | ')}`);
+  }
   ui.write('');
 
   // Compact resources
@@ -573,6 +609,30 @@ function handleScoutAhead(ui, journey) {
 
   if (nextBlock.hazards && nextBlock.hazards.length > 0) {
     ui.writeWarning(`Hazards: ${nextBlock.hazards.join(', ')}`);
+  }
+
+  const accessVerdict = recordAccessVerdict(
+    journey,
+    nextBlock,
+    getBlockAccessVerdict(nextBlock, journey.weather, journey),
+    journey.weather
+  );
+  addDiscoveryTags(journey, inferDiscoveryTagsFromAccess(nextBlock, accessVerdict, journey.weather), {
+    source: `scout:${nextBlock.id}`,
+    severity: accessVerdict.id === 'no_go' ? 3 : 2,
+    note: accessVerdict.summary,
+    details: {
+      blockId: nextBlock.id,
+      verdict: accessVerdict.id
+    }
+  });
+  const accessLine = formatAccessVerdict(accessVerdict);
+  if (accessVerdict.id === 'passable_now') {
+    ui.writePositive(accessLine);
+  } else if (accessVerdict.id === 'no_go' || accessVerdict.id === 'heli_only') {
+    ui.writeDanger(accessLine);
+  } else {
+    ui.writeWarning(accessLine);
   }
 
   if (nextBlock.hasSupply) {
