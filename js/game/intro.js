@@ -15,6 +15,19 @@ function formatScrutiny(scrutiny) {
   return `LOW (${value}%)`;
 }
 
+function formatSnapshotDate(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value).slice(0, 10);
+  }
+  return parsed.toISOString().slice(0, 10);
+}
+
+function shouldShowSampleFileIds(roleId) {
+  return roleId === 'planner' || roleId === 'permitter';
+}
+
 /**
  * Show journey-specific intro based on journey type
  * @param {Object} ui - TerminalUI instance
@@ -147,6 +160,20 @@ export function showJourneyIntro(ui, journey) {
 
   if (Number.isFinite(journey.scrutiny)) {
     ui.write(`Starting Scrutiny: ${formatScrutiny(journey.scrutiny)}`);
+  }
+
+  if (briefing.planningSnapshot?.blockCount) {
+    const districts = briefing.planningSnapshot.districts?.join(', ') || 'Unknown district';
+    const updatedOn = formatSnapshotDate(briefing.planningSnapshot.generatedAt);
+    const updatedLabel = updatedOn ? ` (snapshot ${updatedOn})` : '';
+    ui.write(`Current district snapshot: ${districts} | ${briefing.planningSnapshot.blockCount} cached planning candidates${updatedLabel}.`);
+
+    if (shouldShowSampleFileIds(roleId) && briefing.planningSnapshot.sampleBlocks?.length) {
+      const exampleIds = briefing.planningSnapshot.sampleBlocks.map((block) => block.compactId).join(', ');
+      ui.write(`Example public file IDs: ${exampleIds}`);
+    } else if (briefing.planningSnapshot.dominantConstraint?.label) {
+      ui.write(`Current snapshot watchout: ${briefing.planningSnapshot.dominantConstraint.label}.`);
+    }
   }
 
   if (briefing.likelyFinds.length) {

@@ -29,6 +29,7 @@ export {
   formatRoadAssetSummary,
   getPermittingRoadAssetContext,
   getPlanningRoadAssetContext,
+  getPlanningRoadObservationJoin,
   getRoadAssetAreaSummary,
   getRoadAssetObservationForBlock,
   getRoadAssetObservations

@@ -90,6 +90,17 @@ function blockIdentifier(block) {
   return block.openingId || block.label || block.id;
 }
 
+function compactBlockIdentifier(block) {
+  const parts = [block?.timberMark, block?.cutBlockId].filter(Boolean);
+  if (parts.length) {
+    return parts.join("-");
+  }
+  if (block?.openingId) {
+    return `OPEN-${block.openingId}`;
+  }
+  return blockIdentifier(block);
+}
+
 function getArea(areaId, area = null) {
   if (area) return area;
   return blockOptionsData?.areas?.[areaId] || null;
@@ -97,6 +108,10 @@ function getArea(areaId, area = null) {
 
 function getAreaTags(area) {
   return new Set(Array.isArray(area?.tags) ? area.tags : []);
+}
+
+function listUnique(items = []) {
+  return [...new Set(items.filter(Boolean))];
 }
 
 function getSeasonId(seasonInfo) {
@@ -406,6 +421,62 @@ export function getPlanningCadenceDays() {
 
 export function getPlanningAreaBlockPool(areaId) {
   return blockOptionsData?.areas?.[areaId]?.options || [];
+}
+
+export function getPlanningAreaSnapshot(areaId, area = null, options = {}) {
+  const pool = getPlanningAreaBlockPool(areaId);
+  const sampleCount = clamp(Number(options.sampleCount) || 3, 1, 5);
+  const resolvedArea = getArea(areaId, area);
+  const triage = buildPlanningConstraintTriage(areaId, resolvedArea, pool);
+
+  const signalCounts = pool.reduce(
+    (counts, block) => {
+      if (block?.indicators?.ogmaNearby) counts.ogmaNearby += 1;
+      if (block?.indicators?.whaNoHarvestNearby) counts.whaNoHarvestNearby += 1;
+      if (block?.indicators?.speciesAtRiskNearby) counts.speciesAtRiskNearby += 1;
+      if (block?.indicators?.firstNationsReserveNearby) counts.firstNationsReserveNearby += 1;
+      return counts;
+    },
+    {
+      ogmaNearby: 0,
+      whaNoHarvestNearby: 0,
+      speciesAtRiskNearby: 0,
+      firstNationsReserveNearby: 0,
+    },
+  );
+
+  const districts = listUnique(
+    pool.map((block) => formatDistrictName(block?.adminDistrict || block?.district || "")),
+  );
+
+  const sampleBlocks = [...pool]
+    .sort((a, b) => Number(b?.areaHa || 0) - Number(a?.areaHa || 0) || String(a?.label || "").localeCompare(String(b?.label || "")))
+    .slice(0, sampleCount)
+    .map((block) => ({
+      id: block.id,
+      label: formatPlanningBlockLabel(block),
+      compactId: compactBlockIdentifier(block),
+      district: formatDistrictName(block?.adminDistrict || block?.district || ""),
+      sourceType: block?.sourceType || "planned-cutblock",
+      areaHa: Number(block?.areaHa || 0),
+      species: formatSpecies(block),
+      summary: block?.summary || "",
+    }));
+
+  const generatedAt = blockOptionsData?.generatedAt || null;
+
+  return {
+    areaId,
+    generatedAt,
+    generatedOn: generatedAt ? String(generatedAt).slice(0, 10) : null,
+    blockCount: pool.length,
+    districts,
+    signalCounts,
+    dominantConstraint: triage?.drivers?.[0] || null,
+    recommendedTriageKey: triage?.recommendedKey || null,
+    recommendedTriageLabel: triage ? getPlanningTriageLabel(triage.recommendedKey) : "",
+    sampleBlocks,
+  };
 }
 
 export function getPlanningBlockById(areaId, blockId) {

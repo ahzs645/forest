@@ -10,6 +10,8 @@ test('role-area briefing combines zone summary with role-aware likely finds', ()
 
   assert.ok(briefing.zoneSummary.includes('CWH'));
   assert.equal(briefing.likelyFinds.length, 4);
+  assert.ok(briefing.planningSnapshot);
+  assert.ok(briefing.planningSnapshot.blockCount > 0);
   assert.ok(
     briefing.likelyFinds.some((item) => item.includes('fish') || item.includes('karst'))
   );

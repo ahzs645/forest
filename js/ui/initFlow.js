@@ -4,6 +4,7 @@
  */
 
 import { getRoleAreaBriefing } from "../data/roleAreaIntel.js";
+import { getPlanningAreaSnapshot } from "../data/planningBlocks.js";
 
 // Role icons mapping (Unicode symbols matching reference)
 export const ROLE_ICONS = {
@@ -26,6 +27,34 @@ function getAreaScrutinyProfile(area) {
   if (score >= 60) return { label: 'HIGH', score };
   if (score >= 40) return { label: 'ELEVATED', score };
   return { label: 'LOW', score };
+}
+
+function formatSnapshotDate(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value).slice(0, 10);
+  }
+  return parsed.toISOString().slice(0, 10);
+}
+
+function formatDistrictList(snapshot) {
+  if (!snapshot?.districts?.length) return 'No district snapshot';
+  return snapshot.districts.join(', ');
+}
+
+function getSnapshotIndicatorEntries(snapshot) {
+  const counts = snapshot?.signalCounts || {};
+  return [
+    counts.ogmaNearby ? `OGMA ${counts.ogmaNearby}` : '',
+    counts.whaNoHarvestNearby ? `WHA ${counts.whaNoHarvestNearby}` : '',
+    counts.speciesAtRiskNearby ? `SAR ${counts.speciesAtRiskNearby}` : '',
+    counts.firstNationsReserveNearby ? `Consult ${counts.firstNationsReserveNearby}` : '',
+  ].filter(Boolean);
+}
+
+function shouldShowSampleFileIds(role) {
+  return role?.id === 'planner' || role?.id === 'permitter';
 }
 
 /**
@@ -285,6 +314,12 @@ export const InitFlowMixin = {
     this.areaList.innerHTML = '';
 
     areas.forEach((area, index) => {
+      const snapshot = getPlanningAreaSnapshot(area.id, area, { sampleCount: 2 });
+      const selectionLine = [
+        area.becCode || area.becZone,
+        snapshot.districts?.[0] || '',
+        snapshot.blockCount ? `${snapshot.blockCount} snapshot files` : ''
+      ].filter(Boolean).join(' | ');
       const item = document.createElement('button');
       item.type = 'button';
       item.className = `area-item ${this._initState.areaId === area.id ? 'selected' : ''}`;
@@ -294,6 +329,7 @@ export const InitFlowMixin = {
         <div>
           <strong>${area.name}</strong>
           <div class="muted">${area.description}</div>
+          <div class="muted">${selectionLine}</div>
         </div>
       `;
       item.addEventListener('click', () => {
@@ -349,6 +385,7 @@ export const InitFlowMixin = {
     this.areaDetail.appendChild(meta);
 
     const briefing = getRoleAreaBriefing(role?.id, area, { maxFinds: 4 });
+    const planningSnapshot = briefing.planningSnapshot || getPlanningAreaSnapshot(area.id, area);
 
     if (briefing.zoneSummary) {
       const zoneReality = document.createElement('div');
@@ -359,6 +396,58 @@ export const InitFlowMixin = {
       note.textContent = briefing.zoneSummary;
       zoneReality.appendChild(note);
       this.areaDetail.appendChild(zoneReality);
+    }
+
+    if (planningSnapshot?.blockCount) {
+      const snapshot = document.createElement('div');
+      snapshot.innerHTML = '<div class="detail-label">CURRENT SNAPSHOT</div>';
+
+      const note = document.createElement('p');
+      note.className = 'detail-note';
+      const updatedOn = formatSnapshotDate(planningSnapshot.generatedAt);
+      const updateLabel = updatedOn ? ` Snapshot updated ${updatedOn}.` : '';
+      note.textContent = `${planningSnapshot.blockCount} cached BC OpenMaps planning candidates from ${formatDistrictList(planningSnapshot)}.${updateLabel}`;
+      snapshot.appendChild(note);
+
+      const chips = document.createElement('div');
+      chips.className = 'chip-row';
+
+      const chipLabels = [
+        `TRIAGE ${planningSnapshot.recommendedTriageLabel || 'Balanced'}`,
+        ...getSnapshotIndicatorEntries(planningSnapshot),
+      ];
+
+      chipLabels.forEach((label) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = label;
+        chips.appendChild(chip);
+      });
+
+      if (chipLabels.length) {
+        snapshot.appendChild(chips);
+      }
+
+      if (shouldShowSampleFileIds(role) && planningSnapshot.sampleBlocks?.length) {
+        const sampleList = document.createElement('ul');
+        sampleList.className = 'intel-list';
+
+        planningSnapshot.sampleBlocks.forEach((block) => {
+          const item = document.createElement('li');
+          const species = block.species ? ` | ${block.species}` : '';
+          item.textContent = `Example public file: ${block.compactId} (${block.areaHa.toFixed(1)} ha${species})`;
+          sampleList.appendChild(item);
+        });
+
+        snapshot.appendChild(sampleList);
+      } else if (planningSnapshot.dominantConstraint?.label) {
+        const watchout = document.createElement('p');
+        watchout.className = 'detail-note';
+        watchout.textContent = `Snapshot watchout: ${planningSnapshot.dominantConstraint.label} is leading in the current candidate set.`;
+        snapshot.appendChild(watchout);
+      }
+
+      this.areaDetail.appendChild(snapshot);
     }
 
     if (briefing.seasonalSignals?.length) {

@@ -95,7 +95,7 @@ function syncFomStateFromActiveBlock(journey, seasonInfo) {
 
   const fom = ensurePlanningFomState(journey);
   const waterContext = getPlanningBlockWaterContext(blockPlanning.activeBlock, journey.area, seasonInfo);
-  const roadContext = getPlanningRoadAssetContext(journey, blockPlanning.activeBlock.id);
+  const roadContext = getPlanningRoadAssetContext(journey, blockPlanning.activeBlock);
   const activeBlockId = blockPlanning.activeBlock.id;
 
   if (fom.activeBlockId !== activeBlockId) {
@@ -168,7 +168,7 @@ function getFomActionDescription(fom, roadContext = null) {
 export function getPlanningSubmissionReadiness(journey, seasonInfo = null) {
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
   const waterContext = getPlanningBlockWaterContext(journey.blockPlanning?.activeBlock, journey.area, seasonInfo);
-  const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock?.id || null);
+  const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock || null);
   const reasons = [];
 
   if (!journey.blockPlanning?.activeBlock) {
@@ -405,9 +405,15 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
   if (!options.length) return;
 
   const promptOptions = options.map((block) => {
+    const roadContext = getPlanningRoadAssetContext(journey, block);
+    const roadMatch = roadContext.source === 'joined'
+      ? ` | Matched recce: ${roadContext.joinedFromBlockName} (${roadContext.summary})`
+      : roadContext.source === 'block'
+        ? ` | Recce: ${roadContext.summary}`
+        : '';
     return {
       label: formatPlanningBlockLabel(block),
-      description: formatPlanningBlockPromptDescription(block, journey.area, seasonInfo),
+      description: `${formatPlanningBlockPromptDescription(block, journey.area, seasonInfo)}${roadMatch}`,
       value: block.id
     };
   });
@@ -425,7 +431,11 @@ function applySelectedBlockImpact(journey, block, triageKey = null, seasonInfo =
   state.activeBlock = block;
   state.activeTriage = triageKey;
   state.activeTriageLabel = getPlanningTriageLabel(triageKey);
-  state.activeSummary = summarizePlanningBlock(block, journey.area, triageKey, seasonInfo);
+  const roadContext = getPlanningRoadAssetContext(journey, block);
+  const roadMatch = roadContext.source === 'joined' && roadContext.joinedFromBlockName
+    ? ` | Matched recce ${roadContext.joinedFromBlockName}`
+    : '';
+  state.activeSummary = `${summarizePlanningBlock(block, journey.area, triageKey, seasonInfo)}${roadMatch}`;
   state.activeEventBias = block.eventBias || null;
   state.history = Array.isArray(state.history) ? [...state.history, block.id].slice(-30) : [block.id];
   state.nextSelectionDay = journey.day + (state.cadenceDays || 3);
@@ -469,7 +479,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   const actionOptions = [];
   const hoursLeft = journey.hoursRemaining || 8;
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
-  const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock?.id || null);
+  const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock || null);
 
   // Phase-specific primary actions
   if (journey.plan.phase === 'data_gathering' && journey.resources.dataCredits > 0 && hoursLeft >= 3) {
@@ -706,13 +716,13 @@ async function processAction(game, actionValue, seasonInfo = null) {
       }
 
       const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
-      const roadContext = getPlanningRoadAssetContext(journey, activeBlock.id);
+      const roadContext = getPlanningRoadAssetContext(journey, activeBlock);
       if (fom.status === 'approved') {
         journey.hoursRemaining -= 1;
         applyProtagonistCost(journey, { energy: 3, stress: 2 });
         ui.write('Forest Operations Map record checked. The approved review file stays in place.');
         if (roadContext.hasData) {
-          ui.write(`Road-access intel: ${roadContext.summary}.`);
+          ui.write(roadContext.note);
         }
         break;
       }
@@ -735,7 +745,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       ui.write(`Forest Operations Map posted for public review.`);
       ui.write(`Review window: ${fom.reviewDaysRemaining} day${fom.reviewDaysRemaining === 1 ? '' : 's'} | ${fom.waterNote}`);
       if (roadContext.hasData) {
-        ui.write(`Road-access intel: ${roadContext.summary}.`);
+        ui.write(roadContext.note);
         if (roadContext.blocker) {
           ui.writeWarning(`Road-engineering blocker: ${roadContext.blockerReasons.join(' | ')}`);
         }

@@ -3,6 +3,8 @@
  * Shared interpretation layer for recce-derived road, crossing, and watershed observations.
  */
 
+import { getBlocksForArea } from "./blocks.js";
+
 const ROAD_LIFECYCLE_LEVELS = {
   good: 0,
   watch: 1,
@@ -25,8 +27,151 @@ const WATERSHED_LEVELS = {
   critical: 3
 };
 
+const ACCESS_AREA_TAGS = new Set(["steep", "remote-camps", "winter-road", "peatland", "glacial"]);
+const WATER_AREA_TAGS = new Set(["karst", "salmon", "watershed", "wetland", "community-water"]);
+const COMMUNITY_AREA_TAGS = new Set(["community-interface", "visuals"]);
+const ACCESS_HAZARDS = new Set([
+  "road_damage",
+  "grade",
+  "bridge_weight",
+  "traffic",
+  "industrial",
+  "bog",
+  "subsidence",
+  "tire_damage",
+  "detour",
+  "rough_surface",
+  "flood",
+  "river_crossing"
+]);
+const WATER_HAZARDS = new Set([
+  "river_crossing",
+  "flood",
+  "washout",
+  "water_intake",
+  "erosion",
+  "fish_timing"
+]);
+const WATER_FEATURES = new Set([
+  "river",
+  "bridge",
+  "watershed",
+  "community_water",
+  "water_intake",
+  "salmon_river",
+  "salmon_stream",
+  "fish_habitat",
+  "wetland",
+  "wetland_buffer",
+  "creek",
+  "karst"
+]);
+const COMMUNITY_FEATURES = new Set([
+  "first_nation",
+  "cultural_site",
+  "culturally_modified_trees",
+  "visual_quality_zone",
+  "town",
+  "viewpoint",
+  "ranch"
+]);
+const SENSITIVE_FEATURES = new Set([
+  "old_growth",
+  "karst",
+  "sensitive_area",
+  "caribou_habitat",
+  "wetland",
+  "wetland_buffer",
+  "salmon_river",
+  "salmon_stream",
+  "fish_habitat",
+  "watershed",
+  "community_water"
+]);
+const ACCESS_TERRAINS = new Set(["steep", "hilly", "river", "muskeg", "cutblock"]);
+const WINTER_ACCESS_TERRAINS = new Set(["muskeg"]);
+const WINTER_ACCESS_HAZARDS = new Set(["bog", "subsidence", "permafrost", "snow"]);
+
 function clampLevel(value, max = 4) {
   return Math.max(0, Math.min(max, Math.round(Number(value) || 0)));
+}
+
+function normalizeToken(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getAreaTagSet(journey) {
+  return new Set((journey?.area?.tags || []).map(normalizeToken).filter(Boolean));
+}
+
+function countMatches(tokens, candidates) {
+  let total = 0;
+  for (const candidate of candidates) {
+    if (tokens.has(candidate)) {
+      total += 1;
+    }
+  }
+  return total;
+}
+
+function getMonthFromDate(value) {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.getUTCMonth() + 1;
+}
+
+function getPlanningJoinProfile(journey, planningBlock) {
+  const areaTags = getAreaTagSet(journey);
+  const metrics = planningBlock?.metrics || {};
+  const indicators = planningBlock?.indicators || {};
+  const plannedMonth = getMonthFromDate(planningBlock?.plannedHarvestDate || planningBlock?.approveDate);
+  const winterWindow = plannedMonth === 11 || plannedMonth === 12 || plannedMonth === 1 || plannedMonth === 2;
+
+  const accessNeed = clampLevel(
+    Number((metrics.technicalComplexity || 0) >= 18)
+      + Number((metrics.technicalComplexity || 0) >= 24)
+      + Number([...ACCESS_AREA_TAGS].some((tag) => areaTags.has(tag)))
+      + Number(winterWindow && areaTags.has("winter-road")),
+    3
+  );
+
+  const waterNeed = clampLevel(
+    Number(Boolean(indicators.ogmaNearby) || Boolean(indicators.whaNoHarvestNearby))
+      + Number(Boolean(indicators.speciesAtRiskNearby))
+      + Number([...WATER_AREA_TAGS].some((tag) => areaTags.has(tag)))
+      + Number(plannedMonth === 3 || plannedMonth === 4 || plannedMonth === 9 || plannedMonth === 10),
+    3
+  );
+
+  const communityNeed = clampLevel(
+    Number((metrics.firstNationsSensitivity || 0) >= 18)
+      + Number(Boolean(indicators.firstNationsReserveNearby))
+      + Number([...COMMUNITY_AREA_TAGS].some((tag) => areaTags.has(tag))),
+    2
+  );
+
+  const sensitiveNeed = clampLevel(
+    Number((metrics.biodiversitySensitivity || 0) >= 18)
+      + Number((metrics.biodiversitySensitivity || 0) >= 28)
+      + Number(Boolean(indicators.speciesAtRiskNearby) || Boolean(indicators.ogmaNearby) || Boolean(indicators.whaNoHarvestNearby)),
+    3
+  );
+
+  const winterNeed = clampLevel(
+    Number(areaTags.has("winter-road"))
+      + Number(areaTags.has("peatland"))
+      + Number(winterWindow),
+    2
+  );
+
+  return {
+    accessNeed,
+    waterNeed,
+    communityNeed,
+    sensitiveNeed,
+    winterNeed
+  };
 }
 
 function getRoadLevel(observation) {
@@ -113,6 +258,109 @@ export function getRoadAssetObservationForBlock(journey, blockId) {
   return getRoadAssetObservations(journey).find((observation) => observation.blockId === blockId) || null;
 }
 
+function getObservedRouteCandidates(journey) {
+  const areaId = journey?.areaId || journey?.area?.id;
+  if (!areaId) {
+    return [];
+  }
+
+  const routeBlocks = getBlocksForArea(areaId);
+  const byId = new Map(routeBlocks.map((block) => [block.id, block]));
+  return getRoadAssetObservations(journey)
+    .map((observation) => ({
+      observation,
+      routeBlock: byId.get(observation.blockId) || null
+    }))
+    .filter((entry) => entry.routeBlock);
+}
+
+function scorePlanningObservationJoin(profile, observation, routeBlock) {
+  const terrain = normalizeToken(routeBlock?.terrain);
+  const hazards = new Set((routeBlock?.hazards || []).map(normalizeToken).filter(Boolean));
+  const features = new Set((routeBlock?.features || []).map(normalizeToken).filter(Boolean));
+  const roadLevel = getRoadLevel(observation);
+  const crossingLevel = getCrossingLevel(observation);
+  const watershedLevel = getWatershedLevel(observation);
+
+  let score = getObservationSeverity(observation) * 0.5;
+
+  if (profile.accessNeed > 0) {
+    score += profile.accessNeed * (
+      roadLevel +
+      Number(ACCESS_TERRAINS.has(terrain)) +
+      Math.min(2, countMatches(hazards, ACCESS_HAZARDS))
+    );
+  }
+
+  if (profile.waterNeed > 0) {
+    score += profile.waterNeed * (
+      crossingLevel +
+      watershedLevel +
+      Math.min(2, countMatches(hazards, WATER_HAZARDS) + countMatches(features, WATER_FEATURES))
+    );
+  }
+
+  if (profile.communityNeed > 0) {
+    score += profile.communityNeed * Math.min(2, countMatches(features, COMMUNITY_FEATURES));
+  }
+
+  if (profile.sensitiveNeed > 0) {
+    score += profile.sensitiveNeed * Math.min(2, countMatches(features, SENSITIVE_FEATURES));
+  }
+
+  if (profile.winterNeed > 0) {
+    score += profile.winterNeed * (
+      Number(WINTER_ACCESS_TERRAINS.has(terrain)) +
+      Math.min(2, countMatches(hazards, WINTER_ACCESS_HAZARDS))
+    );
+  }
+
+  if (routeBlock?.name && profile.waterNeed > 0 && /bridge|crossing|creek|river/i.test(routeBlock.name)) {
+    score += 1;
+  }
+  if (routeBlock?.name && profile.accessNeed > 0 && /access|road|junction|camp/i.test(routeBlock.name)) {
+    score += 1;
+  }
+
+  return score;
+}
+
+export function getPlanningRoadObservationJoin(journey, planningBlock) {
+  if (!journey || !planningBlock) {
+    return null;
+  }
+
+  const candidates = getObservedRouteCandidates(journey);
+  if (!candidates.length) {
+    return null;
+  }
+
+  const profile = getPlanningJoinProfile(journey, planningBlock);
+  const scored = candidates
+    .map(({ observation, routeBlock }) => ({
+      observation,
+      routeBlock,
+      score: scorePlanningObservationJoin(profile, observation, routeBlock)
+    }))
+    .sort((a, b) => b.score - a.score || getObservationSeverity(b.observation) - getObservationSeverity(a.observation));
+
+  const best = scored[0];
+  const threshold = profile.accessNeed || profile.waterNeed || profile.communityNeed || profile.sensitiveNeed || profile.winterNeed
+    ? 5
+    : 7;
+
+  if (!best || best.score < threshold) {
+    return null;
+  }
+
+  return {
+    observation: best.observation,
+    routeBlock: best.routeBlock,
+    score: best.score,
+    profile
+  };
+}
+
 export function getRoadAssetAreaSummary(journey) {
   const observations = getRoadAssetObservations(journey);
   if (!observations.length) {
@@ -177,10 +425,25 @@ export function getRoadAssetAreaSummary(journey) {
   };
 }
 
-export function getPlanningRoadAssetContext(journey, blockId = null) {
+function resolvePlanningBlock(blockOrId, journey) {
+  if (!blockOrId) return null;
+  if (typeof blockOrId === "object") return blockOrId;
+  const activeBlock = journey?.blockPlanning?.activeBlock;
+  if (activeBlock?.id === blockOrId) {
+    return activeBlock;
+  }
+  return null;
+}
+
+export function getPlanningRoadAssetContext(journey, blockOrId = null) {
+  const planningBlock = resolvePlanningBlock(blockOrId, journey);
+  const blockId = typeof blockOrId === "string" ? blockOrId : blockOrId?.id || planningBlock?.id || null;
   const directObservation = blockId ? getRoadAssetObservationForBlock(journey, blockId) : null;
+  const joinedObservation = !directObservation && planningBlock
+    ? getPlanningRoadObservationJoin(journey, planningBlock)
+    : null;
   const areaSummary = getRoadAssetAreaSummary(journey);
-  if (!directObservation && !areaSummary.hasData) {
+  if (!directObservation && !joinedObservation && !areaSummary.hasData) {
     return {
       hasData: false,
       source: "none",
@@ -199,19 +462,21 @@ export function getPlanningRoadAssetContext(journey, blockId = null) {
     };
   }
 
-  const observation = directObservation || areaSummary.primaryObservation;
-  const source = directObservation ? "block" : "area";
-  const roadLevel = directObservation ? getRoadLevel(directObservation) : areaSummary.maxRoadLevel;
-  const crossingLevel = directObservation ? getCrossingLevel(directObservation) : areaSummary.maxCrossingLevel;
-  const watershedLevel = directObservation ? getWatershedLevel(directObservation) : areaSummary.maxWatershedLevel;
+  const observation = directObservation || joinedObservation?.observation || areaSummary.primaryObservation;
+  const source = directObservation ? "block" : joinedObservation ? "joined" : "area";
+  const routeBlock = joinedObservation?.routeBlock || null;
+  const roadLevel = source === "area" ? areaSummary.maxRoadLevel : getRoadLevel(observation);
+  const crossingLevel = source === "area" ? areaSummary.maxCrossingLevel : getCrossingLevel(observation);
+  const watershedLevel = source === "area" ? areaSummary.maxWatershedLevel : getWatershedLevel(observation);
+  const uncertaintyPenalty = source === "area" ? 2 : source === "joined" ? 1 : 0;
 
   const engineeringPressure = clampLevel(roadLevel + (crossingLevel >= 2 ? 1 : 0));
   const hydrologyPressure = clampLevel(watershedLevel + (crossingLevel >= 2 ? 1 : 0));
   const timingPressure = clampLevel(crossingLevel + (watershedLevel >= 2 ? 1 : 0));
   const reviewDays = Math.max(0, Number(engineeringPressure >= 2) + Number(hydrologyPressure >= 3) + Number(timingPressure >= 3));
   const commentLoad = Number(engineeringPressure >= 3) + Number(hydrologyPressure >= 2) + Number(timingPressure >= 3);
-  const readinessPenalty = engineeringPressure * 7 + hydrologyPressure * 4 + timingPressure * 3 + (source === "area" ? 2 : 0);
-  const rankingPenalty = engineeringPressure * 3 + hydrologyPressure * 2 + timingPressure * 2 + (source === "area" ? 1 : 0);
+  const readinessPenalty = engineeringPressure * 7 + hydrologyPressure * 4 + timingPressure * 3 + uncertaintyPenalty;
+  const rankingPenalty = engineeringPressure * 3 + hydrologyPressure * 2 + timingPressure * 2 + uncertaintyPenalty;
 
   const blockerReasons = [];
   if (source === "block" && roadLevel >= 4) {
@@ -222,7 +487,15 @@ export function getPlanningRoadAssetContext(journey, blockId = null) {
   }
 
   const summary = summarizeObservation(observation);
-  const notePrefix = source === "block" ? "Active block access intel" : "Carry-forward access intel";
+  const joinedFromBlockId = source === "joined" ? observation?.blockId || null : null;
+  const joinedFromBlockName = source === "joined"
+    ? routeBlock?.name || observation?.blockName || observation?.blockId || null
+    : null;
+  const notePrefix = source === "block"
+    ? "Active block access intel"
+    : source === "joined"
+      ? `Matched recce segment ${joinedFromBlockName || joinedFromBlockId || "route block"}`
+      : "Carry-forward access intel";
   const note = summary
     ? `${notePrefix}: ${summary}.`
     : `${notePrefix}: road and crossing issues are still shaping the file.`;
@@ -242,7 +515,11 @@ export function getPlanningRoadAssetContext(journey, blockId = null) {
     scrutinyDelta: Number(roadLevel >= 3) + Number(crossingLevel >= 2) + Number(watershedLevel >= 3),
     blocker: blockerReasons.length > 0,
     blockerReasons,
-    note
+    note,
+    joinedFromBlockId,
+    joinedFromBlockName,
+    matchScore: joinedObservation?.score || 0,
+    routeBlock
   };
 }
 
