@@ -63,3 +63,20 @@ test('audit escalation triggers after two consecutive low-compliance rounds', ()
   assert.equal(state.metrics.progress, 46);
   assert.equal(state.metrics.budget, 44);
 });
+
+test('professional compliance lapses create additional round pressure', () => {
+  const state = makeState();
+
+  state.round = 3;
+  state.professional.registrationStatus = 'suspended';
+  state.professional.cpdHours = 4;
+  state.professional.paperworkLoad = 22;
+  state.professional.auditExposure = 38;
+
+  const consequences = applyRoundConsequences(state);
+
+  assert.ok(consequences.includes('registration-lapse'));
+  assert.ok(consequences.includes('paperwork-burn'));
+  assert.ok(consequences.includes('professional-audit'));
+  assert.ok(state.metrics.compliance < 50);
+});

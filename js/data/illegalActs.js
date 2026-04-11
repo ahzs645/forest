@@ -1202,4 +1202,108 @@ export const ILLEGAL_ACTS = [
     description: "When a reefer unit fails and kills 50,000 trees, quietly dump them in a ravine and claim they were successfully planted.",
     roles: ["silviculture"],
     tags: ["silviculture", "planting", "coverup"],
-  },];
+  },
+  {
+    id: "borrowed-rpf-stamp",
+    title: "Borrow a Registrant's Stamp",
+    description: "Apply someone else's professional sign-off to the package and hope nobody checks whether the registrant was active, competent, or even aware.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "professional-practice", "forgery"],
+    basisCatalogIds: ["reserved-title-misuse", "rationale-gap"],
+    sourceUrls: [
+      "https://www.fpbc.ca/complaints-and-decisions/unlawful-practice/",
+      "https://www.fpbc.ca/public-interest/registrant-directory/"
+    ],
+  },
+  {
+    id: "phantom-cpd-log",
+    title: "Invent a CPD History",
+    description: "Pad the CPD record with webinars you never watched and courses you never finished so the competence audit reads clean on paper.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    tags: ["professional-practice", "audit", "records", "fraud"],
+    basisCatalogIds: ["competence-audit-pattern"],
+    sourceUrls: [
+      "https://www.fpbc.ca/professional-development/continuing-professional-development/",
+      "https://www.fpbc.ca/professional-development/registrant-competence/audits/"
+    ],
+  },
+  {
+    id: "silent-fom-comment-box",
+    title: "Bury the FOM Comments",
+    description: "Collect Forest Operations Map comments into a private folder, answer none of them, and submit the final permit package as if the notice cycle went smoothly.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "fom", "coverup"],
+    basisCatalogIds: ["rationale-gap", "fom-comment-record-gap", "fom-consistency-gap"],
+    sourceUrls: [
+      "https://www2.gov.bc.ca/gov/content/environment/natural-resource-stewardship/laws-policies-standards-guidance/legislation-regulation/forest-range-practices-act/frpa-improvement-initiative/forest-operations-map"
+    ],
+  },
+  {
+    id: "ghost-fsp-response-package",
+    title: "Forge the FSP Response Package",
+    description: "Backfill the FSP review log with invented responses, pretend the 60-day window ran cleanly, and hope nobody reads the dates too closely.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "fsp", "public-review", "fabrication"],
+    basisCatalogIds: ["fsp-comment-gap", "fsp-review-shortcut", "rationale-gap"],
+    sourceUrls: [
+      "https://www2.gov.bc.ca/gov/content/industry/forestry/managing-our-forest-resources/forest-stewardship-plans",
+      "https://www.bclaws.gov.bc.ca/civix/document/id/lc/statreg/14_2004"
+    ],
+  },
+  {
+    id: "free-rider-rup",
+    title: "Free-Ride the Forest Service Road",
+    description: "Move industrial traffic down an FSR without the required road use permit and leave maintenance, radio coordination, and liability for somebody else to discover.",
+    roles: ["permitter", "recce"],
+    tags: ["permitter", "recce", "roads", "noncompliance"],
+    basisCatalogIds: ["watercourse-due-diligence", "rationale-gap", "road-use-permit-free-rider"],
+    sourceUrls: [
+      "https://www2.gov.bc.ca/gov/content/industry/natural-resource-use/resource-roads/district-road-requirements"
+    ],
+  },
+  {
+    id: "shadow-sup-camp",
+    title: "Run a Shadow Camp",
+    description: "Expand the camp, helipad, and dump beyond the mapped footprint and pretend the occupancy authority somehow grew on its own.",
+    roles: ["permitter", "recce", "silviculture"],
+    tags: ["permitter", "recce", "silviculture", "occupancy", "coverup"],
+    basisCatalogIds: ["rationale-gap", "special-use-occupancy-gap"],
+    sourceUrls: [
+      "https://www2.gov.bc.ca/gov/content/industry/forestry/forest-tenures/timber-harvesting-rights/special-use-permit-forestry"
+    ],
+  },
+  {
+    id: "stealth-aia-skip",
+    title: "Skip the Archaeology Ladder",
+    description: "Treat the desktop archaeology screen as final, push the block anyway, and hope nobody asks why the field review or permit context never materialized.",
+    roles: ["planner", "permitter", "recce"],
+    tags: ["planner", "permitter", "recce", "archaeology", "negligence"],
+    basisCatalogIds: ["watercourse-due-diligence", "rationale-gap", "archaeology-escalation-gap"],
+    sourceUrls: [
+      "https://www2.gov.bc.ca/gov/content/industry/natural-resource-use/archaeology/assessments-studies"
+    ],
+  },
+  {
+    id: "phantom-riparian-class",
+    title: "Invent a Friendly Riparian Call",
+    description: "Rewrite the stream card until a fish-bearing channel magically becomes a lighter-treatment draw and the reserve widths stop eating volume.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    tags: ["planner", "permitter", "recce", "silviculture", "riparian", "fraud"],
+    basisCatalogIds: ["riparian-misclassification", "watercourse-due-diligence"],
+    sourceUrls: [
+      "https://www2.gov.bc.ca/gov/content/industry/forestry/managing-our-forest-resources/silviculture/training-resources/silviculture-guidebooks/riparian-management-area-guidebook"
+    ],
+  },
+  {
+    id: "after-hours-crossing-retrofit",
+    title: "Retrofit the Crossing After Hours",
+    description: "Swap the culvert overnight, skip the proper fish-passage and road-work review, and tell everyone the excavator was only doing maintenance.",
+    roles: ["permitter", "recce"],
+    tags: ["permitter", "recce", "crossings", "fish", "coverup"],
+    basisCatalogIds: ["fish-passage-barrier", "significant-road-work-without-auth"],
+    sourceUrls: [
+      "https://www2.gov.bc.ca/gov/content/environment/plants-animals-ecosystems/fish/aquatic-habitat-management/fish-passage",
+      "https://www2.gov.bc.ca/gov/content/industry/natural-resource-use/resource-roads/district-road-requirements"
+    ],
+  },
+];

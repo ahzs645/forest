@@ -826,4 +826,213 @@ export const ISSUE_LIBRARY = [
       },
     ],
   },
+  {
+    id: "fpbc-competence-audit",
+    title: "FPBC Competence Audit",
+    description:
+      "FPBC requests your CPD records, competence declaration, development plan, and work samples tied to your current practice areas.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    areaTags: ["northern-bc"],
+    seasonBias: ["Winter Review", "Spring Planning"],
+    options: [
+      {
+        label: "Clear the deck and submit a defensible package",
+        outcome:
+          "You assemble clean records, confirm your practice areas, and answer the audit carefully. It costs time, but the file holds together.",
+        effects: { progress: -3, compliance: 7, budget: -2, relationships: 1 },
+      },
+      {
+        label: "Bring in a mentor or peer reviewer before replying",
+        outcome:
+          "A second set of eyes tightens the rationale and spots weak notes before FPBC does.",
+        effects: { progress: -2, compliance: 5, relationships: 3, budget: -1 },
+      },
+      {
+        label: "Treat it like admin and send a thin package",
+        outcome:
+          "You move fast, but the sparse records make the audit feel heavier than it needed to be.",
+        effects: { progress: 1, compliance: -5, relationships: -2 },
+      },
+    ],
+  },
+  {
+    id: "fsp-comment-surge",
+    title: "FSP Comment Surge",
+    description:
+      "The Forest Stewardship Plan review package draws a late wave of written comments on visual quality, water timing, and access assumptions, and the response record is due before the file can move.",
+    roles: ["planner", "permitter"],
+    areaTags: ["community-interface", "community-water", "watershed", "northern-bc"],
+    seasonBias: ["Spring Planning", "Fall Integration"],
+    processHookIds: ["fsp-public-review"],
+    options: [
+      {
+        label: "Extend the review effort and answer every theme carefully",
+        outcome:
+          "You slow down, categorize the comments, and build a response package that reads like somebody actually listened.",
+        effects: { progress: -3, compliance: 6, relationships: 5, budget: -2 },
+      },
+      {
+        label: "Host focused field walks and revise the weak sections",
+        outcome:
+          "A tighter package emerges after a few painful but useful site visits. The file gets stronger and the argument gets narrower.",
+        effects: { progress: -2, compliance: 5, relationships: 6, forestHealth: 2, budget: -2 },
+      },
+      {
+        label: "Treat the comments as noise and keep the file moving",
+        outcome:
+          "The schedule holds for a moment, but the thin response record starts following the file everywhere.",
+        effects: { progress: 3, compliance: -6, relationships: -5 },
+      },
+    ],
+  },
+  {
+    id: "fom-consistency-gap",
+    title: "FOM Consistency Gap",
+    description:
+      "District review catches a mismatch between the final Forest Operations Map and the cutting-permit package you were about to submit.",
+    roles: ["planner", "permitter"],
+    areaTags: ["northern-bc", "community-interface", "watershed", "karst"],
+    seasonBias: ["Spring Planning", "Fall Integration"],
+    processHookIds: ["fom-notice-cycle", "cutting-permit-admin"],
+    options: [
+      {
+        label: "Pull the package back and resync the map set",
+        outcome:
+          "You lose a week rebuilding attachments, but the file stops bleeding credibility.",
+        effects: { progress: -3, compliance: 7, budget: -2 },
+      },
+      {
+        label: "Trim the disputed polygons and resubmit narrowly",
+        outcome:
+          "The permit package gets smaller, yet the clean match gives reviewers less to fight about.",
+        effects: { progress: -1, compliance: 5, relationships: 2, forestHealth: 1 },
+      },
+      {
+        label: "Explain the difference in a cover note and send it anyway",
+        outcome:
+          "The explanation reads thinner than you hoped, and the mismatch becomes the whole conversation.",
+        effects: { progress: 2, compliance: -7, relationships: -3 },
+      },
+    ],
+  },
+  {
+    id: "archaeology-escalation-pause",
+    title: "Archaeology Escalation Pause",
+    description:
+      "An archaeology overview flags overlap with the planned footprint, and what looked like a desktop-screening exercise is now turning into permit and specialist waiting time.",
+    roles: ["planner", "permitter", "recce"],
+    areaTags: ["karst", "glacial", "community-interface", "northern-bc"],
+    seasonBias: ["Spring Planning", "Summer Field", "Fall Integration"],
+    processHookIds: ["archaeology-screening-ladder"],
+    options: [
+      {
+        label: "Escalate immediately and book the specialist work",
+        outcome:
+          "You accept the delay early, preserve the evidence, and keep the file from turning into a mess later.",
+        effects: { progress: -4, compliance: 6, relationships: 4, budget: -3 },
+      },
+      {
+        label: "Redesign the layout away from the highest-risk ground",
+        outcome:
+          "The footprint shrinks, but the cleaner boundary gives everyone less to argue about.",
+        effects: { progress: -2, compliance: 5, forestHealth: 2, relationships: 3 },
+      },
+      {
+        label: "Keep recce moving while the desktop notes sit in a folder",
+        outcome:
+          "You buy short-term momentum, then lose it again when the gap becomes obvious.",
+        effects: { progress: 3, compliance: -7, relationships: -4 },
+      },
+    ],
+  },
+  {
+    id: "riparian-reclassification-call",
+    title: "Riparian Reclassification Call",
+    description:
+      "A field revisit changes fish presence and channel-width assumptions on a stream you already used in layout and prescription work.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    areaTags: ["community-water", "watershed", "salmon", "peatland", "northern-bc"],
+    seasonBias: ["Spring Planning", "Summer Field", "Fall Integration"],
+    processHookIds: ["riparian-classification", "fish-crossing-remediation"],
+    options: [
+      {
+        label: "Reclassify the stream and rebuild the treatment package",
+        outcome:
+          "It is painful rework, but the reserve widths, crossing notes, and regen plan line up again.",
+        effects: { progress: -3, compliance: 7, forestHealth: 4, budget: -2 },
+      },
+      {
+        label: "Keep the reserve wider and salvage the rest of the layout",
+        outcome:
+          "You lose some operable ground, yet the revised package stays coherent and defensible.",
+        effects: { progress: -1, compliance: 5, forestHealth: 3, relationships: 1 },
+      },
+      {
+        label: "Treat the new field call as overcautious and proceed",
+        outcome:
+          "The schedule looks better for a week or two, right up until the water file catches up.",
+        effects: { progress: 2, compliance: -8, relationships: -3, forestHealth: -2 },
+      },
+    ],
+  },
+  {
+    id: "road-use-permit-standoff",
+    title: "Road Use Permit Standoff",
+    description:
+      "District staff flag that your Forest Service Road access needs a cleaner road use permit and a clearer primary-user maintenance plan before hauling can keep rolling.",
+    roles: ["planner", "permitter", "recce"],
+    areaTags: ["winter-road", "remote-camps", "steep", "gas-interface", "northern-bc"],
+    seasonBias: ["Spring Planning", "Summer Field", "Fall Integration"],
+    processHookIds: ["road-use-permit", "road-notifications"],
+    options: [
+      {
+        label: "Take primary-user status and formalize maintenance splits",
+        outcome:
+          "You absorb the coordination headache, but the district sees a credible plan and the road politics cool down.",
+        effects: { progress: -1, compliance: 6, relationships: 3, budget: -3 },
+      },
+      {
+        label: "Negotiate a cost-share and radio-use agreement first",
+        outcome:
+          "It takes longer, but the users leave with clearer expectations and fewer surprise complaints.",
+        effects: { progress: -2, compliance: 4, relationships: 4, budget: -1 },
+      },
+      {
+        label: "Push traffic through while the paperwork catches up",
+        outcome:
+          "The road stays busy, but the district notices exactly what you hoped they would not.",
+        effects: { progress: 2, compliance: -6, relationships: -3 },
+      },
+    ],
+  },
+  {
+    id: "special-use-permit-stack",
+    title: "Special Use Permit Stack",
+    description:
+      "Your camp, helipad, and dump footprint are bigger than the district expected, and suddenly the support infrastructure needs its own special use permit bundle.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    areaTags: ["remote-camps", "glacial", "gas-interface", "community-interface", "northern-bc"],
+    seasonBias: ["Spring Planning", "Summer Field"],
+    processHookIds: ["special-use-permit"],
+    options: [
+      {
+        label: "Bundle the occupancy applications and maps properly",
+        outcome:
+          "You burn time on paperwork and exhibits now, but the support sites stop dragging the main file backward.",
+        effects: { progress: -2, compliance: 6, budget: -2 },
+      },
+      {
+        label: "Shrink the footprint and redesign camp logistics",
+        outcome:
+          "The crew loses convenience, but the smaller support layout is easier to authorize and defend.",
+        effects: { progress: -1, compliance: 4, forestHealth: 2, budget: -1 },
+      },
+      {
+        label: "Use the sites quietly and hope nobody asks",
+        outcome:
+          "It looks efficient for a week or two, right up until the occupancy question lands in writing.",
+        effects: { progress: 2, compliance: -7, relationships: -2 },
+      },
+    ],
+  },
 ];

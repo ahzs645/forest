@@ -11,6 +11,10 @@ import {
   DESK_RESOURCES
 } from '../resources.js';
 import { getActiveCrewCount, processDailyUpdate } from '../crew.js';
+import {
+  applyProfessionalComplianceShift,
+  ensureProfessionalComplianceState,
+} from '../engine.js';
 
 function applyDeskEffort(journey, { energy = 0, stress = 0 }) {
   if (journey.protagonist) {
@@ -66,6 +70,7 @@ export function executeDeskDay(journey, actionId, actionParams = {}) {
 function processPermitWork(journey) {
   const messages = [];
   const hoursUsed = 2;
+  const professional = ensureProfessionalComplianceState(journey);
 
   if (journey.hoursRemaining < hoursUsed) {
     messages.push('Not enough time remaining today.');
@@ -80,10 +85,12 @@ function processPermitWork(journey) {
     journey.permits.submitted--;
     journey.permits.inReview++;
     messages.push('Submitted a permit package for review.');
+    applyProfessionalComplianceShift(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
   } else if (journey.permits.backlog > 0) {
     journey.permits.backlog--;
     journey.permits.submitted++;
     messages.push('Prepared a new permit package for submission.');
+    applyProfessionalComplianceShift(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
   }
 
   // Random chance to advance review
@@ -92,9 +99,11 @@ function processPermitWork(journey) {
     if (Math.random() < 0.7) {
       journey.permits.approved = Math.min(journey.permits.target, journey.permits.approved + 1);
       messages.push('A permit was approved!');
+      applyProfessionalComplianceShift(journey, { cpdHours: 1, paperworkLoad: -1, auditExposure: -1 });
     } else {
       journey.permits.needsRevision++;
       messages.push('A permit needs revision.');
+      applyProfessionalComplianceShift(journey, { paperworkLoad: 2, auditExposure: 1 });
     }
   }
 
@@ -103,6 +112,11 @@ function processPermitWork(journey) {
     journey.permits.needsRevision--;
     journey.permits.inReview++;
     messages.push('Resubmitted a revised permit.');
+    applyProfessionalComplianceShift(journey, { paperworkLoad: -1, auditExposure: -1 });
+  }
+
+  if (professional?.registrationStatus !== 'active') {
+    messages.push('Registration is not current, so the file carries extra scrutiny.');
   }
 
   return { journey, messages };
@@ -123,6 +137,7 @@ function holdStakeholderMeeting(journey, stakeholder = 'ministry') {
   journey.hoursRemaining -= hoursUsed;
   applyDeskEffort(journey, { energy: 15, stress: 6 });
   journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
+  applyProfessionalComplianceShift(journey, { cpdHours: 1, paperworkLoad: -1, auditExposure: -1 });
 
   const sh = journey.stakeholders?.[stakeholder];
   if (sh) {

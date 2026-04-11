@@ -10,7 +10,8 @@ export const FORESTER_ROLES = [
         id: "landscape",
         title: "Landscape Assessment",
         prompt:
-          "A new five-year plan is due. How will you analyze the landscape before setting cutblocks?",
+          "A new five-year plan is due, and your FSP / Forest Operations Map story needs to survive public review. How will you analyze the landscape before setting cutblocks?",
+        processHookIds: ["fsp-public-review", "fom-notice-cycle"],
         options: [
           {
             label: "Lean on existing inventories to move quickly",
@@ -37,7 +38,8 @@ export const FORESTER_ROLES = [
         id: "constraints",
         title: "Values Balancing",
         prompt:
-          "Several wildlife habitat and recreation overlays intersect proposed blocks. What's your approach?",
+          "Several wildlife habitat and recreation overlays intersect proposed blocks just as the FOM and referral package are being assembled. What's your approach?",
+        processHookIds: ["fom-notice-cycle", "riparian-classification"],
         options: [
           {
             label: "Negotiate minor boundary tweaks with regulators",
@@ -64,7 +66,8 @@ export const FORESTER_ROLES = [
         id: "integration",
         title: "Team Integration",
         prompt:
-          "Operations, silviculture, and finance all want their needs reflected in the plan.",
+          "Operations, silviculture, and finance all want their needs reflected in the FSP, the FOM response package, and the cutting-permit sequence.",
+        processHookIds: ["fsp-public-review", "cutting-permit-admin"],
         options: [
           {
             label: "Host an integrated planning charrette",
@@ -99,7 +102,8 @@ export const FORESTER_ROLES = [
         id: "package",
         title: "Application Packaging",
         prompt:
-          "A bundle of cutting permit applications must leave the door this week.",
+          "A bundle of cutting permit and road permit files must leave the door this week, each with clean FOM consistency and attachment checks.",
+        processHookIds: ["cutting-permit-admin", "road-permit-package", "fom-notice-cycle"],
         options: [
           {
             label: "Bundle permits to fast-track volume",
@@ -127,7 +131,8 @@ export const FORESTER_ROLES = [
         id: "referrals",
         title: "Referral Follow-up",
         prompt:
-          "Half of your referral responses are overdue.",
+          "Half of your FOM, archaeology, and hydrology referral responses are overdue.",
+        processHookIds: ["fom-notice-cycle", "archaeology-screening-ladder", "riparian-classification"],
         options: [
           {
             label: "Call everyone for status updates",
@@ -153,7 +158,8 @@ export const FORESTER_ROLES = [
         id: "tracking",
         title: "Regulatory Tracking",
         prompt:
-          "Rules change mid-quarter requiring updated professional sign-off.",
+          "Rules change mid-quarter, and the backlog now needs updated professional sign-off, cleaner amendment records, and fresher road notices.",
+        processHookIds: ["cutting-permit-admin", "road-notifications"],
         options: [
           {
             label: "Bring in a third-party professional immediately",
@@ -188,7 +194,8 @@ export const FORESTER_ROLES = [
         id: "access",
         title: "Road Recon",
         prompt:
-          "Spring melt damaged a key spur road. How do you respond?",
+          "Spring melt damaged a key spur road, and the district wants to know whether this is still maintenance, a road use permit problem, or significant road work. How do you respond?",
+        processHookIds: ["road-use-permit", "significant-road-work", "road-notifications"],
         options: [
           {
             label: "Contract emergency repair",
@@ -214,7 +221,8 @@ export const FORESTER_ROLES = [
         id: "intel",
         title: "Field Intelligence",
         prompt:
-          "Two crews report unrecorded cultural features on separate ridges.",
+          "Two crews report unrecorded cultural features on separate ridges after a desktop archaeology screen came back 'low concern.'",
+        processHookIds: ["archaeology-screening-ladder"],
         options: [
           {
             label: "GPS, photograph, and flag immediately",
@@ -276,7 +284,8 @@ export const FORESTER_ROLES = [
         id: "planting",
         title: "Planting Program",
         prompt:
-          "Crew availability is tight and snow lingers in high elevation blocks.",
+          "Crew availability is tight, snow lingers in high elevation blocks, and the camp-plus-helipad footprint is starting to look like its own occupancy file.",
+        processHookIds: ["special-use-permit"],
         options: [
           {
             label: "Stagger crews by elevation band",
@@ -302,7 +311,8 @@ export const FORESTER_ROLES = [
         id: "regen",
         title: "Regeneration Strategy",
         prompt:
-          "Pine beetle recovery blocks show poor survival.",
+          "Pine beetle recovery blocks show poor survival, especially where riparian treatment and microsite limits are squeezing the prescription.",
+        processHookIds: ["riparian-classification"],
         options: [
           {
             label: "Switch to mixed species blends",
@@ -328,7 +338,8 @@ export const FORESTER_ROLES = [
         id: "reporting",
         title: "Stand Monitoring",
         prompt:
-          "Regulator deadlines for FREP surveys land the same week as community tours.",
+          "Regulator deadlines for FREP surveys and riparian follow-up land the same week as community tours.",
+        processHookIds: ["riparian-classification", "special-use-permit"],
         options: [
           {
             label: "Send technical crews early and host tours later",
@@ -379,4 +390,3 @@ export const FORESTER_ROLES = [
     ],
   },
 ];
-

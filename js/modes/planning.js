@@ -21,6 +21,12 @@ import {
   formatRoadAssetSummary,
   getPlanningRoadAssetContext,
 } from '../data/roadAssetIntel.js';
+import {
+  advanceProfessionalComplianceChain,
+  applyProfessionalComplianceShift,
+  ensureProfessionalComplianceState,
+  getProfessionalComplianceSnapshot,
+} from '../engine.js';
 import { isPlanningApprovalReady } from './shared/endConditions.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
@@ -28,6 +34,66 @@ import { getAreaSituationSummary } from '../data/areaSituations.js';
 
 const FOM_PUBLIC_REVIEW_MIN_DAYS = 2;
 const FOM_PUBLIC_REVIEW_COMMENT_LIMIT = 2;
+const PLANNING_PHASE_NAMES = {
+  data_gathering: 'Data Gathering',
+  analysis: 'Analysis',
+  stakeholder_review: 'Stakeholder Review',
+  ministerial_approval: 'Ministerial Approval'
+};
+
+function ensurePlanningProfessionalState(journey) {
+  return ensureProfessionalComplianceState(journey);
+}
+
+function getPlanningProfessionalSnapshot(journey) {
+  return getProfessionalComplianceSnapshot(journey);
+}
+
+function describePlanningProfessionalSnapshot(snapshot) {
+  if (!snapshot) return 'Registration n/a | CPD n/a | Paperwork n/a | Audit n/a';
+  const burden = snapshot.areaBurdenLabel ? ` | ${snapshot.areaBurdenLabel}` : '';
+  return `Registration: ${snapshot.registrationStatus} | CPD: ${snapshot.cpdHours}/${snapshot.cpdTarget}h | Paperwork: ${snapshot.paperworkLoad} | Audit: ${snapshot.auditExposure}${burden}`;
+}
+
+function getPlanningProfessionalIssues(journey) {
+  const snapshot = getPlanningProfessionalSnapshot(journey);
+  if (!snapshot) return [];
+
+  const reasons = [];
+  if (!snapshot.registrationActive) {
+    reasons.push(`registration is ${snapshot.registrationStatus}`);
+  }
+  if (snapshot.cpdGap > 0) {
+    reasons.push(`CPD gap ${snapshot.cpdGap}h`);
+  }
+  if (snapshot.competenceRisk >= 35) {
+    reasons.push(`competence risk ${snapshot.competenceRisk}%`);
+  }
+  if (snapshot.paperworkLoad >= 40) {
+    reasons.push(`paperwork load ${snapshot.paperworkLoad}`);
+  }
+  if (snapshot.auditExposure >= 35) {
+    reasons.push(`audit exposure ${snapshot.auditExposure}`);
+  }
+  return reasons;
+}
+
+function applyPlanningProfessionalWork(journey, changes = {}) {
+  const professional = ensurePlanningProfessionalState(journey);
+  if (!professional) return null;
+  return applyProfessionalComplianceShift(journey, changes);
+}
+
+function progressPlanningPaperworkChain(journey, chainId, stepCount = 1) {
+  const chain = advanceProfessionalComplianceChain(journey, chainId, stepCount);
+  if (!chain) {
+    return null;
+  }
+
+  const stepIndex = Math.min(chain.stepIndex, chain.steps.length) - 1;
+  const stage = stepIndex >= 0 ? chain.steps[stepIndex] : chain.steps[0];
+  return { chain, stage };
+}
 
 function ensurePlanningFomState(journey) {
   const blockPlanning = journey.blockPlanning || (journey.blockPlanning = {});
@@ -87,6 +153,10 @@ function describeReviewState(fom) {
     default:
       return 'Draft';
   }
+}
+
+function getPlanningPhaseLabel(phase) {
+  return PLANNING_PHASE_NAMES[phase] || phase;
 }
 
 function syncFomStateFromActiveBlock(journey, seasonInfo) {
@@ -169,6 +239,7 @@ export function getPlanningSubmissionReadiness(journey, seasonInfo = null) {
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
   const waterContext = getPlanningBlockWaterContext(journey.blockPlanning?.activeBlock, journey.area, seasonInfo);
   const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock || null);
+  const professional = getPlanningProfessionalSnapshot(journey);
   const reasons = [];
 
   if (!journey.blockPlanning?.activeBlock) {
@@ -191,13 +262,169 @@ export function getPlanningSubmissionReadiness(journey, seasonInfo = null) {
     reasons.push(`road-engineering blocker: ${roadContext.blockerReasons.join('; ')}`);
   }
 
+  if (professional && !professional.registrationActive) {
+    reasons.push(`registration is ${professional.registrationStatus}`);
+  }
+  if (professional?.cpdGap > 0) {
+    reasons.push(`CPD gap ${professional.cpdGap}h`);
+  }
+  if (professional?.competenceRisk >= 35) {
+    reasons.push(`competence risk ${professional.competenceRisk}%`);
+  }
+  if (professional?.auditExposure >= 35) {
+    reasons.push(`audit exposure ${professional.auditExposure}`);
+  }
+
   return {
     ready: reasons.length === 0,
     reasons,
     waterContext,
     roadContext,
     fom,
+    professional,
   };
+}
+
+function getPlanningValueRecoveryHint(journey, deficits) {
+  const sorted = [...(deficits || [])].sort((left, right) => left.value - right.value);
+  const primary = sorted[0] || null;
+  if (!primary) {
+    return null;
+  }
+
+  if (primary.label === 'Timber' && (journey?.values?.biodiversity || 0) > 32) {
+    return {
+      actionLabel: 'Timber Assessment',
+      headline: `Timber Assessment to lift timber supply from ${primary.value}% before the next gate.`,
+      followUp: 'Use Values Workshop after the timber pass if biodiversity starts to slip.'
+    };
+  }
+
+  const workshopFocus = {
+    Bio: 'Emphasize Biodiversity',
+    Timber: 'Emphasize Timber Supply',
+    Community: 'Emphasize Community',
+    FN: 'Emphasize First Nations'
+  };
+
+  return {
+    actionLabel: 'Values Workshop',
+    headline: `Values Workshop to recover ${primary.label} from ${primary.value}% before the next gate.`,
+    followUp: `Use ${workshopFocus[primary.label] || 'Balanced Approach'} inside the workshop first.`
+  };
+}
+
+function pushPlanningGuideStep(steps, text) {
+  if (!text || steps.includes(text)) {
+    return;
+  }
+  steps.push(text);
+}
+
+function buildPlanningActionGuidance(journey, seasonInfo = null) {
+  const readiness = getPlanningSubmissionReadiness(journey, seasonInfo);
+  const deficits = getValuesGateDeficits(journey);
+  const professional = getPlanningProfessionalSnapshot(journey);
+  const professionalIssues = getPlanningProfessionalIssues(journey);
+  const steps = [];
+  let lane = 'Technical file';
+  let headline = 'Gather Data to keep the planning file moving.';
+
+  if (!journey.blockPlanning?.activeBlock) {
+    lane = 'Block file';
+    headline = 'Choose an active block when the cutblock review opens so the rest of the file has somewhere to land.';
+    pushPlanningGuideStep(steps, 'Finish the cutblock review prompt and lock an active block before you worry about FOM or submission work.');
+    return { lane, headline, steps };
+  }
+
+  switch (journey.plan.phase) {
+    case 'data_gathering':
+      lane = 'Technical file';
+      headline = 'Gather Data to reach 80% completeness and unlock analysis.';
+      pushPlanningGuideStep(steps, 'Gather Data until the baseline package is strong enough to hand off to analysis.');
+      pushPlanningGuideStep(steps, 'Use Compliance Admin if registration or paperwork pressure starts dragging the file.');
+      return { lane, headline, steps };
+
+    case 'analysis':
+      lane = 'Technical file';
+      headline = 'Run Analysis to push the model package to 80% and open stakeholder review.';
+      pushPlanningGuideStep(steps, 'Run Analysis until the technical package clears the phase gate.');
+      pushPlanningGuideStep(steps, 'Use Values Workshop if the block choice dragged a core value under the review threshold.');
+      return { lane, headline, steps };
+
+    case 'stakeholder_review': {
+      if (deficits.length > 0) {
+        const valueHint = getPlanningValueRecoveryHint(journey, deficits);
+        lane = 'Values lane';
+        headline = valueHint?.headline || 'Values Workshop to recover the blocked values.';
+        pushPlanningGuideStep(steps, valueHint?.followUp || 'Recover the weakest value before reopening the stakeholder lane.');
+        pushPlanningGuideStep(steps, 'Stakeholder Session stays blocked until every value clears 25%.');
+        return { lane, headline, steps };
+      }
+
+      lane = 'Consultation lane';
+      headline = 'Stakeholder Session to push buy-in toward 75% and open ministerial approval.';
+      pushPlanningGuideStep(steps, 'Hold Stakeholder Session until buy-in clears the approval handoff.');
+      pushPlanningGuideStep(steps, 'Use Values Workshop if a session drags biodiversity, community, or First Nations values back down.');
+      return { lane, headline, steps };
+    }
+
+    default:
+      break;
+  }
+
+  if (deficits.length > 0) {
+    const valueHint = getPlanningValueRecoveryHint(journey, deficits);
+    lane = 'Values lane';
+    headline = valueHint?.headline || 'Values Workshop to reopen the approval gate.';
+    pushPlanningGuideStep(steps, valueHint?.followUp || 'Recover the weakest value first.');
+  }
+
+  const fom = readiness.fom;
+  if (!deficits.length && fom?.status !== 'approved') {
+    lane = 'FOM / submission file';
+    if (fom?.status === 'draft') {
+      headline = 'Open FOM Review to start the public-review clock on the active block.';
+      pushPlanningGuideStep(steps, 'Open FOM Review first; submission cannot move while the FOM is still a draft.');
+    } else if (fom?.status === 'public_review') {
+      headline = 'Update FOM Review until the review window and open comments clear.';
+      pushPlanningGuideStep(steps, `Keep the FOM live until the ${Math.max(0, fom.reviewDaysRemaining || 0)}-day review window and comment load burn down.`);
+    } else if (fom?.status === 'revision_required') {
+      headline = 'Revise FOM to close review comments and reopen the submission lane.';
+      pushPlanningGuideStep(steps, 'Stay in the FOM lane until revision notes and water comments are closed.');
+    }
+    if (readiness.waterContext?.gate === 'hold') {
+      pushPlanningGuideStep(steps, readiness.waterContext.note);
+    }
+    if (readiness.roadContext?.blocker) {
+      pushPlanningGuideStep(steps, `Road blocker: ${readiness.roadContext.blockerReasons.join(' | ')}`);
+    }
+  }
+
+  if (!deficits.length && fom?.status === 'approved' && professionalIssues.length > 0) {
+    lane = 'Professional file';
+    const adminLabel = professional?.registrationActive ? 'Compliance Admin' : 'Renew Registration';
+    headline = `${adminLabel} to clear ${professionalIssues[0]} before the package goes upstairs.`;
+    pushPlanningGuideStep(steps, 'Clear registration, CPD, and paperwork drag before you spend ministerial time.');
+  }
+
+  if (!deficits.length && fom?.status === 'approved' && professionalIssues.length === 0 && journey.plan.ministerialConfidence < 80) {
+    lane = 'Ministerial brief';
+    headline = 'Ministerial Outreach to close the confidence gap before submission.';
+    pushPlanningGuideStep(steps, 'Recover confidence to 80% before you burn six hours on the final package.');
+  }
+
+  if (!deficits.length && readiness.ready && journey.plan.ministerialConfidence >= 80) {
+    lane = 'Submission package';
+    headline = 'Prepare Submission while the FOM, values, and professional gates are clean.';
+    pushPlanningGuideStep(steps, 'Use the six-hour submission push before another event reopens the file.');
+  }
+
+  if (!steps.length) {
+    pushPlanningGuideStep(steps, 'Keep the live blocker moving instead of spending hours on low-yield support work.');
+  }
+
+  return { lane, headline, steps };
 }
 
 /**
@@ -208,6 +435,7 @@ export async function runPlanningDay(game) {
   const { ui, journey } = game;
   const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
   const progressBeforeDay = getOperationalProgress(journey);
+  ensurePlanningProfessionalState(journey);
 
   // Reset hours for new day
   if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
@@ -279,13 +507,7 @@ export async function runPlanningDay(game) {
   }
 
   // Contextual continue (Phase 6.1)
-  const phaseNames = {
-    data_gathering: 'Data Gathering',
-    analysis: 'Analysis',
-    stakeholder_review: 'Stakeholder Review',
-    ministerial_approval: 'Ministerial Approval'
-  };
-  const continueLabel = `Continue... (Phase: ${phaseNames[journey.plan.phase] || journey.plan.phase}, Day ${journey.day})`;
+  const continueLabel = `Continue... (Phase: ${getPlanningPhaseLabel(journey.plan.phase)}, Day ${journey.day})`;
   await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
 }
 
@@ -293,6 +515,8 @@ export async function runPlanningDay(game) {
  * Display compact planning header (Phase 6.2)
  */
 function displayPlanningHeader(ui, journey, seasonInfo) {
+  const professional = ensurePlanningProfessionalState(journey);
+  const guidance = buildPlanningActionGuidance(journey, seasonInfo);
   ui.clear();
   const deadlineLabel = Number.isFinite(journey.deadline)
     ? `DAY ${journey.day} of ${journey.deadline} - STRATEGIC PLANNING`
@@ -312,13 +536,7 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
   }
 
   // Phase and plan metrics
-  const phaseNames = {
-    data_gathering: 'Data Gathering',
-    analysis: 'Analysis',
-    stakeholder_review: 'Stakeholder Review',
-    ministerial_approval: 'Ministerial Approval'
-  };
-  ui.write(`Phase: ${phaseNames[journey.plan.phase] || journey.plan.phase}`);
+  ui.write(`Phase: ${getPlanningPhaseLabel(journey.plan.phase)}`);
   if (Number.isFinite(journey.deadline)) {
     ui.write(`Days Remaining: ${Math.max(0, journey.deadline - journey.day)}`);
   }
@@ -330,6 +548,11 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
     } else {
       ui.write('Approval threshold reached. A full submission can carry the plan across the line.');
     }
+  }
+  ui.write(`Lane Focus: ${guidance.lane}`);
+  ui.write(`Next Best Move: ${guidance.headline}`);
+  if (guidance.steps.length > 0) {
+    ui.write(`Follow-up: ${guidance.steps.join(' -> ')}`);
   }
 
   // Values balance (Phase 4.1 - these now matter)
@@ -346,6 +569,7 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
   if (areaSituation) {
     ui.write(`Area Situation: ${areaSituation}`);
   }
+  ui.write(describePlanningProfessionalSnapshot(getPlanningProfessionalSnapshot(journey)));
   const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'planner', 2);
   if (discoveryNotes.length > 0) {
     ui.write(`Carry-forward: ${discoveryNotes.join(' | ')}`);
@@ -362,6 +586,11 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
         ui.writeWarning(`Road-engineering blocker: ${fom.roadBlockerReasons.join(' | ')}`);
       }
     }
+  }
+  if (professional?.chains?.fom) {
+    const chain = professional.chains.fom;
+    const currentStage = chain.steps[Math.min(chain.stepIndex, chain.steps.length - 1)] || 'submission';
+    ui.write(`FOM paperwork chain: ${currentStage}${chain.complete ? ' (complete)' : ''}`);
   }
 
   if (journey.blockPlanning?.activeSummary) {
@@ -485,7 +714,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   if (journey.plan.phase === 'data_gathering' && journey.resources.dataCredits > 0 && hoursLeft >= 3) {
     actionOptions.push({
       label: 'Gather Data (3h)',
-      description: 'Compile LiDAR, inventory, and baseline data',
+      description: 'Lane: technical file | Compile LiDAR, inventory, and baseline data',
       value: 'gather_data'
     });
   }
@@ -493,7 +722,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   if (journey.plan.phase === 'analysis' && hoursLeft >= 4) {
     actionOptions.push({
       label: 'Run Analysis (4h)',
-      description: 'Spatial analysis and modeling',
+      description: 'Lane: technical file | Spatial analysis and modeling',
       value: 'analyze'
     });
   }
@@ -505,13 +734,14 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (valuesOk) {
       actionOptions.push({
         label: 'Stakeholder Session (4h)',
-        description: 'Host consultation session',
+        description: 'Lane: consultation file | Host consultation and bank buy-in',
         value: 'stakeholder'
       });
     } else {
+      const valueHint = getPlanningValueRecoveryHint(journey, deficits);
       actionOptions.push({
         label: 'Stakeholder Session (BLOCKED)',
-        description: `Needs: ${formatValuesGateDeficits(deficits)}`,
+        description: `Needs: ${formatValuesGateDeficits(deficits)} | Next: ${valueHint?.actionLabel || 'Values Workshop'}`,
         value: 'stakeholder_blocked'
       });
     }
@@ -521,25 +751,49 @@ function buildActionOptions(journey, seasonInfo = null) {
     const deficits = getValuesGateDeficits(journey);
     const valuesOk = deficits.length === 0;
     const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
-    if (valuesOk && submissionReadiness.ready) {
+    const professionalIssues = getPlanningProfessionalIssues(journey);
+    if (valuesOk && submissionReadiness.ready && professionalIssues.length === 0) {
       actionOptions.push({
         label: 'Prepare Submission (6h)',
-        description: 'Fastest approval push (+18 confidence) after the FOM clears public review and water comments.',
+        description: 'Lane: submission package | Fastest approval push once the FOM, road, and professional gates are clear',
         value: 'submit'
       });
     } else {
+      const guidance = buildPlanningActionGuidance(journey, seasonInfo);
       actionOptions.push({
         label: 'Prepare Submission (BLOCKED)',
-        description: `Needs: ${[deficits.length ? formatValuesGateDeficits(deficits) : null, ...submissionReadiness.reasons].filter(Boolean).join(' | ')}`,
+        description: `Needs: ${[deficits.length ? formatValuesGateDeficits(deficits) : null, ...submissionReadiness.reasons, ...professionalIssues].filter(Boolean).join(' | ')} | Next: ${guidance.headline}`,
         value: 'submit_blocked'
       });
     }
   }
 
+  if (hoursLeft >= 2) {
+    const professional = getPlanningProfessionalSnapshot(journey);
+    const label = professional?.registrationActive ? 'Compliance Admin (2h)' : 'Renew Registration (2h)';
+    const pieces = [];
+    if (professional?.registrationStatus !== 'active') {
+      pieces.push(`registration ${professional.registrationStatus}`);
+    }
+    if (professional?.cpdGap > 0) {
+      pieces.push(`CPD gap ${professional.cpdGap}h`);
+    }
+    if (professional?.paperworkLoad > 0) {
+      pieces.push(`paperwork ${professional.paperworkLoad}`);
+    }
+    actionOptions.push({
+      label,
+      description: pieces.length
+        ? `Lane: professional file | Reset: ${pieces.join(' | ')}`
+        : 'Lane: professional file | Renew registration, log CPD, and clear paperwork pressure',
+      value: 'professional_admin'
+    });
+  }
+
   if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 2 && journey.plan.ministerialConfidence < 78) {
     actionOptions.push({
       label: 'Ministerial Outreach (2h)',
-      description: 'Brief decision-makers and recover confidence up to 78%',
+      description: 'Lane: ministerial brief | Brief decision-makers and recover confidence up to 78%',
       value: 'outreach'
     });
   }
@@ -556,7 +810,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   if (hoursLeft >= 3) {
     actionOptions.push({
       label: 'Values Workshop (3h)',
-      description: 'Balance competing interests (tradeoffs required)',
+      description: 'Lane: values file | Balance competing interests with explicit tradeoffs',
       value: 'values'
     });
   }
@@ -565,7 +819,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   if (hoursLeft >= 3) {
     actionOptions.push({
       label: 'Timber Assessment (3h)',
-      description: 'Assess timber supply (+timber, -biodiversity)',
+      description: 'Lane: timber file | Assess timber supply (+timber, -biodiversity)',
       value: 'timber'
     });
   }
@@ -574,7 +828,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   if (hoursLeft >= 1) {
     actionOptions.push({
       label: 'Check Email (1h)',
-      description: 'Handle correspondence (random small effect)',
+      description: 'Lane: admin support | Handle correspondence and clear inbox drag',
       value: 'email'
     });
   }
@@ -582,7 +836,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   if (hoursLeft >= 2) {
     actionOptions.push({
       label: 'Network (2h)',
-      description: 'Build political capital',
+      description: 'Lane: support | Build political capital for the next gate',
       value: 'network'
     });
   }
@@ -590,7 +844,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   if (hoursLeft >= 2 && journey.protagonist) {
     actionOptions.push({
       label: 'Take a Break (2h)',
-      description: 'Reduce stress, recover energy',
+      description: 'Lane: recovery | Reduce stress and recover energy',
       value: 'rest'
     });
   }
@@ -624,6 +878,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 900);
       journey.hoursRemaining -= 3;
       applyProtagonistCost(journey, { energy: 10, stress: 6 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: 3, competenceRisk: -1, auditExposure: 1 });
       ui.write(`Data gathering progressed. Completeness: ${journey.plan.dataCompleteness}%`);
       if (journey.plan.dataCompleteness >= 80) {
         journey.plan.phase = 'analysis';
@@ -641,6 +896,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       journey.hoursRemaining -= 4;
       applyProtagonistCost(journey, { energy: 15, stress: 12 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 3, paperworkLoad: 2, competenceRisk: -1, auditExposure: 1 });
       ui.write(`Analysis progressed. Quality: ${journey.plan.analysisQuality}%`);
       if (journey.plan.analysisQuality >= 80) {
         journey.plan.phase = 'stakeholder_review';
@@ -658,6 +914,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       journey.hoursRemaining -= 4;
       applyProtagonistCost(journey, { energy: 20, stress: 16 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: 4, competenceRisk: -1, auditExposure: 2 });
       if (journey.protagonist) {
         journey.protagonist.reputation = Math.min(100, journey.protagonist.reputation + 3);
       }
@@ -672,6 +929,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
     case 'submit_blocked': {
       const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
       const valueDeficits = getValuesGateDeficits(journey);
+      const guidance = buildPlanningActionGuidance(journey, seasonInfo);
       if (valueDeficits.length > 0) {
         ui.writeWarning(`Cannot proceed. Recover these values first: ${formatValuesGateDeficits(valueDeficits)}.`);
       } else {
@@ -680,7 +938,11 @@ async function processAction(game, actionValue, seasonInfo = null) {
       if (submissionReadiness.reasons.length > 0) {
         ui.write(`Planning gate: ${submissionReadiness.reasons.join(' | ')}.`);
       }
-      ui.write('Use Values Workshop, Timber Assessment, or FOM Review to rebalance.');
+      ui.write(`Lane Focus: ${guidance.lane}`);
+      ui.write(`Next Best Move: ${guidance.headline}`);
+      if (guidance.steps.length > 0) {
+        ui.write(`Follow-up: ${guidance.steps.join(' -> ')}`);
+      }
       break;
     }
 
@@ -698,6 +960,8 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 2200);
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
       applyProtagonistCost(journey, { energy: 25, stress: 20 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 4, paperworkLoad: 5, competenceRisk: -2, auditExposure: 2 });
+      progressPlanningPaperworkChain(journey, 'fom', 1);
       ui.write(`Submission prepared. Confidence: ${journey.plan.ministerialConfidence}%`);
       if (isPlanningApprovalReady(journey)) {
         journey.isComplete = true;
@@ -741,8 +1005,19 @@ async function processAction(game, actionValue, seasonInfo = null) {
 
       journey.hoursRemaining -= reviewCost;
       applyProtagonistCost(journey, { energy: 6, stress: 5 });
+      const chainProgress = progressPlanningPaperworkChain(journey, 'fom', 1);
+      if (fom.status === 'draft') {
+        applyPlanningProfessionalWork(journey, { paperworkLoad: 3, auditExposure: 1 });
+      } else if (fom.commentLoad > 0) {
+        applyPlanningProfessionalWork(journey, { paperworkLoad: 2, competenceRisk: -1, auditExposure: -1 });
+      } else {
+        applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1 });
+      }
 
       ui.write(`Forest Operations Map posted for public review.`);
+      if (chainProgress?.stage) {
+        ui.write(`Paperwork chain advanced to: ${chainProgress.stage}.`);
+      }
       ui.write(`Review window: ${fom.reviewDaysRemaining} day${fom.reviewDaysRemaining === 1 ? '' : 's'} | ${fom.waterNote}`);
       if (roadContext.hasData) {
         ui.write(roadContext.note);
@@ -761,11 +1036,36 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);
       journey.hoursRemaining -= 2;
       applyProtagonistCost(journey, { energy: 8, stress: 7 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, competenceRisk: -1, auditExposure: 1 });
 
       const gained = journey.plan.ministerialConfidence - previousConfidence;
       const gap = Math.max(0, 80 - journey.plan.ministerialConfidence);
       ui.write(`Briefings improved ministerial confidence by ${gained} points to ${journey.plan.ministerialConfidence}%.`);
       ui.write(`You are ${gap} point${gap === 1 ? '' : 's'} short of the submission threshold.`);
+      break;
+    }
+
+    case 'professional_admin': {
+      const professional = ensurePlanningProfessionalState(journey);
+      const didRenewal = professional?.registrationStatus !== 'active';
+      const chainProgress = progressPlanningPaperworkChain(journey, 'registration', 1);
+      applyPlanningProfessionalWork(journey, {
+        registrationStatus: 'active',
+        cpdHours: didRenewal ? 8 : 6,
+        competenceRisk: -6,
+        paperworkLoad: -4,
+        auditExposure: -4,
+      });
+      journey.hoursRemaining -= 2;
+      applyProtagonistCost(journey, { energy: 5, stress: 4 });
+      if (didRenewal) {
+        ui.write('Registration renewal paperwork cleared and active status is restored.');
+      } else {
+        ui.write('Compliance admin caught up CPD records and trimmed the paperwork load.');
+      }
+      if (chainProgress?.stage) {
+        ui.write(`Registration chain advanced to: ${chainProgress.stage}.`);
+      }
       break;
     }
 
@@ -808,6 +1108,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
 
       journey.hoursRemaining -= 3;
       applyProtagonistCost(journey, { energy: 10, stress: 5 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 1 });
       ui.write('Values workshop completed. Balance updated.');
       break;
     }
@@ -818,6 +1119,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.values.biodiversity = Math.max(0, journey.values.biodiversity - 5);
       journey.hoursRemaining -= 3;
       applyProtagonistCost(journey, { energy: 10, stress: 5 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 1 });
       ui.write(`Timber supply assessment completed. Timber: ${journey.values.timberSupply}%, Biodiversity: ${journey.values.biodiversity}%`);
       break;
 
@@ -838,6 +1140,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       } else {
         ui.write('Nothing urgent in the inbox.');
       }
+      applyPlanningProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 1 });
       break;
     }
 
@@ -845,6 +1148,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 4);
       journey.hoursRemaining -= 2;
       applyProtagonistCost(journey, { energy: 8, stress: 3 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1 });
       if (journey.protagonist) {
         journey.protagonist.reputation = Math.min(100, journey.protagonist.reputation + 2);
       }
@@ -857,6 +1161,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
         journey.protagonist.stress = Math.max(0, journey.protagonist.stress - 15);
       }
       journey.hoursRemaining -= 2;
+      applyPlanningProfessionalWork(journey, { auditExposure: -1, competenceRisk: -1 });
       ui.write('You take a break. Feeling refreshed.');
       break;
 
@@ -937,6 +1242,21 @@ async function advanceToNextDay(game) {
     journey.protagonist.stress = Math.max(0, journey.protagonist.stress - 10);
   } else {
     journey.resources.energy = Math.min(100, (journey.resources.energy || 50) + 30);
+  }
+
+  const professional = ensurePlanningProfessionalState(journey);
+  if (professional) {
+    const cpdGap = Math.max(0, professional.cpdTarget - professional.cpdHours);
+    if (cpdGap > 0) {
+      professional.competenceRisk = Math.min(100, professional.competenceRisk + 1);
+      professional.auditExposure = Math.min(100, professional.auditExposure + 1);
+    } else if (professional.competenceRisk > 0) {
+      professional.competenceRisk = Math.max(0, professional.competenceRisk - 1);
+    }
+    professional.paperworkLoad = Math.max(0, professional.paperworkLoad - 1);
+    if (professional.auditExposure > 0 && professional.registrationStatus === 'active') {
+      professional.auditExposure = Math.max(0, professional.auditExposure - 1);
+    }
   }
 
   // Advance season

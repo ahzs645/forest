@@ -292,6 +292,7 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   const actionOptions = [];
   const hoursLeft = journey.hoursRemaining;
   const sequencePhase = silvicultureState.phase;
+  const roster = getSilvicultureContractorRoster(journey, zoneProfile);
 
   // Planting - primarily spring, marginally in summer/fall, impossible in winter
   const plantingEff = seasonMods?.plantingEfficiency ?? 1.0;

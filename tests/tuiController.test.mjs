@@ -198,6 +198,7 @@ test('planning water context holds community watershed blocks and blocks submiss
   assert.match(formatPlanningBlockPromptDescription(block, area, season), /Water HOLD/i);
 
   const journey = {
+    roleId: 'planner',
     area,
     season,
     plan: {
@@ -216,6 +217,14 @@ test('planning water context holds community watershed blocks and blocks submiss
       firstNationsValues: 60,
     },
     scrutiny: 25,
+    professional: {
+      registrationStatus: 'active',
+      cpdHours: 30,
+      cpdTarget: 30,
+      competenceRisk: 18,
+      paperworkLoad: 8,
+      auditExposure: 8,
+    },
     blockPlanning: {
       activeBlock: block,
       fom: {
@@ -269,6 +278,7 @@ test('planning readiness blocks direct severe road observations with road-engine
   const season = { currentSeason: 'summer', year: 1 };
 
   const journey = {
+    roleId: 'planner',
     area,
     season,
     plan: {
@@ -287,6 +297,14 @@ test('planning readiness blocks direct severe road observations with road-engine
       firstNationsValues: 60,
     },
     scrutiny: 25,
+    professional: {
+      registrationStatus: 'active',
+      cpdHours: 30,
+      cpdTarget: 30,
+      competenceRisk: 18,
+      paperworkLoad: 8,
+      auditExposure: 8,
+    },
     blockPlanning: {
       activeBlock: block,
       activeSummary: block.summary,
@@ -359,6 +377,7 @@ test('planning readiness carries forward area-level road intel without blocking 
   const season = { currentSeason: 'summer', year: 1 };
 
   const journey = {
+    roleId: 'planner',
     area,
     season,
     plan: {
@@ -377,6 +396,14 @@ test('planning readiness carries forward area-level road intel without blocking 
       firstNationsValues: 60,
     },
     scrutiny: 25,
+    professional: {
+      registrationStatus: 'active',
+      cpdHours: 30,
+      cpdTarget: 30,
+      competenceRisk: 18,
+      paperworkLoad: 8,
+      auditExposure: 8,
+    },
     blockPlanning: {
       activeBlock: block,
       activeSummary: block.summary,

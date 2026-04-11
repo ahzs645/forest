@@ -5,6 +5,7 @@
 
 import { getRoleAreaBriefing } from "../data/roleAreaIntel.js";
 import { getPlanningAreaSnapshot } from "../data/planningBlocks.js";
+import { getRoleProfessionalContext } from "../data/professionalPractice.js";
 
 // Role icons mapping (Unicode symbols matching reference)
 export const ROLE_ICONS = {
@@ -56,6 +57,22 @@ function getSnapshotIndicatorEntries(snapshot) {
 function shouldShowSampleFileIds(role) {
   return role?.id === 'planner' || role?.id === 'permitter';
 }
+
+function formatProcessHookSummary(hook) {
+  if (!hook) return '';
+  const wait = hook.minimumWait?.label ? ` | ${hook.minimumWait.label}` : '';
+  const docs = Array.isArray(hook.documents) && hook.documents.length
+    ? ` | Docs: ${hook.documents.slice(0, 2).join(', ')}`
+    : '';
+  return `${hook.title}${wait}${docs}`;
+}
+
+const ROLE_GLOSSARY_TERMS = {
+  planner: ['BEC Zone', 'Forest Operations Map (FOM)', 'Professional Discretion', 'Forest Professionals BC (FPBC)'],
+  permitter: ['Referral', 'Cutting Permit', 'Road Permit', 'Special Use Permit', 'Forest Professionals BC (FPBC)'],
+  recce: ['Road Use Permit', 'Riparian Reserve', 'Archaeological Impact Assessment (AIA)', 'Forest Professionals BC (FPBC)'],
+  silviculture: ['Silviculture', 'Free Growing', 'Continuing Professional Development (CPD)', 'Forest Professionals BC (FPBC)'],
+};
 
 /**
  * Init flow mixin
@@ -272,6 +289,7 @@ export const InitFlowMixin = {
       card.addEventListener('click', () => {
         this._initState.roleId = role.id;
         this._renderRoleCards(roles);
+        this._setRoleGlossaryTerms(role);
         const activeArea = this._initAreas?.find((candidate) => candidate.id === this._initState.areaId) || this._initAreas?.[0];
         if (activeArea) {
           this._renderAreaDetail(activeArea, role);
@@ -297,8 +315,11 @@ export const InitFlowMixin = {
    * Set role glossary terms
    * @private
    */
-  _setRoleGlossaryTerms() {
-    this._roleGlossaryTerms = ['Silviculture', 'Referral', 'Hydrology Assessment']
+  _setRoleGlossaryTerms(role = null) {
+    const selectedRole = role || this._initRoles?.find((candidate) => candidate.id === this._initState.roleId) || this._initRoles?.[0];
+    const terms = ROLE_GLOSSARY_TERMS[selectedRole?.id] || ['Silviculture', 'Referral', 'Hydrology Assessment'];
+
+    this._roleGlossaryTerms = terms
       .map((term) => this._findGlossaryTerm(term))
       .filter(Boolean);
 
@@ -386,6 +407,9 @@ export const InitFlowMixin = {
 
     const briefing = getRoleAreaBriefing(role?.id, area, { maxFinds: 4 });
     const planningSnapshot = briefing.planningSnapshot || getPlanningAreaSnapshot(area.id, area);
+    const professionalContext = role
+      ? getRoleProfessionalContext(role.id, { area })
+      : { obligations: [], paperwork: [], enforcement: [], breaches: [] };
 
     if (briefing.zoneSummary) {
       const zoneReality = document.createElement('div');
@@ -448,6 +472,89 @@ export const InitFlowMixin = {
       }
 
       this.areaDetail.appendChild(snapshot);
+    }
+
+    if (professionalContext.areaBurden) {
+      const burden = document.createElement('div');
+      burden.innerHTML = '<div class="detail-label">COMPLIANCE BURDEN</div>';
+
+      const note = document.createElement('p');
+      note.className = 'detail-note';
+      note.textContent = professionalContext.areaBurden.title;
+      burden.appendChild(note);
+
+      const chips = document.createElement('div');
+      chips.className = 'chip-row';
+
+      [
+        `Paperwork ${professionalContext.areaBurden.paperworkLoad}`,
+        `Audit ${professionalContext.areaBurden.auditExposure}`,
+      ].forEach((label) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = label;
+        chips.appendChild(chip);
+      });
+
+      burden.appendChild(chips);
+
+      if (professionalContext.areaBurden.watchouts?.length) {
+        const list = document.createElement('ul');
+        list.className = 'intel-list';
+        professionalContext.areaBurden.watchouts.slice(0, 2).forEach((item) => {
+          const row = document.createElement('li');
+          row.textContent = item;
+          list.appendChild(row);
+        });
+        burden.appendChild(list);
+      }
+
+      this.areaDetail.appendChild(burden);
+    }
+
+    if (
+      professionalContext.obligations?.length ||
+      briefing.processHooks?.length ||
+      professionalContext.enforcement?.length ||
+      professionalContext.breaches?.length
+    ) {
+      const professional = document.createElement('div');
+      professional.innerHTML = '<div class="detail-label">PROFESSIONAL WATCH</div>';
+
+      const obligation = professionalContext.obligations?.[0];
+      if (obligation) {
+        const note = document.createElement('p');
+        note.className = 'detail-note';
+        note.textContent = obligation.summary;
+        professional.appendChild(note);
+      }
+
+      if ((briefing.processHooks || professionalContext.paperwork)?.length) {
+        const list = document.createElement('ul');
+        list.className = 'intel-list';
+        (briefing.processHooks || professionalContext.paperwork).slice(0, 2).forEach((item) => {
+          const row = document.createElement('li');
+          row.textContent = formatProcessHookSummary(item);
+          list.appendChild(row);
+        });
+        professional.appendChild(list);
+      }
+
+      if (professionalContext.enforcement?.[0]) {
+        const note = document.createElement('p');
+        note.className = 'detail-note';
+        note.textContent = `Enforcement pattern: ${professionalContext.enforcement[0].title}.`;
+        professional.appendChild(note);
+      }
+
+      if (professionalContext.breaches?.[0]) {
+        const note = document.createElement('p');
+        note.className = 'detail-note';
+        note.textContent = `Compliance trap: ${professionalContext.breaches[0].summary}`;
+        professional.appendChild(note);
+      }
+
+      this.areaDetail.appendChild(professional);
     }
 
     if (briefing.seasonalSignals?.length) {
@@ -569,7 +676,7 @@ export const InitFlowMixin = {
     }
 
     this._renderRoleCards(roles);
-    this._setRoleGlossaryTerms();
+    this._setRoleGlossaryTerms(roles[0]);
     this._renderAreaList(areas);
     this._renderAreaDetail(areas[0], roles[0]);
     this._renderAreaGlossary(areas[0]);

@@ -802,5 +802,117 @@
         }
       }
     ]
+  },
+  {
+    "id": "fpbc_competence_audit",
+    "title": "FPBC Competence Audit",
+    "type": "compliance",
+    "severity": "moderate",
+    "probability": 0.04,
+    "description": "FPBC asks for your CPD record, competence declaration, professional development plan, and work samples tied to your current practice areas.",
+    "options": [
+      {
+        "label": "Clear the deck and submit a clean record",
+        "outcome": "You slow the office down long enough to produce a defensible package. The audit feels thorough rather than hostile.",
+        "effects": {
+          "timeUsed": 5,
+          "compliance": 8,
+          "budget": -1000
+        }
+      },
+      {
+        "label": "Bring in a mentor to tighten the file",
+        "outcome": "A second set of eyes catches weak notes before the regulator does.",
+        "effects": {
+          "timeUsed": 4,
+          "compliance": 6,
+          "relationships": 3,
+          "budget": -500
+        }
+      },
+      {
+        "label": "Send the minimum and move on",
+        "outcome": "You protect today's schedule at the cost of a rougher conversation later.",
+        "effects": {
+          "timeUsed": 1,
+          "compliance": -6,
+          "politicalCapital": -4
+        }
+      }
+    ]
+  },
+  {
+    "id": "road_use_permit_gap",
+    "title": "Road Use Permit Gap",
+    "type": "compliance",
+    "severity": "moderate",
+    "probability": 0.05,
+    "description": "District staff point out your access plan needs a clearer Forest Service Road use permit and primary-user maintenance arrangement before the file can move cleanly.",
+    "options": [
+      {
+        "label": "Take the lead and formalize the maintenance split",
+        "outcome": "It creates extra admin, but the district sees a credible access package.",
+        "effects": {
+          "timeUsed": 3,
+          "compliance": 6,
+          "budget": -1500
+        }
+      },
+      {
+        "label": "Negotiate a user agreement first",
+        "outcome": "You spend the day calling other industrial users and leave with a calmer road politics file.",
+        "effects": {
+          "timeUsed": 4,
+          "relationships": 4,
+          "compliance": 4
+        }
+      },
+      {
+        "label": "Push traffic while the paperwork catches up",
+        "outcome": "The trucks keep moving. The district's mood does not.",
+        "effects": {
+          "progress": 4,
+          "compliance": -7,
+          "politicalCapital": -5
+        }
+      }
+    ]
+  },
+  {
+    "id": "special_use_permit_bundle",
+    "title": "Special Use Permit Bundle",
+    "type": "technical",
+    "severity": "moderate",
+    "probability": 0.04,
+    "description": "The camp, helipad, and dump footprint are larger than expected, and the district now wants a proper special use permit package for the support sites.",
+    "options": [
+      {
+        "label": "Build the full permit bundle now",
+        "outcome": "It is a paperwork-heavy week, but the support infrastructure stops undermining the main file.",
+        "effects": {
+          "timeUsed": 5,
+          "compliance": 6,
+          "budget": -1200
+        }
+      },
+      {
+        "label": "Shrink the footprint and redraw the maps",
+        "outcome": "You make operations less convenient but easier to authorize.",
+        "effects": {
+          "timeUsed": 4,
+          "progress": -3,
+          "compliance": 4
+        }
+      },
+      {
+        "label": "Use the sites quietly and hope nobody notices",
+        "outcome": "It feels efficient right until the occupancy question shows up in writing.",
+        "effects": {
+          "progress": 3,
+          "compliance": -8,
+          "relationships": -3
+        }
+      }
+    ]
   }
 ]

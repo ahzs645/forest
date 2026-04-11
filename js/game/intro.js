@@ -7,6 +7,7 @@ import { FIELD_SHIFT_HOURS } from '../journey/constants.js';
 import { getCurrentSeasonInfo } from '../season.js';
 import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
+import { getRoleProfessionalContext } from '../data/professionalPractice.js';
 
 function formatScrutiny(scrutiny) {
   const value = Number(scrutiny || 0);
@@ -28,6 +29,12 @@ function shouldShowSampleFileIds(roleId) {
   return roleId === 'planner' || roleId === 'permitter';
 }
 
+function formatProcessHookLine(hook) {
+  if (!hook) return '';
+  const wait = hook.minimumWait?.label ? ` ${hook.minimumWait.label}.` : '';
+  return `${hook.title}.${wait}`;
+}
+
 /**
  * Show journey-specific intro based on journey type
  * @param {Object} ui - TerminalUI instance
@@ -38,6 +45,13 @@ export function showJourneyIntro(ui, journey) {
   const roleId = journey.roleId || journey.role?.id;
   const briefing = getRoleAreaBriefing(roleId, journey.area, { maxFinds: 3 });
   const areaSituation = getAreaSituationSummary(journey);
+  const professionalContext = getRoleProfessionalContext(roleId, {
+    obligationCount: 1,
+    paperworkCount: 2,
+    enforcementCount: 1,
+    breachCount: 1,
+    area: journey.area,
+  });
 
   // Show season info if available
   if (journey.season) {
@@ -180,6 +194,35 @@ export function showJourneyIntro(ui, journey) {
     ui.write('Likely finds on this assignment:');
     for (const finding of briefing.likelyFinds) {
       ui.write(`  - ${finding}`);
+    }
+  }
+
+  if (
+    professionalContext.obligations.length ||
+    briefing.processHooks?.length ||
+    professionalContext.enforcement.length ||
+    professionalContext.breaches?.length
+  ) {
+    ui.write('Professional watch:');
+
+    if (professionalContext.areaBurden?.title) {
+      ui.write(`  - Area burden: ${professionalContext.areaBurden.title}`);
+    }
+
+    if (professionalContext.obligations[0]) {
+      ui.write(`  - ${professionalContext.obligations[0].summary}`);
+    }
+
+    for (const item of (briefing.processHooks || professionalContext.paperwork).slice(0, 2)) {
+      ui.write(`  - File pressure: ${formatProcessHookLine(item)}`);
+    }
+
+    if (professionalContext.enforcement[0]) {
+      ui.write(`  - Enforcement pattern: ${professionalContext.enforcement[0].summary}`);
+    }
+
+    if (professionalContext.breaches?.[0]) {
+      ui.write(`  - Compliance trap: ${professionalContext.breaches[0].summary}`);
     }
   }
 }

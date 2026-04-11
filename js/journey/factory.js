@@ -13,6 +13,7 @@ import {
 } from "../data/blocks.js";
 import { getPlanningCadenceDays } from "../data/planningBlocks.js";
 import { createSeasonState } from "../season.js";
+import { createProfessionalComplianceState } from "../engine.js";
 
 /**
  * Factory function to create the appropriate journey type
@@ -73,6 +74,10 @@ export function createReconJourney(options = {}) {
       gpsUnits: 5,
       flaggingTape: 50,
     },
+    professional: createProfessionalComplianceState(
+      roleId,
+      baseJourney.area || baseJourney.areaId || options.area || options.areaId || null,
+    ),
 
     discoveryTags: [],
   };
@@ -93,6 +98,7 @@ export function createSilvicultureJourney(options = {}) {
     areaId: effectiveAreaId,
     role,
     area,
+    professional: createProfessionalComplianceState(effectiveRoleId, area || effectiveAreaId),
 
     // Season integration
     season: createSeasonState(effectiveRoleId),
@@ -132,7 +138,6 @@ export function createSilvicultureJourney(options = {}) {
       equipment: 100,
       nurseryCredit: 50,
     },
-
     discoveryTags: [],
 
     // Party
@@ -194,6 +199,7 @@ export function createPlanningJourney(options = {}) {
     areaId: effectiveAreaId,
     role,
     area,
+    professional: createProfessionalComplianceState(effectiveRoleId, area || effectiveAreaId),
 
     // Season integration
     season: createSeasonState(effectiveRoleId),
@@ -280,7 +286,6 @@ export function createPlanningJourney(options = {}) {
       dataCredits: 100,
       consultantDays: 30,
     },
-
     discoveryTags: [],
     roadAssets: {
       byBlock: {},
@@ -317,6 +322,7 @@ export function createPermittingJourney(options = {}) {
     areaId: effectiveAreaId,
     role,
     area,
+    professional: createProfessionalComplianceState(effectiveRoleId, area || effectiveAreaId),
 
     // Season integration
     season: createSeasonState(effectiveRoleId),
@@ -439,6 +445,7 @@ export function createFieldJourney(options = {}) {
     // Party
     crew: crew || generateCrew(5, "field"),
     resources: createFieldResources(),
+    professional: createProfessionalComplianceState(roleId || role?.id, area || effectiveAreaId),
 
     discoveryTags: [],
     roadAssets: {
@@ -484,6 +491,7 @@ export function createDeskJourney(options = {}) {
     areaId: effectiveAreaId,
     role,
     area,
+    professional: createProfessionalComplianceState(roleId || role?.id, area || effectiveAreaId),
 
     // Progress
     scrutiny: 32,
@@ -512,7 +520,6 @@ export function createDeskJourney(options = {}) {
     // Party
     crew: crew || generateCrew(5, "desk"),
     resources: createDeskResources(),
-
     discoveryTags: [],
 
     // Daily time tracking
@@ -557,6 +564,10 @@ export function createManagerJourney(options = {}) {
       budget: 100000, // Higher starting budget for manager
       politicalCapital: 100,
     },
+    professional: createProfessionalComplianceState(
+      options.roleId || options.role?.id,
+      options.area || options.areaId || null,
+    ),
     discoveryTags: [],
     flags: {},
     certifications: [],

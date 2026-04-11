@@ -11,6 +11,12 @@ import { getOperationalProgress, recordProgressMilestones } from '../journey.js'
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { formatRoadAssetSummary, getPermittingRoadAssetContext } from '../data/roadAssetIntel.js';
+import {
+  advanceProfessionalComplianceChain,
+  applyProfessionalComplianceShift,
+  ensureProfessionalComplianceState,
+  getProfessionalComplianceSnapshot,
+} from '../engine.js';
 
 const PERMIT_REVISION_PROFILES = [
   {
@@ -178,6 +184,121 @@ const PERMIT_REVISION_PROFILES = [
   }
 ];
 
+function ensurePermittingProfessionalState(journey) {
+  return ensureProfessionalComplianceState(journey);
+}
+
+function getPermittingProfessionalSnapshot(journey) {
+  return getProfessionalComplianceSnapshot(journey);
+}
+
+function describePermittingProfessionalSnapshot(snapshot) {
+  if (!snapshot) return 'Registration n/a | CPD n/a | Paperwork n/a | Audit n/a';
+  const burden = snapshot.areaBurdenLabel ? ` | ${snapshot.areaBurdenLabel}` : '';
+  return `Registration: ${snapshot.registrationStatus} | CPD: ${snapshot.cpdHours}/${snapshot.cpdTarget}h | Paperwork: ${snapshot.paperworkLoad} | Audit: ${snapshot.auditExposure}${burden}`;
+}
+
+function getPermittingProfessionalIssues(journey) {
+  const snapshot = getPermittingProfessionalSnapshot(journey);
+  if (!snapshot) return [];
+
+  const reasons = [];
+  if (!snapshot.registrationActive) {
+    reasons.push(`registration is ${snapshot.registrationStatus}`);
+  }
+  if (snapshot.cpdGap > 0) {
+    reasons.push(`CPD gap ${snapshot.cpdGap}h`);
+  }
+  if (snapshot.competenceRisk >= 35) {
+    reasons.push(`competence risk ${snapshot.competenceRisk}%`);
+  }
+  if (snapshot.paperworkLoad >= 40) {
+    reasons.push(`paperwork load ${snapshot.paperworkLoad}`);
+  }
+  if (snapshot.auditExposure >= 35) {
+    reasons.push(`audit exposure ${snapshot.auditExposure}`);
+  }
+  return reasons;
+}
+
+function applyPermittingProfessionalWork(journey, changes = {}) {
+  const professional = ensurePermittingProfessionalState(journey);
+  if (!professional) return null;
+  return applyProfessionalComplianceShift(journey, changes);
+}
+
+function getPermittingPaperworkChainId(journey) {
+  const tags = new Set((journey?.area?.tags || []).map((tag) => String(tag).toLowerCase()));
+  const discoveryIds = new Set(getJourneyDiscoveryTags(journey).map((tag) => tag.id));
+
+  if (tags.has('road') || tags.has('access') || tags.has('winter-road') || discoveryIds.has('access_rehab')) {
+    return 'roadPermit';
+  }
+  if (tags.has('archaeology') || tags.has('cultural') || tags.has('heritage') || discoveryIds.has('cultural_hold')) {
+    return 'archaeology';
+  }
+  if (tags.has('camp') || tags.has('helipad') || tags.has('dump') || tags.has('special-use')) {
+    return 'specialUse';
+  }
+  return 'registration';
+}
+
+function formatPermittingStageLabel(stage) {
+  return String(stage || 'review')
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getPermittingLaneAction(journey) {
+  const chainId = getPermittingPaperworkChainId(journey);
+  const professional = getPermittingProfessionalSnapshot(journey);
+  const chain = professional?.chains?.[chainId] || null;
+  const stepIndex = chain
+    ? Math.min(chain.stepIndex, Math.max(0, chain.steps.length - 1))
+    : 0;
+  const stage = chain?.steps?.[stepIndex] || (chainId === 'registration' ? 'renewal' : 'screen');
+  const laneMap = {
+    registration: 'Professional file',
+    roadPermit: 'Road permit file',
+    archaeology: 'Archaeology file',
+    specialUse: 'Special-use file'
+  };
+  const labelMap = {
+    registration: professional?.registrationActive ? 'Compliance Admin' : 'Renew Registration',
+    roadPermit: 'Road Permit File',
+    archaeology: 'Archaeology File',
+    specialUse: 'Special-Use File'
+  };
+
+  return {
+    chainId,
+    chain,
+    laneLabel: laneMap[chainId] || 'Professional file',
+    actionLabel: labelMap[chainId] || 'Compliance Admin',
+    stage,
+    stageLabel: formatPermittingStageLabel(stage)
+  };
+}
+
+function progressPermittingPaperworkChain(journey, chainId, stepCount = 1) {
+  const chain = advanceProfessionalComplianceChain(journey, chainId, stepCount);
+  if (!chain) {
+    return null;
+  }
+
+  const stepIndex = Math.min(chain.stepIndex, chain.steps.length) - 1;
+  const stage = stepIndex >= 0 ? chain.steps[stepIndex] : chain.steps[0];
+  return { chain, stage };
+}
+
+function pushPermittingGuideStep(steps, text) {
+  if (!text || steps.includes(text)) {
+    return;
+  }
+  steps.push(text);
+}
+
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
 }
@@ -196,8 +317,12 @@ function derivePermittingConstraintState(journey) {
   const phase = String(journey?.currentPhase || '').toLowerCase();
   const permits = journey?.permits || {};
   const roadIntel = getPermittingRoadAssetContext(journey);
+  const professional = getPermittingProfessionalSnapshot(journey);
   const needRevisionPressure = Math.min(2, Math.floor((permits.needsRevision || 0) / 2));
   const referralPressure = Math.min(2, Math.floor((permits.inReferral || 0) / 2));
+  const professionalPressure = professional?.registrationActive
+    ? Math.min(2, Math.floor((professional.auditExposure + professional.competenceRisk) / 40))
+    : 2;
 
   const publicReviewSignals = countSignals(
     areaTags.has('community-interface'),
@@ -246,7 +371,7 @@ function derivePermittingConstraintState(journey) {
   const publicReviewPressure = clampConstraintLevel(publicReviewSignals + roadIntel.publicReview + needRevisionPressure);
   const hydrologyPressure = clampConstraintLevel(hydrologySignals + roadIntel.hydrology + referralPressure);
   const timingPressure = clampConstraintLevel(timingSignals + roadIntel.timing + (phase === 'crunch' ? 1 : 0));
-  const overallPressure = clampConstraintLevel(engineeringPressure + publicReviewPressure + hydrologyPressure + timingPressure);
+  const overallPressure = clampConstraintLevel(engineeringPressure + publicReviewPressure + hydrologyPressure + timingPressure + professionalPressure);
 
   return {
     engineering: engineeringPressure,
@@ -280,6 +405,100 @@ function getDominantPermittingPressure(pressure) {
   const [label, value] = entries[0];
   if (value <= 0) return 'package';
   return label;
+}
+
+function getPermittingPressureLabel(pressureId) {
+  const labels = {
+    engineering: 'Engineering',
+    publicReview: 'FOM / Public Review',
+    hydrology: 'Hydrology',
+    timing: 'Timing',
+    package: 'Package'
+  };
+  return labels[pressureId] || 'Package';
+}
+
+function buildPermittingActionGuidance(journey) {
+  const laneAction = getPermittingLaneAction(journey);
+  const revisionQueue = ensurePermittingRevisionState(journey).filter((ticket) => ticket && !ticket.resolved);
+  const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
+  const professionalIssues = getPermittingProfessionalIssues(journey);
+  const steps = [];
+  let lane = laneAction.laneLabel;
+  let headline = `${laneAction.actionLabel} to keep the active file moving.`;
+
+  if (revisionQueue.length > 0) {
+    const ticket = revisionQueue[0];
+    lane = 'Revision queue';
+    headline = `Clean response: ${ticket.title} to keep scrutiny from stacking on the file.`;
+    pushPermittingGuideStep(steps, ticket.summary);
+    pushPermittingGuideStep(steps, 'Use the clean response first unless you need a desperate fast resubmission.');
+    return { lane, headline, steps };
+  }
+
+  if ((journey.permits.inReferral || 0) > 0) {
+    lane = 'Referral queue';
+    headline = 'Follow Up on Referrals to move live files back into ministry review.';
+    pushPermittingGuideStep(steps, 'A stuck referral slows every downstream approval.');
+    if (pressure.publicReview > 0 || pressure.hydrology > 0) {
+      pushPermittingGuideStep(steps, `Dominant pressure: ${getPermittingPressureLabel(pressure.dominant)}.`);
+    }
+    return { lane, headline, steps };
+  }
+
+  if (laneAction.chainId !== 'registration' && !laneAction.chain?.complete) {
+    lane = laneAction.laneLabel;
+    headline = `${laneAction.actionLabel} to advance the ${laneAction.stageLabel.toLowerCase()} stage of the active file.`;
+    pushPermittingGuideStep(steps, `Current stage: ${laneAction.stageLabel}.`);
+    if ((journey.permits.backlog || 0) > 0) {
+      pushPermittingGuideStep(steps, 'This lane can convert backlog into drafting or submitted work as it advances.');
+    }
+    return { lane, headline, steps };
+  }
+
+  if (professionalIssues.length > 0) {
+    lane = 'Professional file';
+    headline = `${laneAction.actionLabel} to clear ${professionalIssues[0]} before more heat lands on the queue.`;
+    pushPermittingGuideStep(steps, 'Registration, CPD, and paperwork drag all feed scrutiny.');
+    return { lane, headline, steps };
+  }
+
+  if ((journey.permits.drafting || 0) > 0) {
+    lane = 'Submission stack';
+    headline = 'Submit Permit to move drafted files into review before the day runs out.';
+    pushPermittingGuideStep(steps, 'Drafted files do nothing until they are pushed into the review queue.');
+    return { lane, headline, steps };
+  }
+
+  if ((journey.permits.backlog || 0) > 0) {
+    lane = 'Permit stack';
+    headline = 'Draft Permit Application to keep backlog from choking the queue.';
+    pushPermittingGuideStep(steps, 'Drafting is still the cleanest way to convert backlog into throughput.');
+    return { lane, headline, steps };
+  }
+
+  if ((journey.permits.inReview || 0) > 0) {
+    lane = pressure.publicReview >= pressure.engineering ? 'Consultation support' : 'Review support';
+    headline = pressure.publicReview >= pressure.engineering
+      ? 'Stakeholder Meeting to keep the public-facing file defensible while review is active.'
+      : 'Process Permits to keep active reviews moving through the ministry queue.';
+    pushPermittingGuideStep(steps, `Dominant pressure: ${getPermittingPressureLabel(pressure.dominant)}.`);
+    return { lane, headline, steps };
+  }
+
+  pushPermittingGuideStep(steps, 'Use support actions only after the live file lane is moving.');
+  return { lane, headline, steps };
+}
+
+function getDeskActionLaneLabel(actionId) {
+  const labels = {
+    process_permits: 'Lane: review support',
+    stakeholder_meeting: 'Lane: consultation support',
+    crisis_management: 'Lane: crisis desk',
+    team_morale: 'Lane: office recovery',
+    end_day: 'Lane: recovery'
+  };
+  return labels[actionId] || 'Lane: support';
 }
 
 function formatConstraintPressure(state) {
@@ -559,6 +778,7 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
 export async function runPermittingDay(game) {
   const { ui, journey } = game;
   ensurePermittingRevisionState(journey);
+  ensurePermittingProfessionalState(journey);
   const daysRemaining = journey.deadline - journey.day;
   const progressBeforeDay = getOperationalProgress(journey);
   let meetingsToday = 0;
@@ -575,6 +795,8 @@ export async function runPermittingDay(game) {
 
   // Inner loop: multiple actions per day until hours run out
   while (journey.hoursRemaining > 0) {
+    const guidance = buildPermittingActionGuidance(journey);
+    const laneAction = getPermittingLaneAction(journey);
     ui.clear();
     ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - PERMITTING`);
 
@@ -599,6 +821,12 @@ export async function runPermittingDay(game) {
     ui.write(`  In Review: ${journey.permits.inReview} | Needs Revision: ${journey.permits.needsRevision}`);
     ui.write(`  Scrutiny / Heat: ${Math.round(journey.scrutiny || 0)}%`);
     ui.write(`  Phase 3 Pressure: ${formatConstraintPressure(journey.permits.phase3Pressure || derivePermittingConstraintState(journey))}`);
+    ui.write(`  Lane Focus: ${guidance.lane} | Stage: ${laneAction.stageLabel}`);
+    ui.write(`  Next Best Move: ${guidance.headline}`);
+    if (guidance.steps.length > 0) {
+      ui.write(`  Follow-up: ${guidance.steps.join(' -> ')}`);
+    }
+    ui.write(`  ${describePermittingProfessionalSnapshot(getPermittingProfessionalSnapshot(journey))}`);
     const roadIntel = getPermittingRoadAssetContext(journey);
     if (roadIntel.hasData) {
       ui.write(`  Road Intel: ${formatRoadAssetSummary(roadIntel) || roadIntel.note}`);
@@ -723,12 +951,13 @@ function buildActionOptions(journey) {
   const actionOptions = [];
   const hoursLeft = journey.hoursRemaining || 8;
   const revisionQueue = ensurePermittingRevisionState(journey);
+  const laneAction = getPermittingLaneAction(journey);
 
   // Permit-specific actions
   if (journey.permits.backlog > 0 && hoursLeft >= 2) {
     actionOptions.push({
       label: 'Draft Permit Application',
-      description: '2h - Move a permit from backlog to drafting',
+      description: '2h - Lane: permit stack | Move a permit from backlog to drafting',
       value: 'draft_permit'
     });
   }
@@ -736,7 +965,7 @@ function buildActionOptions(journey) {
   if ((journey.permits.drafting || 0) > 0 && hoursLeft >= 2) {
     actionOptions.push({
       label: 'Submit Permit',
-      description: '2h - Submit a drafted permit for review',
+      description: '2h - Lane: submission stack | Submit a drafted permit for review',
       value: 'submit_permit'
     });
   }
@@ -746,14 +975,14 @@ function buildActionOptions(journey) {
     if (hoursLeft >= ticket.clean.hours) {
       actionOptions.push({
         label: `Clean response: ${ticket.title}`,
-        description: `${ticket.clean.hours}h - cleaner file, lower scrutiny`,
+        description: `${ticket.clean.hours}h - Lane: revision queue | cleaner file, lower scrutiny`,
         value: `revise_permit:${ticket.id}:clean`
       });
     }
     if (hoursLeft >= ticket.fast.hours) {
       actionOptions.push({
         label: `Fast-track: ${ticket.title}`,
-        description: `${ticket.fast.hours}h - quicker resubmission, more heat`,
+        description: `${ticket.fast.hours}h - Lane: revision queue | quicker resubmission, more heat`,
         value: `revise_permit:${ticket.id}:fast`
       });
     }
@@ -763,8 +992,30 @@ function buildActionOptions(journey) {
   if ((journey.permits.inReferral || 0) > 0 && hoursLeft >= 2) {
     actionOptions.push({
       label: 'Follow Up on Referrals',
-      description: '2h - Check status with referral agencies',
+      description: '2h - Lane: referral queue | Check status with referral agencies',
       value: 'follow_up_referrals'
+    });
+  }
+
+  if (hoursLeft >= 2) {
+    const professional = getPermittingProfessionalSnapshot(journey);
+    const label = `${laneAction.actionLabel} (2h)`;
+    const pieces = [];
+    if (professional?.registrationStatus !== 'active') {
+      pieces.push(`registration ${professional.registrationStatus}`);
+    }
+    if (professional?.cpdGap > 0) {
+      pieces.push(`CPD gap ${professional.cpdGap}h`);
+    }
+    if (professional?.paperworkLoad > 0) {
+      pieces.push(`paperwork ${professional.paperworkLoad}`);
+    }
+    actionOptions.push({
+      label,
+      description: pieces.length
+        ? `Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel} | Reset: ${pieces.join(' | ')}`
+        : `Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel}`,
+      value: 'professional_admin'
     });
   }
 
@@ -773,7 +1024,7 @@ function buildActionOptions(journey) {
     .filter(([, action]) => action.hoursRequired <= hoursLeft)
     .map(([id, action]) => ({
       label: action.name,
-      description: `${action.hoursRequired}h - ${action.description}`,
+      description: `${action.hoursRequired}h - ${getDeskActionLaneLabel(id)} | ${action.description}`,
       value: id
     }));
 
@@ -844,6 +1095,7 @@ async function processAction(game, actionId) {
         journey.permits.drafting = (journey.permits.drafting || 0) + 1;
         journey.hoursRemaining -= 2;
         applyProtagonistCost(journey, { energy: 8, stress: 5 });
+        applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
         ui.write('Permit application drafted and ready for submission.');
       }
       return;
@@ -864,12 +1116,24 @@ async function processAction(game, actionId) {
         );
         const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
         const roadIntel = getPermittingRoadAssetContext(journey);
+        const professional = getPermittingProfessionalSnapshot(journey);
+        const professionalIssues = getPermittingProfessionalIssues(journey);
+        const professionalPressure = professional?.registrationActive
+          ? Math.min(0.25, (professional.competenceRisk / 250) + (professional.auditExposure / 300))
+          : 0.35;
+        if (!professional?.registrationActive) {
+          ui.writeWarning('Registration is not current; the submission will draw extra scrutiny.');
+        }
+        if (professionalIssues.length > 0) {
+          ui.write(`Professional watch: ${professionalIssues.join(' | ')}.`);
+        }
         const referralChance = Math.min(0.75, 0.18
           + hotFilePressure * 0.06
           + pressure.publicReview * 0.06
           + pressure.hydrology * 0.05
           + pressure.timing * 0.04
-          + roadIntel.referralPenalty);
+          + roadIntel.referralPenalty
+          + professionalPressure);
         if (hotFilePressure > 0) {
           journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 1);
         }
@@ -879,6 +1143,15 @@ async function processAction(game, actionId) {
         if (roadIntel.hasData) {
           journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + Math.max(0, roadIntel.engineering - 1));
         }
+        if (!professional?.registrationActive) {
+          journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 3);
+        }
+        applyPermittingProfessionalWork(journey, {
+          cpdHours: 1,
+          paperworkLoad: 3,
+          competenceRisk: -1,
+          auditExposure: 1,
+        });
         if (Math.random() < referralChance) {
           journey.permits.inReferral = (journey.permits.inReferral || 0) + 1;
           journey.permits.submitted--;
@@ -907,15 +1180,100 @@ async function processAction(game, actionId) {
           }
           journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 2);
           ui.write('Referral complete - permit moved to ministry review.');
+          applyPermittingProfessionalWork(journey, { paperworkLoad: -1, auditExposure: -1, competenceRisk: -1 });
         } else {
           ui.write('Referral still in progress. Maintained good communication.');
           if (journey.relationships) {
             journey.relationships.nations = Math.min(100, journey.relationships.nations + 1);
           }
           journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 1);
+          applyPermittingProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 1 });
         }
       }
       return;
+
+    case 'professional_admin': {
+      const chainId = getPermittingPaperworkChainId(journey);
+      const chainProgress = progressPermittingPaperworkChain(journey, chainId, 1);
+      const stage = chainProgress?.stage || 'renewal';
+      journey.hoursRemaining -= 2;
+      applyProtagonistCost(journey, { energy: 5, stress: 4 });
+
+      if (chainId === 'registration') {
+        applyPermittingProfessionalWork(journey, {
+          registrationStatus: 'active',
+          cpdHours: 8,
+          competenceRisk: -6,
+          paperworkLoad: -4,
+          auditExposure: -4,
+        });
+        ui.write('Registration renewal and CPD housekeeping are back under control.');
+      } else if (chainId === 'roadPermit') {
+        if (stage === 'screen') {
+          applyPermittingProfessionalWork(journey, { paperworkLoad: 2, auditExposure: 1 });
+          ui.write('Road permit screening confirms the access needs district review.');
+        } else if (stage === 'map') {
+          if ((journey.permits.backlog || 0) > 0) {
+            journey.permits.backlog--;
+            journey.permits.drafting = (journey.permits.drafting || 0) + 1;
+          }
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
+          ui.write('Road permit mapping and Exhibit A detail now sit in the drafting stack.');
+        } else if (stage === 'submit') {
+          if ((journey.permits.drafting || 0) > 0) {
+            journey.permits.drafting--;
+            journey.permits.submitted++;
+            journey.permits.inReview = (journey.permits.inReview || 0) + 1;
+          }
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, competenceRisk: -1, auditExposure: 1 });
+          ui.write('Road permit submission package is aligned and moving into review.');
+        } else {
+          applyPermittingProfessionalWork(journey, { paperworkLoad: -1, auditExposure: -1, competenceRisk: -1 });
+          ui.write('Road maintenance notes and deactivation planning are cleaned up.');
+        }
+      } else if (chainId === 'specialUse') {
+        if (stage === 'screen') {
+          applyPermittingProfessionalWork(journey, { paperworkLoad: 2, auditExposure: 1 });
+          ui.write('Special-use screening confirms the site needs a separate package.');
+        } else if (stage === 'bundle') {
+          if ((journey.permits.backlog || 0) > 0) {
+            journey.permits.backlog--;
+            journey.permits.drafting = (journey.permits.drafting || 0) + 1;
+          }
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
+          ui.write('Special-use bundle assembled and queued with the active permit work.');
+        } else if (stage === 'submit') {
+          if ((journey.permits.drafting || 0) > 0) {
+            journey.permits.drafting--;
+            journey.permits.submitted++;
+          }
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, competenceRisk: -1, auditExposure: 1 });
+          ui.write('Special-use submission is ready for district review.');
+        } else {
+          applyPermittingProfessionalWork(journey, { paperworkLoad: -1, auditExposure: -1 });
+          ui.write('Special-use conditions are lined up and the file is cleaner.');
+        }
+      } else if (chainId === 'archaeology') {
+        if (stage === 'screen') {
+          applyPermittingProfessionalWork(journey, { paperworkLoad: 2, auditExposure: 1 });
+          ui.write('Archaeology screening shows the file needs a proper field review path.');
+        } else if (stage === 'field-review') {
+          if (journey.relationships) {
+            journey.relationships.nations = Math.min(100, journey.relationships.nations + 2);
+          }
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: -1 });
+          ui.write('Field review notes and consultation context are better aligned.');
+        } else {
+          applyPermittingProfessionalWork(journey, { paperworkLoad: -1, auditExposure: -1, competenceRisk: -1 });
+          ui.write('Archaeology context is folded into the permit package.');
+        }
+      }
+
+      if (chainProgress?.stage) {
+        ui.write(`Paperwork chain advanced to: ${chainProgress.stage}.`);
+      }
+      return;
+    }
 
     case 'rest':
       if (journey.protagonist) {
@@ -923,6 +1281,7 @@ async function processAction(game, actionId) {
         journey.protagonist.stress = Math.max(0, journey.protagonist.stress - 10);
       }
       journey.hoursRemaining -= 1;
+      applyPermittingProfessionalWork(journey, { auditExposure: -1, competenceRisk: -1 });
       ui.write('You take a short break. Feeling a bit better.');
       return;
 
@@ -1012,13 +1371,28 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
     }
 
     // Protagonist recovery
-    if (journey.protagonist) {
-      journey.protagonist.energy = Math.min(100, journey.protagonist.energy + 25);
-      journey.protagonist.stress = Math.max(0, journey.protagonist.stress - 8);
-    }
+  if (journey.protagonist) {
+    journey.protagonist.energy = Math.min(100, journey.protagonist.energy + 25);
+    journey.protagonist.stress = Math.max(0, journey.protagonist.stress - 8);
+  }
 
-    // Advance to next day
-    journey.day++;
+  const professional = ensurePermittingProfessionalState(journey);
+  if (professional) {
+    const cpdGap = Math.max(0, professional.cpdTarget - professional.cpdHours);
+    if (cpdGap > 0) {
+      professional.competenceRisk = Math.min(100, professional.competenceRisk + 1);
+      professional.auditExposure = Math.min(100, professional.auditExposure + 1);
+    } else if (professional.competenceRisk > 0) {
+      professional.competenceRisk = Math.max(0, professional.competenceRisk - 1);
+    }
+    professional.paperworkLoad = Math.max(0, professional.paperworkLoad - 1);
+    if (professional.auditExposure > 0 && professional.registrationStatus === 'active') {
+      professional.auditExposure = Math.max(0, professional.auditExposure - 1);
+    }
+  }
+
+  // Advance to next day
+  journey.day++;
     journey.hoursRemaining = 8;
     journey.currentPhase = getDeskPhase(journey);
 
@@ -1054,6 +1428,7 @@ function processPermitPipeline(ui, journey) {
   const queue = ensurePermittingRevisionState(journey);
   const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
   const roadIntel = getPermittingRoadAssetContext(journey);
+  const professional = getPermittingProfessionalSnapshot(journey);
 
   // Submitted permits may advance to inReview
   if (journey.permits.submitted > 0) {
@@ -1076,13 +1451,17 @@ function processPermitPipeline(ui, journey) {
       + pressure.timing * 0.02
     ));
     const roadPenalty = Math.min(0.15, roadIntel.approvalPenalty);
-    const approvalRate = Math.max(0.4, 0.72 - scrutinyPenalty - phase3Penalty - roadPenalty);
+    const professionalPenalty = professional?.registrationActive
+      ? Math.min(0.15, (professional.auditExposure / 300) + (professional.competenceRisk / 500))
+      : 0.2;
+    const approvalRate = Math.max(0.35, 0.72 - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
     const approved = Math.floor(reviewed * approvalRate);
     const revisions = reviewed - approved;
 
     if (approved > 0) {
       journey.permits.inReview -= approved;
       journey.permits.approved += approved;
+      applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: -1, auditExposure: -1 });
       ui.writePositive(`${approved} permit(s) APPROVED!`);
     }
     if (revisions > 0) {
@@ -1095,6 +1474,7 @@ function processPermitPipeline(ui, journey) {
           pressure: pressure.dominant
         });
       }
+      applyPermittingProfessionalWork(journey, { paperworkLoad: 2, auditExposure: 1 });
       ui.writeWarning(`${revisions} permit(s) returned for revision.`);
     }
   }

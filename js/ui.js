@@ -71,6 +71,7 @@ export class TerminalUI {
     this.statusBtn = document.getElementById('status-btn');
     this.helpBtn = document.getElementById('help-btn');
     this.glossaryBtn = document.getElementById('glossary-btn');
+    this.intelBtn = document.getElementById('intel-btn');
     this.restartBtn = document.getElementById('restart-btn');
     this.closePanel = document.getElementById('close-panel');
 
@@ -87,6 +88,7 @@ export class TerminalUI {
     this.loadGameBtn = document.getElementById('load-game-btn');
     this.helpLandingBtn = document.getElementById('help-landing-btn');
     this.settingsBtn = document.getElementById('settings-btn');
+    this.complianceIntelLandingBtn = document.getElementById('compliance-intel-landing-btn');
 
     // Initialization overlay elements
     this.initOverlay = document.getElementById('init-overlay');
@@ -100,9 +102,11 @@ export class TerminalUI {
     this.areaContinueBtn = document.getElementById('area-continue-btn');
     this.roleGrid = document.getElementById('role-grid');
     this.roleGlossaryBtn = document.getElementById('role-glossary-btn');
+    this.roleIntelBtn = document.getElementById('role-intel-btn');
     this.areaList = document.getElementById('area-list');
     this.areaDetail = document.getElementById('area-detail');
     this.areaGlossaryBtn = document.getElementById('area-glossary-btn');
+    this.areaIntelBtn = document.getElementById('area-intel-btn');
 
     // Modern mode header elements
     this.modernHeader = document.getElementById('modern-header');
@@ -134,6 +138,7 @@ export class TerminalUI {
 
     // Modern mode footer buttons
     this.footerGlossaryBtn = document.getElementById('footer-glossary-btn');
+    this.footerIntelBtn = document.getElementById('footer-intel-btn');
     this.footerRestartBtn = document.getElementById('footer-restart-btn');
   }
 
@@ -149,6 +154,7 @@ export class TerminalUI {
     this._onLogRequest = null;
     this._isPanelOpen = false;
     this._initState = { roleId: null, areaId: null };
+    this._currentJourney = null;
     this._roleGlossaryTerms = [];
     this._areaGlossaryTerms = [];
     this._currentOptions = null;
@@ -204,10 +210,22 @@ export class TerminalUI {
       this.glossaryBtn.addEventListener('click', () => this.showGlossary());
     }
 
+    if (this.intelBtn) {
+      this.intelBtn.addEventListener('click', () => this.showProfessionalComplianceIntel());
+    }
+
+    if (this.complianceIntelLandingBtn) {
+      this.complianceIntelLandingBtn.addEventListener('click', () => this.showProfessionalComplianceIntel());
+    }
+
     if (this.roleGlossaryBtn) {
       this.roleGlossaryBtn.addEventListener('click', () => {
         this._openContextGlossary('Role Glossary', this._roleGlossaryTerms);
       });
+    }
+
+    if (this.roleIntelBtn) {
+      this.roleIntelBtn.addEventListener('click', () => this.showProfessionalComplianceIntel());
     }
 
     if (this.areaGlossaryBtn) {
@@ -216,9 +234,17 @@ export class TerminalUI {
       });
     }
 
+    if (this.areaIntelBtn) {
+      this.areaIntelBtn.addEventListener('click', () => this.showProfessionalComplianceIntel());
+    }
+
     // Modern footer buttons
     if (this.footerGlossaryBtn) {
       this.footerGlossaryBtn.addEventListener('click', () => this.showGlossary());
+    }
+
+    if (this.footerIntelBtn) {
+      this.footerIntelBtn.addEventListener('click', () => this.showProfessionalComplianceIntel());
     }
 
     if (this.footerRestartBtn) {
@@ -257,6 +283,12 @@ export class TerminalUI {
       if (canUseGameplayShortcuts && e.key === 'g' && !this._isInputFocused()) {
         e.preventDefault();
         this.showGlossary();
+      }
+
+      // P for professional/compliance intel
+      if (canUseGameplayShortcuts && !this.isModalOpen() && e.key === 'p' && !this._isInputFocused()) {
+        e.preventDefault();
+        this.showProfessionalComplianceIntel();
       }
 
       // Escape to close panel or modal
@@ -301,6 +333,7 @@ export class TerminalUI {
    * @param {Object} journey - Journey state
    */
   updateAllStatus(journey) {
+    this._currentJourney = journey || null;
     // Set layout for modern mode
     this.setJourneyLayout(journey.journeyType);
 
@@ -461,6 +494,7 @@ export class TerminalUI {
 
     // Reset init state
     this._initState = { roleId: null, areaId: null };
+    this._currentJourney = null;
   }
 }
 

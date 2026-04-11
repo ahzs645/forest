@@ -1,4 +1,5 @@
 import { getPlanningAreaSnapshot } from "./planningBlocks.js";
+import { getRoleMinistryProcessHooks } from "./ministryProcessHooks.js";
 
 const ROLE_BASELINES = {
   planner: [
@@ -188,6 +189,7 @@ export function getRoleAreaBriefing(roleId, area, options = {}) {
   const baseFinds = ROLE_BASELINES[roleId] || [];
   const areaFinds = ROLE_AREA_FINDINGS[roleId]?.[area?.id] || [];
   const snapshotSignals = buildSnapshotSignals(roleId, area);
+  const processHooks = getRoleMinistryProcessHooks(roleId, { limit: 2 });
   const likelyFinds = dedupe([...areaFinds, ...snapshotSignals.findings, ...baseFinds]).slice(0, maxFinds);
 
   return {
@@ -195,6 +197,7 @@ export function getRoleAreaBriefing(roleId, area, options = {}) {
     seasonalSignals: Array.isArray(area?.seasonalSignals) ? area.seasonalSignals : [],
     likelyFinds,
     planningSnapshot: snapshotSignals.planningSnapshot,
+    processHooks,
   };
 }
 

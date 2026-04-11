@@ -168,13 +168,13 @@ function pickCollapseChoice(labels, terminalText, modeName) {
   }
 
   if (modeName === 'recce') {
-    const priorities = ['Cautious Recon', 'Rest & End Shift', 'Standard Recon', 'Maintenance', 'Scout Ahead'];
+    const priorities = ['Ground-Truth Access', 'Values Sweep', 'Cautious Recon', 'Rest & End Shift', 'Standard Recon', 'Maintenance', 'Scout Ahead'];
     const matchIndex = labels.findIndex((label) => priorities.some((priority) => label.includes(priority)));
     return matchIndex === -1 ? labels.length - 1 : matchIndex;
   }
 
   if (modeName === 'silviculture') {
-    return findFirstMatching(labels, ['Herbicide Application', 'Contractor Meeting', 'Team Briefing', 'Site Inspection', 'End Day', 'Conduct Survey', 'Deploy Planting Crew']);
+    return findFirstMatching(labels, ['Brush Treatment', 'Contractor Meeting', 'Team Briefing', 'Survival Check', 'End Day', 'Survey Free-Growing', 'Plant Block']);
   }
 
   return 0;

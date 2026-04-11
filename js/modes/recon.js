@@ -73,6 +73,116 @@ const ROUTE_PRESETS = {
   }
 };
 
+const RECON_WATER_FEATURES = new Set([
+  'community_water',
+  'watershed',
+  'water_intake',
+  'salmon_river',
+  'fish_habitat'
+]);
+
+const RECON_CULTURAL_FEATURES = new Set([
+  'first_nation',
+  'cultural_site',
+  'culturally_modified_trees'
+]);
+
+const RECON_VISIBILITY_FEATURES = new Set([
+  'visual_quality_zone',
+  'recreation',
+  'trail',
+  'community_interface'
+]);
+
+const RECON_ACCESS_HAZARDS = new Set([
+  'washout',
+  'road_damage',
+  'erosion',
+  'bridge_weight',
+  'subsidence',
+  'river_crossing',
+  'bog',
+  'glacial_outburst',
+  'karst_collapse',
+  'hidden_cavities'
+]);
+
+function normalizeReconToken(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function ensureReconIntelState(journey) {
+  if (!journey.reconIntel) {
+    journey.reconIntel = { byBlock: {} };
+  }
+  if (!journey.reconIntel.byBlock) {
+    journey.reconIntel.byBlock = {};
+  }
+  return journey.reconIntel;
+}
+
+function getReconBlockIntel(journey, block) {
+  const state = ensureReconIntelState(journey);
+  const key = block?.id || `block-${journey?.currentBlockIndex || 0}`;
+  if (!state.byBlock[key]) {
+    state.byBlock[key] = {
+      accessGroundTruthed: false,
+      valuesSwept: false,
+      lastAccessDay: 0,
+      lastValuesDay: 0
+    };
+  }
+  return state.byBlock[key];
+}
+
+function getReconValueSweepProfile(block, journey) {
+  const features = new Set((block?.features || []).map(normalizeReconToken).filter(Boolean));
+  const hazards = new Set((block?.hazards || []).map(normalizeReconToken).filter(Boolean));
+  const tags = new Set();
+  const notes = [];
+
+  if ([...features].some((feature) => RECON_WATER_FEATURES.has(feature)) || [...hazards].some((hazard) => hazard === 'river_crossing' || hazard === 'flood' || hazard === 'washout')) {
+    tags.add('watershed_watch');
+    notes.push('crossings, riparian ground, or drinking-water values need cleaner notes');
+  }
+  if ([...features].some((feature) => RECON_CULTURAL_FEATURES.has(feature)) || [...hazards].some((hazard) => hazard === 'cultural_protocol')) {
+    tags.add('cultural_hold');
+    notes.push('cultural or archaeology indicators are active on the ground');
+  }
+  if ([...features].some((feature) => RECON_VISIBILITY_FEATURES.has(feature)) || [...hazards].some((hazard) => hazard === 'traffic' || hazard === 'visual_constraint')) {
+    tags.add('community_visibility');
+    notes.push('the block sits where community or recreation eyes will stay on it');
+  }
+  if ([...hazards].some((hazard) => RECON_ACCESS_HAZARDS.has(hazard))) {
+    tags.add('access_rehab');
+    notes.push('access rehab is likely to come back as a live issue');
+  }
+  if (normalizeReconToken(journey?.weather?.id) === 'storm') {
+    tags.add('smoke_pressure');
+    notes.push('the field window is unstable enough to distort clean coverage');
+  }
+
+  return {
+    needed: notes.length > 0,
+    notes,
+    tags: [...tags]
+  };
+}
+
+function getReconAccessSeverity(verdict) {
+  switch (verdict?.id) {
+    case 'no_go':
+      return 3;
+    case 'heli_only':
+    case 'winter_only':
+      return 2;
+    case 'rehab_needed':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 /**
  * Run a recon day (enhanced field day with survey mechanics)
  * @param {Object} game - Game instance
@@ -101,7 +211,11 @@ async function runFieldDay(game) {
 
   // Initialize hours for the day
   if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
-    journey.hoursRemaining = 9;
+    journey.hoursRemaining = journey.difficulty === 'easy'
+      ? 10
+      : journey.difficulty === 'hard'
+        ? 8
+        : 9;
   }
 
   let hasTraveled = false;
@@ -145,6 +259,9 @@ async function runFieldDay(game) {
   while (journey.hoursRemaining > 0) {
     const currentBlock = journey.blocks[journey.currentBlockIndex];
     const canTravel = !hasTraveled && journey.resources.fuel > 0 && journey.resources.equipment > 0;
+    const blockIntel = getReconBlockIntel(journey, currentBlock);
+    const accessVerdict = currentBlock ? getBlockAccessVerdict(currentBlock, journey.weather, journey) : null;
+    const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
 
     if (canTravel && journey.currentBlockIndex < journey.blocks.length - 1 && journey.routePlan?.day !== journey.day) {
       displayDayHeader(ui, journey);
@@ -185,6 +302,22 @@ async function runFieldDay(game) {
           value: 'grueling'
         });
       }
+    }
+
+    if (currentBlock && !blockIntel.accessGroundTruthed && journey.hoursRemaining >= 2) {
+      actionOptions.push({
+        label: 'Ground-Truth Access (2h)',
+        description: `Verify crossings, road condition, and approach risk before moving on (${accessVerdict?.label || 'current access check'})`,
+        value: 'ground_truth'
+      });
+    }
+
+    if (currentBlock && valuesSweep.needed && !blockIntel.valuesSwept && journey.hoursRemaining >= 2) {
+      actionOptions.push({
+        label: 'Values Sweep (2h)',
+        description: `Ground-check riparian, cultural, wildlife, and visibility notes (${valuesSweep.notes[0]})`,
+        value: 'values_sweep'
+      });
     }
 
     // Camp actions (available anytime)
@@ -248,12 +381,19 @@ async function runFieldDay(game) {
     }
 
     if (['slow', 'normal', 'fast', 'grueling'].includes(actionId)) {
+      applyReconTravelIntelPenalty(ui, journey, currentBlock, actionId);
       // Travel action — costs hours based on pace
       const hoursCost = { slow: 4, normal: 5, fast: 6, grueling: 8 };
       journey.hoursRemaining -= hoursCost[actionId];
       const result = executeFieldDay(journey, actionId);
       for (const msg of result.messages) ui.write(msg);
       hasTraveled = true;
+    } else if (actionId === 'ground_truth') {
+      journey.hoursRemaining -= 2;
+      handleGroundTruthAccess(ui, journey, currentBlock);
+    } else if (actionId === 'values_sweep') {
+      journey.hoursRemaining -= 2;
+      handleValuesSweep(ui, journey, currentBlock);
     } else if (actionId === 'forage') {
       journey.hoursRemaining -= 2;
       applyForageResults(ui, journey, 'forage');
@@ -334,6 +474,13 @@ function displayDayHeader(ui, journey) {
     ? `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
     : 'Full rations';
   ui.write(`Route: ${routeText} | Rations: ${rationText}`);
+  const blockIntel = getReconBlockIntel(journey, currentBlock);
+  const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
+  const accessIntelLabel = blockIntel.accessGroundTruthed ? 'ground-truthed' : 'unverified';
+  const valuesIntelLabel = valuesSweep.needed
+    ? (blockIntel.valuesSwept ? 'swept' : 'pending')
+    : 'quiet';
+  ui.write(`Current Intel: access ${accessIntelLabel} | values ${valuesIntelLabel}`);
   const hasScrutiny = Object.prototype.hasOwnProperty.call(journey, 'scrutiny')
     || Object.prototype.hasOwnProperty.call(journey, 'heat');
   const scrutinyValue = Number(journey.scrutiny ?? journey.heat ?? 0);
@@ -592,6 +739,121 @@ async function maybePromptRouteChoice(game, currentBlock) {
   );
 
   journey.routePlan = buildRoutePlan(choice.value, journey, currentBlock, nextBlock);
+}
+
+function applyReconTravelIntelPenalty(ui, journey, currentBlock, actionId) {
+  if (!currentBlock) {
+    return;
+  }
+
+  const blockIntel = getReconBlockIntel(journey, currentBlock);
+  const accessVerdict = getBlockAccessVerdict(currentBlock, journey.weather, journey);
+  const accessSeverity = getReconAccessSeverity(accessVerdict);
+  const pacePressure = actionId === 'grueling' ? 2 : actionId === 'fast' ? 1 : 0;
+
+  if (!blockIntel.accessGroundTruthed && accessSeverity > 0) {
+    const equipmentLoss = accessSeverity + pacePressure;
+    const fuelLoss = Math.max(1, accessSeverity - 1 + pacePressure);
+    journey.resources.equipment = Math.max(0, journey.resources.equipment - equipmentLoss);
+    journey.resources.fuel = Math.max(0, journey.resources.fuel - fuelLoss);
+    journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + accessSeverity);
+    ui.writeWarning(`You moved without ground-truthing the access. ${accessVerdict.summary} Equipment -${equipmentLoss}, fuel -${fuelLoss}, scrutiny +${accessSeverity}.`);
+
+    if (Math.random() < (0.08 * accessSeverity) + (pacePressure * 0.04)) {
+      const activeCrew = journey.crew.filter((member) => member.isActive);
+      const victim = activeCrew.length ? activeCrew[Math.floor(Math.random() * activeCrew.length)] : null;
+      if (victim) {
+        const injury = applyRandomInjury(victim, accessSeverity >= 2 ? 'moderate' : 'minor');
+        ui.writeWarning(`Access mistake! ${injury.message}`);
+      }
+    }
+  }
+
+  const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
+  if (!blockIntel.valuesSwept && valuesSweep.needed) {
+    const scrutinyGain = Math.min(3, Math.max(1, valuesSweep.tags.length));
+    journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + scrutinyGain);
+    ui.writeWarning(`You left ${valuesSweep.notes.slice(0, 2).join(' and ')} unverified. Scrutiny +${scrutinyGain}.`);
+  }
+}
+
+function handleGroundTruthAccess(ui, journey, block) {
+  if (!block) {
+    ui.write('There is no active block to ground-truth.');
+    return;
+  }
+
+  const verdict = recordAccessVerdict(
+    journey,
+    block,
+    getBlockAccessVerdict(block, journey.weather, journey),
+    journey.weather
+  );
+  const intel = getReconBlockIntel(journey, block);
+  intel.accessGroundTruthed = true;
+  intel.lastAccessDay = journey.day;
+
+  addDiscoveryTags(journey, inferDiscoveryTagsFromAccess(block, verdict, journey.weather), {
+    source: `ground-truth:${block.id}`,
+    severity: verdict.id === 'no_go' ? 3 : verdict.id === 'heli_only' || verdict.id === 'winter_only' ? 2 : 1,
+    note: verdict.summary,
+    details: {
+      blockId: block.id,
+      verdict: verdict.id
+    }
+  });
+
+  ui.writeHeader('GROUND-TRUTH ACCESS');
+  if (verdict.id === 'passable_now') {
+    ui.writePositive(formatAccessVerdict(verdict));
+  } else if (verdict.id === 'no_go' || verdict.id === 'heli_only') {
+    ui.writeDanger(formatAccessVerdict(verdict));
+  } else {
+    ui.writeWarning(formatAccessVerdict(verdict));
+  }
+
+  const infrastructureLine = formatInfrastructureStatus(verdict);
+  if (infrastructureLine) {
+    ui.write(infrastructureLine);
+  }
+
+  journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
+  ui.write('You log the access condition before the crew commits more distance.');
+}
+
+function handleValuesSweep(ui, journey, block) {
+  if (!block) {
+    ui.write('There is no active block to sweep.');
+    return;
+  }
+
+  const sweep = getReconValueSweepProfile(block, journey);
+  const intel = getReconBlockIntel(journey, block);
+  intel.valuesSwept = true;
+  intel.lastValuesDay = journey.day;
+
+  ui.writeHeader('VALUES SWEEP');
+  if (!sweep.needed) {
+    ui.write('The block reads quiet. No new water, cultural, or visibility concerns stand out today.');
+    journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
+    return;
+  }
+
+  addDiscoveryTags(journey, sweep.tags, {
+    source: `values-sweep:${block.id}`,
+    severity: 2,
+    note: sweep.notes.join(' | '),
+    details: {
+      blockId: block.id,
+      weather: journey.weather?.id || null
+    }
+  });
+
+  for (const note of sweep.notes) {
+    ui.write(note.charAt(0).toUpperCase() + note.slice(1) + '.');
+  }
+  ui.writePositive(`Logged: ${sweep.tags.join(', ')}`);
+  journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - Math.min(2, sweep.tags.length));
 }
 
 /**

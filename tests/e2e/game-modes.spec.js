@@ -64,7 +64,7 @@ for (const run of TEST_RUNS) {
   });
 }
 
-async function autoPlayToEnd(page, strategyName, maxSteps = 280) {
+async function autoPlayToEnd(page, strategyName, maxSteps = 360) {
   for (let step = 0; step < maxSteps; step++) {
     const terminalText = await page.locator('#terminal').innerText();
     if (isEndScreen(terminalText)) {
@@ -101,6 +101,14 @@ function pickChoice(labels, terminalText, strategyName) {
     return 0;
   }
 
+  const recommendedAction = getRecommendedActionLabel(terminalText);
+  if (recommendedAction) {
+    const recommendedIndex = labels.findIndex((label) => label.includes(recommendedAction));
+    if (recommendedIndex !== -1) {
+      return recommendedIndex;
+    }
+  }
+
   if (strategyName === 'recce') {
     return pickReconChoice(labels, terminalText);
   }
@@ -110,6 +118,13 @@ function pickChoice(labels, terminalText, strategyName) {
   const strategyPriorities = {
     planner: planningPriorities,
     permitter: [
+      'Road Permit File',
+      'Archaeology File',
+      'Special-Use File',
+      'Compliance Admin',
+      'Renew Registration',
+      'Clean response',
+      'Fast-track',
       'Address Revisions',
       'Follow Up on Referrals',
       'Submit Permit',
@@ -121,11 +136,13 @@ function pickChoice(labels, terminalText, strategyName) {
       'End Day Early'
     ],
     silviculture: [
-      'Deploy Planting Crew',
-      'Conduct Survey',
+      'Plant Block',
+      'Survival Check',
+      'Fill Planting',
+      'Brush Treatment',
+      'Survey Free-Growing',
+      'Contractor Rotation',
       'Contractor Meeting',
-      'Site Inspection',
-      'Herbicide Application',
       'Team Briefing',
       'Upgrade camp',
       'Inspect & retrain',
@@ -200,18 +217,49 @@ function pickReconChoice(labels, terminalText) {
   }
 
   if (food <= 12) {
-    return findFirstMatching(labels, ['Resupply', 'Forage & Hunt', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Resupply', 'Forage & Hunt', 'Ground-Truth Access', 'Values Sweep', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
   }
 
   if (fuel <= 25 || equipment <= 35) {
-    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Standard Recon', 'Cautious Recon', 'Forage & Hunt', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Ground-Truth Access', 'Values Sweep', 'Standard Recon', 'Cautious Recon', 'Forage & Hunt', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
   }
 
   if (injuredCount >= 2 && meds > 0) {
-    return findFirstMatching(labels, ['Triage', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Forage & Hunt', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Triage', 'Ground-Truth Access', 'Values Sweep', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Forage & Hunt', 'Rest & End Shift']);
   }
 
-  return findFirstMatching(labels, ['Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Forage & Hunt', 'Triage', 'Rest & End Shift']);
+  return findFirstMatching(labels, ['Ground-Truth Access', 'Values Sweep', 'Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Forage & Hunt', 'Triage', 'Rest & End Shift']);
+}
+
+function getRecommendedActionLabel(terminalText) {
+  const actionLabels = [
+    'Gather Data',
+    'Run Analysis',
+    'Stakeholder Session',
+    'Open FOM Review',
+    'Update FOM Review',
+    'Revise FOM',
+    'Compliance Admin',
+    'Renew Registration',
+    'Ministerial Outreach',
+    'Prepare Submission',
+    'Clean response',
+    'Fast-track',
+    'Follow Up on Referrals',
+    'Road Permit File',
+    'Archaeology File',
+    'Special-Use File',
+    'Draft Permit Application',
+    'Submit Permit'
+  ];
+
+  const line = terminalText.split('\n').find((entry) => entry.includes('Next Best Move:'));
+  if (!line) {
+    return '';
+  }
+
+  const headline = line.split('Next Best Move:')[1]?.trim() || '';
+  return actionLabels.find((label) => headline.includes(label)) || '';
 }
 
 function getPlanningPriorities(terminalText) {
@@ -239,14 +287,20 @@ function getPlanningPriorities(terminalText) {
 
   if (phase === 'Ministerial Approval') {
     return valuesBlocked
-      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Prepare Submission', 'Network', 'Check Email', 'Take a Break', 'End Day']
-      : ['Prepare Submission', 'Balanced Approach', 'Emphasize First Nations', 'Values Workshop', 'Network', 'Check Email', 'Take a Break', 'End Day'];
+      ? ['Values Workshop', 'Timber Assessment', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Prepare Submission', 'Network', 'Check Email', 'Take a Break', 'End Day']
+      : ['Prepare Submission', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Values Workshop', 'Network', 'Check Email', 'Take a Break', 'End Day'];
   }
 
   return [
     'Gather Data',
     'Run Analysis',
     'Stakeholder Session',
+    'Open FOM Review',
+    'Update FOM Review',
+    'Revise FOM',
+    'Compliance Admin',
+    'Renew Registration',
+    'Ministerial Outreach',
     'Prepare Submission',
     'Balanced Approach',
     'Emphasize First Nations',

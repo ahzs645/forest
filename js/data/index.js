@@ -9,6 +9,30 @@ export { LEGACY_GLOSSARY_TERMS } from "./legacyGlossary.js";
 export { LEGACY_ILLEGAL_ACTS } from "./legacyIllegalActs.js";
 export { getRoleAreaBriefing, getRoleAreaFinding } from "./roleAreaIntel.js";
 export {
+  getMinistryProcessHook,
+  getRoleMinistryProcessHooks,
+  getRoleProcessFailureCatalog,
+  MINISTRY_PROCESS_HOOKS as MINISTRY_PROCESS_LIBRARY,
+  MINISTRY_PROCESS_FAILURES,
+} from "./ministryProcessHooks.js";
+export {
+  PROFESSIONAL_OBLIGATIONS,
+  MINISTRY_PROCESS_HOOKS,
+  MINISTRY_PROCESS_FAILURES as REGULATORY_FAILURE_CASEFILES,
+  ENFORCEMENT_CASEFILES,
+  AREA_COMPLIANCE_PROFILES,
+  PAPERWORK_CHAIN_LIBRARY,
+  advancePaperworkChain,
+  applyProfessionalDrift,
+  createProfessionalState,
+  ensureProfessionalState,
+  getAreaComplianceProfile,
+  getIllegalActsCatalog,
+  getPaperworkChainProgress,
+  getPaperworkChainsForRole,
+  getRoleProfessionalContext,
+} from "./professionalPractice.js";
+export {
   addDiscoveryTags,
   ensureDiscoveryTagState,
   getDiscoveryEventTypeMultipliers,
