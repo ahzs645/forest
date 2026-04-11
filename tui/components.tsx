@@ -284,6 +284,28 @@ function SummarySection({
 
 // ── Content View (structured rendering) ──────────────
 export function ContentView({ data }: { data: ContentData }) {
+  const severityColor = data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
+    ? data.surfaceSeverity === "danger"
+      ? C.red
+      : data.surfaceSeverity === "warning"
+        ? C.yellow
+        : C.blue
+    : C.white;
+  const severityLabel = data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
+    ? data.surfaceSeverity === "danger"
+      ? "Serious Fallout"
+      : data.surfaceSeverity === "warning"
+        ? "Manageable Fallout"
+        : "Minor Fallout"
+    : "";
+  const optionColor = data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
+    ? data.optionTone === "danger"
+      ? C.red
+      : data.optionTone === "warning"
+        ? C.yellow
+        : C.cyan
+    : C.cyan;
+
   switch (data.type) {
     case "message":
       return (
@@ -325,7 +347,13 @@ export function ContentView({ data }: { data: ContentData }) {
         <>
           <NoticeView notice={data.notice} />
           {data.notice ? <text content="" /> : null}
-          <text content={data.title} style={{ fg: C.yellow, bold: true }} />
+          {data.surfaceSeverity ? (
+            <text content={severityLabel} style={{ fg: severityColor, bold: true }} />
+          ) : null}
+          {data.phaseLabel ? (
+            <text content={data.phaseLabel} style={{ fg: severityColor, bold: true }} />
+          ) : null}
+          <text content={data.title} style={{ fg: data.surfaceSeverity ? severityColor : C.yellow, bold: true }} />
           <text content="" />
           <text content={data.description} style={{ fg: C.white }} />
           {data.flavor && (
@@ -334,13 +362,20 @@ export function ContentView({ data }: { data: ContentData }) {
               <text content={data.flavor} style={{ fg: C.dim, italic: true }} />
             </>
           )}
+          {data.surfaceReason && (
+            <>
+              <text content="" />
+              <text content="Why This Surfaced:" style={{ fg: C.white, bold: true }} />
+              <text content={data.surfaceReason} style={{ fg: C.dim }} />
+            </>
+          )}
           <text content="" />
-          <text content="Available Options:" style={{ fg: C.white, bold: true }} />
+          <text content={`${data.optionHeading || "Available Options"}:`} style={{ fg: data.optionTone ? optionColor : C.white, bold: true }} />
           {data.optionDetails.map((opt, i) => (
             <box key={`detail-${i}`} style={{ flexDirection: "column", paddingTop: 1 }}>
               <text
                 content={`${i + 1}. ${opt.label}`}
-                style={{ fg: C.cyan }}
+                style={{ fg: optionColor }}
               />
               {opt.outcome && (
                 <box style={{ paddingLeft: 3 }}>

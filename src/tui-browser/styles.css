@@ -158,6 +158,18 @@ body {
   font-weight: 700;
 }
 
+.tui-severity-badge {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+}
+
+.tui-phase-label {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .tui-subheading {
   color: #56d4dd;
   font-weight: 700;

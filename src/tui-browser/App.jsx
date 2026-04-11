@@ -113,6 +113,25 @@ function SummarySection({ title, items, tone }) {
 function ContentView({ data }) {
   if (!data) return null;
 
+  const severityToneClass =
+    data.surfaceSeverity === "danger"
+      ? "red"
+      : data.surfaceSeverity === "warning"
+        ? "yellow"
+        : "blue";
+  const severityLabel =
+    data.surfaceSeverity === "danger"
+      ? "Serious Fallout"
+      : data.surfaceSeverity === "warning"
+        ? "Manageable Fallout"
+        : "Minor Fallout";
+  const optionToneClass =
+    data.optionTone === "danger"
+      ? "red"
+      : data.optionTone === "warning"
+        ? "yellow"
+        : "blue";
+
   if (data.type === "message") {
     return (
       <div className="tui-content-stack">
@@ -137,14 +156,28 @@ function ContentView({ data }) {
     return (
       <div className="tui-content-stack">
         <NoticeBlock notice={data.notice} />
-        <div className="tui-heading">{data.title}</div>
+        {data.surfaceSeverity ? (
+          <div className={`tui-severity-badge tone-${severityToneClass}`}>{severityLabel}</div>
+        ) : null}
+        {data.phaseLabel ? (
+          <div className={`tui-phase-label tone-${severityToneClass}`}>{data.phaseLabel}</div>
+        ) : null}
+        <div className={`tui-heading ${data.surfaceSeverity ? `tone-${severityToneClass}` : ""}`}>{data.title}</div>
         <p className="tui-copy preserve">{data.description}</p>
         {data.flavor ? <p className="tui-copy dim preserve">{data.flavor}</p> : null}
-        <div className="tui-subheading">Available Options</div>
+        {data.surfaceReason ? (
+          <>
+            <div className="tui-subheading">Why This Surfaced</div>
+            <p className="tui-copy dim preserve">{data.surfaceReason}</p>
+          </>
+        ) : null}
+        <div className={`tui-subheading ${data.optionTone ? `tone-${optionToneClass}` : ""}`}>
+          {data.optionHeading || "Available Options"}
+        </div>
         <div className="tui-detail-list">
           {data.optionDetails.map((option, idx) => (
             <div className="tui-detail-item" key={`${option.label}-${idx}`}>
-              <div className="tui-detail-label">{`${idx + 1}. ${option.label}`}</div>
+              <div className={`tui-detail-label ${data.optionTone ? `tone-${optionToneClass}` : ""}`}>{`${idx + 1}. ${option.label}`}</div>
               {option.outcome ? <div className="tui-detail-copy">{option.outcome}</div> : null}
             </div>
           ))}

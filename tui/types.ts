@@ -16,6 +16,11 @@ export type ContentData =
       title: string;
       description: string;
       flavor?: string;
+      surfaceReason?: string;
+      surfaceSeverity?: "info" | "warning" | "danger";
+      phaseLabel?: string;
+      optionHeading?: string;
+      optionTone?: "info" | "warning" | "danger";
       optionDetails: { label: string; outcome?: string }[];
       notice?: NoticeData;
     }

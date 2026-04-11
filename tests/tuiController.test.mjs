@@ -8,6 +8,13 @@ import {
   getPlanningTriageScrutinyDelta,
   rankPlanningBlockOptions,
 } from '../js/data/planningBlocks.js';
+import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
+import {
+  adaptIllegalActTemptation,
+  applyOptionOutcome,
+  createInitialState,
+  drawIssue,
+} from '../js/engine.js';
 import { getPlanningSubmissionReadiness } from '../js/modes/planning.js';
 import { TuiGameController } from '../tui/controller.js';
 
@@ -53,6 +60,212 @@ test('planner option selection updates the dashboard metrics in the controller s
   assert.equal(state.gameState.metrics.compliance, 48);
   assert.match(state.contentData.notice.heading, /^Decision Logged:/);
   assert.match(state.contentData.notice.body, /Effects:/);
+});
+
+test('scheduled fallout issues expose why they surfaced in the issue card', () => {
+  const controller = new TuiGameController();
+  const gs = createInitialState({
+    companyName: 'Controller Fallout Test',
+    roleId: 'permitter',
+    areaId: 'bulkley-valley',
+  });
+  gs.round = 1;
+  gs.metrics.relationships = 20;
+
+  const act = ILLEGAL_ACTS.find((entry) => entry.id === 'courtesy-flag-bribes');
+  const temptation = adaptIllegalActTemptation(act, gs, () => 0.5);
+  const riskyOption = temptation.options.find((option) => option.risk);
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+
+  try {
+    applyOptionOutcome(gs, riskyOption, {
+      type: 'temptation',
+      id: temptation.id,
+      title: temptation.title,
+      option: riskyOption.label,
+      round: gs.round,
+    });
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  const issue = drawIssue(gs, () => 0);
+  controller.gs = gs;
+  controller.queue = [{ type: 'issue', data: issue }];
+  controller.processNext();
+
+  const state = controller.getState();
+  assert.equal(state.contentData.type, 'issue');
+  assert.equal(state.contentData.title, 'Heritage Protocol Gap Identified');
+  assert.equal(state.contentData.surfaceSeverity, 'warning');
+  assert.match(state.contentData.surfaceReason || '', /relationship damage/i);
+});
+
+test('temptation outcome notices preview the most likely fallout branch', () => {
+  const controller = new TuiGameController();
+  const gs = createInitialState({
+    companyName: 'Controller Notice Test',
+    roleId: 'permitter',
+    areaId: 'bulkley-valley',
+  });
+  gs.round = 1;
+  gs.metrics.relationships = 20;
+
+  const act = ILLEGAL_ACTS.find((entry) => entry.id === 'courtesy-flag-bribes');
+  const temptation = adaptIllegalActTemptation(act, gs, () => 0.5);
+  const riskIndex = temptation.options.findIndex((option) => option.risk);
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+
+  try {
+    controller.gs = gs;
+    controller.queue = [
+      { type: 'temptation', data: temptation },
+      { type: 'message', text: 'Checkpoint', body: 'Queued phase for notice capture.' },
+    ];
+    controller.processNext();
+    controller.selectOption(riskIndex);
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  const state = controller.getState();
+  assert.equal(state.contentData.type, 'message');
+  assert.match(state.contentData.notice?.heading || '', /^Caught:/);
+  assert.equal(state.contentData.notice?.tone, 'warning');
+  assert.match(state.contentData.notice?.body || '', /Likely fallout \(manageable\): Heritage Protocol Gap Identified/i);
+  assert.match(state.contentData.notice?.body || '', /relationship damage/i);
+});
+
+test('serious fallout previews keep danger tone on the outcome notice', () => {
+  const controller = new TuiGameController();
+  const gs = createInitialState({
+    companyName: 'Controller Serious Notice Test',
+    roleId: 'planner',
+    areaId: 'bulkley-valley',
+  });
+  gs.round = 1;
+  gs.metrics.compliance = 20;
+
+  const act = ILLEGAL_ACTS.find((entry) => entry.id === 'trespass-lidar-raid');
+  const temptation = adaptIllegalActTemptation(act, gs, () => 0.5);
+  const riskIndex = temptation.options.findIndex((option) => option.risk);
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+
+  try {
+    controller.gs = gs;
+    controller.queue = [
+      { type: 'temptation', data: temptation },
+      { type: 'message', text: 'Checkpoint', body: 'Queued phase for notice capture.' },
+    ];
+    controller.processNext();
+    controller.selectOption(riskIndex);
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  const state = controller.getState();
+  assert.equal(state.contentData.type, 'message');
+  assert.equal(state.contentData.notice?.tone, 'danger');
+  assert.match(state.contentData.notice?.body || '', /Likely fallout \(serious\): Formal Investigation/i);
+});
+
+test('serious fallout issues carry danger severity on the issue card', () => {
+  const controller = new TuiGameController();
+  const gs = createInitialState({
+    companyName: 'Controller Serious Issue Test',
+    roleId: 'planner',
+    areaId: 'bulkley-valley',
+  });
+  gs.round = 1;
+  gs.metrics.compliance = 20;
+
+  const act = ILLEGAL_ACTS.find((entry) => entry.id === 'trespass-lidar-raid');
+  const temptation = adaptIllegalActTemptation(act, gs, () => 0.5);
+  const riskyOption = temptation.options.find((option) => option.risk);
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+
+  try {
+    applyOptionOutcome(gs, riskyOption, {
+      type: 'temptation',
+      id: temptation.id,
+      title: temptation.title,
+      option: riskyOption.label,
+      round: gs.round,
+    });
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  const issue = drawIssue(gs, () => 0);
+  controller.gs = gs;
+  controller.queue = [{ type: 'issue', data: issue }];
+  controller.processNext();
+
+  const state = controller.getState();
+  assert.equal(state.contentData.type, 'issue');
+  assert.equal(state.contentData.title, 'Formal Investigation');
+  assert.equal(state.contentData.surfaceSeverity, 'danger');
+  assert.equal(state.contentData.phaseLabel, 'Crisis Phase');
+  assert.equal(state.contentData.optionHeading, 'Immediate Response Options');
+  assert.equal(state.contentData.optionTone, 'danger');
+  assert.deepEqual(state.options, [
+    'Open the file now',
+    'Lawyer up and freeze comms',
+    'Burn a subcontractor',
+  ]);
+  assert.deepEqual(
+    state.contentData.optionDetails.map((option) => option.outcome),
+    [
+      'You hand over the record immediately and absorb the hit now to keep the case from turning into charges.',
+      'Counsel slows the investigators, but the meter runs hard and the file stays fully live.',
+      'You try to redirect the blast radius, but the story frays fast and the investigation widens.',
+    ],
+  );
+});
+
+test('serious fallout rounds suppress routine task flow and surface the crisis issue first', () => {
+  const controller = new TuiGameController();
+  const gs = createInitialState({
+    companyName: 'Controller Crisis Round Test',
+    roleId: 'planner',
+    areaId: 'bulkley-valley',
+  });
+  gs.round = 0;
+  gs.metrics.compliance = 20;
+  gs.pendingIssues = [{
+    delay: 0,
+    force: true,
+    candidates: [
+      {
+        id: 'formal-investigation',
+        weight: 3,
+        force: true,
+        metricBoosts: { compliance: 2, relationships: 1.5 },
+      },
+    ],
+  }];
+
+  controller.gs = gs;
+  controller.startRound();
+
+  let state = controller.getState();
+  assert.equal(state.contentData.type, 'message');
+  assert.match(state.contentData.body || '', /critical matter overrides routine work/i);
+
+  controller.selectOption(0);
+  state = controller.getState();
+
+  assert.equal(state.contentData.type, 'issue');
+  assert.equal(state.contentData.title, 'Formal Investigation');
+  assert.equal(state.contentData.phaseLabel, 'Crisis Phase');
 });
 
 test('planning triage highlights the dominant area constraint and puts it first', () => {

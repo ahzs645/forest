@@ -35,15 +35,18 @@ function buildOutcomeNotice(option, outcomeResult) {
   const riskResult = outcomeResult?.riskResult ?? null;
   const outcomeText = outcomeResult?.outcome ?? option?.outcome ?? "";
   const deltaText = formatMetricDelta(outcomeResult?.effects || {});
-  const body = [outcomeText, deltaText ? `Effects: ${deltaText}` : ""]
+  const scheduledIssuePreview = outcomeResult?.scheduledIssueTeaser ?? null;
+  const scheduledIssueText = scheduledIssuePreview?.text ?? "";
+  const body = [outcomeText, deltaText ? `Effects: ${deltaText}` : "", scheduledIssueText]
     .filter(Boolean)
     .join("\n\n");
 
   if (riskResult) {
+    const tone = riskResult.success ? "positive" : scheduledIssuePreview?.severity || "danger";
     return {
       heading: riskResult.success ? `Success: ${option.label}` : `Caught: ${option.label}`,
       body,
-      tone: riskResult.success ? "positive" : "danger",
+      tone,
     };
   }
 
@@ -51,6 +54,45 @@ function buildOutcomeNotice(option, outcomeResult) {
     heading: `Decision Logged: ${option.label}`,
     body,
     tone: "info",
+  };
+}
+
+function buildPresentedOptions(item, phaseType) {
+  const options = Array.isArray(item?.options) ? item.options : [];
+  if (phaseType === "issue" && item?.surfaceSeverity === "danger") {
+    return options.map((option, index) => presentDangerIssueOption(item, option, index));
+  }
+  return options.map((option) => ({
+    label: option.label,
+    outcome: option.outcome,
+  }));
+}
+
+function presentDangerIssueOption(item, option, index) {
+  if (item?.id === "formal-investigation") {
+    const crisisCopy = [
+      {
+        label: "Open the file now",
+        outcome: "You hand over the record immediately and absorb the hit now to keep the case from turning into charges.",
+      },
+      {
+        label: "Lawyer up and freeze comms",
+        outcome: "Counsel slows the investigators, but the meter runs hard and the file stays fully live.",
+      },
+      {
+        label: "Burn a subcontractor",
+        outcome: "You try to redirect the blast radius, but the story frays fast and the investigation widens.",
+      },
+    ][index];
+
+    if (crisisCopy) {
+      return crisisCopy;
+    }
+  }
+
+  return {
+    label: option?.label || `Option ${index + 1}`,
+    outcome: option?.outcome,
   };
 }
 
@@ -161,30 +203,37 @@ export class TuiGameController {
     const gs = this.gs;
     gs.round += 1;
     const season = SEASONS[gs.round - 1];
+    const issue = drawIssue(gs);
+    const isCrisisRound = issue?.surfaceSeverity === "danger";
 
     this.queue.push({
       type: "message",
       text: season,
-      body: "A new season begins. Prepare your crew.",
+      body: isCrisisRound
+        ? "A critical matter overrides routine work. The season pivots into immediate response."
+        : "A new season begins. Prepare your crew.",
     });
 
-    for (const task of getRoleTasks(gs)) {
-      this.queue.push({ type: "task", data: task });
-    }
-
-    const event = drawSeasonalEvent(gs);
-    if (event) {
-      this.queue.push({ type: "event", data: event });
-    }
-
-    const temptation = drawSeasonalTemptation(gs);
-    if (temptation) {
-      this.queue.push({ type: "temptation", data: temptation });
-    }
-
-    const issue = drawIssue(gs);
-    if (issue) {
+    if (isCrisisRound) {
       this.queue.push({ type: "issue", data: issue });
+    } else {
+      for (const task of getRoleTasks(gs)) {
+        this.queue.push({ type: "task", data: task });
+      }
+
+      const event = drawSeasonalEvent(gs);
+      if (event) {
+        this.queue.push({ type: "event", data: event });
+      }
+
+      const temptation = drawSeasonalTemptation(gs);
+      if (temptation) {
+        this.queue.push({ type: "temptation", data: temptation });
+      }
+
+      if (issue) {
+        this.queue.push({ type: "issue", data: issue });
+      }
     }
 
     this.queue.push({
@@ -264,19 +313,23 @@ export class TuiGameController {
 
     if (phase.type === "task" || phase.type === "issue" || phase.type === "event" || phase.type === "temptation") {
       const item = phase.data;
+      const isCrisisIssue = phase.type === "issue" && item.surfaceSeverity === "danger";
+      const presentedOptions = buildPresentedOptions(item, phase.type);
       this.present(
         {
           type: phase.type,
           title: item.title,
           description: item.description ?? item.prompt ?? "",
           flavor: item.flavor,
+          surfaceReason: item.surfaceReason,
+          surfaceSeverity: item.surfaceSeverity,
+          phaseLabel: isCrisisIssue ? "Crisis Phase" : undefined,
+          optionHeading: isCrisisIssue ? "Immediate Response Options" : undefined,
+          optionTone: isCrisisIssue ? "danger" : undefined,
           notice,
-          optionDetails: item.options.map((option) => ({
-            label: option.label,
-            outcome: option.outcome,
-          })),
+          optionDetails: presentedOptions,
         },
-        item.options.map((option) => option.label),
+        presentedOptions.map((option) => option.label),
         (idx) => {
           const option = item.options[idx];
           const outcomeResult = applyOptionOutcome(gs, option, {

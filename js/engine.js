@@ -31,6 +31,37 @@ const ROLE_JOURNEY_TYPES = {
   recce: ["recon", "field"],
   silviculture: ["silviculture", "field"],
 };
+const PENDING_PRESSURE_PRIORITY = ["relationships", "budget", "compliance", "forestHealth", "progress"];
+const PENDING_PRESSURE_EXPLANATIONS = {
+  relationships: "relationship damage made the trust-and-protocol branch the likeliest consequence.",
+  budget: "budget stress made the finance-and-audit branch the likeliest consequence.",
+  compliance: "compliance weakness made the scrutiny-heavy branch the likeliest consequence.",
+  forestHealth: "ecological stress made the habitat-and-remediation branch the likeliest consequence.",
+  progress: "schedule pressure made the rework-heavy branch the likeliest consequence.",
+};
+const ISSUE_PREVIEW_SEVERITY = {
+  "formal-investigation": "danger",
+  "environmental-audit-fallout": "warning",
+  "budget-freeze": "warning",
+  "fpbc-competence-audit": "warning",
+  "heritage-protocol-gap": "warning",
+  "archaeology-escalation-pause": "warning",
+  "road-use-permit-standoff": "warning",
+  "special-use-permit-stack": "warning",
+  "wildlife-collar-drop": "warning",
+  "riparian-reclassification-call": "warning",
+  "herbicide-drift-complaint": "warning",
+  "seedlot-vigour-drop": "warning",
+  "free-growing-catchup-plan": "warning",
+  "compliance-drone-sweep": "warning",
+  "ministry-data-audit": "warning",
+  "fom-consistency-gap": "warning",
+};
+const ISSUE_PREVIEW_SEVERITY_LABELS = {
+  danger: "serious",
+  warning: "manageable",
+  info: "minor",
+};
 const ECOLOGICAL_TEMPTATION_TAGS = new Set([
   "wildlife",
   "riparian",
@@ -558,23 +589,28 @@ export function applyOptionOutcome(state, option = {}, source) {
     if (result.flags) {
       applyOptionFlags(state, { setFlags: result.flags });
     }
-    applyScheduledIssues(state, option);
+    const scheduledIssueTeaser = combineScheduledIssueTeasers(
+      applyScheduledIssues(state, option),
+      applyRiskOutcomeSchedules(state, option, result),
+    );
     applyScheduledEvents(state, option);
     return {
       effects,
       outcome: result.outcome,
       riskResult: result,
+      scheduledIssueTeaser,
     };
   }
 
   const effects = applyEffects(state, option.effects || {}, source);
   applyOptionFlags(state, option);
-  applyScheduledIssues(state, option);
+  const scheduledIssueTeaser = applyScheduledIssues(state, option);
   applyScheduledEvents(state, option);
   return {
     effects,
     outcome: option.outcome ?? "",
     riskResult: null,
+    scheduledIssueTeaser,
   };
 }
 
@@ -829,16 +865,13 @@ export function drawIssue(state, rng = Math.random) {
       if (typeof pending.delay === "number" && pending.delay > 0) {
         continue;
       }
-      const candidate = ISSUE_LIBRARY.find((issue) => issue.id === pending.id)
-        || CHAINED_ISSUES.find((issue) => issue.id === pending.id);
-      if (candidate && issueMatchesContext(candidate, state, tags)) {
+      const candidate = resolvePendingIssue(state, pending, { tags, season }, rng);
+      if (candidate) {
         state.pendingIssues.splice(i, 1);
         return candidate;
       }
-      if (!candidate) {
-        state.pendingIssues.splice(i, 1);
-        i--;
-      }
+      state.pendingIssues.splice(i, 1);
+      i--;
     }
   }
 
@@ -1050,20 +1083,21 @@ function getTemptationProfile(stateOrRoleId) {
   return ROLE_TEMPTATION_PROFILES[roleId] || ROLE_TEMPTATION_PROFILES.planner;
 }
 
-function issueMatchesContext(issue, state, tags) {
+function issueMatchesContext(issue, state, tags, options = {}) {
   if (!issue || !state?.role) {
     return false;
   }
   if (!issue.roles?.includes(state.role.id)) {
     return false;
   }
-  if (Array.isArray(issue.requiresFlags)) {
+  const ignoreRequirements = Boolean(options.ignoreRequirements);
+  if (!ignoreRequirements && Array.isArray(issue.requiresFlags)) {
     const hasFlags = issue.requiresFlags.every((flag) => Boolean(state.flags?.[flag]));
     if (!hasFlags) {
       return false;
     }
   }
-  if (Array.isArray(issue.requiresAnyFlags) && issue.requiresAnyFlags.length) {
+  if (!ignoreRequirements && Array.isArray(issue.requiresAnyFlags) && issue.requiresAnyFlags.length) {
     const hasAny = issue.requiresAnyFlags.some((flag) => Boolean(state.flags?.[flag]));
     if (!hasAny) {
       return false;
@@ -1247,6 +1281,18 @@ function scoreIllegalActSelection(act, state) {
   return Math.max(0.25, weight);
 }
 
+function scorePendingIssueCandidateSelection(candidate, issue, state, context) {
+  let weight = scoreIssueSelection(issue, state, context) * Math.max(0.1, Number(candidate?.weight) || 1);
+
+  for (const [metric, bonus] of Object.entries(candidate?.metricBoosts || {})) {
+    if (Number(state.metrics?.[metric]) < 55) {
+      weight += Number(bonus) || 0;
+    }
+  }
+
+  return Math.max(0.1, weight);
+}
+
 function metricsTrendlines(state) {
   const timeline = Array.isArray(state.timeline) ? state.timeline : [];
   const first = timeline.find((entry) => entry?.metrics);
@@ -1390,6 +1436,98 @@ function pickWeightedItem(weightedPool, rng, valueKey) {
   }
 
   return weightedPool[weightedPool.length - 1]?.[valueKey] ?? null;
+}
+
+function findIssueById(issueId) {
+  return ISSUE_LIBRARY.find((issue) => issue.id === issueId)
+    || CHAINED_ISSUES.find((issue) => issue.id === issueId)
+    || null;
+}
+
+function resolvePendingIssue(state, pending, context, rng) {
+  const candidates = Array.isArray(pending?.candidates) ? pending.candidates : null;
+  if (!candidates?.length) {
+    const issue = findIssueById(pending?.id);
+    if (!issue) {
+      return null;
+    }
+    return issueMatchesContext(issue, state, context.tags, { ignoreRequirements: Boolean(pending?.force) }) ? issue : null;
+  }
+
+  const weightedPool = candidates
+    .map((candidate) => {
+      const issue = findIssueById(candidate?.id);
+      if (!issue) {
+        return null;
+      }
+      const ignoreRequirements = Boolean(pending?.force || candidate?.force);
+      if (!issueMatchesContext(issue, state, context.tags, { ignoreRequirements })) {
+        return null;
+      }
+      return {
+        issue,
+        candidate,
+        weight: scorePendingIssueCandidateSelection(candidate, issue, state, context),
+        resolvedIssue: annotatePendingIssue(issue, candidate, state),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.weight - a.weight || a.issue.id.localeCompare(b.issue.id));
+
+  return pickWeightedItem(weightedPool, rng, "resolvedIssue");
+}
+
+function annotatePendingIssue(issue, candidate, state) {
+  const surfaceReason = buildPendingIssueSurfaceReason(candidate, state);
+  const surfaceSeverity = issuePreviewSeverity(issue);
+  if (!surfaceReason) {
+    return surfaceSeverity === "info"
+      ? issue
+      : {
+          ...issue,
+          surfaceSeverity,
+        };
+  }
+  return {
+    ...issue,
+    surfaceReason,
+    surfaceSeverity,
+  };
+}
+
+function buildPendingIssueSurfaceReason(candidate, state) {
+  const boosts = Object.entries(candidate?.metricBoosts || {})
+    .map(([metric, bonus]) => ({ metric, bonus: Number(bonus) || 0 }))
+    .filter((entry) => entry.bonus > 0);
+
+  if (!boosts.length) {
+    return candidate?.force
+      ? "Why this surfaced: this was the strongest remaining follow-up path from the shortcut."
+      : undefined;
+  }
+
+  const activeBoosts = boosts.filter((entry) => Number(state.metrics?.[entry.metric]) < 55);
+  const pool = activeBoosts.length ? activeBoosts : boosts;
+  pool.sort((a, b) => {
+    if (b.bonus !== a.bonus) {
+      return b.bonus - a.bonus;
+    }
+    return pressurePriority(a.metric) - pressurePriority(b.metric);
+  });
+
+  const dominant = pool[0];
+  const explanation = PENDING_PRESSURE_EXPLANATIONS[dominant.metric];
+  if (!explanation) {
+    return candidate?.force
+      ? "Why this surfaced: this branch carried the strongest follow-up pressure from the shortcut."
+      : undefined;
+  }
+  return `Why this surfaced: ${explanation}`;
+}
+
+function pressurePriority(metric) {
+  const index = PENDING_PRESSURE_PRIORITY.indexOf(metric);
+  return index === -1 ? PENDING_PRESSURE_PRIORITY.length : index;
 }
 
 export function adaptOperationalEventEffects(effects = {}, option = {}) {
@@ -1551,6 +1689,7 @@ export function adaptIllegalActTemptation(act, state, rng = Math.random) {
           successOutcome: "The shortcut lands for now. The gains show up immediately, and the exposure stays buried this season.",
           failOutcome: "The shortcut unravels fast. Questions start landing before you can shape the story.",
           failFlags,
+          failScheduleIssues: buildIllegalActFailScheduleIssues(act, state),
         },
       },
       {
@@ -1645,19 +1784,115 @@ function applyIllegalActTagEffects(effects, act) {
 }
 
 function buildIllegalActFailFlags(act) {
-  const flags = { underInvestigation: true };
+  const flags = {};
+  const tags = Array.isArray(act?.tags) ? act.tags : [];
 
-  if (hasMatchingTag(act?.tags, ETHICS_TEMPTATION_TAGS)) {
-    flags.ethicsInquiry = true;
+  if (hasMatchingTag(tags, AUDIT_TEMPTATION_TAGS)) {
+    flags.auditTriggered = true;
   }
-  if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
+  if (hasMatchingTag(tags, ECOLOGICAL_TEMPTATION_TAGS)) {
     flags.environmentalAudit = true;
   }
-  if (hasMatchingTag(act?.tags, AUDIT_TEMPTATION_TAGS)) {
-    flags.auditTriggered = true;
+  if (tags.some((tag) => ["bribery", "collusion", "corruption", "laundering", "payroll", "double-dip"].includes(tag))) {
+    flags.ethicsInquiry = true;
+  }
+  if (tags.some((tag) => ["cultural"].includes(tag))) {
+    flags.culturalViolation = true;
+  }
+  if (tags.some((tag) => ["blatant", "sabotage", "espionage"].includes(tag))) {
+    flags.underInvestigation = true;
   }
 
   return flags;
+}
+
+function buildIllegalActFailScheduleIssues(act, state) {
+  const roleId = state?.role?.id;
+  const tags = new Set(Array.isArray(act?.tags) ? act.tags : []);
+  const candidates = new Map();
+  const addCandidate = (id, weight, metricBoosts = null) => {
+    if (!id) {
+      return;
+    }
+    const current = candidates.get(id) || { id, weight: 0, force: true, metricBoosts: {} };
+    current.weight += weight;
+    if (metricBoosts && typeof metricBoosts === "object") {
+      for (const [metric, bonus] of Object.entries(metricBoosts)) {
+        current.metricBoosts[metric] = (current.metricBoosts[metric] || 0) + (Number(bonus) || 0);
+      }
+    }
+    candidates.set(id, current);
+  };
+
+  if (roleId === "planner" || roleId === "permitter") {
+    if (hasAnyTag(tags, ["mapping", "data", "modeling", "reporting", "monitoring"])) {
+      addCandidate(roleId === "planner" ? "ministry-data-audit" : "fom-consistency-gap", 4, { progress: 1.5, compliance: 1 });
+      addCandidate("fpbc-competence-audit", 1.5, { compliance: 1.5 });
+    }
+    if (hasAnyTag(tags, ["procurement", "paperwork", "compliance", "forgery", "collusion", "bribery", "corruption", "grants"])) {
+      addCandidate("budget-freeze", 3.5, { budget: 2.5, compliance: 2, progress: 1 });
+      addCandidate("fpbc-competence-audit", 2, { compliance: 1.5 });
+    }
+    if (hasAnyTag(tags, ["cultural"])) {
+      addCandidate("heritage-protocol-gap", 3.5, { relationships: 3, compliance: 1 });
+      addCandidate("archaeology-escalation-pause", 2.5, { relationships: 2, progress: 1 });
+    }
+    if (hasAnyTag(tags, ["access", "riparian", "engineering"])) {
+      addCandidate("road-use-permit-standoff", 3, { progress: 2, compliance: 1.5 });
+    }
+    if (hasAnyTag(tags, ["remote-camps", "gas-interface"])) {
+      addCandidate("special-use-permit-stack", 2.5, { progress: 1.5, budget: 1 });
+    }
+  }
+
+  if (roleId === "recce" || roleId === "silviculture") {
+    if (hasAnyTag(tags, ["wildlife"])) {
+      addCandidate("wildlife-collar-drop", 4, { forestHealth: 2.5, relationships: 2 });
+    }
+    if (hasAnyTag(tags, ["riparian", "salvage", "fire", "erosion", "old-growth"])) {
+      addCandidate(
+        roleId === "silviculture" ? "environmental-audit-fallout" : "riparian-reclassification-call",
+        4,
+        { forestHealth: 3, compliance: 2 }
+      );
+    }
+    if (roleId === "silviculture" && hasAnyTag(tags, ["herbicide"])) {
+      addCandidate("herbicide-drift-complaint", 4, { forestHealth: 2.5, relationships: 1.5, compliance: 1.5 });
+      addCandidate("environmental-audit-fallout", 2, { forestHealth: 2, compliance: 1.5 });
+    }
+    if (roleId === "silviculture" && hasAnyTag(tags, ["nursery", "stocking", "automation", "seed"])) {
+      addCandidate("seedlot-vigour-drop", 3.5, { forestHealth: 2.5, progress: 1 });
+      addCandidate("free-growing-catchup-plan", 2.5, { forestHealth: 2, progress: 1, budget: 0.5 });
+    }
+    if (roleId === "recce" && hasAnyTag(tags, ["drones", "media", "access", "aviation"])) {
+      addCandidate("compliance-drone-sweep", 3.5, { compliance: 2.5, relationships: 1 });
+    }
+    if (hasAnyTag(tags, ["remote-camps", "gas-interface"])) {
+      addCandidate("special-use-permit-stack", 2.5, { progress: 1.5, budget: 1 });
+    }
+  }
+
+  if (hasAnyTag(tags, ["fraud", "fabrication", "deception", "records", "paperwork", "monitoring"])) {
+    addCandidate("fpbc-competence-audit", 2, { compliance: 2 });
+  }
+  if (hasAnyTag(tags, ["bribery", "collusion", "corruption", "laundering", "payroll", "double-dip", "blatant", "sabotage", "espionage"])) {
+    addCandidate("formal-investigation", 3, { compliance: 2, relationships: 1.5 });
+  }
+  if (roleId === "planner" && hasAnyTag(tags, ["old-growth", "riparian", "wildlife"])) {
+    addCandidate("environmental-audit-fallout", 2.5, { forestHealth: 2.5, compliance: 1.5 });
+  }
+
+  const weightedCandidates = Array.from(candidates.values())
+    .sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id));
+  if (!weightedCandidates.length) {
+    return [];
+  }
+
+  return [{
+    delay: 1,
+    force: true,
+    candidates: weightedCandidates,
+  }];
 }
 
 function getIllegalActBaseSuccess(act, state) {
@@ -1723,9 +1958,33 @@ function applyOptionFlags(state, option) {
   }
 }
 
+function applyRiskOutcomeSchedules(state, option, result) {
+  const risk = option?.risk;
+  if (!risk || !result) {
+    return null;
+  }
+
+  const scheduleSpec = result.success ? risk.successScheduleIssues : risk.failScheduleIssues;
+  if (scheduleSpec) {
+    scheduleIssueEntries(state, scheduleSpec);
+    return buildScheduledIssueTeaser(state, scheduleSpec);
+  }
+  return null;
+}
+
 function applyScheduledIssues(state, option) {
   const schedule = option.scheduleIssues;
-  if (!schedule || !schedule.id) {
+  if (!schedule) {
+    return null;
+  }
+
+  scheduleIssueEntries(state, schedule);
+  return buildScheduledIssueTeaser(state, schedule);
+}
+
+function scheduleIssueEntries(state, scheduleSpec) {
+  const schedules = normalizeScheduleEntries(scheduleSpec);
+  if (!schedules.length) {
     return;
   }
 
@@ -1733,13 +1992,20 @@ function applyScheduledIssues(state, option) {
     state.pendingIssues = [];
   }
 
-  const existing = state.pendingIssues.find((pending) => pending?.id === schedule.id);
-  const delay = Math.max(0, Number(schedule.delay || 0));
-  if (existing) {
-    existing.delay = Math.min(existing.delay ?? delay, delay);
-    return;
+  for (const schedule of schedules) {
+    const existing = state.pendingIssues.find((pending) => pendingIssueKey(pending) === pendingIssueKey(schedule));
+    const delay = Math.max(0, Number(schedule.delay || 0));
+    if (existing) {
+      existing.delay = Math.min(existing.delay ?? delay, delay);
+      continue;
+    }
+    state.pendingIssues.push({
+      ...(schedule.id ? { id: schedule.id } : {}),
+      ...(Array.isArray(schedule.candidates) ? { candidates: schedule.candidates.map((candidate) => ({ ...candidate })) } : {}),
+      ...(schedule.force ? { force: true } : {}),
+      delay,
+    });
   }
-  state.pendingIssues.push({ id: schedule.id, delay });
 }
 
 function applyScheduledEvents(state, option) {
@@ -1759,4 +2025,144 @@ function applyScheduledEvents(state, option) {
     return;
   }
   state.pendingEvents.push({ id: schedule.id, delay });
+}
+
+function normalizeScheduleEntries(scheduleSpec) {
+  if (Array.isArray(scheduleSpec)) {
+    return scheduleSpec
+      .filter((entry) => isValidScheduleEntry(entry))
+      .map((entry) => normalizeScheduleEntry(entry));
+  }
+  if (isValidScheduleEntry(scheduleSpec)) {
+    return [normalizeScheduleEntry(scheduleSpec)];
+  }
+  return [];
+}
+
+function hasAnyTag(tagSet, candidates) {
+  for (const candidate of candidates) {
+    if (tagSet.has(candidate)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isValidScheduleEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return false;
+  }
+  if (typeof entry.id === "string") {
+    return true;
+  }
+  return Array.isArray(entry.candidates) && entry.candidates.some((candidate) => typeof candidate?.id === "string");
+}
+
+function normalizeScheduleEntry(entry) {
+  return {
+    ...(typeof entry.id === "string" ? { id: entry.id } : {}),
+    ...(Array.isArray(entry.candidates)
+      ? {
+          candidates: entry.candidates
+            .filter((candidate) => typeof candidate?.id === "string")
+            .map((candidate) => ({
+              id: candidate.id,
+              weight: candidate.weight,
+              ...(candidate.metricBoosts && typeof candidate.metricBoosts === "object"
+                ? { metricBoosts: { ...candidate.metricBoosts } }
+                : {}),
+              ...(candidate.force ? { force: true } : {}),
+            })),
+        }
+      : {}),
+    ...(entry.force ? { force: true } : {}),
+    delay: entry.delay,
+  };
+}
+
+function pendingIssueKey(entry) {
+  if (typeof entry?.id === "string") {
+    return `id:${entry.id}`;
+  }
+  if (Array.isArray(entry?.candidates)) {
+    const ids = entry.candidates
+      .map((candidate) => candidate?.id)
+      .filter(Boolean)
+      .sort()
+      .join("|");
+    return `candidates:${ids}`;
+  }
+  return null;
+}
+
+function buildScheduledIssueTeaser(state, scheduleSpec) {
+  const schedules = normalizeScheduleEntries(scheduleSpec)
+    .slice()
+    .sort((a, b) => {
+      const delayA = Math.max(0, Number(a?.delay || 0));
+      const delayB = Math.max(0, Number(b?.delay || 0));
+      return delayA - delayB;
+    });
+
+  if (!schedules.length) {
+    return null;
+  }
+
+  const tags = state?.area?.tags || [];
+  const seasonIndex = Math.max(0, Math.min(SEASONS.length - 1, (state?.round || 1) - 1));
+  const season = SEASONS[seasonIndex];
+
+  for (const schedule of schedules) {
+    const preview = resolvePendingIssue(state, schedule, { tags, season }, () => 0);
+    if (preview) {
+      return formatScheduledIssueTeaser(preview);
+    }
+  }
+
+  return null;
+}
+
+function formatScheduledIssueTeaser(issue) {
+  if (!issue?.title) {
+    return null;
+  }
+
+  const severity = issuePreviewSeverity(issue);
+  const label = ISSUE_PREVIEW_SEVERITY_LABELS[severity] || "notable";
+  const reason = String(issue.surfaceReason || "").replace(/^Why this surfaced:\s*/i, "").trim();
+  const prefix = `Likely fallout (${label}): ${issue.title}.`;
+  if (reason) {
+    return { text: `${prefix} ${reason}`, severity, issueId: issue.id };
+  }
+  return { text: prefix, severity, issueId: issue.id };
+}
+
+function combineScheduledIssueTeasers(...teasers) {
+  const unique = [];
+  let severity = "info";
+  for (const teaser of teasers) {
+    if (!teaser || typeof teaser.text !== "string" || !teaser.text.trim() || unique.includes(teaser.text)) {
+      continue;
+    }
+    unique.push(teaser.text);
+    if (previewSeverityRank(teaser.severity) > previewSeverityRank(severity)) {
+      severity = teaser.severity;
+    }
+  }
+  return unique.length ? { text: unique.join("\n\n"), severity } : null;
+}
+
+function issuePreviewSeverity(issue) {
+  return ISSUE_PREVIEW_SEVERITY[issue?.id] || "info";
+}
+
+function previewSeverityRank(severity) {
+  switch (severity) {
+    case "danger":
+      return 2;
+    case "warning":
+      return 1;
+    default:
+      return 0;
+  }
 }

@@ -7,6 +7,7 @@ import {
   adaptOperationalEventEffects,
   applyOptionOutcome,
   createInitialState,
+  drawIssue,
   drawSeasonalEvent,
   drawSeasonalTemptation,
 } from '../js/engine.js';
@@ -189,7 +190,7 @@ test('temptation profiles differ between desk and field roles', () => {
   assert.ok((plannerRisk.successEffects.progress || 0) >= (silvRisk.successEffects.progress || 0));
 });
 
-test('failed temptation shortcuts raise existing investigation flags', () => {
+test('failed temptation shortcuts raise targeted scrutiny flags', () => {
   const state = createInitialState({
     companyName: 'Temptation Failure Test',
     roleId: 'planner',
@@ -217,12 +218,193 @@ test('failed temptation shortcuts raise existing investigation flags', () => {
     });
 
     assert.equal(resolution.riskResult.success, false);
-    assert.equal(state.flags.underInvestigation, true);
-    assert.equal(state.flags.ethicsInquiry, true);
     assert.equal(state.flags.auditTriggered, true);
+    assert.equal(state.flags.underInvestigation, undefined);
+    assert.equal(state.flags.ethicsInquiry, undefined);
   } finally {
     Math.random = originalRandom;
   }
+});
+
+test('bureaucratic shortcut failures queue specific bureaucratic fallout issues', () => {
+  const state = createInitialState({
+    companyName: 'Bureaucratic Fallout Test',
+    roleId: 'planner',
+    areaId: 'bulkley-valley',
+  });
+  state.round = 3;
+
+  const act = ILLEGAL_ACTS.find((entry) => entry.id === 'black-market-timber-maps');
+  const temptation = adaptIllegalActTemptation(act, state, () => 0.5);
+  const riskyOption = temptation.options.find((option) => option.risk);
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+
+  let resolution;
+  try {
+    resolution = applyOptionOutcome(state, riskyOption, {
+      type: 'temptation',
+      id: temptation.id,
+      title: temptation.title,
+      option: riskyOption.label,
+      round: state.round,
+    });
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  assert.equal(state.pendingIssues.length, 1);
+  assert.equal(state.pendingIssues[0].force, true);
+  assert.deepEqual(
+    state.pendingIssues[0].candidates.map((candidate) => candidate.id),
+    ['ministry-data-audit', 'fpbc-competence-audit']
+  );
+  assert.equal(state.flags.auditTriggered, true);
+  assert.equal(state.flags.ethicsInquiry, undefined);
+  assert.equal(resolution?.scheduledIssueTeaser?.severity, 'warning');
+  assert.match(resolution?.scheduledIssueTeaser?.text || '', /Likely fallout \(manageable\): Ministry Data Audit/i);
+  assert.match(resolution?.scheduledIssueTeaser?.text || '', /schedule pressure/i);
+
+  const issue = drawIssue(state, () => 0);
+  assert.equal(issue?.id, 'ministry-data-audit');
+  assert.match(issue?.surfaceReason || '', /schedule pressure/i);
+  assert.deepEqual(state.pendingIssues, []);
+});
+
+test('ecological shortcut failures queue specific ecological fallout issues', () => {
+  const state = createInitialState({
+    companyName: 'Ecological Fallout Test',
+    roleId: 'silviculture',
+    areaId: 'muskwa-foothills',
+  });
+  state.round = 3;
+
+  const act = ILLEGAL_ACTS.find((entry) => entry.id === 'slash-burn-party');
+  const temptation = adaptIllegalActTemptation(act, state, () => 0.5);
+  const riskyOption = temptation.options.find((option) => option.risk);
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+
+  let resolution;
+  try {
+    resolution = applyOptionOutcome(state, riskyOption, {
+      type: 'temptation',
+      id: temptation.id,
+      title: temptation.title,
+      option: riskyOption.label,
+      round: state.round,
+    });
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  assert.deepEqual(state.pendingIssues, [{
+    delay: 1,
+    force: true,
+    candidates: [{ id: 'environmental-audit-fallout', weight: 4, force: true, metricBoosts: { forestHealth: 3, compliance: 2 } }],
+  }]);
+  assert.equal(state.flags.environmentalAudit, true);
+  assert.equal(state.flags.underInvestigation, undefined);
+  assert.equal(resolution?.scheduledIssueTeaser?.severity, 'warning');
+  assert.match(resolution?.scheduledIssueTeaser?.text || '', /Likely fallout \(manageable\): Environmental Audit Fallout/i);
+  assert.match(resolution?.scheduledIssueTeaser?.text || '', /ecological stress/i);
+
+  const issue = drawIssue(state, () => 0);
+  assert.equal(issue?.id, 'environmental-audit-fallout');
+  assert.match(issue?.surfaceReason || '', /ecological stress/i);
+  assert.deepEqual(state.pendingIssues, []);
+});
+
+test('mixed fallout bundles shift toward the dominant pressure at draw time', () => {
+  const pressureLowTrust = createInitialState({
+    companyName: 'Low Trust Fallout Test',
+    roleId: 'permitter',
+    areaId: 'bulkley-valley',
+  });
+  pressureLowTrust.round = 1;
+  pressureLowTrust.metrics.relationships = 20;
+
+  const pressureLowBudget = createInitialState({
+    companyName: 'Low Budget Fallout Test',
+    roleId: 'permitter',
+    areaId: 'bulkley-valley',
+  });
+  pressureLowBudget.round = 1;
+  pressureLowBudget.metrics.budget = 20;
+  pressureLowBudget.metrics.compliance = 20;
+  pressureLowBudget.metrics.relationships = 80;
+
+  const trustAct = ILLEGAL_ACTS.find((entry) => entry.id === 'courtesy-flag-bribes');
+  const budgetAct = ILLEGAL_ACTS.find((entry) => entry.id === 'hushmail-bid-rigging');
+  const trustTemptation = adaptIllegalActTemptation(trustAct, pressureLowTrust, () => 0.5);
+  const budgetTemptation = adaptIllegalActTemptation(budgetAct, pressureLowBudget, () => 0.5);
+  const trustRisk = trustTemptation.options.find((option) => option.risk);
+  const budgetRisk = budgetTemptation.options.find((option) => option.risk);
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+
+  try {
+    applyOptionOutcome(pressureLowTrust, trustRisk, {
+      type: 'temptation',
+      id: trustTemptation.id,
+      title: trustTemptation.title,
+      option: trustRisk.label,
+      round: pressureLowTrust.round,
+    });
+    applyOptionOutcome(pressureLowBudget, budgetRisk, {
+      type: 'temptation',
+      id: budgetTemptation.id,
+      title: budgetTemptation.title,
+      option: budgetRisk.label,
+      round: pressureLowBudget.round,
+    });
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  const trustIssue = drawIssue(pressureLowTrust, () => 0);
+  const budgetIssue = drawIssue(pressureLowBudget, () => 0);
+
+  assert.equal(trustIssue?.id, 'heritage-protocol-gap');
+  assert.match(trustIssue?.surfaceReason || '', /relationship damage/i);
+  assert.equal(budgetIssue?.id, 'budget-freeze');
+  assert.match(budgetIssue?.surfaceReason || '', /budget stress/i);
+});
+
+test('serious fallout previews stay marked as danger when formal investigation is likely', () => {
+  const state = createInitialState({
+    companyName: 'Serious Fallout Test',
+    roleId: 'planner',
+    areaId: 'bulkley-valley',
+  });
+  state.round = 1;
+  state.metrics.compliance = 20;
+
+  const act = ILLEGAL_ACTS.find((entry) => entry.id === 'trespass-lidar-raid');
+  const temptation = adaptIllegalActTemptation(act, state, () => 0.5);
+  const riskyOption = temptation.options.find((option) => option.risk);
+
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+
+  let resolution;
+  try {
+    resolution = applyOptionOutcome(state, riskyOption, {
+      type: 'temptation',
+      id: temptation.id,
+      title: temptation.title,
+      option: riskyOption.label,
+      round: state.round,
+    });
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  assert.equal(resolution?.scheduledIssueTeaser?.severity, 'danger');
+  assert.match(resolution?.scheduledIssueTeaser?.text || '', /Likely fallout \(serious\): Formal Investigation/i);
 });
 
 test('temptations respect seasonal cooldowns to avoid back-to-back shortcut cards', () => {
