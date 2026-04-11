@@ -152,10 +152,17 @@ function ContentView({ data }) {
     );
   }
 
-  if (data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation") {
+  if (
+    data.type === "assignment"
+    || data.type === "task"
+    || data.type === "issue"
+    || data.type === "event"
+    || data.type === "temptation"
+  ) {
     return (
       <div className="tui-content-stack">
         <NoticeBlock notice={data.notice} />
+        {data.sourceLabel ? <div className="tui-source-label">{data.sourceLabel}</div> : null}
         {data.surfaceSeverity ? (
           <div className={`tui-severity-badge tone-${severityToneClass}`}>{severityLabel}</div>
         ) : null}
@@ -165,6 +172,12 @@ function ContentView({ data }) {
         <div className={`tui-heading ${data.surfaceSeverity ? `tone-${severityToneClass}` : ""}`}>{data.title}</div>
         <p className="tui-copy preserve">{data.description}</p>
         {data.flavor ? <p className="tui-copy dim preserve">{data.flavor}</p> : null}
+        {data.whyNow ? (
+          <>
+            <div className="tui-subheading">Why Now</div>
+            <p className="tui-copy dim preserve">{data.whyNow}</p>
+          </>
+        ) : null}
         {data.surfaceReason ? (
           <>
             <div className="tui-subheading">Why This Surfaced</div>

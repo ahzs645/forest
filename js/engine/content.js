@@ -221,6 +221,7 @@ export function scoreIssueSelection(issue, state, context) {
   } else {
     weight *= 0.75;
   }
+  weight = applyIssueContextWeight(issue, state, weight);
   return Math.max(0.1, weight);
 }
 
@@ -573,6 +574,144 @@ function calculateTemptationChance(state) {
   return clamp(chance, 0, profile.chance.cap);
 }
 
+const ASSIGNMENT_EVENT_TYPE_BIAS = {
+  process: {
+    compliance: 1.18,
+    political: 1.12,
+    stakeholder: 1.15,
+    stakeholders: 1.15,
+    technical: 1.05,
+  },
+  professional: {
+    compliance: 1.18,
+    political: 1.1,
+    stakeholder: 1.12,
+    stakeholders: 1.12,
+    technical: 1.04,
+  },
+  planning: {
+    technical: 1.2,
+    compliance: 1.08,
+  },
+  road: {
+    terrain: 1.2,
+    technical: 1.16,
+    weather: 1.05,
+  },
+  discovery: {
+    terrain: 1.12,
+    technical: 1.1,
+    social: 1.1,
+    wildlife: 1.15,
+    forest_health: 1.12,
+  },
+};
+
+const ASSIGNMENT_ISSUE_KEYWORDS = {
+  process: ["audit", "permit", "file", "review", "heritage", "archaeology", "package", "consistency", "data"],
+  professional: ["audit", "competence", "budget", "permit", "review", "file"],
+  planning: ["water", "watershed", "mapping", "hydrolog", "caribou", "block", "salmon"],
+  road: ["road", "crossing", "access", "riparian", "maintenance", "engineering", "permit"],
+  discovery: ["wildlife", "heritage", "archaeology", "cultural", "riparian", "seedlot", "herbicide", "drone"],
+};
+
+function getSeasonContext(state) {
+  return state?.currentSeasonContext || null;
+}
+
+function getSelectionScope(state) {
+  return ROLE_EVENT_DOMAINS[state?.role?.id] === "field" ? "field" : "desk";
+}
+
+function getSelectedAssignmentFamily(state) {
+  return getSeasonContext(state)?.selectedAssignment?.sourceFamily || null;
+}
+
+function eventTextMatchesKeywords(event, keywords) {
+  if (!keywords?.length) {
+    return false;
+  }
+  const haystack = `${event?.id || ""} ${event?.title || ""} ${event?.description || ""}`.toLowerCase();
+  return keywords.some((keyword) => haystack.includes(keyword));
+}
+
+function issueTextMatchesKeywords(issue, keywords) {
+  if (!keywords?.length) {
+    return false;
+  }
+  const haystack = `${issue?.id || ""} ${issue?.title || ""} ${issue?.description || ""}`.toLowerCase();
+  return keywords.some((keyword) => haystack.includes(keyword));
+}
+
+function applyEventContextWeight(event, state, weight) {
+  const seasonContext = getSeasonContext(state);
+  if (!seasonContext) {
+    return weight;
+  }
+
+  const scope = getSelectionScope(state);
+  const situationMultipliers = seasonContext.areaSituationMultipliers?.[scope];
+  const discoveryMultipliers = seasonContext.discoveryMultipliers?.[scope] || {};
+  const selectedFamily = getSelectedAssignmentFamily(state);
+  const eventType = event?.type;
+
+  if (situationMultipliers?.eventMultiplier) {
+    weight *= situationMultipliers.eventMultiplier;
+  }
+  if (eventType && situationMultipliers?.typeMultipliers?.[eventType]) {
+    weight *= Number(situationMultipliers.typeMultipliers[eventType]) || 1;
+  }
+  if (eventType && discoveryMultipliers?.[eventType]) {
+    weight *= Number(discoveryMultipliers[eventType]) || 1;
+  }
+
+  if (selectedFamily === "situation" && eventType && situationMultipliers?.typeMultipliers?.[eventType]) {
+    weight *= 1.08;
+  }
+
+  const typeBias = ASSIGNMENT_EVENT_TYPE_BIAS[selectedFamily]?.[eventType];
+  if (typeBias) {
+    weight *= typeBias;
+  }
+
+  if (selectedFamily === "planning" && eventTextMatchesKeywords(event, ASSIGNMENT_ISSUE_KEYWORDS.planning)) {
+    weight *= 1.12;
+  }
+  if ((selectedFamily === "road" || selectedFamily === "discovery") && eventTextMatchesKeywords(event, ASSIGNMENT_ISSUE_KEYWORDS[selectedFamily])) {
+    weight *= 1.12;
+  }
+  if ((selectedFamily === "process" || selectedFamily === "professional") && eventTextMatchesKeywords(event, ASSIGNMENT_ISSUE_KEYWORDS[selectedFamily])) {
+    weight *= 1.1;
+  }
+
+  return weight;
+}
+
+function applyIssueContextWeight(issue, state, weight) {
+  const seasonContext = getSeasonContext(state);
+  if (!seasonContext) {
+    return weight;
+  }
+
+  const selectedFamily = getSelectedAssignmentFamily(state);
+  if (!selectedFamily) {
+    return weight;
+  }
+
+  if (issueTextMatchesKeywords(issue, ASSIGNMENT_ISSUE_KEYWORDS[selectedFamily])) {
+    weight *= 1.16;
+  }
+
+  if (selectedFamily === "situation" && Array.isArray(issue?.areaTags) && Array.isArray(seasonContext.areaSituation?.areaTags)) {
+    const matches = issue.areaTags.filter((tag) => seasonContext.areaSituation.areaTags.includes(tag)).length;
+    if (matches > 0) {
+      weight *= 1 + Math.min(0.2, matches * 0.06);
+    }
+  }
+
+  return weight;
+}
+
 function scoreOperationalEventSelection(event, state) {
   let weight = Math.max(1, Number(event.baseWeight) || 1);
   const roleId = state.role.id;
@@ -612,6 +751,7 @@ function scoreOperationalEventSelection(event, state) {
     weight += 1;
   }
 
+  weight = applyEventContextWeight(event, state, weight);
   return Math.max(0.25, weight);
 }
 

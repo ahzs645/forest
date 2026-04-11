@@ -284,21 +284,21 @@ function SummarySection({
 
 // ── Content View (structured rendering) ──────────────
 export function ContentView({ data }: { data: ContentData }) {
-  const severityColor = data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
+  const severityColor = data.type === "assignment" || data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
     ? data.surfaceSeverity === "danger"
       ? C.red
       : data.surfaceSeverity === "warning"
         ? C.yellow
         : C.blue
     : C.white;
-  const severityLabel = data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
+  const severityLabel = data.type === "assignment" || data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
     ? data.surfaceSeverity === "danger"
       ? "Serious Fallout"
       : data.surfaceSeverity === "warning"
         ? "Manageable Fallout"
         : "Minor Fallout"
     : "";
-  const optionColor = data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
+  const optionColor = data.type === "assignment" || data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
     ? data.optionTone === "danger"
       ? C.red
       : data.optionTone === "warning"
@@ -339,6 +339,7 @@ export function ContentView({ data }: { data: ContentData }) {
         </>
       );
 
+    case "assignment":
     case "task":
     case "issue":
     case "event":
@@ -347,6 +348,9 @@ export function ContentView({ data }: { data: ContentData }) {
         <>
           <NoticeView notice={data.notice} />
           {data.notice ? <text content="" /> : null}
+          {data.sourceLabel ? (
+            <text content={data.sourceLabel} style={{ fg: C.cyan, bold: true }} />
+          ) : null}
           {data.surfaceSeverity ? (
             <text content={severityLabel} style={{ fg: severityColor, bold: true }} />
           ) : null}
@@ -360,6 +364,13 @@ export function ContentView({ data }: { data: ContentData }) {
             <>
               <text content="" />
               <text content={data.flavor} style={{ fg: C.dim, italic: true }} />
+            </>
+          )}
+          {data.whyNow && (
+            <>
+              <text content="" />
+              <text content="Why Now:" style={{ fg: C.white, bold: true }} />
+              <text content={data.whyNow} style={{ fg: C.dim }} />
             </>
           )}
           {data.surfaceReason && (

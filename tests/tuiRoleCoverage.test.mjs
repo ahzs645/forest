@@ -4,9 +4,12 @@ import assert from 'node:assert/strict';
 import {
   adaptIllegalActTemptation,
   applyOptionOutcome,
+  buildSeasonContext,
   createInitialState,
+  drawSeasonalAssignment,
   drawIssue,
   drawSeasonalEvent,
+  recordAssignmentSelection,
 } from '../js/engine.js';
 import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
 
@@ -106,5 +109,42 @@ test('all TUI roles surface role-specific fallout after failed shortcuts', () =>
     }
   } finally {
     Math.random = originalRandom;
+  }
+});
+
+test('all TUI roles now source normal-season assignments from the seasonal data families', () => {
+  const allowedFamiliesByRole = {
+    planner: ['briefing', 'planning', 'process', 'situation', 'professional', 'road'],
+    permitter: ['briefing', 'process', 'road', 'situation', 'professional'],
+    recce: ['briefing', 'road', 'situation', 'discovery', 'professional'],
+    silviculture: ['briefing', 'situation', 'discovery', 'professional', 'road'],
+  };
+
+  for (const fixture of ROLE_FIXTURES) {
+    const state = createInitialState({
+      companyName: `${fixture.roleId} assignment coverage`,
+      roleId: fixture.roleId,
+      areaId: fixture.areaId,
+    });
+
+    const families = [];
+    for (let round = 1; round <= 4; round++) {
+      state.round = round;
+      const context = buildSeasonContext(state);
+      state.currentSeasonContext = context;
+      const assignment = drawSeasonalAssignment(state, context);
+
+      assert.ok(assignment, `expected seasonal assignment for ${fixture.roleId} in round ${round}`);
+      assert.notEqual(assignment.sourceFamily, 'legacy-task', `unexpected legacy fallback for ${fixture.roleId}`);
+      assert.ok(
+        allowedFamiliesByRole[fixture.roleId].includes(assignment.sourceFamily),
+        `unexpected assignment family for ${fixture.roleId}: ${assignment.sourceFamily}`,
+      );
+
+      recordAssignmentSelection(state, assignment);
+      families.push(assignment.sourceFamily);
+    }
+
+    assert.ok(new Set(families).size >= 2, `expected assignment variety for ${fixture.roleId}`);
   }
 });

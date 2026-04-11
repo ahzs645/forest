@@ -36,6 +36,11 @@ export function createInitialState({ companyName, roleId, areaId }) {
     pendingIssues: [],
     pendingEvents: [],
     issueHistory: [],
+    assignmentHistory: [],
+    assignmentSourceUsage: {},
+    currentSeasonContext: null,
+    seasonContexts: [],
+    discoveryTags: [],
     timeline: [
       {
         round: 0,

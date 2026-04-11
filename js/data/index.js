@@ -59,6 +59,11 @@ export {
   getRoadAssetObservations
 } from "./roadAssetIntel.js";
 
+export {
+  getPlanningAreaSnapshot,
+  getPlanningAreaSnapshot as getPlanningSnapshotForArea,
+} from "./planningBlocks.js";
+
 // Oregon Trail additions - Crew data
 export {
   FIRST_NAMES,

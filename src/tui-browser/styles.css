@@ -170,6 +170,14 @@ body {
   letter-spacing: 0.04em;
 }
 
+.tui-source-label {
+  color: #56d4dd;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+}
+
 .tui-subheading {
   color: #56d4dd;
   font-weight: 700;

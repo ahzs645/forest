@@ -1,5 +1,9 @@
 import { resolveRisk } from "../risk.js";
 import {
+  advancePaperworkChain,
+  ensureProfessionalState,
+} from "../data/professionalPractice.js";
+import {
   BUDGET_ATTRITION_THRESHOLD,
   COMPLIANCE_AUDIT_THRESHOLD,
   DEFAULT_CPD_TARGET,
@@ -51,6 +55,7 @@ export function applyOptionOutcome(state, option = {}, source) {
     if (result.flags) {
       applyOptionFlags(state, { setFlags: result.flags });
     }
+    applyAssignmentSideEffects(state, option);
     const scheduledIssueTeaser = combineScheduledIssueTeasers(
       applyScheduledIssues(state, option),
       applyRiskOutcomeSchedules(state, option, result),
@@ -66,6 +71,7 @@ export function applyOptionOutcome(state, option = {}, source) {
 
   const effects = applyEffects(state, option.effects || {}, source);
   applyOptionFlags(state, option);
+  applyAssignmentSideEffects(state, option);
   const scheduledIssueTeaser = applyScheduledIssues(state, option);
   applyScheduledEvents(state, option);
   return {
@@ -233,6 +239,38 @@ function applyOptionFlags(state, option) {
     for (const flag of option.clearFlags) {
       delete state.flags[flag];
     }
+  }
+}
+
+function applyAssignmentSideEffects(state, option) {
+  const sideEffects = option?.assignmentSideEffects;
+  if (!sideEffects || !state) {
+    return;
+  }
+
+  if (sideEffects.advancePaperworkChainId) {
+    advancePaperworkChain(state, sideEffects.advancePaperworkChainId, {
+      day: state.round || 0,
+      roleId: state.role?.id,
+      area: state.area,
+    });
+  }
+
+  if (sideEffects.professionalShift && typeof sideEffects.professionalShift === "object") {
+    const professional = ensureProfessionalState(state, {
+      roleId: state.role?.id,
+      area: state.area,
+    });
+    professional.paperworkLoad = clamp(
+      Number(professional.paperworkLoad || 0) + Number(sideEffects.professionalShift.paperworkLoad || 0),
+      0,
+      100,
+    );
+    professional.auditExposure = clamp(
+      Number(professional.auditExposure || 0) + Number(sideEffects.professionalShift.auditExposure || 0),
+      0,
+      100,
+    );
   }
 }
 

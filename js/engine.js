@@ -7,6 +7,7 @@ export {
   getProfessionalComplianceSnapshot,
 } from "./engine/professional.js";
 export { createInitialState, findArea, findRole } from "./engine/state.js";
+export { buildSeasonContext } from "./engine/context.js";
 export {
   adaptIllegalActTemptation,
   adaptOperationalEvent,
@@ -19,6 +20,12 @@ export {
   getRoleTasks,
   scoreIssueSelection,
 } from "./engine/content.js";
+export {
+  buildAssignmentCandidates,
+  buildLegacyTaskFallback,
+  drawSeasonalAssignment,
+  recordAssignmentSelection,
+} from "./engine/assignments.js";
 export {
   applyEffects,
   applyOptionOutcome,

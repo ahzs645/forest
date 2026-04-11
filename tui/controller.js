@@ -1,14 +1,16 @@
 import { FORESTER_ROLES, OPERATING_AREAS } from "../js/data/index.js";
 import {
+  buildSeasonContext,
   createInitialState,
-  getRoleTasks,
   applyOptionOutcome,
   applyRoundConsequences,
+  drawSeasonalAssignment,
   drawSeasonalEvent,
   drawSeasonalTemptation,
   drawIssue,
   buildSummary,
   formatMetricDelta,
+  recordAssignmentSelection,
   SEASONS,
 } from "../js/engine.js";
 import { detectArt } from "./art.js";
@@ -109,8 +111,20 @@ function snapshotGameState(gs) {
     pendingIssues: Array.isArray(gs.pendingIssues) ? [...gs.pendingIssues] : gs.pendingIssues,
     pendingEvents: Array.isArray(gs.pendingEvents) ? [...gs.pendingEvents] : gs.pendingEvents,
     issueHistory: Array.isArray(gs.issueHistory) ? [...gs.issueHistory] : gs.issueHistory,
+    assignmentHistory: Array.isArray(gs.assignmentHistory) ? [...gs.assignmentHistory] : gs.assignmentHistory,
+    assignmentSourceUsage: gs.assignmentSourceUsage ? { ...gs.assignmentSourceUsage } : gs.assignmentSourceUsage,
+    currentSeasonContext: gs.currentSeasonContext ? { ...gs.currentSeasonContext } : gs.currentSeasonContext,
+    seasonContexts: Array.isArray(gs.seasonContexts) ? [...gs.seasonContexts] : gs.seasonContexts,
+    discoveryTags: Array.isArray(gs.discoveryTags) ? [...gs.discoveryTags] : gs.discoveryTags,
     timeline: Array.isArray(gs.timeline) ? [...gs.timeline] : gs.timeline,
   };
+}
+
+function cloneStateForPreview(gs) {
+  if (typeof globalThis.structuredClone === "function") {
+    return globalThis.structuredClone(gs);
+  }
+  return JSON.parse(JSON.stringify(gs));
 }
 
 export class TuiGameController {
@@ -203,8 +217,15 @@ export class TuiGameController {
     const gs = this.gs;
     gs.round += 1;
     const season = SEASONS[gs.round - 1];
-    const issue = drawIssue(gs);
-    const isCrisisRound = issue?.surfaceSeverity === "danger";
+    const context = buildSeasonContext(gs);
+    gs.currentSeasonContext = context;
+    if (!Array.isArray(gs.seasonContexts)) {
+      gs.seasonContexts = [];
+    }
+    gs.seasonContexts.push(context);
+
+    const issuePreview = drawIssue(cloneStateForPreview(gs));
+    const isCrisisRound = issuePreview?.surfaceSeverity === "danger";
 
     this.queue.push({
       type: "message",
@@ -215,10 +236,15 @@ export class TuiGameController {
     });
 
     if (isCrisisRound) {
-      this.queue.push({ type: "issue", data: issue });
+      const issue = drawIssue(gs);
+      if (issue) {
+        this.queue.push({ type: "issue", data: issue });
+      }
     } else {
-      for (const task of getRoleTasks(gs)) {
-        this.queue.push({ type: "task", data: task });
+      const assignment = drawSeasonalAssignment(gs, context);
+      if (assignment) {
+        recordAssignmentSelection(gs, assignment);
+        this.queue.push({ type: "assignment", data: assignment });
       }
 
       const event = drawSeasonalEvent(gs);
@@ -231,6 +257,7 @@ export class TuiGameController {
         this.queue.push({ type: "temptation", data: temptation });
       }
 
+      const issue = drawIssue(gs);
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
       }
@@ -311,7 +338,13 @@ export class TuiGameController {
       return;
     }
 
-    if (phase.type === "task" || phase.type === "issue" || phase.type === "event" || phase.type === "temptation") {
+    if (
+      phase.type === "assignment"
+      || phase.type === "task"
+      || phase.type === "issue"
+      || phase.type === "event"
+      || phase.type === "temptation"
+    ) {
       const item = phase.data;
       const isCrisisIssue = phase.type === "issue" && item.surfaceSeverity === "danger";
       const presentedOptions = buildPresentedOptions(item, phase.type);
@@ -321,6 +354,8 @@ export class TuiGameController {
           title: item.title,
           description: item.description ?? item.prompt ?? "",
           flavor: item.flavor,
+          sourceLabel: item.sourceLabel,
+          whyNow: item.whyNow,
           surfaceReason: item.surfaceReason,
           surfaceSeverity: item.surfaceSeverity,
           phaseLabel: isCrisisIssue ? "Crisis Phase" : undefined,

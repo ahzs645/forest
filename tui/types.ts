@@ -12,10 +12,12 @@ type BaseContent = {
 export type ContentData =
   | (BaseContent & { type: "message"; heading?: string; body: string })
   | {
-      type: "task" | "issue" | "event" | "temptation";
+      type: "assignment" | "task" | "issue" | "event" | "temptation";
       title: string;
       description: string;
       flavor?: string;
+      sourceLabel?: string;
+      whyNow?: string;
       surfaceReason?: string;
       surfaceSeverity?: "info" | "warning" | "danger";
       phaseLabel?: string;

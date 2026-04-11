@@ -36,30 +36,43 @@ test('planner flow snapshots the selected role and area into the dashboard state
   assert.equal(state.gameState.round, 1);
 });
 
-test('planner tasks use prompt text when description is absent', () => {
+test('planner start-of-season flow now surfaces a source-backed assignment card', () => {
   const controller = new TuiGameController();
 
   advanceFromSetupToFirstPlannerTask(controller);
 
   const state = controller.getState();
-  assert.equal(state.contentData.type, 'task');
-  assert.equal(state.contentData.title, 'Landscape Assessment');
-  assert.match(state.contentData.description, /five-year plan is due/i);
+  assert.equal(state.contentData.type, 'assignment');
+  assert.equal(state.contentData.sourceLabel, 'Role-Area Briefing');
+  assert.ok(state.contentData.whyNow);
+  assert.ok(state.contentData.description.length > 20);
 });
 
-test('planner option selection updates the dashboard metrics in the controller snapshot', () => {
+test('planner assignment cards expose source metadata in the controller snapshot', () => {
+  const controller = new TuiGameController();
+
+  advanceFromSetupToFirstPlannerTask(controller);
+
+  const state = controller.getState();
+  assert.equal(state.gameState.assignmentHistory.length, 1);
+  assert.equal(state.gameState.currentSeasonContext.selectedAssignment.sourceFamily, 'briefing');
+  assert.equal(state.gameState.currentSeasonContext.selectedAssignment.sourceLabel, 'Role-Area Briefing');
+});
+
+test('planner assignment selection updates the dashboard metrics in the controller snapshot', () => {
   const controller = new TuiGameController();
 
   advanceFromSetupToFirstPlannerTask(controller);
   controller.selectOption(0);
 
   const state = controller.getState();
-  assert.equal(state.contentData.type, 'task');
-  assert.equal(state.gameState.metrics.progress, 59);
-  assert.equal(state.gameState.metrics.forestHealth, 48);
-  assert.equal(state.gameState.metrics.compliance, 48);
+  assert.equal(state.gameState.metrics.progress, 49);
+  assert.equal(state.gameState.metrics.relationships, 52);
+  assert.equal(state.gameState.metrics.compliance, 53);
   assert.match(state.contentData.notice.heading, /^Decision Logged:/);
-  assert.match(state.contentData.notice.body, /Effects:/);
+  assert.match(state.contentData.notice.body, /Progress -1/);
+  assert.match(state.contentData.notice.body, /Compliance \+3/);
+  assert.match(state.contentData.notice.body, /Relationships \+2/);
 });
 
 test('scheduled fallout issues expose why they surfaced in the issue card', () => {
