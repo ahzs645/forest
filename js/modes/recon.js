@@ -128,11 +128,60 @@ function getReconBlockIntel(journey, block) {
     state.byBlock[key] = {
       accessGroundTruthed: false,
       valuesSwept: false,
+      assessmentComplete: false,
       lastAccessDay: 0,
       lastValuesDay: 0
     };
   }
   return state.byBlock[key];
+}
+
+function getReconOpenPackages(journey) {
+  const blocks = Array.isArray(journey?.blocks) ? journey.blocks : [];
+  return blocks
+    .map((block) => {
+      const intel = getReconBlockIntel(journey, block);
+      const sweep = getReconValueSweepProfile(block, journey);
+      if (intel.assessmentComplete) {
+        return null;
+      }
+
+      const missing = [];
+      if (!intel.accessGroundTruthed) {
+        missing.push('access check');
+      }
+      if (sweep.needed && !intel.valuesSwept) {
+        missing.push('values sweep');
+      }
+
+      return missing.length > 0
+        ? { block, intel, sweep, missing }
+        : null;
+    })
+    .filter(Boolean);
+}
+
+function maybeFinalizeReconAssessment(ui, journey, block) {
+  if (!block) {
+    return false;
+  }
+
+  const intel = getReconBlockIntel(journey, block);
+  if (intel.assessmentComplete) {
+    return false;
+  }
+
+  const sweep = getReconValueSweepProfile(block, journey);
+  const assessmentReady = intel.accessGroundTruthed && (!sweep.needed || intel.valuesSwept);
+  if (!assessmentReady) {
+    return false;
+  }
+
+  intel.assessmentComplete = true;
+  journey.blocksAssessed = Math.min((journey.blocks?.length || 0), (journey.blocksAssessed || 0) + 1);
+  journey.verifiedBlocks = Math.min((journey.blocks?.length || 0), (journey.verifiedBlocks || 0) + 1);
+  ui.writePositive(`Assessment package complete for ${block.name}. Blocks assessed: ${journey.blocksAssessed}/${journey.blocks?.length || 0}.`);
+  return true;
 }
 
 function getReconValueSweepProfile(block, journey) {
@@ -192,13 +241,6 @@ export async function runReconDay(game) {
 
   // Run the field day mechanics
   await runFieldDay(game);
-
-  // Track blocks assessed (recon-specific tracking)
-  const surveyedBlocks = getSurveyedBlockCount(journey);
-  if (surveyedBlocks > (journey.blocksAssessed || 0)) {
-    journey.blocksAssessed = surveyedBlocks;
-    ui.write(`Block assessment complete. Total blocks assessed: ${journey.blocksAssessed}`);
-  }
 }
 
 /**
@@ -258,7 +300,9 @@ async function runFieldDay(game) {
   // Multi-action loop: keep going while hours remain
   while (journey.hoursRemaining > 0) {
     const currentBlock = journey.blocks[journey.currentBlockIndex];
-    const canTravel = !hasTraveled && journey.resources.fuel > 0 && journey.resources.equipment > 0;
+    const openPackages = getReconOpenPackages(journey);
+    const hasNextBlock = journey.currentBlockIndex < journey.blocks.length - 1;
+    const canTravel = !hasTraveled && hasNextBlock && journey.resources.fuel > 0 && journey.resources.equipment > 0;
     const blockIntel = getReconBlockIntel(journey, currentBlock);
     const accessVerdict = currentBlock ? getBlockAccessVerdict(currentBlock, journey.weather, journey) : null;
     const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
@@ -317,6 +361,15 @@ async function runFieldDay(game) {
         label: 'Values Sweep (2h)',
         description: `Ground-check riparian, cultural, wildlife, and visibility notes (${valuesSweep.notes[0]})`,
         value: 'values_sweep'
+      });
+    }
+
+    if (openPackages.length > 0 && journey.hoursRemaining >= 2) {
+      const nextPackage = openPackages[0];
+      actionOptions.push({
+        label: 'Field Notebook (2h)',
+        description: `Close an open package from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')})`,
+        value: 'field_notebook'
       });
     }
 
@@ -394,6 +447,9 @@ async function runFieldDay(game) {
     } else if (actionId === 'values_sweep') {
       journey.hoursRemaining -= 2;
       handleValuesSweep(ui, journey, currentBlock);
+    } else if (actionId === 'field_notebook') {
+      journey.hoursRemaining -= 2;
+      handleFieldNotebook(ui, journey);
     } else if (actionId === 'forage') {
       journey.hoursRemaining -= 2;
       applyForageResults(ui, journey, 'forage');
@@ -481,6 +537,12 @@ function displayDayHeader(ui, journey) {
     ? (blockIntel.valuesSwept ? 'swept' : 'pending')
     : 'quiet';
   ui.write(`Current Intel: access ${accessIntelLabel} | values ${valuesIntelLabel}`);
+  ui.write(`Assessment: ${journey.blocksAssessed || 0}/${journey.blocks?.length || 0} blocks verified`);
+  const openPackages = getReconOpenPackages(journey);
+  if (openPackages.length > 0) {
+    const nextPackage = openPackages[0];
+    ui.write(`Field Notebook: ${nextPackage.block.name} needs ${nextPackage.missing.join(' + ')}`);
+  }
   const hasScrutiny = Object.prototype.hasOwnProperty.call(journey, 'scrutiny')
     || Object.prototype.hasOwnProperty.call(journey, 'heat');
   const scrutinyValue = Number(journey.scrutiny ?? journey.heat ?? 0);
@@ -819,6 +881,7 @@ function handleGroundTruthAccess(ui, journey, block) {
 
   journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
   ui.write('You log the access condition before the crew commits more distance.');
+  maybeFinalizeReconAssessment(ui, journey, block);
 }
 
 function handleValuesSweep(ui, journey, block) {
@@ -854,6 +917,29 @@ function handleValuesSweep(ui, journey, block) {
   }
   ui.writePositive(`Logged: ${sweep.tags.join(', ')}`);
   journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - Math.min(2, sweep.tags.length));
+  maybeFinalizeReconAssessment(ui, journey, block);
+}
+
+function handleFieldNotebook(ui, journey) {
+  const openPackages = getReconOpenPackages(journey);
+  const target = openPackages[0];
+  if (!target) {
+    ui.write('No open recon packages remain in the notebook.');
+    return;
+  }
+
+  if (!target.intel.accessGroundTruthed) {
+    target.intel.accessGroundTruthed = true;
+    target.intel.lastAccessDay = journey.day;
+  }
+  if (target.sweep.needed && !target.intel.valuesSwept) {
+    target.intel.valuesSwept = true;
+    target.intel.lastValuesDay = journey.day;
+  }
+
+  ui.write(`Notebook catch-up closes ${target.block.name}: ${target.missing.join(', ')}.`);
+  maybeFinalizeReconAssessment(ui, journey, target.block);
+  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 1);
 }
 
 /**

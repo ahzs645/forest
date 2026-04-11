@@ -130,3 +130,21 @@ test('recon mode completion wins even if failure flags are also set on the final
     reason: 'Expedition completed!'
   });
 });
+
+test('recon mode fails on the final block when mobility is gone and open packages remain', () => {
+  const reconJourney = {
+    journeyType: 'recon',
+    crew: [{ isActive: true }],
+    blocks: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    currentBlockIndex: 2,
+    blocksAssessed: 2,
+    totalDistance: 18,
+    distanceTraveled: 18,
+    resources: { fuel: 0, food: 12, equipment: 40 }
+  };
+
+  assert.deepEqual(checkEndConditions(reconJourney), {
+    gameOver: true,
+    reason: 'Recon package stalled on the final block with no mobility left'
+  });
+});

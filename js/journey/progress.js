@@ -114,6 +114,10 @@ export function getSurveyedBlockCount(journey) {
   const totalBlocks = journey?.blocks?.length || 0;
   if (!totalBlocks) return 0;
 
+  if (journey?.journeyType === 'recon' && Number.isFinite(journey?.blocksAssessed)) {
+    return Math.min(totalBlocks, Math.max(0, Number(journey.blocksAssessed) || 0));
+  }
+
   const currentIndex = Math.max(0, Number(journey?.currentBlockIndex || 0));
   const trackedBlocks = Math.max(0, Number(journey?.blocksAssessed || 0));
   return Math.min(totalBlocks, Math.max(trackedBlocks, currentIndex + 1));

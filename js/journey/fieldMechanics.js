@@ -873,10 +873,14 @@ export function executeFieldDay(journey, paceId) {
     }
   }
 
-  // Check for victory
+  // Check for travel completion. Recon still needs verified assessments before it counts as a win.
   if (journey.distanceTraveled >= journey.totalDistance || journey.currentBlockIndex >= journey.blocks.length - 1) {
-    journey.isComplete = true;
-    messages.push('You have completed the block sequence!');
+    if (journey.journeyType === 'recon') {
+      messages.push('You have reached the end of the block sequence, but the recon package still needs to be verified.');
+    } else {
+      journey.isComplete = true;
+      messages.push('You have completed the block sequence!');
+    }
   }
 
   // Calculate resource consumption

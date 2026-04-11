@@ -69,13 +69,50 @@ function getPlanningProfessionalIssues(journey) {
   if (snapshot.competenceRisk >= 35) {
     reasons.push(`competence risk ${snapshot.competenceRisk}%`);
   }
-  if (snapshot.paperworkLoad >= 40) {
+  if (snapshot.paperworkLoad >= 55) {
     reasons.push(`paperwork load ${snapshot.paperworkLoad}`);
   }
   if (snapshot.auditExposure >= 35) {
     reasons.push(`audit exposure ${snapshot.auditExposure}`);
   }
   return reasons;
+}
+
+function getPlanningApprovalGaps(journey) {
+  const plan = journey?.plan || {};
+  const gaps = [];
+
+  if ((plan.dataCompleteness || 0) < 80) {
+    gaps.push({
+      key: 'data',
+      actionLabel: 'Gather Data',
+      headline: `Gather Data to recover the technical file to 80% completeness (${plan.dataCompleteness || 0}% now).`,
+      followUp: 'Recover the baseline package before you keep pushing the approval file.',
+      reason: `data completeness ${plan.dataCompleteness || 0}%`
+    });
+  }
+
+  if ((plan.analysisQuality || 0) < 80) {
+    gaps.push({
+      key: 'analysis',
+      actionLabel: 'Run Analysis',
+      headline: `Run Analysis to rebuild the model package to 80% (${plan.analysisQuality || 0}% now).`,
+      followUp: 'Reopen the technical lane until the analysis package clears again.',
+      reason: `analysis quality ${plan.analysisQuality || 0}%`
+    });
+  }
+
+  if ((plan.stakeholderBuyIn || 0) < 75) {
+    gaps.push({
+      key: 'stakeholder',
+      actionLabel: 'Stakeholder Session',
+      headline: `Stakeholder Session to rebuild buy-in to 75% (${plan.stakeholderBuyIn || 0}% now).`,
+      followUp: 'Recover buy-in before you spend more hours on approval-stage work.',
+      reason: `stakeholder buy-in ${plan.stakeholderBuyIn || 0}%`
+    });
+  }
+
+  return gaps;
 }
 
 function applyPlanningProfessionalWork(journey, changes = {}) {
@@ -235,6 +272,28 @@ function getFomActionDescription(fom, roadContext = null) {
   }
 }
 
+function updatePlanningFomStatus(ui, fom, waterContext, roadContext, sourceLabel = 'review work') {
+  if (!fom) {
+    return false;
+  }
+
+  const roadClear = !roadContext?.blocker;
+  const reviewClear = (fom.reviewDaysRemaining || 0) <= 0;
+  const commentsClear = (fom.commentLoad || 0) <= FOM_PUBLIC_REVIEW_COMMENT_LIMIT;
+  const waterClear = waterContext?.gate !== 'hold';
+
+  if (reviewClear && commentsClear && waterClear && roadClear) {
+    fom.status = 'approved';
+    fom.commentLoad = 0;
+    fom.reviewDaysRemaining = 0;
+    fom.approvedDay = Math.max(1, fom.lastUpdatedDay || 0);
+    ui.writePositive(`Forest Operations Map cleared public review after ${sourceLabel}.`);
+    return true;
+  }
+
+  return false;
+}
+
 export function getPlanningSubmissionReadiness(journey, seasonInfo = null) {
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
   const waterContext = getPlanningBlockWaterContext(journey.blockPlanning?.activeBlock, journey.area, seasonInfo);
@@ -324,6 +383,7 @@ function pushPlanningGuideStep(steps, text) {
 function buildPlanningActionGuidance(journey, seasonInfo = null) {
   const readiness = getPlanningSubmissionReadiness(journey, seasonInfo);
   const deficits = getValuesGateDeficits(journey);
+  const approvalGaps = getPlanningApprovalGaps(journey);
   const professional = getPlanningProfessionalSnapshot(journey);
   const professionalIssues = getPlanningProfessionalIssues(journey);
   const steps = [];
@@ -378,6 +438,14 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
     lane = 'Values lane';
     headline = valueHint?.headline || 'Values Workshop to reopen the approval gate.';
     pushPlanningGuideStep(steps, valueHint?.followUp || 'Recover the weakest value first.');
+  }
+
+  if (!deficits.length && approvalGaps.length > 0) {
+    const gap = approvalGaps[0];
+    lane = 'Technical recovery';
+    headline = gap.headline;
+    pushPlanningGuideStep(steps, gap.followUp);
+    return { lane, headline, steps };
   }
 
   const fom = readiness.fom;
@@ -579,6 +647,7 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
   if (fom?.activeBlockId) {
     ui.write(`FOM: ${describeReviewState(fom)} | Water Gate: ${fom.waterGate.toUpperCase()} | ${fom.hydrologyLabel}`);
     ui.write(`Hydrology Readiness: ${Math.round(fom.hydrologyReadiness)}% | ${fom.waterNote}`);
+    ui.write(`Review Burndown: ${Math.max(0, fom.commentLoad || 0)} open comment${(fom.commentLoad || 0) === 1 ? '' : 's'} | ${Math.max(0, fom.reviewDaysRemaining || 0)}d remaining | Road Readiness ${Math.round(fom.roadEngineeringReadiness || 0)}%`);
     if (fom.roadSummary) {
       ui.write(`Road Intel: ${fom.roadSummary}`);
       ui.write(`Road Engineering Readiness: ${Math.round(fom.roadEngineeringReadiness)}% | ${fom.roadNote}`);
@@ -606,6 +675,7 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
   const { ui, journey } = game;
   const plannerState = journey.blockPlanning;
   if (!plannerState) return;
+  if (journey.plan?.phase === 'ministerial_approval' && plannerState.activeBlock) return;
   if (journey.day < (plannerState.nextSelectionDay || 1)) return;
 
   displayPlanningHeader(ui, journey, seasonInfo);
@@ -709,6 +779,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   const hoursLeft = journey.hoursRemaining || 8;
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
   const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock || null);
+  const approvalGaps = getPlanningApprovalGaps(journey);
 
   // Phase-specific primary actions
   if (journey.plan.phase === 'data_gathering' && journey.resources.dataCredits > 0 && hoursLeft >= 3) {
@@ -747,12 +818,47 @@ function buildActionOptions(journey, seasonInfo = null) {
     }
   }
 
+  if (journey.plan.phase === 'ministerial_approval' && approvalGaps.some((gap) => gap.key === 'data') && hoursLeft >= 3) {
+    actionOptions.push({
+      label: 'Gather Data (3h)',
+      description: 'Lane: technical recovery | Rebuild baseline completeness before final approval work',
+      value: 'gather_data'
+    });
+  }
+
+  if (journey.plan.phase === 'ministerial_approval' && approvalGaps.some((gap) => gap.key === 'analysis') && hoursLeft >= 4) {
+    actionOptions.push({
+      label: 'Run Analysis (4h)',
+      description: 'Lane: technical recovery | Reopen the model package and restore submission readiness',
+      value: 'analyze'
+    });
+  }
+
+  if (journey.plan.phase === 'ministerial_approval' && approvalGaps.some((gap) => gap.key === 'stakeholder') && hoursLeft >= 4) {
+    const deficits = getValuesGateDeficits(journey);
+    const valuesOk = deficits.length === 0;
+    if (valuesOk) {
+      actionOptions.push({
+        label: 'Stakeholder Session (4h)',
+        description: 'Lane: consultation recovery | Rebuild buy-in before the final package',
+        value: 'stakeholder'
+      });
+    } else {
+      const valueHint = getPlanningValueRecoveryHint(journey, deficits);
+      actionOptions.push({
+        label: 'Stakeholder Session (BLOCKED)',
+        description: `Needs: ${formatValuesGateDeficits(deficits)} | Next: ${valueHint?.actionLabel || 'Values Workshop'}`,
+        value: 'stakeholder_blocked'
+      });
+    }
+  }
+
   if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 6) {
     const deficits = getValuesGateDeficits(journey);
     const valuesOk = deficits.length === 0;
     const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
     const professionalIssues = getPlanningProfessionalIssues(journey);
-    if (valuesOk && submissionReadiness.ready && professionalIssues.length === 0) {
+    if (valuesOk && submissionReadiness.ready && professionalIssues.length === 0 && approvalGaps.length === 0) {
       actionOptions.push({
         label: 'Prepare Submission (6h)',
         description: 'Lane: submission package | Fastest approval push once the FOM, road, and professional gates are clear',
@@ -762,7 +868,7 @@ function buildActionOptions(journey, seasonInfo = null) {
       const guidance = buildPlanningActionGuidance(journey, seasonInfo);
       actionOptions.push({
         label: 'Prepare Submission (BLOCKED)',
-        description: `Needs: ${[deficits.length ? formatValuesGateDeficits(deficits) : null, ...submissionReadiness.reasons, ...professionalIssues].filter(Boolean).join(' | ')} | Next: ${guidance.headline}`,
+        description: `Needs: ${[deficits.length ? formatValuesGateDeficits(deficits) : null, ...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons, ...professionalIssues].filter(Boolean).join(' | ')} | Next: ${guidance.headline}`,
         value: 'submit_blocked'
       });
     }
@@ -867,7 +973,8 @@ async function processAction(game, actionValue, seasonInfo = null) {
   const discoveryIds = new Set(discoveryTags.map((tag) => tag.id));
 
   switch (actionValue) {
-    case 'gather_data':
+    case 'gather_data': {
+      const recoveryRun = journey.plan.phase === 'ministerial_approval';
       journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + 10);
       if (discoveryTags.length > 0) {
         const bonus = Math.min(3, discoveryTags.length);
@@ -878,15 +985,19 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 900);
       journey.hoursRemaining -= 3;
       applyProtagonistCost(journey, { energy: 10, stress: 6 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: 3, competenceRisk: -1, auditExposure: 1 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: recoveryRun ? 1 : 2, competenceRisk: -1, auditExposure: 1 });
       ui.write(`Data gathering progressed. Completeness: ${journey.plan.dataCompleteness}%`);
-      if (journey.plan.dataCompleteness >= 80) {
+      if (!recoveryRun && journey.plan.dataCompleteness >= 80) {
         journey.plan.phase = 'analysis';
         ui.writePositive('Data phase complete! Moving to Analysis.');
+      } else if (recoveryRun && journey.plan.dataCompleteness >= 80) {
+        ui.writePositive('Technical recovery complete. The data file is back above the approval threshold.');
       }
       break;
+    }
 
-    case 'analyze':
+    case 'analyze': {
+      const recoveryRun = journey.plan.phase === 'ministerial_approval';
       journey.plan.analysisQuality = Math.min(100, journey.plan.analysisQuality + 15);
       if (discoveryTags.length > 0) {
         const bonus = Math.min(4, discoveryTags.length * 2);
@@ -896,15 +1007,19 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       journey.hoursRemaining -= 4;
       applyProtagonistCost(journey, { energy: 15, stress: 12 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 3, paperworkLoad: 2, competenceRisk: -1, auditExposure: 1 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 3, paperworkLoad: recoveryRun ? 1 : 2, competenceRisk: -1, auditExposure: 1 });
       ui.write(`Analysis progressed. Quality: ${journey.plan.analysisQuality}%`);
-      if (journey.plan.analysisQuality >= 80) {
+      if (!recoveryRun && journey.plan.analysisQuality >= 80) {
         journey.plan.phase = 'stakeholder_review';
         ui.writePositive('Analysis complete! Moving to Stakeholder Review.');
+      } else if (recoveryRun && journey.plan.analysisQuality >= 80) {
+        ui.writePositive('Analysis recovery complete. The model package is back above the approval threshold.');
       }
       break;
+    }
 
-    case 'stakeholder':
+    case 'stakeholder': {
+      const recoveryRun = journey.plan.phase === 'ministerial_approval';
       journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 10);
       if (discoveryIds.has('community_visibility') || discoveryIds.has('cultural_hold') || discoveryIds.has('watershed_watch')) {
         journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
@@ -914,16 +1029,19 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       journey.hoursRemaining -= 4;
       applyProtagonistCost(journey, { energy: 20, stress: 16 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: 4, competenceRisk: -1, auditExposure: 2 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: recoveryRun ? 2 : 3, competenceRisk: -1, auditExposure: 2 });
       if (journey.protagonist) {
         journey.protagonist.reputation = Math.min(100, journey.protagonist.reputation + 3);
       }
       ui.write(`Stakeholder buy-in improved to ${journey.plan.stakeholderBuyIn}%`);
-      if (journey.plan.stakeholderBuyIn >= 75) {
+      if (!recoveryRun && journey.plan.stakeholderBuyIn >= 75) {
         journey.plan.phase = 'ministerial_approval';
         ui.writePositive('Stakeholder review complete! Moving to Ministerial Approval.');
+      } else if (recoveryRun && journey.plan.stakeholderBuyIn >= 75) {
+        ui.writePositive('Consultation recovery complete. Buy-in is back above the approval threshold.');
       }
       break;
+    }
 
     case 'stakeholder_blocked':
     case 'submit_blocked': {
@@ -949,8 +1067,9 @@ async function processAction(game, actionValue, seasonInfo = null) {
     case 'submit':
       {
         const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
-        if (!submissionReadiness.ready) {
-          ui.writeWarning(`Submission blocked: ${submissionReadiness.reasons.join(' | ')}.`);
+        const approvalGaps = getPlanningApprovalGaps(journey);
+        if (!submissionReadiness.ready || approvalGaps.length > 0) {
+          ui.writeWarning(`Submission blocked: ${[...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons].join(' | ')}.`);
           break;
         }
         const confidenceGain = submissionReadiness.waterContext.gate === 'clear' ? 18 : 14;
@@ -960,7 +1079,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 2200);
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
       applyProtagonistCost(journey, { energy: 25, stress: 20 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 4, paperworkLoad: 5, competenceRisk: -2, auditExposure: 2 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 4, paperworkLoad: 3, competenceRisk: -2, auditExposure: 2 });
       progressPlanningPaperworkChain(journey, 'fom', 1);
       ui.write(`Submission prepared. Confidence: ${journey.plan.ministerialConfidence}%`);
       if (isPlanningApprovalReady(journey)) {
@@ -981,6 +1100,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
 
       const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
       const roadContext = getPlanningRoadAssetContext(journey, activeBlock);
+      const previousStatus = fom.status;
       if (fom.status === 'approved') {
         journey.hoursRemaining -= 1;
         applyProtagonistCost(journey, { energy: 3, stress: 2 });
@@ -993,32 +1113,51 @@ async function processAction(game, actionValue, seasonInfo = null) {
 
       const waterContext = getPlanningBlockWaterContext(activeBlock, journey.area, seasonInfo);
       const reviewCost = 2;
-      fom.status = 'public_review';
-      fom.reviewDaysRemaining = Math.max(fom.reviewDaysRemaining || 0, waterContext.reviewDays, FOM_PUBLIC_REVIEW_MIN_DAYS);
-      fom.commentLoad = Math.max(fom.commentLoad || 0, waterContext.commentCount);
-      fom.publicReviewOpenedDay = journey.day;
-      fom.lastUpdatedDay = journey.day;
-      fom.hydrologyReadiness = waterContext.readiness;
-      fom.waterGate = waterContext.gate;
-      fom.waterNote = waterContext.note;
-      fom.hydrologyLabel = waterContext.hydrologyLabel;
-
       journey.hoursRemaining -= reviewCost;
       applyProtagonistCost(journey, { energy: 6, stress: 5 });
       const chainProgress = progressPlanningPaperworkChain(journey, 'fom', 1);
-      if (fom.status === 'draft') {
-        applyPlanningProfessionalWork(journey, { paperworkLoad: 3, auditExposure: 1 });
-      } else if (fom.commentLoad > 0) {
-        applyPlanningProfessionalWork(journey, { paperworkLoad: 2, competenceRisk: -1, auditExposure: -1 });
+      fom.lastUpdatedDay = journey.day;
+      fom.hydrologyLabel = waterContext.hydrologyLabel;
+
+      if (previousStatus === 'draft') {
+        fom.status = 'public_review';
+        fom.reviewDaysRemaining = Math.max(fom.reviewDaysRemaining || 0, waterContext.reviewDays, FOM_PUBLIC_REVIEW_MIN_DAYS);
+        fom.commentLoad = Math.max(fom.commentLoad || 0, waterContext.commentCount);
+        fom.publicReviewOpenedDay = journey.day;
+        fom.hydrologyReadiness = waterContext.readiness;
+        fom.waterGate = waterContext.gate;
+        fom.waterNote = waterContext.note;
+        applyPlanningProfessionalWork(journey, { paperworkLoad: 2, auditExposure: 1 });
+
+        ui.write('Forest Operations Map posted for public review.');
+      } else if (previousStatus === 'public_review') {
+        const commentBurn = roadContext.hasData || waterContext.commentCount > 0 ? 2 : 1;
+        fom.commentLoad = Math.max(0, (fom.commentLoad || 0) - commentBurn);
+        fom.reviewDaysRemaining = Math.max(0, (fom.reviewDaysRemaining || 0) - 1);
+        fom.hydrologyReadiness = Math.min(100, Math.max(fom.hydrologyReadiness || 0, waterContext.readiness) + 8);
+        fom.waterGate = waterContext.gate;
+        fom.waterNote = waterContext.note;
+        applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: -3, competenceRisk: -1, auditExposure: -2 });
+
+        ui.write(`FOM review updated. Closed ${commentBurn} comment${commentBurn === 1 ? '' : 's'} and burned down one day of review.`);
+        updatePlanningFomStatus(ui, fom, waterContext, roadContext, 'review work');
       } else {
-        applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1 });
+        const revisionBurn = roadContext.hasData ? 3 : 2;
+        fom.status = 'public_review';
+        fom.reviewDaysRemaining = Math.max(1, Math.min(FOM_PUBLIC_REVIEW_MIN_DAYS, waterContext.reviewDays));
+        fom.commentLoad = Math.max(0, Math.max(fom.commentLoad || 0, waterContext.commentCount) - revisionBurn);
+        fom.hydrologyReadiness = Math.min(100, Math.max(fom.hydrologyReadiness || 0, waterContext.readiness) + 14);
+        fom.waterGate = waterContext.gate;
+        fom.waterNote = waterContext.note;
+        applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: -4, competenceRisk: -2, auditExposure: -2 });
+
+        ui.write(`FOM revisions rebuilt the file and reopened public review with ${Math.max(0, fom.commentLoad)} comment${(fom.commentLoad || 0) === 1 ? '' : 's'} left.`);
       }
 
-      ui.write(`Forest Operations Map posted for public review.`);
       if (chainProgress?.stage) {
         ui.write(`Paperwork chain advanced to: ${chainProgress.stage}.`);
       }
-      ui.write(`Review window: ${fom.reviewDaysRemaining} day${fom.reviewDaysRemaining === 1 ? '' : 's'} | ${fom.waterNote}`);
+      ui.write(`Review window: ${Math.max(0, fom.reviewDaysRemaining)} day${Math.max(0, fom.reviewDaysRemaining) === 1 ? '' : 's'} | ${fom.waterNote}`);
       if (roadContext.hasData) {
         ui.write(roadContext.note);
         if (roadContext.blocker) {
@@ -1036,7 +1175,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);
       journey.hoursRemaining -= 2;
       applyProtagonistCost(journey, { energy: 8, stress: 7 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, competenceRisk: -1, auditExposure: 1 });
+      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: 1 });
 
       const gained = journey.plan.ministerialConfidence - previousConfidence;
       const gap = Math.max(0, 80 - journey.plan.ministerialConfidence);
@@ -1053,8 +1192,8 @@ async function processAction(game, actionValue, seasonInfo = null) {
         registrationStatus: 'active',
         cpdHours: didRenewal ? 8 : 6,
         competenceRisk: -6,
-        paperworkLoad: -4,
-        auditExposure: -4,
+        paperworkLoad: -10,
+        auditExposure: -6,
       });
       journey.hoursRemaining -= 2;
       applyProtagonistCost(journey, { energy: 5, stress: 4 });
@@ -1217,6 +1356,9 @@ async function advanceToNextDay(game) {
   const fom = journey.blockPlanning?.fom;
   if (fom?.status === 'public_review') {
     fom.reviewDaysRemaining = Math.max(0, (fom.reviewDaysRemaining || 0) - 1);
+    if ((fom.commentLoad || 0) > 0) {
+      fom.commentLoad = Math.max(0, fom.commentLoad - 1);
+    }
     if (fom.reviewDaysRemaining <= 0) {
       if (fom.commentLoad <= FOM_PUBLIC_REVIEW_COMMENT_LIMIT && fom.waterGate !== 'hold') {
         fom.status = 'approved';

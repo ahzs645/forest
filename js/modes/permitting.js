@@ -277,8 +277,14 @@ function getPermittingLaneAction(journey) {
     laneLabel: laneMap[chainId] || 'Professional file',
     actionLabel: labelMap[chainId] || 'Compliance Admin',
     stage,
-    stageLabel: formatPermittingStageLabel(stage)
+    stageLabel: formatPermittingStageLabel(stage),
+    stageIndex: chain ? Math.min(chain.stepIndex + 1, chain.steps.length) : 1,
+    stageCount: chain?.steps?.length || 1
   };
+}
+
+function getPermittingLaneProgressSummary(laneAction, permits) {
+  return `${laneAction.actionLabel}: ${laneAction.stageIndex}/${laneAction.stageCount} | Backlog ${permits?.backlog || 0} | Drafting ${permits?.drafting || 0} | Submitted ${permits?.submitted || 0} | Review ${permits?.inReview || 0}`;
 }
 
 function progressPermittingPaperworkChain(journey, chainId, stepCount = 1) {
@@ -822,6 +828,7 @@ export async function runPermittingDay(game) {
     ui.write(`  Scrutiny / Heat: ${Math.round(journey.scrutiny || 0)}%`);
     ui.write(`  Phase 3 Pressure: ${formatConstraintPressure(journey.permits.phase3Pressure || derivePermittingConstraintState(journey))}`);
     ui.write(`  Lane Focus: ${guidance.lane} | Stage: ${laneAction.stageLabel}`);
+    ui.write(`  Lane Progress: ${getPermittingLaneProgressSummary(laneAction, journey.permits)}`);
     ui.write(`  Next Best Move: ${guidance.headline}`);
     if (guidance.steps.length > 0) {
       ui.write(`  Follow-up: ${guidance.steps.join(' -> ')}`);
@@ -1049,6 +1056,69 @@ function buildActionOptions(journey) {
   return actionOptions;
 }
 
+function shiftPermits(sourceKey, targetKey, permits, count) {
+  const available = Math.max(0, permits?.[sourceKey] || 0);
+  const moved = Math.min(available, Math.max(0, count));
+  if (moved <= 0) {
+    return 0;
+  }
+
+  permits[sourceKey] -= moved;
+  permits[targetKey] = (permits[targetKey] || 0) + moved;
+  return moved;
+}
+
+function applyPermittingLaneThroughput(journey, chainId, stage, ui) {
+  const permits = journey.permits || {};
+
+  if (chainId === 'roadPermit') {
+    if (stage === 'screen') {
+      const drafted = shiftPermits('backlog', 'drafting', permits, 1);
+      if (drafted > 0) ui.write(`Road screening pulled ${drafted} package into drafting.`);
+    } else if (stage === 'map') {
+      const drafted = shiftPermits('backlog', 'drafting', permits, 2);
+      if (drafted > 0) ui.write(`Road exhibits advanced ${drafted} package${drafted === 1 ? '' : 's'} into drafting.`);
+    } else if (stage === 'submit') {
+      const reviewed = shiftPermits('drafting', 'inReview', permits, 2);
+      if (reviewed > 0) ui.write(`Road package submission pushed ${reviewed} file${reviewed === 1 ? '' : 's'} directly into review.`);
+    } else {
+      const moved = shiftPermits('submitted', 'inReview', permits, 1) || shiftPermits('inReferral', 'inReview', permits, 1);
+      if (moved > 0) ui.write('Road maintenance conditions cleared one file back into active review.');
+    }
+    return;
+  }
+
+  if (chainId === 'specialUse') {
+    if (stage === 'screen') {
+      const drafted = shiftPermits('backlog', 'drafting', permits, 1);
+      if (drafted > 0) ui.write('Special-use screening opened a package in drafting.');
+    } else if (stage === 'bundle') {
+      const drafted = shiftPermits('backlog', 'drafting', permits, 2);
+      if (drafted > 0) ui.write(`Special-use bundling assembled ${drafted} package${drafted === 1 ? '' : 's'} for submission.`);
+    } else if (stage === 'submit') {
+      const moved = shiftPermits('drafting', 'submitted', permits, 2);
+      if (moved > 0) ui.write(`Special-use submission moved ${moved} file${moved === 1 ? '' : 's'} into the ministry queue.`);
+    } else {
+      const moved = shiftPermits('submitted', 'inReview', permits, 1);
+      if (moved > 0) ui.write('Special-use conditions closed one file into active review.');
+    }
+    return;
+  }
+
+  if (chainId === 'archaeology') {
+    if (stage === 'screen') {
+      const drafted = shiftPermits('backlog', 'drafting', permits, 1);
+      if (drafted > 0) ui.write('Archaeology screening opened a file for drafting.');
+    } else if (stage === 'field-review') {
+      const moved = shiftPermits('inReferral', 'inReview', permits, 1) || shiftPermits('drafting', 'submitted', permits, 1);
+      if (moved > 0) ui.write('Field review work unstuck one archaeology-sensitive file.');
+    } else {
+      const moved = shiftPermits('submitted', 'inReview', permits, 1) || shiftPermits('drafting', 'submitted', permits, 1);
+      if (moved > 0) ui.write('Permit-context work folded archaeology notes into a live file.');
+    }
+  }
+}
+
 /**
  * Process a selected action
  * @param {Object} game - Game instance
@@ -1091,19 +1161,17 @@ async function processAction(game, actionId) {
   switch (actionId) {
     case 'draft_permit':
       if (journey.permits.backlog > 0) {
-        journey.permits.backlog--;
-        journey.permits.drafting = (journey.permits.drafting || 0) + 1;
+        const drafted = shiftPermits('backlog', 'drafting', journey.permits, 1);
         journey.hoursRemaining -= 2;
         applyProtagonistCost(journey, { energy: 8, stress: 5 });
         applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
-        ui.write('Permit application drafted and ready for submission.');
+        ui.write(`Permit application drafted and ready for submission${drafted > 1 ? 's' : ''}.`);
       }
       return;
 
     case 'submit_permit':
       if ((journey.permits.drafting || 0) > 0) {
-        journey.permits.drafting--;
-        journey.permits.submitted++;
+        shiftPermits('drafting', 'submitted', journey.permits, 1);
         journey.hoursRemaining -= 2;
         applyProtagonistCost(journey, { energy: 5, stress: 3 });
 
@@ -1127,7 +1195,7 @@ async function processAction(game, actionId) {
         if (professionalIssues.length > 0) {
           ui.write(`Professional watch: ${professionalIssues.join(' | ')}.`);
         }
-        const referralChance = Math.min(0.75, 0.18
+        const referralChance = Math.min(0.68, 0.12
           + hotFilePressure * 0.06
           + pressure.publicReview * 0.06
           + pressure.hydrology * 0.05
@@ -1159,6 +1227,8 @@ async function processAction(game, actionId) {
             ? 'Permit submitted - the hot spots in the file sent it into referral.'
             : 'Permit submitted - sent for First Nations referral.');
         } else {
+          journey.permits.inReview = (journey.permits.inReview || 0) + 1;
+          journey.permits.submitted = Math.max(0, (journey.permits.submitted || 0) - 1);
           ui.write('Permit submitted for ministry review.');
         }
       }
@@ -1171,7 +1241,7 @@ async function processAction(game, actionId) {
         applyProtagonistCost(journey, { energy: 6, stress: 4 });
 
         // Chance to advance referrals
-        if (Math.random() < 0.5) {
+        if (Math.random() < 0.7) {
           journey.permits.inReferral--;
           journey.permits.inReview++;
           if (journey.relationships) {
@@ -1204,70 +1274,55 @@ async function processAction(game, actionId) {
           registrationStatus: 'active',
           cpdHours: 8,
           competenceRisk: -6,
-          paperworkLoad: -4,
-          auditExposure: -4,
+          paperworkLoad: -8,
+          auditExposure: -5,
         });
         ui.write('Registration renewal and CPD housekeeping are back under control.');
       } else if (chainId === 'roadPermit') {
         if (stage === 'screen') {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: 2, auditExposure: 1 });
+          applyPermittingProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 0, competenceRisk: -1 });
           ui.write('Road permit screening confirms the access needs district review.');
         } else if (stage === 'map') {
-          if ((journey.permits.backlog || 0) > 0) {
-            journey.permits.backlog--;
-            journey.permits.drafting = (journey.permits.drafting || 0) + 1;
-          }
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 0 });
           ui.write('Road permit mapping and Exhibit A detail now sit in the drafting stack.');
         } else if (stage === 'submit') {
-          if ((journey.permits.drafting || 0) > 0) {
-            journey.permits.drafting--;
-            journey.permits.submitted++;
-            journey.permits.inReview = (journey.permits.inReview || 0) + 1;
-          }
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, competenceRisk: -1, auditExposure: 1 });
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: 0 });
           ui.write('Road permit submission package is aligned and moving into review.');
         } else {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: -1, auditExposure: -1, competenceRisk: -1 });
+          applyPermittingProfessionalWork(journey, { paperworkLoad: -2, auditExposure: -2, competenceRisk: -1 });
           ui.write('Road maintenance notes and deactivation planning are cleaned up.');
         }
       } else if (chainId === 'specialUse') {
         if (stage === 'screen') {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: 2, auditExposure: 1 });
+          applyPermittingProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 0 });
           ui.write('Special-use screening confirms the site needs a separate package.');
         } else if (stage === 'bundle') {
-          if ((journey.permits.backlog || 0) > 0) {
-            journey.permits.backlog--;
-            journey.permits.drafting = (journey.permits.drafting || 0) + 1;
-          }
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 0 });
           ui.write('Special-use bundle assembled and queued with the active permit work.');
         } else if (stage === 'submit') {
-          if ((journey.permits.drafting || 0) > 0) {
-            journey.permits.drafting--;
-            journey.permits.submitted++;
-          }
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, competenceRisk: -1, auditExposure: 1 });
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: 0 });
           ui.write('Special-use submission is ready for district review.');
         } else {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: -1, auditExposure: -1 });
+          applyPermittingProfessionalWork(journey, { paperworkLoad: -2, auditExposure: -2 });
           ui.write('Special-use conditions are lined up and the file is cleaner.');
         }
       } else if (chainId === 'archaeology') {
         if (stage === 'screen') {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: 2, auditExposure: 1 });
+          applyPermittingProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 0 });
           ui.write('Archaeology screening shows the file needs a proper field review path.');
         } else if (stage === 'field-review') {
           if (journey.relationships) {
             journey.relationships.nations = Math.min(100, journey.relationships.nations + 2);
           }
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: -1 });
+          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 0, competenceRisk: -1, auditExposure: -2 });
           ui.write('Field review notes and consultation context are better aligned.');
         } else {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: -1, auditExposure: -1, competenceRisk: -1 });
+          applyPermittingProfessionalWork(journey, { paperworkLoad: -2, auditExposure: -2, competenceRisk: -1 });
           ui.write('Archaeology context is folded into the permit package.');
         }
       }
+
+      applyPermittingLaneThroughput(journey, chainId, stage, ui);
 
       if (chainProgress?.stage) {
         ui.write(`Paperwork chain advanced to: ${chainProgress.stage}.`);
@@ -1432,7 +1487,7 @@ function processPermitPipeline(ui, journey) {
 
   // Submitted permits may advance to inReview
   if (journey.permits.submitted > 0) {
-    const advancing = Math.floor(journey.permits.submitted * 0.3);
+    const advancing = Math.max(1, Math.floor(journey.permits.submitted * 0.5));
     if (advancing > 0) {
       journey.permits.submitted -= advancing;
       journey.permits.inReview += advancing;
@@ -1440,9 +1495,19 @@ function processPermitPipeline(ui, journey) {
     }
   }
 
+  if (journey.permits.inReferral > 0) {
+    const returning = Math.max(1, Math.floor(journey.permits.inReferral * 0.25));
+    if (returning > 0) {
+      journey.permits.inReferral -= returning;
+      journey.permits.inReview += returning;
+      applyPermittingProfessionalWork(journey, { paperworkLoad: -1, auditExposure: -1 });
+      ui.write(`${returning} referral file(s) came back into active review.`);
+    }
+  }
+
   // InReview permits may be approved or need revision
   if (journey.permits.inReview > 0) {
-    const reviewed = Math.ceil(journey.permits.inReview * 0.4);
+    const reviewed = Math.max(1, Math.ceil(journey.permits.inReview * 0.55));
     const scrutinyPenalty = Math.min(0.25, (journey.scrutiny || 0) / 400);
     const phase3Penalty = Math.min(0.2, (
       pressure.publicReview * 0.03
@@ -1454,7 +1519,7 @@ function processPermitPipeline(ui, journey) {
     const professionalPenalty = professional?.registrationActive
       ? Math.min(0.15, (professional.auditExposure / 300) + (professional.competenceRisk / 500))
       : 0.2;
-    const approvalRate = Math.max(0.35, 0.72 - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
+    const approvalRate = Math.max(0.42, 0.8 - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
     const approved = Math.floor(reviewed * approvalRate);
     const revisions = reviewed - approved;
 

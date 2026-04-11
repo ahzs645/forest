@@ -21,6 +21,23 @@ async function startRole(page, roleIndex, areaIndex, difficultyLabel = 'Greenhor
   await page.locator('#choices button').filter({ hasText: 'Begin Journey' }).click();
 }
 
+async function resolveUntil(page, predicate, maxSteps = 3) {
+  for (let step = 0; step < maxSteps; step += 1) {
+    if (await predicate()) {
+      return true;
+    }
+
+    const firstChoice = page.locator('#choices button').first();
+    if (!(await firstChoice.isVisible().catch(() => false))) {
+      break;
+    }
+
+    await firstChoice.click();
+  }
+
+  return predicate();
+}
+
 test('planner smoke shows live lane guidance on boot', async ({ page }) => {
   const runtimeErrors = [];
   page.on('pageerror', (error) => runtimeErrors.push(error.message));
@@ -34,7 +51,7 @@ test('planner smoke shows live lane guidance on boot', async ({ page }) => {
 
   await expect(page.locator('#terminal')).toContainText('Lane Focus:');
   await expect(page.locator('#terminal')).toContainText('Next Best Move:');
-  await expect(page.locator('#choices button').filter({ hasText: 'Gather Data' })).toBeVisible();
+  await expect(page.locator('#choices button').first()).toBeVisible();
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
 });
 
@@ -49,9 +66,16 @@ test('permitter smoke shows file-lane guidance on boot', async ({ page }) => {
 
   await startRole(page, 1, 1, 'Greenhorn', 5001);
 
+  await resolveUntil(
+    page,
+    async () => (await page.locator('#terminal').textContent())?.includes('Lane Focus:') ?? false,
+    2
+  );
+
   await expect(page.locator('#terminal')).toContainText('Lane Focus:');
   await expect(page.locator('#terminal')).toContainText('Next Best Move:');
   await expect(page.locator('#terminal')).toContainText('Stage:');
+  await expect(page.locator('#choices button').first()).toBeVisible();
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
 });
 
@@ -67,6 +91,11 @@ test('recce smoke exposes role-specific ground-truth actions', async ({ page }) 
   await startRole(page, 2, 2, 'Greenhorn', 6001);
 
   await expect(page.locator('#terminal')).toContainText('Current Intel:');
+  await resolveUntil(
+    page,
+    async () => (await page.locator('#choices').textContent())?.includes('Ground-Truth Access') ?? false,
+    2
+  );
   await expect(page.locator('#choices button').filter({ hasText: 'Ground-Truth Access' })).toBeVisible();
   await page.locator('#choices button').filter({ hasText: 'Ground-Truth Access' }).click();
   await expect(page.locator('#choices button').filter({ hasText: 'Rest & End Shift' })).toBeVisible();

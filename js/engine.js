@@ -575,7 +575,10 @@ export function drawIssue(state, rng = Math.random) {
     return null;
   }
 
-  const weightedPool = selectablePool.map((issue) => ({ issue, weight: issueWeight(issue, state, { tags, season }) }));
+  const weightedPool = selectablePool.map((issue) => ({
+    issue,
+    weight: scoreIssueSelection(issue, state, { tags, season }),
+  }));
   const totalWeight = weightedPool.reduce((sum, entry) => sum + entry.weight, 0);
   if (totalWeight <= 0) {
     const index = Math.floor(rng() * selectablePool.length);
@@ -749,20 +752,34 @@ function issueMatchesContext(issue, state, tags) {
   return true;
 }
 
-function issueWeight(issue, state, context) {
+export function scoreIssueSelection(issue, state, context) {
   let weight = Math.max(1, Number(issue.baseWeight) || 1);
   if (issue.areaTags?.length) {
     const matches = issue.areaTags.filter((tag) => context.tags.includes(tag)).length;
     weight += matches;
   }
   const seasonBias = issue.seasonBias;
-  if (Array.isArray(seasonBias) && seasonBias.includes(context.season)) {
-    weight += 2;
+  if (Array.isArray(seasonBias) && seasonBias.length) {
+    if (seasonBias.includes(context.season)) {
+      weight += 4;
+    } else {
+      weight *= 0.5;
+    }
   }
   if (issue.priorityFlag && state.flags?.[issue.priorityFlag]) {
     weight += 3;
   }
-  return weight;
+  const roleCount = Array.isArray(issue.roles) && issue.roles.length ? issue.roles.length : 4;
+  if (roleCount === 1) {
+    weight *= 1.6;
+  } else if (roleCount === 2) {
+    weight *= 1.3;
+  } else if (roleCount === 3) {
+    weight *= 1.1;
+  } else {
+    weight *= 0.75;
+  }
+  return Math.max(0.1, weight);
 }
 
 function metricsTrendlines(state) {

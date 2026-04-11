@@ -103,7 +103,7 @@ function pickChoice(labels, terminalText, strategyName) {
 
   const recommendedAction = getRecommendedActionLabel(terminalText);
   if (recommendedAction) {
-    const recommendedIndex = labels.findIndex((label) => label.includes(recommendedAction));
+    const recommendedIndex = labels.findIndex((label) => label.startsWith(recommendedAction));
     if (recommendedIndex !== -1) {
       return recommendedIndex;
     }
@@ -156,7 +156,7 @@ function pickChoice(labels, terminalText, strategyName) {
   const priorities = [...sharedPriorities, ...(strategyPriorities[strategyName] || [])];
 
   for (const priority of priorities) {
-    const index = labels.findIndex((label) => label.includes(priority));
+    const index = labels.findIndex((label) => label.startsWith(priority));
     if (index !== -1) {
       return index;
     }
@@ -217,18 +217,18 @@ function pickReconChoice(labels, terminalText) {
   }
 
   if (food <= 12) {
-    return findFirstMatching(labels, ['Resupply', 'Forage & Hunt', 'Ground-Truth Access', 'Values Sweep', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Resupply', 'Forage & Hunt', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
   }
 
   if (fuel <= 25 || equipment <= 35) {
-    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Ground-Truth Access', 'Values Sweep', 'Standard Recon', 'Cautious Recon', 'Forage & Hunt', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Forage & Hunt', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
   }
 
   if (injuredCount >= 2 && meds > 0) {
-    return findFirstMatching(labels, ['Triage', 'Ground-Truth Access', 'Values Sweep', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Forage & Hunt', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Triage', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Forage & Hunt', 'Rest & End Shift']);
   }
 
-  return findFirstMatching(labels, ['Ground-Truth Access', 'Values Sweep', 'Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Forage & Hunt', 'Triage', 'Rest & End Shift']);
+  return findFirstMatching(labels, ['Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Forage & Hunt', 'Triage', 'Rest & End Shift']);
 }
 
 function getRecommendedActionLabel(terminalText) {
@@ -396,7 +396,7 @@ function extractResource(text, label) {
 
 function findFirstMatching(labels, priorities) {
   for (const priority of priorities) {
-    const index = labels.findIndex((label) => label.includes(priority));
+    const index = labels.findIndex((label) => label.startsWith(priority));
     if (index !== -1) {
       return index;
     }

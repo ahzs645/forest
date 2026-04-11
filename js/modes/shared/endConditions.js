@@ -40,6 +40,13 @@ export function checkReconEndConditions(journey) {
     return { gameOver: true, reason: 'Stranded with no supplies' };
   }
 
+  if (totalBlocks > 0 &&
+      journey.currentBlockIndex >= totalBlocks - 1 &&
+      surveyedBlocks < totalBlocks &&
+      (journey.resources.fuel <= 0 || journey.resources.equipment <= 0)) {
+    return { gameOver: true, reason: 'Recon package stalled on the final block with no mobility left' };
+  }
+
   return null;
 }
 

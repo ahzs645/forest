@@ -293,10 +293,16 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   const hoursLeft = journey.hoursRemaining;
   const sequencePhase = silvicultureState.phase;
   const roster = getSilvicultureContractorRoster(journey, zoneProfile);
+  const { plantRatio, brushRatio } = getSilvicultureRatios(journey);
+  const surveyReady = brushRatio >= Math.max(0.35, plantRatio - 0.05) || sequencePhase === 'survey';
+  const plantingOpen = sequencePhase === 'plant';
+  const fillOpen = sequencePhase === 'fill';
+  const survivalOpen = sequencePhase === 'survival' && journey.planting.blocksPlanted > 0;
 
   // Planting - primarily spring, marginally in summer/fall, impossible in winter
   const plantingEff = seasonMods?.plantingEfficiency ?? 1.0;
-  if (plantingEff > 0 &&
+  if (plantingOpen &&
+      plantingEff > 0 &&
       journey.resources.seedlings > 0 &&
       journey.resources.contractorCapacity > 0 &&
       journey.planting.blocksPlanted < journey.planting.blocksToPlant &&
@@ -317,7 +323,7 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   }
 
   // Survival check - should follow planting before fill/brush work
-  if (hoursLeft >= 2 && journey.planting.blocksPlanted > 0) {
+  if (survivalOpen && hoursLeft >= 2 && journey.planting.blocksPlanted > 0) {
     actionOptions.push({
       label: `Survival Check (2h)`,
       description: `Assess planted blocks before fill work (${getSilvicultureTaskSummary(journey, zoneProfile, 'inspect')})`,
@@ -330,11 +336,7 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
       journey.resources.contractorCapacity > 0 &&
       journey.planting.blocksPlanted > 0 &&
       hoursLeft >= 3) {
-    const fillReady = (
-      sequencePhase === 'fill' ||
-      journey.planting.survivalRate < 92 ||
-      zoneProfile.fillPressure > 0.06
-    ) && journey.planting.seedlingsPlanted < journey.planting.seedlingsAllocated;
+    const fillReady = fillOpen && journey.planting.seedlingsPlanted < journey.planting.seedlingsAllocated;
     if (fillReady) {
       actionOptions.push({
         label: 'Fill Planting (3h)',
@@ -364,11 +366,19 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
       journey.surveys.freeGrowingComplete < journey.surveys.freeGrowingTarget &&
       hoursLeft >= 3) {
     const seasonNote = surveyEff >= 1.2 ? ' (peak season!)' : '';
-    actionOptions.push({
-      label: `Survey Free-Growing (3h)${seasonNote}`,
-      description: `Check planting survival after the stand has been tended (${getSilvicultureTaskSummary(journey, zoneProfile, 'survey')})`,
-      value: 'survey'
-    });
+    if (surveyReady) {
+      actionOptions.push({
+        label: `Survey Free-Growing (3h)${seasonNote}`,
+        description: `Check planting survival after the stand has been tended (${getSilvicultureTaskSummary(journey, zoneProfile, 'survey')})`,
+        value: 'survey'
+      });
+    } else {
+      actionOptions.push({
+        label: 'Survey Free-Growing (NEEDS BRUSH)',
+        description: 'Bring brushing closer to planted ground before trying to declare free-growing.',
+        value: 'survey_blocked'
+      });
+    }
   }
 
   if (journey.contractors.length > 0 && hoursLeft >= 1) {
@@ -433,6 +443,10 @@ async function processAction(game, actionId, currentSeason, seasonMods, silvicul
       if (await handleSurvey(game, seasonMods, silvicultureState, zoneProfile)) {
         journey.hoursRemaining -= 3;
       }
+      break;
+
+    case 'survey_blocked':
+      ui.writeWarning('Survey work is premature. Brush treatment needs to catch up before the file will hold a clean free-growing call.');
       break;
 
     case 'inspect':
@@ -521,8 +535,8 @@ async function handlePlanting(game, seasonMods, stage = 'plant', silvicultureSta
     journey.planting.seedlingsPlanted + seedlingsToPlant
   );
   journey.resources.seedlings -= seedlingsToPlant;
-  journey.resources.contractorCapacity -= 6;
-  journey.resources.budget -= 3500;
+  journey.resources.contractorCapacity -= 4;
+  journey.resources.budget -= 2800;
 
   ui.write(stage === 'fill'
     ? `Filled ${seedlingsToPlant.toLocaleString()} seedlings into mortality gaps.`
@@ -586,9 +600,10 @@ async function handleHerbicide(game, seasonMods, silvicultureState = null, zoneP
     : 50;
 
   const baseHectares = 45;
+  const brushBoost = vegetationPressure > 0.12 ? 1.2 : 1;
   const hectaresTreated = Math.min(
     Math.max(0, journey.brushing.hectaresTarget - journey.brushing.hectaresComplete),
-    Math.round(baseHectares * (avgProductivity / 100) * brushingEff * (0.8 + Math.random() * 0.4))
+    Math.round((baseHectares + 20) * (avgProductivity / 100) * brushingEff * brushBoost * (0.8 + Math.random() * 0.4))
   );
 
   if (hectaresTreated <= 0) {
@@ -600,8 +615,8 @@ async function handleHerbicide(game, seasonMods, silvicultureState = null, zoneP
     journey.brushing.hectaresTarget,
     journey.brushing.hectaresComplete + hectaresTreated
   );
-  journey.resources.contractorCapacity -= 3;
-  journey.resources.budget -= 2200;
+  journey.resources.contractorCapacity -= 2;
+  journey.resources.budget -= 1800;
 
   ui.write(`Treated ${hectaresTreated} hectares of competing vegetation.`);
   if (pressure.brushPressure > 0.05) {
@@ -646,12 +661,16 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
   const hasSurveyor = journey.crew
     ? (crewHasRole(journey.crew, 'surveyor') || crewHasRole(journey.crew, 'spotter'))
     : false;
+  const contractorSurveySupport = activeContractors.some((contractor) => {
+    const specialty = String(contractor?.specialty || '').toLowerCase();
+    return specialty === 'survey' || specialty === 'surveyor' || specialty === 'spotter';
+  });
   const contractorLift = activeContractors.length > 0
     ? Math.min(0.1, activeContractors.reduce((sum, c) => sum + getSilvicultureContractorFit(c, pressure, 'survey'), 0) / (activeContractors.length * 20))
     : 0;
-  const baseChance = hasSurveyor ? 0.58 : 0.44;
-  const brushingSupport = brushRatio >= Math.max(0.2, plantRatio - 0.1) ? 0.05 : 0;
-  let successChance = Math.min(0.82, baseChance * surveyEff + brushingSupport + contractorLift);
+  const baseChance = (hasSurveyor || contractorSurveySupport) ? 0.7 : 0.56;
+  const brushingSupport = brushRatio >= Math.max(0.35, plantRatio - 0.05) ? 0.1 : 0;
+  let successChance = Math.min(0.9, baseChance * surveyEff + brushingSupport + contractorLift);
   if (rushedSurvey) {
     successChance = Math.max(0.18, successChance - 0.1);
   }
@@ -663,11 +682,12 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
   }
 
   if (Math.random() < successChance) {
+    const surveyGain = (!rushedSurvey && surveyEff >= 1.1 && activeContractors.length > 0) ? 2 : 1;
     journey.surveys.freeGrowingComplete = Math.min(
       journey.surveys.freeGrowingTarget,
-      journey.surveys.freeGrowingComplete + 1
+      journey.surveys.freeGrowingComplete + surveyGain
     );
-    ui.writePositive('Survey complete - block declared free-growing!');
+    ui.writePositive(`Survey complete - ${surveyGain > 1 ? `${surveyGain} blocks` : 'block'} declared free-growing!`);
     if (rushedSurvey) {
       ui.writeWarning('The survey passes, but the rushed stand-tending sequence leaves extra scrutiny on the file.');
       adjustScrutiny(journey, 1);
@@ -695,7 +715,9 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
   }
 
   applySilvicultureContractorUsage(journey, activeContractors, pressure, 'survey');
-  activeState.phase = 'plant';
+  activeState.phase = journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget
+    ? 'plant'
+    : (brushRatio < Math.max(0.35, plantRatio - 0.05) ? 'brush' : 'survey');
   activeState.lastAction = 'survey';
 
   return true;
@@ -1201,11 +1223,11 @@ function matchesSilvicultureTask(contractor, task) {
   }
 
   if (task === 'inspect') {
-    return contractor.specialty === 'surveyor' || contractor.specialty === 'spotter' || contractor.specialty === 'planting';
+    return contractor.specialty === 'survey' || contractor.specialty === 'surveyor' || contractor.specialty === 'spotter' || contractor.specialty === 'planting';
   }
 
   if (task === 'survey') {
-    return contractor.specialty === 'surveyor' || contractor.specialty === 'spotter';
+    return contractor.specialty === 'survey' || contractor.specialty === 'surveyor' || contractor.specialty === 'spotter';
   }
 
   if (task === 'brush') {
@@ -1310,7 +1332,7 @@ function getSilvicultureContractorTraits(contractor, journey, zoneProfile = null
   } else if (specialty === 'brushing') {
     traits.add('brush-specialist');
     traits.add('heat-hard');
-  } else if (specialty === 'surveyor' || specialty === 'spotter') {
+  } else if (specialty === 'survey' || specialty === 'surveyor' || specialty === 'spotter') {
     traits.add('survey-minded');
     traits.add('process-cautious');
   }

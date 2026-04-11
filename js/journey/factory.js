@@ -65,6 +65,7 @@ export function createReconJourney(options = {}) {
     // Recon-specific tracking
     blocksAssessed: 0,
     qualitySurveys: 0,
+    verifiedBlocks: 0,
     hazardsDocumented: [],
     culturalSitesReported: [],
 
@@ -102,7 +103,7 @@ export function createSilvicultureJourney(options = {}) {
 
     // Season integration
     season: createSeasonState(effectiveRoleId),
-    scrutiny: 24,
+    scrutiny: 12,
     day: 1,
 
     // Planting Program
@@ -132,9 +133,9 @@ export function createSilvicultureJourney(options = {}) {
 
     // Resources
     resources: {
-      budget: 100000,
+      budget: 120000,
       seedlings: 250000,
-      contractorCapacity: 250,
+      contractorCapacity: 320,
       equipment: 100,
       nurseryCredit: 50,
     },
@@ -378,7 +379,11 @@ export function createPermittingJourney(options = {}) {
     },
 
     // Resources (no crew-related)
-    resources: createDeskResources(),
+    resources: createDeskResources({
+      budget: 42000,
+      politicalCapital: 46,
+      energy: 100,
+    }),
 
     discoveryTags: [],
     roadAssets: {

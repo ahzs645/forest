@@ -619,6 +619,474 @@ export const ISSUE_LIBRARY = [
     ],
   },
   {
+    id: "highway-16-viewshed-redesign",
+    title: "Highway 16 Viewshed Redesign",
+    roles: ["planner"],
+    areaTags: ["sbs", "visuals", "community-interface"],
+    seasonBias: ["Spring Planning"],
+    description:
+      "Updated sightline work above Smithers shows your opening and road prism will read much harder from Highway 16 and town than the first layout suggested.",
+    options: [
+      {
+        label: "Re-cut the boundary and add heavier edge retention",
+        outcome:
+          "You give up some volume, yet the opening finally fits the valley's visual expectations.",
+        effects: { progress: -3, compliance: 5, relationships: 4, forestHealth: 2 },
+      },
+      {
+        label: "Phase the harvest and add road-screening commitments",
+        outcome:
+          "The layout stays mostly intact while the mitigation package becomes more credible.",
+        effects: { progress: -1, compliance: 3, relationships: 3, budget: -2 },
+      },
+      {
+        label: "Defend the efficient shape and move to notice",
+        outcome:
+          "The schedule survives, but reviewers start from the premise that appearance was pushed to the bottom of the pile.",
+        effects: { progress: 3, compliance: -4, relationships: -5 },
+      },
+    ],
+  },
+  {
+    id: "cumulative-effects-dashboard-flare",
+    title: "Cumulative Effects Dashboard Flare",
+    roles: ["planner"],
+    areaTags: ["watershed", "visuals", "northern-bc"],
+    seasonBias: ["Summer Field"],
+    description:
+      "Mid-season monitoring now shows watershed disturbance, road density, and visible opening area climbing faster than the planning model predicted.",
+    options: [
+      {
+        label: "Re-sequence the program around the hottest indicators",
+        outcome:
+          "You slow the plan down and move pressure off the most exposed basins before critics write the story for you.",
+        effects: { progress: -3, compliance: 5, relationships: 4, forestHealth: 3 },
+      },
+      {
+        label: "Narrow the block list but keep the annual strategy",
+        outcome:
+          "The plan stays recognizable, though a smaller working set means harder choices later in the year.",
+        effects: { progress: -1, compliance: 3, budget: -1, relationships: 2 },
+      },
+      {
+        label: "Treat the dashboard as lagging noise and keep the original sequence",
+        outcome:
+          "Volume stays on paper, but the gap between the model and the ground becomes the new argument.",
+        effects: { progress: 3, compliance: -5, relationships: -4, forestHealth: -2 },
+      },
+    ],
+  },
+  {
+    id: "winter-block-sequencing-board",
+    title: "Winter Block Sequencing Board",
+    roles: ["planner"],
+    areaTags: ["winter-road", "remote-camps", "northern-bc"],
+    seasonBias: ["Fall Integration"],
+    description:
+      "Roadbuilding, harvesting, and silviculture teams have each optimized different blocks for freeze-up, and only one winter sequence can actually fit the access window.",
+    options: [
+      {
+        label: "Run an integrated resequencing session and pick one honest plan",
+        outcome:
+          "Everyone gives something up, but the winter board finally matches the crews and roads you actually have.",
+        effects: { progress: -2, relationships: 5, compliance: 3, budget: -1 },
+      },
+      {
+        label: "Stage a smaller satellite program beside the core sequence",
+        outcome:
+          "You preserve a backup option, though the standby work drains planning attention and contingency funds.",
+        effects: { progress: 1, budget: -3, relationships: 1, compliance: 1 },
+      },
+      {
+        label: "Let operations pick the sequence and force the rest to adapt",
+        outcome:
+          "The board gets simple quickly, but stewardship staff and finance stop trusting the assumptions underneath it.",
+        effects: { progress: 3, relationships: -5, forestHealth: -2, compliance: -2 },
+      },
+    ],
+  },
+  {
+    id: "annual-plan-reforecast",
+    title: "Annual Plan Reforecast",
+    roles: ["planner"],
+    areaTags: ["winter-road", "northern-bc"],
+    seasonBias: ["Winter Review"],
+    description:
+      "Late freeze-up, audit delays, and contractor turnover have pushed the annual plan off its original production curve, and leadership wants a credible reforecast before budgets lock.",
+    options: [
+      {
+        label: "Cut the forecast and protect the most defensible work",
+        outcome:
+          "The number gets smaller, but the revised plan reads like something operations can actually deliver.",
+        effects: { progress: -2, compliance: 4, relationships: 2, budget: 2 },
+      },
+      {
+        label: "Hold the target and build contingency scenarios around it",
+        outcome:
+          "You keep ambition on the table while quietly preparing backup sequences in case the winter window stays weak.",
+        effects: { progress: 1, compliance: 2, budget: -2, relationships: 1 },
+      },
+      {
+        label: "Keep the original forecast and hope the road season catches up",
+        outcome:
+          "The headline stays intact, but everyone downstream knows the schedule is now fiction with branding.",
+        effects: { progress: 3, compliance: -4, relationships: -3 },
+      },
+    ],
+  },
+  {
+    id: "exhibit-a-redline-return",
+    title: "Exhibit A Redline Return",
+    roles: ["permitter"],
+    areaTags: ["bwbs", "peace-region", "peatland", "gas-interface", "northern-bc"],
+    seasonBias: ["Spring Planning"],
+    baseWeight: 2,
+    description:
+      "District review sends your access package back with redlines across the Exhibit A, clearing estimate, and deactivation notes just as breakup approaches.",
+    options: [
+      {
+        label: "Rebuild the alignment package and deactivation logic",
+        outcome:
+          "You redraw the road, tighten the peatland rationale, and give reviewers a file that reads cleanly.",
+        effects: { progress: -2, compliance: 6, budget: -2 },
+      },
+      {
+        label: "Trim the spur to the defensible minimum and resubmit",
+        outcome:
+          "The footprint shrinks enough to answer most of the redlines, but the block loses some flexibility.",
+        effects: { progress: -1, compliance: 4, forestHealth: 1 },
+      },
+      {
+        label: "Argue the existing permit authority already covers it",
+        outcome:
+          "You save desk time for a moment, then the authority question becomes the whole review.",
+        effects: { progress: 2, compliance: -6, relationships: -2 },
+      },
+    ],
+  },
+  {
+    id: "significant-road-work-trigger",
+    title: "Bridge Swap Triggers Significant Road Work",
+    roles: ["permitter"],
+    areaTags: ["salmon", "watershed", "steep", "northern-bc"],
+    seasonBias: ["Summer Field"],
+    baseWeight: 2,
+    description:
+      "A washed abutment on a fish-bearing access route turns a maintenance bridge fix into a larger realignment and structure than the district expected.",
+    options: [
+      {
+        label: "Stop and file the significant road work package",
+        outcome:
+          "You lose the first fish window, but the engineering and habitat record finally match the job.",
+        effects: { progress: -3, compliance: 6, budget: -2 },
+      },
+      {
+        label: "Scale the design back to a defensible maintenance fix",
+        outcome:
+          "The crossing gets less future-proof, yet you stay inside a simpler approval path.",
+        effects: { progress: -1, compliance: 3, forestHealth: 1 },
+      },
+      {
+        label: "Mobilize on the original work order before questions harden",
+        outcome:
+          "Machines get moving fast, and so does district scrutiny.",
+        effects: { progress: 3, compliance: -7, relationships: -3 },
+      },
+    ],
+  },
+  {
+    id: "overlap-map-affidavit",
+    title: "Overlap Map Affidavit",
+    roles: ["permitter"],
+    areaTags: ["winter-road", "gas-interface", "northern-bc"],
+    seasonBias: ["Fall Integration"],
+    description:
+      "Title review finds a tenure overlap on one of your late-season files, and the district now wants a signed overlap memo before the package can move.",
+    options: [
+      {
+        label: "Commission a clean overlap package and sworn map note",
+        outcome:
+          "It burns time, but the file stops wobbling and the overlap risk is finally documented properly.",
+        effects: { progress: -2, compliance: 6, budget: -1 },
+      },
+      {
+        label: "Pull the disputed block and advance the clean files first",
+        outcome:
+          "You preserve momentum on part of the program while conceding the overlap needs a slower resolution.",
+        effects: { progress: -1, compliance: 4, relationships: 1 },
+      },
+      {
+        label: "Call the overlap immaterial and keep the bundle intact",
+        outcome:
+          "The package looks faster until the title question becomes the first thing reviewers open.",
+        effects: { progress: 2, compliance: -6, relationships: -2 },
+      },
+    ],
+  },
+  {
+    id: "road-closeout-mismatch",
+    title: "Road Closeout Record Mismatch",
+    roles: ["permitter"],
+    areaTags: ["winter-road", "remote-camps", "bwbs", "steep", "northern-bc"],
+    seasonBias: ["Winter Review"],
+    baseWeight: 2,
+    description:
+      "Demob notes say some spurs were deactivated, others are still under maintenance, and none of it lines up cleanly with the notices already on file.",
+    options: [
+      {
+        label: "Reconcile the records and file the closeout properly",
+        outcome:
+          "You spend days chasing supervisors and maps, but the road file stops drifting.",
+        effects: { progress: -2, compliance: 6, budget: -1 },
+      },
+      {
+        label: "Keep maintenance open on the ambiguous segments",
+        outcome:
+          "It costs a bit more now, yet you avoid declaring an end state you cannot defend.",
+        effects: { progress: -1, compliance: 3, budget: -2 },
+      },
+      {
+        label: "Batch the notices later and hope nobody compares dates",
+        outcome:
+          "The paperwork feels deferred rather than solved, and that becomes obvious on review.",
+        effects: { progress: 2, compliance: -6, relationships: -2 },
+      },
+    ],
+  },
+  {
+    id: "thaw-ravine-realignment",
+    title: "Thaw Ravine Realignment",
+    roles: ["recce"],
+    areaTags: ["steep", "remote-camps", "northern-bc"],
+    seasonBias: ["Spring Planning"],
+    description:
+      "Breakup reactivates a ravine crossing you flagged in winter, and the traverse line you sold as workable no longer lands on stable ground.",
+    options: [
+      {
+        label: "Reroute onto the ridge and refly the notes",
+        outcome:
+          "The line gets longer, but the traverse comes back onto ground that still makes sense after thaw.",
+        effects: { progress: -2, compliance: 4, forestHealth: 2, budget: -1 },
+      },
+      {
+        label: "Bring in a rope-and-geotech check before committing",
+        outcome:
+          "You burn a few field days getting the slope read properly instead of pretending the winter flagging still tells the truth.",
+        effects: { progress: -3, compliance: 5, budget: -2 },
+      },
+      {
+        label: "Keep the original line and trust it will dry out",
+        outcome:
+          "The shortcut survives on paper until later reviewers start asking why your traverse ignored the obvious movement.",
+        effects: { progress: 3, compliance: -4, relationships: -1 },
+      },
+    ],
+  },
+  {
+    id: "seep-slope-reroute",
+    title: "Hidden Seep Complex on Spur Traverse",
+    roles: ["recce"],
+    areaTags: ["steep", "glacial", "northern-bc"],
+    seasonBias: ["Summer Field"],
+    baseWeight: 2,
+    description:
+      "Fresh recce flags a seep band crossing the exact sidehill chosen for a proposed spur, and the original line is moving just enough to unravel a cheap road.",
+    options: [
+      {
+        label: "Reroute higher onto the ridge",
+        outcome:
+          "The road gets longer and more expensive, but the alignment comes back into defensible terrain.",
+        effects: { progress: -2, compliance: 4, forestHealth: 3, budget: -2 },
+      },
+      {
+        label: "Hold the line and bring in geotech",
+        outcome:
+          "You lose time while a specialist confirms what can actually stand up through breakup and storms.",
+        effects: { progress: -3, compliance: 5, budget: -3 },
+      },
+      {
+        label: "Build the original line with extra rock",
+        outcome:
+          "The shortcut keeps the schedule alive now, but future maintenance and stability risk immediately climb.",
+        effects: { progress: 3, budget: -2, compliance: -4, forestHealth: -2 },
+      },
+    ],
+  },
+  {
+    id: "weather-window-collapse",
+    title: "Weather Window Collapse",
+    roles: ["recce"],
+    areaTags: ["remote-camps", "glacial", "northern-bc"],
+    seasonBias: ["Fall Integration"],
+    description:
+      "Fog, early snow, and short daylight keep collapsing the last workable access window for one unfinished ridge traverse.",
+    options: [
+      {
+        label: "Hold the crew in place and finish on the first clear break",
+        outcome:
+          "Camp costs climb, but the traverse comes home complete instead of half-believed.",
+        effects: { progress: -1, compliance: 3, budget: -2, relationships: 1 },
+      },
+      {
+        label: "Downscope to the critical control and leave the fringe notes",
+        outcome:
+          "You protect the most important data while accepting that part of the block will need another look next year.",
+        effects: { progress: 1, compliance: 1, budget: -1 },
+      },
+      {
+        label: "Push the crew through the bad window and finish now",
+        outcome:
+          "The notes come back fast, but the risk call reads worse every time the weather recap gets retold.",
+        effects: { progress: 3, compliance: -4, relationships: -3 },
+      },
+    ],
+  },
+  {
+    id: "whiteout-extraction-call",
+    title: "Whiteout Extraction Call",
+    roles: ["recce"],
+    areaTags: ["winter-road", "remote-camps", "northern-bc"],
+    seasonBias: ["Winter Review"],
+    description:
+      "A whiteout closes both the road and aviation window with one field crew still beyond the camp line during your final winter push.",
+    options: [
+      {
+        label: "Shelter the crew in place and run strict sat check-ins",
+        outcome:
+          "No heroics, no headlines. The work stops, but the decision reads like leadership instead of panic.",
+        effects: { progress: -3, compliance: 4, relationships: 2, budget: -1 },
+      },
+      {
+        label: "Send a tracked recovery unit the moment visibility improves",
+        outcome:
+          "The extraction is slow but controlled, keeping the crew safe while preserving some confidence in the field plan.",
+        effects: { progress: -1, compliance: 2, budget: -2, relationships: 1 },
+      },
+      {
+        label: "Tell the crew to self-extract before conditions worsen",
+        outcome:
+          "You save time on the board and spend it all back when the call gets replayed as needless exposure.",
+        effects: { progress: 2, compliance: -5, relationships: -4 },
+      },
+    ],
+  },
+  {
+    id: "seedlot-vigour-drop",
+    title: "Seedlot Vigour Drop at Cold Storage",
+    roles: ["silviculture"],
+    areaTags: ["sbs", "bwbs", "beetle-recovery"],
+    seasonBias: ["Spring Planning"],
+    description:
+      "A nursery notice says one of your interior spruce lots lost vigour in cold storage and only part of the order should be planted.",
+    options: [
+      {
+        label: "Reassign the best lots and rewrite the notes",
+        outcome:
+          "You protect the toughest blocks and document the shuffle, though the planning week gets consumed by revisions.",
+        effects: { progress: -1, forestHealth: 4, compliance: 4, budget: -2 },
+      },
+      {
+        label: "Blend pine or larch onto warmer aspects",
+        outcome:
+          "The mix is less elegant but operationally workable, and the rationale holds if the field notes stay tight.",
+        effects: { progress: 1, forestHealth: 3, compliance: 2, relationships: 1 },
+      },
+      {
+        label: "Plant the weak lot anyway",
+        outcome:
+          "Planting starts on time, but survival risk gets baked into the program from day one.",
+        effects: { progress: 2, forestHealth: -4, compliance: -3, budget: 1 },
+      },
+    ],
+  },
+  {
+    id: "herbicide-drift-complaint",
+    title: "Herbicide Drift Complaint",
+    roles: ["silviculture"],
+    areaTags: ["community-interface", "watershed", "northern-bc"],
+    seasonBias: ["Summer Field"],
+    description:
+      "A neighbouring landowner calls in a drift complaint after a hot morning treatment near the block edge, and the spray record will not speak for itself.",
+    options: [
+      {
+        label: "Pause treatments and investigate every edge unit",
+        outcome:
+          "The program slows, but the file shows you took the complaint seriously before it hardened into enforcement.",
+        effects: { progress: -2, compliance: 5, relationships: 4, budget: -2 },
+      },
+      {
+        label: "Switch edge work to manual crews and keep the interior spray plan",
+        outcome:
+          "You keep most of the treatment target alive while reducing the risk on the visible ground.",
+        effects: { progress: 1, compliance: 2, budget: -3, relationships: 2 },
+      },
+      {
+        label: "Defend the spray record and continue as planned",
+        outcome:
+          "The hectares look good on the board right up until trust starts peeling away around the block.",
+        effects: { progress: 3, compliance: -4, relationships: -5 },
+      },
+    ],
+  },
+  {
+    id: "free-growing-catchup-plan",
+    title: "Free-Growing Catch-Up Plan",
+    roles: ["silviculture"],
+    areaTags: ["sbs", "beetle-recovery", "northern-bc"],
+    seasonBias: ["Fall Integration"],
+    description:
+      "Fall survey plots on recovery units are coming in light after a wet summer drove aspen suckering and grass cover over the crop trees.",
+    options: [
+      {
+        label: "Package fill plant and brushing now",
+        outcome:
+          "You spend money now to rescue the weakest ground before the deficit compounds.",
+        effects: { progress: -1, forestHealth: 5, compliance: 4, budget: -3 },
+      },
+      {
+        label: "Rewrite targets around natural ingress",
+        outcome:
+          "The stand story becomes more nuanced, and it can work if the survey rationale is airtight.",
+        effects: { progress: 1, forestHealth: 3, compliance: 2, relationships: 1 },
+      },
+      {
+        label: "Roll the weak plots into next year",
+        outcome:
+          "The paperwork stays light for the moment, but the biological problem keeps growing underneath it.",
+        effects: { progress: 2, budget: 1, compliance: -4, forestHealth: -2 },
+      },
+    ],
+  },
+  {
+    id: "snow-press-browse-signal",
+    title: "Snow Press and Browse Signal",
+    roles: ["silviculture"],
+    areaTags: ["bwbs", "sbs", "northern-bc"],
+    seasonBias: ["Winter Review"],
+    description:
+      "Winter check plots show snow press and heavy browse in young mixed stands near a block edge, and next summer's survival story will sag if the program rolls forward unchanged.",
+    options: [
+      {
+        label: "Budget hotspot fill plant and protection",
+        outcome:
+          "You target the worst patches early and keep the damage from setting the tone for the whole block.",
+        effects: { progress: -1, forestHealth: 4, compliance: 3, budget: -3 },
+      },
+      {
+        label: "Shift future mixes to less palatable stock",
+        outcome:
+          "The next cycle gets more defensible on tough ground, even if the species mix moves away from the original ideal.",
+        effects: { progress: 0, forestHealth: 3, compliance: 2, relationships: 1 },
+      },
+      {
+        label: "Treat it as normal wildlife pressure",
+        outcome:
+          "You save money now, but the winter signal shows up again when survival numbers are due.",
+        effects: { progress: 2, budget: 1, compliance: -2, forestHealth: -3 },
+      },
+    ],
+  },
+  {
     id: "heritage-protocol-gap",
     title: "Heritage Protocol Gap Identified",
     description:
