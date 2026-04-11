@@ -133,7 +133,7 @@ function ContentView({ data }) {
     );
   }
 
-  if (data.type === "task" || data.type === "issue") {
+  if (data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation") {
     return (
       <div className="tui-content-stack">
         <NoticeBlock notice={data.notice} />

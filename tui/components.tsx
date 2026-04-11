@@ -319,6 +319,8 @@ export function ContentView({ data }: { data: ContentData }) {
 
     case "task":
     case "issue":
+    case "event":
+    case "temptation":
       return (
         <>
           <NoticeView notice={data.notice} />

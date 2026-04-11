@@ -40,9 +40,13 @@ function extractPair(text, label) {
   };
 }
 
+function normalizeChoiceLabel(label) {
+  return String(label || '').replace(/^\[\d+\]\s*/, '').trim();
+}
+
 function findFirstMatching(labels, priorities) {
   for (const priority of priorities) {
-    const index = labels.findIndex((label) => label.startsWith(priority));
+    const index = labels.findIndex((label) => normalizeChoiceLabel(label).startsWith(priority));
     if (index !== -1) {
       return index;
     }
@@ -178,7 +182,7 @@ function pickChoice(labels, terminalText, strategyName) {
 
   const recommendedAction = getRecommendedActionLabel(terminalText);
   if (recommendedAction) {
-    const recommendedIndex = labels.findIndex((label) => label.startsWith(recommendedAction));
+    const recommendedIndex = labels.findIndex((label) => normalizeChoiceLabel(label).startsWith(recommendedAction));
     if (recommendedIndex !== -1) {
       return recommendedIndex;
     }
@@ -231,7 +235,7 @@ function pickChoice(labels, terminalText, strategyName) {
   const priorities = [...sharedPriorities, ...(strategyPriorities[strategyName] || [])];
 
   for (const priority of priorities) {
-    const index = labels.findIndex((label) => label.startsWith(priority));
+    const index = labels.findIndex((label) => normalizeChoiceLabel(label).startsWith(priority));
     if (index !== -1) {
       return index;
     }

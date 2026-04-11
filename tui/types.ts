@@ -12,7 +12,7 @@ type BaseContent = {
 export type ContentData =
   | (BaseContent & { type: "message"; heading?: string; body: string })
   | {
-      type: "task" | "issue";
+      type: "task" | "issue" | "event" | "temptation";
       title: string;
       description: string;
       flavor?: string;

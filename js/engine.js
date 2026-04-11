@@ -4,16 +4,208 @@ import {
   ISSUE_LIBRARY,
   CHAINED_ISSUES,
   MISCHIEF_OPTIONS,
+  ILLEGAL_ACTS,
+  DESK_EVENTS,
+  FIELD_EVENTS,
 } from "./data/index.js";
 import { getAreaComplianceProfile } from "./data/professionalPractice.js";
 import { resolveRisk } from "./risk.js";
 
 export const SEASONS = ["Spring Planning", "Summer Field", "Fall Integration", "Winter Review"];
 const ISSUE_REPEAT_COOLDOWN_ROUNDS = 2;
+const EVENT_REPEAT_COOLDOWN_ROUNDS = 2;
+const TEMPTATION_REPEAT_COOLDOWN_ROUNDS = 2;
 const BUDGET_ATTRITION_THRESHOLD = 25;
 const RELATIONSHIP_TRUST_THRESHOLD = 35;
 const COMPLIANCE_AUDIT_THRESHOLD = 40;
 const DEFAULT_CPD_TARGET = 30;
+const ROLE_EVENT_DOMAINS = {
+  planner: "desk",
+  permitter: "desk",
+  recce: "field",
+  silviculture: "field",
+};
+const ROLE_JOURNEY_TYPES = {
+  planner: ["planning", "desk"],
+  permitter: ["permitting", "desk"],
+  recce: ["recon", "field"],
+  silviculture: ["silviculture", "field"],
+};
+const ECOLOGICAL_TEMPTATION_TAGS = new Set([
+  "wildlife",
+  "riparian",
+  "fire",
+  "erosion",
+  "herbicide",
+  "nursery",
+  "salvage",
+  "old-growth",
+]);
+const ETHICS_TEMPTATION_TAGS = new Set([
+  "fraud",
+  "corruption",
+  "bribery",
+  "collusion",
+  "procurement",
+  "payroll",
+  "double-dip",
+  "laundering",
+  "greenwashing",
+  "forgery",
+  "deception",
+  "fabrication",
+]);
+const AUDIT_TEMPTATION_TAGS = new Set([
+  "mapping",
+  "reporting",
+  "data",
+  "modeling",
+  "billing",
+  "grants",
+  "compliance",
+  "paperwork",
+  "records",
+  "monitoring",
+]);
+const COMMUNITY_TEMPTATION_TAGS = new Set(["cultural", "community", "labour", "media"]);
+const ROLE_TEMPTATION_PROFILES = {
+  planner: {
+    flavor: "Bureaucratic shortcut",
+    chance: {
+      base: 0.03,
+      lateSeasonBonus: 0.02,
+      cap: 0.18,
+      pressure: {
+        budget: { threshold: 34, bonus: 0.04 },
+        progress: { threshold: 42, bonus: 0.04 },
+        compliance: { threshold: 42, bonus: 0.03 },
+        relationships: { threshold: 34, bonus: 0.01 },
+      },
+    },
+    gainRange: [1400, 2800],
+    successBaseEffects: { progress: 3, politicalCapital: -5 },
+    failConfig: {
+      budgetMin: 2400,
+      budgetMultiplier: 1.2,
+      effects: { politicalCapital: -10, compliance: -14, relationships: -8, progress: -6 },
+    },
+    refuseEffects: { politicalCapital: 2, compliance: 2 },
+    reportEffects: { politicalCapital: 5, compliance: 4, timeUsed: 2 },
+    baseSuccess: 0.4,
+    preferredTags: {
+      mapping: 2.5,
+      data: 2,
+      modeling: 2,
+      reporting: 1.5,
+      monitoring: 1.5,
+      paperwork: 1.5,
+      grants: 1,
+      engineering: 1,
+    },
+  },
+  permitter: {
+    flavor: "Bureaucratic shortcut",
+    chance: {
+      base: 0.035,
+      lateSeasonBonus: 0.02,
+      cap: 0.2,
+      pressure: {
+        budget: { threshold: 35, bonus: 0.05 },
+        progress: { threshold: 42, bonus: 0.04 },
+        compliance: { threshold: 42, bonus: 0.04 },
+        relationships: { threshold: 35, bonus: 0.02 },
+      },
+    },
+    gainRange: [1800, 3400],
+    successBaseEffects: { progress: 5, politicalCapital: -6 },
+    failConfig: {
+      budgetMin: 2600,
+      budgetMultiplier: 1.25,
+      effects: { politicalCapital: -12, compliance: -15, relationships: -9, progress: -6 },
+    },
+    refuseEffects: { politicalCapital: 2, compliance: 2 },
+    reportEffects: { politicalCapital: 5, compliance: 4, timeUsed: 2 },
+    baseSuccess: 0.36,
+    preferredTags: {
+      procurement: 2.5,
+      paperwork: 2,
+      compliance: 1.5,
+      cultural: 1.5,
+      collusion: 1.5,
+      bribery: 1.5,
+      forgery: 1.5,
+      mapping: 1,
+    },
+  },
+  recce: {
+    flavor: "Field desperation",
+    chance: {
+      base: 0.045,
+      lateSeasonBonus: 0.03,
+      cap: 0.22,
+      pressure: {
+        budget: { threshold: 35, bonus: 0.05 },
+        progress: { threshold: 40, bonus: 0.04 },
+        compliance: { threshold: 40, bonus: 0.03 },
+        relationships: { threshold: 32, bonus: 0.02 },
+      },
+    },
+    gainRange: [300, 900],
+    successBaseEffects: { progress: 4, equipment: -10, crew_morale: -4 },
+    failConfig: {
+      budgetMin: 450,
+      budgetMultiplier: 0.9,
+      effects: { equipment: -15, crew_morale: -10, compliance: -12, progress: -8 },
+    },
+    refuseEffects: { crew_morale: 2, compliance: 1 },
+    reportEffects: { crew_morale: 1, compliance: 3, timeUsed: 2 },
+    baseSuccess: 0.34,
+    preferredTags: {
+      access: 2,
+      logistics: 2,
+      aviation: 1.5,
+      wildlife: 1.5,
+      riparian: 1.5,
+      salvage: 1.5,
+      drones: 1.5,
+      risk: 1,
+    },
+  },
+  silviculture: {
+    flavor: "Field desperation",
+    chance: {
+      base: 0.05,
+      lateSeasonBonus: 0.03,
+      cap: 0.24,
+      pressure: {
+        budget: { threshold: 34, bonus: 0.05 },
+        progress: { threshold: 38, bonus: 0.04 },
+        compliance: { threshold: 38, bonus: 0.04 },
+        relationships: { threshold: 32, bonus: 0.02 },
+      },
+    },
+    gainRange: [350, 950],
+    successBaseEffects: { progress: 2, equipment: -12, crew_morale: -5 },
+    failConfig: {
+      budgetMin: 500,
+      budgetMultiplier: 0.9,
+      effects: { equipment: -16, crew_morale: -10, compliance: -12, progress: -9 },
+    },
+    refuseEffects: { crew_morale: 2, compliance: 1 },
+    reportEffects: { crew_morale: 1, compliance: 3, timeUsed: 2 },
+    baseSuccess: 0.28,
+    preferredTags: {
+      nursery: 2.5,
+      herbicide: 2,
+      fire: 2,
+      erosion: 1.5,
+      stocking: 1.5,
+      automation: 1.5,
+      wildlife: 1,
+      records: 1,
+    },
+  },
+};
 const PROFESSIONAL_CHAIN_DEFS = {
   registration: {
     title: "Registration Renewal",
@@ -311,6 +503,7 @@ export function createInitialState({ companyName, roleId, areaId }) {
     history: [],
     flags: {},
     pendingIssues: [],
+    pendingEvents: [],
     issueHistory: [],
     timeline: [
       {
@@ -366,6 +559,7 @@ export function applyOptionOutcome(state, option = {}, source) {
       applyOptionFlags(state, { setFlags: result.flags });
     }
     applyScheduledIssues(state, option);
+    applyScheduledEvents(state, option);
     return {
       effects,
       outcome: result.outcome,
@@ -376,6 +570,7 @@ export function applyOptionOutcome(state, option = {}, source) {
   const effects = applyEffects(state, option.effects || {}, source);
   applyOptionFlags(state, option);
   applyScheduledIssues(state, option);
+  applyScheduledEvents(state, option);
   return {
     effects,
     outcome: option.outcome ?? "",
@@ -528,6 +723,87 @@ export function getRoleTasks(state) {
       options: [...task.options, mischief],
     };
   });
+}
+
+export function drawSeasonalEvent(state, rng = Math.random) {
+  if (!state?.role) {
+    return null;
+  }
+
+  if (Array.isArray(state.pendingEvents)) {
+    for (const pending of state.pendingEvents) {
+      if (!pending || typeof pending.delay !== "number") {
+        continue;
+      }
+      pending.delay = Math.max(0, pending.delay - 1);
+    }
+
+    for (let i = 0; i < state.pendingEvents.length; i++) {
+      const pending = state.pendingEvents[i];
+      if (!pending) continue;
+      if (typeof pending.delay === "number" && pending.delay > 0) {
+        continue;
+      }
+      const candidate = findOperationalEventById(pending.id, state);
+      if (candidate && eventMatchesSeasonalContext(candidate, state)) {
+        state.pendingEvents.splice(i, 1);
+        return adaptOperationalEvent(candidate, state);
+      }
+      if (!candidate) {
+        state.pendingEvents.splice(i, 1);
+        i--;
+      }
+    }
+  }
+
+  const pool = getOperationalEventLibrary(state).filter((event) => eventMatchesSeasonalContext(event, state));
+  const freshPool = pool.filter((event) => !isEventInCooldown(state, event.id));
+  const selectablePool = freshPool.length ? freshPool : pool;
+
+  if (!selectablePool.length) {
+    return null;
+  }
+
+  const weightedPool = selectablePool.map((event) => ({
+    event,
+    weight: scoreOperationalEventSelection(event, state),
+  }));
+  const selected = pickWeightedEntry(weightedPool, rng);
+  return selected ? adaptOperationalEvent(selected, state) : null;
+}
+
+export function drawSeasonalTemptation(state, rng = Math.random) {
+  if (!state?.role || !Array.isArray(ILLEGAL_ACTS) || ILLEGAL_ACTS.length === 0) {
+    return null;
+  }
+
+  if (hasRecentTemptation(state)) {
+    return null;
+  }
+
+  const chance = calculateTemptationChance(state);
+  if (chance <= 0 || rng() >= chance) {
+    return null;
+  }
+
+  const roleId = state.role.id;
+  const matchingActs = ILLEGAL_ACTS.filter((act) => {
+    if (!act) {
+      return false;
+    }
+    if (!Array.isArray(act.roles) || act.roles.length === 0) {
+      return true;
+    }
+    return act.roles.includes(roleId);
+  });
+  const pool = matchingActs.length ? matchingActs : ILLEGAL_ACTS;
+  const weightedPool = pool.map((act) => ({
+    act,
+    weight: scoreIllegalActSelection(act, state),
+  }));
+
+  const selected = pickWeightedItem(weightedPool, rng, "act");
+  return selected ? adaptIllegalActTemptation(selected, state, rng) : null;
 }
 
 export function drawIssue(state, rng = Math.random) {
@@ -706,6 +982,22 @@ function applyDiminishingReturns(currentMetric, delta) {
   return delta;
 }
 
+function getOperationalEventLibrary(state) {
+  return ROLE_EVENT_DOMAINS[state?.role?.id] === "field" ? FIELD_EVENTS : DESK_EVENTS;
+}
+
+function findOperationalEventById(eventId, state) {
+  if (!eventId) {
+    return null;
+  }
+
+  const primary = getOperationalEventLibrary(state);
+  return primary.find((event) => event.id === eventId)
+    || DESK_EVENTS.find((event) => event.id === eventId)
+    || FIELD_EVENTS.find((event) => event.id === eventId)
+    || null;
+}
+
 function isIssueInCooldown(state, issueId) {
   if (!issueId || !Array.isArray(state?.history) || !state.history.length) {
     return false;
@@ -719,6 +1011,43 @@ function isIssueInCooldown(state, issueId) {
     const roundsAgo = currentRound - Number(entry.round || 0);
     return roundsAgo > 0 && roundsAgo <= ISSUE_REPEAT_COOLDOWN_ROUNDS;
   });
+}
+
+function isEventInCooldown(state, eventId) {
+  if (!eventId || !Array.isArray(state?.history) || !state.history.length) {
+    return false;
+  }
+
+  const currentRound = Number(state.round || 1);
+  return state.history.some((entry) => {
+    if (entry?.type !== "event" || entry.id !== eventId) {
+      return false;
+    }
+    const roundsAgo = currentRound - Number(entry.round || 0);
+    return roundsAgo > 0 && roundsAgo <= EVENT_REPEAT_COOLDOWN_ROUNDS;
+  });
+}
+
+function hasRecentTemptation(state) {
+  if (!Array.isArray(state?.history) || !state.history.length) {
+    return false;
+  }
+
+  const currentRound = Number(state.round || 1);
+  return state.history.some((entry) => {
+    if (entry?.type !== "temptation") {
+      return false;
+    }
+    const roundsAgo = currentRound - Number(entry.round || 0);
+    return roundsAgo > 0 && roundsAgo <= TEMPTATION_REPEAT_COOLDOWN_ROUNDS;
+  });
+}
+
+function getTemptationProfile(stateOrRoleId) {
+  const roleId = typeof stateOrRoleId === "string"
+    ? stateOrRoleId
+    : stateOrRoleId?.role?.id || stateOrRoleId?.roleId;
+  return ROLE_TEMPTATION_PROFILES[roleId] || ROLE_TEMPTATION_PROFILES.planner;
 }
 
 function issueMatchesContext(issue, state, tags) {
@@ -752,6 +1081,66 @@ function issueMatchesContext(issue, state, tags) {
   return true;
 }
 
+function eventMatchesSeasonalContext(event, state) {
+  if (!event || !state?.role || !state?.area) {
+    return false;
+  }
+
+  const roleId = state.role.id;
+  const roleJourneyTypes = ROLE_JOURNEY_TYPES[roleId] || [];
+  if (Array.isArray(event.roles) && event.roles.length > 0 && !event.roles.includes(roleId)) {
+    return false;
+  }
+  if (Array.isArray(event.journeyTypes) && event.journeyTypes.length > 0) {
+    const matchesJourney = roleJourneyTypes.some((journeyType) => event.journeyTypes.includes(journeyType));
+    if (!matchesJourney) {
+      return false;
+    }
+  }
+
+  const tags = Array.isArray(state.area.tags) ? state.area.tags : [];
+  if (Array.isArray(event.areaTags) && event.areaTags.length > 0) {
+    if (!event.areaTags.some((tag) => tags.includes(tag))) {
+      return false;
+    }
+  }
+
+  const becCode = state.area.becCode;
+  if (Array.isArray(event.becCodes) && event.becCodes.length > 0) {
+    if (!becCode || !event.becCodes.includes(becCode)) {
+      return false;
+    }
+  }
+
+  if (event.options?.some((option) => typeof option?.effects?.permits_approved === "number") && roleId !== "permitter") {
+    return false;
+  }
+
+  return true;
+}
+
+function calculateTemptationChance(state) {
+  const round = Number(state.round || 1);
+  if (round <= 1) {
+    return 0;
+  }
+
+  const profile = getTemptationProfile(state);
+  let chance = profile.chance.base;
+
+  if (round >= 3) {
+    chance += profile.chance.lateSeasonBonus;
+  }
+
+  for (const [metric, rule] of Object.entries(profile.chance.pressure || {})) {
+    if (Number(state.metrics?.[metric]) < rule.threshold) {
+      chance += rule.bonus;
+    }
+  }
+
+  return clamp(chance, 0, profile.chance.cap);
+}
+
 export function scoreIssueSelection(issue, state, context) {
   let weight = Math.max(1, Number(issue.baseWeight) || 1);
   if (issue.areaTags?.length) {
@@ -780,6 +1169,82 @@ export function scoreIssueSelection(issue, state, context) {
     weight *= 0.75;
   }
   return Math.max(0.1, weight);
+}
+
+function scoreOperationalEventSelection(event, state) {
+  let weight = Math.max(1, Number(event.baseWeight) || 1);
+  const roleId = state.role.id;
+  const areaTags = Array.isArray(state.area?.tags) ? state.area.tags : [];
+
+  if (Array.isArray(event.roles) && event.roles.length > 0) {
+    if (event.roles.length === 1 && event.roles[0] === roleId) {
+      weight += 3;
+    } else if (event.roles.includes(roleId)) {
+      weight += 1.5;
+    }
+  }
+
+  if (Array.isArray(event.areaTags) && event.areaTags.length > 0) {
+    const matches = event.areaTags.filter((tag) => areaTags.includes(tag)).length;
+    weight += matches * 2;
+  }
+
+  if (Array.isArray(event.becCodes) && event.becCodes.includes(state.area?.becCode)) {
+    weight += 2;
+  }
+
+  if (event.options?.some((option) => typeof option?.effects?.permits_approved === "number")) {
+    weight += roleId === "permitter" ? 3 : 0;
+  }
+
+  if (eventTouchesMetric(event, "compliance") && state.metrics.compliance < 55) {
+    weight += 1.5;
+  }
+  if (eventTouchesMetric(event, "relationships") && state.metrics.relationships < 55) {
+    weight += 1.5;
+  }
+  if (eventTouchesMetric(event, "budget") && state.metrics.budget < 55) {
+    weight += 1;
+  }
+  if (eventTouchesMetric(event, "progress") && state.metrics.progress < 55) {
+    weight += 1;
+  }
+
+  return Math.max(0.25, weight);
+}
+
+function scoreIllegalActSelection(act, state) {
+  let weight = 1;
+  const actTags = Array.isArray(act?.tags) ? act.tags : [];
+  const areaTags = Array.isArray(state.area?.tags) ? state.area.tags : [];
+  const profile = getTemptationProfile(state);
+  const matchingTags = actTags.filter((tag) => areaTags.includes(tag)).length;
+  weight += matchingTags * 2;
+
+  if (Array.isArray(act?.roles) && act.roles.length === 1 && act.roles[0] === state.role.id) {
+    weight += 1.5;
+  }
+
+  for (const [tag, bonus] of Object.entries(profile.preferredTags || {})) {
+    if (actTags.includes(tag)) {
+      weight += bonus;
+    }
+  }
+
+  if (hasMatchingTag(actTags, ETHICS_TEMPTATION_TAGS) && state.metrics?.budget < 50) {
+    weight += 2;
+  }
+  if (hasMatchingTag(actTags, ECOLOGICAL_TEMPTATION_TAGS) && state.metrics?.compliance < 55) {
+    weight += 1.5;
+  }
+  if (hasMatchingTag(actTags, AUDIT_TEMPTATION_TAGS) && state.metrics?.progress < 55) {
+    weight += 1;
+  }
+  if (hasMatchingTag(actTags, COMMUNITY_TEMPTATION_TAGS) && state.metrics?.relationships < 55) {
+    weight += 1;
+  }
+
+  return Math.max(0.25, weight);
 }
 
 function metricsTrendlines(state) {
@@ -876,6 +1341,370 @@ function futureOutlook(metrics, trends, area) {
   return pieces;
 }
 
+function eventTouchesMetric(event, metric) {
+  return Array.isArray(event?.options)
+    && event.options.some((option) => {
+      const effects = option?.effects || {};
+      if (effects[metric] !== undefined) {
+        return true;
+      }
+      if ((metric === "relationships" || metric === "compliance") && typeof effects.politicalCapital === "number") {
+        return true;
+      }
+      if (metric === "progress" && typeof option?.timeUsed === "number") {
+        return true;
+      }
+      return false;
+    });
+}
+
+function pickWeightedEntry(weightedPool, rng) {
+  const totalWeight = weightedPool.reduce((sum, entry) => sum + entry.weight, 0);
+  if (totalWeight <= 0) {
+    return weightedPool.length ? weightedPool[0].event : null;
+  }
+
+  let roll = rng() * totalWeight;
+  for (const entry of weightedPool) {
+    roll -= entry.weight;
+    if (roll <= 0) {
+      return entry.event;
+    }
+  }
+
+  return weightedPool[weightedPool.length - 1]?.event ?? null;
+}
+
+function pickWeightedItem(weightedPool, rng, valueKey) {
+  const totalWeight = weightedPool.reduce((sum, entry) => sum + entry.weight, 0);
+  if (totalWeight <= 0) {
+    return weightedPool.length ? weightedPool[0]?.[valueKey] ?? null : null;
+  }
+
+  let roll = rng() * totalWeight;
+  for (const entry of weightedPool) {
+    roll -= entry.weight;
+    if (roll <= 0) {
+      return entry[valueKey] ?? null;
+    }
+  }
+
+  return weightedPool[weightedPool.length - 1]?.[valueKey] ?? null;
+}
+
+export function adaptOperationalEventEffects(effects = {}, option = {}) {
+  const mapped = {};
+
+  const add = (metric, delta) => {
+    const value = Number(delta);
+    if (!Number.isFinite(value) || value === 0) {
+      return;
+    }
+    mapped[metric] = (mapped[metric] || 0) + value;
+  };
+
+  if (typeof effects.progress === "number") {
+    add("progress", effects.progress);
+  }
+  if (typeof effects.forestHealth === "number") {
+    add("forestHealth", effects.forestHealth);
+  }
+  if (typeof effects.relationships === "number") {
+    add("relationships", effects.relationships);
+  }
+  if (typeof effects.compliance === "number") {
+    add("compliance", effects.compliance);
+  }
+  if (typeof effects.budget === "number") {
+    add("budget", normalizeBudgetDelta(effects.budget));
+  }
+
+  if (typeof effects.politicalCapital === "number") {
+    add("relationships", scaleDerivedEffect(effects.politicalCapital, 0.6));
+    add("compliance", scaleDerivedEffect(effects.politicalCapital, 0.25));
+  }
+
+  const timeUsed = Number.isFinite(option?.timeUsed) ? option.timeUsed : effects.timeUsed;
+  if (typeof timeUsed === "number") {
+    add("progress", -Math.max(1, Math.round(Math.abs(timeUsed) * 1.4)));
+  }
+
+  if (typeof effects.crew_morale === "number") {
+    add("relationships", scaleDerivedEffect(effects.crew_morale, 0.45));
+    add("progress", scaleDerivedEffect(effects.crew_morale, 0.2));
+  }
+
+  if (typeof effects.crew_health === "number") {
+    add("progress", scaleDerivedEffect(effects.crew_health, 0.35));
+    add("compliance", scaleDerivedEffect(effects.crew_health, 0.2));
+  }
+
+  if (typeof effects.equipment === "number") {
+    add("progress", scaleDerivedEffect(effects.equipment, 0.3));
+    add("budget", scaleDerivedEffect(effects.equipment, 0.15));
+  }
+
+  if (typeof effects.fuel === "number") {
+    add("progress", scaleDerivedEffect(effects.fuel, 0.2));
+    add("budget", scaleDerivedEffect(effects.fuel, 0.25));
+  }
+
+  if (typeof effects.food === "number") {
+    add("progress", scaleDerivedEffect(effects.food, 0.25));
+    add("relationships", scaleDerivedEffect(effects.food, 0.2));
+  }
+
+  if (typeof effects.firstAid === "number") {
+    add("compliance", scaleDerivedEffect(effects.firstAid, 0.25));
+    add("progress", scaleDerivedEffect(effects.firstAid, 0.15));
+  }
+
+  if (typeof effects.permits_approved === "number") {
+    add("progress", Math.round(effects.permits_approved * 4));
+    add("compliance", Math.round(effects.permits_approved * 2));
+  }
+
+  if (typeof effects.scrutiny === "number") {
+    add("compliance", -scaleDerivedEffect(effects.scrutiny, 0.6));
+    add("relationships", -scaleDerivedEffect(effects.scrutiny, 0.3));
+  }
+
+  return Object.fromEntries(
+    Object.entries(mapped).filter(([, value]) => Number.isFinite(value) && value !== 0)
+  );
+}
+
+function normalizeBudgetDelta(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric === 0) {
+    return 0;
+  }
+  if (Math.abs(numeric) <= 20) {
+    return numeric;
+  }
+  return clamp(Math.round(numeric / 600), -12, 12);
+}
+
+function scaleDerivedEffect(value, multiplier) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric === 0) {
+    return 0;
+  }
+
+  const scaled = Math.round(numeric * multiplier);
+  if (scaled !== 0) {
+    return scaled;
+  }
+  return numeric > 0 ? 1 : -1;
+}
+
+export function adaptOperationalEvent(event, state) {
+  const domain = ROLE_EVENT_DOMAINS[state?.role?.id] || "desk";
+  const flavorBits = [`Adapted ${domain} event`];
+  if (event.type) {
+    flavorBits.push(humanizeLabel(event.type));
+  }
+
+  return {
+    id: event.id,
+    title: event.title,
+    description: buildOperationalEventDescription(event),
+    flavor: flavorBits.join(" • "),
+    options: (event.options || []).map((option) => ({
+      label: option.label,
+      outcome: option.outcome,
+      effects: adaptOperationalEventEffects(option.effects || {}, option),
+      scheduleEvents: option.schedulesEvent
+        ? {
+            id: option.schedulesEvent,
+            delay: normaliseScheduledEventDelay(option.scheduledDelay),
+          }
+        : undefined,
+    })),
+  };
+}
+
+export function adaptIllegalActTemptation(act, state, rng = Math.random) {
+  const profile = getTemptationProfile(state);
+  const rawSuccessEffects = buildIllegalActSuccessEffects(act, state, rng);
+  const rawFailEffects = buildIllegalActFailEffects(act, state, rawSuccessEffects);
+  const failFlags = buildIllegalActFailFlags(act);
+
+  return {
+    id: `temptation:${act.id}`,
+    title: act.title,
+    description: buildIllegalActDescription(act, state),
+    flavor: `Adapted temptation • ${profile.flavor}`,
+    options: [
+      {
+        label: "Refuse and keep it clean",
+        outcome: "You walk away. It keeps the season slower, but the file stays defensible.",
+        effects: adaptOperationalEventEffects(buildIllegalActRefuseEffects(state)),
+      },
+      {
+        label: "Take the shortcut (high risk)",
+        outcome: "You attempt something risky...",
+        risk: {
+          baseSuccess: getIllegalActBaseSuccess(act, state),
+          successEffects: adaptOperationalEventEffects(rawSuccessEffects),
+          failEffects: adaptOperationalEventEffects(rawFailEffects),
+          successOutcome: "The shortcut lands for now. The gains show up immediately, and the exposure stays buried this season.",
+          failOutcome: "The shortcut unravels fast. Questions start landing before you can shape the story.",
+          failFlags,
+        },
+      },
+      {
+        label: "Document and report",
+        outcome: "You put the concern on record. It slows the work, but strengthens your position if scrutiny follows.",
+        effects: adaptOperationalEventEffects(buildIllegalActReportEffects(state)),
+      },
+    ],
+  };
+}
+
+function buildOperationalEventDescription(event) {
+  const details = [];
+  if (event.description) {
+    details.push(event.description);
+  }
+
+  if (Array.isArray(event.areaTags) && event.areaTags.length > 0) {
+    details.push(`Context: ${event.areaTags.slice(0, 2).map(humanizeLabel).join(", ")}.`);
+  } else if (Array.isArray(event.becCodes) && event.becCodes.length > 0) {
+    details.push(`BEC focus: ${event.becCodes.join(", ")}.`);
+  }
+
+  return details.join("\n\n");
+}
+
+function buildIllegalActDescription(act, state) {
+  const details = [String(act.description || "A tempting shortcut appears.")];
+  const relevantTags = (Array.isArray(act.tags) ? act.tags : [])
+    .filter((tag) => tag !== state?.role?.id)
+    .slice(0, 3);
+  if (relevantTags.length) {
+    details.push(`Pressure points: ${relevantTags.map(humanizeLabel).join(", ")}.`);
+  }
+  return details.join("\n\n");
+}
+
+function buildIllegalActSuccessEffects(act, state, rng) {
+  const profile = getTemptationProfile(state);
+  const gain = rollRange(profile.gainRange[0], profile.gainRange[1], rng);
+  const effects = {
+    ...profile.successBaseEffects,
+    budget: gain,
+  };
+
+  applyIllegalActTagEffects(effects, act);
+  return effects;
+}
+
+function buildIllegalActFailEffects(act, state, successEffects) {
+  const profile = getTemptationProfile(state);
+  const successBudget = Number(successEffects?.budget || 0);
+  const effects = {
+    ...profile.failConfig.effects,
+    budget: -Math.max(profile.failConfig.budgetMin, Math.round(successBudget * profile.failConfig.budgetMultiplier)),
+  };
+
+  if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
+    effects.forestHealth = (effects.forestHealth || 0) - 8;
+  }
+  if (hasMatchingTag(act?.tags, COMMUNITY_TEMPTATION_TAGS)) {
+    effects.relationships = (effects.relationships || 0) - 6;
+  }
+  if (hasMatchingTag(act?.tags, AUDIT_TEMPTATION_TAGS)) {
+    effects.compliance = (effects.compliance || 0) - 5;
+  }
+
+  return effects;
+}
+
+function buildIllegalActRefuseEffects(state) {
+  return { ...getTemptationProfile(state).refuseEffects };
+}
+
+function buildIllegalActReportEffects(state) {
+  return { ...getTemptationProfile(state).reportEffects };
+}
+
+function applyIllegalActTagEffects(effects, act) {
+  if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
+    effects.forestHealth = (effects.forestHealth || 0) - 6;
+  }
+  if (hasMatchingTag(act?.tags, COMMUNITY_TEMPTATION_TAGS)) {
+    effects.relationships = (effects.relationships || 0) - 4;
+  }
+  if (hasMatchingTag(act?.tags, ETHICS_TEMPTATION_TAGS)) {
+    effects.compliance = (effects.compliance || 0) - 4;
+  }
+  if (hasMatchingTag(act?.tags, AUDIT_TEMPTATION_TAGS)) {
+    effects.compliance = (effects.compliance || 0) - 3;
+  }
+}
+
+function buildIllegalActFailFlags(act) {
+  const flags = { underInvestigation: true };
+
+  if (hasMatchingTag(act?.tags, ETHICS_TEMPTATION_TAGS)) {
+    flags.ethicsInquiry = true;
+  }
+  if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
+    flags.environmentalAudit = true;
+  }
+  if (hasMatchingTag(act?.tags, AUDIT_TEMPTATION_TAGS)) {
+    flags.auditTriggered = true;
+  }
+
+  return flags;
+}
+
+function getIllegalActBaseSuccess(act, state) {
+  const profile = getTemptationProfile(state);
+  let success = profile.baseSuccess;
+
+  if (hasMatchingTag(act?.tags, ETHICS_TEMPTATION_TAGS)) {
+    success -= 0.08;
+  }
+  if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
+    success -= 0.06;
+  }
+  if (hasMatchingTag(act?.tags, AUDIT_TEMPTATION_TAGS)) {
+    success += 0.02;
+  }
+  if (hasMatchingTag(act?.tags, COMMUNITY_TEMPTATION_TAGS)) {
+    success -= 0.02;
+  }
+
+  return clamp(success, 0.16, 0.65);
+}
+
+function hasMatchingTag(tags, tagSet) {
+  if (!Array.isArray(tags) || !tags.length) {
+    return false;
+  }
+  return tags.some((tag) => tagSet.has(tag));
+}
+
+function rollRange(min, max, rng) {
+  return Math.round(min + (max - min) * rng());
+}
+
+function humanizeLabel(value) {
+  return String(value || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function normaliseScheduledEventDelay(delay) {
+  const numeric = Number(delay);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.min(2, Math.ceil(numeric / 4)));
+}
+
 function applyOptionFlags(state, option) {
   if (!state.flags) {
     state.flags = {};
@@ -911,4 +1740,23 @@ function applyScheduledIssues(state, option) {
     return;
   }
   state.pendingIssues.push({ id: schedule.id, delay });
+}
+
+function applyScheduledEvents(state, option) {
+  const schedule = option.scheduleEvents;
+  if (!schedule || !schedule.id) {
+    return;
+  }
+
+  if (!Array.isArray(state.pendingEvents)) {
+    state.pendingEvents = [];
+  }
+
+  const existing = state.pendingEvents.find((pending) => pending?.id === schedule.id);
+  const delay = Math.max(0, Number(schedule.delay || 0));
+  if (existing) {
+    existing.delay = Math.min(existing.delay ?? delay, delay);
+    return;
+  }
+  state.pendingEvents.push({ id: schedule.id, delay });
 }

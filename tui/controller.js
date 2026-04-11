@@ -4,6 +4,8 @@ import {
   getRoleTasks,
   applyOptionOutcome,
   applyRoundConsequences,
+  drawSeasonalEvent,
+  drawSeasonalTemptation,
   drawIssue,
   buildSummary,
   formatMetricDelta,
@@ -63,6 +65,7 @@ function snapshotGameState(gs) {
     flags: gs.flags ? { ...gs.flags } : gs.flags,
     history: Array.isArray(gs.history) ? [...gs.history] : gs.history,
     pendingIssues: Array.isArray(gs.pendingIssues) ? [...gs.pendingIssues] : gs.pendingIssues,
+    pendingEvents: Array.isArray(gs.pendingEvents) ? [...gs.pendingEvents] : gs.pendingEvents,
     issueHistory: Array.isArray(gs.issueHistory) ? [...gs.issueHistory] : gs.issueHistory,
     timeline: Array.isArray(gs.timeline) ? [...gs.timeline] : gs.timeline,
   };
@@ -169,6 +172,16 @@ export class TuiGameController {
       this.queue.push({ type: "task", data: task });
     }
 
+    const event = drawSeasonalEvent(gs);
+    if (event) {
+      this.queue.push({ type: "event", data: event });
+    }
+
+    const temptation = drawSeasonalTemptation(gs);
+    if (temptation) {
+      this.queue.push({ type: "temptation", data: temptation });
+    }
+
     const issue = drawIssue(gs);
     if (issue) {
       this.queue.push({ type: "issue", data: issue });
@@ -249,14 +262,14 @@ export class TuiGameController {
       return;
     }
 
-    if (phase.type === "task" || phase.type === "issue") {
+    if (phase.type === "task" || phase.type === "issue" || phase.type === "event" || phase.type === "temptation") {
       const item = phase.data;
       this.present(
         {
           type: phase.type,
           title: item.title,
           description: item.description ?? item.prompt ?? "",
-          flavor: phase.type === "issue" ? item.flavor : undefined,
+          flavor: item.flavor,
           notice,
           optionDetails: item.options.map((option) => ({
             label: option.label,
