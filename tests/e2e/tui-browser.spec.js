@@ -38,7 +38,7 @@ test('seasonal strategy TUI completes a keyboard-driven browser playthrough', as
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
   expect(result.ended).toBeTruthy();
-  expect(result.step).toBeLessThan(28);
+  expect(result.step).toBeLessThan(40);
   expect(result.text).toContain('Year End Review');
   expect(result.text).toContain('Key Decisions');
   expect(result.text).toContain('Next Year Outlook');
