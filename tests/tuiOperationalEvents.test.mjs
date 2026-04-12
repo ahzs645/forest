@@ -14,7 +14,12 @@ import {
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
-import { validateSeasonalCardContract } from '../js/engine/seasonalContract.js';
+import { ISSUE_LIBRARY } from '../js/data/issues.js';
+import {
+  listTerminologyGuardrailViolations,
+  matchesPreconditions,
+  validateSeasonalCardContract,
+} from '../js/engine/seasonalContract.js';
 
 const TUI_METRICS = ['budget', 'compliance', 'forestHealth', 'progress', 'relationships'];
 
@@ -126,6 +131,11 @@ test('transcript-hit desk and field events are rewritten into concrete, plain-la
     const adapted = adaptOperationalEvent(source, deskState);
     const violations = validateSeasonalCardContract(adapted);
     assert.deepEqual(violations, [], `contract violations for ${eventId}: ${violations.join(', ')}`);
+    assert.deepEqual(
+      listTerminologyGuardrailViolations(adapted),
+      [],
+      `terminology guardrails tripped for ${eventId}`,
+    );
     assert.ok(adapted.context?.stakes, `expected stakes copy for ${eventId}`);
   }
 
@@ -171,11 +181,88 @@ test('transcript-hit desk and field events are rewritten into concrete, plain-la
     fieldState,
   );
   assert.deepEqual(validateSeasonalCardContract(stuckTruck), []);
+  assert.deepEqual(listTerminologyGuardrailViolations(stuckTruck), []);
   assert.match(stuckTruck.description, /realistic recovery plan/i);
   assert.ok(
     stuckTruck.options.every((option) => !/skidder/i.test(option.label)),
     'truck recovery should not assume a skidder appears by magic',
   );
+});
+
+test('seasonal selector suppresses silviculture issue prompts when the stage or stand age is incompatible', () => {
+  const state = createInitialState({
+    companyName: 'Silviculture Preconditions Test',
+    roleId: 'silviculture',
+    areaId: 'fraser-plateau',
+  });
+  state.round = 2;
+
+  const blockedIssueIds = [
+    'seedlot-vigour-drop',
+    'free-growing-catchup-plan',
+    'snow-press-browse-signal',
+  ];
+
+  for (const issueId of blockedIssueIds) {
+    const source = ISSUE_LIBRARY.find((entry) => entry.id === issueId);
+    assert.ok(source, `expected ${issueId} fixture`);
+    assert.equal(matchesPreconditions(source, state), false, `${issueId} should not match summer brush state`);
+
+    state.pendingIssues = [{ id: issueId, delay: 0 }];
+    const surfaced = drawIssue(state, () => 0);
+    assert.notEqual(surfaced?.id, issueId, `${issueId} should be suppressed when the stage is incompatible`);
+    assert.deepEqual(state.pendingIssues, [], `${issueId} should be cleared after suppression`);
+  }
+});
+
+test('winter silviculture review issues only surface with explicit desk-based framing', () => {
+  const state = createInitialState({
+    companyName: 'Winter Review Framing Test',
+    roleId: 'silviculture',
+    areaId: 'fraser-plateau',
+  });
+  state.round = 4;
+  state.pendingIssues = [{ id: 'snow-press-browse-signal', delay: 0 }];
+
+  const issue = drawIssue(state, () => 0);
+  assert.equal(issue?.id, 'snow-press-browse-signal');
+  assert.equal(issue?.operationState?.stage, 'inspection');
+  assert.match(issue?.context?.operation || '', /winter regeneration review/i);
+  assert.match(issue?.context?.operation || '', /not a full free-growing survey/i);
+});
+
+test('breakup-driven seasonal cards keep a conservative option that stands work down or rebuilds the plan', () => {
+  const scenarios = [
+    {
+      roleId: 'permitter',
+      areaId: 'fort-st-john-plateau',
+      round: 1,
+      issueId: 'exhibit-a-redline-return',
+    },
+    {
+      roleId: 'recce',
+      areaId: 'muskwa-foothills',
+      round: 1,
+      issueId: 'thaw-ravine-realignment',
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    const state = createInitialState({
+      companyName: `Breakup Guardrail ${scenario.issueId}`,
+      roleId: scenario.roleId,
+      areaId: scenario.areaId,
+    });
+    state.round = scenario.round;
+    state.pendingIssues = [{ id: scenario.issueId, delay: 0 }];
+
+    const issue = drawIssue(state, () => 0);
+    assert.ok(issue, `expected ${scenario.issueId} to surface`);
+    assert.ok(
+      issue.options.some((option) => /stop|pause|rebuild|reroute|trim|refly|bring in/i.test(option.label)),
+      `${scenario.issueId} should keep a conservative breakup response`,
+    );
+  }
 });
 
 test('seasonal temptation draws from illegal acts with a risk-based shortcut option', () => {

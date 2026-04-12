@@ -19,14 +19,19 @@ function toKeyInput(domEvent) {
   };
 }
 
-function Header() {
+function Header({ onExit }) {
   return (
     <header className="tui-header">
       <div className="tui-header-title">
         <span className="tui-header-brand">BC Forestry Trail</span>
         <span className="tui-header-tag">Seasonal Strategy TUI</span>
       </div>
-      <div className="tui-header-help">Press Q to quit</div>
+      <div className="tui-header-actions">
+        <button type="button" className="tui-header-button" onClick={onExit}>
+          Exit
+        </button>
+        <div className="tui-header-help">Press Q to quit</div>
+      </div>
     </header>
   );
 }
@@ -63,12 +68,39 @@ function Dashboard({ gameState }) {
   );
 }
 
-function NameInput({ inputText }) {
+function NameInput({ inputText, onInputChange, onSubmit }) {
   return (
     <div className="tui-content-stack">
       <div className="tui-heading">Welcome to BC Forestry Trail</div>
       <p className="tui-copy">Enter your Company Name:</p>
-      <p className="tui-copy dim">(Press Enter for default 'Forest Co-op')</p>
+      <p className="tui-copy dim">Tap the field to type, or continue with the default &ldquo;Forest Co-op&rdquo;.</p>
+      <div className="tui-entry-controls">
+        <label className="tui-input-label" htmlFor="company-name">
+          Company Name
+        </label>
+        <div className="tui-entry-row">
+          <input
+            id="company-name"
+            className="tui-text-input"
+            type="text"
+            value={inputText}
+            placeholder="Forest Co-op"
+            autoComplete="organization"
+            autoCapitalize="words"
+            spellCheck="false"
+            onChange={(event) => onInputChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onSubmit();
+              }
+            }}
+          />
+          <button type="button" className="tui-action-button" onClick={onSubmit}>
+            {inputText.trim() ? "Continue" : "Use Default"}
+          </button>
+        </div>
+      </div>
       <pre className="tui-name-input">{`> ${inputText}█`}</pre>
     </div>
   );
@@ -249,14 +281,14 @@ function OptionsPanel({ options, selected, onSelect }) {
   );
 }
 
-function FieldRadio({ mode, inputText, contentData, art }) {
+function FieldRadio({ mode, inputText, contentData, art, onInputChange, onSubmitName }) {
   return (
     <section className="tui-panel tui-field-radio">
       <div className="tui-panel-title">Field Radio</div>
       <div className="tui-field-layout">
         <div className="tui-field-main">
           {mode === "setup-name" ? (
-            <NameInput inputText={inputText} />
+            <NameInput inputText={inputText} onInputChange={onInputChange} onSubmit={onSubmitName} />
           ) : (
             <ContentView data={contentData} />
           )}
@@ -270,7 +302,10 @@ function FieldRadio({ mode, inputText, contentData, art }) {
 export default function App() {
   const {
     controller,
+    exitGame,
     selectOption,
+    setInputText,
+    submitCurrent,
     ...state
   } = useGameFlow({
     onExit: () => window.location.assign("./index.html"),
@@ -304,7 +339,7 @@ export default function App() {
   return (
     <main className="tui-app-shell">
       <div className="tui-shell">
-        <Header />
+        <Header onExit={exitGame} />
         <div className="tui-main">
           <Dashboard gameState={state.gameState} />
           <div className="tui-stage">
@@ -313,6 +348,8 @@ export default function App() {
               inputText={state.inputText}
               contentData={state.contentData}
               art={state.art}
+              onInputChange={setInputText}
+              onSubmitName={submitCurrent}
             />
             {state.animFrame ? (
               <section className="tui-panel tui-overlay">

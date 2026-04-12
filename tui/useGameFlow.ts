@@ -25,7 +25,10 @@ export function useGameFlow(options: UseGameFlowOptions = {}) {
     controller,
     ...snapshot,
     handleKey: (key: any) => controller.handleKey(key),
+    exitGame: () => controller.exitGame(),
     restart: () => controller.restart(),
+    setInputText: (value: string) => controller.setInputText(value),
     selectOption: (index: number) => controller.selectOption(index),
+    submitCurrent: () => controller.submitCurrent(),
   };
 }

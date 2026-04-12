@@ -74,6 +74,119 @@ test('planner assignment selection updates the dashboard metrics in the controll
   assert.match(state.contentData.notice.body, /Relationships \+2/);
 });
 
+test('seasonal role picker excludes manager and keeps the Field Technician label', () => {
+  const controller = new TuiGameController();
+
+  controller.handleKey({ name: 'return' });
+
+  let state = controller.getState();
+  assert.equal(state.mode, 'setup-role');
+  assert.ok(state.options.includes('Field Technician'));
+  assert.ok(!state.options.includes('General Manager'));
+  assert.equal(state.selected, 0);
+
+  controller.handleKey({ name: 'down' });
+  state = controller.getState();
+  assert.equal(state.selected, 1);
+
+  controller.handleKey({ name: 'up' });
+  state = controller.getState();
+  assert.equal(state.selected, 0);
+
+  controller.handleKey({ name: 'return' });
+  state = controller.getState();
+  assert.equal(state.mode, 'setup-area');
+});
+
+test('first playable seasonal card exposes the contract fields and neutral prompt', () => {
+  const controller = new TuiGameController();
+
+  advanceFromSetupToFirstPlannerTask(controller);
+
+  let state = controller.getState();
+  assert.equal(state.contentData.type, 'assignment');
+  assert.ok(state.contentData.context?.operation);
+  assert.ok(state.contentData.context?.objective);
+  assert.ok(state.contentData.context?.stakes);
+  assert.match(state.contentData.decisionPrompt || '', /^Choose the response/i);
+  assert.equal(state.contentData.optionHeading, 'Choose your response');
+  assert.equal(state.art, null);
+  assert.ok(state.options.length > 1);
+
+  controller.handleKey({ name: 'down' });
+  state = controller.getState();
+  assert.equal(state.selected, 1);
+
+  controller.handleKey({ name: 'up' });
+  state = controller.getState();
+  assert.equal(state.selected, 0);
+});
+
+test('controller suppresses impossible seasonal issue states', () => {
+  const state = createInitialState({
+    companyName: 'Suppressed Seasonal State Test',
+    roleId: 'silviculture',
+    areaId: 'muskwa-foothills',
+  });
+  state.round = 1;
+  state.pendingIssues = [
+    {
+      delay: 0,
+      candidates: [
+        {
+          id: 'free-growing-catchup-plan',
+          weight: 1,
+        },
+      ],
+    },
+  ];
+
+  const issue = drawIssue(state, () => 0);
+
+  assert.notEqual(issue?.id, 'free-growing-catchup-plan');
+  assert.equal(state.pendingIssues.length, 0);
+});
+
+test('end-of-year summary can restart and quit cleanly', () => {
+  let exits = 0;
+  const controller = new TuiGameController({
+    onExit: () => {
+      exits += 1;
+    },
+  });
+
+  controller.gs = createInitialState({
+    companyName: 'Controller Summary Test',
+    roleId: 'planner',
+    areaId: 'bulkley-valley',
+  });
+  controller.gs.round = controller.gs.totalRounds;
+  controller.queue = [];
+  controller.processNext();
+
+  let state = controller.getState();
+  assert.equal(state.contentData.type, 'summary');
+  assert.deepEqual(state.options, ['Play Again', 'Quit']);
+
+  controller.selectOption(0);
+  state = controller.getState();
+  assert.equal(state.mode, 'setup-name');
+  assert.equal(state.contentData.heading, 'Welcome to BC Forestry Trail');
+  assert.deepEqual(state.options, []);
+
+  controller.gs = createInitialState({
+    companyName: 'Controller Summary Quit Test',
+    roleId: 'planner',
+    areaId: 'bulkley-valley',
+  });
+  controller.gs.round = controller.gs.totalRounds;
+  controller.queue = [];
+  controller.processNext();
+  controller.selectOption(1);
+
+  assert.equal(exits, 1);
+});
+
 test('scheduled fallout issues expose why they surfaced in the issue card', () => {
   const controller = new TuiGameController();
   const gs = createInitialState({

@@ -157,12 +157,32 @@ export class TuiGameController {
     this.onExit = onExit ?? (() => {});
   }
 
+  exitGame() {
+    this.onExit();
+  }
+
   restart() {
     this.gs = null;
     this.queue = [];
     this.selectCb = null;
     this.state = createViewState();
     this.emit();
+  }
+
+  setInputText(value) {
+    if (this.state.mode !== "setup-name") return;
+    this.setState({ inputText: value });
+  }
+
+  submitCurrent() {
+    if (this.state.animFrame !== null) return;
+
+    if (this.state.mode === "setup-name") {
+      this.handleSetupNameKey({ name: "return" });
+      return;
+    }
+
+    this.selectCb?.(this.state.selected);
   }
 
   selectOption(index) {
