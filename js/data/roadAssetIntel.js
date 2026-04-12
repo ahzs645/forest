@@ -553,7 +553,7 @@ export function getPermittingRoadAssetContext(journey) {
     approvalPenalty: areaSummary.approvalPenalty,
     note: summary
       ? `Road intel on file: ${summary}.`
-      : "Road and crossing observations are adding engineering pressure to the file."
+      : "Road and crossing observations are adding engineering risk to the file."
   };
 }
 

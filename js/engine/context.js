@@ -11,6 +11,7 @@ import {
   getRoleAreaBriefing,
   getRoleProfessionalContext,
 } from "../data/index.js";
+import { getRoleOperationState } from "./seasonalContract.js";
 
 const SEASON_IDS = ["spring", "summer", "fall", "winter"];
 const SEASON_THEMES = ["foundation", "operations", "pressure", "closeout"];
@@ -50,6 +51,14 @@ export function buildSeasonContext(state) {
 
   ensureProfessionalState(state, { roleId, area });
   const journey = buildJourneyLikeState(state, season);
+  state.flags = state.flags || {};
+  state.flags.professionalAuditActive =
+    Number(state.professional?.auditExposure || 0) >= 35
+    || Number(state.professional?.competenceRisk || 0) >= 40
+    || Number(state.professional?.paperworkLoad || 0) >= 30;
+  state.flags.regenReviewNeeded =
+    Number(state.metrics?.forestHealth || 50) < 45
+    || state.discoveryTags.some((tag) => tag.id === "regen_gap");
 
   const briefing = roleId && area ? getRoleAreaBriefing(roleId, area, { maxFinds: 6 }) : null;
   const areaSituation = getAreaSituationForJourney(journey);
@@ -64,6 +73,7 @@ export function buildSeasonContext(state) {
   const planningRoadContext = getPlanningRoadAssetContext(journey);
   const permittingRoadContext = getPermittingRoadAssetContext(journey);
   const discoveryTags = getJourneyDiscoveryTags(journey);
+  const operationState = getRoleOperationState(state);
 
   return {
     round,
@@ -84,6 +94,7 @@ export function buildSeasonContext(state) {
     planningRoadContext,
     permittingRoadContext,
     discoveryTags,
+    operationState,
     discoveryMultipliers: {
       desk: getDiscoveryEventTypeMultipliers(journey, "desk"),
       field: getDiscoveryEventTypeMultipliers(journey, "field"),

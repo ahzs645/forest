@@ -1306,4 +1306,220 @@ export const ILLEGAL_ACTS = [
       "https://www2.gov.bc.ca/gov/content/industry/natural-resource-use/resource-roads/district-road-requirements"
     ],
   },
+  // source: FPBC 2014-04A / 2014-04B / 2011-04 (Crichton, Zirul, Boucher & Forbes)
+  {
+    id: "plot-shuffle-cruise",
+    title: "Shuffle the Cruise Plots",
+    description: "Walk your cruise plots ten metres uphill until the standard error finally calms down, then blame the random-number generator when stumpage drops.",
+    roles: ["recce", "planner"],
+    tags: ["recce", "planner", "cruising", "sampling", "fraud"],
+  },
+  // source: FPBC 2022-13 (Nickel)
+  {
+    id: "scale-tighter-whisper",
+    title: "Whisper 'Scale Tighter'",
+    description: "Lean on the scaler every shift to find a few more grading deductions until the load tickets drift smaller without anyone writing a policy.",
+    roles: ["recce", "silviculture"],
+    tags: ["recce", "silviculture", "scaling", "pressure", "billing"],
+  },
+  // source: FPBC 2023-10 / 2021-05 (Cover, Maundrell)
+  {
+    id: "drive-by-stream-class",
+    title: "Drive-By Stream Classification",
+    description: "Classify the creek as Non-Classified Drainage from the helicopter window so the culvert spec stays cheap and the FSP stays tidy.",
+    roles: ["planner", "permitter", "recce"],
+    tags: ["planner", "permitter", "recce", "riparian", "deception"],
+  },
+  // source: FPBC 2022-04 / 2022-09 (Chipman, Johnson)
+  {
+    id: "blanket-exemption-assumption",
+    title: "Assume the Blanket Exemption Covers It",
+    description: "Tell yourself last year's Mule Deer Winter Range exemption still applies and sign the fuel-management site plan before lunch.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "wildlife", "exemption", "assumption"],
+  },
+  // source: FPBC 2022-04 / 2022-09 (Chipman, Johnson)
+  {
+    id: "referral-overlap-shrug",
+    title: "The Overlap Shrug",
+    description: "Send the referral to one nation in the overlapping territory, call it done, and hope the other nation never checks the block map.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "consultation", "referrals", "negligence"],
+  },
+  // source: FPBC 2020-01 (Hiebert)
+  {
+    id: "forgotten-cutting-amendment",
+    title: "Forget the Cutting-Authority Amendment",
+    description: "Skip the six tiny block-boundary amendments this quarter; the ministry database will sort itself out before the auditors notice the extra thirteen hectares.",
+    roles: ["permitter", "planner"],
+    tags: ["permitter", "planner", "amendments", "overrun", "drift"],
+  },
+  // source: FPBC 2018-02B (Wolfe)
+  {
+    id: "woodlot-overcut-gambit",
+    title: "The Woodlot Overcut Gambit",
+    description: "Run your woodlot licence at two-and-a-half times the cut control limit and count on a future AAC increase to paper it over.",
+    roles: ["planner"],
+    tags: ["planner", "woodlot", "cut-control", "overrun"],
+  },
+  // source: FPBC 2013-13 (von der Gonna)
+  {
+    id: "community-forest-coasting",
+    title: "Coast the Community Forest",
+    description: "Let contractors set their own cutblock boundaries, road alignments and OGMA edges because nobody at the community forest will challenge the GM.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "supervision", "community-forest", "drift"],
+  },
+  // source: FPBC 2014-05 / 2014-08 / 2015-01 / 2021-10 (Raby, K. Webber, Yodogawa, McIntosh)
+  {
+    id: "crossing-assurance-autograph",
+    title: "Autograph the Crossing Assurance",
+    description: "Sign and seal the bridge Crossing Assurance Statement from your truck window, filling 'N/A' beside every question you didn't feel like answering.",
+    roles: ["permitter", "recce", "planner"],
+    tags: ["permitter", "recce", "planner", "bridges", "signoff"],
+  },
+  // source: FPBC 2021-01 (Dascher)
+  {
+    id: "self-qep-loophole",
+    title: "Be Your Own QEP",
+    description: "Sign off the Riparian Areas Protection assessment on your own lakeshore lot, declaring yourself the Qualified Environmental Professional in the mirror.",
+    roles: ["planner", "permitter", "silviculture"],
+    tags: ["planner", "silviculture", "conflict-of-interest", "riparian"],
+  },
+  // source: FPBC 2022-10 (Kestell)
+  {
+    id: "upstream-of-the-water-intake",
+    title: "Log Upstream of the Water Intake",
+    description: "Start the cutblock a kilometre above the neighbour's domestic gravity line without telling them, then argue their filter should have held up to mud.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "water", "community", "bullying"],
+  },
+  // source: FPBC 2020-03 / 2010-03 (Peasgood, Parker)
+  {
+    id: "cruise-the-client-estimates",
+    title: "Cruise from the Client's Estimates",
+    description: "Copy the landowner's optimistic volume numbers straight onto the cruise report and file the 'field notes' from the comfort of the ferry lounge.",
+    roles: ["recce", "planner"],
+    tags: ["recce", "planner", "cruising", "records", "reliance"],
+  },
+  // source: FPBC 2021-10 (McIntosh)
+  {
+    id: "retire-mid-investigation-dodge",
+    title: "Retire Before the Envelope Lands",
+    description: "Convert to retired status the week the complaint arrives and let the registration lapse so the investigation has nowhere to deliver its findings.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    tags: ["planner", "permitter", "professional-practice", "discipline-dodge"],
+  },
+  // source: FPBC 2014-04A / 2014-04B (Crichton, Zirul)
+  {
+    id: "lean-on-the-junior-cruiser",
+    title: "Lean on the Junior Cruiser",
+    description: "Pressure the new RFT to sign off plot tallies that match the boss's quota, then offer to 'handle any questions from the regional cruising specialist' personally.",
+    roles: ["planner", "recce"],
+    tags: ["planner", "recce", "cruise", "supervision", "coercion"],
+  },
+  // source: FPBC 2022-13 (Nickel)
+  {
+    id: "cost-implication-scaling-whisper",
+    title: "Whisper the Cost Implications",
+    description: "Sidle up to a licensed scaler and explain, very calmly, exactly how much this quarter's bonus depends on finding more grading deductions before lunch.",
+    roles: ["recce", "planner"],
+    tags: ["recce", "planner", "scaling", "coercion", "bonus"],
+  },
+  // source: FPBC 2015-06 (Stamp)
+  {
+    id: "annual-declaration-perjury",
+    title: "Sign the Annual Declaration Anyway",
+    description: "Tick 'no indictable offences' on the renewal form every spring for eight years straight and hope the registrar never runs a CPIC check.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    tags: ["professional-practice", "renewal", "fraud", "character"],
+  },
+  // source: FPBC 2015-01 / 2014-08 (Yodogawa, K. Webber)
+  {
+    id: "in-house-engineer-override",
+    title: "Override the In-House Engineer",
+    description: "Tell the project engineer their load rating is too conservative, edit the hydrology spreadsheet yourself, and sign the crossing off as an RFT-only file.",
+    roles: ["planner", "recce"],
+    tags: ["planner", "recce", "engineering", "scope-creep"],
+  },
+  // source: FPBC 2014-05 (Raby)
+  {
+    id: "n-a-the-inspection-form",
+    title: "N/A the Inspection Form",
+    description: "Write 'N/A' across every damage question on the temporary bridge form so the Crossing Assurance Statement signs itself and the truck can roll before dark.",
+    roles: ["permitter", "recce"],
+    tags: ["permitter", "recce", "crossings", "inspection", "fraud"],
+  },
+  // source: FPBC 2021-06 (Smart / Klahoose K4C)
+  {
+    id: "wrong-seedzone-bulk-order",
+    title: "Order the Wrong Seedzone in Bulk",
+    description: "Copy last season's seed request across forty-odd blocks without checking the sub-maritime zone and let half a million seedlings hit the ground in the wrong climate.",
+    roles: ["planner", "silviculture"],
+    tags: ["planner", "silviculture", "seed", "reforestation", "bulk-error"],
+  },
+  // source: FPBC 2021-06 (Smart)
+  {
+    id: "harvest-before-the-site-plan",
+    title: "Harvest Before the Site Plan",
+    description: "Let the feller-buncher start on two blocks while the Site Plan is still an unsigned draft on someone's laptop and plan to backfill the paperwork after freeze-up.",
+    roles: ["planner", "recce"],
+    tags: ["planner", "recce", "site-plan", "fraud", "sequence"],
+  },
+  // source: FPBC 2009-05 (Lay)
+  {
+    id: "wear-every-hat",
+    title: "Wear Every Hat at Once",
+    description: "Sign the prescription as RPF, approve it as the municipality, supervise the crew on weekends, and tell concerned neighbours you already know what the community wants.",
+    roles: ["planner", "silviculture"],
+    tags: ["planner", "silviculture", "conflict", "role-confusion"],
+  },
+  // source: FPBC 2021-01 (Dascher)
+  {
+    id: "self-qep-foreshore",
+    title: "Self-QEP the Foreshore",
+    description: "Hand-wave the Riparian Areas Protection Act review on your own lakefront lot, then draft the regional district a reassurance letter with your own stamp at the bottom.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "riparian", "conflict", "private-land"],
+  },
+  // source: FPBC 2021-04 / AE 2020-01 (Adair, Andermatt)
+  {
+    id: "drop-the-ret-from-the-signature",
+    title: "Drop the (Ret) from the Signature",
+    description: "Launch a side hustle with 'RPF' stamped on business cards and strip the pesky (Ret) off the email signature because it clutters the branding.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    tags: ["professional-practice", "title-misuse", "retirement", "branding"],
+  },
+  // source: FPBC 2011-02 (Hope)
+  {
+    id: "post-review-sloppy-data",
+    title: "Shrug Off the Practice Review",
+    description: "Finish the mandatory practice review, file the certificate, then go right back to pasting last quarter's appraisal numbers into the ministry portal without proofreading.",
+    roles: ["planner"],
+    tags: ["planner", "appraisal", "data-entry", "recidivism"],
+  },
+  // source: FPBC 2017-06 (Kendall)
+  {
+    id: "wave-off-the-contractors-biologist",
+    title: "Wave Off the Contractor's Biologist",
+    description: "Tell the logging contractor the fish channel is fine and the riparian assessment is 'in progress' when actually you were hoping nobody would notice there isn't one.",
+    roles: ["planner", "recce"],
+    tags: ["planner", "recce", "riparian", "salmon", "private-land"],
+  },
+  // source: FPBC 2020-01 (Hiebert)
+  {
+    id: "leave-the-mess-for-the-next-rpf",
+    title: "Leave the Mess for the Next RPF",
+    description: "Skip the six outstanding cutting-authority amendments, accept the new job offer downtown, and let whoever inherits the tenure reconstruct your paper trail from scratch.",
+    roles: ["planner", "permitter"],
+    tags: ["planner", "permitter", "amendments", "successor", "negligence"],
+  },
+  // source: FPBC 2020-03 (Peasgood)
+  {
+    id: "shred-the-cruise-field-notes",
+    title: "Shred the Cruise Field Notes",
+    description: "Dump the grid sketches, sample cards, and windshield photos the day after the client accepts the report so there is nothing left for investigators to second-guess later.",
+    roles: ["planner", "recce"],
+    tags: ["planner", "recce", "cruise", "records", "destruction"],
+  },
 ];

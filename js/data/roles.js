@@ -2,6 +2,7 @@ export const FORESTER_ROLES = [
   {
     id: "planner",
     name: "Strategic Planner",
+    seasonalName: "Strategic Planner",
     journeyType: "desk",
     description:
       "Build long range harvesting strategies across northern BC BEC zones, balancing values with land use plans.",
@@ -94,6 +95,7 @@ export const FORESTER_ROLES = [
   {
     id: "permitter",
     name: "Permitting Specialist",
+    seasonalName: "Permitting Specialist",
     journeyType: "desk",
     description:
       "Coordinate northern referrals, ensure submissions reflect local values, and shepherd approvals across agencies.",
@@ -186,6 +188,7 @@ export const FORESTER_ROLES = [
   {
     id: "recce",
     name: "Recon Crew Lead",
+    seasonalName: "Field Technician",
     journeyType: "field",
     description:
       "Scout northern BC blocks, confirm rugged access, and collect field intel ahead of development.",
@@ -276,6 +279,7 @@ export const FORESTER_ROLES = [
   {
     id: "silviculture",
     name: "Silviculture Supervisor",
+    seasonalName: "Silviculture Supervisor",
     journeyType: "field",
     description:
       "Design regeneration strategies tailored to northern BC, oversee planting, and monitor stand recovery.",
@@ -366,6 +370,8 @@ export const FORESTER_ROLES = [
   {
     id: "manager",
     name: "General Manager",
+    seasonalName: "General Manager",
+    seasonalEnabled: false,
     journeyType: "manager",
     description:
       "Oversee both field operations and strategic desk initiatives, managing CEOs and certifications.",

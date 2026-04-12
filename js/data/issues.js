@@ -659,7 +659,7 @@ export const ISSUE_LIBRARY = [
       {
         label: "Re-sequence the program around the hottest indicators",
         outcome:
-          "You slow the plan down and move pressure off the most exposed basins before critics write the story for you.",
+          "You slow the plan down and move risk off the most exposed basins before critics write the story for you.",
         effects: { progress: -3, compliance: 5, relationships: 4, forestHealth: 3 },
       },
       {
@@ -711,8 +711,18 @@ export const ISSUE_LIBRARY = [
     roles: ["planner"],
     areaTags: ["winter-road", "northern-bc"],
     seasonBias: ["Winter Review"],
+    preconditions: {
+      operationStages: ["reforecast"],
+      seasons: ["winter"],
+    },
+    context: {
+      operation: "You are resetting the annual operating plan after the winter access window failed to materialize the way the original schedule assumed.",
+      objective: "Give leadership, operations, and finance a forecast they can actually deliver.",
+      stakes: "If you leave the number inflated, the whole program keeps planning around work that is no longer realistically available.",
+    },
+    riskClass: "calculated",
     description:
-      "Late freeze-up, audit delays, and contractor turnover have pushed the annual plan off its original production curve, and leadership wants a credible reforecast before budgets lock.",
+      "Late freeze-up, audit delays, and contractor turnover have knocked the annual plan off schedule, and leadership wants a revised production forecast before budgets are finalized.",
     options: [
       {
         label: "Cut the forecast and protect the most defensible work",
@@ -976,6 +986,10 @@ export const ISSUE_LIBRARY = [
     roles: ["silviculture"],
     areaTags: ["sbs", "bwbs", "beetle-recovery"],
     seasonBias: ["Spring Planning"],
+    preconditions: {
+      operationStages: ["plant", "fill"],
+      seasons: ["spring"],
+    },
     description:
       "A nursery notice says one of your interior spruce lots lost vigour in cold storage and only part of the order should be planted.",
     options: [
@@ -1005,6 +1019,10 @@ export const ISSUE_LIBRARY = [
     roles: ["silviculture"],
     areaTags: ["community-interface", "watershed", "northern-bc"],
     seasonBias: ["Summer Field"],
+    preconditions: {
+      operationStages: ["brush"],
+      seasons: ["summer"],
+    },
     description:
       "A neighbouring landowner calls in a drift complaint after a hot morning treatment near the block edge, and the spray record will not speak for itself.",
     options: [
@@ -1034,8 +1052,19 @@ export const ISSUE_LIBRARY = [
     roles: ["silviculture"],
     areaTags: ["sbs", "beetle-recovery", "northern-bc"],
     seasonBias: ["Fall Integration"],
+    preconditions: {
+      operationStages: ["survey"],
+      standAgeClasses: ["survey-ready"],
+      seasons: ["fall"],
+    },
+    context: {
+      operation: "You are reviewing fall survey results on recovery blocks that should be tracking toward free growing.",
+      objective: "Decide which units need immediate fill planting or brushing before next season.",
+      stakes: "If you call weak ground acceptable, the next survey cycle will be defending biology that is already slipping.",
+    },
+    riskClass: "routine",
     description:
-      "Fall survey plots on recovery units are coming in light after a wet summer drove aspen suckering and grass cover over the crop trees.",
+      "Fall survey plots on recovery units are coming in light after a wet summer pushed aspen suckering and grass over the crop trees.",
     options: [
       {
         label: "Package fill plant and brushing now",
@@ -1046,7 +1075,7 @@ export const ISSUE_LIBRARY = [
       {
         label: "Rewrite targets around natural ingress",
         outcome:
-          "The stand story becomes more nuanced, and it can work if the survey rationale is airtight.",
+          "You revise the survey rationale around natural ingress and mixed regeneration, but the record has to be explicit about what still needs follow-up.",
         effects: { progress: 1, forestHealth: 3, compliance: 2, relationships: 1 },
       },
       {
@@ -1063,8 +1092,19 @@ export const ISSUE_LIBRARY = [
     roles: ["silviculture"],
     areaTags: ["bwbs", "sbs", "northern-bc"],
     seasonBias: ["Winter Review"],
+    preconditions: {
+      operationStages: ["inspection"],
+      standAgeClasses: ["carryover"],
+      seasons: ["winter"],
+    },
+    context: {
+      operation: "You are doing winter regeneration review from field notes, browse observations, and accessible edge checks, not a full free-growing survey.",
+      objective: "Set the spring follow-up plan for young mixed stands that are showing snow damage and browse.",
+      stakes: "If you treat the signal as noise, the spring treatment budget and species plan will both be wrong before crews even mobilize.",
+    },
+    riskClass: "routine",
     description:
-      "Winter check plots show snow press and heavy browse in young mixed stands near a block edge, and next summer's survival story will sag if the program rolls forward unchanged.",
+      "Winter access notes show snow press and heavy browse in young mixed stands near a block edge, and the spring treatment plan will be weak if the program rolls forward unchanged.",
     options: [
       {
         label: "Budget hotspot fill plant and protection",
@@ -1075,13 +1115,13 @@ export const ISSUE_LIBRARY = [
       {
         label: "Shift future mixes to less palatable stock",
         outcome:
-          "The next cycle gets more defensible on tough ground, even if the species mix moves away from the original ideal.",
+          "The next cycle becomes more defensible on tough ground, even if the future species mix moves away from the original planting plan.",
         effects: { progress: 0, forestHealth: 3, compliance: 2, relationships: 1 },
       },
       {
-        label: "Treat it as normal wildlife pressure",
+        label: "Treat it as normal browse and carry on",
         outcome:
-          "You save money now, but the winter signal shows up again when survival numbers are due.",
+          "You save money now, but the winter damage shows up again when next year's survival numbers are due.",
         effects: { progress: 2, budget: 1, compliance: -2, forestHealth: -3 },
       },
     ],
@@ -1298,10 +1338,17 @@ export const ISSUE_LIBRARY = [
     id: "fpbc-competence-audit",
     title: "FPBC Competence Audit",
     description:
-      "FPBC requests your CPD records, competence declaration, development plan, and work samples tied to your current practice areas.",
+      "Your practice file has drawn enough scrutiny that FPBC asks for CPD records, your competence declaration, development plan, and work samples tied to your current practice areas.",
     roles: ["planner", "permitter", "recce", "silviculture"],
     areaTags: ["northern-bc"],
     seasonBias: ["Winter Review", "Spring Planning"],
+    requiresAnyFlags: ["professionalAuditActive"],
+    context: {
+      operation: "You are answering a live professional practice audit tied to the work you have been doing this season.",
+      objective: "Show that your records, practice-area declaration, and work samples match the work you actually performed.",
+      stakes: "A thin reply turns an administrative review into a deeper practice problem.",
+    },
+    riskClass: "calculated",
     options: [
       {
         label: "Clear the deck and submit a defensible package",
@@ -1477,16 +1524,22 @@ export const ISSUE_LIBRARY = [
     id: "special-use-permit-stack",
     title: "Special Use Permit Stack",
     description:
-      "Your camp, helipad, and dump footprint are bigger than the district expected, and suddenly the support infrastructure needs its own special use permit bundle.",
+      "Your camp, helipad, and log-dump footprint grew beyond what was shown in the main file, and the district now wants a separate special-use permit package for the support site.",
     roles: ["planner", "permitter", "recce", "silviculture"],
     areaTags: ["remote-camps", "glacial", "gas-interface", "community-interface", "northern-bc"],
     seasonBias: ["Spring Planning", "Summer Field"],
     processHookIds: ["special-use-permit"],
+    context: {
+      operation: "You are trying to keep field support infrastructure legal while the main file is still moving.",
+      objective: "Decide whether to authorize, shrink, or gamble on a support-site footprint that has outgrown the original plan.",
+      stakes: "If the support site is not properly covered, the district can pull attention and schedule time away from the main work immediately.",
+    },
+    riskClass: "calculated",
     options: [
       {
-        label: "Bundle the occupancy applications and maps properly",
+        label: "Build the special-use permit package properly",
         outcome:
-          "You burn time on paperwork and exhibits now, but the support sites stop dragging the main file backward.",
+          "You burn time on maps, exhibits, and site details now, but the support site stops dragging the main file backward.",
         effects: { progress: -2, compliance: 6, budget: -2 },
       },
       {
@@ -1498,8 +1551,436 @@ export const ISSUE_LIBRARY = [
       {
         label: "Use the sites quietly and hope nobody asks",
         outcome:
-          "It looks efficient for a week or two, right up until the occupancy question lands in writing.",
+          "It looks efficient for a week or two, right up until the district asks why the support site was built without its own permit package.",
         effects: { progress: 2, compliance: -7, relationships: -2 },
+      },
+    ],
+  },
+  // source: FPBC 2023-10 (Cover) / 2021-05 (Maundrell)
+  {
+    id: "stream-class-shortcut",
+    title: "Desk Call on a Borderline Creek",
+    description:
+      "The road crew wants the culvert spec today. The desktop signal says the creek is probably non-classified, but no one has walked it and the block boundary is three days out.",
+    roles: ["recce", "planner", "permitter"],
+    areaTags: ["riparian", "fish-bearing"],
+    seasonBias: ["Spring Planning", "Summer Field"],
+    options: [
+      {
+        label: "Call it NCD off the orthophoto and keep the culvert order",
+        outcome:
+          "The road package moves and nobody notices for a month, until a First Nations crew finds fry in the channel during a joint tour.",
+        effects: { progress: 6, forestHealth: -5, compliance: -6, relationships: -4 },
+        setFlags: { streamMisclassified: true },
+      },
+      {
+        label: "Send a biologist in for a same-week field check",
+        outcome: "A two-day delay and a specialist invoice, but the classification holds up under review.",
+        effects: { progress: -2, forestHealth: 4, compliance: 6, budget: -3 },
+      },
+      {
+        label: "Walk the creek yourself and document every reach",
+        outcome: "You reclassify it as fish-bearing, redesign to a clear-span, and the file is bulletproof.",
+        effects: { progress: -4, forestHealth: 6, compliance: 7, relationships: 2, budget: -1 },
+      },
+    ],
+  },
+  // source: FPBC 2022-04 / 2022-09 (Chipman, Johnson)
+  {
+    id: "blanket-exemption-memory",
+    title: "Is That Exemption Still Live?",
+    description:
+      "Your site plan sits over a Mule Deer Winter Range. Someone on the team is pretty sure there is a blanket GAR exemption from last year's salvage push. The harvest window closes in a week.",
+    roles: ["planner", "permitter"],
+    areaTags: ["wildlife", "salvage"],
+    seasonBias: ["Winter Review", "Spring Planning"],
+    options: [
+      {
+        label: "Sign on the remembered exemption and move the block forward",
+        outcome:
+          "Trees fall inside the winter range. Six months later the compliance branch confirms the exemption lapsed and your name is on the site plan.",
+        effects: { progress: 8, compliance: -8, forestHealth: -3, relationships: -3 },
+        setFlags: { mdwrExposure: true },
+      },
+      {
+        label: "Pause the file and file a fresh exemption request",
+        outcome: "The harvest window slips but the paperwork is clean when the auditor arrives.",
+        effects: { progress: -5, compliance: 7, relationships: 2 },
+      },
+      {
+        label: "Redesign the block to exit the winter range entirely",
+        outcome: "You lose the volume but inherit a cleaner map and a story you can defend.",
+        effects: { progress: -3, forestHealth: 6, compliance: 5, budget: -2 },
+      },
+    ],
+  },
+  // source: FPBC 2014-05 (Raby) / 2014-08 (K. Webber) / 2021-10 (McIntosh)
+  {
+    id: "bridge-signoff-window",
+    title: "Temporary Bridge, Permanent Signature",
+    description:
+      "The fabricator is staging a reused Bailey span tomorrow. You have a pre-work inspection form in your bag and a contractor already moving trucks to the approach.",
+    roles: ["permitter", "recce", "planner"],
+    areaTags: ["bridges", "access"],
+    seasonBias: ["Summer Field", "Fall Integration"],
+    options: [
+      {
+        label: "Inspect girders, document condition, and hold hauling until the PEng agrees",
+        outcome:
+          "You catch a flange dent and delay hauling two days, but the CAS survives district review.",
+        effects: { progress: -3, compliance: 8, relationships: 2, budget: -2 },
+      },
+      {
+        label: "Sign the CAS now, mark 'N/A' on the damage questions, let trucks roll",
+        outcome:
+          "Hauling starts on time. Three weeks later a Forest Practices Board auditor photographs the cracks and your name is on the form.",
+        effects: { progress: 9, compliance: -9, relationships: -4 },
+        setFlags: { unsafeCrossing: true },
+      },
+      {
+        label: "Demand a fresh PEng review before the first axle touches the deck",
+        outcome: "The contractor grumbles and the schedule slips, but your file is untouchable.",
+        effects: { progress: -5, compliance: 9, budget: -4 },
+      },
+    ],
+  },
+  // source: FPBC 2022-10 (Kestell)
+  {
+    id: "downstream-neighbour-intake",
+    title: "Residents Downstream of the Block",
+    description:
+      "Two homesteads hold domestic water licences on the creek that drains your proposed cutblock. They have heard rumours and want to know whether you plan to tell them before trucks roll.",
+    roles: ["planner", "permitter", "silviculture"],
+    areaTags: ["community-water", "riparian"],
+    seasonBias: ["Spring Planning"],
+    options: [
+      {
+        label: "Write, map, and walk the block with both water licensees",
+        outcome:
+          "A full afternoon of conversation and a riparian reserve bump. They still disagree, but they sign acknowledgements.",
+        effects: { progress: -2, relationships: 6, compliance: 6, budget: -2 },
+      },
+      {
+        label: "Send the minimum legal referral letter and proceed",
+        outcome:
+          "You clear the formal bar. When a culvert is removed mid-season, one licensee files a complaint that outlasts the block.",
+        effects: { progress: 5, compliance: -3, relationships: -6 },
+        setFlags: { waterLicenseeComplaint: true },
+      },
+      {
+        label: "Delay the block to redesign around an upslope haul route",
+        outcome: "The mill reschedules and your reputation with local residents grows.",
+        effects: { progress: -6, forestHealth: 4, relationships: 8, compliance: 4 },
+      },
+    ],
+  },
+  // source: FPBC 2021-01 (Dascher) / 2009-05 (Lay)
+  {
+    id: "own-land-temptation",
+    title: "Work on Your Own Shoreline",
+    description:
+      "A regional district bylaw requires a Qualified Environmental Professional to assess the foreshore work on your private lake lot. You happen to be an RPF with riparian training.",
+    roles: ["planner", "silviculture", "recce"],
+    areaTags: ["riparian", "conflict"],
+    seasonBias: ["Summer Field"],
+    options: [
+      {
+        label: "Hire an independent QEP and step out of the file",
+        outcome: "An invoice you hate and a clean paper trail. Your registration stays quiet.",
+        effects: { progress: 0, compliance: 6, budget: -5, relationships: 2 },
+      },
+      {
+        label: "Write the riparian assessment yourself and submit it to the district",
+        outcome:
+          "The district flags the conflict of interest. Your assessment is rejected and a complaint lands on the registrar's desk.",
+        effects: { progress: 4, compliance: -8, relationships: -5 },
+        setFlags: { conflictExposure: true },
+      },
+      {
+        label: "Redesign the project to avoid triggering the RAPR assessment",
+        outcome: "A smaller dock and a smaller headache. The foreshore stays intact.",
+        effects: { progress: -2, forestHealth: 5, compliance: 4 },
+      },
+    ],
+  },
+  // source: FPBC 2023-08 (Angus)
+  {
+    id: "municipal-bylaw-blind-spot",
+    title: "Municipal Bylaw Blind Spot",
+    description:
+      "Your client's private lot abuts a resort municipality's treed highway buffer, and the realtor now wants harvesting for a new driveway. The tree-cutting bylaw is not one you usually work with.",
+    roles: ["planner", "permitter"],
+    areaTags: ["community-interface", "private-land", "municipal"],
+    seasonBias: ["Spring Planning", "Summer Field"],
+    options: [
+      {
+        label: "Pause and book a municipal planner to walk the bylaw with you",
+        outcome: "You lose two weeks and some margin, but the development permit gets written against the right bylaw on the first try.",
+        effects: { progress: -3, compliance: 6, relationships: 3, budget: -2 },
+      },
+      {
+        label: "Scope your services down and tell the client to hire the bylaw expertise directly",
+        outcome: "The client grumbles about coordination but now there is a paper trail showing exactly who owns the municipal piece.",
+        effects: { progress: -1, compliance: 4, relationships: 1 },
+      },
+      {
+        label: "Assume the standard utility exemption covers the work and keep moving",
+        outcome: "The crew starts falling trees before anyone reads the exemption closely, and the municipal contravention notice lands three weeks later.",
+        effects: { progress: 3, compliance: -7, relationships: -4 },
+        setFlags: { municipalBylawMissed: true },
+      },
+    ],
+  },
+  // source: FPBC 2022-10 (Kestell)
+  {
+    id: "wtra-trespass-silence",
+    title: "WTRA Trespass Silence",
+    description:
+      "Your contractor accidentally cut 0.03 ha inside a wildlife tree retention area that was also buffering a neighbour's domestic water intake, and nobody has told the water licensee yet.",
+    roles: ["recce", "permitter"],
+    areaTags: ["community-water", "watershed", "private-land"],
+    seasonBias: ["Summer Field", "Fall Integration"],
+    options: [
+      {
+        label: "Drive out to the neighbour today and walk them through what happened",
+        outcome: "The conversation is uncomfortable but the licensee appreciates hearing it from you before they see it on their trail camera.",
+        effects: { progress: -1, relationships: 5, compliance: 5 },
+      },
+      {
+        label: "Report the trespass to the Ministry and wait for them to notify the neighbour",
+        outcome: "The ministry logs it cleanly. The neighbour hears about it second-hand and takes longer to warm back up.",
+        effects: { progress: 0, relationships: -1, compliance: 4 },
+      },
+      {
+        label: "Say nothing and hope the buffer grows in before anyone notices",
+        outcome: "The licensee spots the stumps on a weekend walk and files a formal complaint citing a pattern of being kept in the dark.",
+        effects: { progress: 2, compliance: -7, relationships: -5 },
+        setFlags: { waterLicenseeComplaint: true, trespassHiddenFromNeighbour: true },
+      },
+    ],
+  },
+  // source: FPBC 2022-13 (Nickel)
+  {
+    id: "scaler-pressure-memo",
+    title: "Scaler Coercion Memo",
+    description:
+      "A scaler in your yard emails that they feel pressured by your supervisor to downgrade loads beyond what the scaling manual supports, and has attached a week of examples.",
+    roles: ["recce", "planner"],
+    areaTags: ["yard", "northern-bc"],
+    seasonBias: ["Fall Integration", "Winter Review"],
+    options: [
+      {
+        label: "Pull the supervisor off scaling and bring in an independent review",
+        outcome: "Yard throughput slows for a week, but the scalers visibly relax and the grading numbers stabilize against the manual.",
+        effects: { progress: -3, compliance: 6, relationships: 4, budget: -2 },
+      },
+      {
+        label: "Issue a written reminder that directions must align with the scaling manual",
+        outcome: "The memo is noted. The supervisor stops putting the instruction in writing, but the scaler flags the same conversation happening verbally a month later.",
+        effects: { progress: 1, compliance: 2, relationships: 1 },
+      },
+      {
+        label: "Tell the scaler the supervisor is just focused on cost control and to keep scaling their best",
+        outcome: "You lose the scaler's trust overnight, and a month later the ministry is asking about grading deduction patterns in your yard.",
+        effects: { progress: 2, compliance: -6, relationships: -5 },
+        setFlags: { scalingPressurePatternIgnored: true },
+      },
+    ],
+  },
+  // source: FPBC 2021-06 (Smart / Klahoose K4C)
+  {
+    id: "seedlot-zone-mismatch",
+    title: "Seedlot Zone Mismatch",
+    description:
+      "Your nursery confirms that the seedlings lined up for spring planting are from a seedlot one zone south of the cutblocks. Forty-some blocks are already in the order.",
+    roles: ["silviculture", "planner"],
+    areaTags: ["reforestation", "coast", "community-forest"],
+    seasonBias: ["Winter Review", "Spring Planning"],
+    options: [
+      {
+        label: "Cancel the order and delay planting to source the right seedlot",
+        outcome: "You eat a restocking fee and push planting into early summer, but the seedlings match the climate and the chief forester's standards.",
+        effects: { progress: -4, forestHealth: 5, compliance: 6, budget: -5 },
+      },
+      {
+        label: "Swap seedlots only on the coastal-aspect blocks and plant the rest",
+        outcome: "The compromise thins the exposure but still leaves a chunk of ground with mismatched stock, and the silviculture auditor marks it.",
+        effects: { progress: -1, forestHealth: 1, compliance: -2, budget: -2 },
+      },
+      {
+        label: "Plant the existing stock and let nature sort out the mismatches",
+        outcome: "The first hot summer hammers survival rates and the community forest partner demands to know how half a million seedlings ended up wrong.",
+        effects: { progress: 2, forestHealth: -6, compliance: -6, relationships: -5 },
+        setFlags: { wrongSeedzonePlanted: true },
+      },
+    ],
+  },
+  // source: FPBC 2014-05 (Raby)
+  {
+    id: "used-bridge-yard-pick",
+    title: "Used Bridge Yard Pick",
+    description:
+      "You need a crossing fast and the licensee's yard has a pre-fabricated temporary bridge that has been installed and pulled three times already. The inspection paperwork is patchy.",
+    roles: ["recce", "permitter"],
+    areaTags: ["steep", "winter-road", "salmon"],
+    seasonBias: ["Summer Field", "Fall Integration"],
+    options: [
+      {
+        label: "Commission a full structural re-inspection before selecting the unit",
+        outcome: "The engineer finds flange dents and recommends this unit go to scrap. You order a different bridge and lose a week.",
+        effects: { progress: -3, compliance: 6, relationships: 2, budget: -4 },
+      },
+      {
+        label: "Walk the bridge yourself with a checklist and accept it if nothing jumps out",
+        outcome: "Your walkaround misses the stress cracks. The crossing holds, but every future audit will ask why you were the only eyes on it.",
+        effects: { progress: 2, compliance: -3, forestHealth: -1 },
+        setFlags: { bridgeWalkaroundShortcut: true },
+      },
+      {
+        label: "Rely on the yard's existing inspection forms and sign the Crossing Assurance Statement",
+        outcome: "Hauling starts, and an FPB auditor happens to catch a loaded truck crossing while a crack widens on video.",
+        effects: { progress: 3, compliance: -8, forestHealth: -2, relationships: -3 },
+        setFlags: { unsafeCrossing: true, crossingAssuranceSignedBlind: true },
+      },
+    ],
+  },
+  // source: FPBC 2020-03 (Peasgood)
+  {
+    id: "cruise-design-grid-shortcut",
+    title: "Cruise Design Grid Shortcut",
+    description:
+      "Your cruise of four small expropriation parcels is behind schedule, and the Cruising Manual allows a 100 by 100 grid that waives the sampling error requirement. Two parcels look low volume from the road.",
+    roles: ["planner", "recce"],
+    areaTags: ["private-land", "cruise", "northern-bc"],
+    seasonBias: ["Summer Field", "Fall Integration"],
+    options: [
+      {
+        label: "Tighten the grid, walk every parcel, and keep full field notes",
+        outcome: "The cruise runs long and the invoice balloons, but the volume estimate is defensible and the landowner sees the methodology.",
+        effects: { progress: -4, compliance: 6, relationships: 3, budget: -3 },
+      },
+      {
+        label: "Use the grid waiver but walk all four parcels before finalizing",
+        outcome: "You stay on budget and still catch the merchantable patches you would have missed from the truck.",
+        effects: { progress: -1, compliance: 3, budget: -1 },
+      },
+      {
+        label: "Apply the grid waiver and exclude the two low-looking parcels on sight",
+        outcome: "The report looks clean until the landowner points at satellite imagery and asks where the merchantable stems went.",
+        effects: { progress: 3, compliance: -7, relationships: -5 },
+        setFlags: { cruiseExcludedParcels: true, missingCruiseFieldNotes: true },
+      },
+    ],
+  },
+  // source: FPBC 2009-05 (Lay)
+  {
+    id: "elected-midproject",
+    title: "Elected Mid-Project",
+    description:
+      "You are the prescribing RPF on a fuel-management project for a small village, and last week you were elected to council. The prescription is not yet implemented.",
+    roles: ["planner", "silviculture"],
+    areaTags: ["community-interface", "wildfire", "municipal"],
+    seasonBias: ["Fall Integration", "Winter Review"],
+    options: [
+      {
+        label: "Hand the RPF role to an independent colleague and recuse from council votes on the file",
+        outcome: "You lose the contract but the prescription survives scrutiny and the council vote is clean.",
+        effects: { progress: -3, compliance: 6, relationships: 4, budget: -3 },
+      },
+      {
+        label: "Keep the RPF role but publicly declare the conflict at every council meeting",
+        outcome: "The declarations paper over the optics but residents still struggle to tell which hat you are wearing.",
+        effects: { progress: 0, compliance: 2, relationships: -1 },
+      },
+      {
+        label: "Keep both roles quietly and tell concerned residents you already know what the community wants",
+        outcome: "A neighbour complains to the professional regulator and to the ministry on the same week.",
+        effects: { progress: 2, compliance: -7, relationships: -6 },
+        setFlags: { dualRoleConflict: true },
+      },
+    ],
+  },
+  // source: FPBC 2022-04 / 2022-09 (Chipman, Johnson)
+  {
+    id: "referral-miss-at-two-levels",
+    title: "Referral Miss at Two Levels",
+    description:
+      "An internal audit finds the same First Nation was missed on referrals for several fuel-management site plans, and both the planning forester and the forest manager signed pieces of the stack.",
+    roles: ["planner", "permitter"],
+    areaTags: ["community-forest", "first-nations", "wildfire"],
+    seasonBias: ["Spring Planning", "Summer Field"],
+    options: [
+      {
+        label: "Self-report to both the First Nation and the professional regulator the same week",
+        outcome: "The Nation is hurt but grateful for the direct disclosure, and the regulator opens a process that ends in a consent order rather than a citation.",
+        effects: { progress: -4, compliance: 6, relationships: 5, budget: -3 },
+      },
+      {
+        label: "Apologize privately to the Nation and tighten the internal referral matrix",
+        outcome: "The matrix is better. The Nation accepts the apology but notes they are now watching every site plan that crosses their territory.",
+        effects: { progress: -1, compliance: 3, relationships: 2 },
+      },
+      {
+        label: "Blame the FSP referral clause wording and keep the audit internal",
+        outcome: "The Nation hears about it from a ministry compliance officer, and the trust damage is harder to undo than a direct admission would have been.",
+        effects: { progress: 2, compliance: -5, relationships: -7 },
+        setFlags: { firstNationReferralHidden: true },
+      },
+    ],
+  },
+  // source: FPBC 2013-13 (von der Gonna / McBride Community Forest)
+  {
+    id: "audit-laundry-list",
+    title: "FPB Audit Laundry List",
+    description:
+      "A Forest Practices Board audit of your community forest lands ten findings at once: vague road mapping, drifting OGMA boundaries, unclear contractor obligations, and six more items.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    areaTags: ["community-forest", "audit"],
+    seasonBias: ["Winter Review", "Spring Planning"],
+    options: [
+      {
+        label: "Triage the ten findings and publish a public response plan",
+        outcome: "The board likes the transparency. Community members show up to the plan meeting in good faith and the file starts to heal.",
+        effects: { progress: -4, compliance: 6, relationships: 5, budget: -3 },
+      },
+      {
+        label: "Fix the two or three easiest findings and debate the rest",
+        outcome: "The easy wins help, but the unresolved findings follow you into the next annual report and sour the board's tone.",
+        effects: { progress: 1, compliance: -2, relationships: -2 },
+      },
+      {
+        label: "Dispute the methodology and keep operating while you litigate it",
+        outcome: "The dispute buys a year but the cumulative publicity damages council's confidence in the forest manager role entirely.",
+        effects: { progress: 3, compliance: -8, relationships: -6 },
+        setFlags: { auditDisputeStance: true, regulatoryScrutiny: true },
+      },
+    ],
+  },
+  // source: FPBC 2010-03 (Parker)
+  {
+    id: "rely-on-client-salvage-numbers",
+    title: "Rely on the Client's Salvage Numbers",
+    description:
+      "Your small-scale salvage client has been logging Douglas-fir for thirty years and already has dead-and-down and green-attacked volume estimates ready for you. Your field day is booked elsewhere.",
+    roles: ["planner", "recce"],
+    areaTags: ["salvage", "interior", "private-land"],
+    seasonBias: ["Summer Field", "Fall Integration"],
+    options: [
+      {
+        label: "Reschedule and walk the blocks yourself before the application",
+        outcome: "You miss the deadline by a week but the field notes line up with what the ministry checkers eventually find.",
+        effects: { progress: -3, compliance: 6, relationships: 2, budget: -2 },
+      },
+      {
+        label: "Drive the blocks with the client and do a reduced visual check",
+        outcome: "The visual check catches most of the outliers. Two applications still come back marked 'inaccurate' but nothing is suspended.",
+        effects: { progress: 0, compliance: 2, relationships: 1 },
+      },
+      {
+        label: "Sign the applications using the client's tally and move on",
+        outcome: "Three applications get suspended the next spring and your name appears on the ministry's list of SSS submitters to watch.",
+        effects: { progress: 3, compliance: -7, relationships: -3 },
+        setFlags: { salvageEstimatesUnchecked: true },
       },
     ],
   },

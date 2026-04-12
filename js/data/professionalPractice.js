@@ -48,6 +48,59 @@ export const PROFESSIONAL_OBLIGATIONS = [
     sourceLabel: "FPBC practice diary",
     sourceUrl: "https://www.fpbc.ca/practice-diary/",
   },
+  // source: pattern across FPBC 2023-10 (Cover), 2021-05 (Maundrell), 2009-05 (Lay)
+  {
+    id: "field-verification-duty",
+    title: "Field Verification Before Sign-off",
+    summary:
+      "Professional opinions about watercourse classification, road alignment, and bridge condition are expected to rest on in-person field checks, not desktop or helicopter flyover assumptions.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    sourceLabel: "FPBC practice standards for forest resource activities",
+    sourceUrl:
+      "https://www.fpbc.ca/practice-resources/standards-practice-guidelines/",
+  },
+  // source: pattern across FPBC 2022-04 (Chipman), 2022-09 (F. Johnson), 2022-10 (Kestell)
+  {
+    id: "referral-and-notification-duty",
+    title: "Referral and Notification Integrity",
+    summary:
+      "Registrants are accountable for making sure referrals to First Nations, water licensees, and other affected parties actually happen, match the FSP commitments, and cover every overlapping interest on the block.",
+    roles: ["planner", "permitter"],
+    sourceLabel: "FRPA forest stewardship plans and referral commitments",
+    sourceUrl:
+      "https://www2.gov.bc.ca/gov/content/industry/forestry/managing-our-forest-resources/stewardship/forest-stewardship-plans",
+  },
+  // source: pattern across FPBC 2021-01 (Dascher), 2009-05 (Lay), 2018-02B (Wolfe)
+  {
+    id: "conflict-of-interest-duty",
+    title: "Refuse the Conflicted Assignment",
+    summary:
+      "Forest professionals must refuse or withdraw from assignments where personal ownership, governance roles, or family interest compromise independence; you cannot be your own QEP or your own regulator.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    sourceLabel: "FPBC Code of Ethical and Professional Conduct",
+    sourceUrl: "https://www.fpbc.ca/about-us/governance/bylaws/",
+  },
+  // source: pattern across FPBC 2014-05 (Raby), 2014-08 (K. Webber), 2015-01 (Yodogawa), 2021-10 (McIntosh)
+  {
+    id: "crossing-crp-duty",
+    title: "Coordinating Registered Professional on Crossings",
+    summary:
+      "If you sign or seal a Crossing Assurance Statement, you are accepting personal responsibility that the structure was designed by qualified professionals, inspected in the field, and built to the load-bearing specification.",
+    roles: ["permitter", "recce", "planner"],
+    sourceLabel: "FPBC practice guidelines for crossings and resource roads",
+    sourceUrl: "https://www.fpbc.ca/practice-resources/standards-practice-guidelines/",
+  },
+  // source: pattern across FPBC 2011-04 (Boucher/Forbes), 2014-04A (Crichton), 2014-04B (Zirul), 2020-03 (Peasgood), 2010-03 (Parker)
+  {
+    id: "cruise-integrity-duty",
+    title: "Timber Cruise Integrity",
+    summary:
+      "Cruise plot placement, tree-class calls, and sampling design must conform to the provincial cruising manual; relying on a client's volume estimates or moving plots to hit a standard error is a stumpage-integrity failure, not a shortcut.",
+    roles: ["recce", "planner"],
+    sourceLabel: "BC Cruising Manual",
+    sourceUrl:
+      "https://www2.gov.bc.ca/gov/content/industry/forestry/competitive-forest-industry/timber-pricing/timber-cruising",
+  },
 ];
 
 export { MINISTRY_PROCESS_HOOKS, MINISTRY_PROCESS_FAILURES };
@@ -99,7 +152,7 @@ export const PAPERWORK_CHAIN_LIBRARY = [
     id: "fom-notice-cycle",
     title: "FOM Notice -> Comment -> Submission",
     roles: ["planner", "permitter"],
-    areaIds: ["bulkley-valley", "fraser-plateau", "skeena-nass"],
+    areaIds: ["bulkley-valley", "fraser-plateau", "skeena-nass", "vancouver-island-coast", "kootenay-wetbelt", "okanagan-shuswap-drybelt"],
     hookIds: ["fom-notice-cycle", "cutting-permit-admin"],
     sourceLabel: "Forest Operations Map",
     sourceUrl:
@@ -141,7 +194,7 @@ export const PAPERWORK_CHAIN_LIBRARY = [
     id: "road-authority-chain",
     title: "Road Permit -> RUP -> Maintenance",
     roles: ["permitter", "planner", "recce"],
-    areaIds: ["fort-st-john-plateau", "muskwa-foothills", "skeena-nass", "tahltan-highland"],
+    areaIds: ["fort-st-john-plateau", "muskwa-foothills", "skeena-nass", "tahltan-highland", "vancouver-island-coast", "kootenay-wetbelt", "okanagan-shuswap-drybelt"],
     hookIds: ["road-permit-package", "road-use-permit", "road-notifications"],
     sourceLabel: "Road permit and road-use administration",
     sourceUrl:
@@ -184,7 +237,7 @@ export const PAPERWORK_CHAIN_LIBRARY = [
     id: "archaeology-ladder",
     title: "AOA Screen -> Field Review -> AIA Context",
     roles: ["permitter", "planner", "recce"],
-    areaIds: ["tahltan-highland", "bulkley-valley", "skeena-nass", "muskwa-foothills"],
+    areaIds: ["tahltan-highland", "bulkley-valley", "skeena-nass", "muskwa-foothills", "vancouver-island-coast", "kootenay-wetbelt", "okanagan-shuswap-drybelt"],
     hookIds: ["archaeology-screening-ladder"],
     sourceLabel: "BC archaeology permits and assessments",
     sourceUrl: "https://www2.gov.bc.ca/gov/content/industry/natural-resource-use/archaeology/assessments-studies",
@@ -225,9 +278,9 @@ export const PAPERWORK_CHAIN_LIBRARY = [
   },
   {
     id: "support-site-occupancy",
-    title: "Support Site -> SUP -> Occupancy Closeout",
+    title: "Support Site -> Special Use Permit -> Closeout",
     roles: ["permitter", "planner", "recce", "silviculture"],
-    areaIds: ["muskwa-foothills", "skeena-nass", "tahltan-highland", "fort-st-john-plateau"],
+    areaIds: ["muskwa-foothills", "skeena-nass", "tahltan-highland", "fort-st-john-plateau", "vancouver-island-coast", "kootenay-wetbelt", "okanagan-shuswap-drybelt"],
     hookIds: ["special-use-permit"],
     sourceLabel: "Special Use Permit - Forestry",
     sourceUrl:
@@ -237,7 +290,7 @@ export const PAPERWORK_CHAIN_LIBRARY = [
         id: "footprint-triage",
         label: "Triage camps, helipads, and support footprints",
         description:
-          "Decide what can ride inside the main file and what needs its own occupancy authority before the footprint balloons.",
+          "Decide what can ride inside the main file and what needs its own special-use permit package before the footprint balloons.",
         hours: 2,
         paperworkRelief: 6,
         auditRelief: 4,
@@ -292,7 +345,7 @@ export const AREA_COMPLIANCE_PROFILES = [
     auditExposure: 12,
     dailyLoad: 3,
     watchouts: [
-      "Remote camp logistics push support-site occupancy authority into the critical path.",
+      "Remote camp logistics push separate support-site permit work onto the critical path.",
       "Steep access and wildlife timing make thin rationale show up quickly in review.",
     ],
   },
@@ -320,7 +373,7 @@ export const AREA_COMPLIANCE_PROFILES = [
     auditExposure: 8,
     dailyLoad: 2,
     watchouts: [
-      "Beetle and wildfire legacy work keeps the planning record alive even when field pressure feels elsewhere.",
+      "Beetle and wildfire legacy work keep the planning record active even when the field problem seems to be somewhere else.",
     ],
   },
   {
@@ -347,8 +400,50 @@ export const AREA_COMPLIANCE_PROFILES = [
     auditExposure: 13,
     dailyLoad: 3,
     watchouts: [
-      "Remote camps and support pads push occupancy packages onto the critical path.",
+      "Remote camps and support pads push special-use permit packages onto the critical path.",
       "Archaeology and heritage sensitivity can escalate from desktop work to specialist-controlled systems.",
+    ],
+  },
+  {
+    areaId: "vancouver-island-coast",
+    title: "Coastal Storm and Fish-Stream Burden",
+    hookIds: ["road-permit-package", "fish-crossing-remediation", "fom-notice-cycle"],
+    enforcementIds: ["watercourse-due-diligence", "rationale-gap"],
+    chainIds: ["road-authority-chain", "fom-notice-cycle", "support-site-occupancy"],
+    paperworkLoad: 18,
+    auditExposure: 11,
+    dailyLoad: 3,
+    watchouts: [
+      "Fish-stream crossings and storm-season access assumptions make weak field notes show up quickly in review.",
+      "Visible roadside work keeps consultation and public-facing map quality live longer than expected.",
+    ],
+  },
+  {
+    areaId: "kootenay-wetbelt",
+    title: "Wetbelt Watershed and Slope Burden",
+    hookIds: ["road-permit-package", "fom-notice-cycle", "riparian-classification"],
+    enforcementIds: ["watercourse-due-diligence", "rationale-gap"],
+    chainIds: ["road-authority-chain", "fom-notice-cycle", "archaeology-ladder"],
+    paperworkLoad: 17,
+    auditExposure: 10,
+    dailyLoad: 3,
+    watchouts: [
+      "Community-water settings and steep road prisms make drainage assumptions easier to challenge.",
+      "Wetbelt cover and access complexity reward clean rationale and punish fast-but-thin file work.",
+    ],
+  },
+  {
+    areaId: "okanagan-shuswap-drybelt",
+    title: "Drybelt Interface and Wildfire Burden",
+    hookIds: ["fom-notice-cycle", "cutting-permit-admin", "riparian-classification"],
+    enforcementIds: ["rationale-gap", "watercourse-due-diligence"],
+    chainIds: ["fom-notice-cycle", "road-authority-chain"],
+    paperworkLoad: 16,
+    auditExposure: 9,
+    dailyLoad: 2,
+    watchouts: [
+      "Interface wildfire logic and visible hillsides mean weak public-facing rationale gets tested early.",
+      "Drybelt water sensitivity can turn a simple access note into a bigger watershed conversation.",
     ],
   },
 ];

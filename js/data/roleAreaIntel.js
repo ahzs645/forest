@@ -16,7 +16,7 @@ const ROLE_BASELINES = {
   ],
   silviculture: [
     "microsites that swing from frost-prone wet pockets to dry knolls inside the same block",
-    "browse, pest pressure, and brush competition that only become obvious once somebody walks the ground",
+    "browse, insect risk, and brush competition that only become obvious once somebody walks the ground",
   ],
 };
 
@@ -35,7 +35,7 @@ const ROLE_AREA_FINDINGS = {
       "high-use benches above towns and rivers where public viewpoints shape block design almost as much as inventory does",
     ],
     "fraser-plateau": [
-      "beetle-legacy stands where salvage logic, wildfire resilience, and evacuation-route reliability all compete for the same hectares",
+      "beetle-killed pine stands where wildfire resilience, mixedwood recovery, and nearby community evacuation routes all compete for the same hectares",
       "Quesnel-plateau style planning where mature residual structure, young pine history, and future fire behavior all need to fit the same story",
     ],
     "skeena-nass": [
@@ -45,6 +45,18 @@ const ROLE_AREA_FINDINGS = {
     "tahltan-highland": [
       "short field windows and braided glacial-river logistics forcing plans to be honest about how much can actually be sequenced in a season",
       "high, cold SWB country where sparse timber, wet hollows, and remote mobilization costs can break a paper plan that looked efficient",
+    ],
+    "vancouver-island-coast": [
+      "coastal road systems where fish-stream crossings, public-road visuals, and rainfall-driven slope failures all shape the block sequence",
+      "island permits that look straightforward on the map until storm exposure and visible roadside ground force a more careful layout story",
+    ],
+    "kootenay-wetbelt": [
+      "wetbelt blocks where community watersheds, cedar-hemlock cover, and steep road prisms all have to be reconciled before the plan reads cleanly",
+      "southeast interior layouts where a small hydrology mistake can matter more than a small volume gain",
+    ],
+    "okanagan-shuswap-drybelt": [
+      "drybelt planning where interface wildfire logic, visible hillsides, and water-sensitive draws keep the block list under public scrutiny",
+      "southern Interior sequencing where you have to prove the harvest story still fits a fire-prone, community-facing landscape",
     ],
   },
   permitter: {
@@ -61,7 +73,7 @@ const ROLE_AREA_FINDINGS = {
       "community-interface files where a weak mitigation map is usually what triggers the hard follow-up, not the cover letter",
     ],
     "fraser-plateau": [
-      "submissions that now have to explain post-beetle intent, wildfire-resilience logic, and why access near evacuation corridors is still defensible",
+      "submissions that now have to explain post-beetle intent, wildfire-resilience logic, and why access near community evacuation routes is still defensible",
       "Quesnel-side files where overlapping habitat and old-forest concerns mean the referral package has to be sharper than the average permit run",
     ],
     "skeena-nass": [
@@ -71,6 +83,18 @@ const ROLE_AREA_FINDINGS = {
     "tahltan-highland": [
       "remote-area packages that need credible camp, aviation, and river-access timing before reviewers believe the work can be done cleanly",
       "highland files where wildlife, cultural-value, and weather-window questions arrive early because the logistics are so unforgiving",
+    ],
+    "vancouver-island-coast": [
+      "coastal files that rise or fall on fish-stream notes, visible roadside treatment, and whether storm-season access assumptions are honest",
+      "island referrals where rainfall timing and public-road optics can matter as much as the timber argument",
+    ],
+    "kootenay-wetbelt": [
+      "wetbelt files that need stronger watershed and slope-stability language before they feel review-ready",
+      "packages where steep-road engineering and community-water concerns can trigger more scrutiny than the cover letter expects",
+    ],
+    "okanagan-shuswap-drybelt": [
+      "drybelt submissions that need clean wildfire-operability logic and defensible visuals for highly visible ground",
+      "community-facing files where smoke, water, and interface concerns can turn a routine permit into a public review problem",
     ],
   },
   recce: {
@@ -98,6 +122,18 @@ const ROLE_AREA_FINDINGS = {
       "snow lingering on benches, cold braided rivers, and long gaps between useful pullouts where a small mistake becomes a camp issue",
       "high, sparsely treed ground with willow-birch parkland and cold-air basins that makes visibility good but access unforgiving",
     ],
+    "vancouver-island-coast": [
+      "fish-bearing ditches, steep creek mouths, and rain-lashed road prisms that can fail between one crew call and the next",
+      "coastal blocks where public-road visibility means sloppy slash or drainage work will be noticed immediately",
+    ],
+    "kootenay-wetbelt": [
+      "wetbelt road prisms where runoff, old fills, and steep side slopes keep turning routine access checks into engineering questions",
+      "cedar-hemlock ground where water is everywhere and the wrong drainage call can move fast downhill",
+    ],
+    "okanagan-shuswap-drybelt": [
+      "drybelt access where dust, fire restrictions, and visible roadside work all shape what a productive day can safely look like",
+      "interface ground where a poor line choice is likely to be seen by nearby residents, recreation users, or both",
+    ],
   },
   silviculture: {
     "fort-st-john-plateau": [
@@ -109,11 +145,11 @@ const ROLE_AREA_FINDINGS = {
       "foothill sites where sparse stocking, frost, and tough access make re-entry costs part of every regeneration decision",
     ],
     "bulkley-valley": [
-      "growing-season frost, browse pressure, and heavy brush on SBS benches where acceptable stocking can still look rough from a public road",
+      "growing-season frost, browse, and heavy brush on SBS benches where acceptable stocking can still look rough from a public road",
       "interface blocks where regeneration quality and site appearance both matter because the work stays visible",
     ],
     "fraser-plateau": [
-      "beetle-legacy ground with moisture deficit on knolls, frost in lows, and strong moose browse pressure on young mixedwood recovery",
+      "beetle-killed pine ground with dry knolls, frost-prone lows, and heavy moose browse on young mixedwood recovery",
       "SBSwk1 sites where species diversification sounds easy until brush, browse, and patchy residual structure start pulling the numbers apart",
     ],
     "skeena-nass": [
@@ -123,6 +159,18 @@ const ROLE_AREA_FINDINGS = {
     "tahltan-highland": [
       "cold-air valley bottoms, shrub fields, and moist meadows that stay nearly treeless while adjacent uplands still carry spruce-fir potential",
       "highland blocks where short seasons, browse, and remote mobilization punish any prescription that misses on the first pass",
+    ],
+    "vancouver-island-coast": [
+      "coastal reforestation ground where competing salal, salmonberry, and wet microsites can make recent planting look uneven fast",
+      "island blocks where visible roadside work means silviculture quality and site appearance are judged at the same time",
+    ],
+    "kootenay-wetbelt": [
+      "wetbelt sites where cedar-hemlock regen, aggressive brush, and steep access can make survey productivity sag quickly",
+      "southeast blocks where heavy moisture and browse mean a stand can look full from the road while weak pockets are already falling behind",
+    ],
+    "okanagan-shuswap-drybelt": [
+      "drybelt ground where drought stress, grass competition, and browse can turn a simple planting program into repeated follow-up work",
+      "high-visibility interface blocks where regen quality and fuel-treatment appearance both matter before free-growing is even in sight",
     ],
   },
 };
@@ -193,7 +241,7 @@ export function getRoleAreaBriefing(roleId, area, options = {}) {
   const likelyFinds = dedupe([...areaFinds, ...snapshotSignals.findings, ...baseFinds]).slice(0, maxFinds);
 
   return {
-    zoneSummary: area?.zoneSummary || "",
+    zoneSummary: [area?.becCode, area?.zoneSummary].filter(Boolean).join(" • "),
     seasonalSignals: Array.isArray(area?.seasonalSignals) ? area.seasonalSignals : [],
     likelyFinds,
     planningSnapshot: snapshotSignals.planningSnapshot,

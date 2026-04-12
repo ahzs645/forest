@@ -205,7 +205,7 @@ export function applyRoundConsequences(state) {
         {
           type: "consequence",
           id: "professional-audit",
-          title: "Professional audit pressure is building",
+          title: "Professional audit risk is building",
           option: "The file is drawing closer review because the records look thin",
           round,
         },

@@ -3,6 +3,7 @@ import {
   ISSUE_LIBRARY,
   getMinistryProcessHook,
 } from "../data/index.js";
+import { normalizeSeasonalCard } from "./seasonalContract.js";
 
 const EXISTING_ISSUE_IDS = new Set([...ISSUE_LIBRARY, ...CHAINED_ISSUES].map((issue) => issue.id));
 
@@ -37,9 +38,9 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
   briefing: [
     {
       stance: "cautious",
-      label: "Ground-truth the pressure",
-      outcome: "You slow down long enough to verify the live pressure before it compounds into a bigger file problem.",
-      effects: { progress: -1, compliance: 3, relationships: 2 },
+      label: "Ground-truth the situation",
+      outcome: "You slow down long enough to verify the live condition before it compounds into a bigger file problem.",
+      effects: { progress: 0, compliance: 3, relationships: 2 },
     },
     {
       stance: "balanced",
@@ -51,7 +52,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Push the original plan",
       outcome: "You hold the original line and bank the momentum, accepting that the exposure may come back later.",
-      effects: { progress: 5, compliance: -3, relationships: -2 },
+      effects: { progress: 4, compliance: -4, relationships: -2 },
     },
   ],
   process: [
@@ -59,7 +60,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Rebuild the file properly",
       outcome: "You rebuild the file from first principles and reduce the odds that the record falls apart under review.",
-      effects: { progress: -2, compliance: 6, relationships: 2, budget: -1 },
+      effects: { progress: -1, compliance: 6, relationships: 2, budget: -1 },
     },
     {
       stance: "balanced",
@@ -71,7 +72,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Push the package through",
       outcome: "You preserve momentum and hope the weak spots do not become next season's audit problem.",
-      effects: { progress: 6, compliance: -4, relationships: -3 },
+      effects: { progress: 4, compliance: -5, relationships: -3 },
     },
   ],
   planning: [
@@ -79,7 +80,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Redesign around the constraint",
       outcome: "You reshape the work to fit the constraint instead of treating it like a memo item.",
-      effects: { progress: -2, forestHealth: 5, compliance: 3, budget: -1 },
+      effects: { progress: -1, forestHealth: 5, compliance: 3, budget: -1 },
     },
     {
       stance: "balanced",
@@ -91,7 +92,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Hold the original line",
       outcome: "You protect the original harvest logic and trust that mitigation can absorb the rough edges.",
-      effects: { progress: 6, forestHealth: -3, compliance: -3, relationships: -2 },
+      effects: { progress: 4, forestHealth: -3, compliance: -4, relationships: -2 },
     },
   ],
   road: [
@@ -99,7 +100,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Repair and document now",
       outcome: "You spend the time to stabilize the access story before field reality outruns the paperwork.",
-      effects: { progress: -1, compliance: 5, budget: -2 },
+      effects: { progress: 0, compliance: 5, budget: -2 },
     },
     {
       stance: "balanced",
@@ -111,7 +112,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Run the access window hard",
       outcome: "You take the short access window and accept the higher chance of downstream scrutiny.",
-      effects: { progress: 5, compliance: -4, budget: -1, forestHealth: -1 },
+      effects: { progress: 4, compliance: -5, budget: -1, forestHealth: -1 },
     },
   ],
   discovery: [
@@ -119,7 +120,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Stop, flag, and report",
       outcome: "You elevate the finding early and keep the later file cleaner, even if the schedule slips.",
-      effects: { progress: -2, compliance: 5, relationships: 3 },
+      effects: { progress: -1, compliance: 5, relationships: 3 },
     },
     {
       stance: "balanced",
@@ -131,27 +132,27 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Work around it quietly",
       outcome: "You keep the crews moving and hope the field signal does not come back as a louder problem next round.",
-      effects: { progress: 4, compliance: -5, relationships: -3 },
+      effects: { progress: 3, compliance: -5, relationships: -3 },
     },
   ],
   situation: [
     {
       stance: "cautious",
       label: "Adapt the schedule",
-      outcome: "You accept the season on its own terms and reshape the schedule before pressure turns into damage.",
-      effects: { progress: -1, compliance: 3, relationships: 1, budget: -1 },
+      outcome: "You accept the season on its own terms and reshape the schedule before the constraint turns into damage.",
+      effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 },
     },
     {
       stance: "balanced",
       label: "Add buffers and keep moving",
-      outcome: "You add just enough buffer to stay operational without pretending the pressure is gone.",
+      outcome: "You add just enough buffer to stay operational without pretending the constraint is gone.",
       effects: { progress: 2, compliance: 1 },
     },
     {
       stance: "aggressive",
       label: "Push through the window",
       outcome: "You chase the work window hard and rely on later cleanup to absorb the strain.",
-      effects: { progress: 5, compliance: -3, forestHealth: -2, relationships: -1 },
+      effects: { progress: 4, compliance: -4, forestHealth: -2, relationships: -1 },
     },
   ],
   professional: [
@@ -159,7 +160,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Clear the admin burden now",
       outcome: "You spend the season clearing the professional burden before it turns into a live practice problem.",
-      effects: { progress: -2, compliance: 5 },
+      effects: { progress: 0, compliance: 5 },
     },
     {
       stance: "balanced",
@@ -171,7 +172,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Defer and keep producing",
       outcome: "You leave the admin debt in place and squeeze one more productive window out of the season.",
-      effects: { progress: 4, compliance: -4 },
+      effects: { progress: 3, compliance: -5 },
     },
   ],
 };
@@ -190,38 +191,38 @@ const SOURCE_LABELS = {
 const ROLE_FAMILY_TITLES = {
   planner: {
     briefing: "Landscape Briefing",
-    process: "File Pressure",
+    process: "File Readiness",
     planning: "Planning Snapshot",
     road: "Access Constraint",
     discovery: "Carry-Forward Finding",
-    situation: "Area Pressure",
+    situation: "Area Constraint",
     professional: "Practice Burden",
   },
   permitter: {
     briefing: "Referral Briefing",
-    process: "Submission Pressure",
+    process: "Submission Blocker",
     planning: "Permit Snapshot",
-    road: "Access Authority Pressure",
+    road: "Access Authority Gap",
     discovery: "Carry-Forward Finding",
-    situation: "Area Pressure",
+    situation: "Area Constraint",
     professional: "Practice Burden",
   },
   recce: {
     briefing: "Field Briefing",
-    process: "File Pressure",
+    process: "File Readiness",
     planning: "Ground Signal",
-    road: "Access Pressure",
+    road: "Access Constraint",
     discovery: "Carry-Forward Finding",
-    situation: "Area Pressure",
+    situation: "Area Constraint",
     professional: "Practice Burden",
   },
   silviculture: {
     briefing: "Operations Briefing",
-    process: "File Pressure",
+    process: "File Readiness",
     planning: "Stand Signal",
-    road: "Access Pressure",
+    road: "Access Constraint",
     discovery: "Carry-Forward Finding",
-    situation: "Area Pressure",
+    situation: "Area Constraint",
     professional: "Practice Burden",
   },
 };
@@ -244,6 +245,14 @@ function familyTitle(roleId, family, fallback = null) {
 function sanitizeText(value, fallback = "") {
   const text = String(value || "").trim();
   return text || fallback;
+}
+
+function buildAssignmentContext(context, stakes) {
+  return {
+    operation: context?.operationState?.operation,
+    objective: context?.operationState?.objective,
+    stakes,
+  };
 }
 
 function buildPressureSummary(state) {
@@ -341,10 +350,10 @@ function buildAssignmentOptions(candidate) {
   });
 }
 
-function finalizeCandidate(candidate) {
+function finalizeCandidate(candidate, state = null) {
   const sourceFamily = candidate.sourceFamily;
   const sourceKey = candidate.sourceKey;
-  return {
+  return normalizeSeasonalCard({
     id: candidate.id || `${sourceFamily}:${sourceKey}`,
     assignmentKey: `${sourceFamily}:${sourceKey}`,
     score: Number(candidate.score || 0),
@@ -356,7 +365,9 @@ function finalizeCandidate(candidate) {
     sourceLabel: sanitizeText(candidate.sourceLabel, SOURCE_LABELS[sourceFamily]),
     whyNow: sanitizeText(candidate.whyNow),
     options: buildAssignmentOptions(candidate),
-  };
+    context: candidate.context || null,
+    riskClass: candidate.riskClass || null,
+  }, state, "assignment");
 }
 
 function buildBriefingCandidates(state, context) {
@@ -370,10 +381,14 @@ function buildBriefingCandidates(state, context) {
     sourceLabel: SOURCE_LABELS.briefing,
     whyNow: sanitizeText(
       context?.briefing?.seasonalSignals?.[Math.max(0, context.round - 1)]
-        || `Seasonal signal: ${context.season} pressure is now shaping the ground.`,
+        || `Seasonal signal: ${context.season} conditions are reshaping the work on the ground.`,
+    ),
+    context: buildAssignmentContext(
+      context,
+      "This is the local ground truth most likely to change how you should work this season.",
     ),
     score: Math.max(1, 100 - index * 10),
-  }));
+  }, state));
 }
 
 function buildProcessCandidates(state, context) {
@@ -395,10 +410,14 @@ function buildProcessCandidates(state, context) {
       flavor: `Paperwork chain • ${progress.stage.label}`,
       sourceLabel: sanitizeText(progress.chain.sourceLabel, SOURCE_LABELS.process),
       whyNow: `Open chain with ${progress.remainingStages} stage(s) remaining. ${buildPressureSummary(state)}`,
+      context: buildAssignmentContext(
+        context,
+        "If this chain slips, the file gets harder to defend and later work starts stacking on bad assumptions.",
+      ),
       paperworkChainId: progress.chain.id,
       failureIssueId: findChainFailureIssueId(progress.chain),
       score: 50 + stageScore,
-    }));
+    }, state));
   }
 
   for (const hook of context?.professionalContext?.paperwork || []) {
@@ -414,9 +433,13 @@ function buildProcessCandidates(state, context) {
       flavor: `Process hook • ${hook.category}`,
       sourceLabel: sanitizeText(hook.sourceLabel, SOURCE_LABELS.process),
       whyNow: sanitizeText(hook.trigger, `Current process load is rising. ${buildPressureSummary(state)}`),
+      context: buildAssignmentContext(
+        context,
+        "The next submission or amendment will inherit this gap if you do not close it now.",
+      ),
       failureIssueId: findExistingFailureIssueId(hook.failureModes),
       score: 35 + Number((hook.failureModes || []).length || 0) * 4,
-    }));
+    }, state));
   }
 
   for (const breach of context?.professionalContext?.breaches || []) {
@@ -431,10 +454,14 @@ function buildProcessCandidates(state, context) {
       description: sanitizeText(breach.summary),
       flavor: `Failure mode • ${breach.processHookTitle || "Regulatory process"}`,
       sourceLabel: sanitizeText(breach.sourceLabel, SOURCE_LABELS.process),
-      whyNow: `This stays live while paperwork and scrutiny pressure remain elevated. ${buildPressureSummary(state)}`,
+      whyNow: `This stays live while paperwork backlog and scrutiny remain elevated. ${buildPressureSummary(state)}`,
+      context: buildAssignmentContext(
+        context,
+        "A known process failure is now close enough to the live file that it can no longer stay theoretical.",
+      ),
       failureIssueId: EXISTING_ISSUE_IDS.has(breach.id) ? breach.id : null,
       score: 28,
-    }));
+    }, state));
   }
 
   return candidates;
@@ -457,10 +484,14 @@ function buildPlanningCandidates(state, context) {
     flavor: sanitizeText(snapshot.generatedOn ? `Snapshot generated ${snapshot.generatedOn}` : "Current planning snapshot"),
     sourceLabel: SOURCE_LABELS.planning,
     whyNow: sanitizeText(
-      `Current snapshot shows ${snapshot.blockCount} candidate block(s); dominant triage pressure is ${snapshot.recommendedTriageLabel || "mixed constraints"}.`,
+      `Current snapshot shows ${snapshot.blockCount} candidate block(s); dominant triage focus is ${snapshot.recommendedTriageLabel || "mixed constraints"}.`,
+    ),
+    context: buildAssignmentContext(
+      context,
+      "The block sequence you choose here will shape what the rest of the team spends the year defending.",
     ),
     score: 60 - index * 6,
-  }));
+  }, state));
 
   if (blockCandidates.length) {
     return blockCandidates;
@@ -475,8 +506,12 @@ function buildPlanningCandidates(state, context) {
       flavor: sanitizeText(snapshot.generatedOn ? `Snapshot generated ${snapshot.generatedOn}` : "Current planning snapshot"),
       sourceLabel: SOURCE_LABELS.planning,
       whyNow: sanitizeText(`Current snapshot shows ${snapshot.blockCount} candidate block(s).`),
+      context: buildAssignmentContext(
+        context,
+        "This planning snapshot is setting the next round of real field and submission work.",
+      ),
       score: 42,
-    }),
+    }, state),
   ];
 }
 
@@ -502,6 +537,10 @@ function buildRoadCandidates(state, context) {
       flavor: sanitizeText(preferredContext.summary),
       sourceLabel: SOURCE_LABELS.road,
       whyNow: `Road engineering ${Number(preferredContext.engineeringPressure || preferredContext.engineering || 0)} • hydrology ${Number(preferredContext.hydrologyPressure || preferredContext.hydrology || 0)} • timing ${Number(preferredContext.timingPressure || preferredContext.timing || 0)}.`,
+      context: buildAssignmentContext(
+        context,
+        "Access credibility is now part of the decision, not just a detail to clean up later.",
+      ),
       roadEngineeringPressure: preferredContext.engineeringPressure || preferredContext.engineering,
       roadHydrologyPressure: preferredContext.hydrologyPressure || preferredContext.hydrology,
       roadTimingPressure: preferredContext.timingPressure || preferredContext.timing,
@@ -511,7 +550,7 @@ function buildRoadCandidates(state, context) {
         roadTimingPressure: preferredContext.timingPressure || preferredContext.timing,
       }),
       score: 36 + Number(preferredContext.reviewDays || preferredContext.approvalPenalty || 0),
-    }),
+    }, state),
   ];
 }
 
@@ -524,9 +563,13 @@ function buildDiscoveryCandidates(state, context) {
     flavor: `Carry-forward severity ${tag.severity} • seen ${tag.count} time(s)`,
     sourceLabel: SOURCE_LABELS.discovery,
     whyNow: `This finding is still live from earlier work and remains one of the strongest carry-forward signals in the file.`,
+    context: buildAssignmentContext(
+      context,
+      "Ignoring a carry-forward finding now usually turns a known issue into a harder stop later.",
+    ),
     aggressiveFlags: buildDiscoveryAggressiveFlags(tag.id),
     score: 50 + Number(tag.severity || 0) * 6 - index,
-  }));
+  }, state));
 }
 
 function buildSituationCandidates(state, context) {
@@ -542,9 +585,13 @@ function buildSituationCandidates(state, context) {
       description: sanitizeText(context.areaSituation.summary),
       flavor: sanitizeText(state?.area?.zoneSummary),
       sourceLabel: SOURCE_LABELS.situation,
-      whyNow: `This situation is active in ${context.season} and is weighting the season toward ${Object.keys(context?.areaSituationMultipliers?.desk?.typeMultipliers || {}).slice(0, 2).join(", ") || "higher stress"} conditions.`,
+      whyNow: `This situation is active in ${context.season} and is weighting the season toward ${Object.keys(context?.areaSituationMultipliers?.desk?.typeMultipliers || {}).slice(0, 2).join(", ") || "more difficult operating"} conditions.`,
+      context: buildAssignmentContext(
+        context,
+        "This seasonal constraint is already changing what safe, legal, or credible progress looks like.",
+      ),
       score: 40,
-    }),
+    }, state),
   ];
 }
 
@@ -567,8 +614,8 @@ function buildProfessionalCandidates(state, context) {
     {
       metric: "competenceRisk",
       value: Number(professional.competenceRisk || 0),
-      title: "Competence pressure",
-      description: "Professional-risk indicators are high enough that your documentation discipline matters this season.",
+      title: "Practice-area documentation risk",
+      description: "Professional-risk indicators are high enough that your documented scope of practice and work samples matter this season.",
     },
   ].sort((a, b) => b.value - a.value);
 
@@ -582,9 +629,13 @@ function buildProfessionalCandidates(state, context) {
       flavor: sanitizeText(professional.areaBurdenLabel),
       sourceLabel: SOURCE_LABELS.professional,
       whyNow: `Paperwork ${Math.round(professional.paperworkLoad || 0)}% • audit ${Math.round(professional.auditExposure || 0)}% • competence ${Math.round(professional.competenceRisk || 0)}%.`,
+      context: buildAssignmentContext(
+        context,
+        "If the practice record slips much further, the season starts being judged through the audit lens instead of the work itself.",
+      ),
       failureIssueId: strongest.metric === "paperworkLoad" ? "budget-freeze" : "fpbc-competence-audit",
       score: strongest.value,
-    }));
+    }, state));
   }
 
   for (const progress of context?.paperworkProgress || []) {
@@ -599,10 +650,14 @@ function buildProfessionalCandidates(state, context) {
       flavor: `Open chain • ${progress.stage.label}`,
       sourceLabel: sanitizeText(progress.chain.sourceLabel, SOURCE_LABELS.professional),
       whyNow: `This chain is still open heading into ${context.season}.`,
+      context: buildAssignmentContext(
+        context,
+        "An unfinished professional chain is now carrying into the active season and can trigger avoidable scrutiny.",
+      ),
       paperworkChainId: progress.chain.id,
       failureIssueId: findChainFailureIssueId(progress.chain),
       score: 30 + Number(progress.remainingStages || 0),
-    }));
+    }, state));
   }
 
   return candidates;
@@ -710,7 +765,7 @@ export function buildLegacyTaskFallback(state, context) {
     sourceLabel: SOURCE_LABELS["legacy-task"],
     whyNow: "No higher-priority source-backed assignment was available, so the role fallback card was used.",
     task,
-  });
+  }, state);
 }
 
 export function drawSeasonalAssignment(state, context, rng = Math.random) {

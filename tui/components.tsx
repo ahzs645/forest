@@ -74,7 +74,7 @@ function DashboardStats({ gs }: { gs: any }) {
       <text content={gs.companyName} style={{ fg: C.dim }} />
       <text content="" />
       <text content="Role" style={{ fg: C.white, bold: true }} />
-      <text content={gs.role.name} style={{ fg: C.dim }} />
+      <text content={gs.roleDisplayName || gs.role.seasonalName || gs.role.name} style={{ fg: C.dim }} />
       <text content="" />
       <text content="Area" style={{ fg: C.white, bold: true }} />
       <text content={gs.area.name} style={{ fg: C.dim }} />
@@ -284,20 +284,6 @@ function SummarySection({
 
 // ── Content View (structured rendering) ──────────────
 export function ContentView({ data }: { data: ContentData }) {
-  const severityColor = data.type === "assignment" || data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
-    ? data.surfaceSeverity === "danger"
-      ? C.red
-      : data.surfaceSeverity === "warning"
-        ? C.yellow
-        : C.blue
-    : C.white;
-  const severityLabel = data.type === "assignment" || data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
-    ? data.surfaceSeverity === "danger"
-      ? "Serious Fallout"
-      : data.surfaceSeverity === "warning"
-        ? "Manageable Fallout"
-        : "Minor Fallout"
-    : "";
   const optionColor = data.type === "assignment" || data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
     ? data.optionTone === "danger"
       ? C.red
@@ -351,14 +337,22 @@ export function ContentView({ data }: { data: ContentData }) {
           {data.sourceLabel ? (
             <text content={data.sourceLabel} style={{ fg: C.cyan, bold: true }} />
           ) : null}
-          {data.surfaceSeverity ? (
-            <text content={severityLabel} style={{ fg: severityColor, bold: true }} />
+          {data.cardLabel ? (
+            <text content={data.cardLabel} style={{ fg: C.blue, bold: true }} />
           ) : null}
-          {data.phaseLabel ? (
-            <text content={data.phaseLabel} style={{ fg: severityColor, bold: true }} />
+          <text content={data.title} style={{ fg: C.yellow, bold: true }} />
+          {data.context?.operation ? (
+            <>
+              <text content="" />
+              <text content="What job am I doing?" style={{ fg: C.white, bold: true }} />
+              <text content={data.context.operation} style={{ fg: C.white }} />
+              {data.context?.objective ? (
+                <text content={`Objective: ${data.context.objective}`} style={{ fg: C.dim }} />
+              ) : null}
+            </>
           ) : null}
-          <text content={data.title} style={{ fg: data.surfaceSeverity ? severityColor : C.yellow, bold: true }} />
           <text content="" />
+          <text content="What changed?" style={{ fg: C.white, bold: true }} />
           <text content={data.description} style={{ fg: C.white }} />
           {data.flavor && (
             <>
@@ -366,22 +360,20 @@ export function ContentView({ data }: { data: ContentData }) {
               <text content={data.flavor} style={{ fg: C.dim, italic: true }} />
             </>
           )}
-          {data.whyNow && (
+          {(data.context?.stakes || data.whyNow || data.surfaceReason) && (
             <>
               <text content="" />
-              <text content="Why Now:" style={{ fg: C.white, bold: true }} />
-              <text content={data.whyNow} style={{ fg: C.dim }} />
-            </>
-          )}
-          {data.surfaceReason && (
-            <>
-              <text content="" />
-              <text content="Why This Surfaced:" style={{ fg: C.white, bold: true }} />
-              <text content={data.surfaceReason} style={{ fg: C.dim }} />
+              <text content="Why does it matter now?" style={{ fg: C.white, bold: true }} />
+              {data.context?.stakes ? <text content={data.context.stakes} style={{ fg: C.white }} /> : null}
+              {data.whyNow ? <text content={data.whyNow} style={{ fg: C.dim }} /> : null}
+              {data.surfaceReason ? <text content={data.surfaceReason} style={{ fg: C.dim }} /> : null}
             </>
           )}
           <text content="" />
-          <text content={`${data.optionHeading || "Available Options"}:`} style={{ fg: data.optionTone ? optionColor : C.white, bold: true }} />
+          <text content="What am I deciding?" style={{ fg: C.white, bold: true }} />
+          <text content={data.decisionPrompt || "Choose the response that best protects the current work."} style={{ fg: C.white }} />
+          <text content="" />
+          <text content={`${data.optionHeading || "Choose your response"}:`} style={{ fg: data.optionTone ? optionColor : C.white, bold: true }} />
           {data.optionDetails.map((opt, i) => (
             <box key={`detail-${i}`} style={{ flexDirection: "column", paddingTop: 1 }}>
               <text

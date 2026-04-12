@@ -12,7 +12,9 @@ import {
   drawSeasonalTemptation,
 } from '../js/engine.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
+import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
+import { validateSeasonalCardContract } from '../js/engine/seasonalContract.js';
 
 const TUI_METRICS = ['budget', 'compliance', 'forestHealth', 'progress', 'relationships'];
 
@@ -97,6 +99,83 @@ test('field roles draw adapted field events instead of desk events', () => {
 
   assert.ok(event);
   assert.match(event.flavor, /Adapted field event/i);
+});
+
+test('transcript-hit desk and field events are rewritten into concrete, plain-language prompts', () => {
+  const deskState = createInitialState({
+    companyName: 'Desk Rewrite Test',
+    roleId: 'planner',
+    areaId: 'bulkley-valley',
+  });
+  deskState.round = 2;
+
+  const transcriptDeskIds = [
+    'angry_stakeholder',
+    'community_complaint',
+    'system_crash',
+    'gis_data_corrupted',
+    'team_conflict',
+    'partnership_offer',
+    'archaeology_screening_gap',
+  ];
+
+  for (const eventId of transcriptDeskIds) {
+    const source = DESK_EVENTS.find((entry) => entry.id === eventId);
+    assert.ok(source, `expected ${eventId} desk event fixture`);
+
+    const adapted = adaptOperationalEvent(source, deskState);
+    const violations = validateSeasonalCardContract(adapted);
+    assert.deepEqual(violations, [], `contract violations for ${eventId}: ${violations.join(', ')}`);
+    assert.ok(adapted.context?.stakes, `expected stakes copy for ${eventId}`);
+  }
+
+  const communityComplaint = adaptOperationalEvent(
+    DESK_EVENTS.find((entry) => entry.id === 'community_complaint'),
+    deskState,
+  );
+  assert.match(communityComplaint.description, /written complaint/i);
+  assert.ok(
+    communityComplaint.options.every((option) => !/town hall/i.test(option.label)),
+    'community complaint should not offer a town hall default',
+  );
+
+  const systemCrash = adaptOperationalEvent(
+    DESK_EVENTS.find((entry) => entry.id === 'system_crash'),
+    deskState,
+  );
+  assert.match(systemCrash.description, /traceable fallback/i);
+  assert.ok(
+    systemCrash.options.every((option) => !/send everyone home/i.test(option.label)),
+    'system crash should not default to sending everyone home',
+  );
+
+  const corrupted = adaptOperationalEvent(
+    DESK_EVENTS.find((entry) => entry.id === 'gis_data_corrupted'),
+    deskState,
+  );
+  assert.match(corrupted.description, /field notes alone are not a defensible rebuild/i);
+  assert.ok(
+    corrupted.options.some((option) => /send crews back/i.test(option.label)),
+    'GIS corruption should support recollecting defensible data',
+  );
+
+  const fieldState = createInitialState({
+    companyName: 'Field Rewrite Test',
+    roleId: 'recce',
+    areaId: 'muskwa-foothills',
+  });
+  fieldState.round = 2;
+
+  const stuckTruck = adaptOperationalEvent(
+    FIELD_EVENTS.find((entry) => entry.id === 'truck_stuck'),
+    fieldState,
+  );
+  assert.deepEqual(validateSeasonalCardContract(stuckTruck), []);
+  assert.match(stuckTruck.description, /realistic recovery plan/i);
+  assert.ok(
+    stuckTruck.options.every((option) => !/skidder/i.test(option.label)),
+    'truck recovery should not assume a skidder appears by magic',
+  );
 });
 
 test('seasonal temptation draws from illegal acts with a risk-based shortcut option', () => {
@@ -264,11 +343,11 @@ test('bureaucratic shortcut failures queue specific bureaucratic fallout issues'
   assert.equal(state.flags.ethicsInquiry, undefined);
   assert.equal(resolution?.scheduledIssueTeaser?.severity, 'warning');
   assert.match(resolution?.scheduledIssueTeaser?.text || '', /Likely fallout \(manageable\): Ministry Data Audit/i);
-  assert.match(resolution?.scheduledIssueTeaser?.text || '', /schedule pressure/i);
+  assert.match(resolution?.scheduledIssueTeaser?.text || '', /schedule strain/i);
 
   const issue = drawIssue(state, () => 0);
   assert.equal(issue?.id, 'ministry-data-audit');
-  assert.match(issue?.surfaceReason || '', /schedule pressure/i);
+  assert.match(issue?.surfaceReason || '', /schedule strain/i);
   assert.deepEqual(state.pendingIssues, []);
 });
 

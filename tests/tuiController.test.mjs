@@ -66,11 +66,10 @@ test('planner assignment selection updates the dashboard metrics in the controll
   controller.selectOption(0);
 
   const state = controller.getState();
-  assert.equal(state.gameState.metrics.progress, 49);
+  assert.equal(state.gameState.metrics.progress, 50);
   assert.equal(state.gameState.metrics.relationships, 52);
   assert.equal(state.gameState.metrics.compliance, 53);
   assert.match(state.contentData.notice.heading, /^Decision Logged:/);
-  assert.match(state.contentData.notice.body, /Progress -1/);
   assert.match(state.contentData.notice.body, /Compliance \+3/);
   assert.match(state.contentData.notice.body, /Relationships \+2/);
 });
@@ -226,8 +225,8 @@ test('serious fallout issues carry danger severity on the issue card', () => {
   assert.equal(state.contentData.type, 'issue');
   assert.equal(state.contentData.title, 'Formal Investigation');
   assert.equal(state.contentData.surfaceSeverity, 'danger');
-  assert.equal(state.contentData.phaseLabel, 'Crisis Phase');
-  assert.equal(state.contentData.optionHeading, 'Immediate Response Options');
+  assert.equal(state.contentData.cardLabel, 'Operational issue');
+  assert.equal(state.contentData.optionHeading, 'Choose your response');
   assert.equal(state.contentData.optionTone, 'danger');
   assert.deepEqual(state.options, [
     'Open the file now',
@@ -278,7 +277,8 @@ test('serious fallout rounds suppress routine task flow and surface the crisis i
 
   assert.equal(state.contentData.type, 'issue');
   assert.equal(state.contentData.title, 'Formal Investigation');
-  assert.equal(state.contentData.phaseLabel, 'Crisis Phase');
+  assert.equal(state.contentData.cardLabel, 'Operational issue');
+  assert.equal(state.contentData.optionHeading, 'Choose your response');
 });
 
 test('planning triage highlights the dominant area constraint and puts it first', () => {

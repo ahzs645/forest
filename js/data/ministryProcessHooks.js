@@ -395,10 +395,10 @@ export const MINISTRY_PROCESS_HOOKS = [
     title: "Special Use Permit Stack",
     category: "occupancy",
     summary:
-      "Short-term camps, helipads, log dumps, scales, and similar support infrastructure can need their own occupancy authority instead of riding for free inside the main file.",
+      "Short-term camps, helipads, log dumps, scales, and similar support infrastructure can need their own special-use permit coverage instead of riding for free inside the main file.",
     roles: ["permitter", "planner", "recce", "silviculture"],
     trigger:
-      "Support infrastructure for camps, dumps, or staging areas grows large enough that the district expects separate occupancy authority.",
+      "Support infrastructure for camps, dumps, or staging areas grows large enough that the district expects a separate special-use permit package.",
     documents: [
       "special use permit application",
       "occupancy maps",
@@ -407,16 +407,16 @@ export const MINISTRY_PROCESS_HOOKS = [
     ],
     minimumWait: { label: "occupancy review must clear before the support footprint is defensible", days: null },
     playerActions: [
-      "decide which support footprints need their own occupancy authority",
+      "decide which support footprints need their own special-use permit package",
       "tighten maps and site layouts before the main file gets dragged backward",
       "shrink or redesign the footprint if the occupancy burden gets too heavy",
     ],
     failureModes: [
       {
         id: "special-use-occupancy-gap",
-        title: "Support footprint outruns occupancy authority",
+        title: "Support footprint outruns the permit package",
         summary:
-          "An oversized camp, helipad, dump, or scale area quickly turns into a permitting problem if the occupancy file never catches up.",
+          "An oversized camp, helipad, dump, or scale area quickly turns into a permitting problem if the special-use permit file never catches up.",
       },
     ],
     sourceLabel: "Special Use Permit - Forestry",

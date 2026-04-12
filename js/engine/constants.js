@@ -28,7 +28,7 @@ export const PENDING_PRESSURE_EXPLANATIONS = {
   budget: "budget stress made the finance-and-audit branch the likeliest consequence.",
   compliance: "compliance weakness made the scrutiny-heavy branch the likeliest consequence.",
   forestHealth: "ecological stress made the habitat-and-remediation branch the likeliest consequence.",
-  progress: "schedule pressure made the rework-heavy branch the likeliest consequence.",
+  progress: "schedule strain made the rework-heavy branch the likeliest consequence.",
 };
 
 export const ISSUE_PREVIEW_SEVERITY = {

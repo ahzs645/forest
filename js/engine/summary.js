@@ -1,8 +1,10 @@
 import { formatMetricName } from "./shared.js";
+import { getRoleDisplayName } from "./seasonalContract.js";
 
 export function buildSummary(state) {
   const { metrics, role, area } = state;
   const averages = weightedAverage(metrics);
+  const roleName = getRoleDisplayName(role);
 
   const messages = [];
   if (metrics.compliance < 35) {
@@ -28,11 +30,14 @@ export function buildSummary(state) {
 
   let overall;
   const balancedExcellence = Object.values(metrics).every((value) => value >= 65);
-  if (averages >= 82 && balancedExcellence) {
-    overall = `Outstanding season – the ${role.name} kept the ${area.name} program balanced.`;
-  } else if (averages >= 60) {
+  const strongOutcomeFloors = metrics.compliance >= 62 && metrics.relationships >= 58 && metrics.forestHealth >= 58;
+  const stableOutcomeFloors = metrics.compliance >= 48 && metrics.relationships >= 45 && metrics.forestHealth >= 45;
+  const stewardshipStrong = metrics.compliance >= 75 && metrics.relationships >= 70 && metrics.forestHealth >= 55;
+  if (averages >= 82 && balancedExcellence && strongOutcomeFloors) {
+    overall = `Outstanding season – the ${roleName} kept the ${area.name} program balanced.`;
+  } else if ((averages >= 64 && strongOutcomeFloors) || stewardshipStrong) {
     overall = "Solid performance with room to fine-tune priorities next cycle.";
-  } else if (averages >= 45) {
+  } else if (averages >= 45 && stableOutcomeFloors) {
     overall = "Mixed outcomes. Consider where trade-offs eroded trust or ecological outcomes.";
   } else {
     overall = "Operations stumbled. Leadership will expect a recovery plan before the next season.";

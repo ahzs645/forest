@@ -42,7 +42,7 @@ function Dashboard({ gameState }) {
         { label: "Compliance", value: `${gameState.metrics.compliance}%`, tone: "magenta" },
         { label: "Budget", value: `${gameState.metrics.budget}%`, tone: "red" },
         { label: "Company", value: gameState.companyName, plain: true },
-        { label: "Role", value: gameState.role?.name, plain: true },
+        { label: "Role", value: gameState.roleDisplayName || gameState.role?.seasonalName || gameState.role?.name, plain: true },
         { label: "Area", value: gameState.area?.name, plain: true },
       ].filter((row) => row.value !== undefined && row.value !== null);
 
@@ -112,19 +112,6 @@ function SummarySection({ title, items, tone }) {
 
 function ContentView({ data }) {
   if (!data) return null;
-
-  const severityToneClass =
-    data.surfaceSeverity === "danger"
-      ? "red"
-      : data.surfaceSeverity === "warning"
-        ? "yellow"
-        : "blue";
-  const severityLabel =
-    data.surfaceSeverity === "danger"
-      ? "Serious Fallout"
-      : data.surfaceSeverity === "warning"
-        ? "Manageable Fallout"
-        : "Minor Fallout";
   const optionToneClass =
     data.optionTone === "danger"
       ? "red"
@@ -163,29 +150,30 @@ function ContentView({ data }) {
       <div className="tui-content-stack">
         <NoticeBlock notice={data.notice} />
         {data.sourceLabel ? <div className="tui-source-label">{data.sourceLabel}</div> : null}
-        {data.surfaceSeverity ? (
-          <div className={`tui-severity-badge tone-${severityToneClass}`}>{severityLabel}</div>
+        {data.cardLabel ? <div className="tui-source-label">{data.cardLabel}</div> : null}
+        <div className="tui-heading">{data.title}</div>
+        {data.context?.operation ? (
+          <>
+            <div className="tui-subheading">What job am I doing?</div>
+            <p className="tui-copy preserve">{data.context.operation}</p>
+            {data.context?.objective ? <p className="tui-copy dim preserve">{`Objective: ${data.context.objective}`}</p> : null}
+          </>
         ) : null}
-        {data.phaseLabel ? (
-          <div className={`tui-phase-label tone-${severityToneClass}`}>{data.phaseLabel}</div>
-        ) : null}
-        <div className={`tui-heading ${data.surfaceSeverity ? `tone-${severityToneClass}` : ""}`}>{data.title}</div>
+        <div className="tui-subheading">What changed?</div>
         <p className="tui-copy preserve">{data.description}</p>
         {data.flavor ? <p className="tui-copy dim preserve">{data.flavor}</p> : null}
-        {data.whyNow ? (
+        {data.context?.stakes || data.whyNow || data.surfaceReason ? (
           <>
-            <div className="tui-subheading">Why Now</div>
-            <p className="tui-copy dim preserve">{data.whyNow}</p>
+            <div className="tui-subheading">Why does it matter now?</div>
+            {data.context?.stakes ? <p className="tui-copy preserve">{data.context.stakes}</p> : null}
+            {data.whyNow ? <p className="tui-copy dim preserve">{data.whyNow}</p> : null}
+            {data.surfaceReason ? <p className="tui-copy dim preserve">{data.surfaceReason}</p> : null}
           </>
         ) : null}
-        {data.surfaceReason ? (
-          <>
-            <div className="tui-subheading">Why This Surfaced</div>
-            <p className="tui-copy dim preserve">{data.surfaceReason}</p>
-          </>
-        ) : null}
+        <div className="tui-subheading">What am I deciding?</div>
+        <p className="tui-copy preserve">{data.decisionPrompt || "Choose the response that best protects the current work."}</p>
         <div className={`tui-subheading ${data.optionTone ? `tone-${optionToneClass}` : ""}`}>
-          {data.optionHeading || "Available Options"}
+          {data.optionHeading || "Choose your response"}
         </div>
         <div className="tui-detail-list">
           {data.optionDetails.map((option, idx) => (

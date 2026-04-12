@@ -15,6 +15,13 @@ export type ContentData =
       type: "assignment" | "task" | "issue" | "event" | "temptation";
       title: string;
       description: string;
+      cardLabel?: string;
+      context?: {
+        operation?: string;
+        objective?: string;
+        stakes?: string;
+      };
+      decisionPrompt?: string;
       flavor?: string;
       sourceLabel?: string;
       whyNow?: string;

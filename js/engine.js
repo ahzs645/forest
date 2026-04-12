@@ -8,6 +8,7 @@ export {
 } from "./engine/professional.js";
 export { createInitialState, findArea, findRole } from "./engine/state.js";
 export { buildSeasonContext } from "./engine/context.js";
+export { getRoleOperationState } from "./engine/seasonalContract.js";
 export {
   adaptIllegalActTemptation,
   adaptOperationalEvent,

@@ -38,6 +38,11 @@ import {
   rollRange,
   scaleDerivedEffect,
 } from "./shared.js";
+import {
+  matchesAreaContext,
+  matchesPreconditions,
+  normalizeSeasonalCard,
+} from "./seasonalContract.js";
 
 export function getRoleTasks(state) {
   const baseTasks = state.role.tasks || [];
@@ -158,7 +163,7 @@ export function drawIssue(state, rng = Math.random) {
       const candidate = resolvePendingIssue(state, pending, { tags, season }, rng);
       if (candidate) {
         state.pendingIssues.splice(i, 1);
-        return candidate;
+        return normalizeSeasonalCard(candidate, state, "issue");
       }
       state.pendingIssues.splice(i, 1);
       i--;
@@ -181,23 +186,23 @@ export function drawIssue(state, rng = Math.random) {
   const totalWeight = weightedPool.reduce((sum, entry) => sum + entry.weight, 0);
   if (totalWeight <= 0) {
     const index = Math.floor(rng() * selectablePool.length);
-    return selectablePool[index];
+    return normalizeSeasonalCard(selectablePool[index], state, "issue");
   }
 
   let roll = rng() * totalWeight;
   for (const entry of weightedPool) {
     roll -= entry.weight;
     if (roll <= 0) {
-      return entry.issue;
+      return normalizeSeasonalCard(entry.issue, state, "issue");
     }
   }
-  return weightedPool[weightedPool.length - 1].issue;
+  return normalizeSeasonalCard(weightedPool[weightedPool.length - 1].issue, state, "issue");
 }
 
 export function scoreIssueSelection(issue, state, context) {
   let weight = Math.max(1, Number(issue.baseWeight) || 1);
   if (issue.areaTags?.length) {
-    const matches = issue.areaTags.filter((tag) => context.tags.includes(tag)).length;
+    const matches = issue.areaTags.filter((tag) => matchesAreaContext([tag], context.tags)).length;
     weight += matches;
   }
   const seasonBias = issue.seasonBias;
@@ -307,19 +312,266 @@ export function adaptOperationalEventEffects(effects = {}, option = {}) {
   );
 }
 
+function getOperationalEventOverride(event) {
+  switch (event?.id) {
+    case "angry_stakeholder":
+      return {
+        description:
+          "A Nation whose territory overlaps Block 7 is calling about a specific concern on the file. You need to clarify the issue and set a credible next step, not guess what they mean.",
+        context: {
+          stakes:
+            "If you handle this poorly, consultation trust and the defensibility of the block can both deteriorate quickly.",
+        },
+        riskClass: "calculated",
+        options: [
+          {
+            label: "Listen, clarify the concern, and commit to a follow-up",
+            outcome:
+              "You slow the call down, hear the exact issue, and leave with a concrete next step instead of guessing.",
+            effects: { timeUsed: 2, relationships: 8, compliance: 2 },
+          },
+          {
+            label: "Explain the current file logic and ask what evidence is missing",
+            outcome:
+              "You keep the call anchored to the file, but the relationship only stabilizes if the follow-up is real.",
+            effects: { timeUsed: 1, relationships: 1, compliance: 2 },
+          },
+          {
+            label: "Keep the work moving until the concern is clearer from your side",
+            outcome:
+              "The file keeps moving for the moment, but you have not reduced the actual concern.",
+            effects: { progress: 4, relationships: -8, compliance: -3 },
+          },
+        ],
+      };
+    case "community_complaint":
+      return {
+        description:
+          "Residents along the haul route have submitted a written complaint about truck traffic timing, dust, or safety. They want a response from the licensee, not a public-relations exercise.",
+        context: {
+          stakes:
+            "Traffic complaints can become a relationship and operating-hours problem quickly if the licensee appears dismissive.",
+        },
+        options: [
+          {
+            label: "Send a written response and offer direct follow-up with affected neighbours",
+            outcome:
+              "You answer the complaint directly and give people a specific way to test whether the mitigation is real.",
+            effects: { timeUsed: 2, relationships: 6, compliance: 2 },
+          },
+          {
+            label: "Adjust haul timing or controls where the complaint is credible",
+            outcome:
+              "You give up some efficiency, but the response is tied to a real operating change instead of just messaging.",
+            effects: { progress: -2, relationships: 8, compliance: 2 },
+          },
+          {
+            label: "Redirect the complaint to the ministry without site-specific follow-up",
+            outcome:
+              "You preserve your day, but the neighbours now know you did not engage with the actual complaint.",
+            effects: { relationships: -6, compliance: -2 },
+          },
+        ],
+      };
+    case "system_crash":
+      return {
+        description:
+          "The permit tracking system is down, but today's deadlines and active files still exist. You need a traceable fallback for the live work, not a dramatic office reset.",
+        context: {
+          stakes:
+            "If the fallback record is weak, the team can lose both progress and file traceability in the same day.",
+        },
+        options: [
+          {
+            label: "Switch to offline tracking and keep a manual log",
+            outcome: "The day gets slower, but the live files still have a defensible record.",
+            effects: { progress: -4, compliance: 2 },
+          },
+          {
+            label: "Prioritize only the live deadlines while IT restores the system",
+            outcome: "You triage the queue and protect the most exposed files first.",
+            effects: { timeUsed: 3, progress: -1, compliance: 1 },
+          },
+          {
+            label: "Wait for the system and let today's queue slip",
+            outcome: "You avoid improvising, but the backlog grows and the day is mostly lost.",
+            effects: { progress: -6, relationships: -2 },
+          },
+        ],
+      };
+    case "gis_data_corrupted":
+      return {
+        description:
+          "Spatial files for three live packages are corrupted. Backups are old enough that you cannot pretend nothing changed, and field notes alone are not a defensible rebuild plan.",
+        context: {
+          stakes:
+            "A map mismatch here can create review delays, approval defects, or fieldwork based on the wrong footprint.",
+        },
+        riskClass: "calculated",
+        options: [
+          {
+            label: "Restore what you can and send crews back for the missing GPS or map checks",
+            outcome:
+              "It is expensive and frustrating, but you rebuild from defensible information instead of imagination.",
+            effects: { progress: -6, timeUsed: 4, compliance: 4, budget: -1500 },
+          },
+          {
+            label: "Tell reviewers the affected files will slip while you rebuild them properly",
+            outcome:
+              "You lose schedule, but you stop the problem from turning into a false submission.",
+            effects: { progress: -4, relationships: 1, compliance: 3 },
+          },
+          {
+            label: "Patch from old data and hope review does not catch the mismatch",
+            outcome:
+              "You recover momentum immediately, but the file is now vulnerable if anyone checks the wrong polygon.",
+            effects: { progress: 4, compliance: -6 },
+          },
+        ],
+      };
+    case "team_conflict":
+      return {
+        description:
+          "Two staff members clashed hard enough that the work day is starting to drift. This is a supervision and documentation call, not a personality test.",
+        context: {
+          stakes:
+            "If the conflict keeps bleeding into assignments, schedule reliability and crew trust both degrade.",
+        },
+        options: [
+          {
+            label: "Separate the work for now and document the next supervisory step",
+            outcome:
+              "You stabilize the day first and push the actual follow-up into the right supervisory channel.",
+            effects: { progress: -1, relationships: 2, compliance: 1 },
+          },
+          {
+            label: "Mediate briefly, then confirm expectations in writing",
+            outcome:
+              "You spend time on it now, but at least the expectations and next steps are no longer implied.",
+            effects: { timeUsed: 2, relationships: 3, progress: -1 },
+          },
+          {
+            label: "Ignore it and hope the tension burns off",
+            outcome:
+              "You save time immediately, but the unresolved problem keeps leaking into the day.",
+            effects: { progress: -3, relationships: -5 },
+          },
+        ],
+      };
+    case "partnership_offer":
+      return {
+        description:
+          "A Nation partner offers to co-lead referrals in their territory. The decision is how to structure the work credibly, not whether collaboration should sound good in a meeting.",
+        context: {
+          stakes:
+            "Handled well, this can improve the quality and legitimacy of the file; handled poorly, it can look transactional fast.",
+        },
+        options: [
+          {
+            label: "Accept and set the process, scope, and timing together",
+            outcome:
+              "You take the offer seriously and define how the referral work will actually function.",
+            effects: { relationships: 10, compliance: 3, progress: -2 },
+          },
+          {
+            label: "Accept with clear deliverables and decision points",
+            outcome:
+              "The partnership starts with guardrails instead of vague goodwill, which keeps the work practical.",
+            effects: { relationships: 7, compliance: 2, progress: -1 },
+          },
+          {
+            label: "Defer until the current workload clears",
+            outcome:
+              "You protect today's queue, but the partner now has less reason to believe the offer mattered.",
+            effects: { relationships: -4, progress: 1 },
+          },
+        ],
+      };
+    case "archaeology_screening_gap":
+      return {
+        description:
+          "Just before submission, the archaeology review says the package is missing the right overview or permit context. You either bring in the right support, reduce the footprint, or accept a thinner file.",
+        context: {
+          stakes:
+            "If the archaeology context is weak, the file can stall or come back looking careless in exactly the place reviewers will focus on.",
+        },
+        riskClass: "calculated",
+        options: [
+          {
+            label: "Hold the file and bring in the right specialist",
+            outcome: "You lose time, but the package stops looking careless.",
+            effects: { progress: -6, budget: -2500, compliance: 7 },
+          },
+          {
+            label: "Revise the package internally only where you have defensible evidence",
+            outcome:
+              "You keep the file moving, but only because you limited the rewrite to what you can actually support.",
+            effects: { timeUsed: 4, compliance: 3, progress: 1 },
+          },
+          {
+            label: "Submit and hope the issue stays minor",
+            outcome:
+              "The file leaves on time, but not in the condition you would normally defend.",
+            effects: { progress: 5, compliance: -6 },
+          },
+        ],
+      };
+    case "truck_stuck":
+      return {
+        description:
+          "A pickup or service truck is buried to the axles on soft ground. You need a realistic recovery plan, and forcing it deeper could damage the road prism or create a safety incident.",
+        context: {
+          stakes:
+            "A bad recovery call here can turn a stuck vehicle into equipment damage, a road repair problem, or an avoidable injury.",
+        },
+        options: [
+          {
+            label: "Call recovery support and close the route until the truck is out",
+            outcome:
+              "You lose time and money, but the recovery happens with the right equipment and a cleaner safety record.",
+            effects: { progress: -4, budget: -1500, compliance: 2 },
+          },
+          {
+            label: "Build a controlled recovery with mats, winch support, and the right equipment",
+            outcome:
+              "The day slows down, but the recovery is planned instead of improvised.",
+            effects: { timeUsed: 3, equipment: -4, fuel: -3, compliance: 1 },
+          },
+          {
+            label: "Keep pulling on it with whatever is nearby",
+            outcome:
+              "You gamble on speed, but the truck, road, or crew can take the hit when the shortcut fails.",
+            effects: { equipment: -14, compliance: -2, progress: -2 },
+          },
+        ],
+      };
+    default:
+      return null;
+  }
+}
+
 export function adaptOperationalEvent(event, state) {
+  const override = getOperationalEventOverride(event);
+  const source = override
+    ? {
+        ...event,
+        ...override,
+        options: override.options || event.options,
+        context: { ...(event.context || {}), ...(override.context || {}) },
+      }
+    : event;
   const domain = ROLE_EVENT_DOMAINS[state?.role?.id] || "desk";
   const flavorBits = [`Adapted ${domain} event`];
-  if (event.type) {
-    flavorBits.push(humanizeLabel(event.type));
+  if (source.type) {
+    flavorBits.push(humanizeLabel(source.type));
   }
 
-  return {
-    id: event.id,
-    title: event.title,
-    description: buildOperationalEventDescription(event),
+  return normalizeSeasonalCard({
+    id: source.id,
+    title: source.title,
+    description: buildOperationalEventDescription(source),
     flavor: flavorBits.join(" • "),
-    options: (event.options || []).map((option) => ({
+    options: (source.options || []).map((option) => ({
       label: option.label,
       outcome: option.outcome,
       effects: adaptOperationalEventEffects(option.effects || {}, option),
@@ -330,7 +582,10 @@ export function adaptOperationalEvent(event, state) {
           }
         : undefined,
     })),
-  };
+    context: source.context || null,
+    preconditions: source.preconditions || null,
+    riskClass: source.riskClass || null,
+  }, state, "event");
 }
 
 export function adaptIllegalActTemptation(act, state, rng = Math.random) {
@@ -339,7 +594,7 @@ export function adaptIllegalActTemptation(act, state, rng = Math.random) {
   const rawFailEffects = buildIllegalActFailEffects(act, state, rawSuccessEffects);
   const failFlags = buildIllegalActFailFlags(act);
 
-  return {
+  return normalizeSeasonalCard({
     id: `temptation:${act.id}`,
     title: act.title,
     description: buildIllegalActDescription(act, state),
@@ -369,7 +624,9 @@ export function adaptIllegalActTemptation(act, state, rng = Math.random) {
         effects: adaptOperationalEventEffects(buildIllegalActReportEffects(state)),
       },
     ],
-  };
+    context: act.context || null,
+    riskClass: "unethical",
+  }, state, "temptation");
 }
 
 export function buildScheduledIssueTeaser(state, scheduleSpec) {
@@ -508,8 +765,11 @@ function issueMatchesContext(issue, state, tags, options = {}) {
       return false;
     }
   }
+  if (!matchesPreconditions(issue, state)) {
+    return false;
+  }
   if (issue.areaTags?.length) {
-    return issue.areaTags.some((tag) => tags.includes(tag));
+    return matchesAreaContext(issue.areaTags, tags);
   }
   return true;
 }
@@ -533,7 +793,7 @@ function eventMatchesSeasonalContext(event, state) {
 
   const tags = Array.isArray(state.area.tags) ? state.area.tags : [];
   if (Array.isArray(event.areaTags) && event.areaTags.length > 0) {
-    if (!event.areaTags.some((tag) => tags.includes(tag))) {
+    if (!matchesAreaContext(event.areaTags, tags)) {
       return false;
     }
   }
@@ -549,7 +809,7 @@ function eventMatchesSeasonalContext(event, state) {
     return false;
   }
 
-  return true;
+  return matchesPreconditions(event, state);
 }
 
 function calculateTemptationChance(state) {
@@ -726,7 +986,7 @@ function scoreOperationalEventSelection(event, state) {
   }
 
   if (Array.isArray(event.areaTags) && event.areaTags.length > 0) {
-    const matches = event.areaTags.filter((tag) => areaTags.includes(tag)).length;
+    const matches = event.areaTags.filter((tag) => matchesAreaContext([tag], areaTags)).length;
     weight += matches * 2;
   }
 
@@ -882,7 +1142,7 @@ function buildPendingIssueSurfaceReason(candidate, state) {
   const explanation = PENDING_PRESSURE_EXPLANATIONS[dominant.metric];
   if (!explanation) {
     return candidate?.force
-      ? "Why this surfaced: this branch carried the strongest follow-up pressure from the shortcut."
+      ? "Why this surfaced: this branch carried the strongest follow-up risk from the shortcut."
       : undefined;
   }
   return `Why this surfaced: ${explanation}`;

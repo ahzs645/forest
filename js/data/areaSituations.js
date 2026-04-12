@@ -1,6 +1,6 @@
 /**
  * Area Situations
- * Recurring zone-specific pressure that colors event selection over time.
+ * Recurring zone-specific constraints that color event selection over time.
  */
 
 const AREA_SITUATIONS = [
@@ -58,7 +58,7 @@ const AREA_SITUATIONS = [
   {
     id: 'fraser_smoke_push',
     title: 'Smoke push',
-    summary: 'Wildfire smoke and community risk are compressing the useful work window.',
+    summary: 'Wildfire smoke and nearby community risk are compressing the useful work window.',
     areaTags: ['wildfire', 'beetle-recovery'],
     seasons: ['summer', 'fall'],
     fieldEventMultiplier: 1.2,
@@ -105,6 +105,57 @@ const AREA_SITUATIONS = [
     deskTypeMultipliers: {
       technical: 1.1,
       team: 1.1
+    }
+  },
+  {
+    id: 'island_storm_window',
+    title: 'Storm-window squeeze',
+    summary: 'Rainfall and fish-stream timing are shrinking the set of coastal tasks that are honestly ready to move.',
+    areaTags: ['cwh', 'salmon', 'visuals'],
+    seasons: ['fall', 'winter'],
+    fieldEventMultiplier: 1.14,
+    fieldTypeMultipliers: {
+      weather: 1.2,
+      terrain: 1.1
+    },
+    deskStressMultiplier: 1.08,
+    deskTypeMultipliers: {
+      technical: 1.15,
+      stakeholder: 1.1
+    }
+  },
+  {
+    id: 'wetbelt_runoff_scrutiny',
+    title: 'Wetbelt runoff scrutiny',
+    summary: 'Community-water and steep-road concerns are making drainage mistakes far more visible than usual.',
+    areaTags: ['watershed', 'steep', 'community-interface'],
+    seasons: ['spring', 'summer', 'fall'],
+    fieldEventMultiplier: 1.12,
+    fieldTypeMultipliers: {
+      terrain: 1.18,
+      weather: 1.1
+    },
+    deskStressMultiplier: 1.09,
+    deskTypeMultipliers: {
+      technical: 1.18,
+      compliance: 1.1
+    }
+  },
+  {
+    id: 'drybelt_interface_smoke',
+    title: 'Drybelt interface smoke',
+    summary: 'Heat, smoke, and visible interface work are narrowing both safe production choices and public tolerance for sloppy execution.',
+    areaTags: ['wildfire', 'community-interface', 'visuals'],
+    seasons: ['summer', 'fall'],
+    fieldEventMultiplier: 1.18,
+    fieldTypeMultipliers: {
+      weather: 1.22,
+      social: 1.12
+    },
+    deskStressMultiplier: 1.1,
+    deskTypeMultipliers: {
+      political: 1.18,
+      stakeholder: 1.15
     }
   }
 ];

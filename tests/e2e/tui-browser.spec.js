@@ -23,6 +23,9 @@ test('seasonal strategy TUI completes a keyboard-driven browser playthrough', as
 
   await page.keyboard.press('Enter');
   await expect(page.locator('.tui-heading')).toHaveText('Select your Specialization');
+  const roleOptions = await page.locator('.tui-options button').allInnerTexts();
+  expect(roleOptions.some((label) => label.includes('General Manager'))).toBeFalsy();
+  expect(roleOptions.some((label) => label.includes('Field Technician'))).toBeTruthy();
 
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
@@ -33,6 +36,12 @@ test('seasonal strategy TUI completes a keyboard-driven browser playthrough', as
 
   await expect(page.locator('.tui-dashboard')).toContainText('Permitting Specialist');
   await expect(page.locator('.tui-dashboard')).toContainText('Muskwa Foothills');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.tui-field-main')).toContainText('What job am I doing?');
+  await expect(page.locator('.tui-field-main')).toContainText('What changed?');
+  await expect(page.locator('.tui-field-main')).toContainText('Why does it matter now?');
+  await expect(page.locator('.tui-field-main')).toContainText('What am I deciding?');
+  await expect(page.locator('.tui-art')).toHaveCount(0);
 
   const result = await autoPlayToSummary(page);
 

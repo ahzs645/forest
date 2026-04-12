@@ -14,6 +14,10 @@ import {
   SEASONS,
 } from "../js/engine.js";
 import { detectArt } from "./art.js";
+import {
+  getRoleDisplayName,
+  getSeasonalPlayableRoles,
+} from "../js/engine/seasonalContract.js";
 
 const INITIAL_CONTENT = {
   type: "setup",
@@ -117,6 +121,7 @@ function snapshotGameState(gs) {
     seasonContexts: Array.isArray(gs.seasonContexts) ? [...gs.seasonContexts] : gs.seasonContexts,
     discoveryTags: Array.isArray(gs.discoveryTags) ? [...gs.discoveryTags] : gs.discoveryTags,
     timeline: Array.isArray(gs.timeline) ? [...gs.timeline] : gs.timeline,
+    roleDisplayName: getRoleDisplayName(gs.role),
   };
 }
 
@@ -135,6 +140,7 @@ export class TuiGameController {
     this.queue = [];
     this.selectCb = null;
     this.onExit = options.onExit ?? (() => {});
+    this.ambientArt = Boolean(options.ambientArt);
   }
 
   getState() {
@@ -321,7 +327,7 @@ export class TuiGameController {
     const phaseText =
       phase.text ??
       (phase.data ? `${phase.data.title} ${phase.data.description ?? phase.data.prompt ?? ""}` : "");
-    const artText = detectArt(phaseText, gs);
+    const artText = this.ambientArt ? detectArt(phaseText, gs) : null;
 
     if (phase.type === "message") {
       this.present(
@@ -353,13 +359,15 @@ export class TuiGameController {
           type: phase.type,
           title: item.title,
           description: item.description ?? item.prompt ?? "",
+          cardLabel: item.cardLabel,
+          context: item.context,
+          decisionPrompt: item.decisionPrompt,
           flavor: item.flavor,
           sourceLabel: item.sourceLabel,
           whyNow: item.whyNow,
           surfaceReason: item.surfaceReason,
           surfaceSeverity: item.surfaceSeverity,
-          phaseLabel: isCrisisIssue ? "Crisis Phase" : undefined,
-          optionHeading: isCrisisIssue ? "Immediate Response Options" : undefined,
+          optionHeading: isCrisisIssue ? "Choose your response" : "Choose your response",
           optionTone: isCrisisIssue ? "danger" : undefined,
           notice,
           optionDetails: presentedOptions,
@@ -397,17 +405,18 @@ export class TuiGameController {
         {
           type: "setup",
           heading: "Select your Specialization",
-          subtitle: "Different roles face different challenges.",
+          subtitle: "Choose the work stream you will be judged on this year.",
         },
-        FORESTER_ROLES.map((role) => role.name),
+        getSeasonalPlayableRoles(FORESTER_ROLES).map((role) => getRoleDisplayName(role)),
         (idx) => {
-          const roleId = FORESTER_ROLES[idx].id;
+          const seasonalRoles = getSeasonalPlayableRoles(FORESTER_ROLES);
+          const roleId = seasonalRoles[idx].id;
           this.setState({ mode: "setup-area" });
           this.present(
             {
               type: "setup",
               heading: "Select your Operating Area",
-              subtitle: "Choose the environment for your operations.",
+              subtitle: "Choose the BC region where this year's file and field work will unfold.",
             },
             OPERATING_AREAS.map((area) => area.name),
             (areaIdx) => {

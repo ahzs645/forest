@@ -47,7 +47,7 @@ const DISCOVERY_TAG_DEFINITIONS = {
     label: 'Heli access',
     summary: 'Ground access is weak enough that aviation keeps entering the conversation.',
     roleNotes: {
-      planner: 'Heli-dependent access is raising cost and sequencing pressure.',
+      planner: 'Heli-dependent access is raising cost and making the sequence less forgiving.',
       permitter: 'Expect more scrutiny on access logic and remote-operability assumptions.',
       silviculture: 'Remote access is making deployment and recovery less stable.',
       recce: 'The safest read is heli-only access.'
@@ -105,7 +105,7 @@ const DISCOVERY_TAG_DEFINITIONS = {
     summary: 'The work is sitting close enough to people, viewsheds, or recreation use that it stays public-facing.',
     roleNotes: {
       planner: 'Visible ground is raising the cost of sloppy sequencing.',
-      permitter: 'Expect more public-facing map and visual-quality pressure.',
+      permitter: 'Expect more public-facing map review and visual-quality scrutiny.',
       silviculture: 'Visible ground means contractor sloppiness will get noticed faster.',
       recce: 'This block is likely to generate visible community reaction if it goes sideways.'
     },
@@ -120,12 +120,12 @@ const DISCOVERY_TAG_DEFINITIONS = {
   },
   smoke_pressure: {
     id: 'smoke_pressure',
-    label: 'Smoke pressure',
-    summary: 'Smoke and wildfire-operability pressure are active enough to shape daily work.',
+    label: 'Smoke constraint',
+    summary: 'Smoke and wildfire-operability limits are active enough to shape daily work.',
     roleNotes: {
-      planner: 'Wildfire pressure is reshaping priorities faster than the schedule likes.',
-      permitter: 'Expect more pressure around operability, timing, and public risk.',
-      silviculture: 'Smoke pressure is chewing through crew stability and work windows.',
+      planner: 'Wildfire constraints are reshaping priorities faster than the schedule likes.',
+      permitter: 'Expect more scrutiny around operability, timing, and public risk.',
+      silviculture: 'Smoke is chewing through crew stability and usable work windows.',
       recce: 'Smoke is likely to close or distort field windows.'
     },
     fieldTypeMultipliers: {
