@@ -133,7 +133,10 @@ export const ModalMixin = {
 
     if (this.modalBody) {
       if (typeof content === 'string') {
-        this.modalBody.innerHTML = `<p>${content}</p>`;
+        this.modalBody.innerHTML = '';
+        const p = document.createElement('p');
+        p.textContent = content;
+        this.modalBody.appendChild(p);
       } else if (content instanceof HTMLElement) {
         this.modalBody.innerHTML = '';
         this.modalBody.appendChild(content);
@@ -229,28 +232,31 @@ export const ModalMixin = {
    * Show help modal
    */
   showHelp() {
-    this.showModal({
+    this.openModal({
       title: 'HOW TO PLAY',
-      content: `
-        <p><strong>BC FORESTRY TRAIL</strong></p>
-        <p>Guide your crew through the northern BC wilderness.</p>
-        <br>
-        <p><strong>Controls:</strong></p>
-        <p>[1-9] - Select options</p>
-        <p>[S] - Toggle status panel</p>
-        <p>[L] - View journey log</p>
-        <p>[P] - Open professional/compliance intel</p>
-        <p>[ESC] - Close panels</p>
-        <br>
-        <p><strong>Field Roles:</strong></p>
-        <p>Survey forest blocks during 8-9 hour shifts. Keep radio contact while managing fuel, food, and equipment.</p>
-        <br>
-        <p><strong>Desk Roles:</strong></p>
-        <p>Process permits against a deadline. Manage budget and stakeholders.</p>
-        <br>
-        <p><strong>Keep your crew healthy and reach your goal!</strong></p>
-      `,
-      actions: [{ label: 'Got it!', primary: true }]
+      dismissible: true,
+      buildContent: (container) => {
+        container.innerHTML = `
+          <p><strong>BC FORESTRY TRAIL</strong></p>
+          <p>Guide your crew through the northern BC wilderness.</p>
+          <br>
+          <p><strong>Controls:</strong></p>
+          <p>[1-9] - Select options</p>
+          <p>[S] - Toggle status panel</p>
+          <p>[L] - View journey log</p>
+          <p>[P] - Open professional/compliance intel</p>
+          <p>[ESC] - Close panels</p>
+          <br>
+          <p><strong>Field Roles:</strong></p>
+          <p>Survey forest blocks during 8-9 hour shifts. Keep radio contact while managing fuel, food, and equipment.</p>
+          <br>
+          <p><strong>Desk Roles:</strong></p>
+          <p>Process permits against a deadline. Manage budget and stakeholders.</p>
+          <br>
+          <p><strong>Keep your crew healthy and reach your goal!</strong></p>
+        `;
+      },
+      actions: [{ label: 'Got it!', primary: true, onSelect: () => this.closeModal() }]
     });
   },
 
@@ -931,28 +937,48 @@ export const ModalMixin = {
     if (!logEntries || logEntries.length === 0) {
       this.showModal({
         title: 'JOURNEY LOG',
-        content: '<p>No events recorded yet.</p>',
+        content: 'No events recorded yet.',
         actions: [{ label: 'Close', primary: true }]
       });
       return;
     }
 
-    // Build log content
-    const logHtml = logEntries.map(entry => {
-      const icon = entry.icon || '·';
-      const detail = entry.detail ? ` - ${entry.detail}` : '';
-      const dayLabel = entry.dayLabel || 'Day';
-      return `<div class="log-entry log-${entry.type}">
-        <span class="log-day">${dayLabel} ${entry.day}</span>
-        <span class="log-icon">${icon}</span>
-        <span class="log-summary">${entry.summary}${detail}</span>
-      </div>`;
-    }).join('');
-
-    this.showModal({
+    this.openModal({
       title: 'JOURNEY LOG',
-      content: `<div class="log-list">${logHtml}</div>`,
-      actions: [{ label: 'Close', primary: true }]
+      dismissible: true,
+      buildContent: (container) => {
+        const list = document.createElement('div');
+        list.className = 'log-list';
+
+        for (const entry of logEntries) {
+          const icon = entry.icon || '·';
+          const detail = entry.detail ? ` - ${entry.detail}` : '';
+          const dayLabel = entry.dayLabel || 'Day';
+
+          const row = document.createElement('div');
+          row.className = `log-entry log-${entry.type}`;
+
+          const daySpan = document.createElement('span');
+          daySpan.className = 'log-day';
+          daySpan.textContent = `${dayLabel} ${entry.day}`;
+
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'log-icon';
+          iconSpan.textContent = icon;
+
+          const summarySpan = document.createElement('span');
+          summarySpan.className = 'log-summary';
+          summarySpan.textContent = `${entry.summary}${detail}`;
+
+          row.appendChild(daySpan);
+          row.appendChild(iconSpan);
+          row.appendChild(summarySpan);
+          list.appendChild(row);
+        }
+
+        container.appendChild(list);
+      },
+      actions: [{ label: 'Close', primary: true, onSelect: () => this.closeModal() }]
     });
   },
 
