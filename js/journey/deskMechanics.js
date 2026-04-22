@@ -108,11 +108,22 @@ function processPermitWork(journey) {
   }
 
   // Fix revisions
-  if (journey.permits.needsRevision > 0 && Math.random() < 0.5) {
-    journey.permits.needsRevision--;
-    journey.permits.inReview++;
-    messages.push('Resubmitted a revised permit.');
-    applyProfessionalComplianceShift(journey, { paperworkLoad: -1, auditExposure: -1 });
+  if (journey.permits.needsRevision > 0) {
+    const registrationBonus = professional?.registrationStatus === 'active' ? 0.2 : 0;
+    const burdenPenalty = Math.min(0.3, (professional?.paperworkLoad || 0) / 100);
+    const successChance = 0.45 + registrationBonus - burdenPenalty;
+
+    if (Math.random() < successChance) {
+      journey.permits.needsRevision--;
+      journey.permits.submitted++;
+      messages.push('Resubmitted a revised permit.');
+      applyProfessionalComplianceShift(journey, { paperworkLoad: -1, auditExposure: -1 });
+
+      // Sync the revision queue if it exists
+      if (Array.isArray(journey.permits.revisionQueue) && journey.permits.revisionQueue.length > 0) {
+        journey.permits.revisionQueue.shift();
+      }
+    }
   }
 
   if (professional?.registrationStatus !== 'active') {
