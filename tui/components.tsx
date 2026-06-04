@@ -72,6 +72,20 @@ function DashboardStats({ gs }: { gs: any }) {
       <text content="" />
       <text content="Company" style={{ fg: C.white, bold: true }} />
       <text content={gs.companyName} style={{ fg: C.dim }} />
+      {gs.modeLabel ? (
+        <>
+          <text content="" />
+          <text content="Mode" style={{ fg: C.white, bold: true }} />
+          <text content={gs.modeLabel} style={{ fg: C.dim }} />
+        </>
+      ) : null}
+      {gs.crisis?.title ? (
+        <>
+          <text content="" />
+          <text content="Incident" style={{ fg: C.white, bold: true }} />
+          <text content={gs.crisis.title} style={{ fg: C.yellow }} />
+        </>
+      ) : null}
       <text content="" />
       <text content="Role" style={{ fg: C.white, bold: true }} />
       <text content={gs.roleDisplayName || gs.role.seasonalName || gs.role.name} style={{ fg: C.dim }} />
@@ -284,7 +298,7 @@ function SummarySection({
 
 // ── Content View (structured rendering) ──────────────
 export function ContentView({ data }: { data: ContentData }) {
-  const optionColor = data.type === "assignment" || data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation"
+  const optionColor = data.type === "assignment" || data.type === "task" || data.type === "issue" || data.type === "event" || data.type === "temptation" || data.type === "scenario"
     ? data.optionTone === "danger"
       ? C.red
       : data.optionTone === "warning"
@@ -330,6 +344,7 @@ export function ContentView({ data }: { data: ContentData }) {
     case "issue":
     case "event":
     case "temptation":
+    case "scenario":
       return (
         <>
           <NoticeView notice={data.notice} />
@@ -340,7 +355,28 @@ export function ContentView({ data }: { data: ContentData }) {
           {data.cardLabel ? (
             <text content={data.cardLabel} style={{ fg: C.blue, bold: true }} />
           ) : null}
+          {data.phaseLabel ? (
+            <text content={data.phaseLabel} style={{ fg: C.yellow, bold: true }} />
+          ) : null}
           <text content={data.title} style={{ fg: C.yellow, bold: true }} />
+          {data.type === "scenario" ? (
+            <>
+              <text content="" />
+              <text content="Incident Status" style={{ fg: C.white, bold: true }} />
+              {data.weather ? <text content={`Weather: ${data.weather}`} style={{ fg: C.white }} /> : null}
+              {data.deadline ? <text content={`Deadline: ${data.deadline}`} style={{ fg: C.white }} /> : null}
+              {Object.entries(data.status || {}).map(([label, value]) => (
+                <text key={label} content={`${label}: ${value}`} style={{ fg: C.dim }} />
+              ))}
+              {data.map ? (
+                <>
+                  <text content="" />
+                  <text content="Block Map" style={{ fg: C.white, bold: true }} />
+                  <text content={data.map} style={{ fg: C.green }} />
+                </>
+              ) : null}
+            </>
+          ) : null}
           {data.context?.operation ? (
             <>
               <text content="" />
@@ -369,6 +405,15 @@ export function ContentView({ data }: { data: ContentData }) {
               {data.surfaceReason ? <text content={data.surfaceReason} style={{ fg: C.dim }} /> : null}
             </>
           )}
+          {data.type === "scenario" && data.intelLines?.length ? (
+            <>
+              <text content="" />
+              <text content="Intel Feed" style={{ fg: C.white, bold: true }} />
+              {data.intelLines.map((line, index) => (
+                <text key={`intel-${index}`} content={line} style={{ fg: C.dim }} />
+              ))}
+            </>
+          ) : null}
           <text content="" />
           <text content="What am I deciding?" style={{ fg: C.white, bold: true }} />
           <text content={data.decisionPrompt || "Choose the response that best protects the current work."} style={{ fg: C.white }} />

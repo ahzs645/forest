@@ -6,35 +6,46 @@ body,
 }
 
 body {
-  background: #0d1117;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(86, 212, 221, 0.12), transparent 28%),
+    linear-gradient(135deg, #182030 0%, #0c1218 48%, #132018 100%);
   color: #c9d1d9;
   font-family: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .tui-app-shell {
   min-height: 100vh;
-  padding: 1rem;
-  background: #0d1117;
+  padding: 1.25rem;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 44px 44px;
 }
 
 .tui-shell {
-  min-height: calc(100vh - 2rem);
+  width: min(1420px, calc(100vw - 4rem));
+  height: min(860px, calc(100vh - 2.5rem));
+  min-height: 640px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  border: 1px solid #2d5016;
-  background: #0d1117;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  border: 1px solid rgba(86, 212, 221, 0.34);
+  border-radius: 6px;
+  background: rgba(8, 12, 17, 0.95);
+  box-shadow:
+    0 34px 100px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(86, 212, 221, 0.08) inset;
 }
 
 .tui-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  flex-wrap: wrap;
-  padding: 0.65rem 1rem;
-  background: #2d5016;
-  border-bottom: 1px solid #2d5016;
+  padding: 0.75rem 0.95rem;
+  background: linear-gradient(90deg, rgba(45, 80, 22, 0.95), rgba(13, 17, 23, 0.96));
+  border-bottom: 1px solid rgba(86, 212, 221, 0.28);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.65), 0 0 36px rgba(63, 185, 80, 0.08) inset;
 }
 
 .tui-header-title {
@@ -43,6 +54,7 @@ body {
   flex-wrap: wrap;
   align-items: baseline;
   min-width: 0;
+  flex: 1;
 }
 
 .tui-header-actions {
@@ -56,6 +68,8 @@ body {
   margin: 0;
   color: #e6edf3;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .tui-header-tag,
@@ -84,6 +98,8 @@ body {
   flex: 1;
   display: flex;
   min-height: 0;
+  padding: 0.85rem;
+  gap: 0.85rem;
 }
 
 .tui-stage {
@@ -92,13 +108,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  padding-left: 0.65rem;
 }
 
 .tui-panel {
-  border: 1px solid #56d4dd;
-  background: #0d1117;
+  border: 1px solid rgba(86, 212, 221, 0.56);
+  background: rgba(13, 17, 23, 0.88);
   min-width: 0;
+  box-shadow: 0 0 0 1px rgba(86, 212, 221, 0.05) inset;
 }
 
 .tui-panel-title {
@@ -111,6 +127,7 @@ body {
 .tui-dashboard {
   width: 28ch;
   padding: 0.35rem 0.75rem 0.75rem;
+  border-color: rgba(63, 185, 80, 0.55);
 }
 
 .tui-dashboard-body {
@@ -174,7 +191,7 @@ body {
 .tui-field-main {
   flex: 1;
   min-width: 0;
-  padding: 0.85rem 1rem;
+  padding: 0.75rem;
   overflow: auto;
 }
 
@@ -217,7 +234,7 @@ body {
 .tui-notice {
   border: 1px solid currentColor;
   padding: 0.7rem 0.8rem;
-  background: rgba(34, 40, 48, 0.35);
+  background: rgba(210, 153, 34, 0.08);
 }
 
 .tui-notice-heading {
@@ -262,6 +279,187 @@ body {
   padding-left: 1.5rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.tui-scenario-console {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 100%;
+}
+
+.tui-scenario-titlebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(210, 153, 34, 0.62);
+  background: rgba(210, 153, 34, 0.08);
+}
+
+.tui-scenario-title {
+  color: #e6edf3;
+  font-weight: 700;
+}
+
+.tui-window-grid {
+  display: grid;
+  grid-template-columns: minmax(30rem, 1.55fr) minmax(18rem, 0.9fr);
+  grid-template-rows: minmax(18rem, 1.4fr) minmax(8rem, 0.7fr) minmax(7rem, 0.55fr);
+  grid-template-areas:
+    "map status"
+    "map intel"
+    "brief actions";
+  gap: 0.65rem;
+  min-height: 0;
+  flex: 1;
+}
+
+.tui-tui-window,
+.tui-mini-panel {
+  border: 1px solid rgba(63, 185, 80, 0.48);
+  padding: 0.75rem;
+  min-width: 0;
+  min-height: 0;
+  background: rgba(16, 29, 18, 0.36);
+  overflow: auto;
+}
+
+.tui-window-title {
+  margin: -0.2rem -0.25rem 0.65rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(86, 212, 221, 0.34);
+  color: #56d4dd;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+}
+
+.tui-window-status {
+  grid-area: status;
+}
+
+.tui-window-map {
+  grid-area: map;
+}
+
+.tui-window-brief {
+  grid-area: brief;
+}
+
+.tui-window-intel {
+  grid-area: intel;
+}
+
+.tui-window-actions {
+  grid-area: actions;
+}
+
+.tui-scenario-map {
+  margin: 0;
+  color: #3fb950;
+  white-space: pre;
+  overflow: auto;
+  line-height: 1.22;
+  font-size: clamp(0.88rem, 1.05vw, 1.1rem);
+}
+
+.tui-window-map .tui-scenario-map {
+  min-height: 100%;
+}
+
+.tui-map-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 100%;
+}
+
+.tui-map-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  color: #7d8590;
+}
+
+.tui-map-controls button {
+  border: 1px solid rgba(88, 166, 255, 0.55);
+  background: rgba(88, 166, 255, 0.08);
+  color: #e6edf3;
+  font: inherit;
+  min-width: 2rem;
+  min-height: 1.7rem;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+}
+
+.tui-map-controls button:hover,
+.tui-map-controls button:focus-visible {
+  background: rgba(88, 166, 255, 0.2);
+  outline: none;
+}
+
+.tui-map-viewport {
+  flex: 1;
+  min-height: 18rem;
+  overflow: hidden;
+  border: 1px solid rgba(63, 185, 80, 0.24);
+  background:
+    linear-gradient(rgba(63, 185, 80, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63, 185, 80, 0.04) 1px, transparent 1px),
+    rgba(4, 12, 8, 0.42);
+  background-size: 1.35rem 1.35rem;
+}
+
+.tui-map-layer {
+  transform-origin: top left;
+  padding: 0.65rem;
+}
+
+.tui-map-viewport.tactical {
+  overflow: auto;
+}
+
+.tui-map-viewport.tactical .tui-map-layer {
+  width: max-content;
+  min-width: 100%;
+  font-size: clamp(0.88rem, 1.05vw, 1.06rem);
+  line-height: 1.36;
+}
+
+.tui-map-viewport.braille .tui-map-layer {
+  font-size: clamp(0.78rem, 0.92vw, 0.95rem);
+  line-height: 1.08;
+}
+
+.tui-map-legend {
+  color: #7d8590;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.tui-action-preview-list {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.tui-action-preview {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
+  color: #c9d1d9;
+}
+
+.tui-action-number {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid rgba(88, 166, 255, 0.75);
+  color: #58a6ff;
 }
 
 .tui-name-input,
@@ -343,19 +541,62 @@ body {
   border-bottom-color: #3fb950;
 }
 
+.tui-terminal-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.15rem;
+  padding: 0 0.9rem;
+  color: #c9d1d9;
+  background: rgba(5, 8, 12, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tui-cursor {
+  width: 0.62rem;
+  height: 1.05rem;
+  display: inline-block;
+  background: #3fb950;
+  animation: cursor-blink 1s steps(1, end) infinite;
+}
+
+@keyframes cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
 @media (max-width: 720px) {
   .tui-app-shell {
     padding: 0;
   }
 
   .tui-shell {
-    min-height: 100vh;
-    border: 0;
+    width: 100vw;
+    height: 100vh;
+    min-height: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 0;
   }
 
   .tui-main,
   .tui-field-layout {
     flex-direction: column;
+  }
+
+  .tui-window-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      "status"
+      "map"
+      "brief"
+      "intel"
+      "actions";
   }
 
   .tui-header {

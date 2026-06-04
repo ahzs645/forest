@@ -98,6 +98,53 @@ test('seasonal role picker excludes manager and keeps the Field Technician label
   assert.equal(state.mode, 'setup-area');
 });
 
+test('role picker exposes the crisis command game mode without displacing seasonal roles', () => {
+  const controller = new TuiGameController();
+
+  controller.handleKey({ name: 'return' });
+
+  const state = controller.getState();
+  assert.equal(state.options[0], 'Strategic Planner');
+  assert.ok(state.options.includes('BC Forestry Simulator: Crisis Command'));
+});
+
+test('crisis command starts the Williams Lake beetle scenario with map and reused area intel', () => {
+  const controller = new TuiGameController();
+
+  controller.handleKey({ name: 'return' });
+  const crisisIndex = controller.getState().options.indexOf('BC Forestry Simulator: Crisis Command');
+  controller.selectOption(crisisIndex);
+
+  const state = controller.getState();
+  assert.equal(state.mode, 'playing');
+  assert.equal(state.gameState.gameMode, 'crisis-command');
+  assert.equal(state.gameState.roleDisplayName, 'Incident Commander');
+  assert.equal(state.gameState.area.name, 'Fraser Plateau Uplands');
+  assert.equal(state.contentData.type, 'scenario');
+  assert.match(state.contentData.title, /Pine Beetle Outbreak/);
+  assert.match(state.contentData.map, /BEETLE/);
+  assert.ok(state.contentData.intelLines.some((line) => line.includes('SBSwk1')));
+  assert.ok(state.contentData.optionDetails.length >= 5);
+});
+
+test('crisis command choices advance metrics and end at a crisis debrief', () => {
+  const controller = new TuiGameController();
+
+  controller.handleKey({ name: 'return' });
+  controller.selectOption(controller.getState().options.indexOf('BC Forestry Simulator: Crisis Command'));
+
+  for (let i = 0; i < 4; i += 1) {
+    assert.equal(controller.getState().contentData.type, 'scenario');
+    controller.selectOption(0);
+  }
+
+  const state = controller.getState();
+  assert.equal(state.contentData.type, 'summary');
+  assert.equal(state.contentData.heading, 'Crisis Debrief');
+  assert.equal(state.gameState.crisis.commandLog.length, 4);
+  assert.deepEqual(state.options, ['Play Again', 'Quit']);
+});
+
 test('first playable seasonal card exposes the contract fields and neutral prompt', () => {
   const controller = new TuiGameController();
 
