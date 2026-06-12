@@ -72,20 +72,24 @@ function getEntryPattern(entry) {
   return tags.length ? tags.join(' · ') : 'General compliance risk';
 }
 
+const HIGH_RISK_TAGS = new Set(['fraud', 'forgery', 'bribery', 'illegal-works', 'blatant', 'sabotage', 'coverup', 'laundering', 'noncompliance', 'deception', 'tampering']);
+const ELEVATED_RISK_TAGS = new Set(['compliance', 'records', 'risk', 'ethics', 'paperwork', 'reporting', 'regulatory']);
+
 function getEntryRisk(entry) {
-  const tags = normalizeSearchText((Array.isArray(entry?.tags) ? entry.tags : []).join(' '));
-  const highRisk = ['fraud', 'forgery', 'bribery', 'illegal-works', 'blatant', 'sabotage', 'coverup', 'laundering', 'noncompliance', 'deception', 'tampering'];
-  const elevatedRisk = ['compliance', 'records', 'risk', 'ethics', 'paperwork', 'reporting', 'regulatory'];
+  const tagsStr = normalizeSearchText((Array.isArray(entry?.tags) ? entry.tags : []).join(' '));
 
-  if (highRisk.some((term) => tags.includes(term))) {
-    return 'HIGH';
+  let isElevated = false;
+  for (const term of HIGH_RISK_TAGS) {
+    if (tagsStr.includes(term)) return 'HIGH';
+  }
+  for (const term of ELEVATED_RISK_TAGS) {
+    if (tagsStr.includes(term)) {
+      isElevated = true;
+      break;
+    }
   }
 
-  if (elevatedRisk.some((term) => tags.includes(term))) {
-    return 'ELEVATED';
-  }
-
-  return 'MODERATE';
+  return isElevated ? 'ELEVATED' : 'MODERATE';
 }
 
 function getRoleFit(entry) {
