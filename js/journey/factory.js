@@ -566,7 +566,9 @@ export function createManagerJourney(options = {}) {
     resources: {
       ...baseDesk,
       ...baseField,
-      budget: 100000, // Higher starting budget for manager
+      // Must cover the mandatory day-1 CEO hire ($180-200k), an optional
+      // certification ($80-150k), and the $500/day burn over a 100-day term.
+      budget: 500000,
       politicalCapital: 100,
     },
     professional: createProfessionalComplianceState(

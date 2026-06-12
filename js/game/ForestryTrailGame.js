@@ -31,7 +31,7 @@ import { displayMode } from '../displayMode.js';
 
 // Import extracted display modules
 import { showJourneyIntro } from './intro.js';
-import { showEndScreen } from './endScreen.js';
+import { runFinalDebrief } from './debrief.js';
 
 /**
  * Apply difficulty multipliers to journey resources
@@ -71,6 +71,11 @@ export class ForestryTrailGame {
     this.ui.onRestartRequest(() => this._promptRestart());
     this.ui.onLogRequest(() => this._showLog());
     this._bindKeyboard();
+
+    // Dev/test hook: lets automated tests inspect or fast-forward a run.
+    if (typeof window !== 'undefined') {
+      window.__forestGame = this;
+    }
   }
 
   _showLog() {
@@ -253,7 +258,7 @@ export class ForestryTrailGame {
       }
     }
 
-    await showEndScreen(this.ui, this.journey, this.victory);
+    await runFinalDebrief(this.ui, this.journey, this.victory);
 
     await this.ui.promptChoice('', [{ label: 'New Expedition', value: 'restart' }]);
     this.start();

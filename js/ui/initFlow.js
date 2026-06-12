@@ -196,6 +196,27 @@ export const InitFlowMixin = {
         window.dispatchEvent(new CustomEvent('initFlowComplete', { detail: payload }));
       });
     }
+
+    // The status footer advertises "[ENTER] CONFIRM SELECTION" — make it true.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      if (!this.initOverlay || this.initOverlay.hidden) return;
+      if (this.isModalOpen()) return;
+
+      const continueBtn = this.introStep?.classList.contains('active') ? this.introContinueBtn
+        : this.roleStep?.classList.contains('active') ? this.roleContinueBtn
+        : this.areaStep?.classList.contains('active') ? this.areaContinueBtn
+        : null;
+      if (!continueBtn) return;
+
+      // If another button has focus (e.g. a role/area card reached via Tab),
+      // let the browser's native Enter-activates-it behaviour run instead.
+      const active = document.activeElement;
+      if (active && active.tagName === 'BUTTON' && active !== continueBtn) return;
+
+      e.preventDefault();
+      continueBtn.click();
+    });
   },
 
   /**

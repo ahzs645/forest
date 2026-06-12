@@ -46,6 +46,14 @@ export function calculateScore(journey, victory) {
       components.objectives = scorePermittingObjectives(journey, victory);
       components.events = scoreEventHandling(journey);
       break;
+
+    case 'manager':
+      components.speed = scoreManagerTerm(journey);
+      components.crewWelfare = scoreCrewWelfare(journey);
+      components.resourceEfficiency = scoreManagerResources(journey);
+      components.objectives = scoreManagerObjectives(journey, victory);
+      components.events = scoreEventHandling(journey);
+      break;
   }
 
   // Weighted total: Speed 25%, Crew 25%, Resources 20%, Objectives 20%, Events 10%
@@ -64,7 +72,7 @@ export function calculateScore(journey, victory) {
   return { totalScore, grade, components, victory };
 }
 
-function getLetterGrade(score) {
+export function getLetterGrade(score) {
   if (score >= 90) return 'A';
   if (score >= 75) return 'B';
   if (score >= 60) return 'C';
@@ -106,6 +114,14 @@ function scorePermittingSpeed(journey) {
   const daysRemaining = Math.max(0, deadline - daysUsed);
   const score = Math.min(100, Math.round((daysRemaining / deadline) * 100) + 20);
   return { score: Math.min(100, score), label: `${daysUsed}/${deadline} days used` };
+}
+
+// Manager "speed" is staying power: surviving deeper into the term scores higher.
+function scoreManagerTerm(journey) {
+  const daysUsed = journey.day - 1;
+  const deadline = journey.deadline || 100;
+  const score = Math.min(100, Math.round((daysUsed / deadline) * 100));
+  return { score, label: `${daysUsed}/${deadline} days served` };
 }
 
 // --- Crew Welfare Scoring ---
@@ -182,6 +198,22 @@ function scoreDeskResourceEfficiency(journey) {
   return { score, label: `Budget: $${Math.round(r.budget || 0).toLocaleString()}` };
 }
 
+function scoreManagerResources(journey) {
+  const r = journey.resources || {};
+  let score = 50;
+
+  const budgetPct = (r.budget || 0) / 500000;
+  score += scoreSweetSpot(budgetPct) * 25;
+
+  const polCapPct = (r.politicalCapital || 0) / 100;
+  score += scoreSweetSpot(polCapPct) * 15;
+
+  if (r.budget <= 0) score -= 20;
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  return { score, label: `Budget: $${Math.round(r.budget || 0).toLocaleString()}` };
+}
+
 // Returns 0-1 where sweet spot is 10-40% remaining
 function scoreSweetSpot(pct) {
   if (pct <= 0) return 0;
@@ -239,6 +271,18 @@ function scorePermittingObjectives(journey, victory) {
   score += Math.round(approvalRate * 40);
   score = Math.min(100, score);
   return { score, label: `${permits.approved}/${permits.target} approved` };
+}
+
+function scoreManagerObjectives(journey, victory) {
+  let score = victory ? 55 : 10;
+  const reputation = journey.metrics?.reputation ?? 50;
+  score += Math.round((reputation / 100) * 25);
+  score += Math.min(20, (journey.certifications?.length || 0) * 10);
+  score = Math.min(100, score);
+  const certLabel = journey.certifications?.length
+    ? `, ${journey.certifications.length} certification${journey.certifications.length > 1 ? 's' : ''}`
+    : '';
+  return { score, label: `Reputation ${Math.round(reputation)}%${certLabel}` };
 }
 
 // --- Event Handling Scoring ---

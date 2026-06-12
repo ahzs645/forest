@@ -43,48 +43,7 @@ export async function showEndScreen(ui, journey, victory) {
 
   ui.write('');
   ui.writeDivider('FINAL STATISTICS');
-
-  switch (journey.journeyType) {
-    case 'recon':
-    case 'field': {
-      const fieldProgressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
-      const surveyedBlocks = getSurveyedBlockCount(journey);
-      ui.write(`Traverse Covered: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km (${fieldProgressPct}%)`);
-      ui.write(`Shifts Elapsed: ${daysUsed}`);
-      ui.write(`Blocks Surveyed: ${surveyedBlocks}/${journey.blocks.length}`);
-      if (journey.blocksAssessed !== undefined) {
-        ui.write(`Blocks Assessed: ${journey.blocksAssessed}`);
-      }
-      break;
-    }
-    case 'silviculture': {
-      const plantingPct = Math.round((journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
-      ui.write(`Seedlings Planted: ${journey.planting.seedlingsPlanted.toLocaleString()}/${journey.planting.seedlingsAllocated.toLocaleString()} (${plantingPct}%)`);
-      ui.write(`Blocks Planted: ${journey.planting.blocksPlanted}/${journey.planting.blocksToPlant}`);
-      ui.write(`Brushing Complete: ${journey.brushing.hectaresComplete}/${journey.brushing.hectaresTarget} ha`);
-      ui.write(`Free-Growing Surveys: ${journey.surveys.freeGrowingComplete}/${journey.surveys.freeGrowingTarget}`);
-      ui.write(`Days Elapsed: ${daysUsed}`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
-      break;
-    }
-    case 'planning':
-      ui.write(`Final Phase: ${journey.plan.phase}`);
-      ui.write(`Data Completeness: ${journey.plan.dataCompleteness}%`);
-      ui.write(`Analysis Quality: ${journey.plan.analysisQuality}%`);
-      ui.write(`Stakeholder Buy-in: ${journey.plan.stakeholderBuyIn}%`);
-      ui.write(`Ministerial Confidence: ${journey.plan.ministerialConfidence}%`);
-      ui.write(`Days Elapsed: ${daysUsed}`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
-      break;
-
-    case 'permitting':
-    case 'desk':
-    default:
-      ui.write(`Permits Approved: ${journey.permits.approved}/${journey.permits.target}`);
-      ui.write(`Days Used: ${daysUsed}/${journey.deadline}`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
-      break;
-  }
+  writeFinalStatistics(ui, journey);
 
   // --- Crew Fate (narrative) ---
   if (journey.crew?.length > 0) {
@@ -135,6 +94,69 @@ export async function showEndScreen(ui, journey, victory) {
   ui.write('Press ESC to start a new expedition.');
 }
 
+/**
+ * Write the per-journey-type final statistics block
+ * @param {Object} ui - TerminalUI instance
+ * @param {Object} journey - Journey state
+ */
+export function writeFinalStatistics(ui, journey) {
+  const daysUsed = journey.day - 1;
+
+  switch (journey.journeyType) {
+    case 'recon':
+    case 'field': {
+      const fieldProgressPct = Math.round((journey.distanceTraveled / journey.totalDistance) * 100);
+      const surveyedBlocks = getSurveyedBlockCount(journey);
+      ui.write(`Traverse Covered: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km (${fieldProgressPct}%)`);
+      ui.write(`Shifts Elapsed: ${daysUsed}`);
+      ui.write(`Blocks Surveyed: ${surveyedBlocks}/${journey.blocks.length}`);
+      if (journey.blocksAssessed !== undefined) {
+        ui.write(`Blocks Assessed: ${journey.blocksAssessed}`);
+      }
+      break;
+    }
+    case 'silviculture': {
+      const plantingPct = Math.round((journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
+      ui.write(`Seedlings Planted: ${journey.planting.seedlingsPlanted.toLocaleString()}/${journey.planting.seedlingsAllocated.toLocaleString()} (${plantingPct}%)`);
+      ui.write(`Blocks Planted: ${journey.planting.blocksPlanted}/${journey.planting.blocksToPlant}`);
+      ui.write(`Brushing Complete: ${journey.brushing.hectaresComplete}/${journey.brushing.hectaresTarget} ha`);
+      ui.write(`Free-Growing Surveys: ${journey.surveys.freeGrowingComplete}/${journey.surveys.freeGrowingTarget}`);
+      ui.write(`Days Elapsed: ${daysUsed}`);
+      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      break;
+    }
+    case 'planning':
+      ui.write(`Final Phase: ${journey.plan.phase}`);
+      ui.write(`Data Completeness: ${journey.plan.dataCompleteness}%`);
+      ui.write(`Analysis Quality: ${journey.plan.analysisQuality}%`);
+      ui.write(`Stakeholder Buy-in: ${journey.plan.stakeholderBuyIn}%`);
+      ui.write(`Ministerial Confidence: ${journey.plan.ministerialConfidence}%`);
+      ui.write(`Days Elapsed: ${daysUsed}`);
+      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      break;
+
+    case 'manager':
+      ui.write(`Term Served: ${daysUsed}/${journey.deadline} days`);
+      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      ui.write(`Reputation: ${Math.round(journey.metrics?.reputation ?? 50)}%`);
+      if (journey.ceo) {
+        ui.write(`CEO: ${journey.ceo.name}`);
+      }
+      if (journey.certifications?.length) {
+        ui.write(`Certifications: ${journey.certifications.map((c) => c.name).join(', ')}`);
+      }
+      break;
+
+    case 'permitting':
+    case 'desk':
+    default:
+      ui.write(`Permits Approved: ${journey.permits?.approved ?? 0}/${journey.permits?.target ?? 0}`);
+      ui.write(`Days Used: ${daysUsed}/${journey.deadline ?? daysUsed}`);
+      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      break;
+  }
+}
+
 export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
   const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
   const seasonName = seasonInfo ? seasonInfo.name.toLowerCase() : 'the season';
@@ -158,9 +180,12 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
         `The plan will shape forestry operations in the region for the next decade.`;
     case 'permitting':
     case 'desk':
-      return `${journey.permits.approved} permits approved out of ${journey.permits.target} targeted. ` +
+      return `${journey.permits?.approved ?? 0} permits approved out of ${journey.permits?.target ?? 0} targeted. ` +
         `The permit pipeline in ${areaName} is flowing smoothly after ${daysUsed} days of diligent processing ` +
         `and relationship building.`;
+    case 'manager':
+      return `${crewName} closed out the term in ${areaName} after ${daysUsed} days with the books balanced ` +
+        `and the board's confidence intact. The operation is set up to thrive under its new leadership.`;
     default:
       return journey.endReason || 'Expedition completed successfully.';
   }
@@ -188,6 +213,9 @@ export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
     case 'desk':
       return `The permitting office in ${areaName} could not meet its targets. ` +
         `${reason} After ${daysUsed} days, the backlog remains.`;
+    case 'manager':
+      return `${crewName}'s tenure leading the ${areaName} operation ended after ${daysUsed} days. ` +
+        `${reason} The board is already interviewing replacements.`;
     default:
       return reason;
   }

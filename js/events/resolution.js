@@ -8,6 +8,7 @@ import { applyRandomInjury, applyStatusEffect } from '../crew.js';
 import { syncBlocksFromDistance } from '../journey/blockNav.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
+import { buildEventReaction } from './reactions.js';
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
@@ -105,6 +106,11 @@ export function resolveEvent(journey, event, option) {
   if (scrutinyDelta !== 0) {
     const direction = scrutinyDelta > 0 ? 'rose' : 'eased';
     messages.push(`Scrutiny ${direction} to ${journey.scrutiny}%.`);
+  }
+
+  const reaction = buildEventReaction(journey, option);
+  if (reaction) {
+    messages.push(reaction);
   }
 
   if (!journey.log) journey.log = [];

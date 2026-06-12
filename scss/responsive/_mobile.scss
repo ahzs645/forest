@@ -37,10 +37,11 @@
   .choice-btn {
     padding: var(--space-sm);
     font-size: var(--font-size-sm);
+    min-height: 44px;
   }
 
   .close-btn {
-    display: block;
+    display: flex;
   }
 
   .field-row {

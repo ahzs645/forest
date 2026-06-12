@@ -83,6 +83,22 @@ export const TerminalMixin = {
   },
 
   /**
+   * Alias for writePositive
+   * @param {string} text - Success text
+   */
+  writeSuccess(text) {
+    this.writePositive(text);
+  },
+
+  /**
+   * Write an informational message
+   * @param {string} text - Info text
+   */
+  writeInfo(text) {
+    this.write(text, 'term-dim');
+  },
+
+  /**
    * Write a pre-formatted ASCII box
    * @param {string} content - Pre-formatted content
    */

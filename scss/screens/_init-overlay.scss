@@ -206,6 +206,11 @@
   gap: var(--space-sm);
   padding-top: var(--space-sm);
   border-top: 1px dashed var(--border-color);
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(5, 15, 5, 0.88), rgba(5, 15, 5, 0.99));
+  padding-bottom: var(--space-xs);
 
   @include mobile-down {
     padding-top: var(--space-xs);
@@ -220,6 +225,14 @@
   padding-top: var(--space-md);
   border-top: 1px dashed var(--border-color);
   margin-top: auto;
+
+  // Keep the continue button reachable when the step content overflows
+  // (the area detail panel can be several screens tall).
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(5, 15, 5, 0.88), rgba(5, 15, 5, 0.99));
+  padding-bottom: var(--space-sm);
 
   @include mobile-down {
     flex-direction: column;

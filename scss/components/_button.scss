@@ -40,6 +40,11 @@
   padding: 2px 6px;
   cursor: pointer;
   display: none;
+  // Only shown on mobile (responsive/_mobile.scss) — keep it finger-sized.
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
 }
 
 // Init primary button
