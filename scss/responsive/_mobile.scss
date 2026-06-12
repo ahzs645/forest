@@ -76,3 +76,10 @@
 .footer-hotkeys {
   padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
 }
+
+// 44-char scene frames must fit the narrowest supported viewport
+@include mobile-down {
+  .scene-canvas {
+    font-size: min(var(--font-size-sm), calc((100vw - 68px) / 26.4));
+  }
+}

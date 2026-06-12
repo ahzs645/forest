@@ -20,8 +20,7 @@
         "outcome": "Quick swap and you're moving again. Hope there are no more surprises.",
         "effects": {
           "equipment": -3
-        },
-        "consumesSpare": true
+        }
       },
       {
         "label": "Wait for help",
@@ -100,6 +99,7 @@
       }
     ],
     "roles": [
+      "recce",
       "silviculture"
     ]
   },
@@ -262,8 +262,7 @@
         "outcome": "Direct hit. The bear runs. Everyone's shaken but safe.",
         "effects": {
           "crew_morale": -5
-        },
-        "consumesItem": "bear_spray"
+        }
       },
       {
         "label": "Fire a warning shot",
@@ -472,8 +471,7 @@
           "budget": -2000
         },
         "crewEffect": {
-          "evacuate": true,
-          "serious": true
+          "evacuate": true
         }
       },
       {
@@ -989,10 +987,10 @@
       },
       {
         "label": "Harvest the valuable timber",
-        "outcome": "You decided to Harvest the valuable timber.",
+        "outcome": "The fallers take the grove down in two days. The mill pays a premium for clear old-growth cedar — $3,000 lands in the crew account. Word travels faster than the logging trucks.",
         "effects": {
           "reputation": -10,
-          "budget": 50000
+          "budget": 3000
         },
         "schedulesEvent": "story_arc_ancientGrove_stage1_harvest"
       }
@@ -1172,7 +1170,7 @@
         },
         "hiddenOutcome": true,
         "crewEffect": {
-          "illness": "worsening",
+          "illness": "flu",
           "riskWorsen": 0.35
         }
       },
@@ -1185,7 +1183,7 @@
         },
         "hiddenOutcome": true,
         "crewEffect": {
-          "illness": "medicated",
+          "illness": "exhaustion",
           "riskWorsen": 0.5
         }
       }
@@ -1628,7 +1626,11 @@
           "progress": -3
         },
         "hiddenOutcome": true,
-        "chanceSuccess": 0.4
+        "chanceSuccess": 0.4,
+        "failureOutcome": "Hours of tinkering. The radio stays dead, and its parts are spread across a tarp.",
+        "failureEffects": {
+          "progress": -5
+        }
       },
       {
         "label": "Work without radio — check in when you can",
@@ -2375,5 +2377,57 @@
       }
     ],
     "expeditionOnly": true
+  },
+  {
+    "id": "story_arc_ancientGrove_stage1_protect",
+    "title": "Eco-tourism Opportunity",
+    "type": "narrative",
+    "severity": "moderate",
+    "probability": 0,
+    "description": "A local entrepreneur wants to create an eco-tourism venture around the protected grove",
+    "options": [
+      {
+        "label": "Back the eco-tourism pitch ($1,500)",
+        "outcome": "You front the guiding outfit's first season. By fall, the boardwalk to the grove has a guestbook with three hundred names in it — several of them ministers' staff.",
+        "effects": {
+          "reputation": 10,
+          "budget": -1500
+        }
+      },
+      {
+        "label": "Decline politely",
+        "outcome": "You pass. The grove stays standing and protected on paper; the opportunity drives off in someone else's truck.",
+        "effects": {
+          "reputation": 2
+        }
+      }
+    ]
+  },
+  {
+    "id": "story_arc_ancientGrove_stage1_harvest",
+    "title": "Environmental Protest",
+    "type": "narrative",
+    "severity": "moderate",
+    "probability": 0,
+    "description": "Activists blockade the road to the grove, demanding its preservation",
+    "options": [
+      {
+        "label": "Negotiate and offer partial protection",
+        "outcome": "Two tense days at the blockade end with a map on a tailgate: the oldest stand stays, the rest is released. Nobody is happy, which the mediator calls success.",
+        "effects": {
+          "reputation": 5,
+          "crew_morale": 3
+        }
+      },
+      {
+        "label": "Call law enforcement to clear the blockade",
+        "outcome": "The RCMP clear the road by noon. The footage clears the evening news by six. Legal fees and a hostile district office follow.",
+        "effects": {
+          "reputation": -15,
+          "budget": -2000,
+          "compliance": -8
+        }
+      }
+    ]
   }
 ]

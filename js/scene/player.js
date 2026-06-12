@@ -59,23 +59,38 @@ export function playFrames(terminal, frames, opts = {}) {
     let timer = null;
     let done = false;
 
-    const finish = () => {
+    const finish = (e) => {
       if (done) return;
       done = true;
       clearInterval(timer);
       if (skippable) {
-        document.removeEventListener('pointerdown', finish, true);
-        document.removeEventListener('keydown', finish, true);
+        document.removeEventListener('pointerdown', skipPointer, true);
+        document.removeEventListener('keydown', skipKey, true);
+      }
+      // The skipping gesture must not fall through to UI rendered the moment
+      // this promise settles (e.g. the Continue button after a travel beat).
+      if (e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (e.type === 'pointerdown') {
+          // WebKit synthesizes the tap's click after touchend and hit-tests it
+          // against the new DOM — eat it so it can't press a fresh button.
+          const swallow = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
+          document.addEventListener('click', swallow, { capture: true, once: true });
+          setTimeout(() => document.removeEventListener('click', swallow, true), 500);
+        }
       }
       canvas.textContent = finishFrame;
       canvas.classList.remove('scene-keep');
       if (!holdLastFrame) canvas.remove();
       resolve();
     };
+    const skipPointer = (e) => finish(e);
+    const skipKey = (e) => finish(e);
 
     if (skippable) {
-      document.addEventListener('pointerdown', finish, true);
-      document.addEventListener('keydown', finish, true);
+      document.addEventListener('pointerdown', skipPointer, true);
+      document.addEventListener('keydown', skipKey, true);
     }
 
     canvas.textContent = frames[0];

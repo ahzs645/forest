@@ -54,12 +54,20 @@ export function resolveEvent(journey, event, option) {
   const messages = [];
   const scrutinyBefore = Number(journey.scrutiny || 0);
 
-  if (option.outcome) {
-    messages.push(option.outcome);
+  // Gamble options: roll once, then use the resolved branch throughout
+  let outcome = option.outcome;
+  let effects = option.effects;
+  if (typeof option.chanceSuccess === 'number' && Math.random() >= option.chanceSuccess) {
+    outcome = option.failureOutcome || outcome;
+    effects = option.failureEffects || effects;
   }
 
-  if (option.effects) {
-    applyEventEffects(journey, option.effects, messages);
+  if (outcome) {
+    messages.push(outcome);
+  }
+
+  if (effects) {
+    applyEventEffects(journey, effects, messages);
   }
 
   if (option.crewEffect) {
@@ -77,6 +85,13 @@ export function resolveEvent(journey, event, option) {
     }
   }
 
+  // A risky call can come back as a compliance/permitting problem later
+  const complianceRisk = option.riskCompliance ?? option.riskRejection;
+  if (typeof complianceRisk === 'number' && Math.random() < complianceRisk) {
+    applyEventEffects(journey, { compliance: -5 }, messages);
+    messages.push('That call comes back on you.');
+  }
+
   if (isFieldJourney(journey.journeyType) && typeof option.timeUsed === 'number') {
     const hours = Math.max(0, Math.min(8, option.timeUsed));
     journey.travelDelayHours = Math.min(8, (journey.travelDelayHours || 0) + hours);
@@ -85,10 +100,10 @@ export function resolveEvent(journey, event, option) {
     }
   }
 
-  if (typeof option.effects?.permits_approved === 'number' && journey.permits) {
+  if (typeof effects?.permits_approved === 'number' && journey.permits) {
     journey.permits.approved = Math.min(
       journey.permits.target,
-      journey.permits.approved + option.effects.permits_approved
+      journey.permits.approved + effects.permits_approved
     );
     messages.push(`Permits approved: ${journey.permits.approved}/${journey.permits.target}`);
   }
@@ -137,14 +152,15 @@ function applyEventEffects(journey, effects, messages) {
 
   // Resource effects (field)
   if (isFieldJourney(journey.journeyType)) {
-    if (typeof effects.budget === 'number' && typeof journey.resources?.budget === 'number') {
+    if (typeof effects.budget === 'number' && effects.budget !== 0 && typeof journey.resources?.budget === 'number') {
+      // The field cash ceiling is sized for a crew wallet, not silviculture's
+      // program treasury — clamping the latter to it would wipe the budget.
+      const budgetCap = journey.journeyType === 'silviculture' ? Infinity : FIELD_RESOURCES.budget.max;
       journey.resources.budget = Math.max(0,
-        Math.min(FIELD_RESOURCES.budget.max, journey.resources.budget + effects.budget));
-      if (effects.budget !== 0) {
-        const delta = effects.budget;
-        const label = delta > 0 ? `+$${Math.abs(delta).toLocaleString()}` : `-$${Math.abs(delta).toLocaleString()}`;
-        messages.push(`Cash: ${label}`);
-      }
+        Math.min(budgetCap, journey.resources.budget + effects.budget));
+      const delta = effects.budget;
+      const label = delta > 0 ? `+$${Math.abs(delta).toLocaleString()}` : `-$${Math.abs(delta).toLocaleString()}`;
+      messages.push(`Cash: ${label}`);
     }
     if (typeof effects.fuel === 'number' && typeof journey.resources?.fuel === 'number') {
       journey.resources.fuel = Math.max(0,
@@ -231,15 +247,45 @@ function applyEventEffects(journey, effects, messages) {
   }
 
   if (effects.crew_morale) {
-    for (const member of journey.crew) {
-      if (member.isActive) {
+    const active = (journey.crew || []).filter((m) => m.isActive);
+    if (active.length > 0) {
+      for (const member of active) {
         member.morale = Math.max(0, Math.min(100, member.morale + effects.crew_morale));
       }
+      messages.push(effects.crew_morale > 0 ? 'Crew morale improved.' : 'Crew morale dropped.');
+    } else if (journey.protagonist) {
+      // Protagonist desk modes have no crew: morale maps to stress, the same
+      // equivalence checkDeskEvent uses (avgMorale = 100 - stress).
+      journey.protagonist.stress = Math.max(0, Math.min(100,
+        (journey.protagonist.stress || 0) - effects.crew_morale));
+      messages.push(effects.crew_morale > 0 ? 'Your stress eases.' : 'Your stress climbs.');
     }
-    if (effects.crew_morale > 0) {
-      messages.push('Crew morale improved.');
-    } else if (effects.crew_morale < 0) {
-      messages.push('Crew morale dropped.');
+  }
+
+  // Survey/intel data (recce discoveries; feeds planning data when present)
+  if (typeof effects.data === 'number' && effects.data !== 0) {
+    let banked = false;
+    if (typeof journey.qualitySurveys === 'number') {
+      journey.qualitySurveys += Math.max(1, Math.round(effects.data / 5));
+      banked = true;
+    }
+    if (journey.plan && typeof journey.plan.dataCompleteness === 'number') {
+      journey.plan.dataCompleteness = clampPercent(journey.plan.dataCompleteness + effects.data);
+      banked = true;
+    }
+    if (banked) {
+      messages.push(`Survey data logged (+${effects.data}).`);
+    }
+  }
+
+  // Reputation outside manager mode lands on standing: relationships for desk
+  // journeys, compliance/scrutiny for field crews (the manager branch above
+  // routes it to metrics.reputation directly).
+  if (typeof effects.reputation === 'number' && effects.reputation !== 0 && journey.journeyType !== 'manager') {
+    if (isFieldJourney(journey.journeyType)) {
+      applyComplianceEffects(journey, effects.reputation, messages);
+    } else {
+      applyRelationshipEffects(journey, effects.reputation, messages);
     }
   }
 
@@ -333,6 +379,18 @@ function applyProgressEffects(journey, progressPoints, messages) {
         journey.metrics.progress = clampPercent((journey.metrics.progress || 0) + progressPoints);
         const direction = progressPoints > 0 ? 'advanced' : 'slipped';
         messages.push(`Operational progress ${direction} (${progressPoints > 0 ? '+' : ''}${progressPoints}).`);
+      }
+      return;
+
+    case 'silviculture':
+      // Route program progress into the planting track that
+      // getOperationalProgress actually reads (~8 points per block).
+      if (journey.planting && typeof journey.planting.blocksToPlant === 'number') {
+        const blockDelta = progressPoints / 8;
+        journey.planting.blocksPlanted = Math.max(0,
+          Math.min(journey.planting.blocksToPlant, (journey.planting.blocksPlanted || 0) + blockDelta));
+        const direction = progressPoints > 0 ? 'advanced' : 'slipped';
+        messages.push(`Program progress ${direction} (${progressPoints > 0 ? '+' : ''}${progressPoints}).`);
       }
       return;
 
@@ -473,11 +531,34 @@ function handleCrewEffect(journey, crewEffect, messages) {
     }
   }
 
-  if (crewEffect.illness && crewEffect.count) {
-    const victims = pickMultipleCrewMembers(journey.crew, crewEffect.count);
-    for (const victim of victims) {
-      const result = applyStatusEffect(victim, crewEffect.illness);
-      if (result.message) messages.push(result.message);
+  if (crewEffect.illness) {
+    // riskWorsen gates whether the condition actually sets in
+    const setsIn = typeof crewEffect.riskWorsen === 'number'
+      ? Math.random() < crewEffect.riskWorsen
+      : true;
+    if (setsIn) {
+      const victims = pickMultipleCrewMembers(journey.crew, crewEffect.count || 1);
+      for (const victim of victims) {
+        const result = applyStatusEffect(victim, crewEffect.illness);
+        if (result.message) messages.push(result.message);
+      }
+    }
+  }
+
+  if (crewEffect.lose_member || crewEffect.leave) {
+    const victim = pickRandomCrewMember(journey.crew);
+    if (victim) {
+      victim.isActive = false;
+      victim.hasQuit = true;
+      messages.push(`${victim.name} has left the crew.`);
+    }
+  }
+
+  if (crewEffect.evacuate_sick) {
+    const victim = (journey.crew || []).find(m => m.isActive && m.statusEffects?.length > 0);
+    if (victim) {
+      victim.isActive = false;
+      messages.push(`${victim.name} has been sent to town for medical care.`);
     }
   }
 

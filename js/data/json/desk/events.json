@@ -275,7 +275,8 @@
       }
     ],
     "roles": [
-      "planner"
+      "planner",
+      "permitter"
     ]
   },
   {
@@ -434,7 +435,9 @@
         "effects": {
           "progress": -8
         },
-        "crewLoss": true
+        "crewEffect": {
+          "lose_member": true
+        }
       },
       {
         "label": "Guilt trip about timing",
@@ -442,8 +445,9 @@
         "effects": {
           "crew_morale": -15
         },
-        "crewLoss": true,
-        "delayed": true
+        "crewEffect": {
+          "lose_member": true
+        }
       }
     ]
   },
@@ -598,32 +602,6 @@
         "effects": {
           "relationships": 30,
           "reputation": 30,
-          "budget": 0
-        }
-      }
-    ]
-  },
-  {
-    "id": "story_arc_ancientGrove_stage1_protect",
-    "title": "Eco-tourism Opportunity",
-    "type": "narrative",
-    "severity": "moderate",
-    "probability": 0,
-    "description": "A local entrepreneur wants to create an eco-tourism venture around the protected grove",
-    "options": [
-      {
-        "label": "Invest $40,000",
-        "outcome": "You decided to Invest $40,000.",
-        "effects": {
-          "reputation": 10,
-          "budget": -40000
-        }
-      },
-      {
-        "label": "Decline",
-        "outcome": "You decided to Decline.",
-        "effects": {
-          "reputation": 0,
           "budget": 0
         }
       }
@@ -803,32 +781,6 @@
     ]
   },
   {
-    "id": "story_arc_ancientGrove_stage1_harvest",
-    "title": "Environmental Protest",
-    "type": "narrative",
-    "severity": "moderate",
-    "probability": 0,
-    "description": "Activists blockade the road to the grove, demanding its preservation",
-    "options": [
-      {
-        "label": "Negotiate and offer partial protection",
-        "outcome": "You decided to Negotiate and offer partial protection.",
-        "effects": {
-          "reputation": 5,
-          "budget": 0
-        }
-      },
-      {
-        "label": "Call law enforcement to clear the blockade",
-        "outcome": "You decided to Call law enforcement to clear the blockade.",
-        "effects": {
-          "reputation": -15,
-          "budget": -20000
-        }
-      }
-    ]
-  },
-  {
     "id": "fpbc_competence_audit",
     "title": "FPBC Competence Audit",
     "type": "compliance",
@@ -903,6 +855,7 @@
       }
     ],
     "roles": [
+      "planner",
       "permitter"
     ]
   },
@@ -943,6 +896,7 @@
       }
     ],
     "roles": [
+      "planner",
       "permitter"
     ]
   },

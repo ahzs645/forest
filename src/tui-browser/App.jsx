@@ -20,12 +20,12 @@ function toKeyInput(domEvent) {
   };
 }
 
-function Header({ onExit }) {
+function Header({ onExit, isCrisis }) {
   return (
     <header className="tui-header">
       <div className="tui-header-title">
-        <span className="tui-header-brand">BC Forestry Simulator</span>
-        <span className="tui-header-tag">Incident command TUI</span>
+        <span className="tui-header-brand">{isCrisis ? "BC Forestry Simulator" : "BC Forestry Trail"}</span>
+        <span className="tui-header-tag">{isCrisis ? "Incident command TUI" : "Seasonal Strategy TUI"}</span>
       </div>
       <div className="tui-header-actions">
         <button type="button" className="tui-header-button" onClick={onExit}>
@@ -421,12 +421,12 @@ function AmbientArt({ art }) {
   return <pre className="tui-art">{art.frames[frameIndex]}</pre>;
 }
 
-function OptionsPanel({ options, selected, onSelect }) {
+function OptionsPanel({ options, selected, onSelect, isCrisis }) {
   if (!options.length) return null;
 
   return (
     <section className="tui-panel tui-options">
-      <div className="tui-panel-title">Command Menu (Use Arrow Keys & Enter)</div>
+      <div className="tui-panel-title">{isCrisis ? "Command Menu" : "Options"} (Use Arrow Keys & Enter)</div>
       <div className="tui-options-list">
         {options.map((label, index) => (
           <button
@@ -443,10 +443,10 @@ function OptionsPanel({ options, selected, onSelect }) {
   );
 }
 
-function FieldRadio({ mode, inputText, contentData, art, onInputChange, onSubmitName }) {
+function FieldRadio({ mode, inputText, contentData, art, onInputChange, onSubmitName, isCrisis }) {
   return (
     <section className="tui-panel tui-field-radio">
-      <div className="tui-panel-title">Scenario Console</div>
+      <div className="tui-panel-title">{isCrisis ? "Scenario Console" : "Field Radio"}</div>
       <div className="tui-field-layout">
         <div className="tui-field-main">
           {mode === "setup-name" ? (
@@ -498,14 +498,17 @@ export default function App() {
     };
   }, [controller]);
 
+  const isCrisis = state.gameState?.gameMode === "crisis-command";
+
   return (
     <main className="tui-app-shell">
       <div className="tui-shell">
-        <Header onExit={exitGame} />
+        <Header onExit={exitGame} isCrisis={isCrisis} />
         <div className="tui-main">
           <Dashboard gameState={state.gameState} />
           <div className="tui-stage">
             <FieldRadio
+              isCrisis={isCrisis}
               mode={state.mode}
               inputText={state.inputText}
               contentData={state.contentData}
@@ -523,16 +526,19 @@ export default function App() {
               options={state.options}
               selected={state.selected}
               onSelect={selectOption}
+              isCrisis={isCrisis}
             />
           </div>
         </div>
-        <footer className="tui-terminal-footer">
-          <span className="tone-green">forest-ops@bc-simulator</span>
-          <span>:</span>
-          <span className="tone-blue">~/incident-command</span>
-          <span>$ run crisis_command --scenario pine-beetle --area fraser-plateau</span>
-          <span className="tui-cursor" aria-hidden="true" />
-        </footer>
+        {isCrisis ? (
+          <footer className="tui-terminal-footer">
+            <span className="tone-green">forest-ops@bc-simulator</span>
+            <span>:</span>
+            <span className="tone-blue">~/incident-command</span>
+            <span>$ run crisis_command --scenario pine-beetle --area fraser-plateau</span>
+            <span className="tui-cursor" aria-hidden="true" />
+          </footer>
+        ) : null}
       </div>
     </main>
   );

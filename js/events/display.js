@@ -37,6 +37,9 @@ export function formatEventForDisplay(event, journeyType = 'field') {
  * Generate a hint about an option's effects
  */
 function getOptionHint(option, journeyType) {
+  // Options flagged hiddenOutcome keep their cards close to the chest
+  if (option.hiddenOutcome) return 'Outcome uncertain';
+
   const hints = [];
   const isField = isFieldJourney(journeyType);
 
@@ -79,8 +82,11 @@ function getOptionHint(option, journeyType) {
       hints.push(option.effects.politicalCapital > 0 ? `+${option.effects.politicalCapital} capital` : `${option.effects.politicalCapital} capital`);
     }
 
+    if (option.effects.data !== undefined && option.effects.data !== 0) {
+      hints.push(option.effects.data > 0 ? `+${option.effects.data} data` : `${option.effects.data} data`);
+    }
     if (option.effects.progress !== undefined && option.effects.progress !== 0) {
-      const unit = isField ? ' km traverse' : ' progress';
+      const unit = journeyType === 'field' || journeyType === 'recon' ? ' km traverse' : ' progress';
       hints.push(option.effects.progress > 0
         ? `+${option.effects.progress}${unit}`
         : `${option.effects.progress}${unit}`);
@@ -97,8 +103,13 @@ function getOptionHint(option, journeyType) {
     hints.push(`${riskPct}% injury risk`);
   }
 
+  if (typeof option.chanceSuccess === 'number') {
+    hints.push(`${Math.round(option.chanceSuccess * 100)}% success odds`);
+  }
+
+  // Managers have no hours mechanic — don't advertise a cost that never lands
   const timeUsed = option.timeUsed ?? option.effects?.timeUsed;
-  if (typeof timeUsed === 'number' && timeUsed > 0) {
+  if (typeof timeUsed === 'number' && timeUsed > 0 && journeyType !== 'manager') {
     hints.push(`-${timeUsed}h`);
   }
 

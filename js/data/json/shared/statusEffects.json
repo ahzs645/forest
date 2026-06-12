@@ -117,5 +117,14 @@
     "workCapacity": 0.2,
     "description": "An untreated condition is getting worse.",
     "canTravel": false
+  },
+  "severe_laceration": {
+    "name": "Severe Laceration",
+    "duration": 6,
+    "healthDrain": 1,
+    "moraleEffect": -4,
+    "workCapacity": 0.2,
+    "description": "Deep saw cut; needs hospital care.",
+    "canTravel": true
   }
 }

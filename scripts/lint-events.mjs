@@ -13,9 +13,30 @@
 
 import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
+import STATUS_EFFECTS from '../js/data/json/shared/statusEffects.json' with { type: 'json' };
 
 const VALID_ROLES = new Set(['planner', 'permitter', 'recce', 'silviculture', 'manager']);
 const VALID_JOURNEY_TYPES = new Set(['field', 'recon', 'silviculture', 'desk', 'planning', 'permitting', 'manager']);
+
+// Vocabulary the engine actually consumes (js/events/resolution.js,
+// js/modes/shared/handleEvent.js). Anything outside these sets is a broken
+// promise to the player — the option text implies a mechanic that never runs.
+const VALID_OPTION_KEYS = new Set([
+  'label', 'outcome', 'effects', 'crewEffect', 'riskInjury', 'riskCompliance',
+  'riskRejection', 'timeUsed', 'schedulesEvent', 'scheduledDelay', 'requiresRole',
+  'gameOver', 'gameOverReason', 'hiddenOutcome', 'chanceSuccess', 'failureOutcome',
+  'failureEffects',
+]);
+const VALID_EFFECT_KEYS = new Set([
+  'budget', 'fuel', 'food', 'equipment', 'firstAid', 'politicalCapital',
+  'timeUsed', 'progress', 'crew_health', 'crew_morale', 'compliance',
+  'relationships', 'scrutiny', 'reputation', 'permits_approved', 'data',
+]);
+const VALID_CREW_EFFECT_KEYS = new Set([
+  'injury', 'illness', 'count', 'evacuate', 'evacuate_sick', 'rest',
+  'lose_member', 'leave', 'riskWorsen',
+]);
+const VALID_STATUS_IDS = new Set(Object.keys(STATUS_EFFECTS));
 
 const ALL = [
   ...FIELD_EVENTS.map((e) => ({ pool: 'field', event: e })),
@@ -55,7 +76,30 @@ for (const { pool, event } of ALL) {
     continue;
   }
   for (const [i, option] of event.options.entries()) {
-    if (!option.label) errors.push(`${where}: option ${i + 1} missing label`);
+    const optWhere = `${where} option ${i + 1}`;
+    if (!option.label) errors.push(`${optWhere}: missing label`);
+
+    for (const key of Object.keys(option)) {
+      if (!VALID_OPTION_KEYS.has(key)) errors.push(`${optWhere}: unconsumed option key "${key}"`);
+    }
+    for (const key of Object.keys(option.effects || {})) {
+      if (!VALID_EFFECT_KEYS.has(key)) errors.push(`${optWhere}: unconsumed effects key "${key}"`);
+    }
+    for (const key of Object.keys(option.failureEffects || {})) {
+      if (!VALID_EFFECT_KEYS.has(key)) errors.push(`${optWhere}: unconsumed failureEffects key "${key}"`);
+    }
+    const crewEffect = option.crewEffect || {};
+    for (const key of Object.keys(crewEffect)) {
+      if (!VALID_CREW_EFFECT_KEYS.has(key)) errors.push(`${optWhere}: unconsumed crewEffect key "${key}"`);
+    }
+    for (const idKey of ['injury', 'illness']) {
+      if (crewEffect[idKey] && !VALID_STATUS_IDS.has(crewEffect[idKey])) {
+        errors.push(`${optWhere}: crewEffect.${idKey} "${crewEffect[idKey]}" is not a status effect id`);
+      }
+    }
+    if (typeof option.chanceSuccess === 'number' && !option.failureOutcome) {
+      errors.push(`${optWhere}: chanceSuccess without failureOutcome — half a gamble`);
+    }
   }
 }
 
