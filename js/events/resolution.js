@@ -66,12 +66,14 @@ export function resolveEvent(journey, event, option) {
     handleCrewEffect(journey, option.crewEffect, messages);
   }
 
+  let injuryVictim = null;
   if (option.riskInjury && Math.random() < option.riskInjury) {
     const victim = pickRandomCrewMember(journey.crew);
     if (victim) {
       const severity = option.riskInjury > 0.2 ? 'moderate' : 'minor';
       const result = applyRandomInjury(victim, severity);
       messages.push(`Accident! ${result.message}`);
+      injuryVictim = victim;
     }
   }
 
@@ -119,7 +121,9 @@ export function resolveEvent(journey, event, option) {
     type: 'event',
     eventId: event.id,
     eventTitle: event.title,
-    optionLabel: option.label
+    optionLabel: option.label,
+    severity: event.severity,
+    ...(injuryVictim ? { victimId: injuryVictim.id, victimName: injuryVictim.name } : {})
   });
 
   return { journey, messages };

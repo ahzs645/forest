@@ -672,7 +672,10 @@ export function combineScheduledIssueTeasers(...teasers) {
 }
 
 function getOperationalEventLibrary(state) {
-  return ROLE_EVENT_DOMAINS[state?.role?.id] === "field" ? FIELD_EVENTS : DESK_EVENTS;
+  const library = ROLE_EVENT_DOMAINS[state?.role?.id] === "field" ? FIELD_EVENTS : DESK_EVENTS;
+  // Events authored for the expedition game stay out of the seasonal draws;
+  // remove the flag on an event to promote it into this pool deliberately.
+  return library.filter((event) => !event.expeditionOnly);
 }
 
 function findOperationalEventById(eventId, state) {

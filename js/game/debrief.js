@@ -125,6 +125,32 @@ export function resolveFinalReport(style, journey, rng = Math.random) {
 }
 
 // ---------------------------------------------------------------------------
+// Stage 2.5: Moments that mattered — callbacks to the run's biggest events
+// ---------------------------------------------------------------------------
+
+const SEVERITY_RANK = { severe: 4, major: 3, moderate: 2, minor: 1, positive: 1 };
+
+/**
+ * Pick the 2-3 logged events most worth remembering, biggest first.
+ * @param {Object} journey
+ * @param {number} limit
+ * @returns {Array<{day: number, title: string, choice: string, victimName?: string}>}
+ */
+export function pickKeyMoments(journey, limit = 3) {
+  const entries = (journey.log || []).filter((e) => e.type === 'event' && e.eventTitle);
+  return entries
+    .map((e) => ({
+      day: e.day,
+      title: e.eventTitle,
+      choice: e.optionLabel,
+      victimName: e.victimName,
+      rank: (SEVERITY_RANK[e.severity] || 0) + (e.victimName ? 2 : 0),
+    }))
+    .sort((a, b) => b.rank - a.rank || a.day - b.day)
+    .slice(0, limit);
+}
+
+// ---------------------------------------------------------------------------
 // Stage 3: Where are they now — crew & protagonist epilogues
 // ---------------------------------------------------------------------------
 
@@ -153,6 +179,11 @@ export function buildCrewEpilogue(member, context = {}) {
 
   if (member.isDead) {
     return `${name}: A bench at the staging area carries their name now. The crew stops there every season.`;
+  }
+  // Survivors who took an injury during a logged event remember exactly where
+  if (member.isActive && context.injuredAt?.has(member.id)) {
+    const where = context.injuredAt.get(member.id);
+    return `${name}: Still favours the side they hurt during ${where}. Tells the story like it was a fair trade.`;
   }
   if (member.hasQuit) {
     return member.morale < 30
@@ -370,10 +401,27 @@ export async function runFinalDebrief(ui, journey, victory) {
   ui.write('');
   ui.writeDivider('FINAL STATISTICS');
   writeFinalStatistics(ui, journey);
+
+  const moments = pickKeyMoments(journey);
+  if (moments.length) {
+    ui.write('');
+    ui.writeDivider('MOMENTS THAT MATTERED');
+    const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon' ? 'Shift' : 'Day';
+    for (const m of moments) {
+      const injury = m.victimName ? ` ${m.victimName} carries the scar.` : '';
+      ui.write(`${dayLabel} ${m.day} — ${m.title}. You chose: ${m.choice}.${injury}`);
+    }
+  }
   await next(ui);
 
   // --- Stage 3: Where are they now ---
-  const epilogueContext = { victory, reportStyle };
+  const injuredAt = new Map();
+  for (const entry of journey.log || []) {
+    if (entry.victimId && !injuredAt.has(entry.victimId)) {
+      injuredAt.set(entry.victimId, entry.eventTitle);
+    }
+  }
+  const epilogueContext = { victory, reportStyle, injuredAt };
   const epilogues = [];
   if (journey.crew?.length) {
     for (const member of journey.crew) {
