@@ -7,14 +7,14 @@
 
 import { TerminalUI } from '../ui.js';
 import { FORESTER_ROLES, OPERATING_AREAS } from '../data/index.js';
-import { generateCrew, processDailyUpdate, getCrewDisplayInfo, crewHasRole } from '../crew.js';
+import { generateCrew, processDailyUpdate, getCrewDisplayInfo } from '../crew.js';
 import {
   createJourney,
   formatJourneyLog,
   FIELD_SHIFT_HOURS,
   getSurveyedBlockCount
 } from '../journey.js';
-import { checkScheduledEvents, formatEventForDisplay, resolveEvent } from '../events.js';
+import { checkScheduledEvents } from '../events.js';
 import { getCurrentSeasonInfo } from '../season.js';
 import { calculateScore, formatScoreDisplay } from '../scoring.js';
 
@@ -32,6 +32,7 @@ import { displayMode } from '../displayMode.js';
 // Import extracted display modules
 import { showJourneyIntro } from './intro.js';
 import { runFinalDebrief } from './debrief.js';
+import { handleEvent } from '../modes/shared/handleEvent.js';
 
 /**
  * Apply difficulty multipliers to journey resources
@@ -265,50 +266,7 @@ export class ForestryTrailGame {
   }
 
   async _handleEvent(event) {
-    const formatted = formatEventForDisplay(event, this.journey?.journeyType);
-
-    this.ui.write('');
-    const headerLabel = event.reporter ? 'RADIO CHECK' : 'EVENT';
-    this.ui.writeHeader(`${headerLabel}: ${formatted.title}`);
-    this.ui.write(formatted.description);
-    this.ui.write('');
-
-    const options = formatted.options.map((opt, index) => {
-      const raw = event.options[index] || {};
-      const requirement = raw.requiresRole ? `Requires ${this._formatRoleName(raw.requiresRole)}` : '';
-      const pieces = [];
-      if (opt.hint) pieces.push(opt.hint);
-      if (requirement) pieces.push(requirement);
-      return {
-        label: opt.label,
-        description: pieces.length ? `[${pieces.join(' | ')}]` : '',
-        value: index
-      };
-    });
-
-    let selectedOption = null;
-    while (!selectedOption) {
-      const choice = await this.ui.promptChoice('What do you do?', options);
-      const optionIndex = typeof choice.value === 'number' ? choice.value : 0;
-      const candidate = event.options[optionIndex];
-      if (candidate?.requiresRole && !crewHasRole(this.journey.crew, candidate.requiresRole)) {
-        this.ui.writeWarning(`You need a ${this._formatRoleName(candidate.requiresRole)} to do that.`);
-        continue;
-      }
-      selectedOption = candidate;
-    }
-
-    const result = resolveEvent(this.journey, event, selectedOption);
-
-    this.ui.write('');
-    for (const msg of result.messages) {
-      this.ui.write(msg);
-    }
-
-    if (selectedOption.gameOver) {
-      this.gameOver = true;
-      this.journey.endReason = selectedOption.gameOverReason || 'Event outcome';
-    }
+    await handleEvent(this, event);
   }
 
   _displayCrewStatus() {
@@ -334,12 +292,6 @@ export class ForestryTrailGame {
     if (day > phaseLength * 2) return 'approval';
     if (day > phaseLength) return 'review';
     return 'planning';
-  }
-
-  _formatRoleName(roleId) {
-    if (!roleId) return 'specialist';
-    const formatted = roleId.replace(/[_-]+/g, ' ').trim();
-    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
   }
 
   _miniBar(value, width = 5) {

@@ -4,7 +4,8 @@
  * Multi-action days with seasonal gating and contractor events
  */
 
-import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
+import { checkForEvent } from '../events.js';
+import { handleEvent } from './shared/handleEvent.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
 import { crewHasRole } from '../crew.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
@@ -875,61 +876,9 @@ async function handleContractorEvent(game, cEvent, contractor) {
   }
 }
 
-/**
- * Handle an event
- */
-async function handleEvent(game, event) {
-  const { ui, journey } = game;
-  const formatted = formatEventForDisplay(event, journey.journeyType);
 
-  ui.write('');
-  ui.writeHeader(`EVENT: ${formatted.title}`);
-  ui.write(formatted.description);
-  ui.write('');
 
-  const options = formatted.options.map((opt, index) => {
-    const raw = event.options[index] || {};
-    const requirement = raw.requiresRole ? `Requires ${formatRoleName(raw.requiresRole)}` : '';
-    const pieces = [];
-    if (opt.hint) pieces.push(opt.hint);
-    if (requirement) pieces.push(requirement);
-    return {
-      label: opt.label,
-      description: pieces.length ? `[${pieces.join(' | ')}]` : '',
-      value: index
-    };
-  });
 
-  let selectedOption = null;
-  while (!selectedOption) {
-    const choice = await ui.promptChoice('What do you do?', options);
-    const optionIndex = typeof choice.value === 'number' ? choice.value : 0;
-    const candidate = event.options[optionIndex];
-    if (candidate?.requiresRole && journey.crew && !crewHasRole(journey.crew, candidate.requiresRole)) {
-      ui.writeWarning(`You need a ${formatRoleName(candidate.requiresRole)} to do that.`);
-      continue;
-    }
-    selectedOption = candidate;
-  }
-
-  const result = resolveEvent(journey, event, selectedOption);
-
-  ui.write('');
-  for (const msg of result.messages) {
-    ui.write(msg);
-  }
-
-  if (selectedOption.gameOver) {
-    game.gameOver = true;
-    journey.endReason = selectedOption.gameOverReason || 'Event outcome';
-  }
-}
-
-function formatRoleName(roleId) {
-  if (!roleId) return 'specialist';
-  const formatted = roleId.replace(/[_-]+/g, ' ').trim();
-  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
-}
 
 function safeRatio(current, target) {
   if (!Number.isFinite(target) || target <= 0) {

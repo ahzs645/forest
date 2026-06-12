@@ -4,7 +4,8 @@
  * Multi-action days with values tradeoffs
  */
 
-import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
+import { checkForEvent } from '../events.js';
+import { handleEvent } from './shared/handleEvent.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
 import {
   buildPlanningConstraintTriage,
@@ -1432,41 +1433,7 @@ function checkGameOver(game) {
   }
 }
 
-async function handleEvent(game, event) {
-  const { ui, journey } = game;
-  const formatted = formatEventForDisplay(event, journey.journeyType);
 
-  ui.write('');
-  ui.writeHeader(`EVENT: ${formatted.title}`);
-  ui.write(formatted.description);
-  ui.write('');
-
-  const options = formatted.options.map((opt, index) => {
-    const pieces = [];
-    if (opt.hint) pieces.push(opt.hint);
-    return {
-      label: opt.label,
-      description: pieces.length ? `[${pieces.join(' | ')}]` : '',
-      value: index
-    };
-  });
-
-  const choice = await ui.promptChoice('What do you do?', options);
-  const optionIndex = typeof choice.value === 'number' ? choice.value : 0;
-  const selectedOption = event.options[optionIndex];
-
-  const result = resolveEvent(journey, event, selectedOption);
-
-  ui.write('');
-  for (const msg of result.messages) {
-    ui.write(msg);
-  }
-
-  if (selectedOption.gameOver) {
-    game.gameOver = true;
-    journey.endReason = selectedOption.gameOverReason || 'Event outcome';
-  }
-}
 
 function createBar(value, width) {
   const filled = Math.round((value / 100) * width);

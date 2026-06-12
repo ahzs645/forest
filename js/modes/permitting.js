@@ -4,7 +4,8 @@
  * YOU are the Permitting Specialist - no crew, just pipeline and relationships
  */
 
-import { checkForEvent, resolveEvent, formatEventForDisplay } from '../events.js';
+import { checkForEvent } from '../events.js';
+import { handleEvent } from './shared/handleEvent.js';
 import { calculateDeskConsumption, applyConsumption, applyDeskRegen, getFormattedResourceStatus, DESK_RESOURCES } from '../resources.js';
 import { executeDeskDay, DESK_ACTIONS } from '../journey.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
@@ -1569,47 +1570,7 @@ function getDeskPhase(journey) {
   return 'planning';
 }
 
-/**
- * Handle an event
- * @param {Object} game - Game instance
- * @param {Object} event - Event to handle
- */
-async function handleEvent(game, event) {
-  const { ui, journey } = game;
-  const formatted = formatEventForDisplay(event, journey.journeyType);
 
-  ui.write('');
-  ui.writeHeader(`EVENT: ${formatted.title}`);
-  ui.write(formatted.description);
-  ui.write('');
-
-  // Build options
-  const options = formatted.options.map((opt, index) => {
-    const pieces = [];
-    if (opt.hint) pieces.push(opt.hint);
-    return {
-      label: opt.label,
-      description: pieces.length ? `[${pieces.join(' | ')}]` : '',
-      value: index
-    };
-  });
-
-  const choice = await ui.promptChoice('What do you do?', options);
-  const optionIndex = typeof choice.value === 'number' ? choice.value : 0;
-  const selectedOption = event.options[optionIndex];
-
-  const result = resolveEvent(journey, event, selectedOption);
-
-  ui.write('');
-  for (const msg of result.messages) {
-    ui.write(msg);
-  }
-
-  if (selectedOption.gameOver) {
-    game.gameOver = true;
-    journey.endReason = selectedOption.gameOverReason || 'Event outcome';
-  }
-}
 
 /**
  * Create a visual progress bar
