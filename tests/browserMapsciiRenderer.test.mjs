@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderMapsciiFrame } from '../src/tui-browser/mapscii/index.js';
+import { renderMapsciiFrame } from '../js/scene/mapscii/index.js';
 
 test('browser mapscii renderer turns vector features into a braille frame with labels', () => {
   const frame = renderMapsciiFrame(

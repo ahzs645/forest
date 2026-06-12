@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useGameFlow } from "../../tui/useGameFlow";
-import { renderMapsciiFrame } from "./mapscii";
+import { renderMapsciiFrame } from "../../js/scene/mapscii/index.js";
 function toKeyInput(domEvent) {
   const map = {
     ArrowUp: "up",
