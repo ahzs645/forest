@@ -124,10 +124,6 @@ export function eventMatchesJourneyContext(event, journey, options = {}) {
  * Check for field events
  */
 function checkFieldEvent(journey) {
-  if (journey.journeyType === 'silviculture' && (!Array.isArray(journey.blocks) || journey.blocks.length === 0)) {
-    return null;
-  }
-
   const currentBlock = Array.isArray(journey.blocks)
     ? (journey.blocks[journey.currentBlockIndex] || journey.blocks[0] || null)
     : null;

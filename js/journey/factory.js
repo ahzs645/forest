@@ -94,6 +94,12 @@ export function createSilvicultureJourney(options = {}) {
 
   return {
     journeyType: "silviculture",
+
+    // Area blocks give event selection terrain/feature context, opening the
+    // full field event pool to silviculture runs (the program works these
+    // blocks even though travel is contractor-managed).
+    blocks: getBlocksForArea(effectiveAreaId),
+    currentBlockIndex: 0,
     companyName: companyName || crewName || "Unnamed Crew",
     roleId: effectiveRoleId,
     areaId: effectiveAreaId,

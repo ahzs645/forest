@@ -32,7 +32,9 @@ export function selectRandomDeskEvent(events, modifiers = {}) {
   // In crisis mode, negative events more likely
   const crisisMultiplier = crisisMode ? 1.5 : 1;
 
-  for (const event of events) {
+  // Shuffle before rolling — see selectRandomFieldEvent: file order must not
+  // decide which events dominate.
+  for (const event of shuffle(events)) {
     const typeMultiplier = Number(typeMultipliers?.[event.type]) || 1;
     let adjustedProb = event.probability * stressModifier * typeMultiplier;
     if (event.severity !== 'positive') {
@@ -45,4 +47,13 @@ export function selectRandomDeskEvent(events, modifiers = {}) {
   }
 
   return null;
+}
+
+function shuffle(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }

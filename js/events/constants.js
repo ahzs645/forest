@@ -6,7 +6,7 @@
 // Journey type categories — used to route events and effects correctly
 export const FIELD_JOURNEY_TYPES = new Set(['field', 'recon', 'silviculture']);
 export const DESK_JOURNEY_TYPES = new Set(['desk', 'permitting', 'planning']);
-export const EVENT_REPEAT_COOLDOWN = 2;
+export const EVENT_REPEAT_COOLDOWN = 6;
 
 export function isFieldJourney(journeyType) {
   return FIELD_JOURNEY_TYPES.has(journeyType);

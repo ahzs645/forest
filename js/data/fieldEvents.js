@@ -36,7 +36,9 @@ export function getApplicableFieldEvents(conditions = {}) {
 export function selectRandomFieldEvent(events, modifiers = {}) {
   const { paceModifier = 1, terrainModifier = 1, typeMultipliers = {} } = modifiers;
 
-  for (const event of events) {
+  // Shuffle before rolling: iterating in file order gives the first events in
+  // the JSON an outsized share of triggers across runs.
+  for (const event of shuffle(events)) {
     const typeMultiplier = Number(typeMultipliers?.[event.type]) || 1;
     const adjustedProb = event.probability * paceModifier * terrainModifier * typeMultiplier;
     if (Math.random() < adjustedProb) {
@@ -45,4 +47,13 @@ export function selectRandomFieldEvent(events, modifiers = {}) {
   }
 
   return null;
+}
+
+function shuffle(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
