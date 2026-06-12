@@ -241,7 +241,8 @@ export class TuiGameController {
   }
 
   setState(next) {
-    this.state = { ...this.state, ...next, gameState: snapshotGameState(this.gs) };
+    // emit() refreshes the gameState snapshot — don't compute it twice per update.
+    this.state = { ...this.state, ...next };
     this.emit();
   }
 
