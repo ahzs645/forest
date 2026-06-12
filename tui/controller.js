@@ -18,6 +18,15 @@ import {
   getRoleDisplayName,
   getSeasonalPlayableRoles,
 } from "../js/engine/seasonalContract.js";
+import {
+  CRISIS_COMMAND_LABEL,
+  applyCrisisOption,
+  buildCrisisCard,
+  buildCrisisOutcomeNotice,
+  buildCrisisSummary,
+  createCrisisCommandState,
+  getNextCrisisScenario,
+} from "./crisisMode.js";
 
 const INITIAL_CONTENT = {
   type: "setup",
@@ -121,7 +130,15 @@ function snapshotGameState(gs) {
     seasonContexts: Array.isArray(gs.seasonContexts) ? [...gs.seasonContexts] : gs.seasonContexts,
     discoveryTags: Array.isArray(gs.discoveryTags) ? [...gs.discoveryTags] : gs.discoveryTags,
     timeline: Array.isArray(gs.timeline) ? [...gs.timeline] : gs.timeline,
-    roleDisplayName: getRoleDisplayName(gs.role),
+    gameMode: gs.gameMode,
+    modeLabel: gs.modeLabel,
+    crisis: gs.crisis
+      ? {
+          ...gs.crisis,
+          commandLog: Array.isArray(gs.crisis.commandLog) ? [...gs.crisis.commandLog] : gs.crisis.commandLog,
+        }
+      : null,
+    roleDisplayName: gs.roleDisplayName || getRoleDisplayName(gs.role),
   };
 }
 
@@ -311,6 +328,11 @@ export class TuiGameController {
   processNext(notice = null) {
     const gs = this.gs;
 
+    if (gs?.gameMode === "crisis-command") {
+      this.processCrisisNext(notice);
+      return;
+    }
+
     if (this.queue.length === 0) {
       if (gs && gs.round < gs.totalRounds) {
         this.startRound(notice);
@@ -417,6 +439,58 @@ export class TuiGameController {
     }
   }
 
+  processCrisisNext(notice = null) {
+    const gs = this.gs;
+
+    if (!gs) return;
+
+    if (this.queue.length === 0) {
+      if (gs.round < gs.totalRounds) {
+        gs.round += 1;
+        this.queue.push({
+          type: "crisis-scenario",
+          data: getNextCrisisScenario(gs),
+        });
+      } else {
+        this.setState({ mode: "end" });
+        this.present(
+          buildCrisisSummary(gs),
+          ["Play Again", "Quit"],
+          (idx) => {
+            if (idx === 0) {
+              this.restart();
+            } else {
+              this.onExit();
+            }
+          },
+        );
+        return;
+      }
+    }
+
+    const phase = this.queue.shift();
+    if (phase.type !== "crisis-scenario" || !phase.data) {
+      this.processCrisisNext(notice);
+      return;
+    }
+
+    const scenario = phase.data;
+    const artText = this.ambientArt ? detectArt(`${scenario.title} ${scenario.description}`, gs) : null;
+    const card = buildCrisisCard(gs, scenario, notice);
+
+    this.present(
+      card,
+      scenario.options.map((option) => option.label),
+      (idx) => {
+        const option = scenario.options[idx];
+        const outcomeResult = applyCrisisOption(gs, scenario, option);
+        this.emit();
+        this.processCrisisNext(buildCrisisOutcomeNotice(option, outcomeResult));
+      },
+      artText,
+    );
+  }
+
   handleSetupNameKey(key) {
     if (key.name === "return") {
       const company = this.state.inputText.trim() || "Forest Co-op";
@@ -427,9 +501,23 @@ export class TuiGameController {
           heading: "Select your Specialization",
           subtitle: "Choose the work stream you will be judged on this year.",
         },
-        getSeasonalPlayableRoles(FORESTER_ROLES).map((role) => getRoleDisplayName(role)),
+        [
+          ...getSeasonalPlayableRoles(FORESTER_ROLES).map((role) => getRoleDisplayName(role)),
+          CRISIS_COMMAND_LABEL,
+        ],
         (idx) => {
           const seasonalRoles = getSeasonalPlayableRoles(FORESTER_ROLES);
+          if (idx >= seasonalRoles.length) {
+            this.gs = createCrisisCommandState(company);
+            this.queue = [];
+            this.setState({ mode: "playing" });
+            this.processCrisisNext({
+              heading: "Incident Command Online",
+              body: "BC Forestry Simulator mode loaded. The Williams Lake pine beetle scenario is live.",
+              tone: "warning",
+            });
+            return;
+          }
           const roleId = seasonalRoles[idx].id;
           this.setState({ mode: "setup-area" });
           this.present(

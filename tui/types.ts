@@ -12,7 +12,7 @@ type BaseContent = {
 export type ContentData =
   | (BaseContent & { type: "message"; heading?: string; body: string })
   | {
-      type: "assignment" | "task" | "issue" | "event" | "temptation";
+      type: "assignment" | "task" | "issue" | "event" | "temptation" | "scenario";
       title: string;
       description: string;
       cardLabel?: string;
@@ -28,6 +28,11 @@ export type ContentData =
       surfaceReason?: string;
       surfaceSeverity?: "info" | "warning" | "danger";
       phaseLabel?: string;
+      weather?: string;
+      deadline?: string;
+      map?: string;
+      status?: Record<string, string>;
+      intelLines?: string[];
       optionHeading?: string;
       optionTone?: "info" | "warning" | "danger";
       optionDetails: { label: string; outcome?: string }[];
