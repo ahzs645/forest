@@ -42,6 +42,8 @@
   flex: 1;
   padding: var(--space-md);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-actions {

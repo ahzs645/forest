@@ -53,7 +53,7 @@ export function formatJourneyLog(journey) {
     return [];
   }
 
-  const dayLabel = journey.journeyType === 'field' ? 'Shift' : 'Day';
+  const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon' ? 'Shift' : 'Day';
   const typeIcons = {
     travel: '→',
     event: '!',

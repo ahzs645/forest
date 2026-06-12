@@ -64,3 +64,15 @@
     min-width: 60px;
   }
 }
+
+// Touch devices: hide keyboard-only hints; respect iOS safe areas
+@media (pointer: coarse) {
+  .kbd-hint {
+    display: none;
+  }
+}
+
+.init-status-footer,
+.footer-hotkeys {
+  padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+}

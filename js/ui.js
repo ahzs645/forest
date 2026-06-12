@@ -138,6 +138,8 @@ export class TerminalUI {
 
     // Modern mode footer buttons
     this.footerGlossaryBtn = document.getElementById('footer-glossary-btn');
+    this.logBtn = document.getElementById('log-btn');
+    this.footerLogBtn = document.getElementById('footer-log-btn');
     this.footerIntelBtn = document.getElementById('footer-intel-btn');
     this.footerRestartBtn = document.getElementById('footer-restart-btn');
   }
@@ -241,6 +243,18 @@ export class TerminalUI {
     // Modern footer buttons
     if (this.footerGlossaryBtn) {
       this.footerGlossaryBtn.addEventListener('click', () => this.showGlossary());
+    }
+
+    if (this.logBtn) {
+      this.logBtn.addEventListener('click', () => {
+        if (this._onLogRequest) this._onLogRequest();
+      });
+    }
+
+    if (this.footerLogBtn) {
+      this.footerLogBtn.addEventListener('click', () => {
+        if (this._onLogRequest) this._onLogRequest();
+      });
     }
 
     if (this.footerIntelBtn) {

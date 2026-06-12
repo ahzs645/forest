@@ -340,7 +340,6 @@ export const ModalMixin = {
         input.style.marginBottom = '12px';
 
         const list = document.createElement('div');
-        list.style.maxHeight = '52vh';
         list.style.overflow = 'auto';
 
         const render = (query) => {

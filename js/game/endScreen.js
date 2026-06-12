@@ -91,7 +91,7 @@ export async function showEndScreen(ui, journey, victory) {
   }
 
   ui.write('');
-  ui.write('Press ESC to start a new expedition.');
+  ui.write('Tap NEW EXPEDITION (or press ESC) to start again.');
 }
 
 /**

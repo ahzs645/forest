@@ -630,6 +630,7 @@ body[data-display-mode="modern"] .game-wrapper {
   grid-template-columns: auto 1fr;
   grid-template-rows: auto auto 1fr auto;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 

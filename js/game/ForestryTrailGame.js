@@ -33,6 +33,7 @@ import { displayMode } from '../displayMode.js';
 import { showJourneyIntro } from './intro.js';
 import { runFinalDebrief } from './debrief.js';
 import { handleEvent } from '../modes/shared/handleEvent.js';
+import { saveActiveRun, loadActiveRun, clearActiveRun } from './saveLoad.js';
 
 /**
  * Apply difficulty multipliers to journey resources
@@ -118,6 +119,7 @@ export class ForestryTrailGame {
           primary: true,
           onSelect: () => {
             this.ui.closeModal();
+            clearActiveRun();
             this.gameOver = false;
             this.victory = false;
             this.start();
@@ -136,6 +138,22 @@ export class ForestryTrailGame {
     this.ui.clear();
     this.gameOver = false;
     this.victory = false;
+
+    // A saved run survives refreshes, tab evictions, and crashes
+    const savedRun = loadActiveRun();
+    if (savedRun) {
+      const resume = await this._promptResume(savedRun);
+      if (resume) {
+        this.journey = savedRun;
+        this.ui.writeHeader('EXPEDITION RESUMED');
+        this.ui.write(`${savedRun.companyName || 'Your crew'} — ${savedRun.area?.name || 'the operating area'}, day ${savedRun.day}.`);
+        this.ui.write('The daybook is where you left it. Back to work.', 'term-dim');
+        this.ui.write('');
+        await this._mainLoop();
+        return;
+      }
+      clearActiveRun();
+    }
 
     const init = await new Promise((resolve) => {
       const handleFallback = (e) => {
@@ -210,9 +228,42 @@ export class ForestryTrailGame {
 
     showJourneyIntro(this.ui, this.journey);
 
-    await this.ui.promptChoice('Press any key to begin...', [{ label: 'Begin Journey', value: 'start' }]);
+    await this.ui.promptChoice('Ready to move out?', [{ label: 'Begin Journey', value: 'start' }]);
 
+    saveActiveRun(this.journey);
     await this._mainLoop();
+  }
+
+  /**
+   * Offer to resume a saved expedition. Resolves true to resume.
+   * @private
+   */
+  _promptResume(savedRun) {
+    return new Promise((resolve) => {
+      this.ui.openModal({
+        title: 'Expedition in Progress',
+        dismissible: false,
+        buildContent: (container) => {
+          const msg = document.createElement('p');
+          const roleName = savedRun.role?.name || 'Forester';
+          msg.textContent = `${savedRun.companyName || 'Your crew'} — ${roleName}, `
+            + `${savedRun.area?.name || 'operating area'}, day ${savedRun.day}.`;
+          msg.style.marginTop = '0';
+          container.appendChild(msg);
+        },
+        actions: [
+          {
+            label: 'Resume Expedition',
+            primary: true,
+            onSelect: () => { this.ui.closeModal(); resolve(true); }
+          },
+          {
+            label: 'Start Fresh',
+            onSelect: () => { this.ui.closeModal(); resolve(false); }
+          }
+        ]
+      });
+    });
   }
 
   async _mainLoop() {
@@ -252,13 +303,25 @@ export class ForestryTrailGame {
         }
 
         this._checkEndConditions();
+
+        // Day boundary: persist so refresh/eviction never loses the run
+        if (!this.gameOver && !this.victory) {
+          saveActiveRun(this.journey);
+        }
       } catch (error) {
+        // A crash must not reach the debrief or poison the career record.
+        // The last day-boundary save survives, so a reload offers Resume.
         console.error('Main loop error:', error);
-        this.ui.writeDanger(`Error: ${error.message}. Please refresh to restart.`);
-        break;
+        this.ui.write('');
+        this.ui.writeDanger(`Something broke in the field office: ${error.message}`);
+        this.ui.write('Your expedition is saved up to the start of this day.', 'term-dim');
+        await this.ui.promptChoice('', [{ label: 'Reload & Resume', value: 'reload' }]);
+        window.location.reload();
+        return;
       }
     }
 
+    clearActiveRun();
     await runFinalDebrief(this.ui, this.journey, this.victory);
 
     await this.ui.promptChoice('', [{ label: 'New Expedition', value: 'restart' }]);
@@ -279,7 +342,7 @@ export class ForestryTrailGame {
     const injured = activeCrew.filter(m => m.statusEffects?.length > 0).length;
 
     this.ui.write(`Crew: ${activeCount}/${totalCount} active | Avg Health: ${avgHealth}%${injured > 0 ? ` | ${injured} injured` : ''}`);
-    this.ui.write('(Press [S] for detailed crew status)');
+    this.ui.write('(Crew details: the [S] Status button, or press S)');
     this.ui.write('');
   }
 

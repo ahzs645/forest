@@ -1271,7 +1271,7 @@ function displayCrewStatus(ui, journey) {
   const injured = activeCrew.filter(m => m.statusEffects?.length > 0).length;
 
   ui.write(`Crew: ${activeCount}/${totalCount} active | Avg Health: ${avgHealth}%${injured > 0 ? ` | ${injured} injured` : ''}`);
-  ui.write('(Press [S] for detailed crew status)');
+  ui.write('(Crew details: the [S] Status button, or press S)');
   ui.write('');
 }
 
