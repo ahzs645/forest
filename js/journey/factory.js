@@ -555,10 +555,14 @@ export function createDeskJourney(options = {}) {
 export function createManagerJourney(options = {}) {
   const baseDesk = createDeskResources(options.difficulty);
   const baseField = createFieldResources(options.difficulty);
+  const effectiveRoleId = options.roleId || options.role?.id || "manager";
 
   return {
     ...options,
     journeyType: "manager",
+    companyName: options.companyName || options.crewName || "Corporate Operations",
+    roleId: effectiveRoleId,
+    areaId: options.areaId || options.area?.id,
     scrutiny: 36,
     day: 1,
     metrics: {
@@ -578,7 +582,7 @@ export function createManagerJourney(options = {}) {
       politicalCapital: 100,
     },
     professional: createProfessionalComplianceState(
-      options.roleId || options.role?.id,
+      effectiveRoleId,
       options.area || options.areaId || null,
     ),
     discoveryTags: [],
@@ -588,5 +592,18 @@ export function createManagerJourney(options = {}) {
     targetProfit: 100000,
     deadline: 100,
     history: [],
+
+    // The GM keeps a small executive crew: they gate requiresRole event
+    // options and act as field reporters for operational (field-pool) events.
+    crew: options.crew || generateCrew(5, "field"),
+
+    // State flags
+    isComplete: false,
+    isGameOver: false,
+    gameOverReason: null,
+
+    // History
+    log: [],
+    decisions: [],
   };
 }

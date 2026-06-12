@@ -189,6 +189,33 @@ function applyEventEffects(journey, effects, messages) {
     }
   }
 
+  // Resource effects (manager) — explicit handling because the GM journey is
+  // neither a field nor a desk journey: it carries BOTH resource sets (see
+  // createManagerJourney). Money and political capital behave like desk, but
+  // at corporate scale (the 100k desk budget ceiling would eat a 500k
+  // treasury), while the field-side stocks back the operating divisions.
+  if (journey.journeyType === 'manager') {
+    if (typeof effects.budget === 'number' && typeof journey.resources?.budget === 'number') {
+      journey.resources.budget = Math.max(0, journey.resources.budget + effects.budget);
+      if (effects.budget !== 0) {
+        const label = effects.budget > 0 ? '+' : '-';
+        messages.push(`Budget: ${label}$${Math.abs(effects.budget).toLocaleString()}`);
+      }
+    }
+    if (typeof effects.politicalCapital === 'number' && typeof journey.resources?.politicalCapital === 'number') {
+      journey.resources.politicalCapital = Math.max(0,
+        Math.min(DESK_RESOURCES.politicalCapital.max, journey.resources.politicalCapital + effects.politicalCapital));
+    }
+    for (const stock of ['fuel', 'food', 'equipment', 'firstAid']) {
+      if (typeof effects[stock] !== 'number' || typeof journey.resources?.[stock] !== 'number') continue;
+      journey.resources[stock] = Math.max(0,
+        Math.min(FIELD_RESOURCES[stock].max, journey.resources[stock] + effects[stock]));
+    }
+    if (typeof effects.reputation === 'number' && journey.metrics) {
+      journey.metrics.reputation = clampPercent((journey.metrics.reputation || 0) + effects.reputation);
+    }
+  }
+
   // Progress effects
   if (typeof effects.progress === 'number' && effects.progress !== 0) {
     applyProgressEffects(journey, effects.progress, messages);
@@ -301,6 +328,14 @@ function applyProgressEffects(journey, progressPoints, messages) {
       }
       return;
 
+    case 'manager':
+      if (journey.metrics) {
+        journey.metrics.progress = clampPercent((journey.metrics.progress || 0) + progressPoints);
+        const direction = progressPoints > 0 ? 'advanced' : 'slipped';
+        messages.push(`Operational progress ${direction} (${progressPoints > 0 ? '+' : ''}${progressPoints}).`);
+      }
+      return;
+
     default:
       return;
   }
@@ -339,6 +374,12 @@ function applyPlanningProgress(journey, progressPoints, messages) {
 }
 
 function applyComplianceEffects(journey, delta, messages) {
+  if (journey.journeyType === 'manager' && journey.metrics) {
+    journey.metrics.compliance = clampPercent((journey.metrics.compliance || 0) + delta);
+    messages.push(`Compliance posture ${delta > 0 ? 'improved' : 'slipped'} (${delta > 0 ? '+' : ''}${delta}).`);
+    return;
+  }
+
   if (isDeskJourney(journey.journeyType) && typeof journey.resources?.politicalCapital === 'number') {
     journey.resources.politicalCapital = clampPercent(journey.resources.politicalCapital + delta);
   }
@@ -384,6 +425,10 @@ function applyRelationshipEffects(journey, delta, messages) {
       journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + relationshipShift);
     }
     advancePlanningPhaseIfReady(journey, messages);
+  }
+
+  if (journey.journeyType === 'manager' && journey.metrics) {
+    journey.metrics.relationships = clampPercent((journey.metrics.relationships || 0) + delta);
   }
 
   messages.push(`Relationships ${delta > 0 ? 'improved' : 'frayed'} (${delta > 0 ? '+' : ''}${delta}).`);

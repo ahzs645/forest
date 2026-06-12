@@ -8,6 +8,7 @@ import {
   buildProtagonistEpilogue,
   buildManagerEpilogue,
   updateServiceRecord,
+  pickKeyMoments,
 } from '../js/game/debrief.js';
 import { buildEventReaction } from '../js/events/reactions.js';
 import { calculateScore } from '../js/scoring.js';
@@ -150,6 +151,24 @@ test('event reactions: crew voice by morale, protagonist by stress, gated by cha
   assert.match(quip, /Margaret Chen/);
 
   assert.equal(buildEventReaction(happy, {}, rngFrom([0.9])), null, 'chance gate holds');
+});
+
+test('key moments favour severity and injuries, in day order', () => {
+  const journey = {
+    log: [
+      { type: 'event', day: 2, eventTitle: 'Flat Tire', optionLabel: 'Fix it', severity: 'minor' },
+      { type: 'event', day: 5, eventTitle: 'Major Storm Hits', optionLabel: 'Shelter', severity: 'major' },
+      { type: 'event', day: 7, eventTitle: 'Chainsaw Accident', optionLabel: 'Risk it', severity: 'moderate', victimName: 'Dana', victimId: 'c1' },
+      { type: 'travel', day: 3 },
+      { type: 'event', day: 9, eventTitle: 'Beautiful Sunset', optionLabel: 'Enjoy', severity: 'positive' },
+    ],
+  };
+  const moments = pickKeyMoments(journey, 3);
+  assert.equal(moments.length, 3);
+  assert.equal(moments[0].title, 'Chainsaw Accident', 'injury outranks severity alone');
+  assert.equal(moments[0].victimName, 'Dana');
+  assert.equal(moments[1].title, 'Major Storm Hits');
+  assert.ok(pickKeyMoments({ log: [] }).length === 0);
 });
 
 test('manager journeys now produce a real score', () => {

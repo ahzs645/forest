@@ -1994,5 +1994,202 @@
       }
     ],
     "expeditionOnly": true
+  },
+  {
+    "id": "gm_board_packet_pressure",
+    "title": "Board Chair Wants the Numbers Early",
+    "type": "political",
+    "severity": "moderate",
+    "probability": 0.07,
+    "roles": [
+      "manager"
+    ],
+    "description": "The board chair calls at 7:40 a.m. He is golfing with two institutional investors on Thursday and would like the quarterly numbers 'directionally, nothing fancy' -- which means a full pack, footnoted, by Wednesday.",
+    "options": [
+      {
+        "label": "Build the pack properly",
+        "outcome": "Finance loses two evenings, but every figure survives contact with the investors. The chair takes the credit. That's the job.",
+        "effects": {
+          "politicalCapital": 6,
+          "crew_morale": -3
+        }
+      },
+      {
+        "label": "Send topline numbers with caveats in bold",
+        "outcome": "He reads the toplines and skips the bold. One number gets repeated on the back nine without its footnote. You spend Friday walking it back.",
+        "effects": {
+          "politicalCapital": -4,
+          "scrutiny": 3
+        }
+      },
+      {
+        "label": "Suggest the numbers wait for the audited pack",
+        "outcome": "Prudent, defensible, and exactly the kind of answer that gets you described as 'not commercial' in board washrooms.",
+        "effects": {
+          "compliance": 4,
+          "politicalCapital": -2
+        }
+      }
+    ],
+    "expeditionOnly": true
+  },
+  {
+    "id": "gm_shareholder_inquiry",
+    "title": "Activist Shareholder Letter",
+    "type": "stakeholder",
+    "severity": "moderate",
+    "probability": 0.06,
+    "roles": [
+      "manager"
+    ],
+    "description": "A Vancouver fund holding four percent of the company writes to ask why your cost per cubic metre runs above the coast average, and whether the answer involves 'legacy attitudes.' They have cc'd the board.",
+    "options": [
+      {
+        "label": "Open the books and host a site tour",
+        "outcome": "They arrive in brand-new caulk boots and leave impressed despite themselves. The follow-up letter is almost warm.",
+        "effects": {
+          "budget": -4000,
+          "relationships": 6,
+          "politicalCapital": 4
+        }
+      },
+      {
+        "label": "Have legal draft a courteous nothing",
+        "outcome": "Three pages that commit to no figure and no date. The fund reads it for what it is and starts phoning your directors individually.",
+        "effects": {
+          "politicalCapital": -6,
+          "scrutiny": 4
+        }
+      },
+      {
+        "label": "Rebut with your own benchmarking",
+        "outcome": "Your numbers are decent and your tone is not. The exchange ends in a stalemate the trade press finds delicious.",
+        "effects": {
+          "reputation": -3,
+          "compliance": 2,
+          "scrutiny": 2
+        }
+      }
+    ],
+    "expeditionOnly": true
+  },
+  {
+    "id": "gm_division_rivalry",
+    "title": "Woodlands and Silviculture Stop Talking",
+    "type": "team",
+    "severity": "moderate",
+    "probability": 0.07,
+    "roles": [
+      "manager"
+    ],
+    "description": "Your woodlands manager and silviculture superintendent now communicate exclusively through forwarded emails with the subject line 'per my last.' Planting windows are at stake, and so is the lunchroom seating plan.",
+    "options": [
+      {
+        "label": "Lock them in a room with a map and no chairs",
+        "outcome": "Forty minutes standing over the divisional map produces a schedule both sides claim they suggested. Peace, of a kind.",
+        "effects": {
+          "relationships": 4,
+          "crew_morale": 4,
+          "progress": 3
+        }
+      },
+      {
+        "label": "Side with woodlands -- the wood pays the bills",
+        "outcome": "The schedule favours harvest. Silviculture plants late into the hot window and quietly starts documenting everything.",
+        "effects": {
+          "progress": 5,
+          "crew_morale": -5,
+          "compliance": -3
+        }
+      },
+      {
+        "label": "Let them sort it out like adults",
+        "outcome": "They do not sort it out like adults. A seedling order misses its lift date, and the cold-storage invoice finds your desk anyway.",
+        "effects": {
+          "budget": -6000,
+          "crew_morale": -3
+        }
+      }
+    ],
+    "expeditionOnly": true
+  },
+  {
+    "id": "gm_executive_poaching",
+    "title": "A Competitor Courts Your CEO",
+    "type": "political",
+    "severity": "major",
+    "probability": 0.05,
+    "roles": [
+      "manager"
+    ],
+    "description": "An Alberta outfit with deeper pockets and shallower cutblocks has taken your CEO to dinner twice this month. Your executive assistant noticed the second reservation was for the good steakhouse.",
+    "options": [
+      {
+        "label": "Counter with money and a longer leash",
+        "outcome": "The retention package stings, but the CEO stays -- and now knows exactly what staying is worth.",
+        "effects": {
+          "budget": -20000,
+          "politicalCapital": 3
+        }
+      },
+      {
+        "label": "Appeal to the work, not the wallet",
+        "outcome": "You talk tenure, stewardship, and finishing what was started. It lands -- this time. The steakhouse will still be there next quarter.",
+        "effects": {
+          "relationships": 4,
+          "politicalCapital": 2
+        }
+      },
+      {
+        "label": "Quietly start shortlisting successors",
+        "outcome": "Word gets out that you're shopping, because word always gets out. The CEO's lawyer calls your lawyer. Productive quarter all around.",
+        "effects": {
+          "politicalCapital": -5,
+          "crew_morale": -4,
+          "reputation": -2
+        }
+      }
+    ],
+    "expeditionOnly": true
+  },
+  {
+    "id": "gm_certification_audit_prep",
+    "title": "Certification Surveillance Audit Booked",
+    "type": "compliance",
+    "severity": "moderate",
+    "probability": 0.07,
+    "roles": [
+      "manager"
+    ],
+    "description": "The certification body has booked its annual surveillance audit for the week after next. The lead auditor is the one who once wrote up a licensee for a coffee cup left in a riparian zone.",
+    "options": [
+      {
+        "label": "Run a full internal pre-audit",
+        "outcome": "Two findings surface in-house, which means they get fixed instead of cited. The audit closes with zero non-conformities and one approving remark about your record-keeping.",
+        "effects": {
+          "budget": -8000,
+          "compliance": 8,
+          "reputation": 2
+        }
+      },
+      {
+        "label": "Tidy what the auditor will actually see",
+        "outcome": "The route is spotless; the rest stays as it was. One minor non-conformity surfaces in a place you didn't expect them to look -- because the auditor has read this play before.",
+        "effects": {
+          "budget": -2000,
+          "compliance": -2,
+          "scrutiny": 4
+        }
+      },
+      {
+        "label": "Trust the system you already run",
+        "outcome": "Bold. The audit lands one minor and one observation. Your certification survives, and your operations forester ages a year in a week.",
+        "effects": {
+          "compliance": 2,
+          "crew_morale": -3
+        }
+      }
+    ],
+    "expeditionOnly": true
   }
 ]

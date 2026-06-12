@@ -67,6 +67,18 @@ export function getOperationalProgress(journey) {
     case 'desk':
       return Math.round(safeProgressRatio(journey?.permits?.approved, journey?.permits?.target) * 100);
 
+    case 'manager': {
+      // The GM's term is mostly time served, partly how healthy the company
+      // looks while serving it: 60% term progress, 40% average metric health.
+      const termRatio = safeProgressRatio(journey?.day, journey?.deadline);
+      const metricValues = Object.values(journey?.metrics || {})
+        .filter((value) => Number.isFinite(value));
+      const metricRatio = metricValues.length
+        ? clampRatio(metricValues.reduce((sum, value) => sum + value, 0) / metricValues.length / 100)
+        : 0;
+      return Math.round(clampRatio(termRatio * 0.6 + metricRatio * 0.4) * 100);
+    }
+
     default:
       return 0;
   }

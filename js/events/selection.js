@@ -23,12 +23,53 @@ import { getAreaSituationMultipliers } from '../data/areaSituations.js';
  * @returns {Object|null} Event to resolve or null
  */
 export function checkForEvent(journey) {
+  if (journey.journeyType === 'manager') {
+    return checkManagerEvent(journey);
+  }
+
   const isField = isFieldJourney(journey.journeyType);
   const event = isField ? checkFieldEvent(journey) : checkDeskEvent(journey);
   if (event) {
     return isField ? attachFieldReporter(event, journey) : event;
   }
   return maybeCreateTemptationEvent(journey);
+}
+
+// Manager days split roughly 60/40 between boardroom paper and operational
+// radio traffic from the divisions.
+const MANAGER_DESK_EVENT_RATIO = 0.6;
+
+/**
+ * Check for manager events: roll desk-context vs field-context 60/40, with
+ * both lanes running through the same cooldown/context/modifier pipeline the
+ * dedicated modes use.
+ */
+function checkManagerEvent(journey) {
+  const wantsDesk = Math.random() < MANAGER_DESK_EVENT_RATIO;
+  const event = wantsDesk ? checkDeskEvent(journey) : checkFieldEvent(journey);
+  if (!event) {
+    return maybeCreateTemptationEvent(journey);
+  }
+  return wantsDesk ? event : attachManagerFieldReporter(event, journey);
+}
+
+/**
+ * Manager journeys keep a crew, so field-context events still arrive as radio
+ * calls — but formatEventForDisplay only narrates reporters for field journey
+ * types, so the radio framing is baked into the description here.
+ */
+function attachManagerFieldReporter(event, journey) {
+  const reported = attachFieldReporter(event, journey);
+  const reporter = reported?.reporter;
+  if (!reporter) {
+    return reported;
+  }
+
+  const taskClause = reporter.task ? ` while ${reporter.task}` : '';
+  return {
+    ...reported,
+    description: `${reporter.name} (${reporter.role})${taskClause} radios in: ${event.description}`
+  };
 }
 
 function getDifficultyEventModifier(journey) {
@@ -268,7 +309,9 @@ function maybeCreateTemptationEvent(journey) {
     return null;
   }
 
-  const chance = (isDeskJourney(journey.journeyType) ? 0.03 : 0.04) * getDifficultyEventModifier(journey);
+  // Manager temptations play at boardroom stakes, not bush stakes.
+  const isDesk = isDeskJourney(journey.journeyType) || journey.journeyType === 'manager';
+  const chance = (isDesk ? 0.03 : 0.04) * getDifficultyEventModifier(journey);
   if (Math.random() > chance) return null;
 
   const roleId = journey.roleId || journey.role?.id;
@@ -281,8 +324,6 @@ function maybeCreateTemptationEvent(journey) {
   const pool = candidates.length ? candidates : ILLEGAL_ACTS;
   const act = pool[Math.floor(Math.random() * pool.length)];
   if (!act) return null;
-
-  const isDesk = isDeskJourney(journey.journeyType);
   const baseGain = isDesk ? 3500 : 650;
   const swing = isDesk ? 2500 : 550;
   const gain = Math.max(0, Math.round(baseGain + (Math.random() * 2 - 1) * swing));
