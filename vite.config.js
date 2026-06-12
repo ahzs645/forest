@@ -30,7 +30,6 @@ export default defineConfig(({ command }) => ({
           if (!id.includes('node_modules')) return;
 
           if (id.includes('react')) return 'react-vendor';
-          if (id.includes('@opentui')) return 'opentui-vendor';
           return 'vendor';
         },
       },

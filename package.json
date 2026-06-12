@@ -14,7 +14,6 @@
     "test:all": "npm run test && npm run test:e2e",
     "playtest:matrix": "node scripts/playwright-matrix.mjs",
     "play": "bun run cli-game.tsx",
-    "play:blessed": "node cli-game.js",
     "import:legacy": "node scripts/import-legacy-content.mjs",
     "refresh:planning-blocks": "node scripts/generate-planning-block-options.mjs"
   },
@@ -27,7 +26,6 @@
   "dependencies": {
     "@opentui/core": "^0.1.97",
     "@opentui/react": "^0.1.97",
-    "blessed": "^0.1.81",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   }

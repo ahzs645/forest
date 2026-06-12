@@ -1,75 +1,73 @@
-# BC Forestry Simulator
+# BC Forestry Trail
 
-A rebuilt, choice-driven forestry operations simulator grounded in northern British Columbia BEC zones. Pick the type of forester you want to be, choose a northern operating area, and shepherd an integrated year of work. Every season you complete core duties for your specialization and react to a contextual issue drawn from an event library that considers both your role and the selected landscape.
+Two terminal-styled forestry games set in northern British Columbia, sharing one
+content library (`js/data/`) and a retro green-CRT aesthetic.
 
-## Play in the browser
+## The two games
 
-Open `index.html` in your browser to launch the expedition mode. This is the original crew-based journey simulator with daily mode runners, field risks, and end-of-expedition win/fail states. Tap the on-screen buttons or type numbers/labels to answer prompts — the layout is fully mobile friendly. Use the top-right **Glossary** button to search forestry jargon, and tap any highlighted in-line term to jump straight to its definition. Hit **Restart** (or press `ESC`) to open a confirmation modal before wiping your run and selecting a new crew.
+### 1. Expedition mode (`index.html`) — the flagship
 
-The seasonal strategy TUI also has a dedicated browser entry point at `tui.html`. That React app shares the seasonal metrics engine used by the CLI/TUI controller, not the expedition-mode browser loop. It is fully client-side and can be hosted on GitHub Pages or any other static host without PTYs or a backend terminal server.
+An Oregon Trail-style crew simulator. Pick a forester role, an operating area, and a
+difficulty, then shepherd a multi-day expedition: travel, supplies, crew health and
+morale, field/desk events with consequences, milestones, and an interactive final
+debrief with persistent career records (saved in your browser).
 
-### Forester specializations
+**Five roles, five distinct journeys:**
 
-Each role comes with bespoke tasks that appear every season:
+- **Strategic Planner** — phase-gated landscape planning under a ministerial deadline.
+- **Permitting Specialist** — a permit pipeline sim: drafting → referral → review → approval.
+- **Recon Crew Lead** — block-to-block traverse with pace, rations, camps, and crew welfare.
+- **Silviculture Supervisor** — contractor management across planting, brushing, and surveys.
+- **General Manager** — executive mode: hire a CEO, pursue certifications, balance the books.
 
-- **Strategic Planner** – landscape analysis, values balancing, and integration workshops.
-- **Permitting Specialist** – application packaging, referral follow-up, and regulatory tracking.
-- **Recon Crew Lead** – field access, cultural feature intelligence, and safety rhythms.
-- **Silviculture Supervisor** – planting coordination, regeneration strategy, and monitoring.
+Fully tap-playable on mobile. Everything is buttons; keyboard shortcuts ([S]tatus,
+[G]lossary, [P] Intel, number keys for choices) are accelerators, not requirements.
 
-### Operating areas
+### 2. Seasonal Strategy TUI (`tui.html`)
 
-Six northern BC operating areas capture BEC zones, dominant species, and landscape tags used to drive event selection.
+A four-season, role-based strategy game built on the seasonal metrics engine
+(`js/engine/` + `tui/controller.js`). Each season you complete role duties and react
+to contextual issues; five shared metrics track the year. Fully client-side, hosted on
+GitHub Pages without a backend.
 
-- Fort St. John Plateau — BWBSmw1 peatland plateaus and gas interface roads
-- Muskwa Foothills — BWBSdk2 permafrost slopes and remote camps
-- Bulkley Valley Escarpment — SBSmc2 community interface benches and water intakes
-- Fraser Plateau Uplands — SBSwk1 wildfire-prone spruce and beetle legacies
-- Skeena-Nass Transition — CWHws2 salmon systems with karst plateaus
-- Tahltan Highland — SWBmk glacial headwaters and alpine parklands
+## Frontend status matrix
 
-### Dynamic issue library
-
-Every season the simulator draws a random issue that matches your specialization and the active operating area tags. Responses adjust five shared metrics — operational progress, forest health, relationships, regulatory confidence, and budget flexibility. Your year-end summary reflects the trade-offs you navigated.
-
-Wildcard mischief, risk plays, and seasonal news flashes keep runs varied. Illegal options now swing between hush-hush wins and investigations, while risk gambles read the room—higher compliance or frayed relationships shift the odds and payout magnitude. At the end of each season the Northern Timber Times prints a headline based on your biggest metric swing to celebrate (or roast) your strategy.
-
-## Command line quick run
-
-A lightweight CLI runner is available for automated playthroughs:
-
-```bash
-node cli.mjs --runs 3 --rounds 4 --role planner --area fort-st-john-plateau
-```
-
-Options:
-
-- `--runs` Number of simulations to run (default `1`).
-- `--rounds` Number of seasons to simulate (default `4`).
-- `--role` Optional role ID (defaults to random).
-- `--area` Optional operating area ID (defaults to random).
-- `--log` Output season summaries for each run.
-
-Each run makes heuristic decisions that prioritise balanced performance.
+| Entry point | Tech | Status |
+|---|---|---|
+| `index.html` (expedition) | Vanilla JS + DOM terminal | **Primary** |
+| `tui.html` (seasonal TUI) | React + `tui/controller.js` | **Primary** |
+| `cli-game.tsx` (`npm run play`) | @opentui/react + Bun, seasonal only | Experimental (frozen) |
+| `cli.mjs` | Headless seasonal sim for balance runs | Tooling (uses a legacy engine loop; pending rebuild on `TuiGameController`) |
+| ~~`cli-game.js` (blessed)~~ | — | Removed |
 
 ## Local development
 
-Use Vite for local development:
-
 ```bash
-npm run dev
+npm install
+npm run dev          # then open / for expedition mode, /tui.html for the seasonal TUI
+npm test             # unit tests (node --test)
+npm run test:e2e     # Playwright end-to-end suite
 ```
 
-Then open `/` for expedition mode or `/tui.html` for the seasonal strategy TUI. Production builds still use the `/forest/` base path for GitHub Pages. Game content is organized under `js/data/` with dedicated modules for roles, operating areas, and dynamic issues, making it easy to extend forester duties or add new geography.
+Production builds use the `/forest/` base path for GitHub Pages
+(`VITE_BASE_PATH=/ npm run build` for a root-path build). Every push to `main`
+deploys via `.github/workflows/pages.yml`, which gates on the unit test suite.
 
-### Refresh planning block intelligence data
+## Content layout
 
-Planning mode now includes periodic real-data cutblock/opening choices per operating area. To refresh the local snapshot from BC OpenMaps layers, run:
+Game content lives under `js/data/` (roles, operating areas, events, issues,
+glossary) with JSON payloads in `js/data/json/`. The six northern BC operating areas
+carry real BEC zones, dominant species, and landscape tags that drive event selection.
+
+To refresh the real-data planning block snapshot from BC OpenMaps:
 
 ```bash
 node scripts/generate-planning-block-options.mjs
 ```
 
-## Future directions
+## Roadmap
 
-Curious about where the simulator could head next? Check out [`docs/future_directions.md`](docs/future_directions.md) for a curated list of mechanics, humour, and accessibility enhancements inspired by community feedback.
+See [`docs/future_state_roadmap.md`](docs/future_state_roadmap.md) for the sequenced
+plan toward the full Oregon Trail-style experience (animated travel, illustrated event
+vignettes, Braille area maps), and [`docs/future_directions.md`](docs/future_directions.md)
+for the broader idea backlog.
