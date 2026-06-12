@@ -464,8 +464,13 @@ async function runFieldDay(game) {
       }
       for (const msg of result.messages) ui.write(msg);
       hasTraveled = true;
+      // Let the journey beat land before the next header clears the screen
+      if (journey.hoursRemaining > 0) {
+        await ui.promptChoice('', [{ label: 'Continue', value: 'next' }]);
+      }
     } else if (actionId === 'consult_map') {
       handleConsultMap(ui, journey);
+      await ui.promptChoice('', [{ label: 'Fold the map', value: 'next' }]);
     } else if (actionId === 'ground_truth') {
       journey.hoursRemaining -= 2;
       handleGroundTruthAccess(ui, journey, currentBlock);

@@ -41,12 +41,15 @@ export function buildJourneyMapFeatures(journey) {
 
   const features = [];
 
-  // Operating-area frame
+  // Operating-area frame — a closed line loop (a polygon would scanline-fill
+  // the whole viewport with Braille)
   features.push({
-    type: 'polygon',
+    type: 'line',
+    width: 1,
     points: [
       { x: 4, y: 10 }, { x: 96, y: 10 },
       { x: 96, y: 92 }, { x: 4, y: 92 },
+      { x: 4, y: 10 },
     ],
   });
 
