@@ -104,6 +104,20 @@
   font-size: var(--font-size-sm);
 }
 
+// Animated scene mounts (travel strip, event vignettes, Braille maps)
+.scene-canvas {
+  margin: var(--space-sm) 0;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px dashed var(--border-color);
+  color: var(--fg-main);
+  overflow-x: auto;
+  max-width: 100%;
+
+  @media (prefers-reduced-motion: reduce) {
+    border-style: solid;
+  }
+}
+
 // Progress bar text
 .progress-text {
   font-family: var(--font-mono);

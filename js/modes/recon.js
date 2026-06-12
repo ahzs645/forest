@@ -22,6 +22,7 @@ import {
 } from '../journey/fieldMechanics.js';
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
+import { renderJourneyMap } from '../scene/areaMap.js';
 import { FIELD_RESOURCES } from '../resources.js';
 import {
   addDiscoveryTags,
@@ -397,6 +398,13 @@ async function runFieldDay(game) {
       });
     }
 
+    // Map check costs nothing — orientation should always be free
+    actionOptions.push({
+      label: 'Consult the Area Map',
+      description: 'Plot the traverse, camps, and remaining blocks',
+      value: 'consult_map'
+    });
+
     const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
     if (hasAnyInjured && journey.resources.firstAid > 0 && journey.hoursRemaining >= 1) {
       actionOptions.push({
@@ -439,9 +447,25 @@ async function runFieldDay(game) {
       // Travel action — costs hours based on pace
       const hoursCost = { slow: 4, normal: 5, fast: 6, grueling: 8 };
       journey.hoursRemaining -= hoursCost[actionId];
+      const progressBefore = journey.totalDistance > 0
+        ? journey.distanceTraveled / journey.totalDistance
+        : 0;
       const result = executeFieldDay(journey, actionId);
+      if (typeof ui.playTravelStrip === 'function') {
+        await ui.playTravelStrip({
+          progressBefore,
+          progressAfter: journey.totalDistance > 0
+            ? journey.distanceTraveled / journey.totalDistance
+            : progressBefore,
+          weatherId: journey.weather?.id,
+          terrain: currentBlock?.terrain,
+          pace: actionId,
+        });
+      }
       for (const msg of result.messages) ui.write(msg);
       hasTraveled = true;
+    } else if (actionId === 'consult_map') {
+      handleConsultMap(ui, journey);
     } else if (actionId === 'ground_truth') {
       journey.hoursRemaining -= 2;
       handleGroundTruthAccess(ui, journey, currentBlock);
@@ -1254,3 +1278,20 @@ function displayCrewStatus(ui, journey) {
 
 
 
+
+/**
+ * Render the Braille area map of the traverse
+ * @param {Object} ui - TerminalUI instance
+ * @param {Object} journey - Journey state
+ */
+function handleConsultMap(ui, journey) {
+  const frame = renderJourneyMap(journey);
+  if (!frame) {
+    ui.write('The map tube is empty. Someone left the area map at the office.');
+    return;
+  }
+  ui.write('');
+  ui.writeHeader('AREA MAP');
+  ui.writeBox(frame);
+  ui.write('You trace the route with a finger and feel better about where you stand.', 'term-dim');
+}
