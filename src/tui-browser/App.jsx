@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { useGameFlow } from "../../tui/useGameFlow";
 import { renderMapsciiFrame } from "../../js/scene/mapscii/index.js";
+
+// Findings are authored as sentence fragments ("peatland edges, ..."), which
+// read fine mid-sentence but look wrong when they lead a line. Capitalize the
+// first letter for standalone display without touching the source data.
+function leadCapitalize(text) {
+  const str = String(text ?? "");
+  return str.replace(/^(\s*)(\p{L})/u, (_, space, letter) => space + letter.toUpperCase());
+}
+
 function toKeyInput(domEvent) {
   const map = {
     ArrowUp: "up",
@@ -37,7 +46,40 @@ function Header({ onExit, isCrisis }) {
   );
 }
 
+function AreaBriefing({ briefing, areaName }) {
+  const finds = briefing?.likelyFinds || [];
+  const signals = briefing?.seasonalSignals || [];
+  return (
+    <div className="tui-dashboard-body tui-area-briefing">
+      {areaName ? <div className="tui-heading">{areaName}</div> : null}
+      {briefing?.zoneSummary ? <p className="tui-copy dim preserve">{briefing.zoneSummary}</p> : null}
+      {finds.length ? (
+        <>
+          <div className="tui-subheading">What you'll likely hit</div>
+          <ul className="tui-area-list">
+            {finds.map((find, idx) => (
+              <li className="tui-copy preserve" key={`find-${idx}`}>{find}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {signals.length ? (
+        <>
+          <div className="tui-subheading">Seasonal signals</div>
+          <ul className="tui-area-list">
+            {signals.map((signal, idx) => (
+              <li className="tui-copy dim preserve" key={`signal-${idx}`}>{signal}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function Dashboard({ gameState }) {
+  const [tab, setTab] = useState("status");
+
   const rows = !gameState
     ? [{ label: "Status", value: "Awaiting game start..." }]
     : [
@@ -54,19 +96,48 @@ function Dashboard({ gameState }) {
         { label: "Area", value: gameState.area?.name, plain: true },
       ].filter((row) => row.value !== undefined && row.value !== null);
 
+  const briefing = gameState?.areaBriefing;
+  const hasBriefing = Boolean(
+    briefing && (briefing.zoneSummary || briefing.likelyFinds?.length || briefing.seasonalSignals?.length)
+  );
+  // Fall back to Status whenever there's no area context to show (e.g. setup,
+  // or a reset that clears the briefing while the tab was left on "area").
+  const activeTab = tab === "area" && hasBriefing ? "area" : "status";
+
   return (
     <aside className="tui-panel tui-dashboard">
-      <div className="tui-panel-title">Dashboard</div>
-      <div className="tui-dashboard-body">
-        {rows.map((row) => (
-          <div className="tui-dashboard-row" key={row.label}>
-            <span className="tui-dashboard-label">{row.label}</span>
-            <span className={`tui-dashboard-value ${row.tone ? `tone-${row.tone}` : ""}`}>
-              {row.plain ? row.value : typeof row.value === "number" ? row.value : row.value}
-            </span>
-          </div>
-        ))}
+      <div className="tui-panel-title tui-dashboard-tabs">
+        <button
+          type="button"
+          className={`tui-dashboard-tab ${activeTab === "status" ? "active" : ""}`}
+          onClick={() => setTab("status")}
+        >
+          Dashboard
+        </button>
+        {hasBriefing ? (
+          <button
+            type="button"
+            className={`tui-dashboard-tab ${activeTab === "area" ? "active" : ""}`}
+            onClick={() => setTab("area")}
+          >
+            Area
+          </button>
+        ) : null}
       </div>
+      {activeTab === "area" ? (
+        <AreaBriefing briefing={briefing} areaName={gameState?.area?.name} />
+      ) : (
+        <div className="tui-dashboard-body">
+          {rows.map((row) => (
+            <div className="tui-dashboard-row" key={row.label}>
+              <span className="tui-dashboard-label">{row.label}</span>
+              <span className={`tui-dashboard-value ${row.tone ? `tone-${row.tone}` : ""}`}>
+                {row.plain ? row.value : typeof row.value === "number" ? row.value : row.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </aside>
   );
 }
@@ -216,12 +287,6 @@ function ScenarioAsciiMap({ map, features }) {
 
 function ContentView({ data }) {
   if (!data) return null;
-  const optionToneClass =
-    data.optionTone === "danger"
-      ? "red"
-      : data.optionTone === "warning"
-        ? "yellow"
-        : "blue";
 
   if (data.type === "message") {
     return (
@@ -314,8 +379,9 @@ function ContentView({ data }) {
     return (
       <div className="tui-content-stack">
         <NoticeBlock notice={data.notice} />
-        {data.sourceLabel ? <div className="tui-source-label">{data.sourceLabel}</div> : null}
-        {data.cardLabel ? <div className="tui-source-label">{data.cardLabel}</div> : null}
+        {data.sourceLabel || data.cardLabel ? (
+          <div className="tui-source-label">{data.sourceLabel || data.cardLabel}</div>
+        ) : null}
         {data.phaseLabel ? <div className="tui-source-label tone-yellow">{data.phaseLabel}</div> : null}
         <div className="tui-heading">{data.title}</div>
         {data.type === "scenario" ? (
@@ -336,7 +402,7 @@ function ContentView({ data }) {
             </div>
           </div>
         ) : null}
-        <p className="tui-copy preserve">{data.description}</p>
+        <p className="tui-copy preserve">{leadCapitalize(data.description)}</p>
         <CardContext data={data} />
         {data.type === "scenario" && data.intelLines?.length ? (
           <>
@@ -348,17 +414,6 @@ function ContentView({ data }) {
             </div>
           </>
         ) : null}
-        <div className={`tui-subheading ${data.optionTone ? `tone-${optionToneClass}` : ""}`}>
-          {data.optionHeading || "Choose your response"}
-        </div>
-        <div className="tui-detail-list">
-          {data.optionDetails.map((option, idx) => (
-            <div className="tui-detail-item" key={`${option.label}-${idx}`}>
-              <div className={`tui-detail-label ${data.optionTone ? `tone-${optionToneClass}` : ""}`}>{`${idx + 1}. ${option.label}`}</div>
-              {option.outcome ? <div className="tui-detail-copy">{option.outcome}</div> : null}
-            </div>
-          ))}
-        </div>
       </div>
     );
   }
@@ -446,23 +501,44 @@ function CardContext({ data }) {
   );
 }
 
-function OptionsPanel({ options, selected, onSelect, isCrisis }) {
+function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelect, isCrisis, situation }) {
   if (!options.length) return null;
+
+  const toneClass =
+    tone === "danger" ? "red" : tone === "warning" ? "yellow" : tone ? "blue" : "";
+  const title = heading || (isCrisis ? "Command Menu" : "Options");
 
   return (
     <section className="tui-panel tui-options">
-      <div className="tui-panel-title">{isCrisis ? "Command Menu" : "Options"} (Use Arrow Keys & Enter)</div>
+      <div className="tui-panel-title">
+        <span className={`tui-options-prompt ${toneClass ? `tone-${toneClass}` : ""}`}>{title}</span>
+        <span className="tui-options-hint">↑↓ · Enter</span>
+      </div>
+      {situation ? (
+        <p className="tui-options-situation preserve">
+          <span className="tui-options-situation-label">Situation</span>
+          {leadCapitalize(situation)}
+        </p>
+      ) : null}
       <div className="tui-options-list">
-        {options.map((label, index) => (
-          <button
-            key={`${label}-${index}`}
-            type="button"
-            className={`tui-option ${index === selected ? "selected" : ""}`}
-            onClick={() => onSelect(index)}
-          >
-            {` ${index + 1}. ${label} `}
-          </button>
-        ))}
+        {options.map((label, index) => {
+          const outcome = optionDetails?.[index]?.outcome;
+          const sub = outcome && outcome !== label ? outcome : null;
+          return (
+            <button
+              key={`${label}-${index}`}
+              type="button"
+              className={`tui-option ${index === selected ? "selected" : ""}`}
+              onClick={() => onSelect(index)}
+            >
+              <span className="tui-option-number">{index + 1}</span>
+              <span className="tui-option-body">
+                <span className="tui-option-label">{label}</span>
+                {sub ? <span className="tui-option-outcome">{sub}</span> : null}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
@@ -565,9 +641,13 @@ export default function App() {
             ) : null}
             <OptionsPanel
               options={state.options}
+              optionDetails={state.contentData?.optionDetails}
+              heading={state.contentData?.decisionPrompt || state.contentData?.optionHeading}
+              tone={state.contentData?.optionTone}
               selected={state.selected}
               onSelect={selectOption}
               isCrisis={isCrisis}
+              situation={state.contentData?.description}
             />
           </div>
         </div>

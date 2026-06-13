@@ -245,10 +245,10 @@ function inferDecisionPrompt(type, riskClass, context) {
   if (type === "temptation") {
     return "Decide whether to refuse, report, or take a shortcut that could damage the file if it comes back on you.";
   }
-  if (riskClass === "calculated") {
-    return `Choose the response that protects ${String(context?.objective || "the job").toLowerCase()} without creating a larger follow-up problem.`;
-  }
-  return `Choose the response that best protects ${String(context?.objective || "the current work").toLowerCase()}.`;
+  // There is no per-card authored question, and the role/season objective is
+  // generic, so asking a grounded question that points at the briefing above
+  // reads better than splicing in a goal that doesn't match this situation.
+  return "How do you want to respond?";
 }
 
 function rewriteAmbiguousTerminology(text) {

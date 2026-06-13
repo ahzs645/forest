@@ -42,7 +42,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 0.95rem;
+  padding: 0.5rem 0.95rem;
   background: linear-gradient(90deg, rgba(45, 80, 22, 0.95), rgba(13, 17, 23, 0.96));
   border-bottom: 1px solid rgba(86, 212, 221, 0.28);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.65), 0 0 36px rgba(63, 185, 80, 0.08) inset;
@@ -155,6 +155,50 @@ body {
   min-width: 0;
   text-align: right;
   overflow-wrap: anywhere;
+}
+
+.tui-dashboard-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0;
+  align-items: stretch;
+}
+
+.tui-dashboard-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #7d8590;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.45rem 0.6rem;
+}
+
+.tui-dashboard-tab:hover {
+  color: #e6edf3;
+}
+
+.tui-dashboard-tab.active {
+  color: #e6edf3;
+  border-bottom-color: #3fb950;
+}
+
+.tui-area-briefing .tui-heading {
+  font-size: 0.95rem;
+}
+
+.tui-area-list {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.tui-area-list li {
+  list-style: square;
 }
 
 .tone-yellow {
@@ -505,22 +549,105 @@ body {
   border-color: #58a6ff;
 }
 
+.tui-options .tui-panel-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tui-options-prompt {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.tui-options-hint {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-weight: 400;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: #7d8590;
+}
+
 .tui-options-list {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
   padding: 0.6rem 0.75rem 0.75rem;
 }
 
 .tui-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
   border: 1px solid transparent;
   background: transparent;
-  color: #7d8590;
+  color: #c9d1d9;
   width: 100%;
   text-align: left;
   font: inherit;
-  padding: 0.5rem 0.55rem;
+  padding: 0.55rem 0.6rem;
   cursor: pointer;
+}
+
+.tui-option-number {
+  flex: 0 0 auto;
+  min-width: 1.5rem;
+  padding: 0 0.25rem;
+  text-align: center;
+  border: 1px solid rgba(88, 166, 255, 0.55);
+  color: #58a6ff;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.tui-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.tui-option-label {
+  color: inherit;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.tui-option-outcome {
+  color: #8b949e;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.tui-option.selected .tui-option-outcome {
+  color: #c9d1d9;
+}
+
+.tui-options-situation {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(88, 166, 255, 0.25);
+  color: #8b949e;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.tui-options-situation-label {
+  color: #56d4dd;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  margin-right: 0.5rem;
 }
 
 .tui-option:hover {
@@ -531,6 +658,11 @@ body {
   background: #3d5a1f;
   color: #e6edf3;
   border-color: #56d4dd;
+}
+
+.tui-option.selected .tui-option-number {
+  border-color: #56d4dd;
+  color: #e6edf3;
 }
 
 .tui-overlay {
@@ -641,17 +773,18 @@ body {
   }
 
   .tui-header {
-    flex-wrap: wrap;
     align-items: center;
-    padding: 0.75rem;
+    padding: 0.4rem 0.75rem;
   }
 
   .tui-header-actions {
-    width: 100%;
-    margin-left: 0;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    margin-left: auto;
+    gap: 0.5rem;
+  }
+
+  /* Keyboard hint is meaningless on touch — reclaim the row it forced. */
+  .tui-header-help {
+    display: none;
   }
 
   .tui-dashboard {
