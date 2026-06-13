@@ -336,24 +336,8 @@ function ContentView({ data }) {
             </div>
           </div>
         ) : null}
-        {data.context?.operation ? (
-          <>
-            <div className="tui-subheading">What job am I doing?</div>
-            <p className="tui-copy preserve">{data.context.operation}</p>
-            {data.context?.objective ? <p className="tui-copy dim preserve">{`Objective: ${data.context.objective}`}</p> : null}
-          </>
-        ) : null}
-        <div className="tui-subheading">What changed?</div>
         <p className="tui-copy preserve">{data.description}</p>
-        {data.flavor ? <p className="tui-copy dim preserve">{data.flavor}</p> : null}
-        {data.context?.stakes || data.whyNow || data.surfaceReason ? (
-          <>
-            <div className="tui-subheading">Why does it matter now?</div>
-            {data.context?.stakes ? <p className="tui-copy preserve">{data.context.stakes}</p> : null}
-            {data.whyNow ? <p className="tui-copy dim preserve">{data.whyNow}</p> : null}
-            {data.surfaceReason ? <p className="tui-copy dim preserve">{data.surfaceReason}</p> : null}
-          </>
-        ) : null}
+        <CardContext data={data} />
         {data.type === "scenario" && data.intelLines?.length ? (
           <>
             <div className="tui-subheading">Intel Feed</div>
@@ -364,8 +348,6 @@ function ContentView({ data }) {
             </div>
           </>
         ) : null}
-        <div className="tui-subheading">What am I deciding?</div>
-        <p className="tui-copy preserve">{data.decisionPrompt || "Choose the response that best protects the current work."}</p>
         <div className={`tui-subheading ${data.optionTone ? `tone-${optionToneClass}` : ""}`}>
           {data.optionHeading || "Choose your response"}
         </div>
@@ -419,6 +401,49 @@ function AmbientArt({ art }) {
   if (!art?.frames?.length) return null;
 
   return <pre className="tui-art">{art.frames[frameIndex]}</pre>;
+}
+
+function CardContext({ data }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [data]);
+
+  const hasContext = Boolean(
+    data.context?.operation || data.context?.objective || data.context?.stakes
+    || data.whyNow || data.surfaceReason || data.flavor
+  );
+  if (!hasContext) return null;
+
+  if (!open) {
+    return (
+      <button type="button" className="tui-context-toggle" onClick={() => setOpen(true)}>
+        ▸ More context
+      </button>
+    );
+  }
+
+  return (
+    <div className="tui-context-detail">
+      {data.context?.operation ? (
+        <>
+          <div className="tui-subheading">The job</div>
+          <p className="tui-copy preserve">{data.context.operation}</p>
+          {data.context?.objective ? <p className="tui-copy dim preserve">{`Objective: ${data.context.objective}`}</p> : null}
+        </>
+      ) : null}
+      {data.flavor ? <p className="tui-copy dim preserve">{data.flavor}</p> : null}
+      {data.context?.stakes || data.whyNow || data.surfaceReason ? (
+        <>
+          <div className="tui-subheading">Why it matters</div>
+          {data.context?.stakes ? <p className="tui-copy preserve">{data.context.stakes}</p> : null}
+          {data.whyNow ? <p className="tui-copy dim preserve">{data.whyNow}</p> : null}
+          {data.surfaceReason ? <p className="tui-copy dim preserve">{data.surfaceReason}</p> : null}
+        </>
+      ) : null}
+      <button type="button" className="tui-context-toggle" onClick={() => setOpen(false)}>
+        ▾ Hide context
+      </button>
+    </div>
+  );
 }
 
 function OptionsPanel({ options, selected, onSelect, isCrisis }) {
