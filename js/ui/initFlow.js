@@ -98,6 +98,10 @@ export const InitFlowMixin = {
       window.location.assign('./tui.html');
     });
 
+    this.crisisModeBtn?.addEventListener('click', () => {
+      window.location.assign('./tui.html?mode=crisis-command');
+    });
+
     // Load Game button (placeholder for now)
     this.loadGameBtn?.addEventListener('click', () => {
       this.showModal({
@@ -133,6 +137,9 @@ export const InitFlowMixin = {
       } else if (e.key === 't' || e.key === 'T') {
         e.preventDefault();
         this.tuiModeBtn?.click();
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        this.crisisModeBtn?.click();
       } else if (e.key === 'l' || e.key === 'L') {
         e.preventDefault();
         this.loadGameBtn?.click();

@@ -11,12 +11,17 @@ import { ASCII_ART } from '../ascii_art.js';
 import { getCrewDisplayInfo } from '../crew.js';
 import { calculateScore, formatScoreDisplay, getLetterGrade } from '../scoring.js';
 import {
+  foldRunIntoRecord,
+  loadServiceRecord,
+  saveServiceRecord,
+  ROLE_LABELS,
+  CAREER_LABELS,
+} from '../career.js';
+import {
   buildVictoryNarrative,
   buildDefeatNarrative,
   writeFinalStatistics,
 } from './endScreen.js';
-
-const SERVICE_RECORD_KEY = 'bcft.serviceRecord.v1';
 
 // ---------------------------------------------------------------------------
 // Stage 1: The final report — one last decision that colours the epilogue
@@ -276,80 +281,34 @@ export function buildManagerEpilogue(journey, victory) {
  */
 export function updateServiceRecord(record, journey, scoreResult, victory) {
   const type = journey.journeyType || 'field';
-  const next = {
-    runs: (record?.runs || 0) + 1,
-    byRole: { ...(record?.byRole || {}) },
-    career: { ...(record?.career || {}) },
-  };
 
-  const prevRole = next.byRole[type] || { runs: 0, victories: 0, bestScore: -1, bestGrade: null };
-  const isBest = scoreResult.totalScore > prevRole.bestScore;
-  next.byRole[type] = {
-    runs: prevRole.runs + 1,
-    victories: prevRole.victories + (victory ? 1 : 0),
-    bestScore: isBest ? scoreResult.totalScore : prevRole.bestScore,
-    bestGrade: isBest ? scoreResult.grade : prevRole.bestGrade,
-  };
-
-  const c = next.career;
+  const careerDeltas = {};
   switch (type) {
     case 'recon':
     case 'field':
-      c.kmSurveyed = Math.round((c.kmSurveyed || 0) + (journey.distanceTraveled || 0));
+      careerDeltas.kmSurveyed = Math.round(journey.distanceTraveled || 0);
       break;
     case 'silviculture':
-      c.seedlingsPlanted = (c.seedlingsPlanted || 0) + (journey.planting?.seedlingsPlanted || 0);
+      careerDeltas.seedlingsPlanted = journey.planting?.seedlingsPlanted || 0;
       break;
     case 'planning':
-      c.plansApproved = (c.plansApproved || 0) + (victory ? 1 : 0);
+      careerDeltas.plansApproved = victory ? 1 : 0;
       break;
     case 'permitting':
     case 'desk':
-      c.permitsApproved = (c.permitsApproved || 0) + (journey.permits?.approved || 0);
+      careerDeltas.permitsApproved = journey.permits?.approved || 0;
       break;
     case 'manager':
-      c.daysInTheChair = (c.daysInTheChair || 0) + Math.max(0, (journey.day || 1) - 1);
+      careerDeltas.daysInTheChair = Math.max(0, (journey.day || 1) - 1);
       break;
   }
 
-  return { ...next, isBest };
+  return foldRunIntoRecord(record, type, {
+    score: scoreResult.totalScore,
+    grade: scoreResult.grade,
+    victory: Boolean(victory),
+  }, careerDeltas);
 }
-
-function loadServiceRecord() {
-  try {
-    const raw = window.localStorage?.getItem(SERVICE_RECORD_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveServiceRecord(record) {
-  try {
-    const { isBest, ...persisted } = record;
-    window.localStorage?.setItem(SERVICE_RECORD_KEY, JSON.stringify(persisted));
-  } catch {
-    // Storage unavailable (private mode, etc.) — the run still ends gracefully.
-  }
-}
-
-const ROLE_LABELS = {
-  recon: 'Recon Crew Lead',
-  field: 'Field Crew',
-  silviculture: 'Silviculture Supervisor',
-  planning: 'Strategic Planner',
-  permitting: 'Permitting Specialist',
-  desk: 'Desk Team',
-  manager: 'General Manager',
-};
-
-const CAREER_LABELS = {
-  kmSurveyed: 'Kilometres surveyed',
-  seedlingsPlanted: 'Seedlings planted',
-  plansApproved: 'Plans approved',
-  permitsApproved: 'Permits approved',
-  daysInTheChair: 'Days in the chair',
-};
 
 // ---------------------------------------------------------------------------
 // The staged sequence

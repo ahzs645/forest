@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useGameFlow } from "../../tui/useGameFlow";
 import { renderMapsciiFrame } from "../../js/scene/mapscii/index.js";
@@ -499,6 +499,22 @@ export default function App() {
   }, [controller]);
 
   const isCrisis = state.gameState?.gameMode === "crisis-command";
+
+  // Hub deep-link: tui.html?mode=crisis-command jumps straight into the
+  // incident with the default company name.
+  const crisisRequested = useRef(
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("mode") === "crisis-command"
+  );
+  useEffect(() => {
+    if (!crisisRequested.current) return;
+    if (state.mode === "setup-name") {
+      controller.handleKey({ name: "return" });
+    } else if (state.mode === "setup-role" && state.options.length) {
+      crisisRequested.current = false;
+      selectOption(state.options.length - 1);
+    }
+  }, [state.mode, state.options.length, controller, selectOption]);
 
   return (
     <main className="tui-app-shell">

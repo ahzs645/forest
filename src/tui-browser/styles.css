@@ -552,6 +552,8 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.09);
   white-space: nowrap;
   overflow: hidden;
+  /* Pure decoration — must never swallow taps meant for content near it */
+  pointer-events: none;
 }
 
 .tui-cursor {
