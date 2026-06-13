@@ -245,10 +245,18 @@ function inferDecisionPrompt(type, riskClass, context) {
   if (type === "temptation") {
     return "Decide whether to refuse, report, or take a shortcut that could damage the file if it comes back on you.";
   }
-  if (riskClass === "calculated") {
-    return `Choose the response that protects ${String(context?.objective || "the job").toLowerCase()} without creating a larger follow-up problem.`;
+  // Objectives are written as imperative sentences ("Build a work program..."),
+  // so introduce them with a colon rather than splicing them mid-sentence — and
+  // strip any trailing period so we don't double-punctuate.
+  const objective = String(context?.objective || "").trim().replace(/\s*[.]+\s*$/, "");
+  if (objective) {
+    return riskClass === "calculated"
+      ? `Choose the response that protects this objective without a larger follow-up problem: ${objective}.`
+      : `Choose the response that best protects this objective: ${objective}.`;
   }
-  return `Choose the response that best protects ${String(context?.objective || "the current work").toLowerCase()}.`;
+  return riskClass === "calculated"
+    ? "Choose the response that protects the work without creating a larger follow-up problem."
+    : "Choose the response that best protects the current work.";
 }
 
 function rewriteAmbiguousTerminology(text) {

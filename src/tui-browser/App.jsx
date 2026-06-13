@@ -440,7 +440,7 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
   return (
     <section className="tui-panel tui-options">
       <div className="tui-panel-title">
-        <span className={toneClass ? `tone-${toneClass}` : ""}>{title}</span>
+        <span className={`tui-options-prompt ${toneClass ? `tone-${toneClass}` : ""}`}>{title}</span>
         <span className="tui-options-hint">↑↓ · Enter</span>
       </div>
       <div className="tui-options-list">
@@ -561,7 +561,7 @@ export default function App() {
             <OptionsPanel
               options={state.options}
               optionDetails={state.contentData?.optionDetails}
-              heading={state.contentData?.optionHeading}
+              heading={state.contentData?.decisionPrompt || state.contentData?.optionHeading}
               tone={state.contentData?.optionTone}
               selected={state.selected}
               onSelect={selectOption}
