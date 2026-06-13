@@ -492,7 +492,7 @@ function CardContext({ data }) {
   );
 }
 
-function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelect, isCrisis }) {
+function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelect, isCrisis, situation }) {
   if (!options.length) return null;
 
   const toneClass =
@@ -505,9 +505,16 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
         <span className={`tui-options-prompt ${toneClass ? `tone-${toneClass}` : ""}`}>{title}</span>
         <span className="tui-options-hint">↑↓ · Enter</span>
       </div>
+      {situation ? (
+        <p className="tui-options-situation preserve">
+          <span className="tui-options-situation-label">Situation</span>
+          {situation}
+        </p>
+      ) : null}
       <div className="tui-options-list">
         {options.map((label, index) => {
-          const text = optionDetails?.[index]?.outcome || label;
+          const outcome = optionDetails?.[index]?.outcome;
+          const sub = outcome && outcome !== label ? outcome : null;
           return (
             <button
               key={`${label}-${index}`}
@@ -516,7 +523,10 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
               onClick={() => onSelect(index)}
             >
               <span className="tui-option-number">{index + 1}</span>
-              <span className="tui-option-label">{text}</span>
+              <span className="tui-option-body">
+                <span className="tui-option-label">{label}</span>
+                {sub ? <span className="tui-option-outcome">{sub}</span> : null}
+              </span>
             </button>
           );
         })}
@@ -628,6 +638,7 @@ export default function App() {
               selected={state.selected}
               onSelect={selectOption}
               isCrisis={isCrisis}
+              situation={state.contentData?.description}
             />
           </div>
         </div>

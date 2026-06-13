@@ -606,10 +606,48 @@ body {
   line-height: 1.5;
 }
 
+.tui-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
 .tui-option-label {
   color: inherit;
+  font-weight: 600;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.tui-option-outcome {
+  color: #8b949e;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.tui-option.selected .tui-option-outcome {
+  color: #c9d1d9;
+}
+
+.tui-options-situation {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(88, 166, 255, 0.25);
+  color: #8b949e;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.tui-options-situation-label {
+  color: #56d4dd;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  margin-right: 0.5rem;
 }
 
 .tui-option:hover {
