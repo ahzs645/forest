@@ -308,8 +308,9 @@ function ContentView({ data }) {
     return (
       <div className="tui-content-stack">
         <NoticeBlock notice={data.notice} />
-        {data.sourceLabel ? <div className="tui-source-label">{data.sourceLabel}</div> : null}
-        {data.cardLabel ? <div className="tui-source-label">{data.cardLabel}</div> : null}
+        {data.sourceLabel || data.cardLabel ? (
+          <div className="tui-source-label">{data.sourceLabel || data.cardLabel}</div>
+        ) : null}
         {data.phaseLabel ? <div className="tui-source-label tone-yellow">{data.phaseLabel}</div> : null}
         <div className="tui-heading">{data.title}</div>
         {data.type === "scenario" ? (
