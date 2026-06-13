@@ -1225,14 +1225,10 @@ async function processAction(game, actionValue, seasonInfo = null) {
     }
 
     case 'values': {
-      // Values workshop with tradeoffs (Phase 4.1)
-      const choices = [
-        { label: 'Emphasize Biodiversity', description: '+8 bio, -3 timber', value: 'bio' },
-        { label: 'Emphasize Timber Supply', description: '+8 timber, -3 bio', value: 'timber_v' },
-        { label: 'Emphasize Community', description: '+8 community, -3 FN values', value: 'community' },
-        { label: 'Emphasize First Nations', description: '+8 FN values, -3 community', value: 'fn' },
-        { label: 'Balanced Approach (5h total)', description: '+3 all values', value: 'balanced' }
-      ];
+      // Values workshop with tradeoffs (Phase 4.1). Balanced Approach costs 5h
+      // total, so it is only offered when the player can actually afford it —
+      // otherwise the nested choice would spend more time than they have.
+      const choices = buildValuesWorkshopChoices(journey.hoursRemaining);
       const pick = await ui.promptChoice('Choose values focus:', choices);
 
       switch (pick.value) {
@@ -1323,6 +1319,35 @@ async function processAction(game, actionValue, seasonInfo = null) {
     default:
       break;
   }
+
+  // Safety net: no single action may push the shift into negative hours.
+  // Action costs are gated when options are built, but this guarantees the
+  // time economy stays trustworthy even if a new action slips through.
+  if (journey.hoursRemaining < 0) {
+    journey.hoursRemaining = 0;
+  }
+}
+
+/**
+ * Build the Values Workshop sub-menu. The four single-emphasis options cost
+ * the workshop's base 3h; Balanced Approach costs 5h total and is only listed
+ * when the player has at least 5h left.
+ * @param {number} hoursRemaining
+ * @returns {Array<{label: string, description: string, value: string}>}
+ */
+export function buildValuesWorkshopChoices(hoursRemaining = 0) {
+  const choices = [
+    { label: 'Emphasize Biodiversity', description: '+8 bio, -3 timber', value: 'bio' },
+    { label: 'Emphasize Timber Supply', description: '+8 timber, -3 bio', value: 'timber_v' },
+    { label: 'Emphasize Community', description: '+8 community, -3 FN values', value: 'community' },
+    { label: 'Emphasize First Nations', description: '+8 FN values, -3 community', value: 'fn' }
+  ];
+
+  if (hoursRemaining >= 5) {
+    choices.push({ label: 'Balanced Approach (5h total)', description: '+3 all values', value: 'balanced' });
+  }
+
+  return choices;
 }
 
 function applyProtagonistCost(journey, costs) {

@@ -144,12 +144,7 @@ export class ForestryTrailGame {
     if (savedRun) {
       const resume = await this._promptResume(savedRun);
       if (resume) {
-        this.journey = savedRun;
-        this.ui.writeHeader('EXPEDITION RESUMED');
-        this.ui.write(`${savedRun.companyName || 'Your crew'} — ${savedRun.area?.name || 'the operating area'}, day ${savedRun.day}.`);
-        this.ui.write('The daybook is where you left it. Back to work.', 'term-dim');
-        this.ui.write('');
-        await this._mainLoop();
+        await this._resumeSavedRun(savedRun);
         return;
       }
       clearActiveRun();
@@ -168,6 +163,12 @@ export class ForestryTrailGame {
         areas: OPERATING_AREAS
       }).then(resolve);
     });
+
+    // Load Data on the landing screen resumes the auto-saved run directly.
+    if (init?.action === 'load' && init.journey) {
+      await this._resumeSavedRun(init.journey);
+      return;
+    }
 
     const crewName = init?.crewName || 'The Timber Wolves';
     const role = init?.role || FORESTER_ROLES[0];
@@ -232,6 +233,21 @@ export class ForestryTrailGame {
     await this.ui.promptChoice('Ready to move out?', [{ label: 'Begin Journey', value: 'start' }]);
 
     saveActiveRun(this.journey);
+    await this._mainLoop();
+  }
+
+  /**
+   * Restore a saved expedition and hand control back to the main loop.
+   * @private
+   */
+  async _resumeSavedRun(savedRun) {
+    this.journey = savedRun;
+    this.gameOver = false;
+    this.victory = false;
+    this.ui.writeHeader('EXPEDITION RESUMED');
+    this.ui.write(`${savedRun.companyName || 'Your crew'} — ${savedRun.area?.name || 'the operating area'}, day ${savedRun.day}.`);
+    this.ui.write('The daybook is where you left it. Back to work.', 'term-dim');
+    this.ui.write('');
     await this._mainLoop();
   }
 
@@ -315,8 +331,23 @@ export class ForestryTrailGame {
         console.error('Main loop error:', error);
         this.ui.write('');
         this.ui.writeDanger(`Something broke in the field office: ${error.message}`);
+
+        // Debug context — enough to triage from the screen, not just the console.
+        this.ui.write(`Mode: ${this.journey?.journeyType || 'unknown'} | Day: ${this.journey?.day ?? '?'}`, 'term-dim');
+        const isDevBuild = typeof import.meta !== 'undefined' && import.meta.env?.DEV;
+        if (isDevBuild && error.stack) {
+          this.ui.write(error.stack, 'term-dim');
+        }
         this.ui.write('Your expedition is saved up to the start of this day.', 'term-dim');
-        await this.ui.promptChoice('', [{ label: 'Reload & Resume', value: 'reload' }]);
+
+        // Offer recovery and a clean break, so a bug on resume is not a trap.
+        const recovery = await this.ui.promptChoice('', [
+          { label: 'Reload & Resume', value: 'reload' },
+          { label: 'Start Fresh', value: 'fresh' }
+        ]);
+        if (recovery.value === 'fresh') {
+          clearActiveRun();
+        }
         window.location.reload();
         return;
       }

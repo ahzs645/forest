@@ -6,6 +6,7 @@
 import { getRoleAreaBriefing } from "../data/roleAreaIntel.js";
 import { getPlanningAreaSnapshot } from "../data/planningBlocks.js";
 import { getRoleProfessionalContext } from "../data/professionalPractice.js";
+import { loadActiveRun } from "../game/saveLoad.js";
 
 // Role icons mapping (Unicode symbols matching reference)
 export const ROLE_ICONS = {
@@ -88,9 +89,10 @@ export const InitFlowMixin = {
     // New Game button
     this.newGameBtn?.addEventListener('click', () => {
       this._hideLandingScreen();
-      if (this._resolveNewGame) {
-        this._resolveNewGame();
-        this._resolveNewGame = null;
+      if (this._resolveLanding) {
+        const resolve = this._resolveLanding;
+        this._resolveLanding = null;
+        resolve({ action: 'new' });
       }
     });
 
@@ -102,11 +104,26 @@ export const InitFlowMixin = {
       window.location.assign('./tui.html?mode=crisis-command');
     });
 
-    // Load Game button (placeholder for now)
+    // Load Data button — resumes the auto-saved expedition if one exists.
+    // Runs persist at every in-game day boundary, so this is the same run the
+    // resume prompt offers after a refresh; there is no separate save slot.
     this.loadGameBtn?.addEventListener('click', () => {
+      const savedRun = loadActiveRun();
+      if (savedRun) {
+        this._hideLandingScreen();
+        if (this._resolveLanding) {
+          const resolve = this._resolveLanding;
+          this._resolveLanding = null;
+          resolve({ action: 'load', journey: savedRun });
+        }
+        return;
+      }
+
       this.showModal({
         title: 'LOAD DATA',
-        content: 'Save/Load functionality coming soon.',
+        content: 'No saved expedition found. Runs save automatically at the end of '
+          + 'each in-game day — reload the page anytime to pick one back up, and '
+          + 'you will be asked before anything is overwritten.',
         actions: [{ label: 'OK', primary: true }]
       });
     });
@@ -682,12 +699,17 @@ export const InitFlowMixin = {
    * @returns {Promise<Object>} Init result
    */
   async runInitializationFlow({ roles = [], areas = [], defaultCrewName = 'The Timber Wolves' } = {}) {
-    // Show landing screen first and wait for New Game click
+    // Show landing screen first and wait for the player to pick New Game or
+    // Load Data. Load Data short-circuits the role/area flow and resumes a run.
     if (this.landingScreen) {
       this._showLandingScreen();
-      await new Promise((resolve) => {
-        this._resolveNewGame = resolve;
+      const landingChoice = await new Promise((resolve) => {
+        this._resolveLanding = resolve;
       });
+      if (landingChoice?.action === 'load' && landingChoice.journey) {
+        this._hideLandingScreen();
+        return { action: 'load', journey: landingChoice.journey };
+      }
     }
 
     if (!this.initOverlay) {

@@ -263,6 +263,7 @@ async function runFieldDay(game) {
   }
 
   let hasTraveled = false;
+  let dayAdvanced = false;
 
   // Check for random event at start of day
   const event = checkForEvent(journey);
@@ -440,8 +441,10 @@ async function runFieldDay(game) {
 
     // Process the chosen action
     if (actionId === 'end_shift') {
-      // End the shift early with rest benefits
+      // End the shift early with rest benefits. This advances the day, so the
+      // end-of-day camp_work pass below must not fire a second time.
       const result = executeFieldDay(journey, 'resting');
+      dayAdvanced = true;
       for (const msg of result.messages) ui.write(msg);
       journey.hoursRemaining = 0;
       break;
@@ -510,8 +513,9 @@ async function runFieldDay(game) {
     // If there are still hours, prompt between actions
   }
 
-  // End of day — if we haven't traveled, still advance the day
-  if (!hasTraveled) {
+  // End of day — if the day was not already advanced by travel or an ended
+  // shift, run a camp_work pass so the calendar moves exactly once.
+  if (!hasTraveled && !dayAdvanced) {
     const result = executeFieldDay(journey, 'camp_work');
     for (const msg of result.messages) ui.write(msg);
   }
@@ -549,6 +553,21 @@ function displayDayHeader(ui, journey) {
 
   const r = journey.resources;
   ui.write(`FUEL: ${Math.round(r.fuel)} | FOOD: ${Math.round(r.food)} | EQUIP: ${Math.round(r.equipment)}% | MEDS: ${r.firstAid} | CASH: $${Math.round(r.budget).toLocaleString()}`);
+
+  // Objective tracker: packages verified, and the checklist for THIS block, so
+  // the win condition (verify every package) is never a surprise.
+  const totalBlocks = journey.blocks?.length || 0;
+  ui.write(`Objective: verify ${journey.blocksAssessed || 0}/${totalBlocks} block packages`);
+  if (currentBlock) {
+    const intel = getReconBlockIntel(journey, currentBlock);
+    const sweep = getReconValueSweepProfile(currentBlock, journey);
+    const check = (done) => (done ? '[x]' : '[ ]');
+    const sweepLabel = sweep.needed
+      ? `${check(intel.valuesSwept)} values sweep`
+      : '[x] values sweep (not flagged)';
+    const finalized = intel.accessGroundTruthed && (!sweep.needed || intel.valuesSwept);
+    ui.write(`${currentBlock.name} package: ${check(intel.accessGroundTruthed)} access  ${sweepLabel}  ${check(finalized)} finalized`);
+  }
   displayCrewStatus(ui, journey);
 
   // Alerts only — the full picture lives in Review the Briefing

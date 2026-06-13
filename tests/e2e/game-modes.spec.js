@@ -4,7 +4,8 @@ const ROLE_RUNS = [
   { name: 'planner', roleIndex: 0, areaIndex: 0, seed: 1001 },
   { name: 'permitter', roleIndex: 1, areaIndex: 1, seed: 1002 },
   { name: 'recce', roleIndex: 2, areaIndex: 2, seed: 1003 },
-  { name: 'silviculture', roleIndex: 3, areaIndex: 3, seed: 1004 }
+  { name: 'silviculture', roleIndex: 3, areaIndex: 3, seed: 1004 },
+  { name: 'manager', roleIndex: 4, areaIndex: 0, seed: 1005 }
 ];
 
 const DIFFICULTIES = [
@@ -64,7 +65,7 @@ for (const run of TEST_RUNS) {
   });
 }
 
-async function autoPlayToEnd(page, strategyName, maxSteps = 360) {
+async function autoPlayToEnd(page, strategyName, maxSteps = 900) {
   for (let step = 0; step < maxSteps; step++) {
     const terminalText = await page.locator('#terminal').innerText();
     if (isEndScreen(terminalText)) {
@@ -150,6 +151,17 @@ function pickChoice(labels, terminalText, strategyName) {
       'Grant rest day',
       'Pay retention',
       'End Day'
+    ],
+    // Manager runs a 100-day term: favour budget-disciplined, no-cost choices so
+    // the treasury survives to the deadline and the term reaches a clean end.
+    manager: [
+      'Skip certification',
+      'Hold the line',
+      'Demand a corrective plan',
+      'Stay at your desk',
+      'Rehearse the numbers',
+      'Full transparency',
+      'Adjourn the meeting'
     ]
   };
 
@@ -318,7 +330,7 @@ function isEndScreen(text) {
 }
 
 function extractElapsedDays(text) {
-  const match = text.match(/(?:Days Elapsed|Days Used|Shifts Elapsed):\s*(\d+)/);
+  const match = text.match(/(?:Days Elapsed|Days Used|Shifts Elapsed|Term Served):\s*(\d+)/);
   return match ? Number(match[1]) : 0;
 }
 
@@ -368,6 +380,17 @@ function assertModeSpecificExpectations(modeName, terminalText) {
       } else {
         expect(terminalText).toMatch(/fell short of its targets|Budget exhausted|No contractor capacity/i);
         expect(planted.current).toBeLessThanOrEqual(planted.total);
+      }
+      break;
+    }
+    case 'manager': {
+      const term = extractPair(terminalText, 'Term Served');
+      expect(term.current).toBeGreaterThan(0);
+      expect(term.current).toBeLessThanOrEqual(term.total);
+      if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
+        expect(terminalText).toMatch(/board's confidence intact/);
+      } else {
+        expect(terminalText).toMatch(/board is already interviewing replacements|Budget exhausted|poor performance|board trust/i);
       }
       break;
     }

@@ -46,8 +46,9 @@ export function showJourneyIntro(ui, journey) {
 
   switch (journeyType) {
     case 'recon':
-      ui.write(`Mission: Survey ${journey.totalDistance} km of traverse across ${journey.blocks.length} forest blocks.`);
-      ui.write(`Each shift is about ${FIELD_SHIFT_HOURS} hours. Complete the survey before the season ends.`);
+      ui.write(`Mission: Verify a recon package for every one of the ${journey.blocks.length} forest blocks — reaching the end of the traverse is not the win.`);
+      ui.write('Each block needs its access ground-truthed and, where values are flagged, a values sweep. Then the package finalizes.');
+      ui.write(`Field Notebook can close missed packages from notes, but it raises scrutiny. Each shift is about ${FIELD_SHIFT_HOURS} hours.`);
       ui.write('Manage fuel, food, and equipment while documenting hazards, cultural sites, and road/crossing condition.');
       ui.write('');
       ui.write('Starting supplies:');

@@ -34,12 +34,26 @@ export async function handleEvent(game, event) {
 
   const hasCrew = Array.isArray(journey.crew) && journey.crew.length > 0;
 
-  const options = formatted.options.map((opt, index) => {
-    const raw = event.options[index] || {};
-    const requirement = hasCrew && raw.requiresRole ? `Requires ${formatRoleName(raw.requiresRole)}` : '';
+  // A role-gated option the crew cannot fulfill is a dead end, not a choice —
+  // presenting it only to reject the selection traps the player on the prompt.
+  // Hide those so every offered option is actually actionable.
+  const isUnavailable = (raw) =>
+    hasCrew && raw?.requiresRole && !crewHasRole(journey.crew, raw.requiresRole);
+
+  const entries = formatted.options.map((opt, index) => ({
+    opt,
+    raw: event.options[index] || {},
+    index
+  }));
+  const actionable = entries.filter(({ raw }) => !isUnavailable(raw));
+  // Defensive: no event ships with every option gated, but never leave the
+  // player with zero choices if one somehow did.
+  const usable = actionable.length ? actionable : entries;
+
+  const options = usable.map(({ opt, raw, index }) => {
     const pieces = [];
     if (opt.hint) pieces.push(opt.hint);
-    if (requirement) pieces.push(requirement);
+    if (isUnavailable(raw)) pieces.push(`Requires ${formatRoleName(raw.requiresRole)}`);
     return {
       label: opt.label,
       description: pieces.length ? `[${pieces.join(' | ')}]` : '',
@@ -47,17 +61,9 @@ export async function handleEvent(game, event) {
     };
   });
 
-  let selectedOption = null;
-  while (!selectedOption) {
-    const choice = await ui.promptChoice('What do you do?', options);
-    const optionIndex = typeof choice.value === 'number' ? choice.value : 0;
-    const candidate = event.options[optionIndex];
-    if (hasCrew && candidate?.requiresRole && !crewHasRole(journey.crew, candidate.requiresRole)) {
-      ui.writeWarning(`You need a ${formatRoleName(candidate.requiresRole)} to do that.`);
-      continue;
-    }
-    selectedOption = candidate;
-  }
+  const choice = await ui.promptChoice('What do you do?', options);
+  const optionIndex = typeof choice.value === 'number' ? choice.value : usable[0].index;
+  const selectedOption = event.options[optionIndex] || event.options[usable[0].index];
 
   const result = resolveEvent(journey, event, selectedOption);
 
