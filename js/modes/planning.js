@@ -584,7 +584,6 @@ export async function runPlanningDay(game) {
  * Display compact planning header (Phase 6.2)
  */
 function displayPlanningHeader(ui, journey, seasonInfo) {
-  const professional = ensurePlanningProfessionalState(journey);
   const guidance = buildPlanningActionGuidance(journey, seasonInfo);
   ui.clear();
   const deadlineLabel = Number.isFinite(journey.deadline)
@@ -595,40 +594,49 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
   if (seasonInfo) {
     ui.write(`${seasonInfo.icon} ${seasonInfo.name} - Year ${seasonInfo.year} | Hours: ${journey.hoursRemaining}h`);
   }
-  ui.write('');
 
-  // Protagonist status
   if (journey.protagonist) {
     const energyBar = createBar(journey.protagonist.energy, 10);
     const stressLevel = journey.protagonist.stress > 70 ? 'HIGH' : journey.protagonist.stress > 40 ? 'MODERATE' : 'LOW';
     ui.write(`Energy: [${energyBar}] ${journey.protagonist.energy}% | Stress: ${stressLevel} (${journey.protagonist.stress}%) | Rep: ${journey.protagonist.reputation}`);
   }
 
-  // Phase and plan metrics
-  ui.write(`Phase: ${getPlanningPhaseLabel(journey.plan.phase)}`);
-  if (Number.isFinite(journey.deadline)) {
-    ui.write(`Days Remaining: ${Math.max(0, journey.deadline - journey.day)}`);
-  }
+  ui.write(`Phase: ${getPlanningPhaseLabel(journey.plan.phase)}${Number.isFinite(journey.deadline) ? ` | Days left: ${Math.max(0, journey.deadline - journey.day)}` : ''}`);
   ui.write(`Data: ${journey.plan.dataCompleteness}% | Analysis: ${journey.plan.analysisQuality}% | Buy-in: ${journey.plan.stakeholderBuyIn}% | Confidence: ${journey.plan.ministerialConfidence}%`);
+  ui.write(`Next Best Move: ${guidance.headline}`);
+  ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Political Capital: ${journey.resources.politicalCapital} | Data: ${journey.resources.dataCredits}`);
+
+  // Alerts only — the full file lives behind Review the File
   if (journey.plan.phase === 'ministerial_approval') {
     const gap = Math.max(0, 80 - journey.plan.ministerialConfidence);
     if (gap > 0) {
-      ui.write(`Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Use Ministerial Outreach to recover ground before submission.`);
+      ui.writeWarning(`Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Use Ministerial Outreach before submission.`);
     } else {
-      ui.write('Approval threshold reached. A full submission can carry the plan across the line.');
+      ui.writePositive('Approval threshold reached. A full submission can carry the plan across the line.');
     }
   }
+  const fomAlert = syncFomStateFromActiveBlock(journey, seasonInfo);
+  if (fomAlert?.roadBlocker) {
+    ui.writeWarning(`Road-engineering blocker: ${fomAlert.roadBlockerReasons.join(' | ')}`);
+  }
+  ui.write('');
+}
+
+/**
+ * The full file, on demand: guidance detail, values, situation, FOM, blocks
+ */
+function displayPlanningBriefing(ui, journey, seasonInfo) {
+  const professional = ensurePlanningProfessionalState(journey);
+  const guidance = buildPlanningActionGuidance(journey, seasonInfo);
+
+  ui.write('');
+  ui.writeHeader('PLANNING FILE REVIEW');
+
   ui.write(`Lane Focus: ${guidance.lane}`);
-  ui.write(`Next Best Move: ${guidance.headline}`);
   if (guidance.steps.length > 0) {
     ui.write(`Follow-up: ${guidance.steps.join(' -> ')}`);
   }
-
-  // Values balance (Phase 4.1 - these now matter)
   ui.write(`Values: Bio ${journey.values.biodiversity}% | Timber ${journey.values.timberSupply}% | Community ${journey.values.communityNeeds}% | FN ${journey.values.firstNationsValues}%`);
-
-  // Resources
-  ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Political Capital: ${journey.resources.politicalCapital} | Data: ${journey.resources.dataCredits}`);
   if (Number.isFinite(journey.scrutiny)) {
     const scrutiny = Math.round(journey.scrutiny);
     const scrutinyLevel = scrutiny > 70 ? 'HIGH' : scrutiny > 40 ? 'MODERATE' : 'LOW';
@@ -652,9 +660,6 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
     if (fom.roadSummary) {
       ui.write(`Road Intel: ${fom.roadSummary}`);
       ui.write(`Road Engineering Readiness: ${Math.round(fom.roadEngineeringReadiness)}% | ${fom.roadNote}`);
-      if (fom.roadBlocker) {
-        ui.writeWarning(`Road-engineering blocker: ${fom.roadBlockerReasons.join(' | ')}`);
-      }
     }
   }
   if (professional?.chains?.fom) {
@@ -662,14 +667,12 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
     const currentStage = chain.steps[Math.min(chain.stepIndex, chain.steps.length - 1)] || 'submission';
     ui.write(`FOM paperwork chain: ${currentStage}${chain.complete ? ' (complete)' : ''}`);
   }
-
   if (journey.blockPlanning?.activeSummary) {
     ui.write(`Active Block: ${journey.blockPlanning.activeSummary}`);
     if (journey.blockPlanning.nextSelectionDay) {
       ui.write(`Next block review: Day ${journey.blockPlanning.nextSelectionDay}`);
     }
   }
-  ui.write('');
 }
 
 async function maybePromptForBlockSelection(game, seasonInfo) {
@@ -957,6 +960,12 @@ function buildActionOptions(journey, seasonInfo = null) {
   }
 
   actionOptions.push({
+    label: 'Review the File',
+    description: 'Values, situation, FOM detail, and carry-forward notes',
+    value: 'briefing'
+  });
+
+  actionOptions.push({
     label: 'End Day',
     description: 'Wrap up work',
     value: 'end'
@@ -974,6 +983,12 @@ async function processAction(game, actionValue, seasonInfo = null) {
   const discoveryIds = new Set(discoveryTags.map((tag) => tag.id));
 
   switch (actionValue) {
+    case 'briefing': {
+      displayPlanningBriefing(ui, journey, seasonInfo);
+      await ui.promptChoice('', [{ label: 'Close the file', value: 'next' }]);
+      return;
+    }
+
     case 'gather_data': {
       const recoveryRun = journey.plan.phase === 'ministerial_approval';
       journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + 10);

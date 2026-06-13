@@ -243,7 +243,38 @@ function displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, z
   if (seasonInfo) {
     ui.write(`${seasonInfo.icon} ${seasonInfo.name} - Year ${seasonInfo.year} | Hours: ${journey.hoursRemaining}h`);
   }
+
+  // Compact program status
+  const plantPct = Math.round(Math.min(1, journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
+  const brushPct = Math.round(Math.min(1, journey.brushing.hectaresComplete / journey.brushing.hectaresTarget) * 100);
+  const surveyPct = Math.round(Math.min(1, journey.surveys.freeGrowingComplete / journey.surveys.freeGrowingTarget) * 100);
+
+  ui.write(`Plant: ${plantPct}% (${Math.min(journey.planting.blocksPlanted, journey.planting.blocksToPlant)}/${journey.planting.blocksToPlant} blocks) | Brush: ${brushPct}% | Survey: ${surveyPct}% (${Math.min(journey.surveys.freeGrowingComplete, journey.surveys.freeGrowingTarget)}/${journey.surveys.freeGrowingTarget})`);
+
+  // Compact contractors
+  const roster = getSilvicultureContractorRoster(journey, zoneProfile);
+  ui.write(`Roster: ${roster.summary}`);
+
+  // Resources
+  ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Seedlings: ${journey.resources.seedlings.toLocaleString()} | Capacity: ${journey.resources.contractorCapacity} days`);
+
+  // Alerts only — the full program lives behind Review the Program Binder
+  const vegetationPressure = getVegetationPressure(journey);
+  if (vegetationPressure > 0.25) {
+    ui.writeWarning('Vegetation pressure: HIGH - brushing is lagging well behind planted ground.');
+  }
+  if (seasonInfo?.id === 'winter') {
+    ui.writeWarning('Winter lockout: ground is frozen - planting waits for spring.');
+  }
   ui.write('');
+}
+
+/**
+ * The full program binder, on demand: sequence, zone, scrutiny, roster detail
+ */
+function displaySilvicultureBriefing(ui, journey, silvicultureState, zoneProfile) {
+  ui.write('');
+  ui.writeHeader('PROGRAM BINDER REVIEW');
 
   ui.write(`Sequence: ${formatSilviculturePhase(silvicultureState.phase)} | ${zoneProfile.summary}`);
   if (zoneProfile.likelyFinds.length > 0) {
@@ -261,29 +292,14 @@ function displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, z
   if (discoveryNotes.length > 0) {
     ui.write(`Carry-forward: ${discoveryNotes.join(' | ')}`);
   }
-  ui.write('');
 
-  // Compact program status
-  const plantPct = Math.round(Math.min(1, journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
-  const brushPct = Math.round(Math.min(1, journey.brushing.hectaresComplete / journey.brushing.hectaresTarget) * 100);
-  const surveyPct = Math.round(Math.min(1, journey.surveys.freeGrowingComplete / journey.surveys.freeGrowingTarget) * 100);
-
-  ui.write(`Plant: ${plantPct}% (${Math.min(journey.planting.blocksPlanted, journey.planting.blocksToPlant)}/${journey.planting.blocksToPlant} blocks) | Brush: ${brushPct}% | Survey: ${surveyPct}% (${Math.min(journey.surveys.freeGrowingComplete, journey.surveys.freeGrowingTarget)}/${journey.surveys.freeGrowingTarget})`);
-
-  // Compact contractors
   const roster = getSilvicultureContractorRoster(journey, zoneProfile);
-  ui.write(`Roster: ${roster.summary}`);
   ui.write(`Contractors: ${roster.lines.join(' | ')}`);
 
-  // Resources
-  ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Seedlings: ${journey.resources.seedlings.toLocaleString()} | Capacity: ${journey.resources.contractorCapacity} days`);
   const vegetationPressure = getVegetationPressure(journey);
-  if (vegetationPressure > 0.25) {
-    ui.write('Vegetation pressure: HIGH - brushing is lagging well behind planted ground.');
-  } else if (vegetationPressure > 0.1) {
+  if (vegetationPressure > 0.1 && vegetationPressure <= 0.25) {
     ui.write('Vegetation pressure: MODERATE - keep brushing close to planting progress.');
   }
-  ui.write('');
 }
 
 /**
@@ -404,9 +420,15 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
     actionOptions.push({
       label: 'Team Briefing (1h)',
       description: 'Boost crew morale',
-      value: 'briefing'
+      value: 'team_briefing'
     });
   }
+
+  actionOptions.push({
+    label: 'Review the Program Binder',
+    description: 'Sequence, zone pressure, scrutiny, and contractor detail',
+    value: 'briefing'
+  });
 
   actionOptions.push({
     label: 'End Day',
@@ -468,6 +490,11 @@ async function processAction(game, actionId, currentSeason, seasonMods, silvicul
       break;
 
     case 'briefing':
+      displaySilvicultureBriefing(ui, journey, silvicultureState, zoneProfile);
+      await ui.promptChoice('', [{ label: 'Close the binder', value: 'next' }]);
+      break;
+
+    case 'team_briefing':
       handleTeamBriefing(game);
       journey.hoursRemaining -= 1;
       break;

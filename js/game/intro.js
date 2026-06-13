@@ -16,24 +16,8 @@ function formatScrutiny(scrutiny) {
   return `LOW (${value}%)`;
 }
 
-function formatSnapshotDate(value) {
-  if (!value) return '';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return String(value).slice(0, 10);
-  }
-  return parsed.toISOString().slice(0, 10);
-}
 
-function shouldShowSampleFileIds(roleId) {
-  return roleId === 'planner' || roleId === 'permitter';
-}
 
-function formatProcessHookLine(hook) {
-  if (!hook) return '';
-  const wait = hook.minimumWait?.label ? ` ${hook.minimumWait.label}.` : '';
-  return `${hook.title}.${wait}`;
-}
 
 /**
  * Show journey-specific intro based on journey type
@@ -176,53 +160,17 @@ export function showJourneyIntro(ui, journey) {
     ui.write(`Starting Scrutiny: ${formatScrutiny(journey.scrutiny)}`);
   }
 
-  if (briefing.planningSnapshot?.blockCount) {
-    const districts = briefing.planningSnapshot.districts?.join(', ') || 'Unknown district';
-    const updatedOn = formatSnapshotDate(briefing.planningSnapshot.generatedAt);
-    const updatedLabel = updatedOn ? ` (snapshot ${updatedOn})` : '';
-    ui.write(`Current district snapshot: ${districts} | ${briefing.planningSnapshot.blockCount} cached planning candidates${updatedLabel}.`);
-
-    if (shouldShowSampleFileIds(roleId) && briefing.planningSnapshot.sampleBlocks?.length) {
-      const exampleIds = briefing.planningSnapshot.sampleBlocks.map((block) => block.compactId).join(', ');
-      ui.write(`Example public file IDs: ${exampleIds}`);
-    } else if (briefing.planningSnapshot.dominantConstraint?.label) {
-      ui.write(`Current snapshot watchout: ${briefing.planningSnapshot.dominantConstraint.label}.`);
-    }
+  // Deeper intel (district snapshots, likely finds, professional watch) lives
+  // behind the day menu's briefing/file-review action and the [P] Intel panel —
+  // the send-off should read like a send-off, not a binder.
+  const watchItems = [
+    briefing.likelyFinds[0],
+    professionalContext.obligations[0]?.summary,
+    professionalContext.areaBurden?.title ? `Area burden: ${professionalContext.areaBurden.title}` : null,
+  ].filter(Boolean);
+  if (watchItems.length) {
+    ui.write(`Watch for: ${watchItems[0]}`);
   }
-
-  if (briefing.likelyFinds.length) {
-    ui.write('Likely finds on this assignment:');
-    for (const finding of briefing.likelyFinds) {
-      ui.write(`  - ${finding}`);
-    }
-  }
-
-  if (
-    professionalContext.obligations.length ||
-    briefing.processHooks?.length ||
-    professionalContext.enforcement.length ||
-    professionalContext.breaches?.length
-  ) {
-    ui.write('Professional watch:');
-
-    if (professionalContext.areaBurden?.title) {
-      ui.write(`  - Area burden: ${professionalContext.areaBurden.title}`);
-    }
-
-    if (professionalContext.obligations[0]) {
-      ui.write(`  - ${professionalContext.obligations[0].summary}`);
-    }
-
-    for (const item of (briefing.processHooks || professionalContext.paperwork).slice(0, 2)) {
-      ui.write(`  - File pressure: ${formatProcessHookLine(item)}`);
-    }
-
-    if (professionalContext.enforcement[0]) {
-      ui.write(`  - Enforcement pattern: ${professionalContext.enforcement[0].summary}`);
-    }
-
-    if (professionalContext.breaches?.[0]) {
-      ui.write(`  - Compliance trap: ${professionalContext.breaches[0].summary}`);
-    }
-  }
+  ui.write('');
+  ui.write('(Deeper intel: the briefing action in your day menu, or [P] Intel.)', 'term-dim');
 }

@@ -802,77 +802,7 @@ export async function runPermittingDay(game) {
 
   // Inner loop: multiple actions per day until hours run out
   while (journey.hoursRemaining > 0) {
-    const guidance = buildPermittingActionGuidance(journey);
-    const laneAction = getPermittingLaneAction(journey);
-    ui.clear();
-    ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - PERMITTING`);
-
-    // Show protagonist status if using protagonist model
-    if (journey.protagonist) {
-      displayProtagonistStatus(ui, journey.protagonist);
-    }
-
-    // Show permit pipeline
-    const permitProgress = Math.round((journey.permits.approved / journey.permits.target) * 100);
-    ui.writeDivider('PERMIT PIPELINE');
-    ui.write(`Days Remaining: ${journey.deadline - journey.day}`);
-    ui.write(`Target: ${journey.permits.approved}/${journey.permits.target} approved (${permitProgress}%)`);
-    ui.write('');
-
-    const backlog = journey.permits.backlog || 0;
-    const inReferral = journey.permits.inReferral || 0;
-    const revisionQueue = journey.permits.revisionQueue || [];
-    ui.write(`Pipeline Status:`);
-    ui.write(`  Backlog: ${backlog} | Drafting: ${journey.permits.drafting || 0}`);
-    ui.write(`  Submitted: ${journey.permits.submitted} | In Referral: ${inReferral}`);
-    ui.write(`  In Review: ${journey.permits.inReview} | Needs Revision: ${journey.permits.needsRevision}`);
-    ui.write(`  Scrutiny / Heat: ${Math.round(journey.scrutiny || 0)}%`);
-    ui.write(`  Phase 3 Pressure: ${formatConstraintPressure(journey.permits.phase3Pressure || derivePermittingConstraintState(journey))}`);
-    ui.write(`  Lane Focus: ${guidance.lane} | Stage: ${laneAction.stageLabel}`);
-    ui.write(`  Lane Progress: ${getPermittingLaneProgressSummary(laneAction, journey.permits)}`);
-    ui.write(`  Next Best Move: ${guidance.headline}`);
-    if (guidance.steps.length > 0) {
-      ui.write(`  Follow-up: ${guidance.steps.join(' -> ')}`);
-    }
-    ui.write(`  ${describePermittingProfessionalSnapshot(getPermittingProfessionalSnapshot(journey))}`);
-    const roadIntel = getPermittingRoadAssetContext(journey);
-    if (roadIntel.hasData) {
-      ui.write(`  Road Intel: ${formatRoadAssetSummary(roadIntel) || roadIntel.note}`);
-    }
-    if (revisionQueue.length > 0) {
-      ui.write(`  Open Deficiencies: ${revisionQueue.length}`);
-      for (const ticket of revisionQueue.slice(0, 2)) {
-        ui.write(`    - ${ticket.title}: ${ticket.summary}`);
-      }
-    }
-    const areaSituation = getAreaSituationSummary(journey);
-    if (areaSituation) {
-      ui.write(`  Area Situation: ${areaSituation}`);
-    }
-    const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'permitter', 2);
-    if (discoveryNotes.length > 0) {
-      ui.write(`  Carry-forward: ${discoveryNotes.join(' | ')}`);
-    }
-    ui.write('');
-
-    // Show relationships (protagonist mode)
-    if (journey.relationships) {
-      ui.writeDivider('STAKEHOLDER RELATIONSHIPS');
-      ui.write(`Ministry: ${journey.relationships.ministry}%`);
-      ui.write(`First Nations: ${journey.relationships.nations}%`);
-      ui.write(`Agencies: ${journey.relationships.agencies}%`);
-      ui.write('');
-    }
-
-    // Show resources
-    ui.writeDivider('RESOURCES');
-    const deskResourceStatus = getFormattedResourceStatus(journey.resources, DESK_RESOURCES);
-    for (const [, status] of Object.entries(deskResourceStatus)) {
-      const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
-      ui.write(`${icon} ${status.label}: ${status.display}`);
-    }
-    ui.write(`   Hours Remaining: ${journey.hoursRemaining}`);
-    ui.write('');
+    displayPermittingHeader(ui, journey);
 
     // Check protagonist energy
     if (journey.protagonist && journey.protagonist.energy <= 0) {
@@ -885,9 +815,6 @@ export async function runPermittingDay(game) {
       ui.writeWarning('You are exhausted. The day ends early.');
       break;
     }
-
-    // Build action options
-    ui.writeDivider('WHAT DO YOU DO?');
 
     const actionOptions = buildActionOptions(journey);
 
@@ -921,33 +848,95 @@ export async function runPermittingDay(game) {
 }
 
 /**
- * Display protagonist status
- * @param {Object} ui - UI instance
- * @param {Object} protagonist - Protagonist state
+ * Display compact permitting header (Phase 6.2)
  */
-function displayProtagonistStatus(ui, protagonist) {
-  ui.writeDivider('YOUR STATUS');
+function displayPermittingHeader(ui, journey) {
+  const daysRemaining = Math.max(0, journey.deadline - journey.day);
+  ui.clear();
+  ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - PERMITTING`);
 
-  // Energy bar
-  const energyBar = createBar(protagonist.energy, 10);
-  ui.write(`Energy: [${energyBar}] ${protagonist.energy}%`);
+  ui.write(`Days Remaining: ${daysRemaining} | Hours: ${journey.hoursRemaining}h`);
 
-  // Stress level
-  const stressLevel = protagonist.stress > 70 ? 'HIGH' : protagonist.stress > 40 ? 'MODERATE' : 'LOW';
-  ui.write(`Stress: ${stressLevel} (${protagonist.stress}%)`);
+  if (journey.protagonist) {
+    const energyBar = createBar(journey.protagonist.energy, 10);
+    const stressLevel = journey.protagonist.stress > 70 ? 'HIGH' : journey.protagonist.stress > 40 ? 'MODERATE' : 'LOW';
+    ui.write(`Energy: [${energyBar}] ${journey.protagonist.energy}% | Stress: ${stressLevel} (${journey.protagonist.stress}%) | Rep: ${journey.protagonist.reputation}`);
+  }
 
-  // Reputation
-  ui.write(`Reputation: ${protagonist.reputation}`);
+  const permitProgress = Math.round((journey.permits.approved / journey.permits.target) * 100);
+  ui.write(`Pipeline: Backlog ${journey.permits.backlog || 0} | Drafting ${journey.permits.drafting || 0} | Submitted ${journey.permits.submitted} | In Review ${journey.permits.inReview} | Approved ${journey.permits.approved}/${journey.permits.target} (${permitProgress}%)`);
+  ui.write(`Budget: $${Math.round(journey.resources.budget).toLocaleString()} | Political Capital: ${journey.resources.politicalCapital}`);
 
-  // Expertise (if available)
-  if (protagonist.expertise) {
-    const skills = Object.entries(protagonist.expertise)
+  // Alerts only — the full file lives behind Review the File
+  if (daysRemaining <= 5) {
+    ui.writeWarning(`Deadline pressure: ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining.`);
+  }
+  ui.write('');
+}
+
+/**
+ * The full file, on demand: pipeline detail, pressure, relationships, resources
+ */
+function displayPermittingBriefing(ui, journey) {
+  const guidance = buildPermittingActionGuidance(journey);
+  const laneAction = getPermittingLaneAction(journey);
+  const revisionQueue = journey.permits.revisionQueue || [];
+
+  ui.write('');
+  ui.writeHeader('PERMIT FILE REVIEW');
+
+  ui.write(`Pipeline Status:`);
+  ui.write(`  Backlog: ${journey.permits.backlog || 0} | Drafting: ${journey.permits.drafting || 0}`);
+  ui.write(`  Submitted: ${journey.permits.submitted} | In Referral: ${journey.permits.inReferral || 0}`);
+  ui.write(`  In Review: ${journey.permits.inReview} | Needs Revision: ${journey.permits.needsRevision}`);
+  ui.write(`  Scrutiny / Heat: ${Math.round(journey.scrutiny || 0)}%`);
+  ui.write(`  Phase 3 Pressure: ${formatConstraintPressure(journey.permits.phase3Pressure || derivePermittingConstraintState(journey))}`);
+  ui.write(`  Lane Focus: ${guidance.lane} | Stage: ${laneAction.stageLabel}`);
+  ui.write(`  Lane Progress: ${getPermittingLaneProgressSummary(laneAction, journey.permits)}`);
+  ui.write(`  Next Best Move: ${guidance.headline}`);
+  if (guidance.steps.length > 0) {
+    ui.write(`  Follow-up: ${guidance.steps.join(' -> ')}`);
+  }
+  ui.write(`  ${describePermittingProfessionalSnapshot(getPermittingProfessionalSnapshot(journey))}`);
+  const roadIntel = getPermittingRoadAssetContext(journey);
+  if (roadIntel.hasData) {
+    ui.write(`  Road Intel: ${formatRoadAssetSummary(roadIntel) || roadIntel.note}`);
+  }
+  if (revisionQueue.length > 0) {
+    ui.write(`  Open Deficiencies: ${revisionQueue.length}`);
+    for (const ticket of revisionQueue.slice(0, 2)) {
+      ui.write(`    - ${ticket.title}: ${ticket.summary}`);
+    }
+  }
+  const areaSituation = getAreaSituationSummary(journey);
+  if (areaSituation) {
+    ui.write(`  Area Situation: ${areaSituation}`);
+  }
+  const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'permitter', 2);
+  if (discoveryNotes.length > 0) {
+    ui.write(`  Carry-forward: ${discoveryNotes.join(' | ')}`);
+  }
+
+  if (journey.relationships) {
+    ui.writeDivider('STAKEHOLDER RELATIONSHIPS');
+    ui.write(`Ministry: ${journey.relationships.ministry}%`);
+    ui.write(`First Nations: ${journey.relationships.nations}%`);
+    ui.write(`Agencies: ${journey.relationships.agencies}%`);
+  }
+
+  ui.writeDivider('RESOURCES');
+  const deskResourceStatus = getFormattedResourceStatus(journey.resources, DESK_RESOURCES);
+  for (const [, status] of Object.entries(deskResourceStatus)) {
+    const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
+    ui.write(`${icon} ${status.label}: ${status.display}`);
+  }
+
+  if (journey.protagonist?.expertise) {
+    const skills = Object.entries(journey.protagonist.expertise)
       .map(([skill, value]) => `${capitalize(skill)}: ${value}`)
       .join(' | ');
     ui.write(`Expertise: ${skills}`);
   }
-
-  ui.write('');
 }
 
 /**
@@ -1046,6 +1035,12 @@ function buildActionOptions(journey) {
       value: 'rest'
     });
   }
+
+  actionOptions.push({
+    label: 'Review the File',
+    description: 'Pipeline detail, pressure, relationships, and carry-forward notes',
+    value: 'briefing'
+  });
 
   // Always add "End Day Early" option
   actionOptions.push({
@@ -1160,6 +1155,12 @@ async function processAction(game, actionId) {
 
   // Permit-specific actions
   switch (actionId) {
+    case 'briefing': {
+      displayPermittingBriefing(ui, journey);
+      await ui.promptChoice('', [{ label: 'Close the file', value: 'next' }]);
+      return;
+    }
+
     case 'draft_permit':
       if (journey.permits.backlog > 0) {
         const drafted = shiftPermits('backlog', 'drafting', journey.permits, 1);

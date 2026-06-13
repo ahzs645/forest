@@ -398,11 +398,16 @@ async function runFieldDay(game) {
       });
     }
 
-    // Map check costs nothing — orientation should always be free
+    // Orientation is always free
     actionOptions.push({
       label: 'Consult the Area Map',
       description: 'Plot the traverse, camps, and remaining blocks',
       value: 'consult_map'
+    });
+    actionOptions.push({
+      label: 'Review the Briefing',
+      description: 'Access intel, area situation, and carry-forward notes',
+      value: 'briefing'
     });
 
     const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
@@ -471,6 +476,9 @@ async function runFieldDay(game) {
     } else if (actionId === 'consult_map') {
       handleConsultMap(ui, journey);
       await ui.promptChoice('', [{ label: 'Fold the map', value: 'next' }]);
+    } else if (actionId === 'briefing') {
+      displayReconBriefing(ui, journey);
+      await ui.promptChoice('', [{ label: 'Back to work', value: 'next' }]);
     } else if (actionId === 'ground_truth') {
       journey.hoursRemaining -= 2;
       handleGroundTruthAccess(ui, journey, currentBlock);
@@ -537,29 +545,58 @@ function displayDayHeader(ui, journey) {
   const progressBar = '\u2588'.repeat(filledWidth) + '\u2591'.repeat(progressBarWidth - filledWidth);
   ui.write(`[${progressBar}] ${progressInfo.overallProgress}% | ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
 
-  // Weather and terrain
   ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'} | Hours: ${journey.hoursRemaining || 0}h`);
+
+  const r = journey.resources;
+  ui.write(`FUEL: ${Math.round(r.fuel)} | FOOD: ${Math.round(r.food)} | EQUIP: ${Math.round(r.equipment)}% | MEDS: ${r.firstAid} | CASH: $${Math.round(r.budget).toLocaleString()}`);
+  displayCrewStatus(ui, journey);
+
+  // Alerts only — the full picture lives in Review the Briefing
   const currentAccessVerdict = getBlockAccessVerdict(currentBlock, journey.weather, journey);
-  const currentAccessLine = formatAccessVerdict(currentAccessVerdict);
-  if (currentAccessVerdict.id === 'passable_now') {
-    ui.writePositive(currentAccessLine);
-  } else if (currentAccessVerdict.id === 'no_go' || currentAccessVerdict.id === 'heli_only') {
-    ui.writeDanger(currentAccessLine);
-  } else {
-    ui.writeWarning(currentAccessLine);
+  if (currentAccessVerdict.id === 'no_go' || currentAccessVerdict.id === 'heli_only') {
+    ui.writeDanger(formatAccessVerdict(currentAccessVerdict));
+  } else if (currentAccessVerdict.id !== 'passable_now') {
+    ui.writeWarning(formatAccessVerdict(currentAccessVerdict));
   }
+  if (journey.rationPlan?.mode === 'short') {
+    ui.writeWarning(`Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`);
+  }
+  ui.write('');
+
+  // Crew dialogue (Phase 5.1) — an occasional voice, not a daily ritual
+  const activeCrew = journey.crew.filter(m => m.isActive);
+  if (activeCrew.length > 0 && Math.random() < 0.35) {
+    const speaker = activeCrew[Math.floor(Math.random() * activeCrew.length)];
+    const comment = getCrewComment(speaker, journey);
+    if (comment) {
+      ui.write(comment);
+      ui.write('');
+    }
+  }
+}
+
+/**
+ * The long-form picture, on demand: intel, situation, plans, carry-forward
+ */
+function displayReconBriefing(ui, journey) {
+  const currentBlock = journey.blocks[journey.currentBlockIndex];
+
+  ui.write('');
+  ui.writeHeader('FIELD BRIEFING');
+
+  const currentAccessVerdict = getBlockAccessVerdict(currentBlock, journey.weather, journey);
+  ui.write(formatAccessVerdict(currentAccessVerdict));
   const currentInfrastructureLine = formatInfrastructureStatus(currentAccessVerdict);
   if (currentInfrastructureLine) {
     ui.write(currentInfrastructureLine);
   }
 
-  const routeText = journey.routePlan
-    ? `${journey.routePlan.label}`
-    : 'Route undecided';
+  const routeText = journey.routePlan ? `${journey.routePlan.label}` : 'Route undecided';
   const rationText = journey.rationPlan?.mode === 'short'
     ? `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
     : 'Full rations';
   ui.write(`Route: ${routeText} | Rations: ${rationText}`);
+
   const blockIntel = getReconBlockIntel(journey, currentBlock);
   const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
   const accessIntelLabel = blockIntel.accessGroundTruthed ? 'ground-truthed' : 'unverified';
@@ -568,15 +605,15 @@ function displayDayHeader(ui, journey) {
     : 'quiet';
   ui.write(`Current Intel: access ${accessIntelLabel} | values ${valuesIntelLabel}`);
   ui.write(`Assessment: ${journey.blocksAssessed || 0}/${journey.blocks?.length || 0} blocks verified`);
+
   const openPackages = getReconOpenPackages(journey);
   if (openPackages.length > 0) {
     const nextPackage = openPackages[0];
     ui.write(`Field Notebook: ${nextPackage.block.name} needs ${nextPackage.missing.join(' + ')}`);
   }
-  const hasScrutiny = Object.prototype.hasOwnProperty.call(journey, 'scrutiny')
-    || Object.prototype.hasOwnProperty.call(journey, 'heat');
+
   const scrutinyValue = Number(journey.scrutiny ?? journey.heat ?? 0);
-  if (hasScrutiny && Number.isFinite(scrutinyValue)) {
+  if (Number.isFinite(scrutinyValue)) {
     ui.write(`Scrutiny / Heat: ${Math.max(0, scrutinyValue)}`);
   }
   const areaSituation = getAreaSituationSummary(journey);
@@ -586,25 +623,6 @@ function displayDayHeader(ui, journey) {
   const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'recce', 2);
   if (discoveryNotes.length > 0) {
     ui.write(`Carry-forward: ${discoveryNotes.join(' | ')}`);
-  }
-  ui.write('');
-
-  // Compact resources
-  const r = journey.resources;
-  ui.write(`FUEL: ${Math.round(r.fuel)} | FOOD: ${Math.round(r.food)} | EQUIP: ${Math.round(r.equipment)}% | MEDS: ${r.firstAid} | CASH: $${Math.round(r.budget).toLocaleString()}`);
-
-  // Crew summary
-  displayCrewStatus(ui, journey);
-
-  // Crew dialogue (Phase 5.1)
-  const activeCrew = journey.crew.filter(m => m.isActive);
-  if (activeCrew.length > 0) {
-    const speaker = activeCrew[Math.floor(Math.random() * activeCrew.length)];
-    const comment = getCrewComment(speaker, journey);
-    if (comment) {
-      ui.write(comment);
-      ui.write('');
-    }
   }
 }
 
