@@ -34,7 +34,6 @@ import { showJourneyIntro } from './intro.js';
 import { runFinalDebrief } from './debrief.js';
 import { handleEvent } from '../modes/shared/handleEvent.js';
 import { saveActiveRun, loadActiveRun, clearActiveRun } from './saveLoad.js';
-import { getCareerSnapshot } from '../career.js';
 
 /**
  * Apply difficulty multipliers to journey resources
@@ -211,15 +210,6 @@ export class ForestryTrailGame {
     this.journey.difficulty = difficulty;
     applyDifficultyMultipliers(this.journey, difficulty);
 
-    // A seasonal-strategy track record earns standing out here too
-    const careerSnapshot = getCareerSnapshot();
-    if (careerSnapshot.seasonalYears > 0 && typeof this.journey.resources?.budget === 'number') {
-      this.journey.resources.budget = Math.round(this.journey.resources.budget * 1.1);
-      this.ui.writePositive(
-        `The co-op remembers your ${careerSnapshot.seasonalYears} season${careerSnapshot.seasonalYears === 1 ? '' : 's'} of planning work — supplies stretch a little further (+10% budget).`
-      );
-      this.ui.write('');
-    }
 
     this.ui.write('');
     this.ui.writeHeader(`${crewName.toUpperCase() || 'YOUR CREW'} - ${role.name}`);

@@ -14,7 +14,6 @@ import {
   SEASONS,
 } from "../js/engine.js";
 import { detectArt } from "./art.js";
-import { recordSeasonalYear, getCareerSnapshot, ROLE_LABELS } from "../js/career.js";
 import {
   getRoleDisplayName,
   getSeasonalPlayableRoles,
@@ -340,17 +339,6 @@ export class TuiGameController {
         this.startRound(notice);
       } else {
         const summary = buildSummary(gs);
-        const strongEnding = /Outstanding season|Solid performance/.test(summary.overall || "");
-        const career = recordSeasonalYear(gs, strongEnding);
-        if (career) {
-          const seasonal = career.byRole?.seasonal;
-          const careerLine = seasonal
-            ? `Career: ${seasonal.runs} seasonal year${seasonal.runs === 1 ? "" : "s"} on file, best grade ${seasonal.bestGrade ?? "-"}${career.isBest ? " — new personal best!" : ""}`
-            : null;
-          if (careerLine && Array.isArray(summary.messages)) {
-            summary.messages.push(careerLine);
-          }
-        }
         this.setState({ mode: "end" });
         this.present(
           {
@@ -465,15 +453,9 @@ export class TuiGameController {
           data: getNextCrisisScenario(gs),
         });
       } else {
-        const crisisSummary = buildCrisisSummary(gs);
-        const career = recordSeasonalYear(gs, /monitored recovery/.test(crisisSummary.body || ""));
-        if (career?.byRole?.["crisis-command"] && Array.isArray(crisisSummary.bullets)) {
-          const cc = career.byRole["crisis-command"];
-          crisisSummary.bullets.push(`Career: ${cc.runs} incident${cc.runs === 1 ? "" : "s"} commanded, best grade ${cc.bestGrade ?? "-"}`);
-        }
         this.setState({ mode: "end" });
         this.present(
-          crisisSummary,
+          buildCrisisSummary(gs),
           ["Play Again", "Quit"],
           (idx) => {
             if (idx === 0) {
@@ -555,19 +537,7 @@ export class TuiGameController {
               });
               this.queue = [];
               this.setState({ mode: "playing" });
-              // Field experience from the expedition game earns standing here
-              const snapshot = getCareerSnapshot();
-              let veteranNotice = null;
-              if (snapshot.expeditionWins > 0 && this.gs?.metrics) {
-                this.gs.metrics.relationships = Math.min(100, (this.gs.metrics.relationships || 0) + 2);
-                this.gs.metrics.compliance = Math.min(100, (this.gs.metrics.compliance || 0) + 2);
-                veteranNotice = {
-                  heading: "Reputation Precedes You",
-                  body: `Word of ${snapshot.expeditionWins} successful expedition${snapshot.expeditionWins === 1 ? "" : "s"} reached the district office. Relationships and compliance start +2.`,
-                  tone: "positive",
-                };
-              }
-              this.startRound(veteranNotice);
+              this.startRound();
             },
           );
         },

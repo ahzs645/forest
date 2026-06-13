@@ -1,12 +1,7 @@
 /**
  * Career Record
- * The one persistent profile both games share. Expedition runs (via the
- * debrief), seasonal years, and crisis-command incidents all land in the same
- * localStorage record, so a player's history follows them across modes —
- * and each game can tip its hat to experience earned in the other.
+ * Persistent service record for the expedition game (written by the debrief).
  */
-
-import { getLetterGrade } from './scoring.js';
 
 const SERVICE_RECORD_KEY = 'bcft.serviceRecord.v1';
 
@@ -18,8 +13,6 @@ export const ROLE_LABELS = {
   permitting: 'Permitting Specialist',
   desk: 'Desk Team',
   manager: 'General Manager',
-  seasonal: 'Seasonal Strategist',
-  'crisis-command': 'Incident Commander',
 };
 
 export const CAREER_LABELS = {
@@ -28,8 +21,6 @@ export const CAREER_LABELS = {
   plansApproved: 'Plans approved',
   permitsApproved: 'Permits approved',
   daysInTheChair: 'Days in the chair',
-  yearsCompleted: 'Seasonal years completed',
-  incidentsCommanded: 'Incidents commanded',
 };
 
 export function loadServiceRecord() {
@@ -82,49 +73,4 @@ export function foldRunIntoRecord(record, bucket, result, careerDeltas = {}) {
   }
 
   return { ...next, isBest };
-}
-
-/**
- * Score a finished seasonal year (or crisis run) from its final metrics:
- * the average of the five 0-100 metrics.
- * @param {Object} metrics
- * @returns {number} 0-100
- */
-export function scoreFromMetrics(metrics = {}) {
-  const values = Object.values(metrics).filter((v) => typeof v === 'number');
-  if (!values.length) return 0;
-  return Math.round(values.reduce((sum, v) => sum + v, 0) / values.length);
-}
-
-/**
- * Record a completed seasonal year. Persists and returns the updated record.
- * @param {Object} gs - Seasonal game state (metrics, gameMode)
- * @param {boolean} strongEnding - Did the year end strongly?
- * @returns {Object} updated record
- */
-export function recordSeasonalYear(gs, strongEnding) {
-  const bucket = gs?.gameMode === 'crisis-command' ? 'crisis-command' : 'seasonal';
-  const score = scoreFromMetrics(gs?.metrics);
-  const result = { score, grade: getLetterGrade(score), victory: Boolean(strongEnding) };
-  const deltas = bucket === 'seasonal' ? { yearsCompleted: 1 } : { incidentsCommanded: 1 };
-  const updated = foldRunIntoRecord(loadServiceRecord(), bucket, result, deltas);
-  saveServiceRecord(updated);
-  return updated;
-}
-
-/**
- * What the other game should know about this player.
- * @returns {{expeditionWins: number, seasonalYears: number, totalRuns: number}}
- */
-export function getCareerSnapshot() {
-  const record = loadServiceRecord();
-  if (!record) return { expeditionWins: 0, seasonalYears: 0, totalRuns: 0 };
-  const expeditionBuckets = ['recon', 'field', 'silviculture', 'planning', 'permitting', 'desk', 'manager'];
-  const expeditionWins = expeditionBuckets.reduce(
-    (sum, key) => sum + (record.byRole?.[key]?.victories || 0), 0);
-  return {
-    expeditionWins,
-    seasonalYears: record.byRole?.seasonal?.runs || 0,
-    totalRuns: record.runs || 0,
-  };
 }
