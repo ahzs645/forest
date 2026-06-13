@@ -212,7 +212,10 @@ export function createPlanningJourney(options = {}) {
     season: createSeasonState(effectiveRoleId),
     scrutiny: 34,
     day: 1,
-    deadline: 20,
+    // The cabinet window. Planning has many gates (data, analysis, FOM review,
+    // stakeholder buy-in, ministerial confidence), so the term needs room to
+    // clear them; 20 days was tight. Difficulty nudges this in ForestryTrailGame.
+    deadline: 28,
     hoursRemaining: 8,
 
     // Protagonist state - YOU are the planner
