@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { useGameFlow } from "../../tui/useGameFlow";
 import { renderMapsciiFrame } from "../../js/scene/mapscii/index.js";
+
+// Findings are authored as sentence fragments ("peatland edges, ..."), which
+// read fine mid-sentence but look wrong when they lead a line. Capitalize the
+// first letter for standalone display without touching the source data.
+function leadCapitalize(text) {
+  const str = String(text ?? "");
+  return str.replace(/^(\s*)(\p{L})/u, (_, space, letter) => space + letter.toUpperCase());
+}
+
 function toKeyInput(domEvent) {
   const map = {
     ArrowUp: "up",
@@ -393,7 +402,7 @@ function ContentView({ data }) {
             </div>
           </div>
         ) : null}
-        <p className="tui-copy preserve">{data.description}</p>
+        <p className="tui-copy preserve">{leadCapitalize(data.description)}</p>
         <CardContext data={data} />
         {data.type === "scenario" && data.intelLines?.length ? (
           <>
@@ -508,7 +517,7 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
       {situation ? (
         <p className="tui-options-situation preserve">
           <span className="tui-options-situation-label">Situation</span>
-          {situation}
+          {leadCapitalize(situation)}
         </p>
       ) : null}
       <div className="tui-options-list">
