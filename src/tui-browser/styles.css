@@ -528,8 +528,8 @@ body {
 
 .tui-option {
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+  align-items: flex-start;
+  gap: 0.55rem;
   border: 1px solid transparent;
   background: transparent;
   color: #c9d1d9;
@@ -540,12 +540,6 @@ body {
   cursor: pointer;
 }
 
-.tui-option-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.55rem;
-}
-
 .tui-option-number {
   flex: 0 0 auto;
   min-width: 1.5rem;
@@ -554,19 +548,12 @@ body {
   border: 1px solid rgba(88, 166, 255, 0.55);
   color: #58a6ff;
   font-size: 0.85rem;
+  line-height: 1.5;
 }
 
 .tui-option-label {
-  font-weight: 700;
   color: inherit;
-  overflow-wrap: anywhere;
-}
-
-.tui-option-outcome {
-  padding-left: 2.05rem;
-  color: #7d8590;
-  font-size: 0.85rem;
-  line-height: 1.45;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 

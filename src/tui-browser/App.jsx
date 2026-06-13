@@ -444,7 +444,7 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
       </div>
       <div className="tui-options-list">
         {options.map((label, index) => {
-          const outcome = optionDetails?.[index]?.outcome;
+          const text = optionDetails?.[index]?.outcome || label;
           return (
             <button
               key={`${label}-${index}`}
@@ -452,11 +452,8 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
               className={`tui-option ${index === selected ? "selected" : ""}`}
               onClick={() => onSelect(index)}
             >
-              <span className="tui-option-head">
-                <span className="tui-option-number">{index + 1}</span>
-                <span className="tui-option-label">{label}</span>
-              </span>
-              {outcome ? <span className="tui-option-outcome">{outcome}</span> : null}
+              <span className="tui-option-number">{index + 1}</span>
+              <span className="tui-option-label">{text}</span>
             </button>
           );
         })}
