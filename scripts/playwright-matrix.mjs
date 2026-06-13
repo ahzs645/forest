@@ -4,7 +4,8 @@ const ROLE_RUNS = [
   { name: 'planner', roleIndex: 0, areaIndex: 0, seed: 1001 },
   { name: 'permitter', roleIndex: 1, areaIndex: 1, seed: 2001 },
   { name: 'recce', roleIndex: 2, areaIndex: 2, seed: 3001 },
-  { name: 'silviculture', roleIndex: 3, areaIndex: 3, seed: 4001 }
+  { name: 'silviculture', roleIndex: 3, areaIndex: 3, seed: 4001 },
+  { name: 'manager', roleIndex: 4, areaIndex: 4, seed: 5001 }
 ];
 
 const DIFFICULTIES = [
@@ -229,6 +230,19 @@ function pickChoice(labels, terminalText, strategyName) {
       'Grant rest day',
       'Pay retention',
       'End Day'
+    ],
+    // Manager runs a 12-month term; this strategy protects the treasury and
+    // reputation (the win condition) by favouring cheap, steady choices.
+    manager: [
+      'Skip certification for now',
+      'Hold the line',
+      'Demand a corrective plan',
+      'Rehearse the numbers cold',
+      'Full transparency',
+      'Back the division lead publicly',
+      'Fly out to the blocks',
+      'Stay at your desk',
+      'Adjourn the meeting'
     ]
   };
 
@@ -428,4 +442,19 @@ if (VERBOSE) {
     }
     console.log(lines.slice(-14).join(' | '));
   }
+}
+
+// CI gate: a playable smoke test should never hit a runtime error (an uncaught
+// page error or a console error) for any role. This is the regression class the
+// startup-parse-error report was about — a broken import surfaces here for every
+// role. Balance outcomes (SUCCESS vs FAIL) and whether the auto-player reaches
+// an end screen are reported above but intentionally not gated.
+const runsWithErrors = results.filter((result) => result.runtimeErrors.length > 0);
+
+if (runsWithErrors.length > 0) {
+  console.error(`\n${runsWithErrors.length} run(s) hit runtime errors:`);
+  for (const result of runsWithErrors) {
+    console.error(`- ${result.role}/${result.difficulty}: ${result.runtimeErrors.join(' | ')}`);
+  }
+  process.exitCode = 1;
 }

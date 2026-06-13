@@ -590,7 +590,10 @@ export function createManagerJourney(options = {}) {
     certifications: [],
     ceo: null,
     targetProfit: 100000,
-    deadline: 100,
+    // The term runs as 12 monthly board periods rather than 100 daily turns:
+    // each period is one strategic decision plus its fallout, with quarterly
+    // board reviews. ~16 meaningful decisions instead of a 100-turn grind.
+    deadline: 12,
     history: [],
 
     // The GM keeps a small executive crew: they gate requiresRole event

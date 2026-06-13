@@ -18,25 +18,27 @@ const NEW_MANAGER_EVENT_IDS = [
 test('manager operational progress blends term progress with metric health', () => {
   const journey = createManagerJourney();
 
-  // Day 1 of 100 with all metrics at 50: 0.6 * 1% + 0.4 * 50% = 20.6 -> 21
+  // Month 1 of 12 with all metrics at 50: 0.6 * (1/12) + 0.4 * 0.5 = 0.25 -> 25
   assert.equal(journey.day, 1);
-  assert.equal(getOperationalProgress(journey), 21);
+  assert.equal(journey.deadline, 12);
+  assert.equal(getOperationalProgress(journey), 25);
 
-  journey.day = 50;
+  // Halfway through the term: 0.6 * 0.5 + 0.4 * 0.5 = 0.5 -> 50
+  journey.day = 6;
   assert.equal(getOperationalProgress(journey), 50);
 
-  journey.day = 100;
+  journey.day = 12;
   for (const key of Object.keys(journey.metrics)) {
     journey.metrics[key] = 100;
   }
   assert.equal(getOperationalProgress(journey), 100);
 
   // Overshooting the deadline stays clamped to 100
-  journey.day = 250;
+  journey.day = 30;
   assert.equal(getOperationalProgress(journey), 100);
 
   // Collapsed metrics drag progress below pure term progress
-  journey.day = 50;
+  journey.day = 6;
   for (const key of Object.keys(journey.metrics)) {
     journey.metrics[key] = 0;
   }
@@ -45,7 +47,7 @@ test('manager operational progress blends term progress with metric health', () 
 
 test('manager journeys now cross the shared milestone thresholds', () => {
   const journey = createManagerJourney();
-  journey.day = 20; // 0.6 * 20% + 0.4 * 50% = 32%
+  journey.day = 3; // 0.6 * (3/12) + 0.4 * 0.5 = 0.35 -> 35%
 
   const messages = [];
   const reached = recordProgressMilestones(journey, 0, messages, journey.day);
