@@ -553,21 +553,30 @@ function displayDayHeader(ui, journey) {
   // ASCII block map (Phase 5.4)
   ui.write(buildBlockMap(journey));
 
-  // Compact progress line
+  // Compact progress line. Recon is won by closing every block package, not by
+  // reaching the end of the route, so the headline bar tracks Package
+  // Completion (verified packages / total) and distance is a secondary stat.
+  const totalBlocks = progressInfo.totalBlocks || journey.blocks?.length || 0;
+  const packagesDone = Math.min(totalBlocks, journey.blocksAssessed || 0);
+  const completionPct = totalBlocks > 0 ? Math.round((packagesDone / totalBlocks) * 100) : 0;
   const progressBarWidth = 20;
-  const filledWidth = Math.max(0, Math.min(progressBarWidth, Math.round((progressInfo.overallProgress / 100) * progressBarWidth)));
+  const filledWidth = Math.max(0, Math.min(progressBarWidth, Math.round((completionPct / 100) * progressBarWidth)));
   const progressBar = '\u2588'.repeat(filledWidth) + '\u2591'.repeat(progressBarWidth - filledWidth);
-  ui.write(`[${progressBar}] ${progressInfo.overallProgress}% | ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
+  ui.write(`[${progressBar}] Package Completion ${packagesDone}/${totalBlocks} (${completionPct}%) | Traverse ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
 
   ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'} | Hours: ${journey.hoursRemaining || 0}h`);
 
   const r = journey.resources;
   ui.write(`FUEL: ${Math.round(r.fuel)} | FOOD: ${Math.round(r.food)} | EQUIP: ${Math.round(r.equipment)}% | MEDS: ${r.firstAid} | CASH: $${Math.round(r.budget).toLocaleString()}`);
 
-  // Objective tracker: packages verified, and the checklist for THIS block, so
-  // the win condition (verify every package) is never a surprise.
-  const totalBlocks = journey.blocks?.length || 0;
-  ui.write(`Objective: verify ${journey.blocksAssessed || 0}/${totalBlocks} block packages`);
+  // Objective tracker: the win condition (finalize every package) and the
+  // checklist for THIS block, so closing packages is never a surprise.
+  const packagesRemaining = Math.max(0, totalBlocks - packagesDone);
+  ui.write(
+    packagesRemaining > 0
+      ? `Win condition: finalize every block package — ${packagesRemaining} still open`
+      : `Win condition met: all ${totalBlocks} block packages finalized`
+  );
   if (currentBlock) {
     const intel = getReconBlockIntel(journey, currentBlock);
     const sweep = getReconValueSweepProfile(currentBlock, journey);

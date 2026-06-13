@@ -1,7 +1,8 @@
 # BC Forestry Trail
 
-Two terminal-styled forestry games set in northern British Columbia, sharing one
-content library (`js/data/`) and a retro green-CRT aesthetic.
+Two terminal-styled forestry games set across British Columbia — from the
+northern Interior to the coast and southern wetbelt — sharing one content
+library (`js/data/`) and a retro green-CRT aesthetic.
 
 ## The two games
 
@@ -56,8 +57,10 @@ deploys via `.github/workflows/pages.yml`, which gates on the unit test suite.
 ## Content layout
 
 Game content lives under `js/data/` (roles, operating areas, events, issues,
-glossary) with JSON payloads in `js/data/json/`. The six northern BC operating areas
-carry real BEC zones, dominant species, and landscape tags that drive event selection.
+glossary) with JSON payloads in `js/data/json/`. The nine BC operating areas — six
+across the northern Interior plus Vancouver Island Coast, the Kootenay Wetbelt, and
+the Okanagan/Shuswap Drybelt — carry real BEC zones, dominant species, and landscape
+tags that drive event selection.
 
 To refresh the real-data planning block snapshot from BC OpenMaps:
 
