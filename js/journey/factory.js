@@ -212,7 +212,10 @@ export function createPlanningJourney(options = {}) {
     season: createSeasonState(effectiveRoleId),
     scrutiny: 34,
     day: 1,
-    deadline: 20,
+    // The cabinet window. Planning has many gates (data, analysis, FOM review,
+    // stakeholder buy-in, ministerial confidence), so the term needs room to
+    // clear them; 20 days was tight. Difficulty nudges this in ForestryTrailGame.
+    deadline: 28,
     hoursRemaining: 8,
 
     // Protagonist state - YOU are the planner
@@ -590,7 +593,10 @@ export function createManagerJourney(options = {}) {
     certifications: [],
     ceo: null,
     targetProfit: 100000,
-    deadline: 100,
+    // The term runs as 12 monthly board periods rather than 100 daily turns:
+    // each period is one strategic decision plus its fallout, with quarterly
+    // board reviews. ~16 meaningful decisions instead of a 100-turn grind.
+    deadline: 12,
     history: [],
 
     // The GM keeps a small executive crew: they gate requiresRole event

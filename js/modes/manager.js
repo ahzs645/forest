@@ -1,8 +1,9 @@
 /**
  * Manager Mode Runner
- * General Manager term: one strategic decision a day, events drawn through
- * the shared pipeline (60% boardroom desk-context, 40% operational
- * field-context radio traffic), quarterly board reviews at term milestones.
+ * General Manager term: 12 monthly board periods, one strategic decision per
+ * period, events drawn through the shared pipeline (60% boardroom desk-context,
+ * 40% operational field-context radio traffic), quarterly board reviews at term
+ * milestones. The compressed term is ~16 decisions rather than a 100-turn grind.
  */
 
 import { checkForEvent } from "../events.js";
@@ -12,7 +13,8 @@ import { getOperationalProgress, recordProgressMilestones } from "../journey.js"
 import ceoProfiles from "../../docs/legacy_archive/game_content_datasets/ceo_profiles.json" with { type: "json" };
 import certificationsData from "../../docs/legacy_archive/game_content_datasets/certifications.json" with { type: "json" };
 
-const DAILY_BURN = 500;
+// Corporate overhead burned each board period (month) of the term.
+const PERIOD_BURN = 4000;
 
 const STRATEGIC_BEATS = [
   "budget_allocation",
@@ -59,7 +61,7 @@ async function runExecutiveOnboarding(game) {
   const { journey, ui } = game;
 
   ui.clear();
-  ui.writeHeader(`MANAGER - DAY ${journey.day}/${journey.deadline} - EXECUTIVE ONBOARDING`);
+  ui.writeHeader(`MANAGER - MONTH ${journey.day}/${journey.deadline} - EXECUTIVE ONBOARDING`);
   ui.write("Welcome to the corner office. Your first order of business: Executive Hiring.");
   ui.write("");
 
@@ -115,7 +117,7 @@ async function runExecutiveOnboarding(game) {
   journey.day++;
 
   await ui.promptChoice("", [
-    { label: `Continue... (Day ${journey.day} of ${journey.deadline})`, value: "next" },
+    { label: `Continue... (Month ${journey.day} of ${journey.deadline})`, value: "next" },
   ]);
 }
 
@@ -124,7 +126,7 @@ async function runExecutiveOnboarding(game) {
  */
 function displayManagerHeader(ui, journey) {
   ui.clear();
-  ui.writeHeader(`MANAGER - DAY ${journey.day}/${journey.deadline}`);
+  ui.writeHeader(`MANAGER - MONTH ${journey.day}/${journey.deadline}`);
 
   ui.writeDivider("EXECUTIVE DASHBOARD");
   ui.write(
@@ -165,7 +167,7 @@ function displayManagerHeader(ui, journey) {
 }
 
 /**
- * One strategic decision per day from a rotating menu.
+ * One strategic decision per board period, from a rotating menu.
  */
 async function runStrategicDecision(game) {
   const { journey } = game;
@@ -421,17 +423,17 @@ async function runBoardPrep(game) {
 }
 
 /**
- * End of day: burn rate, CEO periodic effect, day advance, milestones,
+ * End of period: burn rate, CEO periodic effect, month advance, milestones,
  * quarterly board reviews, continue prompt.
  */
 async function endOfManagerDay(game, progressBeforeDay) {
   const { journey, ui } = game;
 
   ui.write("");
-  ui.write("--- End of Day ---");
+  ui.write("--- End of Month ---");
 
-  journey.resources.budget = Math.max(0, journey.resources.budget - DAILY_BURN);
-  ui.write(`Corporate overhead: -$${DAILY_BURN.toLocaleString()}`);
+  journey.resources.budget = Math.max(0, journey.resources.budget - PERIOD_BURN);
+  ui.write(`Corporate overhead: -$${PERIOD_BURN.toLocaleString()}`);
 
   applyCeoInitiative(ui, journey);
 
@@ -452,18 +454,18 @@ async function endOfManagerDay(game, progressBeforeDay) {
     await runBoardReview(game, threshold);
   }
 
-  const daysLeft = journey.deadline - journey.day;
-  const continueLabel = daysLeft >= 0
-    ? `Continue... (Day ${journey.day} of ${journey.deadline}, $${Math.round(journey.resources.budget).toLocaleString()} on hand)`
+  const monthsLeft = journey.deadline - journey.day;
+  const continueLabel = monthsLeft >= 0
+    ? `Continue... (Month ${journey.day} of ${journey.deadline}, $${Math.round(journey.resources.budget).toLocaleString()} on hand)`
     : "Continue... (TERM COMPLETE)";
   await ui.promptChoice("", [{ label: continueLabel, value: "next" }]);
 }
 
 /**
- * CEO periodic effect (every 10th day of the term).
+ * CEO periodic effect, fired each quarter (every third month of the term).
  */
 function applyCeoInitiative(ui, journey) {
-  if (!journey.ceo || journey.day % 10 !== 0) return;
+  if (!journey.ceo || journey.day % 3 !== 0) return;
 
   ui.writeInfo(`${journey.ceo.name} has implemented a strategic initiative.`);
   if (journey.ceo.decision_making_style === "conservative") {

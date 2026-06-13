@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createReconJourney, executeFieldDay } from '../js/journey.js';
+import {
+  createReconJourney,
+  executeFieldDay,
+  executeFieldAction,
+  endFieldDay
+} from '../js/journey.js';
 import {
   applyAccessVerdictPressure,
   getBlockAccessVerdict
@@ -59,6 +64,34 @@ test('access verdicts distinguish hard stops from passable blocks and adjust scr
   const aggressiveDelta = applyAccessVerdictPressure(journey, noGoVerdict, { stance: 'aggressive' });
   assert.equal(aggressiveDelta, 3);
   assert.equal(journey.scrutiny, 5);
+});
+
+test('executeFieldAction resolves the shift without rolling the calendar forward', () => {
+  const journey = makeJourney();
+  journey.routePlan = { day: journey.day, shortLabel: 'ridge line', fuelMultiplier: 1 };
+  const startDay = journey.day;
+  const startWeather = journey.weather;
+
+  const result = executeFieldAction(journey, 'normal');
+
+  // The day's work resolved (distance covered) but the calendar did not advance,
+  // so the header, weather, and route plan stay put for the rest of the shift.
+  assert.equal(journey.day, startDay, 'day must not advance on a single action');
+  assert.equal(journey.weather, startWeather, 'weather must not reroll mid-shift');
+  assert.deepEqual(journey.routePlan, { day: startDay, shortLabel: 'ridge line', fuelMultiplier: 1 });
+  assert.ok(result.messages.length > 0);
+
+  // Only ending the shift advances the calendar and clears per-shift state.
+  endFieldDay(journey);
+  assert.equal(journey.day, startDay + 1, 'endFieldDay advances exactly one day');
+  assert.equal(journey.routePlan, null, 'endFieldDay clears the route plan');
+});
+
+test('executeFieldDay still advances the day for single-call callers', () => {
+  const journey = makeJourney();
+  const startDay = journey.day;
+  executeFieldDay(journey, 'normal');
+  assert.equal(journey.day, startDay + 1);
 });
 
 test('sustained critical food shortage triggers hardship pressure on the field crew', () => {

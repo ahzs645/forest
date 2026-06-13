@@ -17,7 +17,12 @@ export {
 
 export { getCurrentBlock, getNextBlock, syncBlocksFromDistance } from './blockNav.js';
 
-export { calculateTravelDistance, executeFieldDay } from './fieldMechanics.js';
+export {
+  calculateTravelDistance,
+  executeFieldDay,
+  executeFieldAction,
+  endFieldDay
+} from './fieldMechanics.js';
 
 export { executeDeskDay } from './deskMechanics.js';
 

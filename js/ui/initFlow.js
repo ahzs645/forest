@@ -17,6 +17,10 @@ export const ROLE_ICONS = {
   default: '◉'
 };
 
+// Newer expedition roles that are playable but less battle-tested than the
+// field roles. Flagged in the picker so first-time players know what to expect.
+export const EXPERIMENTAL_ROLE_IDS = new Set(['manager']);
+
 function getAreaScrutinyProfile(area) {
   const tags = Array.isArray(area?.tags) ? area.tags : [];
   let score = 20;
@@ -318,6 +322,13 @@ export const InitFlowMixin = {
       card.className = `role-card ${isSelected ? 'selected' : ''}`;
 
       const icon = ROLE_ICONS[role.id] || ROLE_ICONS.default;
+      const isExperimental = EXPERIMENTAL_ROLE_IDS.has(role.id);
+      if (isExperimental) {
+        card.classList.add('experimental');
+      }
+      const experimentalBadge = isExperimental
+        ? '<span class="role-experimental" title="Newer mode — less playtested than the field roles">EXPERIMENTAL</span>'
+        : '';
 
       card.innerHTML = `
         <div class="role-icon-box">
@@ -327,6 +338,7 @@ export const InitFlowMixin = {
           <div class="role-header">
             <span class="role-id">0${index + 1} ::</span>
             <h3 class="role-name">${role.name.toUpperCase()}</h3>
+            ${experimentalBadge}
           </div>
           <p class="role-desc">${role.description}</p>
         </div>

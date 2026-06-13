@@ -800,7 +800,7 @@ export function calculateTravelDistance(journey, paceId) {
  * @param {string} paceId - Selected pace
  * @returns {Object} Result with updated journey and messages
  */
-export function executeFieldDay(journey, paceId) {
+export function executeFieldAction(journey, paceId) {
   const messages = [];
   let effectivePaceId = paceId;
   let pace = PACE_OPTIONS[paceId] || PACE_OPTIONS.normal;
@@ -970,16 +970,6 @@ export function executeFieldDay(journey, paceId) {
     messages.push(journey.gameOverReason);
   }
 
-  // Update weather for next day
-  journey.day++;
-  journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day);
-  journey.temperature = getTemperature(journey.weather, getCurrentBlock(journey));
-  journey.travelDelayHours = 0;
-  journey.routePlan = null;
-  if (journey.rationPlan) {
-    journey.rationPlan.mode = 'normal';
-  }
-
   // Log the day with more detail
   journey.log.push({
     day: dayNumber,
@@ -1007,6 +997,43 @@ export function executeFieldDay(journey, paceId) {
   }
 
   return { journey, messages };
+}
+
+/**
+ * Advance the calendar to the next shift.
+ *
+ * This is intentionally separate from {@link executeFieldAction}: in the recon
+ * multi-action shift loop, several actions can resolve within a single shift,
+ * but the day must only roll over once — at the END of the shift. Calling this
+ * mid-shift is what made the header jump from Shift 1 to Shift 2, rerolled
+ * weather while hours remained, and cleared the route/ration plans early.
+ *
+ * @param {Object} journey - Journey state to advance
+ * @returns {Object} The same journey, now pointing at the next shift
+ */
+export function endFieldDay(journey) {
+  journey.day++;
+  journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day);
+  journey.temperature = getTemperature(journey.weather, getCurrentBlock(journey));
+  journey.travelDelayHours = 0;
+  journey.routePlan = null;
+  if (journey.rationPlan) {
+    journey.rationPlan.mode = 'normal';
+  }
+  return journey;
+}
+
+/**
+ * Resolve a field action AND immediately advance to the next shift.
+ *
+ * Retained for callers (and tests) that treat one action as one whole day.
+ * The recon loop instead calls {@link executeFieldAction} for each in-shift
+ * action and {@link endFieldDay} exactly once when the shift ends.
+ */
+export function executeFieldDay(journey, paceId) {
+  const result = executeFieldAction(journey, paceId);
+  endFieldDay(journey);
+  return result;
 }
 
 function applyRoutePlanConsequences(journey, routePlan, paceId, fromBlock, toBlock, messages) {

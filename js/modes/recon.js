@@ -14,7 +14,8 @@ import {
 } from '../crew.js';
 import { getFieldProgressInfo, getSurveyedBlockCount } from '../journey.js';
 import {
-  executeFieldDay,
+  executeFieldAction,
+  endFieldDay,
   formatAccessVerdict,
   formatInfrastructureStatus,
   getBlockAccessVerdict,
@@ -263,7 +264,10 @@ async function runFieldDay(game) {
   }
 
   let hasTraveled = false;
-  let dayAdvanced = false;
+  // Tracks whether this shift's daily resolution (resource burn, crew updates,
+  // hardships) has already run via executeFieldAction. The calendar itself only
+  // rolls over once, at the very end of the shift, via endFieldDay().
+  let dayResolved = false;
 
   // Check for random event at start of day
   const event = checkForEvent(journey);
@@ -282,8 +286,9 @@ async function runFieldDay(game) {
     ui.writeDanger(`${journey.weather.name} has grounded all operations. The crew hunkers down.`);
     ui.write('');
     journey.hoursRemaining = 0;
-    const result = executeFieldDay(journey, 'resting');
+    const result = executeFieldAction(journey, 'resting');
     for (const msg of result.messages) ui.write(msg);
+    endFieldDay(journey);
     ui.updateAllStatus(journey);
 
     // Contextual continue (Phase 6.1)
@@ -317,33 +322,36 @@ async function runFieldDay(game) {
 
     displayDayHeader(ui, journey);
 
-    // Build action options based on remaining hours and state
-    const actionOptions = [];
+    // The shift menu is split so each turn reads as a decision, not an audit:
+    //   primary  = the main work choices (travel / verify / notebook) + resupply
+    //   support  = camp upkeep and orientation, one level down behind "Camp & Support"
+    const primaryOptions = [];
+    const supportOptions = [];
 
     if (canTravel) {
       const routeSuffix = journey.routePlan ? ` via ${journey.routePlan.shortLabel}` : '';
       // Travel options (4-6 hours depending on pace)
-      actionOptions.push({
+      primaryOptions.push({
         label: `Cautious Recon${routeSuffix} (4h)`,
         description: '60% coverage, low risk',
         value: 'slow'
       });
       if (journey.hoursRemaining >= 5) {
-        actionOptions.push({
+        primaryOptions.push({
           label: `Standard Recon${routeSuffix} (5h)`,
           description: '100% coverage, normal risk',
           value: 'normal'
         });
       }
       if (journey.hoursRemaining >= 6) {
-        actionOptions.push({
+        primaryOptions.push({
           label: `Extended Recon${routeSuffix} (6h)`,
           description: '140% coverage, higher risk',
           value: 'fast'
         });
       }
       if (journey.hoursRemaining >= 8) {
-        actionOptions.push({
+        primaryOptions.push({
           label: `Max Effort${routeSuffix} (8h)`,
           description: '180% coverage, grueling',
           value: 'grueling'
@@ -352,7 +360,7 @@ async function runFieldDay(game) {
     }
 
     if (currentBlock && !blockIntel.accessGroundTruthed && journey.hoursRemaining >= 2) {
-      actionOptions.push({
+      primaryOptions.push({
         label: 'Ground-Truth Access (2h)',
         description: `Verify crossings, road condition, and approach risk before moving on (${accessVerdict?.label || 'current access check'})`,
         value: 'ground_truth'
@@ -360,7 +368,7 @@ async function runFieldDay(game) {
     }
 
     if (currentBlock && valuesSweep.needed && !blockIntel.valuesSwept && journey.hoursRemaining >= 2) {
-      actionOptions.push({
+      primaryOptions.push({
         label: 'Values Sweep (2h)',
         description: `Ground-check riparian, cultural, wildlife, and visibility notes (${valuesSweep.notes[0]})`,
         value: 'values_sweep'
@@ -369,21 +377,29 @@ async function runFieldDay(game) {
 
     if (openPackages.length > 0 && journey.hoursRemaining >= 2) {
       const nextPackage = openPackages[0];
-      actionOptions.push({
+      primaryOptions.push({
         label: 'Field Notebook (2h)',
         description: `Close an open package from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')})`,
         value: 'field_notebook'
       });
     }
 
-    // Camp actions (available anytime)
+    if (currentBlock?.hasSupply && journey.hoursRemaining >= 2) {
+      primaryOptions.push({
+        label: 'Resupply (2h)',
+        description: 'Buy fuel, food, repairs, kits',
+        value: 'resupply'
+      });
+    }
+
+    // Camp actions (available anytime), one level down to keep the turn clean.
     if (journey.hoursRemaining >= 2) {
-      actionOptions.push({
+      supportOptions.push({
         label: 'Forage & Hunt (2h)',
         description: 'Search for food and salvage; moderate risk',
         value: 'forage'
       });
-      actionOptions.push({
+      supportOptions.push({
         label: 'Maintenance (2h)',
         description: 'Repair equipment',
         value: 'maintain'
@@ -392,59 +408,79 @@ async function runFieldDay(game) {
 
     // Scouting (Phase 4.3)
     if (journey.hoursRemaining >= 2 && journey.currentBlockIndex < journey.blocks.length - 1) {
-      actionOptions.push({
+      supportOptions.push({
         label: 'Scout Ahead (2h)',
         description: 'Reveal next block conditions',
         value: 'scout'
       });
     }
 
-    // Orientation is always free
-    actionOptions.push({
-      label: 'Consult the Area Map',
-      description: 'Plot the traverse, camps, and remaining blocks',
-      value: 'consult_map'
-    });
-    actionOptions.push({
-      label: 'Review the Briefing',
-      description: 'Access intel, area situation, and carry-forward notes',
-      value: 'briefing'
-    });
-
     const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
     if (hasAnyInjured && journey.resources.firstAid > 0 && journey.hoursRemaining >= 1) {
-      actionOptions.push({
+      supportOptions.push({
         label: 'Triage (1h)',
         description: 'Treat an injured crew member',
         value: 'triage'
       });
     }
 
-    if (currentBlock?.hasSupply && journey.hoursRemaining >= 2) {
-      actionOptions.push({
-        label: 'Resupply (2h)',
-        description: 'Buy fuel, food, repairs, kits',
-        value: 'resupply'
+    // Orientation is always free
+    supportOptions.push({
+      label: 'Consult the Area Map',
+      description: 'Plot the traverse, camps, and remaining blocks',
+      value: 'consult_map'
+    });
+    supportOptions.push({
+      label: 'Review the Briefing',
+      description: 'Access intel, area situation, and carry-forward notes',
+      value: 'briefing'
+    });
+
+    if (supportOptions.length > 0) {
+      primaryOptions.push({
+        label: 'Camp & Support ▸',
+        description: 'Forage, repairs, triage, scouting, map and briefing',
+        value: 'support_menu'
       });
     }
 
-    actionOptions.push({
+    primaryOptions.push({
       label: 'Rest & End Shift',
       description: 'Recover health/morale, end the day',
       value: 'end_shift'
     });
 
-    const action = await ui.promptChoice(`${journey.hoursRemaining}h remaining:`, actionOptions);
-    const actionId = action.value || 'end_shift';
+    // Resolve the menu, drilling into the support submenu when chosen.
+    let actionId = 'end_shift';
+    while (true) {
+      const action = await ui.promptChoice(`${journey.hoursRemaining}h remaining:`, primaryOptions);
+      const chosen = action.value || 'end_shift';
+      if (chosen === 'support_menu') {
+        const sub = await ui.promptChoice('Camp & support:', [
+          ...supportOptions,
+          { label: 'Back', description: 'Return to the main shift menu', value: 'support_back' }
+        ]);
+        const subChoice = sub.value || 'support_back';
+        if (subChoice === 'support_back') {
+          displayDayHeader(ui, journey);
+          continue;
+        }
+        actionId = subChoice;
+        break;
+      }
+      actionId = chosen;
+      break;
+    }
 
     ui.write('');
 
     // Process the chosen action
     if (actionId === 'end_shift') {
-      // End the shift early with rest benefits. This advances the day, so the
-      // end-of-day camp_work pass below must not fire a second time.
-      const result = executeFieldDay(journey, 'resting');
-      dayAdvanced = true;
+      // End the shift early with rest benefits. This resolves the day, so the
+      // end-of-shift camp_work pass below must not fire a second time. The
+      // calendar advances once, after the loop, via endFieldDay().
+      const result = executeFieldAction(journey, 'resting');
+      dayResolved = true;
       for (const msg of result.messages) ui.write(msg);
       journey.hoursRemaining = 0;
       break;
@@ -458,7 +494,8 @@ async function runFieldDay(game) {
       const progressBefore = journey.totalDistance > 0
         ? journey.distanceTraveled / journey.totalDistance
         : 0;
-      const result = executeFieldDay(journey, actionId);
+      const result = executeFieldAction(journey, actionId);
+      dayResolved = true;
       if (typeof ui.playTravelStrip === 'function') {
         await ui.playTravelStrip({
           progressBefore,
@@ -513,12 +550,15 @@ async function runFieldDay(game) {
     // If there are still hours, prompt between actions
   }
 
-  // End of day — if the day was not already advanced by travel or an ended
-  // shift, run a camp_work pass so the calendar moves exactly once.
-  if (!hasTraveled && !dayAdvanced) {
-    const result = executeFieldDay(journey, 'camp_work');
+  // End of shift — if no action resolved the day yet (no travel, no rest), run
+  // a camp_work pass so the day's resource/crew effects apply exactly once.
+  if (!dayResolved) {
+    const result = executeFieldAction(journey, 'camp_work');
     for (const msg of result.messages) ui.write(msg);
   }
+
+  // Advance the calendar exactly once, now that the shift is genuinely over.
+  endFieldDay(journey);
 
   ui.updateAllStatus(journey);
 
@@ -543,21 +583,30 @@ function displayDayHeader(ui, journey) {
   // ASCII block map (Phase 5.4)
   ui.write(buildBlockMap(journey));
 
-  // Compact progress line
+  // Compact progress line. Recon is won by closing every block package, not by
+  // reaching the end of the route, so the headline bar tracks Package
+  // Completion (verified packages / total) and distance is a secondary stat.
+  const totalBlocks = progressInfo.totalBlocks || journey.blocks?.length || 0;
+  const packagesDone = Math.min(totalBlocks, journey.blocksAssessed || 0);
+  const completionPct = totalBlocks > 0 ? Math.round((packagesDone / totalBlocks) * 100) : 0;
   const progressBarWidth = 20;
-  const filledWidth = Math.max(0, Math.min(progressBarWidth, Math.round((progressInfo.overallProgress / 100) * progressBarWidth)));
+  const filledWidth = Math.max(0, Math.min(progressBarWidth, Math.round((completionPct / 100) * progressBarWidth)));
   const progressBar = '\u2588'.repeat(filledWidth) + '\u2591'.repeat(progressBarWidth - filledWidth);
-  ui.write(`[${progressBar}] ${progressInfo.overallProgress}% | ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
+  ui.write(`[${progressBar}] Package Completion ${packagesDone}/${totalBlocks} (${completionPct}%) | Traverse ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
 
   ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'} | Hours: ${journey.hoursRemaining || 0}h`);
 
   const r = journey.resources;
   ui.write(`FUEL: ${Math.round(r.fuel)} | FOOD: ${Math.round(r.food)} | EQUIP: ${Math.round(r.equipment)}% | MEDS: ${r.firstAid} | CASH: $${Math.round(r.budget).toLocaleString()}`);
 
-  // Objective tracker: packages verified, and the checklist for THIS block, so
-  // the win condition (verify every package) is never a surprise.
-  const totalBlocks = journey.blocks?.length || 0;
-  ui.write(`Objective: verify ${journey.blocksAssessed || 0}/${totalBlocks} block packages`);
+  // Objective tracker: the win condition (finalize every package) and the
+  // checklist for THIS block, so closing packages is never a surprise.
+  const packagesRemaining = Math.max(0, totalBlocks - packagesDone);
+  ui.write(
+    packagesRemaining > 0
+      ? `Win condition: finalize every block package — ${packagesRemaining} still open`
+      : `Win condition met: all ${totalBlocks} block packages finalized`
+  );
   if (currentBlock) {
     const intel = getReconBlockIntel(journey, currentBlock);
     const sweep = getReconValueSweepProfile(currentBlock, journey);

@@ -4,7 +4,8 @@ const ROLE_RUNS = [
   { name: 'planner', roleIndex: 0, areaIndex: 0, seed: 1001 },
   { name: 'permitter', roleIndex: 1, areaIndex: 1, seed: 2001 },
   { name: 'recce', roleIndex: 2, areaIndex: 2, seed: 3001 },
-  { name: 'silviculture', roleIndex: 3, areaIndex: 3, seed: 4001 }
+  { name: 'silviculture', roleIndex: 3, areaIndex: 3, seed: 4001 },
+  { name: 'manager', roleIndex: 4, areaIndex: 4, seed: 5001 }
 ];
 
 const DIFFICULTIES = [
@@ -49,6 +50,35 @@ function findFirstMatching(labels, priorities) {
     const index = labels.findIndex((label) => normalizeChoiceLabel(label).startsWith(priority));
     if (index !== -1) {
       return index;
+    }
+  }
+  return 0;
+}
+
+// Recon's shift menu is two-tiered: camp/upkeep actions live behind a
+// "Camp & Support" entry. When the highest-priority action is one of those
+// and it isn't on the current (primary) menu, drill into the submenu; the next
+// call sees the support actions and selects directly.
+const RECON_SUPPORT_ACTIONS = new Set([
+  'Forage & Hunt',
+  'Maintenance',
+  'Scout Ahead',
+  'Triage',
+  'Consult the Area Map',
+  'Review the Briefing'
+]);
+
+function pickReconMenuChoice(labels, priorities) {
+  for (const priority of priorities) {
+    const index = labels.findIndex((label) => normalizeChoiceLabel(label).startsWith(priority));
+    if (index !== -1) {
+      return index;
+    }
+    if (RECON_SUPPORT_ACTIONS.has(priority)) {
+      const supportIndex = labels.findIndex((label) => normalizeChoiceLabel(label).startsWith('Camp & Support'));
+      if (supportIndex !== -1) {
+        return supportIndex;
+      }
     }
   }
   return 0;
@@ -125,6 +155,20 @@ function pickReconChoice(labels, terminalText) {
   const injuredMatch = terminalText.match(/\|\s*(\d+)\s+injured/);
   const injuredCount = injuredMatch ? Number(injuredMatch[1]) : 0;
 
+  // When the shift is nearly out of hours, no useful work fits — end it rather
+  // than bouncing into the support submenu for actions we can't afford.
+  const hoursMatch = terminalText.match(/Hours:\s*(\d+)\s*h/);
+  const hoursLeft = hoursMatch ? Number(hoursMatch[1]) : 9;
+  const atShiftMenu = labels.some((label) => {
+    const normalized = normalizeChoiceLabel(label);
+    return normalized.startsWith('Rest & End Shift')
+      || normalized.startsWith('Camp & Support')
+      || normalized === 'Back';
+  });
+  if (atShiftMenu && hoursLeft < 2) {
+    return findFirstMatching(labels, ['Rest & End Shift', 'Back', 'Consult the Area Map']);
+  }
+
   if (labels.some((label) => label.includes('Safe Detour')) || labels.some((label) => label.includes('Stay Mainline'))) {
     if (fuel < 20 || equipment < 40) {
       return findFirstMatching(labels, ['Risky Shortcut', 'Stay Mainline', 'Safe Detour']);
@@ -161,18 +205,18 @@ function pickReconChoice(labels, terminalText) {
   }
 
   if (food <= 12) {
-    return findFirstMatching(labels, ['Resupply', 'Forage & Hunt', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return pickReconMenuChoice(labels, ['Resupply', 'Forage & Hunt', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
   }
 
   if (fuel <= 25 || equipment <= 35) {
-    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Forage & Hunt', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return pickReconMenuChoice(labels, ['Resupply', 'Maintenance', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Forage & Hunt', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
   }
 
   if (injuredCount >= 2 && meds > 0) {
-    return findFirstMatching(labels, ['Triage', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Forage & Hunt', 'Rest & End Shift']);
+    return pickReconMenuChoice(labels, ['Triage', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Forage & Hunt', 'Rest & End Shift']);
   }
 
-  return findFirstMatching(labels, ['Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Forage & Hunt', 'Triage', 'Rest & End Shift']);
+  return pickReconMenuChoice(labels, ['Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Forage & Hunt', 'Triage', 'Rest & End Shift']);
 }
 
 function pickChoice(labels, terminalText, strategyName) {
@@ -229,6 +273,19 @@ function pickChoice(labels, terminalText, strategyName) {
       'Grant rest day',
       'Pay retention',
       'End Day'
+    ],
+    // Manager runs a 12-month term; this strategy protects the treasury and
+    // reputation (the win condition) by favouring cheap, steady choices.
+    manager: [
+      'Skip certification for now',
+      'Hold the line',
+      'Demand a corrective plan',
+      'Rehearse the numbers cold',
+      'Full transparency',
+      'Back the division lead publicly',
+      'Fly out to the blocks',
+      'Stay at your desk',
+      'Adjourn the meeting'
     ]
   };
 
@@ -428,4 +485,19 @@ if (VERBOSE) {
     }
     console.log(lines.slice(-14).join(' | '));
   }
+}
+
+// CI gate: a playable smoke test should never hit a runtime error (an uncaught
+// page error or a console error) for any role. This is the regression class the
+// startup-parse-error report was about — a broken import surfaces here for every
+// role. Balance outcomes (SUCCESS vs FAIL) and whether the auto-player reaches
+// an end screen are reported above but intentionally not gated.
+const runsWithErrors = results.filter((result) => result.runtimeErrors.length > 0);
+
+if (runsWithErrors.length > 0) {
+  console.error(`\n${runsWithErrors.length} run(s) hit runtime errors:`);
+  for (const result of runsWithErrors) {
+    console.error(`- ${result.role}/${result.difficulty}: ${result.runtimeErrors.join(' | ')}`);
+  }
+  process.exitCode = 1;
 }

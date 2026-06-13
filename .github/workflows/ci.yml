@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches-ignore: []
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Lint game content
+        run: npm run lint:events --if-present
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      # Drives a full auto-played run for every expedition role (planner,
+      # permitter, recce, silviculture, manager) across all difficulties and
+      # fails if any run hits a runtime error.
+      - name: Playtest matrix smoke
+        run: |
+          VITE_BASE_PATH=/ npm run build
+          npx vite preview --host 127.0.0.1 --port 4173 --strictPort &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4173/ >/dev/null && break
+            sleep 2
+          done
+          PLAYWRIGHT_MATRIX_URL=http://127.0.0.1:4173/ node scripts/playwright-matrix.mjs
