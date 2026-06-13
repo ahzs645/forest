@@ -245,18 +245,10 @@ function inferDecisionPrompt(type, riskClass, context) {
   if (type === "temptation") {
     return "Decide whether to refuse, report, or take a shortcut that could damage the file if it comes back on you.";
   }
-  // Objectives are written as imperative sentences ("Build a work program..."),
-  // so introduce them with a colon rather than splicing them mid-sentence — and
-  // strip any trailing period so we don't double-punctuate.
-  const objective = String(context?.objective || "").trim().replace(/\s*[.]+\s*$/, "");
-  if (objective) {
-    return riskClass === "calculated"
-      ? `Choose the response that protects this objective without a larger follow-up problem: ${objective}.`
-      : `Choose the response that best protects this objective: ${objective}.`;
-  }
-  return riskClass === "calculated"
-    ? "Choose the response that protects the work without creating a larger follow-up problem."
-    : "Choose the response that best protects the current work.";
+  // There is no per-card authored question, and the role/season objective is
+  // generic, so asking a grounded question that points at the briefing above
+  // reads better than splicing in a goal that doesn't match this situation.
+  return "How do you want to respond?";
 }
 
 function rewriteAmbiguousTerminology(text) {

@@ -155,7 +155,7 @@ test('first playable seasonal card exposes the contract fields and neutral promp
   assert.ok(state.contentData.context?.operation);
   assert.ok(state.contentData.context?.objective);
   assert.ok(state.contentData.context?.stakes);
-  assert.match(state.contentData.decisionPrompt || '', /^Choose the response/i);
+  assert.match(state.contentData.decisionPrompt || '', /^How do you want to respond\?$/i);
   assert.equal(state.contentData.optionHeading, 'Choose your response');
   assert.equal(state.art, null);
   assert.ok(state.options.length > 1);
