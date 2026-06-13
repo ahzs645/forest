@@ -216,12 +216,6 @@ function ScenarioAsciiMap({ map, features }) {
 
 function ContentView({ data }) {
   if (!data) return null;
-  const optionToneClass =
-    data.optionTone === "danger"
-      ? "red"
-      : data.optionTone === "warning"
-        ? "yellow"
-        : "blue";
 
   if (data.type === "message") {
     return (
@@ -348,17 +342,6 @@ function ContentView({ data }) {
             </div>
           </>
         ) : null}
-        <div className={`tui-subheading ${data.optionTone ? `tone-${optionToneClass}` : ""}`}>
-          {data.optionHeading || "Choose your response"}
-        </div>
-        <div className="tui-detail-list">
-          {data.optionDetails.map((option, idx) => (
-            <div className="tui-detail-item" key={`${option.label}-${idx}`}>
-              <div className={`tui-detail-label ${data.optionTone ? `tone-${optionToneClass}` : ""}`}>{`${idx + 1}. ${option.label}`}</div>
-              {option.outcome ? <div className="tui-detail-copy">{option.outcome}</div> : null}
-            </div>
-          ))}
-        </div>
       </div>
     );
   }
@@ -446,23 +429,37 @@ function CardContext({ data }) {
   );
 }
 
-function OptionsPanel({ options, selected, onSelect, isCrisis }) {
+function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelect, isCrisis }) {
   if (!options.length) return null;
+
+  const toneClass =
+    tone === "danger" ? "red" : tone === "warning" ? "yellow" : tone ? "blue" : "";
+  const title = heading || (isCrisis ? "Command Menu" : "Options");
 
   return (
     <section className="tui-panel tui-options">
-      <div className="tui-panel-title">{isCrisis ? "Command Menu" : "Options"} (Use Arrow Keys & Enter)</div>
+      <div className="tui-panel-title">
+        <span className={toneClass ? `tone-${toneClass}` : ""}>{title}</span>
+        <span className="tui-options-hint">↑↓ · Enter</span>
+      </div>
       <div className="tui-options-list">
-        {options.map((label, index) => (
-          <button
-            key={`${label}-${index}`}
-            type="button"
-            className={`tui-option ${index === selected ? "selected" : ""}`}
-            onClick={() => onSelect(index)}
-          >
-            {` ${index + 1}. ${label} `}
-          </button>
-        ))}
+        {options.map((label, index) => {
+          const outcome = optionDetails?.[index]?.outcome;
+          return (
+            <button
+              key={`${label}-${index}`}
+              type="button"
+              className={`tui-option ${index === selected ? "selected" : ""}`}
+              onClick={() => onSelect(index)}
+            >
+              <span className="tui-option-head">
+                <span className="tui-option-number">{index + 1}</span>
+                <span className="tui-option-label">{label}</span>
+              </span>
+              {outcome ? <span className="tui-option-outcome">{outcome}</span> : null}
+            </button>
+          );
+        })}
       </div>
     </section>
   );
@@ -565,6 +562,9 @@ export default function App() {
             ) : null}
             <OptionsPanel
               options={state.options}
+              optionDetails={state.contentData?.optionDetails}
+              heading={state.contentData?.optionHeading}
+              tone={state.contentData?.optionTone}
               selected={state.selected}
               onSelect={selectOption}
               isCrisis={isCrisis}
