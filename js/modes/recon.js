@@ -14,7 +14,8 @@ import {
 } from '../crew.js';
 import { getFieldProgressInfo, getSurveyedBlockCount } from '../journey.js';
 import {
-  executeFieldDay,
+  executeFieldAction,
+  endFieldDay,
   formatAccessVerdict,
   formatInfrastructureStatus,
   getBlockAccessVerdict,
@@ -263,7 +264,10 @@ async function runFieldDay(game) {
   }
 
   let hasTraveled = false;
-  let dayAdvanced = false;
+  // Tracks whether this shift's daily resolution (resource burn, crew updates,
+  // hardships) has already run via executeFieldAction. The calendar itself only
+  // rolls over once, at the very end of the shift, via endFieldDay().
+  let dayResolved = false;
 
   // Check for random event at start of day
   const event = checkForEvent(journey);
@@ -282,8 +286,9 @@ async function runFieldDay(game) {
     ui.writeDanger(`${journey.weather.name} has grounded all operations. The crew hunkers down.`);
     ui.write('');
     journey.hoursRemaining = 0;
-    const result = executeFieldDay(journey, 'resting');
+    const result = executeFieldAction(journey, 'resting');
     for (const msg of result.messages) ui.write(msg);
+    endFieldDay(journey);
     ui.updateAllStatus(journey);
 
     // Contextual continue (Phase 6.1)
@@ -441,10 +446,11 @@ async function runFieldDay(game) {
 
     // Process the chosen action
     if (actionId === 'end_shift') {
-      // End the shift early with rest benefits. This advances the day, so the
-      // end-of-day camp_work pass below must not fire a second time.
-      const result = executeFieldDay(journey, 'resting');
-      dayAdvanced = true;
+      // End the shift early with rest benefits. This resolves the day, so the
+      // end-of-shift camp_work pass below must not fire a second time. The
+      // calendar advances once, after the loop, via endFieldDay().
+      const result = executeFieldAction(journey, 'resting');
+      dayResolved = true;
       for (const msg of result.messages) ui.write(msg);
       journey.hoursRemaining = 0;
       break;
@@ -458,7 +464,8 @@ async function runFieldDay(game) {
       const progressBefore = journey.totalDistance > 0
         ? journey.distanceTraveled / journey.totalDistance
         : 0;
-      const result = executeFieldDay(journey, actionId);
+      const result = executeFieldAction(journey, actionId);
+      dayResolved = true;
       if (typeof ui.playTravelStrip === 'function') {
         await ui.playTravelStrip({
           progressBefore,
@@ -513,12 +520,15 @@ async function runFieldDay(game) {
     // If there are still hours, prompt between actions
   }
 
-  // End of day — if the day was not already advanced by travel or an ended
-  // shift, run a camp_work pass so the calendar moves exactly once.
-  if (!hasTraveled && !dayAdvanced) {
-    const result = executeFieldDay(journey, 'camp_work');
+  // End of shift — if no action resolved the day yet (no travel, no rest), run
+  // a camp_work pass so the day's resource/crew effects apply exactly once.
+  if (!dayResolved) {
+    const result = executeFieldAction(journey, 'camp_work');
     for (const msg of result.messages) ui.write(msg);
   }
+
+  // Advance the calendar exactly once, now that the shift is genuinely over.
+  endFieldDay(journey);
 
   ui.updateAllStatus(journey);
 
