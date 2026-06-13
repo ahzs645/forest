@@ -37,7 +37,40 @@ function Header({ onExit, isCrisis }) {
   );
 }
 
+function AreaBriefing({ briefing, areaName }) {
+  const finds = briefing?.likelyFinds || [];
+  const signals = briefing?.seasonalSignals || [];
+  return (
+    <div className="tui-dashboard-body tui-area-briefing">
+      {areaName ? <div className="tui-heading">{areaName}</div> : null}
+      {briefing?.zoneSummary ? <p className="tui-copy dim preserve">{briefing.zoneSummary}</p> : null}
+      {finds.length ? (
+        <>
+          <div className="tui-subheading">What you'll likely hit</div>
+          <ul className="tui-area-list">
+            {finds.map((find, idx) => (
+              <li className="tui-copy preserve" key={`find-${idx}`}>{find}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {signals.length ? (
+        <>
+          <div className="tui-subheading">Seasonal signals</div>
+          <ul className="tui-area-list">
+            {signals.map((signal, idx) => (
+              <li className="tui-copy dim preserve" key={`signal-${idx}`}>{signal}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function Dashboard({ gameState }) {
+  const [tab, setTab] = useState("status");
+
   const rows = !gameState
     ? [{ label: "Status", value: "Awaiting game start..." }]
     : [
@@ -54,19 +87,48 @@ function Dashboard({ gameState }) {
         { label: "Area", value: gameState.area?.name, plain: true },
       ].filter((row) => row.value !== undefined && row.value !== null);
 
+  const briefing = gameState?.areaBriefing;
+  const hasBriefing = Boolean(
+    briefing && (briefing.zoneSummary || briefing.likelyFinds?.length || briefing.seasonalSignals?.length)
+  );
+  // Fall back to Status whenever there's no area context to show (e.g. setup,
+  // or a reset that clears the briefing while the tab was left on "area").
+  const activeTab = tab === "area" && hasBriefing ? "area" : "status";
+
   return (
     <aside className="tui-panel tui-dashboard">
-      <div className="tui-panel-title">Dashboard</div>
-      <div className="tui-dashboard-body">
-        {rows.map((row) => (
-          <div className="tui-dashboard-row" key={row.label}>
-            <span className="tui-dashboard-label">{row.label}</span>
-            <span className={`tui-dashboard-value ${row.tone ? `tone-${row.tone}` : ""}`}>
-              {row.plain ? row.value : typeof row.value === "number" ? row.value : row.value}
-            </span>
-          </div>
-        ))}
+      <div className="tui-panel-title tui-dashboard-tabs">
+        <button
+          type="button"
+          className={`tui-dashboard-tab ${activeTab === "status" ? "active" : ""}`}
+          onClick={() => setTab("status")}
+        >
+          Dashboard
+        </button>
+        {hasBriefing ? (
+          <button
+            type="button"
+            className={`tui-dashboard-tab ${activeTab === "area" ? "active" : ""}`}
+            onClick={() => setTab("area")}
+          >
+            Area
+          </button>
+        ) : null}
       </div>
+      {activeTab === "area" ? (
+        <AreaBriefing briefing={briefing} areaName={gameState?.area?.name} />
+      ) : (
+        <div className="tui-dashboard-body">
+          {rows.map((row) => (
+            <div className="tui-dashboard-row" key={row.label}>
+              <span className="tui-dashboard-label">{row.label}</span>
+              <span className={`tui-dashboard-value ${row.tone ? `tone-${row.tone}` : ""}`}>
+                {row.plain ? row.value : typeof row.value === "number" ? row.value : row.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </aside>
   );
 }

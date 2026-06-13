@@ -157,6 +157,50 @@ body {
   overflow-wrap: anywhere;
 }
 
+.tui-dashboard-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0;
+  align-items: stretch;
+}
+
+.tui-dashboard-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #7d8590;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.45rem 0.6rem;
+}
+
+.tui-dashboard-tab:hover {
+  color: #e6edf3;
+}
+
+.tui-dashboard-tab.active {
+  color: #e6edf3;
+  border-bottom-color: #3fb950;
+}
+
+.tui-area-briefing .tui-heading {
+  font-size: 0.95rem;
+}
+
+.tui-area-list {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.tui-area-list li {
+  list-style: square;
+}
+
 .tone-yellow {
   color: #d29922;
 }

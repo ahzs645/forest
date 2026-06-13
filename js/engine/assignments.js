@@ -377,7 +377,8 @@ function buildBriefingCandidates(state, context) {
     sourceKey: `finding:${index}`,
     title: familyTitle(context.roleId, "briefing"),
     description: sanitizeText(finding),
-    flavor: sanitizeText(context?.briefing?.zoneSummary),
+    // The zone summary is standing area context — it now lives in the
+    // Dashboard "Area" tab, so the per-turn card keeps just its finding.
     sourceLabel: SOURCE_LABELS.briefing,
     whyNow: sanitizeText(
       context?.briefing?.seasonalSignals?.[Math.max(0, context.round - 1)]

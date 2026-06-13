@@ -1,4 +1,4 @@
-import { FORESTER_ROLES, OPERATING_AREAS } from "../js/data/index.js";
+import { FORESTER_ROLES, OPERATING_AREAS, getRoleAreaBriefing } from "../js/data/index.js";
 import {
   buildSeasonContext,
   createInitialState,
@@ -139,6 +139,12 @@ function snapshotGameState(gs) {
         }
       : null,
     roleDisplayName: gs.roleDisplayName || getRoleDisplayName(gs.role),
+    // Standing role-area context for the Dashboard "Area" tab. It's a pure
+    // function of role + area, so recompute it from the snapshot rather than
+    // threading it through every season's state.
+    areaBriefing: gs.role?.id && gs.area
+      ? getRoleAreaBriefing(gs.role.id, gs.area, { maxFinds: 6 })
+      : null,
   };
 }
 
