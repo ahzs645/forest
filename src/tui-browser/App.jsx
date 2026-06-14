@@ -77,25 +77,84 @@ function AreaBriefing({ briefing, areaName }) {
   );
 }
 
+const METRIC_ROWS = [
+  { key: "progress", label: "Progress", tone: "yellow", color: "#d29922" },
+  { key: "forestHealth", label: "Forest Health", tone: "green", color: "#3fb950" },
+  { key: "relationships", label: "Relationships", tone: "blue", color: "#58a6ff" },
+  { key: "compliance", label: "Compliance", tone: "magenta", color: "#bc8cff" },
+  { key: "budget", label: "Budget", tone: "red", color: "#f85149" },
+];
+
+// Five percentages are hard to scan, so each meter draws a proportional bar and
+// surfaces the swing from the player's most recent choice as an arrow.
+function MetricBar({ label, value, tone, color, delta }) {
+  const pct = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+  const change = Math.round(Number(delta) || 0);
+  return (
+    <div className="tui-metric">
+      <div className="tui-metric-head">
+        <span className="tui-metric-label">{label}</span>
+        <span className="tui-metric-figs">
+          <span className={`tui-metric-value tone-${tone}`}>{pct}%</span>
+          {change !== 0 ? (
+            <span className={`tui-metric-delta ${change > 0 ? "tone-green" : "tone-red"}`}>
+              {change > 0 ? `▲ +${change}` : `▼ ${change}`}
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <div className="tui-metric-track">
+        <div className="tui-metric-fill" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+    </div>
+  );
+}
+
+function shortSeason(season) {
+  return String(season || "").split(" ")[0] || season;
+}
+
+function StyleReadout({ style }) {
+  if (!style || !style.total) return null;
+  return (
+    <div className="tui-dashboard-aside">
+      <div className="tui-dashboard-section-title">Management style</div>
+      <div className="tui-style-label tone-green">{style.label}</div>
+      <p className="tui-copy dim">{style.tendency}</p>
+    </div>
+  );
+}
+
+function SeasonLog({ timeline }) {
+  if (!timeline?.length) return null;
+  return (
+    <div className="tui-dashboard-aside">
+      <div className="tui-dashboard-section-title">Season log</div>
+      {timeline.map((entry) => (
+        <div className="tui-season-log-row" key={`season-${entry.round}`}>
+          <span className="tui-season-log-season tone-green">{shortSeason(entry.season)}</span>
+          <span className="tui-season-log-headline">{entry.headline || "—"}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Dashboard({ gameState }) {
   const [tab, setTab] = useState("status");
 
-  const rows = !gameState
+  const metaRows = !gameState
     ? [{ label: "Status", value: "Awaiting game start..." }]
     : [
         { label: "Season", value: `${gameState.round || 0} / ${gameState.totalRounds || 4}` },
-        { label: "Progress", value: `${gameState.metrics.progress}%`, tone: "yellow" },
-        { label: "Forest Health", value: `${gameState.metrics.forestHealth}%`, tone: "green" },
-        { label: "Relationships", value: `${gameState.metrics.relationships}%`, tone: "blue" },
-        { label: "Compliance", value: `${gameState.metrics.compliance}%`, tone: "magenta" },
-        { label: "Budget", value: `${gameState.metrics.budget}%`, tone: "red" },
-        { label: "Company", value: gameState.companyName, plain: true },
-        { label: "Mode", value: gameState.modeLabel, plain: true },
-        { label: "Incident", value: gameState.crisis?.title, plain: true },
-        { label: "Role", value: gameState.roleDisplayName || gameState.role?.seasonalName || gameState.role?.name, plain: true },
-        { label: "Area", value: gameState.area?.name, plain: true },
+        { label: "Company", value: gameState.companyName },
+        { label: "Mode", value: gameState.modeLabel },
+        { label: "Incident", value: gameState.crisis?.title },
+        { label: "Role", value: gameState.roleDisplayName || gameState.role?.seasonalName || gameState.role?.name },
+        { label: "Area", value: gameState.area?.name },
       ].filter((row) => row.value !== undefined && row.value !== null);
 
+  const deltas = gameState?.lastChoiceEffects || {};
   const briefing = gameState?.areaBriefing;
   const hasBriefing = Boolean(
     briefing && (briefing.zoneSummary || briefing.likelyFinds?.length || briefing.seasonalSignals?.length)
@@ -128,14 +187,28 @@ function Dashboard({ gameState }) {
         <AreaBriefing briefing={briefing} areaName={gameState?.area?.name} />
       ) : (
         <div className="tui-dashboard-body">
-          {rows.map((row) => (
+          {gameState ? (
+            <div className="tui-metric-list">
+              {METRIC_ROWS.map((row) => (
+                <MetricBar
+                  key={row.key}
+                  label={row.label}
+                  tone={row.tone}
+                  color={row.color}
+                  value={gameState.metrics[row.key]}
+                  delta={deltas[row.key]}
+                />
+              ))}
+            </div>
+          ) : null}
+          {metaRows.map((row) => (
             <div className="tui-dashboard-row" key={row.label}>
               <span className="tui-dashboard-label">{row.label}</span>
-              <span className={`tui-dashboard-value ${row.tone ? `tone-${row.tone}` : ""}`}>
-                {row.plain ? row.value : typeof row.value === "number" ? row.value : row.value}
-              </span>
+              <span className="tui-dashboard-value">{row.value}</span>
             </div>
           ))}
+          <StyleReadout style={gameState?.managementStyle} />
+          <SeasonLog timeline={gameState?.seasonTimeline} />
         </div>
       )}
     </aside>
@@ -385,6 +458,13 @@ function ContentView({ data }) {
         <NoticeBlock notice={data.notice} />
         <div className="tui-heading">{data.heading}</div>
         <p className="tui-copy preserve">{data.body}</p>
+        {data.style?.total ? (
+          <div className="tui-notice tone-green">
+            <div className="tui-notice-heading">Management style: {data.style.label}</div>
+            <p className="tui-copy">{data.style.tendency}</p>
+          </div>
+        ) : null}
+        {data.roleLens ? <p className="tui-copy preserve tone-blue">{data.roleLens}</p> : null}
         <SummarySection title="Signals" items={data.bullets} />
         <SummarySection title="Key Decisions" items={data.highlights} />
         <SummarySection title="Season Review" items={data.seasonSummaries} />

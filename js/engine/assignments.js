@@ -311,6 +311,9 @@ function buildAssignmentOptions(candidate) {
       label: template.label,
       outcome: template.outcome,
       effects: { ...template.effects },
+      // Carry the authored stance forward so chosen decisions can feed the
+      // management-style meter without re-deriving intent from the effects.
+      stance: template.stance,
     };
 
     if (

@@ -34,3 +34,9 @@ export {
   formatMetricDelta,
 } from "./engine/effects.js";
 export { buildSummary } from "./engine/summary.js";
+export {
+  buildRoleLens,
+  buildSeasonHeadline,
+  computeManagementStyle,
+  describeConsequences,
+} from "./engine/insights.js";

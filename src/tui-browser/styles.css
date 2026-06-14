@@ -201,6 +201,101 @@ body {
   list-style: square;
 }
 
+.tui-metric-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-bottom: 0.2rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid rgba(86, 212, 221, 0.18);
+}
+
+.tui-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.tui-metric-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.tui-metric-label {
+  color: #7d8590;
+}
+
+.tui-metric-figs {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.tui-metric-value {
+  font-weight: 700;
+}
+
+.tui-metric-delta {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.tui-metric-track {
+  height: 0.4rem;
+  border: 1px solid rgba(86, 212, 221, 0.22);
+  background: rgba(8, 12, 17, 0.85);
+  overflow: hidden;
+}
+
+.tui-metric-fill {
+  height: 100%;
+  transition: width 0.35s ease;
+}
+
+.tui-dashboard-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.5rem;
+  margin-top: 0.35rem;
+  border-top: 1px solid rgba(86, 212, 221, 0.18);
+}
+
+.tui-dashboard-section-title {
+  color: #56d4dd;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+}
+
+.tui-style-label {
+  font-weight: 700;
+}
+
+.tui-season-log-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  line-height: 1.4;
+}
+
+.tui-season-log-season {
+  flex: 0 0 4.5rem;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.tui-season-log-headline {
+  flex: 1;
+  min-width: 0;
+  color: #c9d1d9;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
 .tone-yellow {
   color: #d29922;
 }

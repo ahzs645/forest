@@ -1,5 +1,6 @@
 import { formatMetricName } from "./shared.js";
 import { getRoleDisplayName } from "./seasonalContract.js";
+import { buildRoleLens, computeManagementStyle } from "./insights.js";
 
 export function buildSummary(state) {
   const { metrics, role, area } = state;
@@ -50,10 +51,12 @@ export function buildSummary(state) {
   const trends = metricsTrendlines(state);
   const legacy = buildLegacyReport(metrics, trends, timeline);
   const highlights = topDecisions(state.history);
-  const achievements = buildAchievements(metrics, trends);
+  const style = computeManagementStyle(state);
+  const achievements = buildAchievements(metrics, trends, style);
   const projection = futureOutlook(metrics, trends, area);
+  const roleLens = buildRoleLens(state);
 
-  return { overall, messages, legacy, highlights, achievements, projection };
+  return { overall, messages, legacy, highlights, achievements, projection, style, roleLens };
 }
 
 function weightedAverage(metrics) {
@@ -122,8 +125,11 @@ function topDecisions(history = []) {
   return scored;
 }
 
-function buildAchievements(metrics, trends) {
+function buildAchievements(metrics, trends, style) {
   const medals = [];
+  if (style?.total >= 3 && style.dominant && style.label) {
+    medals.push(`🎯 ${style.label} – ${style.tendency}`);
+  }
   if (metrics.relationships >= 75 && metrics.compliance >= 65) {
     medals.push("🏅 Balanced Steward – high trust and strong compliance sustained.");
   }
