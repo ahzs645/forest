@@ -86,11 +86,17 @@ export const InputMixin = {
       btn.type = 'button';
       btn.className = isModern ? 'decision-card' : 'choice-btn';
 
+      // Keyboard accelerator: 1-9 for the first nine, 0 for a tenth. Beyond ten
+      // options there is no number key, so the badge is dropped rather than
+      // promising a shortcut that does not exist.
+      const shortcutKey = index < 9 ? String(index + 1) : index === 9 ? '0' : null;
+      const prefix = shortcutKey ? `[${shortcutKey}] ` : '';
+
       if (isModern) {
         // Modern card layout with header and checkbox
         btn.innerHTML = `
           <div class="card-header">
-            <span class="card-kbd-badge">KEY [${index + 1}]</span>
+            ${shortcutKey ? `<span class="card-kbd-badge">KEY [${shortcutKey}]</span>` : '<span class="card-kbd-badge card-kbd-badge--none"></span>'}
             <span class="card-checkbox">&#10003;</span>
           </div>
           <div class="card-content">
@@ -104,7 +110,7 @@ export const InputMixin = {
         // Classic terminal style
         const label = document.createElement('span');
         label.className = 'choice-label';
-        label.textContent = `[${index + 1}] ${option.label}`;
+        label.textContent = `${prefix}${option.label}`;
         btn.appendChild(label);
 
         if (option.hint || option.description) {

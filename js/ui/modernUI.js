@@ -41,6 +41,28 @@ export const ModernUIMixin = {
       this.badgeZoneValue.textContent = zoneName.toUpperCase();
     }
 
+    // Stats row (year / funds / eco-health / zone) — live data, not the static
+    // placeholders that used to ship in the markup.
+    if (this.modernYearValue) {
+      this.modernYearValue.textContent = journey.season?.year ? `Year ${journey.season.year}` : `Day ${journey.day}`;
+    }
+    if (this.modernFundsValue) {
+      const budget = Math.round(journey.resources?.budget ?? 0);
+      this.modernFundsValue.textContent = `$${budget.toLocaleString()}`;
+    }
+    if (this.modernZoneValue) {
+      this.modernZoneValue.textContent = journey.area?.becZone || journey.area?.name || journey.zone || '—';
+    }
+    // Eco-health maps to whatever the mode tracks: forest health, then
+    // biodiversity, falling back to a neutral dash when neither applies.
+    const ecoHealth = journey.metrics?.forestHealth ?? journey.values?.biodiversity;
+    if (this.modernEcoValue) {
+      this.modernEcoValue.textContent = Number.isFinite(ecoHealth) ? `${Math.round(ecoHealth)}%` : '—';
+    }
+    if (this.modernEcoFill) {
+      this.modernEcoFill.style.width = `${Number.isFinite(ecoHealth) ? Math.round(ecoHealth) : 0}%`;
+    }
+
     // Metrics sidebar
     if (this.metricProgressValue) {
       this.metricProgressValue.textContent = `${progress}%`;

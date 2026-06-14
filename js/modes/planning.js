@@ -116,6 +116,25 @@ function getPlanningApprovalGaps(journey) {
   return gaps;
 }
 
+/**
+ * The four ministerial approval thresholds, rendered as an always-visible
+ * checklist so the player never has to guess why submission is still blocked.
+ * Mirrors isPlanningApprovalReady() in shared/endConditions.js.
+ */
+function formatPlanningApprovalGates(journey) {
+  const plan = journey?.plan || {};
+  const gates = [
+    { label: 'Data 80%', current: Math.round(plan.dataCompleteness || 0), target: 80 },
+    { label: 'Analysis 80%', current: Math.round(plan.analysisQuality || 0), target: 80 },
+    { label: 'Buy-in 75%', current: Math.round(plan.stakeholderBuyIn || 0), target: 75 },
+    { label: 'Confidence 80%', current: Math.round(plan.ministerialConfidence || 0), target: 80 }
+  ];
+  return gates.map((gate) => {
+    const met = gate.current >= gate.target;
+    return `[${met ? 'x' : ' '}] ${gate.label} (${gate.current}%)`;
+  });
+}
+
 function applyPlanningProfessionalWork(journey, changes = {}) {
   const professional = ensurePlanningProfessionalState(journey);
   if (!professional) return null;
@@ -517,8 +536,9 @@ export async function runPlanningDay(game) {
   // Apply daily values consequences (Phase 4.1)
   applyValuesConsequences(journey);
 
-  // Check for event at start of day
-  const event = checkForEvent(journey);
+  // Check for event at start of day. Day 1 stays event-free so the player meets
+  // the normal planning loop before the game starts throwing disruptions.
+  const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     displayPlanningHeader(ui, journey, seasonInfo);
     await handleEvent(game, event);
@@ -603,7 +623,13 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
 
   ui.write(`Phase: ${getPlanningPhaseLabel(journey.plan.phase)}${Number.isFinite(journey.deadline) ? ` | Days left: ${Math.max(0, journey.deadline - journey.day)}` : ''}`);
   ui.write(`Data: ${journey.plan.dataCompleteness}% | Analysis: ${journey.plan.analysisQuality}% | Buy-in: ${journey.plan.stakeholderBuyIn}% | Confidence: ${journey.plan.ministerialConfidence}%`);
+  // Sticky objective block — the player should never have to dig into Review the
+  // File to learn what they are doing right now or what is still blocking them.
+  const objectiveDeadline = Number.isFinite(journey.deadline) ? ` by Day ${journey.deadline}` : '';
+  ui.write(`Objective: Win ministerial approval of the landscape plan${objectiveDeadline}.`);
+  ui.write(`Lane Focus: ${guidance.lane}`);
   ui.write(`Next Best Move: ${guidance.headline}`);
+  ui.write(`Approval Gates: ${formatPlanningApprovalGates(journey).join('  ')}`);
   ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Political Capital: ${journey.resources.politicalCapital} | Data: ${journey.resources.dataCredits}`);
 
   // Alerts only — the full file lives behind Review the File
@@ -883,19 +909,19 @@ function buildActionOptions(journey, seasonInfo = null) {
     const label = professional?.registrationActive ? 'Compliance Admin (2h)' : 'Renew Registration (2h)';
     const pieces = [];
     if (professional?.registrationStatus !== 'active') {
-      pieces.push(`registration ${professional.registrationStatus}`);
+      pieces.push(`registration ${professional.registrationStatus} (your licence to sign off is not current)`);
     }
     if (professional?.cpdGap > 0) {
-      pieces.push(`CPD gap ${professional.cpdGap}h`);
+      pieces.push(`CPD gap ${professional.cpdGap}h (professional training file is behind)`);
     }
     if (professional?.paperworkLoad > 0) {
-      pieces.push(`paperwork ${professional.paperworkLoad}`);
+      pieces.push(`paperwork ${professional.paperworkLoad} (filing backlog slowing the file)`);
     }
     actionOptions.push({
       label,
       description: pieces.length
-        ? `Lane: professional file | Reset: ${pieces.join(' | ')}`
-        : 'Lane: professional file | Renew registration, log CPD, and clear paperwork pressure',
+        ? `Lane: professional file | Clears: ${pieces.join(' | ')}`
+        : 'Lane: professional file | Renew registration, log CPD (continuing training), and clear paperwork pressure',
       value: 'professional_admin'
     });
   }

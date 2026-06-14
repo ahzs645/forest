@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>BC Forestry Trail — Expedition Mode</title>
@@ -62,7 +62,9 @@
               <span class="btn-icon">#</span>
               <span class="btn-text">[T] SEASONAL STRATEGY</span>
             </button>
-            <button id="crisis-mode-btn" class="landing-btn secondary experimental" type="button">
+            <!-- Experimental: hidden until the core loop is solid. Opt in with
+                 ?experimental=1 or localStorage forestExperimental=1. -->
+            <button id="crisis-mode-btn" class="landing-btn secondary experimental" type="button" hidden>
               <span class="btn-icon">!</span>
               <span class="btn-text">[C]RISIS COMMAND</span>
               <span class="landing-btn-badge">EXPERIMENTAL</span>
@@ -224,24 +226,24 @@
       <div id="modern-stats-row" class="modern-stats-row">
         <div class="modern-stat-card">
           <span class="stat-card-label">CURRENT YEAR</span>
-          <span class="stat-card-value" id="modern-year-value">2025</span>
+          <span class="stat-card-value" id="modern-year-value">—</span>
         </div>
         <div class="modern-stat-card">
           <span class="stat-card-label">FUNDS</span>
-          <span class="stat-card-value" id="modern-funds-value">$80,000</span>
+          <span class="stat-card-value" id="modern-funds-value">—</span>
         </div>
         <div class="modern-stat-card">
           <span class="stat-card-label">ECO-HEALTH</span>
           <div class="stat-card-progress">
-            <span class="stat-card-value" id="modern-eco-value">85%</span>
-            <div class="stat-card-bar"><div class="stat-card-fill" id="modern-eco-fill" style="width: 85%"></div></div>
+            <span class="stat-card-value" id="modern-eco-value">—</span>
+            <div class="stat-card-bar"><div class="stat-card-fill" id="modern-eco-fill" style="width: 0%"></div></div>
           </div>
         </div>
         <div class="modern-stat-card">
           <span class="stat-card-label">ZONE</span>
           <div class="stat-card-zone">
             <span class="zone-icon">🌲</span>
-            <span class="stat-card-value" id="modern-zone-value">Sub-Boreal Spruce</span>
+            <span class="stat-card-value" id="modern-zone-value">—</span>
           </div>
         </div>
       </div>
