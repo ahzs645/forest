@@ -13,6 +13,7 @@ import {
   recordAssignmentSelection,
   SEASONS,
 } from "../js/engine.js";
+import { formatMetricName } from "../js/engine/shared.js";
 import { detectArt } from "./art.js";
 import {
   getRoleDisplayName,
@@ -72,15 +73,44 @@ function buildOutcomeNotice(option, outcomeResult) {
   };
 }
 
+// Turn a raw effects delta into a short tradeoff hint shown *before* the player
+// commits. We surface the direction of the swing (which meters rise, which
+// fall) without spoiling the magnitude or the narrative outcome — that lands
+// after the choice in the result notice.
+function summarizeEffects(effects) {
+  if (!effects || typeof effects !== "object") return null;
+
+  const gains = [];
+  const costs = [];
+  for (const [key, value] of Object.entries(effects)) {
+    if (!value) continue;
+    (value > 0 ? gains : costs).push(formatMetricName(key));
+  }
+
+  if (!gains.length && !costs.length) return null;
+
+  const parts = [];
+  if (gains.length) parts.push(`${gains.join(", ")} up`);
+  if (costs.length) parts.push(`${costs.join(", ")} down`);
+  return parts.join(" · ");
+}
+
+function presentOption(option) {
+  return {
+    label: option.label,
+    // Authored hint wins; otherwise derive a neutral tradeoff from the effects.
+    preview: option.preview ?? summarizeEffects(option.effects),
+    // Kept for the post-choice result notice and danger-issue copy tests.
+    outcome: option.outcome,
+  };
+}
+
 function buildPresentedOptions(item, phaseType) {
   const options = Array.isArray(item?.options) ? item.options : [];
   if (phaseType === "issue" && item?.surfaceSeverity === "danger") {
     return options.map((option, index) => presentDangerIssueOption(item, option, index));
   }
-  return options.map((option) => ({
-    label: option.label,
-    outcome: option.outcome,
-  }));
+  return options.map(presentOption);
 }
 
 function presentDangerIssueOption(item, option, index) {
@@ -101,12 +131,13 @@ function presentDangerIssueOption(item, option, index) {
     ][index];
 
     if (crisisCopy) {
-      return crisisCopy;
+      return { ...crisisCopy, preview: summarizeEffects(option?.effects) };
     }
   }
 
   return {
     label: option?.label || `Option ${index + 1}`,
+    preview: option?.preview ?? summarizeEffects(option?.effects),
     outcome: option?.outcome,
   };
 }

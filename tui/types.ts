@@ -35,7 +35,7 @@ export type ContentData =
       intelLines?: string[];
       optionHeading?: string;
       optionTone?: "info" | "warning" | "danger";
-      optionDetails: { label: string; outcome?: string }[];
+      optionDetails: { label: string; preview?: string; outcome?: string }[];
       notice?: NoticeData;
     }
   | (BaseContent & { type: "outcome"; label: string; outcome?: string })

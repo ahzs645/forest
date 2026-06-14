@@ -376,46 +376,7 @@ function ContentView({ data }) {
     || data.type === "event"
     || data.type === "temptation"
   ) {
-    return (
-      <div className="tui-content-stack">
-        <NoticeBlock notice={data.notice} />
-        {data.sourceLabel || data.cardLabel ? (
-          <div className="tui-source-label">{data.sourceLabel || data.cardLabel}</div>
-        ) : null}
-        {data.phaseLabel ? <div className="tui-source-label tone-yellow">{data.phaseLabel}</div> : null}
-        <div className="tui-heading">{data.title}</div>
-        {data.type === "scenario" ? (
-          <div className="tui-scenario-grid">
-            <div className="tui-mini-panel">
-              <div className="tui-subheading">Incident Status</div>
-              <div className="tui-detail-list">
-                {data.weather ? <div className="tui-copy preserve">{`Weather: ${data.weather}`}</div> : null}
-                {data.deadline ? <div className="tui-copy preserve">{`Deadline: ${data.deadline}`}</div> : null}
-                {Object.entries(data.status || {}).map(([label, value]) => (
-                  <div className="tui-copy preserve" key={label}>{`${label}: ${value}`}</div>
-                ))}
-              </div>
-            </div>
-            <div className="tui-mini-panel">
-              <div className="tui-subheading">Block Map</div>
-              <pre className="tui-scenario-map">{data.map}</pre>
-            </div>
-          </div>
-        ) : null}
-        <p className="tui-copy preserve">{leadCapitalize(data.description)}</p>
-        <CardContext data={data} />
-        {data.type === "scenario" && data.intelLines?.length ? (
-          <>
-            <div className="tui-subheading">Intel Feed</div>
-            <div className="tui-detail-list">
-              {data.intelLines.map((line, idx) => (
-                <p className="tui-copy dim preserve" key={`intel-${idx}`}>{line}</p>
-              ))}
-            </div>
-          </>
-        ) : null}
-      </div>
-    );
+    return <DecisionCard data={data} />;
   }
 
   if (data.type === "summary") {
@@ -458,50 +419,46 @@ function AmbientArt({ art }) {
   return <pre className="tui-art">{art.frames[frameIndex]}</pre>;
 }
 
-function CardContext({ data }) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => setOpen(false), [data]);
-
-  const hasContext = Boolean(
-    data.context?.operation || data.context?.objective || data.context?.stakes
-    || data.whyNow || data.surfaceReason || data.flavor
-  );
-  if (!hasContext) return null;
-
-  if (!open) {
-    return (
-      <button type="button" className="tui-context-toggle" onClick={() => setOpen(true)}>
-        ▸ More context
-      </button>
-    );
-  }
+// Every seasonal decision card answers the same four questions up front, so the
+// player never has to open a panel to understand the choice they're making:
+//   1. What job am I doing?   2. What changed?
+//   3. Why does it matter now? 4. What am I deciding?
+// Each section falls back to sensible copy so the contract holds even when a
+// card omits a piece of context.
+function DecisionCard({ data }) {
+  const job = data.context?.operation || data.sourceLabel || data.cardLabel
+    || "This season's fieldwork";
+  const changed = leadCapitalize(data.description) || "A new situation needs your call.";
+  const whyNow = data.context?.stakes || data.whyNow || data.surfaceReason || data.flavor
+    || "How you handle this shapes your standing for the rest of the season.";
+  const deciding = data.context?.objective || data.decisionPrompt
+    || "Choose the response that best fits your strategy.";
 
   return (
-    <div className="tui-context-detail">
-      {data.context?.operation ? (
-        <>
-          <div className="tui-subheading">The job</div>
-          <p className="tui-copy preserve">{data.context.operation}</p>
-          {data.context?.objective ? <p className="tui-copy dim preserve">{`Objective: ${data.context.objective}`}</p> : null}
-        </>
+    <div className="tui-content-stack tui-decision-card">
+      <NoticeBlock notice={data.notice} />
+      {data.sourceLabel || data.cardLabel ? (
+        <div className="tui-source-label">{data.sourceLabel || data.cardLabel}</div>
       ) : null}
-      {data.flavor ? <p className="tui-copy dim preserve">{data.flavor}</p> : null}
-      {data.context?.stakes || data.whyNow || data.surfaceReason ? (
-        <>
-          <div className="tui-subheading">Why it matters</div>
-          {data.context?.stakes ? <p className="tui-copy preserve">{data.context.stakes}</p> : null}
-          {data.whyNow ? <p className="tui-copy dim preserve">{data.whyNow}</p> : null}
-          {data.surfaceReason ? <p className="tui-copy dim preserve">{data.surfaceReason}</p> : null}
-        </>
-      ) : null}
-      <button type="button" className="tui-context-toggle" onClick={() => setOpen(false)}>
-        ▾ Hide context
-      </button>
+      {data.phaseLabel ? <div className="tui-source-label tone-yellow">{data.phaseLabel}</div> : null}
+      <div className="tui-heading">{data.title}</div>
+
+      <div className="tui-subheading">What job am I doing?</div>
+      <p className="tui-copy preserve">{job}</p>
+
+      <div className="tui-subheading">What changed?</div>
+      <p className="tui-copy preserve">{changed}</p>
+
+      <div className="tui-subheading">Why does it matter now?</div>
+      <p className="tui-copy preserve">{whyNow}</p>
+
+      <div className="tui-subheading">What am I deciding?</div>
+      <p className="tui-copy preserve">{deciding}</p>
     </div>
   );
 }
 
-function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelect, isCrisis, situation }) {
+function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelect, isCrisis }) {
   if (!options.length) return null;
 
   const toneClass =
@@ -514,16 +471,12 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
         <span className={`tui-options-prompt ${toneClass ? `tone-${toneClass}` : ""}`}>{title}</span>
         <span className="tui-options-hint">↑↓ · Enter</span>
       </div>
-      {situation ? (
-        <p className="tui-options-situation preserve">
-          <span className="tui-options-situation-label">Situation</span>
-          {leadCapitalize(situation)}
-        </p>
-      ) : null}
       <div className="tui-options-list">
         {options.map((label, index) => {
-          const outcome = optionDetails?.[index]?.outcome;
-          const sub = outcome && outcome !== label ? outcome : null;
+          // Show the tradeoff hint before commitment — never the full outcome,
+          // which lands in the result notice after the choice is made.
+          const preview = optionDetails?.[index]?.preview;
+          const sub = preview && preview !== label ? preview : null;
           return (
             <button
               key={`${label}-${index}`}
@@ -534,7 +487,7 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
               <span className="tui-option-number">{index + 1}</span>
               <span className="tui-option-body">
                 <span className="tui-option-label">{label}</span>
-                {sub ? <span className="tui-option-outcome">{sub}</span> : null}
+                {sub ? <span className="tui-option-preview">{sub}</span> : null}
               </span>
             </button>
           );
@@ -647,7 +600,6 @@ export default function App() {
               selected={state.selected}
               onSelect={selectOption}
               isCrisis={isCrisis}
-              situation={state.contentData?.description}
             />
           </div>
         </div>
