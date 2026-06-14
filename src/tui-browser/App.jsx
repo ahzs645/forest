@@ -400,7 +400,7 @@ function ObjectiveStrip({ strip }) {
 function ContentView({ data, objective }) {
   if (!data) return null;
 
-  if (data.type === "message") {
+  if (data.type === "message" || data.type === "confirm") {
     return (
       <div className="tui-content-stack">
         <NoticeBlock notice={data.notice} />

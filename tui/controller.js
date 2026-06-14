@@ -283,7 +283,62 @@ export class TuiGameController {
   }
 
   exitGame() {
-    this.onExit();
+    this.requestExit();
+  }
+
+  // Quitting mid-run is one keystroke away in a keyboard-driven UI, so guard it
+  // with a confirm overlay. Setup screens and the finished-year summary have
+  // nothing live to lose, so they exit immediately.
+  requestExit() {
+    if (this.state.mode === "confirm-exit") return;
+    const hasLiveRun = this.gs && this.state.mode === "playing";
+    if (!hasLiveRun) {
+      this.onExit();
+      return;
+    }
+
+    this.savedView = {
+      mode: this.state.mode,
+      contentData: this.state.contentData,
+      options: this.state.options,
+      selected: this.state.selected,
+      art: this.state.art,
+      selectCb: this.selectCb,
+    };
+
+    this.present(
+      {
+        type: "confirm",
+        heading: "Return to the main menu?",
+        body: "Your seasonal run is autosaved — you can resume it later from the menu.",
+      },
+      ["Continue run", "Main menu"],
+      (idx) => {
+        if (idx === 0) {
+          this.resumeFromExit();
+        } else {
+          this.onExit();
+        }
+      },
+    );
+    this.setState({ mode: "confirm-exit" });
+  }
+
+  resumeFromExit() {
+    const saved = this.savedView;
+    this.savedView = null;
+    if (!saved) {
+      this.onExit();
+      return;
+    }
+    this.selectCb = saved.selectCb;
+    this.setState({
+      mode: saved.mode,
+      contentData: saved.contentData,
+      options: saved.options,
+      selected: saved.selected,
+      art: saved.art,
+    });
   }
 
   restart() {
@@ -321,13 +376,24 @@ export class TuiGameController {
       return;
     }
 
+    // While the confirm overlay is up, Escape cancels (keep playing); the rest
+    // of the keys drive its two options like any other card.
+    if (this.state.mode === "confirm-exit") {
+      if (key.name === "escape") {
+        this.resumeFromExit();
+        return;
+      }
+      this.handleOptionKey(key);
+      return;
+    }
+
     if (this.state.mode !== "setup-name" && key.name === "q") {
-      this.onExit();
+      this.requestExit();
       return;
     }
 
     if (key.name === "escape") {
-      this.onExit();
+      this.requestExit();
       return;
     }
 
