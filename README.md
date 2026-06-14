@@ -46,9 +46,10 @@ GitHub Pages without a backend.
 
 ```bash
 npm install
-npm run dev          # then open / for expedition mode, /tui.html for the seasonal TUI
-npm test             # unit tests (node --test)
-npm run test:e2e     # Playwright end-to-end suite
+npm run dev            # then open / for expedition mode, /tui.html for the seasonal TUI
+npm test               # unit tests (node --test)
+npm run test:e2e       # Playwright end-to-end suite
+npm run lint:seasonal  # structural lint of seasonal content (also gated in npm test)
 ```
 
 ## Balance simulation
