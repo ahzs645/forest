@@ -12,9 +12,11 @@ import {
   formatMetricDelta,
   recordAssignmentSelection,
   buildSeasonHeadline,
+  buildObjectiveStrip,
   computeManagementStyle,
   describeConsequences,
   describeCardCause,
+  getRoleObjective,
   makeRng,
   isForkableRng,
   SEASONS,
@@ -50,7 +52,11 @@ const ROLE_PREVIEWS = {
 };
 
 function buildRolePreview(role) {
-  return ROLE_PREVIEWS[role?.id] || role?.description || "";
+  const base = ROLE_PREVIEWS[role?.id] || role?.description || "";
+  // Surface the role's win condition at setup so the first pick is about a
+  // mandate, not just flavor.
+  const objective = getRoleObjective(role?.id);
+  return objective?.signatureWin ? `${base}\nWin: ${objective.signatureWin}.` : base;
 }
 
 function buildAreaPreview(area) {
@@ -230,6 +236,12 @@ function snapshotGameState(gs) {
     areaBriefing: gs.role?.id && gs.area
       ? getRoleAreaBriefing(gs.role.id, gs.area, { maxFinds: 6 })
       : null,
+    // Standing role mandate + signature win, shown on the dashboard so the
+    // player always knows what they're judged on.
+    roleObjective: gs.role?.id ? getRoleObjective(gs.role.id) : null,
+    // Live "what am I trying to do right now" strip: mandate + at-risk meters +
+    // the single most pressing pressure, recomputed from current metrics.
+    objectiveStrip: gs.role?.id ? buildObjectiveStrip(gs) : null,
   };
 }
 

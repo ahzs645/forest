@@ -114,6 +114,22 @@ function shortSeason(season) {
   return String(season || "").split(" ")[0] || season;
 }
 
+function ObjectiveReadout({ objective, strip }) {
+  if (!objective) return null;
+  return (
+    <div className="tui-dashboard-aside tui-objective">
+      <div className="tui-dashboard-section-title">Your mandate</div>
+      <p className="tui-copy">{objective.mandate}</p>
+      {objective.signatureWin ? (
+        <p className="tui-copy dim">{`Win: ${objective.signatureWin}.`}</p>
+      ) : null}
+      {strip ? (
+        <p className="tui-copy dim">{`Right now: ${strip.pressure}`}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function StyleReadout({ style }) {
   if (!style || !style.total) return null;
   return (
@@ -207,6 +223,7 @@ function Dashboard({ gameState }) {
               <span className="tui-dashboard-value">{row.value}</span>
             </div>
           ))}
+          <ObjectiveReadout objective={gameState?.roleObjective} strip={gameState?.objectiveStrip} />
           <StyleReadout style={gameState?.managementStyle} />
           <SeasonLog timeline={gameState?.seasonTimeline} />
         </div>
@@ -358,7 +375,29 @@ function ScenarioAsciiMap({ map, features }) {
   );
 }
 
-function ContentView({ data }) {
+// Top-of-card strip the player reads first: the standing goal, what is at risk
+// right now, and the single most pressing pressure. Generated from current
+// metrics + role mandate so it always matches the dashboard.
+function ObjectiveStrip({ strip }) {
+  if (!strip) return null;
+  const riskText = strip.risks?.length
+    ? strip.risks.map((risk) => risk.label).join(" · ")
+    : "All meters stable";
+  return (
+    <div className="tui-objective-strip">
+      <div className="tui-objective-strip-row">
+        <span className="tui-objective-strip-key">Goal</span>
+        <span className="tui-objective-strip-val">{strip.goal}</span>
+      </div>
+      <div className="tui-objective-strip-row">
+        <span className="tui-objective-strip-key">Current risk</span>
+        <span className={`tui-objective-strip-val ${strip.risks?.length ? "tone-yellow" : "tone-green"}`}>{riskText}</span>
+      </div>
+    </div>
+  );
+}
+
+function ContentView({ data, objective }) {
   if (!data) return null;
 
   if (data.type === "message") {
@@ -449,7 +488,7 @@ function ContentView({ data }) {
     || data.type === "event"
     || data.type === "temptation"
   ) {
-    return <DecisionCard data={data} />;
+    return <DecisionCard data={data} objective={objective} />;
   }
 
   if (data.type === "summary") {
@@ -514,7 +553,7 @@ function AmbientArt({ art }) {
 //   3. Why does it matter now? 4. What am I deciding?
 // Each section falls back to sensible copy so the contract holds even when a
 // card omits a piece of context.
-function DecisionCard({ data }) {
+function DecisionCard({ data, objective }) {
   const job = data.context?.operation || data.sourceLabel || data.cardLabel
     || "This season's fieldwork";
   const changed = leadCapitalize(data.description) || "A new situation needs your call.";
@@ -526,6 +565,7 @@ function DecisionCard({ data }) {
   return (
     <div className="tui-content-stack tui-decision-card">
       <NoticeBlock notice={data.notice} />
+      <ObjectiveStrip strip={objective} />
       {data.sourceLabel || data.cardLabel ? (
         <div className="tui-source-label">{data.sourceLabel || data.cardLabel}</div>
       ) : null}
@@ -592,7 +632,7 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
   );
 }
 
-function FieldRadio({ mode, inputText, contentData, art, onInputChange, onSubmitName, isCrisis }) {
+function FieldRadio({ mode, inputText, contentData, art, objective, onInputChange, onSubmitName, isCrisis }) {
   return (
     <section className="tui-panel tui-field-radio">
       <div className="tui-panel-title">{isCrisis ? "Scenario Console" : "Field Radio"}</div>
@@ -601,7 +641,7 @@ function FieldRadio({ mode, inputText, contentData, art, onInputChange, onSubmit
           {mode === "setup-name" ? (
             <NameInput inputText={inputText} onInputChange={onInputChange} onSubmit={onSubmitName} />
           ) : (
-            <ContentView data={contentData} />
+            <ContentView data={contentData} objective={objective} />
           )}
         </div>
         {art ? <AmbientArt art={art} /> : null}
@@ -678,6 +718,7 @@ export default function App() {
               inputText={state.inputText}
               contentData={state.contentData}
               art={state.art}
+              objective={state.gameState?.objectiveStrip}
               onInputChange={setInputText}
               onSubmitName={submitCurrent}
             />

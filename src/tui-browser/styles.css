@@ -370,6 +370,43 @@ body {
   font-weight: 700;
 }
 
+/* Objective strip: the "what am I trying to do right now" banner at the top of
+   every decision card. */
+.tui-objective-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid rgba(86, 212, 221, 0.35);
+  border-left-width: 3px;
+  background: rgba(86, 212, 221, 0.06);
+}
+
+.tui-objective-strip-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  line-height: 1.4;
+}
+
+.tui-objective-strip-key {
+  flex: 0 0 6.5rem;
+  color: #56d4dd;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+}
+
+.tui-objective-strip-val {
+  flex: 1;
+  color: #c9d1d9;
+}
+
+.tui-objective .tui-copy {
+  line-height: 1.45;
+}
+
 .tui-notice {
   border: 1px solid currentColor;
   padding: 0.7rem 0.8rem;
