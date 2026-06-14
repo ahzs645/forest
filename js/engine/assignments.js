@@ -52,7 +52,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Push the original plan",
       outcome: "You hold the original line and bank the momentum, accepting that the exposure may come back later.",
-      effects: { progress: 4, compliance: -4, relationships: -2 },
+      effects: { progress: 4, compliance: -3, relationships: -2 },
     },
   ],
   process: [
@@ -72,7 +72,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Push the package through",
       outcome: "You preserve momentum and hope the weak spots do not become next season's audit problem.",
-      effects: { progress: 4, compliance: -5, relationships: -3 },
+      effects: { progress: 4, compliance: -3, relationships: -3 },
     },
   ],
   planning: [
@@ -92,7 +92,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Hold the original line",
       outcome: "You protect the original harvest logic and trust that mitigation can absorb the rough edges.",
-      effects: { progress: 4, forestHealth: -3, compliance: -4, relationships: -2 },
+      effects: { progress: 4, forestHealth: -3, compliance: -3, relationships: -2 },
     },
   ],
   road: [
@@ -112,7 +112,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Run the access window hard",
       outcome: "You take the short access window and accept the higher chance of downstream scrutiny.",
-      effects: { progress: 4, compliance: -5, budget: -1, forestHealth: -1 },
+      effects: { progress: 4, compliance: -3, budget: -1, forestHealth: -1 },
     },
   ],
   discovery: [
@@ -132,7 +132,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Work around it quietly",
       outcome: "You keep the crews moving and hope the field signal does not come back as a louder problem next round.",
-      effects: { progress: 3, compliance: -5, relationships: -3 },
+      effects: { progress: 3, compliance: -3, relationships: -3 },
     },
   ],
   situation: [
@@ -152,7 +152,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Push through the window",
       outcome: "You chase the work window hard and rely on later cleanup to absorb the strain.",
-      effects: { progress: 4, compliance: -4, forestHealth: -2, relationships: -1 },
+      effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 },
     },
   ],
   professional: [
@@ -172,7 +172,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Defer and keep producing",
       outcome: "You leave the admin debt in place and squeeze one more productive window out of the season.",
-      effects: { progress: 3, compliance: -5 },
+      effects: { progress: 3, compliance: -3 },
     },
   ],
 };

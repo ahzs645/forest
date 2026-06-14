@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-06-14T19:50:55.739Z",
+    "generatedAt": "2026-06-14T20:08:36.584Z",
     "runs": 25,
     "seedBase": 1000,
     "roles": [
@@ -93,20 +93,20 @@
       {
         "strategy": "weakest-metric",
         "runs": 900,
-        "tierScore": 0.88,
+        "tierScore": 0.9,
         "tiers": {
           "outstanding": 0,
           "solid": 11,
-          "mixed": 768,
-          "stumbled": 121,
+          "mixed": 789,
+          "stumbled": 100,
           "unknown": 0
         },
         "metrics": {
-          "progress": 52.7,
+          "progress": 52.8,
           "forestHealth": 53.4,
           "relationships": 54.1,
-          "compliance": 62.4,
-          "budget": 44.1
+          "compliance": 63.7,
+          "budget": 44.3
         }
       },
       {
@@ -131,20 +131,20 @@
       {
         "strategy": "random",
         "runs": 900,
-        "tierScore": 0.76,
+        "tierScore": 0.78,
         "tiers": {
           "outstanding": 0,
-          "solid": 9,
-          "mixed": 663,
-          "stumbled": 228,
+          "solid": 10,
+          "mixed": 684,
+          "stumbled": 206,
           "unknown": 0
         },
         "metrics": {
-          "progress": 46.3,
+          "progress": 46.4,
           "forestHealth": 52.4,
-          "relationships": 53.4,
-          "compliance": 59.1,
-          "budget": 38.1
+          "relationships": 53.5,
+          "compliance": 60.9,
+          "budget": 38.2
         }
       },
       {
@@ -159,18 +159,18 @@
           "unknown": 0
         },
         "metrics": {
-          "progress": 68.8,
+          "progress": 69.5,
           "forestHealth": 47,
           "relationships": 28,
-          "compliance": 7.6,
-          "budget": 27.8
+          "compliance": 11.7,
+          "budget": 29
         }
       }
     ],
     "comboSummary": [
       {
         "combo": "planner @ kootenay-wetbelt",
-        "tierScore": 1.2,
+        "tierScore": 1.19,
         "runs": 175
       },
       {
@@ -185,7 +185,7 @@
       },
       {
         "combo": "planner @ vancouver-island-coast",
-        "tierScore": 1.17,
+        "tierScore": 1.18,
         "runs": 175
       },
       {
@@ -194,13 +194,23 @@
         "runs": 175
       },
       {
-        "combo": "planner @ muskwa-foothills",
+        "combo": "planner @ fraser-plateau",
         "tierScore": 1.02,
         "runs": 175
       },
       {
-        "combo": "planner @ fraser-plateau",
-        "tierScore": 1.02,
+        "combo": "planner @ muskwa-foothills",
+        "tierScore": 1.01,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ bulkley-valley",
+        "tierScore": 1.01,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ vancouver-island-coast",
+        "tierScore": 1.01,
         "runs": 175
       },
       {
@@ -209,12 +219,7 @@
         "runs": 175
       },
       {
-        "combo": "silviculture @ bulkley-valley",
-        "tierScore": 1,
-        "runs": 175
-      },
-      {
-        "combo": "silviculture @ vancouver-island-coast",
+        "combo": "recce @ fraser-plateau",
         "tierScore": 0.99,
         "runs": 175
       },
@@ -224,28 +229,28 @@
         "runs": 175
       },
       {
-        "combo": "recce @ fraser-plateau",
+        "combo": "silviculture @ skeena-nass",
         "tierScore": 0.98,
         "runs": 175
       },
       {
-        "combo": "silviculture @ skeena-nass",
-        "tierScore": 0.97,
+        "combo": "silviculture @ kootenay-wetbelt",
+        "tierScore": 0.98,
         "runs": 175
       },
       {
         "combo": "planner @ fort-st-john-plateau",
-        "tierScore": 0.96,
-        "runs": 175
-      },
-      {
-        "combo": "silviculture @ kootenay-wetbelt",
         "tierScore": 0.95,
         "runs": 175
       },
       {
         "combo": "silviculture @ fraser-plateau",
-        "tierScore": 0.94,
+        "tierScore": 0.95,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ okanagan-shuswap-drybelt",
+        "tierScore": 0.93,
         "runs": 175
       },
       {
@@ -254,8 +259,8 @@
         "runs": 175
       },
       {
-        "combo": "permitter @ vancouver-island-coast",
-        "tierScore": 0.91,
+        "combo": "silviculture @ muskwa-foothills",
+        "tierScore": 0.92,
         "runs": 175
       },
       {
@@ -274,27 +279,32 @@
         "runs": 175
       },
       {
-        "combo": "recce @ okanagan-shuswap-drybelt",
+        "combo": "permitter @ vancouver-island-coast",
+        "tierScore": 0.9,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ tahltan-highland",
         "tierScore": 0.9,
         "runs": 175
       },
       {
         "combo": "permitter @ bulkley-valley",
-        "tierScore": 0.89,
-        "runs": 175
-      },
-      {
-        "combo": "recce @ tahltan-highland",
-        "tierScore": 0.89,
-        "runs": 175
-      },
-      {
-        "combo": "silviculture @ muskwa-foothills",
-        "tierScore": 0.89,
+        "tierScore": 0.88,
         "runs": 175
       },
       {
         "combo": "recce @ skeena-nass",
+        "tierScore": 0.88,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ vancouver-island-coast",
+        "tierScore": 0.88,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ tahltan-highland",
         "tierScore": 0.88,
         "runs": 175
       },
@@ -304,27 +314,22 @@
         "runs": 175
       },
       {
-        "combo": "recce @ vancouver-island-coast",
+        "combo": "recce @ bulkley-valley",
         "tierScore": 0.87,
         "runs": 175
       },
       {
-        "combo": "recce @ bulkley-valley",
-        "tierScore": 0.86,
-        "runs": 175
-      },
-      {
-        "combo": "silviculture @ tahltan-highland",
-        "tierScore": 0.86,
-        "runs": 175
-      },
-      {
         "combo": "permitter @ fraser-plateau",
-        "tierScore": 0.85,
+        "tierScore": 0.86,
         "runs": 175
       },
       {
         "combo": "permitter @ fort-st-john-plateau",
+        "tierScore": 0.84,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ muskwa-foothills",
         "tierScore": 0.84,
         "runs": 175
       },
@@ -334,43 +339,38 @@
         "runs": 175
       },
       {
-        "combo": "recce @ muskwa-foothills",
+        "combo": "recce @ fort-st-john-plateau",
         "tierScore": 0.83,
         "runs": 175
       },
       {
-        "combo": "recce @ fort-st-john-plateau",
-        "tierScore": 0.82,
-        "runs": 175
-      },
-      {
         "combo": "recce @ kootenay-wetbelt",
-        "tierScore": 0.8,
+        "tierScore": 0.81,
         "runs": 175
       }
     ],
     "dominantStrategy": "greedy",
     "easiestCombo": {
       "combo": "planner @ kootenay-wetbelt",
-      "tierScore": 1.2,
+      "tierScore": 1.19,
       "runs": 175
     },
     "hardestCombo": {
       "combo": "recce @ kootenay-wetbelt",
-      "tierScore": 0.8,
+      "tierScore": 0.81,
       "runs": 175
     },
     "overallMetrics": {
-      "progress": 44.7,
+      "progress": 44.9,
       "forestHealth": 53.5,
       "relationships": 57.8,
-      "compliance": 64.8,
-      "budget": 37.2
+      "compliance": 65.8,
+      "budget": 37.4
     },
     "consequenceCounts": {
       "contractor-attrition": 103,
-      "trust-deficit": 583,
-      "audit-escalation": 959,
+      "trust-deficit": 586,
+      "audit-escalation": 936,
       "registration-lapse": 0,
       "paperwork-burn": 525,
       "professional-audit": 0
@@ -382,23 +382,23 @@
     "topIssues": [
       [
         "riparian-reclassification-call",
-        1564
+        1566
       ],
       [
         "special-use-permit-stack",
-        1533
+        1534
       ],
       [
         "archaeology-escalation-pause",
-        1387
+        1382
       ],
       [
         "road-use-permit-standoff",
-        1264
+        1262
       ],
       [
         "labour-job-action",
-        977
+        974
       ],
       [
         "fom-consistency-gap",
@@ -418,7 +418,7 @@
       ],
       [
         "wtra-trespass-silence",
-        593
+        592
       ],
       [
         "significant-road-work-trigger",
@@ -426,7 +426,7 @@
       ],
       [
         "lumber-market-crash",
-        584
+        586
       ]
     ]
   }
