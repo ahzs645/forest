@@ -1,9 +1,10 @@
 import { formatMetricName } from "./shared.js";
 import { getRoleDisplayName } from "./seasonalContract.js";
+import { buildRoleLens, computeManagementStyle } from "./insights.js";
+import { scoreRun } from "./scoring.js";
 
 export function buildSummary(state) {
   const { metrics, role, area } = state;
-  const averages = weightedAverage(metrics);
   const roleName = getRoleDisplayName(role);
 
   const messages = [];
@@ -28,20 +29,13 @@ export function buildSummary(state) {
     messages.push("💳 Emergency loan repayments trimmed future budget gains by 20%.");
   }
 
-  let overall;
-  const balancedExcellence = Object.values(metrics).every((value) => value >= 65);
-  const strongOutcomeFloors = metrics.compliance >= 62 && metrics.relationships >= 58 && metrics.forestHealth >= 58;
-  const stableOutcomeFloors = metrics.compliance >= 48 && metrics.relationships >= 45 && metrics.forestHealth >= 45;
-  const stewardshipStrong = metrics.compliance >= 75 && metrics.relationships >= 70 && metrics.forestHealth >= 55;
-  if (averages >= 82 && balancedExcellence && strongOutcomeFloors) {
-    overall = `Outstanding season – the ${roleName} kept the ${area.name} program balanced.`;
-  } else if ((averages >= 64 && strongOutcomeFloors) || stewardshipStrong) {
-    overall = "Solid performance with room to fine-tune priorities next cycle.";
-  } else if (averages >= 45 && stableOutcomeFloors) {
-    overall = "Mixed outcomes. Consider where trade-offs eroded trust or ecological outcomes.";
-  } else {
-    overall = "Operations stumbled. Leadership will expect a recovery plan before the next season.";
-  }
+  const score = scoreRun(state);
+  const overall = {
+    outstanding: `Outstanding season – the ${roleName} kept the ${area.name} program balanced.`,
+    solid: "Solid performance with room to fine-tune priorities next cycle.",
+    mixed: "Mixed outcomes. Consider where trade-offs eroded trust or ecological outcomes.",
+    stumbled: "Operations stumbled. Leadership will expect a recovery plan before the next season.",
+  }[score.tier];
   if (!messages.length) {
     messages.push("✅ Stakeholders acknowledge the cohesive strategy you delivered.");
   }
@@ -50,28 +44,24 @@ export function buildSummary(state) {
   const trends = metricsTrendlines(state);
   const legacy = buildLegacyReport(metrics, trends, timeline);
   const highlights = topDecisions(state.history);
-  const achievements = buildAchievements(metrics, trends);
+  const style = computeManagementStyle(state);
+  const achievements = buildAchievements(metrics, trends, style);
   const projection = futureOutlook(metrics, trends, area);
+  const roleLens = buildRoleLens(state);
 
-  return { overall, messages, legacy, highlights, achievements, projection };
-}
-
-function weightedAverage(metrics) {
-  const weights = {
-    progress: 1,
-    forestHealth: 1,
-    relationships: 1,
-    compliance: 1.2,
-    budget: 0.8,
+  return {
+    overall,
+    tier: score.tier,
+    score: score.score,
+    scoreDetail: score,
+    messages,
+    legacy,
+    highlights,
+    achievements,
+    projection,
+    style,
+    roleLens,
   };
-  let total = 0;
-  let weight = 0;
-  for (const [key, value] of Object.entries(metrics)) {
-    const w = weights[key] ?? 1;
-    total += value * w;
-    weight += w;
-  }
-  return total / weight;
 }
 
 function metricsTrendlines(state) {
@@ -122,8 +112,11 @@ function topDecisions(history = []) {
   return scored;
 }
 
-function buildAchievements(metrics, trends) {
+function buildAchievements(metrics, trends, style) {
   const medals = [];
+  if (style?.total >= 3 && style.dominant && style.label) {
+    medals.push(`🎯 ${style.label} – ${style.tendency}`);
+  }
   if (metrics.relationships >= 75 && metrics.compliance >= 65) {
     medals.push("🏅 Balanced Steward – high trust and strong compliance sustained.");
   }

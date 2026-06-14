@@ -78,7 +78,9 @@ export function drawSeasonalEvent(state, rng = Math.random) {
       const candidate = findOperationalEventById(pending.id, state);
       if (candidate && eventMatchesSeasonalContext(candidate, state)) {
         state.pendingEvents.splice(i, 1);
-        return adaptOperationalEvent(candidate, state);
+        const card = adaptOperationalEvent(candidate, state);
+        if (pending.causedBy) card.causedBy = pending.causedBy;
+        return card;
       }
       if (!candidate) {
         state.pendingEvents.splice(i, 1);
@@ -163,7 +165,8 @@ export function drawIssue(state, rng = Math.random) {
       const candidate = resolvePendingIssue(state, pending, { tags, season }, rng);
       if (candidate) {
         state.pendingIssues.splice(i, 1);
-        return normalizeSeasonalCard(candidate, state, "issue");
+        const sourced = pending.causedBy ? { ...candidate, causedBy: pending.causedBy } : candidate;
+        return normalizeSeasonalCard(sourced, state, "issue");
       }
       state.pendingIssues.splice(i, 1);
       i--;

@@ -11,6 +11,12 @@ import {
   buildSummary,
   formatMetricDelta,
   recordAssignmentSelection,
+  buildSeasonHeadline,
+  computeManagementStyle,
+  describeConsequences,
+  describeCardCause,
+  makeRng,
+  isForkableRng,
   SEASONS,
 } from "../js/engine.js";
 import { formatMetricName } from "../js/engine/shared.js";
@@ -33,6 +39,35 @@ const INITIAL_CONTENT = {
   type: "setup",
   heading: "Welcome to BC Forestry Trail",
 };
+
+// Short "what am I signing up for" lines shown under each setup choice so the
+// role and area pick feels strategic instead of cosmetic.
+const ROLE_PREVIEWS = {
+  planner: "Landscape trade-offs & long-range plans · watch public review and hydrology.",
+  permitter: "Permit pipeline: draft → referral → approval · watch deficiencies and referrals.",
+  recce: "Field access, layout, and crew calls · watch terrain, water, and morale.",
+  silviculture: "Planting, brushing, and free-growing · watch stock quality and survival.",
+};
+
+function buildRolePreview(role) {
+  return ROLE_PREVIEWS[role?.id] || role?.description || "";
+}
+
+function buildAreaPreview(area) {
+  const topics = Array.isArray(area?.focusTopics) ? area.focusTopics.slice(0, 3) : [];
+  if (topics.length) return topics.join(" · ");
+  return area?.description || "";
+}
+
+// Normalize the controller's RNG option: pass through an existing rng function,
+// seed a fresh one from a number, or fall back to live Math.random.
+function createSessionRng(rngOrSeed) {
+  if (typeof rngOrSeed === "function") return rngOrSeed;
+  // Default: look Math.random up *per call* so test/e2e harnesses that override
+  // the global still take effect (capturing the reference would freeze it).
+  if (rngOrSeed === undefined || rngOrSeed === null) return () => Math.random();
+  return makeRng(rngOrSeed);
+}
 
 function createViewState() {
   return {
@@ -102,6 +137,11 @@ function presentOption(option) {
     preview: option.preview ?? summarizeEffects(option.effects),
     // Kept for the post-choice result notice and danger-issue copy tests.
     outcome: option.outcome,
+    // Surfaced for headless strategy policies (sims/tests). The browser UI
+    // ignores these; only the preview/label are rendered.
+    stance: option.stance,
+    effects: option.effects,
+    risk: option.risk ? true : undefined,
   };
 }
 
@@ -170,6 +210,20 @@ function snapshotGameState(gs) {
         }
       : null,
     roleDisplayName: gs.roleDisplayName || getRoleDisplayName(gs.role),
+    // Metric swing from the most recent logged decision/consequence, so the
+    // dashboard can show "↓ -4 last choice" arrows next to each meter.
+    lastChoiceEffects: Array.isArray(gs.history) && gs.history.length
+      ? { ...(gs.history[gs.history.length - 1].effects || {}) }
+      : {},
+    // Emerging strategy identity, read from the stances the player has chosen.
+    managementStyle: computeManagementStyle(gs),
+    // Completed-season strip: baseline entry is dropped, headline pulled from
+    // that season's most impactful decision.
+    seasonTimeline: Array.isArray(gs.timeline)
+      ? gs.timeline
+          .filter((entry) => entry && entry.round > 0)
+          .map((entry) => ({ ...entry, metrics: { ...(entry.metrics || {}) } }))
+      : [],
     // Standing role-area context for the Dashboard "Area" tab. It's a pure
     // function of role + area, so recompute it from the snapshot rather than
     // threading it through every season's state.
@@ -195,6 +249,11 @@ export class TuiGameController {
     this.selectCb = null;
     this.onExit = options.onExit ?? (() => {});
     this.ambientArt = Boolean(options.ambientArt);
+    // Optional seeded RNG. When omitted we keep the browser's live-random
+    // behavior; when provided (sims, deterministic tests) the whole seasonal
+    // year becomes reproducible. createSessionRng accepts an rng, a numeric
+    // seed, or nothing.
+    this.rng = createSessionRng(options.rng ?? options.seed);
   }
 
   getState() {
@@ -305,7 +364,11 @@ export class TuiGameController {
     }
     gs.seasonContexts.push(context);
 
-    const issuePreview = drawIssue(cloneStateForPreview(gs));
+    // Peek at the upcoming issue on a forked RNG so crisis detection doesn't
+    // consume from the main stream (and so the real draw reproduces the peek on
+    // a crisis round).
+    const previewRng = isForkableRng(this.rng) ? this.rng.fork() : this.rng;
+    const issuePreview = drawIssue(cloneStateForPreview(gs), previewRng);
     const isCrisisRound = issuePreview?.surfaceSeverity === "danger";
 
     this.queue.push({
@@ -317,7 +380,7 @@ export class TuiGameController {
     });
 
     if (isCrisisRound) {
-      const issue = drawIssue(gs);
+      const issue = drawIssue(gs, this.rng);
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
       }
@@ -328,17 +391,17 @@ export class TuiGameController {
         this.queue.push({ type: "assignment", data: assignment });
       }
 
-      const event = drawSeasonalEvent(gs);
+      const event = drawSeasonalEvent(gs, this.rng);
       if (event) {
         this.queue.push({ type: "event", data: event });
       }
 
-      const temptation = drawSeasonalTemptation(gs);
+      const temptation = drawSeasonalTemptation(gs, this.rng);
       if (temptation) {
         this.queue.push({ type: "temptation", data: temptation });
       }
 
-      const issue = drawIssue(gs);
+      const issue = drawIssue(gs, this.rng);
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
       }
@@ -349,18 +412,44 @@ export class TuiGameController {
       execute: (queuedNotice) => {
         const cons = applyRoundConsequences(gs);
         if (cons?.length) {
+          const explained = describeConsequences(gs, cons);
+          const body = explained
+            .map((entry) => {
+              const lines = [`• ${entry.title}`];
+              if (entry.cause) lines.push(`  Why: ${entry.cause}`);
+              if (entry.effectText) lines.push(`  This season: ${entry.effectText}`);
+              return lines.join("\n");
+            })
+            .join("\n\n");
           this.queue.unshift({
             type: "message",
-            text: "End of Season Consequences",
-            body: cons.map((entry) => `- ${entry}`).join("\n"),
+            text: "Why This Happened",
+            body,
           });
         }
+        this.recordSeasonTimeline();
         this.emit();
         this.processNext(queuedNotice);
       },
     });
 
     this.processNext(notice);
+  }
+
+  // Snapshot the season's closing metrics so the year-end review and the
+  // persistent mini-timeline have a real per-season record. Without this the
+  // engine's timeline never grew past its baseline entry in seasonal play.
+  recordSeasonTimeline() {
+    const gs = this.gs;
+    if (!gs) return;
+    if (!Array.isArray(gs.timeline)) gs.timeline = [];
+    const season = SEASONS[gs.round - 1] || `Season ${gs.round}`;
+    gs.timeline.push({
+      round: gs.round,
+      season,
+      metrics: { ...gs.metrics },
+      headline: buildSeasonHeadline(gs, gs.round),
+    });
   }
 
   processNext(notice = null) {
@@ -382,6 +471,11 @@ export class TuiGameController {
             type: "summary",
             heading: "Year End Review",
             body: summary.overall,
+            tier: summary.tier,
+            score: summary.score,
+            scoreReasons: summary.scoreDetail?.reasons,
+            roleLens: summary.roleLens,
+            style: summary.style,
             bullets: summary.messages,
             highlights: summary.highlights,
             seasonSummaries: summary.legacy?.seasonSummaries,
@@ -447,6 +541,7 @@ export class TuiGameController {
           whyNow: item.whyNow,
           surfaceReason: item.surfaceReason,
           surfaceSeverity: item.surfaceSeverity,
+          provenance: describeCardCause(item),
           optionHeading: isCrisisIssue ? "Choose your response" : "Choose your response",
           optionTone: isCrisisIssue ? "danger" : undefined,
           notice,
@@ -461,7 +556,8 @@ export class TuiGameController {
             title: item.title,
             option: option.label,
             round: gs.round,
-          });
+            stance: option.stance,
+          }, this.rng);
 
           this.emit();
 
@@ -533,14 +629,22 @@ export class TuiGameController {
     if (key.name === "return") {
       const company = this.state.inputText.trim() || "Forest Co-op";
       this.setState({ mode: "setup-role" });
+      const playableRoles = getSeasonalPlayableRoles(FORESTER_ROLES);
       this.present(
         {
           type: "setup",
           heading: "Select your Specialization",
           subtitle: "Choose the work stream you will be judged on this year.",
+          optionDetails: [
+            ...playableRoles.map((role) => ({
+              label: getRoleDisplayName(role),
+              preview: buildRolePreview(role),
+            })),
+            { label: CRISIS_COMMAND_LABEL, preview: "Incident command mode · live pine-beetle scenario." },
+          ],
         },
         [
-          ...getSeasonalPlayableRoles(FORESTER_ROLES).map((role) => getRoleDisplayName(role)),
+          ...playableRoles.map((role) => getRoleDisplayName(role)),
           CRISIS_COMMAND_LABEL,
         ],
         (idx) => {
@@ -563,6 +667,10 @@ export class TuiGameController {
               type: "setup",
               heading: "Select your Operating Area",
               subtitle: "Choose the BC region where this year's file and field work will unfold.",
+              optionDetails: OPERATING_AREAS.map((area) => ({
+                label: area.name,
+                preview: buildAreaPreview(area),
+              })),
             },
             OPERATING_AREAS.map((area) => area.name),
             (areaIdx) => {

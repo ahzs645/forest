@@ -21,35 +21,65 @@ import {
 
 export function applyEffects(state, effects = {}, source) {
   const metrics = state.metrics;
-  const delta = { ...effects };
-  if (state.flags?.budgetLoanActive && typeof delta.budget === "number" && delta.budget > 0) {
-    const reduced = Math.floor(delta.budget * 0.8);
-    delta.budget = Math.max(reduced, 1);
-  }
+  const budgetLoan = Boolean(state.flags?.budgetLoanActive);
+  // Track three views of the swing so balance/debug work can tell "authored too
+  // strong" apart from "engine softened it because the meter was already high":
+  //   rawEffects   – what the option/consequence authored
+  //   effects      – what actually applied after modifiers (player-facing)
+  //   modifiers    – which adjustments fired
+  const rawEffects = {};
+  const appliedEffects = {};
+  const modifiers = new Set();
+
   for (const key of Object.keys(metrics)) {
-    if (delta[key] !== undefined) {
-      const value = Number(delta[key]);
-      let adjustedDelta = Number.isFinite(value) ? applyDiminishingReturns(metrics[key], value) : 0;
-      if (state.flags?.trustDeficitActive && key === "relationships" && adjustedDelta > 0) {
-        adjustedDelta = Math.max(1, Math.floor(adjustedDelta * 0.5));
-      }
-      delta[key] = adjustedDelta;
-      metrics[key] = clamp(metrics[key] + adjustedDelta, 0, 100);
+    if (effects[key] === undefined) continue;
+    const rawValue = Number(effects[key]);
+    if (!Number.isFinite(rawValue)) continue;
+    rawEffects[key] = rawValue;
+
+    let working = rawValue;
+    if (budgetLoan && key === "budget" && working > 0) {
+      working = Math.max(Math.floor(working * 0.8), 1);
+      modifiers.add("budget-loan");
     }
+    let adjustedDelta = applyDiminishingReturns(metrics[key], working);
+    if (adjustedDelta !== working) {
+      modifiers.add("diminishing-returns");
+    }
+    if (state.flags?.trustDeficitActive && key === "relationships" && adjustedDelta > 0) {
+      adjustedDelta = Math.max(1, Math.floor(adjustedDelta * 0.5));
+      modifiers.add("trust-deficit");
+    }
+    const next = clamp(metrics[key] + adjustedDelta, 0, 100);
+    if (next - metrics[key] !== adjustedDelta) {
+      modifiers.add("clamp");
+    }
+    // Keep the pre-clamp adjusted delta as the player-facing effect, matching
+    // historical behavior so existing copy/tests stay stable.
+    appliedEffects[key] = adjustedDelta;
+    metrics[key] = next;
   }
+
   if (source) {
-    state.history.push({ ...source, effects: delta });
+    state.history.push({
+      ...source,
+      effects: appliedEffects,
+      rawEffects,
+      modifiers: [...modifiers],
+    });
   }
-  return delta;
+  return appliedEffects;
 }
 
-export function applyOptionOutcome(state, option = {}, source) {
+export function applyOptionOutcome(state, option = {}, source, rng = Math.random) {
   if (!state || !option) {
     return null;
   }
 
+  const causedBy = buildCausedBy(state, source);
+
   if (option.risk) {
-    const result = resolveRisk(state, option.risk);
+    const result = resolveRisk(state, option.risk, rng);
     const effects = applyEffects(state, result.effects, source);
     applyOptionFlags(state, option);
     if (result.flags) {
@@ -57,10 +87,10 @@ export function applyOptionOutcome(state, option = {}, source) {
     }
     applyAssignmentSideEffects(state, option);
     const scheduledIssueTeaser = combineScheduledIssueTeasers(
-      applyScheduledIssues(state, option),
-      applyRiskOutcomeSchedules(state, option, result),
+      applyScheduledIssues(state, option, causedBy),
+      applyRiskOutcomeSchedules(state, option, result, causedBy),
     );
-    applyScheduledEvents(state, option);
+    applyScheduledEvents(state, option, causedBy);
     return {
       effects,
       outcome: result.outcome,
@@ -72,13 +102,28 @@ export function applyOptionOutcome(state, option = {}, source) {
   const effects = applyEffects(state, option.effects || {}, source);
   applyOptionFlags(state, option);
   applyAssignmentSideEffects(state, option);
-  const scheduledIssueTeaser = applyScheduledIssues(state, option);
-  applyScheduledEvents(state, option);
+  const scheduledIssueTeaser = applyScheduledIssues(state, option, causedBy);
+  applyScheduledEvents(state, option, causedBy);
   return {
     effects,
     outcome: option.outcome ?? "",
     riskResult: null,
     scheduledIssueTeaser,
+  };
+}
+
+// Provenance stamp attached to anything this decision schedules for later, so a
+// delayed issue/event can name the choice that caused it.
+function buildCausedBy(state, source) {
+  if (!source) return null;
+  return {
+    round: source.round ?? state.round ?? null,
+    season: state.currentSeasonContext?.season || null,
+    sourceType: source.type || null,
+    sourceId: source.id || null,
+    title: source.title || null,
+    option: source.option || null,
+    stance: source.stance || null,
   };
 }
 
@@ -274,7 +319,7 @@ function applyAssignmentSideEffects(state, option) {
   }
 }
 
-function applyRiskOutcomeSchedules(state, option, result) {
+function applyRiskOutcomeSchedules(state, option, result, causedBy = null) {
   const risk = option?.risk;
   if (!risk || !result) {
     return null;
@@ -282,23 +327,23 @@ function applyRiskOutcomeSchedules(state, option, result) {
 
   const scheduleSpec = result.success ? risk.successScheduleIssues : risk.failScheduleIssues;
   if (scheduleSpec) {
-    scheduleIssueEntries(state, scheduleSpec);
+    scheduleIssueEntries(state, scheduleSpec, causedBy);
     return buildScheduledIssueTeaser(state, scheduleSpec);
   }
   return null;
 }
 
-function applyScheduledIssues(state, option) {
+function applyScheduledIssues(state, option, causedBy = null) {
   const schedule = option.scheduleIssues;
   if (!schedule) {
     return null;
   }
 
-  scheduleIssueEntries(state, schedule);
+  scheduleIssueEntries(state, schedule, causedBy);
   return buildScheduledIssueTeaser(state, schedule);
 }
 
-function scheduleIssueEntries(state, scheduleSpec) {
+function scheduleIssueEntries(state, scheduleSpec, causedBy = null) {
   const schedules = normalizeScheduleEntries(scheduleSpec);
   if (!schedules.length) {
     return;
@@ -313,18 +358,20 @@ function scheduleIssueEntries(state, scheduleSpec) {
     const delay = Math.max(0, Number(schedule.delay || 0));
     if (existing) {
       existing.delay = Math.min(existing.delay ?? delay, delay);
+      if (causedBy && !existing.causedBy) existing.causedBy = causedBy;
       continue;
     }
     state.pendingIssues.push({
       ...(schedule.id ? { id: schedule.id } : {}),
       ...(Array.isArray(schedule.candidates) ? { candidates: schedule.candidates.map((candidate) => ({ ...candidate })) } : {}),
       ...(schedule.force ? { force: true } : {}),
+      ...(causedBy ? { causedBy } : {}),
       delay,
     });
   }
 }
 
-function applyScheduledEvents(state, option) {
+function applyScheduledEvents(state, option, causedBy = null) {
   const schedule = option.scheduleEvents;
   if (!schedule || !schedule.id) {
     return;
@@ -338,7 +385,8 @@ function applyScheduledEvents(state, option) {
   const delay = Math.max(0, Number(schedule.delay || 0));
   if (existing) {
     existing.delay = Math.min(existing.delay ?? delay, delay);
+    if (causedBy && !existing.causedBy) existing.causedBy = causedBy;
     return;
   }
-  state.pendingEvents.push({ id: schedule.id, delay });
+  state.pendingEvents.push({ id: schedule.id, delay, ...(causedBy ? { causedBy } : {}) });
 }

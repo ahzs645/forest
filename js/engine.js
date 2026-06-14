@@ -34,3 +34,22 @@ export {
   formatMetricDelta,
 } from "./engine/effects.js";
 export { buildSummary } from "./engine/summary.js";
+export {
+  buildRoleLens,
+  buildSeasonHeadline,
+  computeManagementStyle,
+  describeConsequences,
+  describeCardCause,
+  describePendingIssueCause,
+  describeEventCause,
+} from "./engine/insights.js";
+export { makeRng, isForkableRng } from "./engine/rng.js";
+export {
+  scoreRun,
+  scoreMetricHealth,
+  scoreRolePerformance,
+  scoreRiskLoad,
+  scoreStyleFit,
+  deriveTier,
+} from "./engine/scoring.js";
+export { ROLE_OBJECTIVES, getRoleObjective } from "./engine/roleObjectives.js";
