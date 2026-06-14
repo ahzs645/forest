@@ -44,6 +44,10 @@ const CONSEQUENCE_INFO = {
     title: "Comeback window",
     cause: "The file was still salvageable, so targeted effort steadied your weakest meter.",
   },
+  "field-discipline-rebound": {
+    title: "Field-discipline rebound",
+    cause: "The crew was still delivering, so pausing to clean up documentation clawed back some compliance.",
+  },
 };
 
 function formatEffectText(effects = {}) {

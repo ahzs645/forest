@@ -1,6 +1,6 @@
 # Seasonal Balance Summary
 
-Generated: 2026-06-14T21:06:17.260Z
+Generated: 2026-06-14T22:39:56.133Z
 Runs: 6300 · seeds 1000–1024 · roles 4 · areas 9 · strategies 7
 
 Tier rank: outstanding 3 · solid 2 · mixed 1 · stumbled 0.
@@ -14,8 +14,8 @@ Tier rank: outstanding 3 · solid 2 · mixed 1 · stumbled 0.
 | role-optimal | 1.38 | 15 | 312 | 573 | 0 | 41.1/56.4/71.4/85.4/43.5 |
 | weakest-metric | 0.9 | 7 | 5 | 778 | 110 | 53.1/53.3/53.7/63.7/44.9 |
 | balanced | 0.86 | 0 | 3 | 764 | 133 | 45.1/52/53.7/68/40 |
-| random | 0.81 | 1 | 11 | 707 | 181 | 47.4/52.5/53.8/61.4/40.3 |
-| aggressive | 0 | 0 | 0 | 0 | 900 | 67.4/47.2/27.9/15.1/28.5 |
+| random | 0.81 | 1 | 11 | 707 | 181 | 47.5/52.5/53.8/61.5/40.4 |
+| aggressive | 0 | 0 | 0 | 0 | 900 | 63.3/47.2/28.1/23.9/28.9 |
 
 Dominant strategy: **greedy**.
 
@@ -68,12 +68,12 @@ Most punishing: **recce @ fort-st-john-plateau** (mean tier 0.84).
 
 | Consequence | Runs fired |
 |---|---|
-| contractor-attrition | 60 |
-| trust-deficit | 593 |
-| audit-escalation | 929 |
+| contractor-attrition | 61 |
+| trust-deficit | 595 |
+| audit-escalation | 922 |
 | registration-lapse | 286 |
 | paperwork-burn | 525 |
-| professional-audit | 794 |
+| professional-audit | 790 |
 
 Every consequence fired at least once.
 
@@ -90,10 +90,10 @@ Every consequence fired at least once.
 | fsp-comment-surge | 815 |
 | scaler-pressure-memo | 791 |
 | fom-consistency-gap | 718 |
-| lumber-market-crash | 636 |
-| snow-press-browse-signal | 618 |
+| lumber-market-crash | 638 |
+| snow-press-browse-signal | 615 |
 | wtra-trespass-silence | 589 |
 
 ## Average final metrics (all runs)
 
-Progress 47 · Forest Health 53.5 · Relationships 58 · Compliance 66.3 · Budget 41.9
+Progress 46.4 · Forest Health 53.5 · Relationships 58 · Compliance 67.5 · Budget 41.9
