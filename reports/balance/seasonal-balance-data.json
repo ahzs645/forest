@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-06-14T21:06:17.260Z",
+    "generatedAt": "2026-06-14T22:39:56.133Z",
     "runs": 25,
     "seedBase": 1000,
     "roles": [
@@ -140,11 +140,11 @@
           "unknown": 0
         },
         "metrics": {
-          "progress": 47.4,
+          "progress": 47.5,
           "forestHealth": 52.5,
           "relationships": 53.8,
-          "compliance": 61.4,
-          "budget": 40.3
+          "compliance": 61.5,
+          "budget": 40.4
         }
       },
       {
@@ -159,11 +159,11 @@
           "unknown": 0
         },
         "metrics": {
-          "progress": 67.4,
+          "progress": 63.3,
           "forestHealth": 47.2,
-          "relationships": 27.9,
-          "compliance": 15.1,
-          "budget": 28.5
+          "relationships": 28.1,
+          "compliance": 23.9,
+          "budget": 28.9
         }
       }
     ],
@@ -361,19 +361,19 @@
       "runs": 175
     },
     "overallMetrics": {
-      "progress": 47,
+      "progress": 46.4,
       "forestHealth": 53.5,
       "relationships": 58,
-      "compliance": 66.3,
+      "compliance": 67.5,
       "budget": 41.9
     },
     "consequenceCounts": {
-      "contractor-attrition": 60,
-      "trust-deficit": 593,
-      "audit-escalation": 929,
+      "contractor-attrition": 61,
+      "trust-deficit": 595,
+      "audit-escalation": 922,
       "registration-lapse": 286,
       "paperwork-burn": 525,
-      "professional-audit": 794
+      "professional-audit": 790
     },
     "neverFiredConsequences": [],
     "topIssues": [
@@ -415,11 +415,11 @@
       ],
       [
         "lumber-market-crash",
-        636
+        638
       ],
       [
         "snow-press-browse-signal",
-        618
+        615
       ],
       [
         "wtra-trespass-silence",

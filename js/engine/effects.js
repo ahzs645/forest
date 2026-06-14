@@ -274,9 +274,14 @@ export function applyRoundConsequences(state) {
     }
 
     if (professional.auditExposure >= 35) {
+      // De-pile-on: once compliance is already critically low the audit reads as
+      // a *standing* exposure, not a fresh wound — keep the scrutiny (progress
+      // drag + the firing event) but ease the compliance bleed so a run in a
+      // hole isn't hammered into oblivion by every layer at once.
+      const auditComplianceHit = metrics.compliance < 20 ? -1 : -2;
       applyEffects(
         state,
-        { compliance: -2, progress: -2 },
+        { compliance: auditComplianceHit, progress: -2 },
         {
           type: "consequence",
           id: "professional-audit",
@@ -317,6 +322,28 @@ function applyRoundRecoveries(state, round, consequences) {
       },
     );
     consequences.push("operational-dividend");
+  }
+
+  // Field-discipline rebound ("repair compliance later"): a crew that is still
+  // delivering real work on the ground can be pulled off the line to catch up
+  // documentation and clean the file, clawing back some compliance at the cost
+  // of a little production. This is the comeback tool for a fast-and-loose run
+  // that wants to course-correct — it eases a compliance collapse on an
+  // actively-producing file without, on its own, rescuing the run to a good
+  // ending (relationships and budget still have to be earned elsewhere).
+  if (round >= 2 && metrics.compliance < 35 && metrics.progress >= 55) {
+    applyEffects(
+      state,
+      { compliance: 5, progress: -2 },
+      {
+        type: "recovery",
+        id: "field-discipline-rebound",
+        title: "Field-discipline rebound",
+        option: "Crew paused production to catch up documentation and clean the file",
+        round,
+      },
+    );
+    consequences.push("field-discipline-rebound");
   }
 
   // Comeback window: late in the year a single collapsing meter gets a modest

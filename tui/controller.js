@@ -135,6 +135,23 @@ function buildOutcomeNotice(option, outcomeResult) {
   };
 }
 
+// Structured record of the player's most recent choice, surfaced as a persistent
+// "Last Decision" panel so the result of a call stays visible into the next card
+// instead of scrolling away with the transient outcome notice.
+function buildLastDecision(option, outcomeResult) {
+  if (!option) return null;
+  const riskResult = outcomeResult?.riskResult ?? null;
+  const effects = outcomeResult?.effects || {};
+  return {
+    label: option.label,
+    outcome: outcomeResult?.outcome ?? option.outcome ?? "",
+    effects: { ...effects },
+    effectText: formatMetricDelta(effects),
+    // null for a plain decision; true/false for a gamble that resolved.
+    success: riskResult ? Boolean(riskResult.success) : null,
+  };
+}
+
 // Turn a raw effects delta into a short tradeoff hint shown *before* the player
 // commits. We surface the direction of the swing (which meters rise, which
 // fall) without spoiling the magnitude or the narrative outcome — that lands
@@ -157,6 +174,35 @@ function summarizeEffects(effects) {
   return parts.join(" · ");
 }
 
+// Classify an option's downside into one readable risk band — SAFE / TRADEOFF /
+// RISKY — so the player can size up a choice before committing. We grade on the
+// *shape* of the downside (how deep the worst hit is, whether compliance takes a
+// dive, whether the option is an explicit gamble), never on the magnitude of the
+// upside, so the tag hints at exposure without spoiling the outcome.
+function deriveRiskLevel(option, { danger = false } = {}) {
+  // An explicit gamble (success/failure roll) or a danger-issue response is
+  // always the high band — its downside is by definition uncertain or severe.
+  if (option?.risk || danger) return "high";
+
+  const effects = option?.effects;
+  if (!effects || typeof effects !== "object") return "low";
+
+  const negatives = Object.entries(effects)
+    .map(([key, value]) => [key, Number(value)])
+    .filter(([, value]) => Number.isFinite(value) && value < 0);
+
+  if (!negatives.length) return "low";
+
+  const worst = Math.min(...negatives.map(([, value]) => value));
+  const totalDown = negatives.reduce((sum, [, value]) => sum + value, 0);
+  const complianceDrop = Number(effects.compliance) < 0 ? Number(effects.compliance) : 0;
+
+  // A steep single hit, a compliance dive, or broad across-the-board costs read
+  // as RISKY; a contained, single-meter cost reads as a TRADEOFF.
+  if (worst <= -6 || complianceDrop <= -4 || totalDown <= -8) return "high";
+  return "medium";
+}
+
 function presentOption(option) {
   return {
     label: option.label,
@@ -169,6 +215,8 @@ function presentOption(option) {
     stance: option.stance,
     effects: option.effects,
     risk: option.risk ? true : undefined,
+    // Pre-commitment risk band rendered as a SAFE/TRADEOFF/RISKY tag.
+    riskLevel: deriveRiskLevel(option),
   };
 }
 
@@ -198,7 +246,11 @@ function presentDangerIssueOption(item, option, index) {
     ][index];
 
     if (crisisCopy) {
-      return { ...crisisCopy, preview: summarizeEffects(option?.effects) };
+      return {
+        ...crisisCopy,
+        preview: summarizeEffects(option?.effects),
+        riskLevel: deriveRiskLevel(option, { danger: true }),
+      };
     }
   }
 
@@ -206,6 +258,7 @@ function presentDangerIssueOption(item, option, index) {
     label: option?.label || `Option ${index + 1}`,
     preview: option?.preview ?? summarizeEffects(option?.effects),
     outcome: option?.outcome,
+    riskLevel: deriveRiskLevel(option, { danger: true }),
   };
 }
 
@@ -263,6 +316,8 @@ function snapshotGameState(gs) {
     // Live "what am I trying to do right now" strip: mandate + at-risk meters +
     // the single most pressing pressure, recomputed from current metrics.
     objectiveStrip: gs.role?.id ? buildObjectiveStrip(gs) : null,
+    // The player's most recent choice + its effects, for the Last Decision panel.
+    lastDecision: gs.lastDecision ?? null,
   };
 }
 
@@ -782,6 +837,7 @@ export class TuiGameController {
             stance: option.stance,
           }, this.rng);
 
+          gs.lastDecision = buildLastDecision(option, outcomeResult);
           this.emit();
 
           this.processNext(buildOutcomeNotice(option, outcomeResult));

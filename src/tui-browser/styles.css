@@ -763,6 +763,70 @@ body {
   color: #c9d1d9;
 }
 
+/* Risk band tag (SAFE / TRADEOFF / RISKY) pinned to the right of a decision
+   option. A bordered chip so it reads as a label, not as part of the copy. */
+.tui-option-tag {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-left: auto;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Last Decision panel: a compact, persistent readout of the player's most
+   recent call and its metric swing. */
+.tui-last-decision {
+  border-color: rgba(86, 212, 221, 0.5);
+  flex: 0 0 auto;
+}
+
+.tui-last-decision-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem 0.75rem 0.65rem;
+}
+
+.tui-last-decision-key {
+  display: inline-block;
+  min-width: 4.5rem;
+  margin-right: 0.5rem;
+  color: #56d4dd;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+}
+
+.tui-last-decision-choice {
+  color: #e6edf3;
+  font-weight: 600;
+}
+
+.tui-last-decision-result {
+  margin-left: 0.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+}
+
+.tui-last-decision-effects {
+  color: #c9d1d9;
+}
+
+/* Mobile-only sticky metric strip. Hidden on desktop, where the dashboard is
+   always visible alongside the stage. */
+.tui-mobile-metrics {
+  display: none;
+}
+
 .tui-option:hover {
   background: rgba(61, 90, 31, 0.18);
 }
@@ -940,6 +1004,42 @@ body {
   .tui-art {
     font-size: 0.8rem;
     padding: 0.75rem 1rem 1rem;
+  }
+
+  /* Surface the sticky metric strip on phones, just above the options the
+     player is choosing between, so the meters never scroll out of reach. */
+  .tui-mobile-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.9rem;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid rgba(86, 212, 221, 0.45);
+    background: rgba(8, 12, 17, 0.97);
+  }
+
+  .tui-mobile-metric {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+  }
+
+  .tui-mobile-metric-key {
+    color: #7d8590;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .tui-mobile-metric-val {
+    font-weight: 700;
+  }
+
+  .tui-mobile-metric-delta {
+    font-size: 0.72rem;
+    font-weight: 700;
   }
 }
 

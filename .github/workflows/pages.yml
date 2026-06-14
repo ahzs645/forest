@@ -36,6 +36,17 @@ jobs:
       - name: Lint game content
         run: npm run lint:events --if-present
 
+      # Gate the deploy on a fast browser smoke test: a keyboard-driven seasonal
+      # playthrough plus the mobile no-overflow check. These build and serve the
+      # app via `serve:e2e`, so a TUI page that won't load or play can't ship.
+      # The full Playwright suite stays out of the deploy path (run it with
+      # `npm run test:e2e`); this is the minimal "is the build alive" gate.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke test browser build
+        run: npx playwright test tests/e2e/tui-browser.spec.js tests/e2e/tui-browser-mobile.spec.js
+
       - name: Build
         run: npm run build
 
