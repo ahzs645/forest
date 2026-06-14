@@ -40,3 +40,4 @@ export {
   computeManagementStyle,
   describeConsequences,
 } from "./engine/insights.js";
+export { makeRng, isForkableRng } from "./engine/rng.js";

@@ -1,0 +1,433 @@
+{
+  "meta": {
+    "generatedAt": "2026-06-14T19:50:55.739Z",
+    "runs": 25,
+    "seedBase": 1000,
+    "roles": [
+      "planner",
+      "permitter",
+      "recce",
+      "silviculture"
+    ],
+    "areas": [
+      "fort-st-john-plateau",
+      "muskwa-foothills",
+      "bulkley-valley",
+      "fraser-plateau",
+      "skeena-nass",
+      "tahltan-highland",
+      "vancouver-island-coast",
+      "kootenay-wetbelt",
+      "okanagan-shuswap-drybelt"
+    ],
+    "strategies": [
+      "cautious",
+      "balanced",
+      "aggressive",
+      "random",
+      "greedy",
+      "weakest-metric",
+      "role-optimal"
+    ]
+  },
+  "analysis": {
+    "totalRuns": 6300,
+    "strategySummary": [
+      {
+        "strategy": "greedy",
+        "runs": 900,
+        "tierScore": 1.41,
+        "tiers": {
+          "outstanding": 0,
+          "solid": 372,
+          "mixed": 528,
+          "stumbled": 0,
+          "unknown": 0
+        },
+        "metrics": {
+          "progress": 43.1,
+          "forestHealth": 56.9,
+          "relationships": 71.1,
+          "compliance": 84.7,
+          "budget": 38.7
+        }
+      },
+      {
+        "strategy": "cautious",
+        "runs": 900,
+        "tierScore": 1.4,
+        "tiers": {
+          "outstanding": 0,
+          "solid": 361,
+          "mixed": 539,
+          "stumbled": 0,
+          "unknown": 0
+        },
+        "metrics": {
+          "progress": 21,
+          "forestHealth": 56.2,
+          "relationships": 73.3,
+          "compliance": 85.7,
+          "budget": 39.1
+        }
+      },
+      {
+        "strategy": "role-optimal",
+        "runs": 900,
+        "tierScore": 1.33,
+        "tiers": {
+          "outstanding": 0,
+          "solid": 299,
+          "mixed": 601,
+          "stumbled": 0,
+          "unknown": 0
+        },
+        "metrics": {
+          "progress": 37.8,
+          "forestHealth": 56.5,
+          "relationships": 70.8,
+          "compliance": 85.6,
+          "budget": 34.4
+        }
+      },
+      {
+        "strategy": "weakest-metric",
+        "runs": 900,
+        "tierScore": 0.88,
+        "tiers": {
+          "outstanding": 0,
+          "solid": 11,
+          "mixed": 768,
+          "stumbled": 121,
+          "unknown": 0
+        },
+        "metrics": {
+          "progress": 52.7,
+          "forestHealth": 53.4,
+          "relationships": 54.1,
+          "compliance": 62.4,
+          "budget": 44.1
+        }
+      },
+      {
+        "strategy": "balanced",
+        "runs": 900,
+        "tierScore": 0.84,
+        "tiers": {
+          "outstanding": 0,
+          "solid": 1,
+          "mixed": 758,
+          "stumbled": 141,
+          "unknown": 0
+        },
+        "metrics": {
+          "progress": 43.5,
+          "forestHealth": 52.1,
+          "relationships": 54.1,
+          "compliance": 68.5,
+          "budget": 38.2
+        }
+      },
+      {
+        "strategy": "random",
+        "runs": 900,
+        "tierScore": 0.76,
+        "tiers": {
+          "outstanding": 0,
+          "solid": 9,
+          "mixed": 663,
+          "stumbled": 228,
+          "unknown": 0
+        },
+        "metrics": {
+          "progress": 46.3,
+          "forestHealth": 52.4,
+          "relationships": 53.4,
+          "compliance": 59.1,
+          "budget": 38.1
+        }
+      },
+      {
+        "strategy": "aggressive",
+        "runs": 900,
+        "tierScore": 0,
+        "tiers": {
+          "outstanding": 0,
+          "solid": 0,
+          "mixed": 0,
+          "stumbled": 900,
+          "unknown": 0
+        },
+        "metrics": {
+          "progress": 68.8,
+          "forestHealth": 47,
+          "relationships": 28,
+          "compliance": 7.6,
+          "budget": 27.8
+        }
+      }
+    ],
+    "comboSummary": [
+      {
+        "combo": "planner @ kootenay-wetbelt",
+        "tierScore": 1.2,
+        "runs": 175
+      },
+      {
+        "combo": "planner @ okanagan-shuswap-drybelt",
+        "tierScore": 1.19,
+        "runs": 175
+      },
+      {
+        "combo": "planner @ bulkley-valley",
+        "tierScore": 1.18,
+        "runs": 175
+      },
+      {
+        "combo": "planner @ vancouver-island-coast",
+        "tierScore": 1.17,
+        "runs": 175
+      },
+      {
+        "combo": "planner @ skeena-nass",
+        "tierScore": 1.09,
+        "runs": 175
+      },
+      {
+        "combo": "planner @ muskwa-foothills",
+        "tierScore": 1.02,
+        "runs": 175
+      },
+      {
+        "combo": "planner @ fraser-plateau",
+        "tierScore": 1.02,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ okanagan-shuswap-drybelt",
+        "tierScore": 1.01,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ bulkley-valley",
+        "tierScore": 1,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ vancouver-island-coast",
+        "tierScore": 0.99,
+        "runs": 175
+      },
+      {
+        "combo": "planner @ tahltan-highland",
+        "tierScore": 0.98,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ fraser-plateau",
+        "tierScore": 0.98,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ skeena-nass",
+        "tierScore": 0.97,
+        "runs": 175
+      },
+      {
+        "combo": "planner @ fort-st-john-plateau",
+        "tierScore": 0.96,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ kootenay-wetbelt",
+        "tierScore": 0.95,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ fraser-plateau",
+        "tierScore": 0.94,
+        "runs": 175
+      },
+      {
+        "combo": "permitter @ tahltan-highland",
+        "tierScore": 0.92,
+        "runs": 175
+      },
+      {
+        "combo": "permitter @ vancouver-island-coast",
+        "tierScore": 0.91,
+        "runs": 175
+      },
+      {
+        "combo": "permitter @ kootenay-wetbelt",
+        "tierScore": 0.91,
+        "runs": 175
+      },
+      {
+        "combo": "permitter @ okanagan-shuswap-drybelt",
+        "tierScore": 0.91,
+        "runs": 175
+      },
+      {
+        "combo": "permitter @ skeena-nass",
+        "tierScore": 0.9,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ okanagan-shuswap-drybelt",
+        "tierScore": 0.9,
+        "runs": 175
+      },
+      {
+        "combo": "permitter @ bulkley-valley",
+        "tierScore": 0.89,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ tahltan-highland",
+        "tierScore": 0.89,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ muskwa-foothills",
+        "tierScore": 0.89,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ skeena-nass",
+        "tierScore": 0.88,
+        "runs": 175
+      },
+      {
+        "combo": "permitter @ muskwa-foothills",
+        "tierScore": 0.87,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ vancouver-island-coast",
+        "tierScore": 0.87,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ bulkley-valley",
+        "tierScore": 0.86,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ tahltan-highland",
+        "tierScore": 0.86,
+        "runs": 175
+      },
+      {
+        "combo": "permitter @ fraser-plateau",
+        "tierScore": 0.85,
+        "runs": 175
+      },
+      {
+        "combo": "permitter @ fort-st-john-plateau",
+        "tierScore": 0.84,
+        "runs": 175
+      },
+      {
+        "combo": "silviculture @ fort-st-john-plateau",
+        "tierScore": 0.84,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ muskwa-foothills",
+        "tierScore": 0.83,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ fort-st-john-plateau",
+        "tierScore": 0.82,
+        "runs": 175
+      },
+      {
+        "combo": "recce @ kootenay-wetbelt",
+        "tierScore": 0.8,
+        "runs": 175
+      }
+    ],
+    "dominantStrategy": "greedy",
+    "easiestCombo": {
+      "combo": "planner @ kootenay-wetbelt",
+      "tierScore": 1.2,
+      "runs": 175
+    },
+    "hardestCombo": {
+      "combo": "recce @ kootenay-wetbelt",
+      "tierScore": 0.8,
+      "runs": 175
+    },
+    "overallMetrics": {
+      "progress": 44.7,
+      "forestHealth": 53.5,
+      "relationships": 57.8,
+      "compliance": 64.8,
+      "budget": 37.2
+    },
+    "consequenceCounts": {
+      "contractor-attrition": 103,
+      "trust-deficit": 583,
+      "audit-escalation": 959,
+      "registration-lapse": 0,
+      "paperwork-burn": 525,
+      "professional-audit": 0
+    },
+    "neverFiredConsequences": [
+      "registration-lapse",
+      "professional-audit"
+    ],
+    "topIssues": [
+      [
+        "riparian-reclassification-call",
+        1564
+      ],
+      [
+        "special-use-permit-stack",
+        1533
+      ],
+      [
+        "archaeology-escalation-pause",
+        1387
+      ],
+      [
+        "road-use-permit-standoff",
+        1264
+      ],
+      [
+        "labour-job-action",
+        977
+      ],
+      [
+        "fom-consistency-gap",
+        928
+      ],
+      [
+        "scaler-pressure-memo",
+        857
+      ],
+      [
+        "fsp-comment-surge",
+        734
+      ],
+      [
+        "snow-press-browse-signal",
+        707
+      ],
+      [
+        "wtra-trespass-silence",
+        593
+      ],
+      [
+        "significant-road-work-trigger",
+        590
+      ],
+      [
+        "lumber-market-crash",
+        584
+      ]
+    ]
+  }
+}

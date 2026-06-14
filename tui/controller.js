@@ -14,6 +14,8 @@ import {
   buildSeasonHeadline,
   computeManagementStyle,
   describeConsequences,
+  makeRng,
+  isForkableRng,
   SEASONS,
 } from "../js/engine.js";
 import { formatMetricName } from "../js/engine/shared.js";
@@ -54,6 +56,14 @@ function buildAreaPreview(area) {
   const topics = Array.isArray(area?.focusTopics) ? area.focusTopics.slice(0, 3) : [];
   if (topics.length) return topics.join(" · ");
   return area?.description || "";
+}
+
+// Normalize the controller's RNG option: pass through an existing rng function,
+// seed a fresh one from a number, or fall back to live Math.random.
+function createSessionRng(rngOrSeed) {
+  if (typeof rngOrSeed === "function") return rngOrSeed;
+  if (rngOrSeed === undefined || rngOrSeed === null) return Math.random;
+  return makeRng(rngOrSeed);
 }
 
 function createViewState() {
@@ -124,6 +134,11 @@ function presentOption(option) {
     preview: option.preview ?? summarizeEffects(option.effects),
     // Kept for the post-choice result notice and danger-issue copy tests.
     outcome: option.outcome,
+    // Surfaced for headless strategy policies (sims/tests). The browser UI
+    // ignores these; only the preview/label are rendered.
+    stance: option.stance,
+    effects: option.effects,
+    risk: option.risk ? true : undefined,
   };
 }
 
@@ -231,6 +246,11 @@ export class TuiGameController {
     this.selectCb = null;
     this.onExit = options.onExit ?? (() => {});
     this.ambientArt = Boolean(options.ambientArt);
+    // Optional seeded RNG. When omitted we keep the browser's live-random
+    // behavior; when provided (sims, deterministic tests) the whole seasonal
+    // year becomes reproducible. createSessionRng accepts an rng, a numeric
+    // seed, or nothing.
+    this.rng = createSessionRng(options.rng ?? options.seed);
   }
 
   getState() {
@@ -341,7 +361,11 @@ export class TuiGameController {
     }
     gs.seasonContexts.push(context);
 
-    const issuePreview = drawIssue(cloneStateForPreview(gs));
+    // Peek at the upcoming issue on a forked RNG so crisis detection doesn't
+    // consume from the main stream (and so the real draw reproduces the peek on
+    // a crisis round).
+    const previewRng = isForkableRng(this.rng) ? this.rng.fork() : this.rng;
+    const issuePreview = drawIssue(cloneStateForPreview(gs), previewRng);
     const isCrisisRound = issuePreview?.surfaceSeverity === "danger";
 
     this.queue.push({
@@ -353,7 +377,7 @@ export class TuiGameController {
     });
 
     if (isCrisisRound) {
-      const issue = drawIssue(gs);
+      const issue = drawIssue(gs, this.rng);
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
       }
@@ -364,17 +388,17 @@ export class TuiGameController {
         this.queue.push({ type: "assignment", data: assignment });
       }
 
-      const event = drawSeasonalEvent(gs);
+      const event = drawSeasonalEvent(gs, this.rng);
       if (event) {
         this.queue.push({ type: "event", data: event });
       }
 
-      const temptation = drawSeasonalTemptation(gs);
+      const temptation = drawSeasonalTemptation(gs, this.rng);
       if (temptation) {
         this.queue.push({ type: "temptation", data: temptation });
       }
 
-      const issue = drawIssue(gs);
+      const issue = drawIssue(gs, this.rng);
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
       }
@@ -526,7 +550,7 @@ export class TuiGameController {
             option: option.label,
             round: gs.round,
             stance: option.stance,
-          });
+          }, this.rng);
 
           this.emit();
 

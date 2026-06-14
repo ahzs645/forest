@@ -38,7 +38,8 @@ GitHub Pages without a backend.
 | `index.html` (expedition) | Vanilla JS + DOM terminal | **Primary** |
 | `tui.html` (seasonal TUI) | React + `tui/controller.js` | **Primary** |
 | `cli-game.tsx` (`npm run play`) | @opentui/react + Bun, seasonal only | Experimental (frozen) |
-| `cli.mjs` | Headless seasonal sim for balance runs | Tooling (uses a legacy engine loop; pending rebuild on `TuiGameController`) |
+| `scripts/run-seasonal-sims.mjs` (`npm run sim:seasonal`) | Headless seasonal balance harness driving the real `TuiGameController` | **Primary tooling** |
+| `cli.mjs` | Headless seasonal sim for balance runs | Legacy (superseded by `run-seasonal-sims.mjs`; uses an older engine loop) |
 | ~~`cli-game.js` (blessed)~~ | — | Removed |
 
 ## Local development
@@ -49,6 +50,23 @@ npm run dev          # then open / for expedition mode, /tui.html for the season
 npm test             # unit tests (node --test)
 npm run test:e2e     # Playwright end-to-end suite
 ```
+
+## Balance simulation
+
+The seasonal game can be run headlessly across many seeds, roles, areas, and
+strategies. The harness drives the same `TuiGameController` the browser uses
+(via `js/engine/simulate.js`) with a seeded RNG, so every run is reproducible.
+
+```bash
+npm run sim:seasonal -- --runs 100 --strategy balanced
+npm run sim:seasonal -- --role planner --area fraser-plateau --runs 500
+npm run sim:seasonal -- --json > /tmp/runs.json   # full matrix as JSON
+```
+
+Strategies: `cautious`, `balanced`, `aggressive`, `random`, `greedy`,
+`weakest-metric`, `role-optimal`. Without `--json`, a markdown + JSON balance
+report is written to `reports/balance/` (mean ending tier per strategy, role ×
+area difficulty, consequence firing rates, most frequent issues).
 
 Production builds use the `/forest/` base path for GitHub Pages
 (`VITE_BASE_PATH=/ npm run build` for a root-path build). Every push to `main`

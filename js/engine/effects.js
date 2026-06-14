@@ -43,13 +43,13 @@ export function applyEffects(state, effects = {}, source) {
   return delta;
 }
 
-export function applyOptionOutcome(state, option = {}, source) {
+export function applyOptionOutcome(state, option = {}, source, rng = Math.random) {
   if (!state || !option) {
     return null;
   }
 
   if (option.risk) {
-    const result = resolveRisk(state, option.risk);
+    const result = resolveRisk(state, option.risk, rng);
     const effects = applyEffects(state, result.effects, source);
     applyOptionFlags(state, option);
     if (result.flags) {
