@@ -110,6 +110,77 @@ function MetricBar({ label, value, tone, color, delta }) {
   );
 }
 
+// Short keys for the cramped mobile strip, where five spelled-out labels won't
+// fit on one row.
+const METRIC_SHORT = {
+  progress: "P",
+  forestHealth: "FH",
+  relationships: "R",
+  compliance: "C",
+  budget: "B",
+};
+
+// Mobile-only sticky strip so the five meters stay in view while the player
+// reads options — on phones the full dashboard sits below the fold. Hidden on
+// desktop (the dashboard is always visible there) and aria-hidden because the
+// dashboard already exposes these values to assistive tech.
+function MobileMetricStrip({ gameState }) {
+  if (!gameState?.metrics) return null;
+  const deltas = gameState.lastChoiceEffects || {};
+  return (
+    <div className="tui-mobile-metrics" aria-hidden="true">
+      {METRIC_ROWS.map((row) => {
+        const value = Math.max(0, Math.min(100, Math.round(Number(gameState.metrics[row.key]) || 0)));
+        const change = Math.round(Number(deltas[row.key]) || 0);
+        return (
+          <span className="tui-mobile-metric" key={row.key}>
+            <span className="tui-mobile-metric-key">{METRIC_SHORT[row.key] || row.label}</span>
+            <span className={`tui-mobile-metric-val tone-${row.tone}`}>{value}</span>
+            {change !== 0 ? (
+              <span className={`tui-mobile-metric-delta ${change > 0 ? "tone-green" : "tone-red"}`}>
+                {change > 0 ? `▲${change}` : `▼${Math.abs(change)}`}
+              </span>
+            ) : null}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// Persistent "here's what your last call did" panel. The transient outcome
+// notice scrolls away with the next card; this keeps the chosen option and its
+// metric swing in view so the loop reads as choice → consequence → next choice.
+function LastDecisionPanel({ decision }) {
+  if (!decision?.label) return null;
+  const resultTone = decision.success === true ? "green" : decision.success === false ? "red" : null;
+  const resultWord = decision.success === true ? "Success" : decision.success === false ? "Caught" : null;
+  return (
+    <section className="tui-panel tui-last-decision" aria-label="Last decision">
+      <div className="tui-panel-title">Last Decision</div>
+      <div className="tui-last-decision-body">
+        <p className="tui-copy">
+          <span className="tui-last-decision-key">You chose</span>
+          <span className="tui-last-decision-choice">{decision.label}</span>
+          {resultWord ? <span className={`tui-last-decision-result tone-${resultTone}`}>{resultWord}</span> : null}
+        </p>
+        {decision.outcome ? <p className="tui-copy dim preserve">{decision.outcome}</p> : null}
+        {decision.effectText ? (
+          <p className="tui-copy">
+            <span className="tui-last-decision-key">Effects</span>
+            <span className="tui-last-decision-effects">{decision.effectText}</span>
+          </p>
+        ) : (
+          <p className="tui-copy dim">
+            <span className="tui-last-decision-key">Effects</span>
+            <span>No measurable change.</span>
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function shortSeason(season) {
   return String(season || "").split(" ")[0] || season;
 }
@@ -593,6 +664,15 @@ function DecisionCard({ data, objective }) {
   );
 }
 
+// Pre-commitment risk band: a quick read on how exposed a choice is, without
+// spoiling the outcome. Only attached to real decision options (which carry a
+// riskLevel) — setup/confirm/menu options stay tag-free.
+const RISK_TAGS = {
+  low: { text: "SAFE", className: "tone-green", word: "Safe" },
+  medium: { text: "TRADEOFF", className: "tone-yellow", word: "Tradeoff" },
+  high: { text: "RISKY", className: "tone-red", word: "Risky" },
+};
+
 function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelect, isCrisis }) {
   if (!options.length) return null;
 
@@ -604,26 +684,42 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
     <section className="tui-panel tui-options">
       <div className="tui-panel-title">
         <span className={`tui-options-prompt ${toneClass ? `tone-${toneClass}` : ""}`}>{title}</span>
-        <span className="tui-options-hint">↑↓ · Enter</span>
+        <span className="tui-options-hint">↑↓ · Enter · 1–9</span>
       </div>
       <div className="tui-options-list">
         {options.map((label, index) => {
+          const detail = optionDetails?.[index];
           // Show the tradeoff hint before commitment — never the full outcome,
           // which lands in the result notice after the choice is made.
-          const preview = optionDetails?.[index]?.preview;
+          const preview = detail?.preview;
           const sub = preview && preview !== label ? preview : null;
+          const riskTag = detail?.riskLevel ? RISK_TAGS[detail.riskLevel] : null;
+          const isSelected = index === selected;
+          // Decision options get a clean, spoken accessible name ("Option 2:
+          // Continue run — Risky"); setup/menu options keep their visible text as
+          // their accessible name so existing role-name selectors still resolve.
+          const ariaLabel = riskTag
+            ? `Option ${index + 1}: ${label} — ${riskTag.word}`
+            : detail
+              ? `Option ${index + 1}: ${label}`
+              : undefined;
           return (
             <button
               key={`${label}-${index}`}
               type="button"
-              className={`tui-option ${index === selected ? "selected" : ""}`}
+              className={`tui-option ${isSelected ? "selected" : ""}`}
+              aria-label={ariaLabel}
+              aria-current={isSelected ? "true" : undefined}
               onClick={() => onSelect(index)}
             >
-              <span className="tui-option-number">{index + 1}</span>
+              <span className="tui-option-number" aria-hidden="true">{index + 1}</span>
               <span className="tui-option-body">
                 <span className="tui-option-label">{label}</span>
                 {sub ? <span className="tui-option-preview">{sub}</span> : null}
               </span>
+              {riskTag ? (
+                <span className={`tui-option-tag ${riskTag.className}`} aria-hidden="true">{riskTag.text}</span>
+              ) : null}
             </button>
           );
         })}
@@ -732,6 +828,10 @@ export default function App() {
                 <pre className="tui-art">{state.animFrame}</pre>
               </section>
             ) : null}
+            {state.mode !== "end" ? (
+              <LastDecisionPanel decision={state.gameState?.lastDecision} />
+            ) : null}
+            <MobileMetricStrip gameState={state.gameState} />
             <OptionsPanel
               options={state.options}
               optionDetails={state.contentData?.optionDetails}
