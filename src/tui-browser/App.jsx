@@ -227,6 +227,32 @@ function SeasonLog({ timeline }) {
   );
 }
 
+// Persistent cause/effect feed: the player's recent calls and the fallout they
+// triggered, newest first. Makes the world feel responsive — every line is
+// either a choice they made or a consequence it set off.
+function DecisionTrail({ trail }) {
+  if (!trail?.length) return null;
+  return (
+    <div className="tui-dashboard-aside tui-decision-trail">
+      <div className="tui-dashboard-section-title">Decision trail</div>
+      {trail.map((entry, idx) => {
+        const isFallout = entry.kind === "fallout";
+        const lead = isFallout ? "Fallout" : "You chose";
+        const text = isFallout ? entry.title : entry.option || entry.title;
+        return (
+          <div className="tui-trail-row" key={`trail-${idx}`}>
+            <span className={`tui-trail-lead ${isFallout ? "tone-yellow" : "tone-blue"}`}>{lead}</span>
+            <span className="tui-trail-text">
+              {text}
+              {entry.effectText ? <span className="tui-trail-effect dim">{` — ${entry.effectText}`}</span> : null}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Dashboard({ gameState }) {
   const [tab, setTab] = useState("status");
 
@@ -295,6 +321,7 @@ function Dashboard({ gameState }) {
             </div>
           ))}
           <ObjectiveReadout objective={gameState?.roleObjective} strip={gameState?.objectiveStrip} />
+          <DecisionTrail trail={gameState?.decisionTrail} />
           <StyleReadout style={gameState?.managementStyle} />
           <SeasonLog timeline={gameState?.seasonTimeline} />
         </div>
@@ -468,6 +495,44 @@ function ObjectiveStrip({ strip }) {
   );
 }
 
+// One-screen "what am I trying to do?" card shown alongside the first season's
+// opening message, so a new player learns the goal, the loop, and their win
+// condition before the first real decision.
+function MissionBriefing({ mission }) {
+  if (!mission) return null;
+  return (
+    <section className="tui-mission" aria-label="How to play">
+      <div className="tui-mission-title">Your mission</div>
+      <div className="tui-mission-row">
+        <span className="tui-mission-key tone-green">Goal</span>
+        <span className="tui-mission-val">{mission.goal}</span>
+      </div>
+      {mission.steps?.length ? (
+        <div className="tui-mission-row">
+          <span className="tui-mission-key tone-blue">How to play</span>
+          <ul className="tui-mission-steps">
+            {mission.steps.map((step, idx) => (
+              <li className="tui-copy" key={`step-${idx}`}>{step}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {mission.mandate ? (
+        <div className="tui-mission-row">
+          <span className="tui-mission-key tone-magenta">Your role</span>
+          <span className="tui-mission-val">{mission.mandate}</span>
+        </div>
+      ) : null}
+      {mission.win ? (
+        <div className="tui-mission-row">
+          <span className="tui-mission-key tone-yellow">Win</span>
+          <span className="tui-mission-val">{mission.win}</span>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function ContentView({ data, objective }) {
   if (!data) return null;
 
@@ -477,6 +542,7 @@ function ContentView({ data, objective }) {
         <NoticeBlock notice={data.notice} />
         {data.heading ? <div className="tui-heading">{data.heading}</div> : null}
         {data.body ? <p className="tui-copy preserve">{data.body}</p> : null}
+        <MissionBriefing mission={data.mission} />
       </div>
     );
   }
@@ -642,6 +708,7 @@ function DecisionCard({ data, objective }) {
       ) : null}
       {data.phaseLabel ? <div className="tui-source-label tone-yellow">{data.phaseLabel}</div> : null}
       <div className="tui-heading">{data.title}</div>
+      {data.headline ? <p className="tui-card-headline preserve">{data.headline}</p> : null}
 
       {data.provenance ? (
         <div className="tui-notice tone-yellow">
@@ -679,6 +746,10 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
   const toneClass =
     tone === "danger" ? "red" : tone === "warning" ? "yellow" : tone ? "blue" : "";
   const title = heading || (isCrisis ? "Command Menu" : "Options");
+  // Only explain the tags when they're actually on screen (decision cards),
+  // never on setup/menu lists. New players read "SAFE" as "correct", so spell
+  // out that the bands describe exposure, not the right answer.
+  const hasRiskTags = (optionDetails || []).some((detail) => detail?.riskLevel);
 
   return (
     <section className="tui-panel tui-options">
@@ -724,6 +795,11 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
           );
         })}
       </div>
+      {hasRiskTags ? (
+        <p className="tui-options-risk-help">
+          Risk tags flag downside, not the best move — SAFE can be slow, RISKY can still pay off.
+        </p>
+      ) : null}
     </section>
   );
 }

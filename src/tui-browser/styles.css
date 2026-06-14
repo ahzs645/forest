@@ -821,6 +821,108 @@ body {
   color: #c9d1d9;
 }
 
+/* Mission briefing: one-screen onboarding shown beside the first season's
+   opening card. */
+.tui-mission {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(86, 212, 221, 0.4);
+  border-left-width: 3px;
+  background: rgba(86, 212, 221, 0.06);
+}
+
+.tui-mission-title {
+  color: #56d4dd;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+}
+
+.tui-mission-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  line-height: 1.45;
+}
+
+.tui-mission-key {
+  flex: 0 0 6.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+}
+
+.tui-mission-val {
+  flex: 1;
+  min-width: 0;
+  color: #c9d1d9;
+  overflow-wrap: anywhere;
+}
+
+.tui-mission-steps {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Decision-card headline: the single scannable "season + what's at stake" line
+   the player reads before the four-question body. */
+.tui-card-headline {
+  margin: 0;
+  color: #e6edf3;
+  font-weight: 600;
+  line-height: 1.5;
+  border-left: 3px solid #d29922;
+  padding: 0.1rem 0 0.1rem 0.6rem;
+  overflow-wrap: anywhere;
+}
+
+/* Footnote under the options list explaining the risk bands. */
+.tui-options-risk-help {
+  margin: 0;
+  padding: 0 0.75rem 0.7rem;
+  color: #7d8590;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* Decision trail: persistent choice → fallout feed in the dashboard. */
+.tui-trail-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  line-height: 1.4;
+}
+
+.tui-trail-lead {
+  flex: 0 0 4.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+}
+
+.tui-trail-text {
+  flex: 1;
+  min-width: 0;
+  color: #c9d1d9;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.tui-trail-effect {
+  white-space: nowrap;
+}
+
 /* Mobile-only sticky metric strip. Hidden on desktop, where the dashboard is
    always visible alongside the stage. */
 .tui-mobile-metrics {

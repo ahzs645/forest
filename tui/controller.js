@@ -152,6 +152,55 @@ function buildLastDecision(option, outcomeResult) {
   };
 }
 
+// One-screen onboarding shown the very first time the player opens a season, so
+// they know what they're steering before the first decision lands. Pulled from
+// the role objective system so the "win" line matches the dashboard mandate.
+function buildMissionBriefing(gs) {
+  const objective = gs?.role?.id ? getRoleObjective(gs.role.id) : null;
+  return {
+    goal: "Finish the year with strong Progress, Forest Health, Relationships, Compliance, and Budget.",
+    steps: [
+      "Each card, pick one response. Some calls help now but cost you later.",
+      "Read the five meters and the SAFE / TRADEOFF / RISKY tag on every option.",
+      "Choices echo: delayed fallout returns later under “Why This Happened.”",
+    ],
+    mandate: objective?.mandate || null,
+    win: objective?.signatureWin || null,
+  };
+}
+
+// One scannable line the player reads before the four-question body: the season
+// plus what's actually at stake right now. Keeps the first read fast even when
+// the card's full context runs long.
+function buildCardHeadline(gs, item) {
+  const season = SEASONS[(gs?.round || 1) - 1] || "";
+  const seasonShort = season ? String(season).split(" ")[0] : "";
+  const why = item?.context?.stakes || item?.whyNow || item?.surfaceReason || "";
+  const trimmed = why ? String(why).replace(/\s+/g, " ").trim() : "";
+  const tail = trimmed
+    ? (trimmed.length > 120 ? `${trimmed.slice(0, 117)}…` : trimmed)
+    : (item?.title || "A call needs making");
+  return seasonShort ? `${seasonShort}: ${tail}` : tail;
+}
+
+// Running cause/effect feed for the dashboard: the last few choices *and* the
+// fallout they triggered, newest first, so the world visibly responds to the
+// player instead of feeling random. Built from the engine's decision history,
+// which already stamps each entry with its applied metric effects.
+function buildDecisionTrail(gs, limit = 5) {
+  const history = Array.isArray(gs?.history) ? gs.history : [];
+  const entries = history
+    .filter((entry) => entry && (entry.option || entry.title))
+    .map((entry) => ({
+      round: typeof entry.round === "number" ? entry.round : null,
+      kind: entry.type === "consequence" ? "fallout" : "choice",
+      title: entry.title || "",
+      option: entry.option || "",
+      effectText: formatMetricDelta(entry.effects || {}),
+    }));
+  return entries.slice(-limit).reverse();
+}
+
 // Turn a raw effects delta into a short tradeoff hint shown *before* the player
 // commits. We surface the direction of the swing (which meters rise, which
 // fall) without spoiling the magnitude or the narrative outcome — that lands
@@ -318,6 +367,9 @@ function snapshotGameState(gs) {
     objectiveStrip: gs.role?.id ? buildObjectiveStrip(gs) : null,
     // The player's most recent choice + its effects, for the Last Decision panel.
     lastDecision: gs.lastDecision ?? null,
+    // Persistent choice → fallout feed for the dashboard, so consequences stay
+    // visible across cards instead of scrolling away with the outcome notice.
+    decisionTrail: buildDecisionTrail(gs),
   };
 }
 
@@ -653,6 +705,10 @@ export class TuiGameController {
       body: isCrisisRound
         ? "A critical matter overrides routine work. The season pivots into immediate response."
         : "A new season begins. Prepare your crew.",
+      // First non-crisis season doubles as onboarding: ride along with the
+      // existing opening card (no extra step) so the player gets a one-screen
+      // briefing before the year's first real decision.
+      mission: !isCrisisRound && gs.round === 1 ? buildMissionBriefing(gs) : undefined,
     });
 
     if (isCrisisRound) {
@@ -787,6 +843,7 @@ export class TuiGameController {
           type: "message",
           heading: phase.text,
           body: phase.body ?? "",
+          mission: phase.mission,
           notice,
         },
         ["Continue"],
@@ -810,6 +867,7 @@ export class TuiGameController {
         {
           type: phase.type,
           title: item.title,
+          headline: buildCardHeadline(gs, item),
           description: item.description ?? item.prompt ?? "",
           cardLabel: item.cardLabel,
           context: item.context,
