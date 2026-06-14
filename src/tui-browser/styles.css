@@ -620,42 +620,25 @@ body {
   overflow-wrap: anywhere;
 }
 
-.tui-option-outcome {
+.tui-option-preview {
   color: #8b949e;
   font-size: 0.85rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
-.tui-option.selected .tui-option-outcome {
+.tui-option.selected .tui-option-preview {
   color: #c9d1d9;
-}
-
-.tui-options-situation {
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid rgba(88, 166, 255, 0.25);
-  color: #8b949e;
-  font-size: 0.85rem;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-
-.tui-options-situation-label {
-  color: #56d4dd;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.72rem;
-  margin-right: 0.5rem;
 }
 
 .tui-option:hover {
   background: rgba(61, 90, 31, 0.18);
 }
 
+/* Selection is keyboard *focus*, not a verdict. Use a neutral ring so the
+   first (default-selected) option doesn't read as the "correct answer". */
 .tui-option.selected {
-  background: #3d5a1f;
+  background: rgba(88, 166, 255, 0.08);
   color: #e6edf3;
   border-color: #56d4dd;
 }
@@ -828,27 +811,3 @@ body {
   }
 }
 
-.tui-context-toggle {
-  align-self: flex-start;
-  margin-top: 0.35rem;
-  padding: 0.25rem 0.6rem;
-  font: inherit;
-  font-size: 0.85em;
-  color: #7ee2a8;
-  background: transparent;
-  border: 1px dashed rgba(126, 226, 168, 0.45);
-  border-radius: 2px;
-  cursor: pointer;
-  min-height: 36px;
-}
-
-.tui-context-toggle:hover {
-  border-style: solid;
-  background: rgba(126, 226, 168, 0.08);
-}
-
-.tui-context-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
