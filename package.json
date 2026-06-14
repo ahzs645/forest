@@ -11,6 +11,7 @@
     "serve:e2e": "VITE_BASE_PATH=/ npm run build && vite preview --host 127.0.0.1 --strictPort",
     "test": "node --test tests/*.test.mjs",
     "lint:events": "node scripts/lint-events.mjs",
+    "lint:seasonal": "node scripts/lint-seasonal-content.mjs",
     "test:e2e": "playwright test",
     "test:all": "npm run test && npm run test:e2e",
     "playtest:matrix": "node scripts/playwright-matrix.mjs",
