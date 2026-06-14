@@ -79,12 +79,29 @@ export function scoreStyleFit(state) {
 // does not silently re-balance the game; the numeric score is supplementary.
 export function deriveTier(metrics = {}) {
   const averages = weightedMetricAverage(metrics);
-  const balancedExcellence = Object.values(metrics).every((value) => Number(value) >= 65);
   const strongOutcomeFloors = metrics.compliance >= 62 && metrics.relationships >= 58 && metrics.forestHealth >= 58;
   const stableOutcomeFloors = metrics.compliance >= 48 && metrics.relationships >= 45 && metrics.forestHealth >= 45;
   const stewardshipStrong = metrics.compliance >= 75 && metrics.relationships >= 70 && metrics.forestHealth >= 55;
+  // Outstanding is judged on floors a disciplined run can actually clear. Budget
+  // and forest health sit structurally low (budget never tops ~60 across 6,300
+  // simulated years; forest health rarely clears ~60 outside silviculture), so
+  // requiring every meter ≥ 65 made the tier dead content. Instead, Outstanding
+  // has two role-flavored paths over a shared "nothing collapsed" floor:
+  //   • stewardship — an exceptional compliance + relationships year, and
+  //   • ecology     — an exceptional forest-health year that stayed defensible.
+  const nothingCollapsed = Object.values(metrics).every((value) => Number(value) >= 44);
+  const stewardshipExcellence = metrics.compliance >= 80 && metrics.relationships >= 76;
+  const ecologicalExcellence =
+    metrics.forestHealth >= 60 && metrics.compliance >= 70 && metrics.relationships >= 66;
 
-  if (averages >= 82 && balancedExcellence && strongOutcomeFloors) return "outstanding";
+  if (
+    averages >= 67
+    && metrics.progress >= 45
+    && nothingCollapsed
+    && (stewardshipExcellence || ecologicalExcellence)
+  ) {
+    return "outstanding";
+  }
   if ((averages >= 64 && strongOutcomeFloors) || stewardshipStrong) return "solid";
   if (averages >= 45 && stableOutcomeFloors) return "mixed";
   return "stumbled";

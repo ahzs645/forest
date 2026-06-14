@@ -172,9 +172,14 @@ export function applyRoundConsequences(state) {
   }
 
   if (flags.trustDeficitActive) {
+    // Scale the compliance bleed down once compliance is already collapsing, so
+    // a run in a hole isn't punished into oblivion by every meter at once. This
+    // is the "reduce repeated compliance punishment when already in a hole"
+    // lever — it lets a recovering run climb back instead of compounding.
+    const trustComplianceHit = metrics.compliance > 30 ? -3 : -1;
     applyEffects(
       state,
-      { compliance: -3 },
+      { compliance: trustComplianceHit },
       {
         type: "consequence",
         id: "trust-deficit",
@@ -203,28 +208,26 @@ export function applyRoundConsequences(state) {
   }
 
   if (professional) {
+    const complianceLow = metrics.compliance < COMPLIANCE_AUDIT_THRESHOLD;
     const cpdGap = Math.max(0, Math.round((professional.cpdTarget || DEFAULT_CPD_TARGET) - professional.cpdHours));
-    if (professional.registrationStatus !== "active") {
-      applyEffects(
-        state,
-        { compliance: -4, budget: -2 },
-        {
-          type: "consequence",
-          id: "registration-lapse",
-          title: "Registration lapse creates compliance drag",
-          option: "Active practice has to stop until renewal clears",
-          round,
-        },
-      );
-      professional.auditExposure = clamp(professional.auditExposure + 2, 0, 100);
-      consequences.push("registration-lapse");
-    }
 
     if (cpdGap > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk + 1 + Math.floor(cpdGap / 15), 0, 100);
       professional.auditExposure = clamp(professional.auditExposure + 1, 0, 100);
     } else if (professional.competenceRisk > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk - 1, 0, 100);
+    }
+
+    // Seasonal play barely touched the professional state, so its two
+    // consequences could never fire. Tie audit exposure to the compliance
+    // signal the game *does* move: letting the file fall below the audit line
+    // (and an active audit escalation on top) is what now drives professional
+    // scrutiny — so the consequence reads as fallout from visible neglect.
+    if (complianceLow) {
+      professional.auditExposure = clamp(professional.auditExposure + 5, 0, 100);
+    }
+    if (flags.auditEscalationActive) {
+      professional.auditExposure = clamp(professional.auditExposure + 3, 0, 100);
     }
 
     if (professional.paperworkLoad >= 20) {
@@ -243,6 +246,33 @@ export function applyRoundConsequences(state) {
       consequences.push("paperwork-burn");
     }
 
+    // A ticket lapses only in a deep, sustained collapse — high audit exposure
+    // layered on unmanaged competence risk. Reachable on a true neglect run,
+    // not in ordinary play.
+    if (
+      professional.registrationStatus === "active"
+      && professional.auditExposure >= 44
+      && professional.competenceRisk >= 30
+    ) {
+      professional.registrationStatus = "lapsed";
+    }
+
+    if (professional.registrationStatus !== "active") {
+      applyEffects(
+        state,
+        { compliance: -4, budget: -2 },
+        {
+          type: "consequence",
+          id: "registration-lapse",
+          title: "Registration lapse creates compliance drag",
+          option: "Active practice has to stop until renewal clears",
+          round,
+        },
+      );
+      professional.auditExposure = clamp(professional.auditExposure + 2, 0, 100);
+      consequences.push("registration-lapse");
+    }
+
     if (professional.auditExposure >= 35) {
       applyEffects(
         state,
@@ -259,7 +289,58 @@ export function applyRoundConsequences(state) {
     }
   }
 
+  applyRoundRecoveries(state, round, consequences);
+
   return consequences;
+}
+
+// Positive end-of-season swings, kept separate from the punishment ladder so
+// disciplined play has a real path back. These read through the same "Why This
+// Happened" panel as consequences but use a non-"consequence" history type so
+// the run-scoring risk penalty never counts them against the player.
+function applyRoundRecoveries(state, round, consequences) {
+  const { metrics } = state;
+
+  // Operational dividend: a clean, well-trusted file burns far less budget on
+  // rework and firefighting, so a strongly-run year recovers some budget. This
+  // is the missing budget lever that made Outstanding unreachable.
+  if (metrics.compliance >= 70 && metrics.relationships >= 65 && metrics.budget < 72) {
+    applyEffects(
+      state,
+      { budget: 5 },
+      {
+        type: "recovery",
+        id: "operational-dividend",
+        title: "Operational dividend from a clean file",
+        option: "Less rework and firefighting freed up budget",
+        round,
+      },
+    );
+    consequences.push("operational-dividend");
+  }
+
+  // Comeback window: late in the year a single collapsing meter gets a modest
+  // rebound — but only if the overall file is still salvageable, so one rough
+  // stretch doesn't doom an otherwise competent run.
+  if (round >= 3) {
+    const values = Object.values(metrics).map((value) => Number(value) || 0);
+    const average = values.reduce((sum, value) => sum + value, 0) / (values.length || 1);
+    const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
+    if (weakest && Number(weakest[1]) < 35 && average >= 42) {
+      applyEffects(
+        state,
+        { [weakest[0]]: 5 },
+        {
+          type: "recovery",
+          id: "comeback-window",
+          title: "Comeback window",
+          option: `Targeted effort steadied ${formatMetricName(weakest[0])}`,
+          round,
+        },
+      );
+      consequences.push("comeback-window");
+    }
+  }
 }
 
 export function formatMetricDelta(delta = {}) {

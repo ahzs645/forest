@@ -36,6 +36,14 @@ const CONSEQUENCE_INFO = {
     title: "Professional audit risk",
     cause: "Thin records pushed audit exposure high enough to draw formal review.",
   },
+  "operational-dividend": {
+    title: "Operational dividend",
+    cause: "Strong compliance and relationships meant less rework and firefighting, freeing up budget.",
+  },
+  "comeback-window": {
+    title: "Comeback window",
+    cause: "The file was still salvageable, so targeted effort steadied your weakest meter.",
+  },
 };
 
 function formatEffectText(effects = {}) {
@@ -58,7 +66,12 @@ export function describeConsequences(state, ids = []) {
     const info = CONSEQUENCE_INFO[id] || { title: id, cause: "" };
     const entry = [...history]
       .reverse()
-      .find((item) => item?.type === "consequence" && item?.id === id && Number(item?.round) === round);
+      .find(
+        (item) =>
+          (item?.type === "consequence" || item?.type === "recovery")
+          && item?.id === id
+          && Number(item?.round) === round,
+      );
     return {
       id,
       title: info.title,
