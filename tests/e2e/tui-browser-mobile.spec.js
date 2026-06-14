@@ -84,7 +84,7 @@ test('mobile exit button returns the TUI to the landing page', async ({ page }) 
   await seedBrowser(page, MOBILE_SEED + 1);
   await page.goto('/tui.html');
 
-  await page.getByRole('button', { name: 'Exit' }).click();
+  await page.getByRole('button', { name: '← Main Menu' }).click();
 
   await expect(page).toHaveURL(/\/index\.html$/);
   await expect(page.locator('#new-game-btn')).toBeVisible();
