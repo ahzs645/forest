@@ -124,10 +124,24 @@ test('summary play-again restarts back to the welcome screen', async ({ page }) 
   await expect(page.locator('.tui-options button')).toHaveCount(0);
 });
 
-test('escape exits the browser TUI back to the landing screen', async ({ page }) => {
+test('escape on a live run confirms before exiting to the landing screen', async ({ page }) => {
   await bootSeasonalTui(page, DEFAULT_SEED + 2);
 
+  // Escape no longer quits instantly mid-run — it raises a confirm overlay so an
+  // accidental keypress can't throw away a seasonal run.
   await page.keyboard.press('Escape');
+  await expect(page.locator('.tui-heading')).toHaveText('Return to the main menu?');
+  await expect(page.locator('.tui-options button')).toHaveText(['1Continue run', '2Main menu']);
+
+  // Continuing keeps the run alive on the same decision card.
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.tui-field-main')).toContainText('What job am I doing?');
+
+  // Escape again, then confirm the exit (Main menu is the second option).
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.tui-heading')).toHaveText('Return to the main menu?');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
 
   await expect(page).toHaveURL(/\/index\.html$/);
   await expect(page.locator('#new-game-btn')).toBeVisible();

@@ -12,9 +12,12 @@ import {
   formatMetricDelta,
   recordAssignmentSelection,
   buildSeasonHeadline,
+  buildObjectiveStrip,
   computeManagementStyle,
   describeConsequences,
   describeCardCause,
+  ensureProfessionalComplianceState,
+  getRoleObjective,
   makeRng,
   isForkableRng,
   SEASONS,
@@ -40,6 +43,26 @@ const INITIAL_CONTENT = {
   heading: "Welcome to BC Forestry Trail",
 };
 
+// Autosave: a seasonal run is short, but it can still be interrupted (a closed
+// tab, a phone call mid-commute). We snapshot at every season boundary so the
+// player can pick the year back up from the start of the current season.
+const SAVE_VERSION = 1;
+const DEFAULT_SAVE_KEY = "bc-forestry-trail/seasonal-run/v1";
+
+// Resolve a Web Storage target without assuming the browser exists (sims and
+// node tests run with no localStorage), mirroring the existing js/game pattern.
+function resolveStorage(storage) {
+  if (storage === null) return null;
+  if (storage) return storage;
+  try {
+    return typeof globalThis !== "undefined" && globalThis.localStorage ? globalThis.localStorage : null;
+  } catch {
+    // Some embeddings throw on localStorage access (privacy mode, sandboxed
+    // iframes); treat that as "no persistence" rather than crashing the game.
+    return null;
+  }
+}
+
 // Short "what am I signing up for" lines shown under each setup choice so the
 // role and area pick feels strategic instead of cosmetic.
 const ROLE_PREVIEWS = {
@@ -50,7 +73,11 @@ const ROLE_PREVIEWS = {
 };
 
 function buildRolePreview(role) {
-  return ROLE_PREVIEWS[role?.id] || role?.description || "";
+  const base = ROLE_PREVIEWS[role?.id] || role?.description || "";
+  // Surface the role's win condition at setup so the first pick is about a
+  // mandate, not just flavor.
+  const objective = getRoleObjective(role?.id);
+  return objective?.signatureWin ? `${base}\nWin: ${objective.signatureWin}.` : base;
 }
 
 function buildAreaPreview(area) {
@@ -230,6 +257,12 @@ function snapshotGameState(gs) {
     areaBriefing: gs.role?.id && gs.area
       ? getRoleAreaBriefing(gs.role.id, gs.area, { maxFinds: 6 })
       : null,
+    // Standing role mandate + signature win, shown on the dashboard so the
+    // player always knows what they're judged on.
+    roleObjective: gs.role?.id ? getRoleObjective(gs.role.id) : null,
+    // Live "what am I trying to do right now" strip: mandate + at-risk meters +
+    // the single most pressing pressure, recomputed from current metrics.
+    objectiveStrip: gs.role?.id ? buildObjectiveStrip(gs) : null,
   };
 }
 
@@ -254,6 +287,11 @@ export class TuiGameController {
     // year becomes reproducible. createSessionRng accepts an rng, a numeric
     // seed, or nothing.
     this.rng = createSessionRng(options.rng ?? options.seed);
+    this.storage = resolveStorage(options.storage);
+    this.saveKey = options.saveKey ?? DEFAULT_SAVE_KEY;
+    // If a previous seasonal run is parked in storage, open on a resume prompt
+    // instead of the welcome screen.
+    this.maybeOfferResume();
   }
 
   getState() {
@@ -271,15 +309,184 @@ export class TuiGameController {
   }
 
   exitGame() {
-    this.onExit();
+    this.requestExit();
+  }
+
+  // Quitting mid-run is one keystroke away in a keyboard-driven UI, so guard it
+  // with a confirm overlay. Setup screens and the finished-year summary have
+  // nothing live to lose, so they exit immediately.
+  requestExit() {
+    if (this.state.mode === "confirm-exit") return;
+    const hasLiveRun = this.gs && this.state.mode === "playing";
+    if (!hasLiveRun) {
+      this.onExit();
+      return;
+    }
+
+    this.savedView = {
+      mode: this.state.mode,
+      contentData: this.state.contentData,
+      options: this.state.options,
+      selected: this.state.selected,
+      art: this.state.art,
+      selectCb: this.selectCb,
+    };
+
+    this.present(
+      {
+        type: "confirm",
+        heading: "Return to the main menu?",
+        body: "Your seasonal run is autosaved — you can resume it later from the menu.",
+      },
+      ["Continue run", "Main menu"],
+      (idx) => {
+        if (idx === 0) {
+          this.resumeFromExit();
+        } else {
+          this.onExit();
+        }
+      },
+    );
+    this.setState({ mode: "confirm-exit" });
+  }
+
+  resumeFromExit() {
+    const saved = this.savedView;
+    this.savedView = null;
+    if (!saved) {
+      this.onExit();
+      return;
+    }
+    this.selectCb = saved.selectCb;
+    this.setState({
+      mode: saved.mode,
+      contentData: saved.contentData,
+      options: saved.options,
+      selected: saved.selected,
+      art: saved.art,
+    });
   }
 
   restart() {
+    // Play Again / new run abandons any parked autosave.
+    this.clearSeasonalSave();
     this.gs = null;
     this.queue = [];
     this.selectCb = null;
     this.state = createViewState();
     this.emit();
+  }
+
+  // ── Autosave / resume ──────────────────────────────────────────────────────
+  // Snapshot the run at a season boundary. We capture the RNG state alongside
+  // the game state so the resumed season redraws exactly the cards the original
+  // run would have, keeping seeded play and bug reports reproducible.
+  persistSeasonalSave() {
+    if (!this.storage || !this.gs) return;
+    if (this.gs.gameMode === "crisis-command") return;
+    const gs = this.gs;
+    const rngState = typeof this.rng?.state === "function" ? this.rng.state() : null;
+    if (rngState === null) return; // a live Math.random run can't be replayed.
+    const payload = {
+      version: SAVE_VERSION,
+      savedAt: Date.now(),
+      gameMode: gs.gameMode || "seasonal",
+      companyName: gs.companyName,
+      roleId: gs.role?.id || null,
+      areaId: gs.area?.id || null,
+      roleName: getRoleDisplayName(gs.role),
+      areaName: gs.area?.name || null,
+      // gs.round is the count of completed seasons at the snapshot point.
+      round: Number(gs.round || 0),
+      rngState,
+      state: gs,
+    };
+    try {
+      this.storage.setItem(this.saveKey, JSON.stringify(payload));
+    } catch {
+      // Quota or serialization failure: degrade to no autosave rather than
+      // interrupting the run.
+    }
+  }
+
+  loadSeasonalSave() {
+    if (!this.storage) return null;
+    let raw;
+    try {
+      raw = this.storage.getItem(this.saveKey);
+    } catch {
+      return null;
+    }
+    if (!raw) return null;
+    let save;
+    try {
+      save = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (!save || save.version !== SAVE_VERSION || !save.state?.role || !save.state?.metrics) {
+      return null;
+    }
+    // A finished (or over-run) save has nothing left to resume.
+    const total = Number(save.state.totalRounds || SEASONS.length);
+    if (Number(save.round) >= total) return null;
+    return save;
+  }
+
+  clearSeasonalSave() {
+    if (!this.storage) return;
+    try {
+      this.storage.removeItem(this.saveKey);
+    } catch {
+      // ignore
+    }
+  }
+
+  hasSavedRun() {
+    return Boolean(this.loadSeasonalSave());
+  }
+
+  maybeOfferResume() {
+    const save = this.loadSeasonalSave();
+    if (!save) return;
+    const nextSeason = SEASONS[Number(save.round)] || `Season ${Number(save.round) + 1}`;
+    const where = [save.roleName, save.areaName].filter(Boolean).join(" · ");
+    this.present(
+      {
+        type: "resume",
+        heading: "Resume your seasonal run?",
+        body: `A saved run is waiting${where ? ` (${where})` : ""}, paused before ${nextSeason}.`,
+      },
+      ["Resume seasonal run", "Start a new run"],
+      (idx) => {
+        if (idx === 0) {
+          this.resumeSavedRun();
+        } else {
+          this.clearSeasonalSave();
+          this.restart();
+        }
+      },
+    );
+    this.setState({ mode: "resume" });
+  }
+
+  resumeSavedRun() {
+    const save = this.loadSeasonalSave();
+    if (!save) {
+      this.restart();
+      return;
+    }
+    this.gs = save.state;
+    // Rehydrate derived professional-compliance shape (chains, clamps) that the
+    // engine expects but that JSON round-tripping can leave thin.
+    ensureProfessionalComplianceState(this.gs);
+    this.rng = makeRng(save.rngState);
+    this.queue = [];
+    this.selectCb = null;
+    this.setState({ mode: "playing" });
+    // startRound() re-increments and redraws the parked season from the restored
+    // RNG state, so the player lands exactly where they left off.
+    this.startRound();
   }
 
   setInputText(value) {
@@ -309,13 +516,24 @@ export class TuiGameController {
       return;
     }
 
+    // While the confirm overlay is up, Escape cancels (keep playing); the rest
+    // of the keys drive its two options like any other card.
+    if (this.state.mode === "confirm-exit") {
+      if (key.name === "escape") {
+        this.resumeFromExit();
+        return;
+      }
+      this.handleOptionKey(key);
+      return;
+    }
+
     if (this.state.mode !== "setup-name" && key.name === "q") {
-      this.onExit();
+      this.requestExit();
       return;
     }
 
     if (key.name === "escape") {
-      this.onExit();
+      this.requestExit();
       return;
     }
 
@@ -355,6 +573,9 @@ export class TuiGameController {
 
   startRound(notice = null) {
     const gs = this.gs;
+    // Autosave at the season boundary, before any of this season's cards are
+    // drawn, capturing the RNG state so a resume redraws this exact season.
+    this.persistSeasonalSave();
     gs.round += 1;
     const season = SEASONS[gs.round - 1];
     const context = buildSeasonContext(gs);
@@ -464,6 +685,8 @@ export class TuiGameController {
       if (gs && gs.round < gs.totalRounds) {
         this.startRound(notice);
       } else {
+        // Year complete: the parked save is now stale, so clear it.
+        this.clearSeasonalSave();
         const summary = buildSummary(gs);
         this.setState({ mode: "end" });
         this.present(

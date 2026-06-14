@@ -10,24 +10,30 @@ export const ROLE_OBJECTIVES = {
     secondary: ["relationships", "forestHealth"],
     failureModes: ["fom-consistency-gap", "environmental-audit-fallout"],
     signatureWin: "Defensible landscape plan",
+    // One-line "what success looks like" mandate, shown at setup and on the
+    // dashboard so the player always knows what they are judged on.
+    mandate: "Keep compliance and relationships stable while advancing landscape planning.",
   },
   permitter: {
     primary: "compliance",
     secondary: ["progress", "relationships"],
     failureModes: ["permit-deficiency", "road-use-permit-standoff"],
     signatureWin: "Clean approval pipeline",
+    mandate: "Protect compliance and progress while avoiding paperwork burn.",
   },
   recce: {
     primary: "relationships",
     secondary: ["compliance", "progress"],
     failureModes: ["heritage-protocol-gap", "wildlife-collar-drop"],
     signatureWin: "Ground truth protected the file",
+    mandate: "Protect relationships and crew confidence while making field progress.",
   },
   silviculture: {
     primary: "forestHealth",
     secondary: ["budget", "compliance"],
     failureModes: ["seedlot-vigour-drop", "free-growing-catchup-plan"],
     signatureWin: "Regeneration trajectory stabilized",
+    mandate: "Protect forest health while managing budget and contractors.",
   },
 };
 

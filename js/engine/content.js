@@ -206,12 +206,26 @@ export function scoreIssueSelection(issue, state, context) {
   let weight = Math.max(1, Number(issue.baseWeight) || 1);
   if (issue.areaTags?.length) {
     const matches = issue.areaTags.filter((tag) => matchesAreaContext([tag], context.tags)).length;
-    weight += matches;
+    // Cap the area-match bonus: a handful of issues carry 4–5 area tags
+    // (including the near-universal "northern-bc"), which let them dominate the
+    // pool in almost every region. Capping at 2 keeps area relevance without
+    // crowding out the long tail of regional issues.
+    weight += Math.min(matches, 2);
+
+    // Breadth dampener: a widely-tagged issue is already eligible in far more
+    // regions than a narrowly-scoped one, so it gets more chances to appear
+    // across the area space. Trim its per-draw weight so specialized regional
+    // issues compete instead of the same broad permit cards surfacing everywhere.
+    if (issue.areaTags.length >= 3) {
+      weight *= issue.areaTags.length >= 5 ? 0.6 : 0.8;
+    }
   }
   const seasonBias = issue.seasonBias;
   if (Array.isArray(seasonBias) && seasonBias.length) {
     if (seasonBias.includes(context.season)) {
-      weight += 4;
+      // A +2 nudge (down from +4) still favors in-season issues without letting
+      // a broad 3-of-4-season bias swamp narrowly-scoped seasonal cards.
+      weight += 2;
     } else {
       weight *= 0.5;
     }

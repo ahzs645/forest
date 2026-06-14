@@ -35,6 +35,7 @@ export {
 } from "./engine/effects.js";
 export { buildSummary } from "./engine/summary.js";
 export {
+  buildObjectiveStrip,
   buildRoleLens,
   buildSeasonHeadline,
   computeManagementStyle,

@@ -29,10 +29,10 @@ Other structural notes:
 - **No strategy ever reaches "Outstanding"** across 6,300 years. The Outstanding
   gate needs every meter ≥ 65 including budget, but budget structurally drifts
   down (avg ~38–44 even for the best policies). Outstanding is currently dead
-  content for these envelopes.
+  content for these envelopes. *(Resolved in tuning pass #2.)*
 - `registration-lapse` and `professional-audit` **never fire** under these
   policies — professional state only degrades through specific authored paths
-  the bots don't take.
+  the bots don't take. *(Resolved in tuning pass #2.)*
 - Difficulty by combo is fairly flat (mean tier ~0.98–1.20); no single role/area
   is wildly easy or punishing.
 
@@ -58,6 +58,55 @@ the assignment effects further would over-tune one layer to compensate for the
 others — explicitly what the roadmap warns against. Greedy/cautious/role-optimal
 were unaffected (the tune only touches options the aggressive-leaning policies
 pick), so the change is contained.
+
+## Tuning pass #2 (this PR)
+
+This pass took three coordinated levers — all in the consequence/scoring layer,
+none in the assignment content the maintainer warned against over-tuning.
+
+**1. Reachable professional consequences.** In seasonal play the professional
+subsystem was dormant (nothing fed `cpdHours`/`registrationStatus`), so
+`registration-lapse` and `professional-audit` could never fire. They are now
+driven by the signal the seasonal game actually moves: compliance below the
+audit line (and an active audit escalation) raises `auditExposure`, which fires
+`professional-audit`; a deep, sustained collapse (high exposure on top of
+unmanaged competence risk) lapses registration. Healthy files are untouched.
+
+**2. Reachable Outstanding.** The old gate required every meter ≥ 65 including
+budget — impossible (budget never tops ~60 in 6,300 years; forest health rarely
+clears ~60 outside silviculture). Outstanding now has two role-flavored paths
+over a shared "nothing collapsed (≥ 44)" floor: a **stewardship** path (elite
+compliance + relationships) and an **ecology** path (elite forest health that
+stayed defensible).
+
+**3. Recovery levers + less pile-on.** An *operational dividend* gives budget
+back to clean, well-trusted files (the missing budget lever); a late-year
+*comeback window* steadies the weakest meter on a still-salvageable run; and the
+trust-deficit compliance bleed scales down once compliance is already collapsing
+so a run in a hole isn't punished into oblivion.
+
+**Before → after (matrix, 6,300 runs, seeds 1000–1024):**
+
+| Signal | Before | After |
+|---|---|---|
+| Outstanding endings (any strategy) | 0 | 37 (greedy 19 · role-optimal 12 · weakest-metric 5 · random 1) |
+| `registration-lapse` runs fired | 0 | 305 |
+| `professional-audit` runs fired | 0 | 817 |
+| Never-fired consequences | 2 | 0 |
+| Avg budget (greedy / cautious) | 38.7 / 39.1 | 47.2 / 48.4 |
+| Aggressive avg compliance | 11.7 | 14.4 |
+| Aggressive stumble rate | 100% | 100% |
+
+**Findings.** Outstanding is now reachable but rare (~0.6% of runs), split across
+the two role paths (permitter via stewardship, silviculture via ecology), and no
+strategy can reach it by ignoring progress — cautious stays Solid because it
+trades progress away. Both professional consequences now fire for runs that let
+compliance rot, so aggressive's risk reads as visible professional fallout. The
+de-pile-on nudged aggressive's compliance up (11.7 → 14.4) but it still stumbles
+every time: its compliance lands near ~14, far below the Mixed floor of 48, and
+bridging that is a **content-layer** rebalance (the authored event/issue/temptation
+penalties), exactly what lever #1 below describes. This pass deliberately stops
+short of forcing aggressive up with a blunt floor.
 
 ## Recommended next levers (future passes, one at a time)
 

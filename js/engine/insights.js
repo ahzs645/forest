@@ -36,6 +36,14 @@ const CONSEQUENCE_INFO = {
     title: "Professional audit risk",
     cause: "Thin records pushed audit exposure high enough to draw formal review.",
   },
+  "operational-dividend": {
+    title: "Operational dividend",
+    cause: "Strong compliance and relationships meant less rework and firefighting, freeing up budget.",
+  },
+  "comeback-window": {
+    title: "Comeback window",
+    cause: "The file was still salvageable, so targeted effort steadied your weakest meter.",
+  },
 };
 
 function formatEffectText(effects = {}) {
@@ -58,7 +66,12 @@ export function describeConsequences(state, ids = []) {
     const info = CONSEQUENCE_INFO[id] || { title: id, cause: "" };
     const entry = [...history]
       .reverse()
-      .find((item) => item?.type === "consequence" && item?.id === id && Number(item?.round) === round);
+      .find(
+        (item) =>
+          (item?.type === "consequence" || item?.type === "recovery")
+          && item?.id === id
+          && Number(item?.round) === round,
+      );
     return {
       id,
       title: info.title,
@@ -206,6 +219,73 @@ const ROLE_LENS = {
     weak: "Stand condition slipped; next year inherits the fill planting and brushing debt.",
   },
 };
+
+// ── Live objective strip ("what am I trying to do right now") ────────────────
+// Each metric has a "stable / watch / at risk" reading anchored to the same
+// thresholds the consequence engine uses, so the strip the player sees lines up
+// with the punishment the engine will actually hand out.
+// Warning bands sit just below the neutral 50 baseline so a fresh run reads
+// "all stable" and the strip only speaks up once a meter genuinely sags toward
+// its consequence threshold.
+const METRIC_STATUS_BANDS = {
+  compliance: { danger: COMPLIANCE_AUDIT_THRESHOLD, warning: COMPLIANCE_AUDIT_THRESHOLD + 8 },
+  relationships: { danger: RELATIONSHIP_TRUST_THRESHOLD, warning: RELATIONSHIP_TRUST_THRESHOLD + 10 },
+  budget: { danger: BUDGET_ATTRITION_THRESHOLD, warning: BUDGET_ATTRITION_THRESHOLD + 13 },
+  forestHealth: { danger: 30, warning: 44 },
+  progress: { danger: 30, warning: 44 },
+};
+
+const METRIC_RISK_WORDS = {
+  compliance: { danger: "audit risk rising", warning: "compliance slipping" },
+  relationships: { danger: "trust fraying", warning: "relationships strained" },
+  budget: { danger: "budget critical", warning: "budget low" },
+  forestHealth: { danger: "stands degrading", warning: "forest health soft" },
+  progress: { danger: "schedule stalled", warning: "progress behind" },
+};
+
+function metricStatus(metric, value) {
+  const bands = METRIC_STATUS_BANDS[metric] || { danger: 30, warning: 45 };
+  const v = Number(value ?? 50);
+  if (v < bands.danger) return "danger";
+  if (v < bands.warning) return "warning";
+  return "stable";
+}
+
+/**
+ * Build the top-of-card strip that answers "what am I trying to do right now?":
+ * the role's standing mandate, the metrics that are currently at risk, and the
+ * single most pressing pressure. Pure function of role + current metrics, so the
+ * controller can recompute it from any snapshot.
+ */
+export function buildObjectiveStrip(state) {
+  const objective = getRoleObjective(state?.role?.id);
+  if (!objective) return null;
+  const metrics = state?.metrics || {};
+
+  const tracked = ["progress", "forestHealth", "relationships", "compliance", "budget"];
+  const risks = [];
+  let worst = null;
+  for (const metric of tracked) {
+    const status = metricStatus(metric, metrics[metric]);
+    if (status === "stable") continue;
+    const word = METRIC_RISK_WORDS[metric]?.[status] || `${formatMetricName(metric)} low`;
+    risks.push({ metric, status, label: word });
+    const bands = METRIC_STATUS_BANDS[metric] || { warning: 45 };
+    const deficit = bands.warning - Number(metrics[metric] ?? 50);
+    if (!worst || deficit > worst.deficit || (status === "danger" && worst.status !== "danger")) {
+      worst = { metric, status, deficit, label: word };
+    }
+  }
+
+  return {
+    goal: objective.mandate,
+    winCondition: objective.signatureWin,
+    primaryMetric: objective.primary,
+    primaryLabel: formatMetricName(objective.primary),
+    risks,
+    pressure: worst ? worst.label : "All meters stable — press your advantage.",
+  };
+}
 
 export function buildRoleLens(state) {
   const roleId = state?.role?.id;
