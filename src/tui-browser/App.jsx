@@ -400,7 +400,7 @@ function ObjectiveStrip({ strip }) {
 function ContentView({ data, objective }) {
   if (!data) return null;
 
-  if (data.type === "message" || data.type === "confirm") {
+  if (data.type === "message" || data.type === "confirm" || data.type === "resume") {
     return (
       <div className="tui-content-stack">
         <NoticeBlock notice={data.notice} />
@@ -697,7 +697,11 @@ export default function App() {
   );
   useEffect(() => {
     if (!crisisRequested.current) return;
-    if (state.mode === "setup-name") {
+    if (state.mode === "resume") {
+      // Crisis deep-link takes priority over a parked seasonal run: discard the
+      // resume prompt (Start a new run) and continue into the crisis flow.
+      selectOption(state.options.length - 1);
+    } else if (state.mode === "setup-name") {
       controller.handleKey({ name: "return" });
     } else if (state.mode === "setup-role" && state.options.length) {
       crisisRequested.current = false;
