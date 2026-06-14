@@ -85,7 +85,12 @@ test('scheduled desk-event follow-ups are queued into the next TUI event draw', 
     round: state.round,
   });
 
-  assert.deepEqual(state.pendingEvents, [{ id: 'audit_followup', delay: 1 }]);
+  assert.equal(state.pendingEvents.length, 1);
+  assert.equal(state.pendingEvents[0].id, 'audit_followup');
+  assert.equal(state.pendingEvents[0].delay, 1);
+  // Provenance stamp connects the delayed event to the decision that scheduled it.
+  assert.equal(state.pendingEvents[0].causedBy?.option, 'Ask to reschedule');
+  assert.equal(state.pendingEvents[0].causedBy?.sourceId, 'surprise_audit');
 
   const followUp = drawSeasonalEvent(state, () => 0);
   assert.equal(followUp?.id, 'audit_followup');
@@ -466,11 +471,14 @@ test('ecological shortcut failures queue specific ecological fallout issues', ()
     Math.random = originalRandom;
   }
 
-  assert.deepEqual(state.pendingIssues, [{
-    delay: 1,
-    force: true,
-    candidates: [{ id: 'environmental-audit-fallout', weight: 4, force: true, metricBoosts: { forestHealth: 3, compliance: 2 } }],
-  }]);
+  assert.equal(state.pendingIssues.length, 1);
+  const pending = state.pendingIssues[0];
+  assert.equal(pending.delay, 1);
+  assert.equal(pending.force, true);
+  assert.deepEqual(pending.candidates, [{ id: 'environmental-audit-fallout', weight: 4, force: true, metricBoosts: { forestHealth: 3, compliance: 2 } }]);
+  // Provenance stamp ties the delayed fallout to the shortcut that scheduled it.
+  assert.equal(pending.causedBy?.sourceType, 'temptation');
+  assert.equal(pending.causedBy?.option, riskyOption.label);
   assert.equal(state.flags.environmentalAudit, true);
   assert.equal(state.flags.underInvestigation, undefined);
   assert.equal(resolution?.scheduledIssueTeaser?.severity, 'warning');

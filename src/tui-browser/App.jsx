@@ -532,6 +532,12 @@ function DecisionCard({ data }) {
       {data.phaseLabel ? <div className="tui-source-label tone-yellow">{data.phaseLabel}</div> : null}
       <div className="tui-heading">{data.title}</div>
 
+      {data.provenance ? (
+        <div className="tui-notice tone-yellow">
+          <p className="tui-copy">{data.provenance}</p>
+        </div>
+      ) : null}
+
       <div className="tui-subheading">What job am I doing?</div>
       <p className="tui-copy preserve">{job}</p>
 

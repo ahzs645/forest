@@ -39,6 +39,9 @@ export {
   buildSeasonHeadline,
   computeManagementStyle,
   describeConsequences,
+  describeCardCause,
+  describePendingIssueCause,
+  describeEventCause,
 } from "./engine/insights.js";
 export { makeRng, isForkableRng } from "./engine/rng.js";
 export {

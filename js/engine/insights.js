@@ -68,6 +68,25 @@ export function describeConsequences(state, ids = []) {
   });
 }
 
+// ── Provenance: which past decision caused this delayed issue/event ──────────
+/**
+ * Turn a scheduled card's `causedBy` stamp into a one-line "this came from your
+ * Fall decision" connection. Returns "" when the card surfaced for other
+ * reasons (area context, low metric, random operational noise).
+ */
+export function describeCardCause(card) {
+  const causedBy = card?.causedBy;
+  if (!causedBy) return "";
+  const season = causedBy.season ? `${causedBy.season} ` : "";
+  const option = causedBy.option ? `“${causedBy.option}”` : "an earlier call";
+  return `Connected to your ${season}decision: ${option}.`;
+}
+
+// Named per the roadmap; both delayed issues and delayed events carry the same
+// causedBy shape, so they share one formatter.
+export const describePendingIssueCause = describeCardCause;
+export const describeEventCause = describeCardCause;
+
 // ── Management style (strategy identity) ─────────────────────────────────────
 const STYLE_INFO = {
   cautious: {
