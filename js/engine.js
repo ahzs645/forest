@@ -41,3 +41,12 @@ export {
   describeConsequences,
 } from "./engine/insights.js";
 export { makeRng, isForkableRng } from "./engine/rng.js";
+export {
+  scoreRun,
+  scoreMetricHealth,
+  scoreRolePerformance,
+  scoreRiskLoad,
+  scoreStyleFit,
+  deriveTier,
+} from "./engine/scoring.js";
+export { ROLE_OBJECTIVES, getRoleObjective } from "./engine/roleObjectives.js";

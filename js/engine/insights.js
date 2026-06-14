@@ -5,6 +5,7 @@ import {
 } from "./constants.js";
 import { formatMetricName } from "./shared.js";
 import { getRoleDisplayName } from "./seasonalContract.js";
+import { getRoleObjective } from "./roleObjectives.js";
 
 // ── Cause-and-effect for end-of-season consequences ──────────────────────────
 // applyRoundConsequences() returns bare ids (and tests depend on that), so the
@@ -191,7 +192,10 @@ export function buildRoleLens(state) {
   const roleId = state?.role?.id;
   const lens = ROLE_LENS[roleId];
   if (!lens) return "";
-  const value = Number(state?.metrics?.[lens.metric] ?? 50);
+  // The role's primary objective metric is the single source of truth for which
+  // meter the ending is judged on.
+  const metric = getRoleObjective(roleId)?.primary || lens.metric;
+  const value = Number(state?.metrics?.[metric] ?? 50);
   const verdict = value >= 60 ? lens.strong : value >= 45 ? "Mixed result — defensible in parts, exposed in others." : lens.weak;
   const roleName = getRoleDisplayName(state?.role) || "this role";
   return `${roleName} — ${lens.question} ${verdict}`;

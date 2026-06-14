@@ -457,7 +457,16 @@ function ContentView({ data }) {
       <div className="tui-content-stack">
         <NoticeBlock notice={data.notice} />
         <div className="tui-heading">{data.heading}</div>
+        {data.tier ? (
+          <div className="tui-source-label tone-yellow">
+            {`Ending: ${data.tier}`}
+            {typeof data.score === "number" ? ` · score ${data.score}/100` : ""}
+          </div>
+        ) : null}
         <p className="tui-copy preserve">{data.body}</p>
+        {data.scoreReasons?.length ? (
+          <SummarySection title="Scorecard" items={data.scoreReasons} />
+        ) : null}
         {data.style?.total ? (
           <div className="tui-notice tone-green">
             <div className="tui-notice-heading">Management style: {data.style.label}</div>

@@ -62,7 +62,9 @@ function buildAreaPreview(area) {
 // seed a fresh one from a number, or fall back to live Math.random.
 function createSessionRng(rngOrSeed) {
   if (typeof rngOrSeed === "function") return rngOrSeed;
-  if (rngOrSeed === undefined || rngOrSeed === null) return Math.random;
+  // Default: look Math.random up *per call* so test/e2e harnesses that override
+  // the global still take effect (capturing the reference would freeze it).
+  if (rngOrSeed === undefined || rngOrSeed === null) return () => Math.random();
   return makeRng(rngOrSeed);
 }
 
@@ -468,6 +470,9 @@ export class TuiGameController {
             type: "summary",
             heading: "Year End Review",
             body: summary.overall,
+            tier: summary.tier,
+            score: summary.score,
+            scoreReasons: summary.scoreDetail?.reasons,
             roleLens: summary.roleLens,
             style: summary.style,
             bullets: summary.messages,

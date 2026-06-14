@@ -125,15 +125,6 @@ function areaIndex(areaId) {
   return index;
 }
 
-function tierFromOverall(text = "") {
-  const lower = String(text).toLowerCase();
-  if (lower.includes("outstanding")) return "outstanding";
-  if (lower.includes("solid")) return "solid";
-  if (lower.includes("mixed")) return "mixed";
-  if (lower.includes("stumbled")) return "stumbled";
-  return "unknown";
-}
-
 function uniqueHistoryIds(history, type) {
   const seen = [];
   for (const entry of history || []) {
@@ -185,7 +176,8 @@ export function simulateRun({ roleId, areaId, strategy = "balanced", seed = 1, c
     area: areaId,
     strategy,
     seed,
-    endingTier: tierFromOverall(summary.body),
+    endingTier: summary.tier || "unknown",
+    score: typeof summary.score === "number" ? summary.score : null,
     style: gs.managementStyle?.label || null,
     finalMetrics: { ...(gs.metrics || {}) },
     consequences: uniqueHistoryIds(gs.history, "consequence"),
