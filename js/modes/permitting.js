@@ -497,17 +497,6 @@ function buildPermittingActionGuidance(journey) {
   return { lane, headline, steps };
 }
 
-function getDeskActionLaneLabel(actionId) {
-  const labels = {
-    process_permits: 'Lane: review support',
-    stakeholder_meeting: 'Lane: consultation support',
-    crisis_management: 'Lane: crisis desk',
-    team_morale: 'Lane: office recovery',
-    end_day: 'Lane: recovery'
-  };
-  return labels[actionId] || 'Lane: support';
-}
-
 function formatConstraintPressure(state) {
   return `Engineering ${state?.engineering || 0}/4 | FOM/Public Review ${state?.publicReview || 0}/4 | Hydrology ${state?.hydrology || 0}/4 | Water Timing ${state?.timing || 0}/4`;
 }
@@ -791,8 +780,9 @@ export async function runPermittingDay(game) {
   let meetingsToday = 0;
   let crisisMode = daysRemaining <= 5;
 
-  // Check for random event at start of day
-  const event = checkForEvent(journey);
+  // Check for random event at start of day. Day 1 is event-free onboarding so
+  // the player sees the normal permitting loop before any exception arrives.
+  const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     ui.clear();
     ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - ${(journey.currentPhase || 'PERMITTING').toUpperCase()}`);
@@ -816,10 +806,30 @@ export async function runPermittingDay(game) {
       break;
     }
 
-    const actionOptions = buildActionOptions(journey);
+    const { primary, support } = buildActionOptions(journey);
 
-    const action = await ui.promptChoice(`${journey.hoursRemaining} hours remaining:`, actionOptions);
-    const actionId = action.value || 'end_day';
+    // Resolve the menu, drilling into the support submenu when chosen — the same
+    // shape recon uses, so the primary turn stays a clean set of decisions.
+    let actionId = 'end_day';
+    while (true) {
+      const action = await ui.promptChoice(`${journey.hoursRemaining} hours remaining:`, primary);
+      const chosen = action.value || 'end_day';
+      if (chosen === 'support_menu') {
+        const sub = await ui.promptChoice('Office & support:', [
+          ...support,
+          { label: 'Back', description: 'Return to the main menu', value: 'support_back' }
+        ]);
+        const subChoice = sub.value || 'support_back';
+        if (subChoice === 'support_back') {
+          displayPermittingHeader(ui, journey);
+          continue;
+        }
+        actionId = subChoice;
+        break;
+      }
+      actionId = chosen;
+      break;
+    }
 
     // End day early
     if (actionId === 'end_day') {
@@ -852,6 +862,8 @@ export async function runPermittingDay(game) {
  */
 function displayPermittingHeader(ui, journey) {
   const daysRemaining = Math.max(0, journey.deadline - journey.day);
+  const guidance = buildPermittingActionGuidance(journey);
+  const laneAction = getPermittingLaneAction(journey);
   ui.clear();
   ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - PERMITTING`);
 
@@ -865,6 +877,11 @@ function displayPermittingHeader(ui, journey) {
 
   const permitProgress = Math.round((journey.permits.approved / journey.permits.target) * 100);
   ui.write(`Pipeline: Backlog ${journey.permits.backlog || 0} | Drafting ${journey.permits.drafting || 0} | Submitted ${journey.permits.submitted} | In Review ${journey.permits.inReview} | Approved ${journey.permits.approved}/${journey.permits.target} (${permitProgress}%)`);
+  // Sticky objective block — lane, stage, and best move live here on every shift,
+  // not only behind Review the File.
+  ui.write(`Objective: Approve ${journey.permits.target} permits by Day ${journey.deadline} (${journey.permits.approved} done).`);
+  ui.write(`Lane Focus: ${guidance.lane} | Stage: ${laneAction.stageLabel}`);
+  ui.write(`Next Best Move: ${guidance.headline}`);
   ui.write(`Budget: $${Math.round(journey.resources.budget).toLocaleString()} | Political Capital: ${journey.resources.politicalCapital}`);
 
   // Alerts only — the full file lives behind Review the File
@@ -945,111 +962,145 @@ function displayPermittingBriefing(ui, journey) {
  * @returns {Array} Action options
  */
 function buildActionOptions(journey) {
-  const actionOptions = [];
   const hoursLeft = journey.hoursRemaining || 8;
   const revisionQueue = ensurePermittingRevisionState(journey);
   const laneAction = getPermittingLaneAction(journey);
 
-  // Permit-specific actions
+  // The turn is split so it reads as a decision, not an audit:
+  //   primary  = the best move + core pipeline throughput (kept ≤6)
+  //   support  = relationships, morale, crisis, recovery — one level down
+  const primary = [];
+  const support = [];
+
+  // Best move leads the menu — the lane action is always the recommended choice.
+  // Professional blockers carry a plain-English translation of the jargon.
+  if (hoursLeft >= 2) {
+    const professional = getPermittingProfessionalSnapshot(journey);
+    const pieces = [];
+    if (professional?.registrationStatus !== 'active') {
+      pieces.push(`registration ${professional.registrationStatus} (your licence to sign off is not current)`);
+    }
+    if (professional?.cpdGap > 0) {
+      pieces.push(`CPD gap ${professional.cpdGap}h (training file behind — reviewers trust submissions less)`);
+    }
+    if (professional?.paperworkLoad > 0) {
+      pieces.push(`paperwork ${professional.paperworkLoad} (filing backlog slowing the desk)`);
+    }
+    primary.push({
+      label: `${laneAction.actionLabel} (2h)`,
+      description: pieces.length
+        ? `Best move | Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel} | Clears: ${pieces.join(' | ')}`
+        : `Best move | Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel}`,
+      value: 'professional_admin'
+    });
+  }
+
+  // Core pipeline throughput stays top-level so the main work is never buried.
   if (journey.permits.backlog > 0 && hoursLeft >= 2) {
-    actionOptions.push({
+    primary.push({
       label: 'Draft Permit Application',
-      description: '2h - Lane: permit stack | Move a permit from backlog to drafting',
+      description: '2h - Move a permit from the backlog into drafting',
       value: 'draft_permit'
     });
   }
 
   if ((journey.permits.drafting || 0) > 0 && hoursLeft >= 2) {
-    actionOptions.push({
+    primary.push({
       label: 'Submit Permit',
-      description: '2h - Lane: submission stack | Submit a drafted permit for review',
+      description: '2h - Send a drafted permit into review',
       value: 'submit_permit'
     });
   }
 
+  // First open deficiency gets a top-level pair; extras drop into the submenu so
+  // the primary menu does not balloon when several files come back at once.
   const openRevisionTickets = revisionQueue.filter((ticket) => ticket && !ticket.resolved);
-  for (const ticket of openRevisionTickets.slice(0, 3)) {
+  openRevisionTickets.forEach((ticket, index) => {
+    const bucket = index === 0 ? primary : support;
     if (hoursLeft >= ticket.clean.hours) {
-      actionOptions.push({
+      bucket.push({
         label: `Clean response: ${ticket.title}`,
-        description: `${ticket.clean.hours}h - Lane: revision queue | cleaner file, lower scrutiny`,
+        description: `${ticket.clean.hours}h - Fix the deficiency properly; lower scrutiny`,
         value: `revise_permit:${ticket.id}:clean`
       });
     }
     if (hoursLeft >= ticket.fast.hours) {
-      actionOptions.push({
+      bucket.push({
         label: `Fast-track: ${ticket.title}`,
-        description: `${ticket.fast.hours}h - Lane: revision queue | quicker resubmission, more heat`,
+        description: `${ticket.fast.hours}h - Quicker resubmission, but more heat`,
         value: `revise_permit:${ticket.id}:fast`
       });
     }
-  }
+  });
 
-  // Referral management (permitting-specific)
   if ((journey.permits.inReferral || 0) > 0 && hoursLeft >= 2) {
-    actionOptions.push({
+    primary.push({
       label: 'Follow Up on Referrals',
-      description: '2h - Lane: referral queue | Check status with referral agencies',
+      description: '2h - Chase the other-agency sign-offs a permit is waiting on',
       value: 'follow_up_referrals'
     });
   }
 
-  if (hoursLeft >= 2) {
-    const professional = getPermittingProfessionalSnapshot(journey);
-    const label = `${laneAction.actionLabel} (2h)`;
-    const pieces = [];
-    if (professional?.registrationStatus !== 'active') {
-      pieces.push(`registration ${professional.registrationStatus}`);
-    }
-    if (professional?.cpdGap > 0) {
-      pieces.push(`CPD gap ${professional.cpdGap}h`);
-    }
-    if (professional?.paperworkLoad > 0) {
-      pieces.push(`paperwork ${professional.paperworkLoad}`);
-    }
-    actionOptions.push({
-      label,
-      description: pieces.length
-        ? `Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel} | Reset: ${pieces.join(' | ')}`
-        : `Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel}`,
-      value: 'professional_admin'
+  // Process Permits is core throughput — it keeps submitted files moving.
+  if (DESK_ACTIONS.process_permits.hoursRequired <= hoursLeft) {
+    primary.push({
+      label: DESK_ACTIONS.process_permits.name,
+      description: `${DESK_ACTIONS.process_permits.hoursRequired}h - ${DESK_ACTIONS.process_permits.description}`,
+      value: 'process_permits'
     });
   }
 
-  // Standard desk actions
-  const standardActions = Object.entries(DESK_ACTIONS)
-    .filter(([, action]) => action.hoursRequired <= hoursLeft)
-    .map(([id, action]) => ({
-      label: action.name,
-      description: `${action.hoursRequired}h - ${getDeskActionLaneLabel(id)} | ${action.description}`,
-      value: id
-    }));
-
-  actionOptions.push(...standardActions);
-
-  // Protagonist-specific actions
+  // Support actions: relationships, morale, crisis response, recovery.
+  if (DESK_ACTIONS.stakeholder_meeting.hoursRequired <= hoursLeft) {
+    support.push({
+      label: DESK_ACTIONS.stakeholder_meeting.name,
+      description: `${DESK_ACTIONS.stakeholder_meeting.hoursRequired}h - ${DESK_ACTIONS.stakeholder_meeting.description}`,
+      value: 'stakeholder_meeting'
+    });
+  }
+  if (DESK_ACTIONS.team_morale.hoursRequired <= hoursLeft) {
+    support.push({
+      label: DESK_ACTIONS.team_morale.name,
+      description: `${DESK_ACTIONS.team_morale.hoursRequired}h - ${DESK_ACTIONS.team_morale.description}`,
+      value: 'team_morale'
+    });
+  }
+  if (DESK_ACTIONS.crisis_management.hoursRequired <= hoursLeft) {
+    support.push({
+      label: DESK_ACTIONS.crisis_management.name,
+      description: `${DESK_ACTIONS.crisis_management.hoursRequired}h - ${DESK_ACTIONS.crisis_management.description}`,
+      value: 'crisis_management'
+    });
+  }
   if (journey.protagonist && hoursLeft >= 1) {
-    actionOptions.push({
+    support.push({
       label: 'Take a Break',
       description: '1h - Reduce stress, recover energy',
       value: 'rest'
     });
   }
 
-  actionOptions.push({
+  if (support.length > 0) {
+    primary.push({
+      label: 'Office & Support ▸',
+      description: 'Stakeholders, team morale, crisis response, and recovery',
+      value: 'support_menu'
+    });
+  }
+
+  primary.push({
     label: 'Review the File',
     description: 'Pipeline detail, pressure, relationships, and carry-forward notes',
     value: 'briefing'
   });
 
-  // Always add "End Day Early" option
-  actionOptions.push({
+  primary.push({
     label: 'End Day Early',
     description: 'Rest and start fresh tomorrow',
     value: 'end_day'
   });
 
-  return actionOptions;
+  return { primary, support };
 }
 
 function shiftPermits(sourceKey, targetKey, permits, count) {

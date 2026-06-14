@@ -137,6 +137,13 @@ export class TerminalUI {
     this.statCrewValue = document.getElementById('stat-crew-value');
     this.statMoraleValue = document.getElementById('stat-morale-value');
 
+    // Modern mode stats row (year / funds / eco-health / zone)
+    this.modernYearValue = document.getElementById('modern-year-value');
+    this.modernFundsValue = document.getElementById('modern-funds-value');
+    this.modernEcoValue = document.getElementById('modern-eco-value');
+    this.modernEcoFill = document.getElementById('modern-eco-fill');
+    this.modernZoneValue = document.getElementById('modern-zone-value');
+
     // Modern mode footer buttons
     this.footerGlossaryBtn = document.getElementById('footer-glossary-btn');
     this.logBtn = document.getElementById('log-btn');
@@ -272,9 +279,11 @@ export class TerminalUI {
     document.addEventListener('keydown', (e) => {
       const canUseGameplayShortcuts = this._canUseGameplayShortcuts();
 
-      // Number keys for choices (works in both classic and modern mode)
-      if (canUseGameplayShortcuts && /^[1-9]$/.test(e.key) && this._choiceHandler) {
-        const index = parseInt(e.key, 10) - 1;
+      // Number keys for choices (works in both classic and modern mode).
+      // 1-9 map directly; 0 is the accelerator for a 10th option so menus that
+      // reach ten choices are never left with an unreachable last item.
+      if (canUseGameplayShortcuts && /^[0-9]$/.test(e.key) && this._choiceHandler) {
+        const index = e.key === '0' ? 9 : parseInt(e.key, 10) - 1;
         const buttons = this.choices?.querySelectorAll('.choice-btn, .decision-card');
         if (buttons && buttons[index]) {
           e.preventDefault();

@@ -38,9 +38,9 @@ function Header({ onExit, isCrisis }) {
       </div>
       <div className="tui-header-actions">
         <button type="button" className="tui-header-button" onClick={onExit}>
-          Exit
+          ← Main Menu
         </button>
-        <div className="tui-header-help">Press Q to quit</div>
+        <div className="tui-header-help">Press Q to return to the main menu</div>
       </div>
     </header>
   );

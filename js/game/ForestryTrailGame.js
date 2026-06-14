@@ -7,7 +7,7 @@
 
 import { TerminalUI } from '../ui.js';
 import { FORESTER_ROLES, OPERATING_AREAS } from '../data/index.js';
-import { generateCrew, processDailyUpdate, getCrewDisplayInfo } from '../crew.js';
+import { generateCrew, getCrewDisplayInfo } from '../crew.js';
 import {
   createJourney,
   formatJourneyLog,
@@ -362,70 +362,6 @@ export class ForestryTrailGame {
 
   async _handleEvent(event) {
     await handleEvent(this, event);
-  }
-
-  _displayCrewStatus() {
-    const activeCrew = this.journey.crew.filter(m => m.isActive);
-    const activeCount = activeCrew.length;
-    const totalCount = this.journey.crew.length;
-    const avgHealth = activeCount > 0
-      ? Math.round(activeCrew.reduce((sum, m) => sum + m.health, 0) / activeCount)
-      : 0;
-    const injured = activeCrew.filter(m => m.statusEffects?.length > 0).length;
-
-    this.ui.write(`Crew: ${activeCount}/${totalCount} active | Avg Health: ${avgHealth}%${injured > 0 ? ` | ${injured} injured` : ''}`);
-    this.ui.write('(Crew details: the [S] Status button, or press S)');
-    this.ui.write('');
-  }
-
-  _getDeskPhase(journey) {
-    const day = journey.day;
-    const deadline = journey.deadline || 30;
-    const phaseLength = Math.max(1, Math.floor(deadline / 3));
-
-    if (day > deadline - 4) return 'crunch';
-    if (day > phaseLength * 2) return 'approval';
-    if (day > phaseLength) return 'review';
-    return 'planning';
-  }
-
-  _miniBar(value, width = 5) {
-    const filled = Math.round((value / 100) * width);
-    return '█'.repeat(filled) + '░'.repeat(width - filled);
-  }
-
-  _updateCrewConditions() {
-    const journey = this.journey;
-    const conditions = {
-      restDay: journey.journeyType === 'desk' || journey.pace === 'resting',
-      gruelingPace: journey.pace === 'grueling',
-      lowFood: journey.journeyType === 'field' ? journey.resources.food <= 0 : false,
-      coldWeather: journey.journeyType === 'field' && (journey.temperature === 'cold' || journey.temperature === 'freezing'),
-      shelter: journey.journeyType === 'desk'
-    };
-
-    for (const member of journey.crew) {
-      if (!member.isActive) continue;
-
-      const wasAlive = !member.isDead;
-      const wasActive = !member.hasQuit;
-
-      const update = processDailyUpdate(member, conditions);
-
-      if (wasAlive && member.isDead) {
-        this.ui.writeWarning(`${member.name} has died from their injuries!`);
-      } else if (wasActive && member.hasQuit) {
-        this.ui.writeWarning(`${member.name} has had enough and quit the expedition!`);
-      }
-
-      if (update.messages && update.messages.length > 0) {
-        for (const msg of update.messages) {
-          this.ui.write(msg);
-        }
-      }
-    }
-
-    this.ui.updateAllStatus(journey);
   }
 
   _checkEndConditions() {

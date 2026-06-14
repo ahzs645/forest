@@ -44,7 +44,8 @@ export async function runManagerDay(game) {
 
   // The day's event, drawn through the real selection pipeline (cooldowns,
   // context matching, scrutiny/difficulty modifiers, reporter attachment).
-  const event = checkForEvent(journey);
+  // The opening month is event-free so the executive loop reads cleanly first.
+  const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     displayManagerHeader(ui, journey);
     await handleEvent(game, event);
@@ -162,6 +163,11 @@ function displayManagerHeader(ui, journey) {
     ui.write(`Executive Crew: ${activeCrew.length} active | Avg Morale: ${avgMorale}%`);
   }
 
+  // Sticky objective + the two survival gates the term victory check uses.
+  const budgetOk = journey.resources.budget > 0;
+  const repOk = (journey.metrics.reputation || 50) > 40;
+  ui.write(`Objective: Lead the company through all ${journey.deadline} months with the books and the board onside.`);
+  ui.write(`Survival Gates: [${budgetOk ? 'x' : ' '}] Solvent  [${repOk ? 'x' : ' '}] Reputation above 40%`);
   ui.write(`Term Progress: ${getOperationalProgress(journey)}%`);
   ui.write("");
 }

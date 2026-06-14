@@ -269,8 +269,9 @@ async function runFieldDay(game) {
   // rolls over once, at the very end of the shift, via endFieldDay().
   let dayResolved = false;
 
-  // Check for random event at start of day
-  const event = checkForEvent(journey);
+  // Check for random event at start of day. The first shift teaches the base
+  // loop — no surprise event fires before the player has seen a normal turn.
+  const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     displayDayHeader(ui, journey);
     await handleEvent(game, event);
@@ -616,6 +617,13 @@ function displayDayHeader(ui, journey) {
       : '[x] values sweep (not flagged)';
     const finalized = intel.accessGroundTruthed && (!sweep.needed || intel.valuesSwept);
     ui.write(`${currentBlock.name} package: ${check(intel.accessGroundTruthed)} access  ${sweepLabel}  ${check(finalized)} finalized`);
+    // Current Intel on the shift header, not only behind Review the Briefing, so
+    // the player always knows what is still unverified on the block underfoot.
+    const accessIntelLabel = intel.accessGroundTruthed ? 'ground-truthed' : 'unverified';
+    const valuesIntelLabel = sweep.needed
+      ? (intel.valuesSwept ? 'swept' : 'pending')
+      : 'quiet';
+    ui.write(`Current Intel: access ${accessIntelLabel} | values ${valuesIntelLabel}`);
   }
   displayCrewStatus(ui, journey);
 

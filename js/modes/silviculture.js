@@ -127,10 +127,11 @@ export async function runSilvicultureDay(game) {
   // Apply daily overhead cost
   journey.resources.budget -= 850;
 
-  // Check for contractor event (higher when morale/productivity is slipping)
+  // Check for contractor event (higher when morale/productivity is slipping).
+  // Held back on day 1 so onboarding is not interrupted by a contractor crisis.
   const activeContractors = journey.contractors.filter(c => c.isActive);
   const contractorStress = activeContractors.some(c => c.morale < 55 || c.productivity < 60);
-  if (Math.random() < (contractorStress ? 0.40 : 0.30)) {
+  if (journey.day > 1 && Math.random() < (contractorStress ? 0.40 : 0.30)) {
     if (activeContractors.length > 0) {
       const targetContractor = activeContractors[Math.floor(Math.random() * activeContractors.length)];
       const applicableEvents = CONTRACTOR_EVENTS.filter(e => e.trigger(targetContractor));
@@ -142,8 +143,9 @@ export async function runSilvicultureDay(game) {
     }
   }
 
-  // Check for random event
-  const event = checkForEvent(journey);
+  // Check for random event. Day 1 stays event-free so the contractor loop is
+  // legible before disruptions begin.
+  const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, zoneProfile);
     await handleEvent(game, event);
@@ -250,6 +252,12 @@ function displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, z
   const surveyPct = Math.round(Math.min(1, journey.surveys.freeGrowingComplete / journey.surveys.freeGrowingTarget) * 100);
 
   ui.write(`Plant: ${plantPct}% (${Math.min(journey.planting.blocksPlanted, journey.planting.blocksToPlant)}/${journey.planting.blocksToPlant} blocks) | Brush: ${brushPct}% | Survey: ${surveyPct}% (${Math.min(journey.surveys.freeGrowingComplete, journey.surveys.freeGrowingTarget)}/${journey.surveys.freeGrowingTarget})`);
+
+  // Sticky objective + win gates so the regen targets are never a mystery.
+  const plantDone = journey.planting.blocksPlanted >= journey.planting.blocksToPlant;
+  const surveyDone = journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget;
+  ui.write(`Objective: Hit the regeneration targets — plant the block program and clear free-growing surveys.`);
+  ui.write(`Regen Gates: [${plantDone ? 'x' : ' '}] Planting (${plantPct}%)  [${surveyDone ? 'x' : ' '}] Free-growing surveys (${surveyPct}%)`);
 
   // Compact contractors
   const roster = getSilvicultureContractorRoster(journey, zoneProfile);

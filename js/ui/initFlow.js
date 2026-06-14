@@ -90,6 +90,12 @@ export const InitFlowMixin = {
   _initLandingScreen() {
     if (!this.landingScreen) return;
 
+    // Experimental modes (Crisis Command) stay hidden until the core loop is
+    // solid. Reveal them only when the player explicitly opts in.
+    if (this.crisisModeBtn && this._isExperimentalEnabled()) {
+      this.crisisModeBtn.hidden = false;
+    }
+
     // New Game button
     this.newGameBtn?.addEventListener('click', () => {
       this._hideLandingScreen();
@@ -105,6 +111,9 @@ export const InitFlowMixin = {
     });
 
     this.crisisModeBtn?.addEventListener('click', () => {
+      // Stays inert while hidden so a stray programmatic click cannot launch an
+      // experimental mode the player never opted into.
+      if (this.crisisModeBtn.hidden) return;
       window.location.assign('./tui.html?mode=crisis-command');
     });
 
@@ -159,8 +168,10 @@ export const InitFlowMixin = {
         e.preventDefault();
         this.tuiModeBtn?.click();
       } else if (e.key === 'c' || e.key === 'C') {
-        e.preventDefault();
-        this.crisisModeBtn?.click();
+        if (this.crisisModeBtn && !this.crisisModeBtn.hidden) {
+          e.preventDefault();
+          this.crisisModeBtn.click();
+        }
       } else if (e.key === 'l' || e.key === 'L') {
         e.preventDefault();
         this.loadGameBtn?.click();
@@ -169,6 +180,21 @@ export const InitFlowMixin = {
         this.helpLandingBtn?.click();
       }
     });
+  },
+
+  /**
+   * Whether experimental modes should be exposed on the landing screen.
+   * Opt in with ?experimental=1 in the URL or localStorage forestExperimental=1.
+   * @private
+   */
+  _isExperimentalEnabled() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('experimental') === '1' || params.has('dev')) return true;
+      return window.localStorage?.getItem('forestExperimental') === '1';
+    } catch {
+      return false;
+    }
   },
 
   /**
