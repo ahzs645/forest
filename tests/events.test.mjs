@@ -61,6 +61,96 @@ test('permitting events update relationship and compliance tracks without legacy
   assert.ok(result.messages.some((message) => message.includes('Relationships improved')));
 });
 
+test('a generic negative-progress event slips reviews back but never revokes an approved permit', () => {
+  const journey = {
+    journeyType: 'permitting',
+    day: 10,
+    log: [],
+    hoursRemaining: 8,
+    permits: {
+      target: 5,
+      backlog: 0,
+      drafting: 0,
+      submitted: 0,
+      inReferral: 0,
+      inReview: 1,
+      needsRevision: 0,
+      approved: 2,
+      rejected: 0
+    },
+    resources: {
+      budget: 35000,
+      politicalCapital: 40
+    },
+    relationships: {
+      ministry: 50,
+      nations: 45,
+      agencies: 48
+    },
+    regulations: {
+      complianceScore: 80
+    }
+  };
+
+  const event = { id: 'distracted-week', title: 'Distracted Week' };
+  const option = {
+    label: 'Take the hit',
+    effects: {
+      progress: -5
+    }
+  };
+
+  const result = resolveEvent(journey, event, option);
+
+  // "Approved 2/5" must stay "Approved 2/5" — a setback can knock the file
+  // in review back to needing revision, but it cannot un-approve a permit.
+  assert.equal(journey.permits.approved, 2);
+  assert.equal(journey.permits.inReview, 0);
+  assert.equal(journey.permits.needsRevision, 1);
+  assert.ok(result.messages.some((message) => message.includes('Permit pipeline slowed')));
+});
+
+test('a negative-progress event with nothing left to slip leaves approved permits untouched', () => {
+  const journey = {
+    journeyType: 'permitting',
+    day: 20,
+    log: [],
+    hoursRemaining: 8,
+    permits: {
+      target: 5,
+      backlog: 0,
+      drafting: 0,
+      submitted: 0,
+      inReferral: 0,
+      inReview: 0,
+      needsRevision: 0,
+      approved: 3,
+      rejected: 0
+    },
+    resources: {
+      budget: 35000,
+      politicalCapital: 40
+    },
+    relationships: {
+      ministry: 50,
+      nations: 45,
+      agencies: 48
+    },
+    regulations: {
+      complianceScore: 80
+    }
+  };
+
+  const result = resolveEvent(journey, { id: 'bad-week', title: 'Bad Week' }, {
+    label: 'Absorb it',
+    effects: { progress: -50 }
+  });
+
+  assert.equal(journey.permits.approved, 3);
+  assert.equal(journey.permits.needsRevision, 0);
+  assert.ok(!result.messages.some((message) => message.includes('Permit pipeline slowed')));
+});
+
 test('planning events advance the active phase instead of no-oping against permit state', () => {
   const journey = {
     journeyType: 'planning',

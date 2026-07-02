@@ -252,8 +252,10 @@ export async function runCampaign(game) {
   try {
     await runCampaignInner(game);
   } finally {
-    // Never leak hidden expedition chrome back to the hub or a quick mode.
+    // Never leak hidden expedition chrome or the campaign banner back to the
+    // hub or a quick mode.
     setExpeditionChromeHidden(false);
+    game.ui.campaignBanner = null;
     game.journey = null;
   }
 }
@@ -268,6 +270,7 @@ async function runCampaignInner(game) {
     ui.writeHeader('CAMPAIGN IN PROGRESS');
     const seasonLabel = CAMPAIGN_SEASONS[saved.seasonIndex]?.label || 'Unknown';
     ui.write(`${saved.crewName} — ${seasonLabel}, ${saved.areaName || 'the district'}.`);
+    ui.write('Saves land at the start of each day — resuming replays the saved day from its morning.', 'term-dim');
     const resume = await ui.promptChoice('', [
       { label: 'Resume the year', value: 'resume' },
       { label: 'Start a new campaign (abandons the saved year)', value: 'fresh' },
@@ -428,6 +431,12 @@ async function runCampaignSeason(game, campaign, season) {
   let endResult = null;
   while (!endResult) {
     try {
+      // Keep the campaign layer visible inside the deployment: day headers
+      // clear the screen, and this banner is re-written by every clear().
+      const m = campaign.yearMetrics;
+      ui.campaignBanner = `CAMPAIGN · ${season.label} ${campaign.seasonIndex + 1}/4 · Year: `
+        + `Prog ${Math.round(m.progress)} · Forest ${Math.round(m.forestHealth)} · Rel ${Math.round(m.relationships)} `
+        + `· Comp ${Math.round(m.compliance)} · Budget ${Math.round(m.budget)}`;
       ui.updateAllStatus(journey);
 
       const scheduledEvent = checkScheduledEvents(journey);
@@ -463,8 +472,12 @@ async function runCampaignSeason(game, campaign, season) {
   }
 
   // ── 3. Season review ────────────────────────────────────────────────────
+  ui.campaignBanner = null;
   setExpeditionChromeHidden(true);
   const bridge = computeSeasonBridge(journey, endResult, journey.campaignStartBudget);
+  if (stance && Object.keys(stance.yearEffects).length) {
+    bridge.causes.push(`Briefing stance "${stance.label}" → ${formatMetricDelta(stance.yearEffects)}`);
+  }
   applyEffects(gsSeason, bridge.deltas, {
     type: 'event',
     id: `campaign-season-${season.id}`,
@@ -482,9 +495,12 @@ async function runCampaignSeason(game, campaign, season) {
     }
   }
 
-  // Crisis interlude: only a danger-severity issue interrupts the review.
+  // Crisis interlude: a danger-severity issue interrupts the review — and a
+  // failed deployment always draws one, so falling short has a face.
   const issue = drawIssue(gsSeason, campaign.rng);
-  if (issue && issue.surfaceSeverity === 'danger' && Array.isArray(issue.options) && issue.options.length) {
+  const isCrisis = issue && Array.isArray(issue.options) && issue.options.length
+    && (issue.surfaceSeverity === 'danger' || !endResult.victory);
+  if (isCrisis) {
     const index = await promptSeasonalCard(ui, {
       cardLabel: 'CRISIS',
       title: issue.title,

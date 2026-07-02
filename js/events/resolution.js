@@ -638,6 +638,12 @@ function applyDeskProgress(journey, progressPoints, messages) {
       messages.push(`Permit pipeline accelerated (+${moved}).`);
     }
   } else {
+    // A negative progress effect is a generic setback (a distracted week,
+    // a scheduling slip, ...), not a regulator revoking a decision. It can
+    // only slip work that is still in motion - drafts and reviews - back a
+    // stage. An approved permit is a legal decision that has already been
+    // granted, so it is deliberately excluded from every bucket below and
+    // can never be decremented here.
     while (remaining > 0 && journey.permits.inReview > 0) {
       journey.permits.inReview--;
       journey.permits.needsRevision++;
@@ -645,8 +651,8 @@ function applyDeskProgress(journey, progressPoints, messages) {
       moved++;
     }
 
-    while (remaining > 0 && journey.permits.approved > 0) {
-      journey.permits.approved--;
+    while (remaining > 0 && (journey.permits.inReferral || 0) > 0) {
+      journey.permits.inReferral--;
       journey.permits.needsRevision++;
       remaining--;
       moved++;
@@ -654,6 +660,13 @@ function applyDeskProgress(journey, progressPoints, messages) {
 
     while (remaining > 0 && journey.permits.submitted > 0) {
       journey.permits.submitted--;
+      journey.permits.backlog = (journey.permits.backlog || 0) + 1;
+      remaining--;
+      moved++;
+    }
+
+    while (remaining > 0 && (journey.permits.drafting || 0) > 0) {
+      journey.permits.drafting--;
       journey.permits.backlog = (journey.permits.backlog || 0) + 1;
       remaining--;
       moved++;

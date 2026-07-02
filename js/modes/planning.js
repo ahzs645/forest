@@ -35,6 +35,12 @@ import { getAreaSituationSummary } from '../data/areaSituations.js';
 
 const FOM_PUBLIC_REVIEW_MIN_DAYS = 2;
 const FOM_PUBLIC_REVIEW_COMMENT_LIMIT = 2;
+// The Cutblock Priority Decision card re-triages the area and reprints the
+// same zone framing every time it fires. On a short (campaign-scale) run the
+// 3-day cadence can put it on screen 4 times with identical wording, so cap
+// it to a couple of appearances per run instead of letting the day-based
+// cadence reschedule indefinitely.
+const MAX_BLOCK_SELECTIONS_PER_RUN = 2;
 const PLANNING_PHASE_NAMES = {
   data_gathering: 'Data Gathering',
   analysis: 'Analysis',
@@ -216,7 +222,7 @@ function getPlanningPhaseLabel(phase) {
   return PLANNING_PHASE_NAMES[phase] || phase;
 }
 
-function syncFomStateFromActiveBlock(journey, seasonInfo) {
+export function syncFomStateFromActiveBlock(journey, seasonInfo) {
   const blockPlanning = journey.blockPlanning;
   if (!blockPlanning?.activeBlock) return ensurePlanningFomState(journey);
 
@@ -225,7 +231,15 @@ function syncFomStateFromActiveBlock(journey, seasonInfo) {
   const roadContext = getPlanningRoadAssetContext(journey, blockPlanning.activeBlock);
   const activeBlockId = blockPlanning.activeBlock.id;
 
-  if (fom.activeBlockId !== activeBlockId) {
+  // The FOM submission is plan-level, not per-block: Cutblock Priority
+  // Decision can reassign the active block focus mid-run, and that switch
+  // used to reset fom.status straight back to 'draft', silently discarding
+  // review progress (or even a completed approval) every time the block
+  // changed. Seed the review clock only the first time this journey gets an
+  // FOM tracker; after that, changing the active block just refreshes the
+  // descriptive water/road readiness context below without rewinding
+  // status/reviewDaysRemaining/commentLoad.
+  if (!fom.activeBlockId) {
     fom.status = 'draft';
     fom.reviewDaysRemaining = waterContext.reviewDays;
     fom.commentLoad = waterContext.commentCount;
@@ -651,6 +665,17 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
     }
   }
   const fomAlert = syncFomStateFromActiveBlock(journey, seasonInfo);
+  // Once the FOM is published, the public-review clock is one of the few
+  // hard deadlines in this mode - it used to only surface behind Review the
+  // File, so a player working the day-to-day menu could miss it closing in.
+  // Show it in the day header for as long as the window is open.
+  if (fomAlert?.status === 'public_review') {
+    const reviewDaysRemaining = Math.max(0, fomAlert.reviewDaysRemaining || 0);
+    const commentLoad = Math.max(0, fomAlert.commentLoad || 0);
+    ui.write(`Public Review Window: ${reviewDaysRemaining}d remaining | ${commentLoad} open comment${commentLoad === 1 ? '' : 's'}`);
+  } else if (fomAlert?.status === 'revision_required') {
+    ui.writeWarning('FOM public review flagged revisions - address them before the window reopens.');
+  }
   if (fomAlert?.roadBlocker) {
     ui.writeWarning(`Road-engineering blocker: ${fomAlert.roadBlockerReasons.join(' | ')}`);
   }
@@ -716,6 +741,7 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
   if (!plannerState) return;
   if (journey.plan?.phase === 'ministerial_approval' && plannerState.activeBlock) return;
   if (journey.day < (plannerState.nextSelectionDay || 1)) return;
+  if ((plannerState.selectionCount || 0) >= MAX_BLOCK_SELECTIONS_PER_RUN) return;
 
   displayPlanningHeader(ui, journey, seasonInfo);
   ui.writeHeader('CUTBLOCK PRIORITY DECISION');
@@ -724,9 +750,10 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
 
   const allBlocks = getPlanningAreaBlockPool(journey.areaId);
   const triage = buildPlanningConstraintTriage(journey.areaId, journey.area, allBlocks);
-  if (triage.area?.zoneSummary) {
-    ui.write(triage.area.zoneSummary);
-  }
+  // triage.summary already leads with the area's zoneSummary paragraph
+  // (buildPlanningConstraintTriage prefixes it before the driver ranking), so
+  // printing triage.area.zoneSummary here as well used to render the same
+  // paragraph twice in this card.
   ui.write(triage.summary);
   ui.write('');
 
@@ -776,6 +803,7 @@ function applySelectedBlockImpact(journey, block, triageKey = null, seasonInfo =
   state.activeSummary = `${summarizePlanningBlock(block, journey.area, triageKey, seasonInfo)}${roadMatch}`;
   state.activeEventBias = block.eventBias || null;
   state.history = Array.isArray(state.history) ? [...state.history, block.id].slice(-30) : [block.id];
+  state.selectionCount = (state.selectionCount || 0) + 1;
   state.nextSelectionDay = journey.day + (state.cadenceDays || 3);
   syncFomStateFromActiveBlock(journey, seasonInfo);
 
@@ -935,10 +963,10 @@ function buildActionOptions(journey, seasonInfo = null) {
     });
   }
 
-  if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 2 && journey.plan.ministerialConfidence < 78) {
+  if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 2 && journey.plan.ministerialConfidence < 80) {
     actionOptions.push({
       label: 'Ministerial Outreach (2h)',
-      description: 'Lane: ministerial brief | Brief decision-makers and recover confidence up to 78%',
+      description: 'Lane: ministerial brief | Brief decision-makers and recover confidence up to 80%',
       value: 'outreach'
     });
   }
@@ -1012,7 +1040,7 @@ function buildActionOptions(journey, seasonInfo = null) {
 /**
  * Process a selected action
  */
-async function processAction(game, actionValue, seasonInfo = null) {
+export async function processAction(game, actionValue, seasonInfo = null) {
   const { ui, journey } = game;
   const discoveryTags = getJourneyDiscoveryTags(journey);
   const discoveryIds = new Set(discoveryTags.map((tag) => tag.id));
@@ -1228,7 +1256,12 @@ async function processAction(game, actionValue, seasonInfo = null) {
 
     case 'outreach': {
       const previousConfidence = journey.plan.ministerialConfidence;
-      journey.plan.ministerialConfidence = Math.min(78, journey.plan.ministerialConfidence + 8);
+      // The submission gate needs 80% (see the "Confidence 80%" approval gate
+      // and the 80-point gap checks elsewhere in this file) - capping this
+      // recommended action's gain at 78% meant the game could tell a player
+      // to use Ministerial Outreach to "close the confidence gap" while the
+      // action itself was structurally incapable of ever reaching the gate.
+      journey.plan.ministerialConfidence = Math.min(80, journey.plan.ministerialConfidence + 8);
       journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
       journey.resources.budget = Math.max(0, journey.resources.budget - 600);
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);

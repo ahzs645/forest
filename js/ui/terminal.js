@@ -131,6 +131,12 @@ export const TerminalMixin = {
     if (this.terminal) {
       this.terminal.innerHTML = '';
     }
+    // A campaign sets a persistent banner (season + year meters) so the
+    // campaign layer stays visible inside deployments, whose day headers
+    // clear the screen every render.
+    if (this.campaignBanner) {
+      this.write(this.campaignBanner, 'term-dim');
+    }
   },
 
   /**

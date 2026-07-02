@@ -1084,7 +1084,7 @@ function displayPermittingBriefing(ui, journey) {
  * @param {Object} journey - Journey state
  * @returns {Array} Action options
  */
-function buildActionOptions(journey) {
+export function buildActionOptions(journey) {
   const hoursLeft = journey.hoursRemaining || 8;
   const revisionQueue = ensurePermittingRevisionState(journey);
   const laneAction = getPermittingLaneAction(journey);
@@ -1212,7 +1212,16 @@ function buildActionOptions(journey) {
     });
   }
 
-  if (support.length > 0) {
+  // Several open revision tickets can land on the same profile once the
+  // deficiency queue outgrows PERMIT_REVISION_PROFILES (pickRevisionProfile
+  // cycles through the profile list), which used to surface exact-duplicate
+  // "Clean response: X" / "Fast-track: X" rows in this submenu. Collapse
+  // repeats down to one visible row per label+description; the underlying
+  // tickets are unaffected and any remaining duplicate will resurface here
+  // once the visible one is resolved.
+  const dedupedSupport = dedupeMenuOptions(support);
+
+  if (dedupedSupport.length > 0) {
     primary.push({
       label: 'Office & Support ▸',
       description: 'Stakeholders, team morale, crisis response, and recovery',
@@ -1232,7 +1241,24 @@ function buildActionOptions(journey) {
     value: 'end_day'
   });
 
-  return { primary, support };
+  return { primary, support: dedupedSupport };
+}
+
+/**
+ * Collapse options that read as identical to the player (same label and
+ * description) down to a single entry, keeping the first occurrence so the
+ * remaining `value` still resolves a real, currently-open item.
+ */
+function dedupeMenuOptions(options) {
+  const seen = new Set();
+  const deduped = [];
+  for (const option of options) {
+    const key = `${option?.label ?? ''}|${option?.description ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(option);
+  }
+  return deduped;
 }
 
 function shiftPermits(sourceKey, targetKey, permits, count) {

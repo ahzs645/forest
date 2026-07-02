@@ -278,7 +278,11 @@ export function applyConsumption(resources, consumption, definitions) {
   for (const [key, amount] of Object.entries(consumption)) {
     if (typeof updated[key] !== 'number') continue;
 
-    updated[key] = Math.max(0, updated[key] - amount);
+    // Round to one decimal so repeated subtraction of "clean" one-decimal
+    // consumption amounts (see calculateFieldConsumption) cannot accumulate
+    // binary floating-point noise (e.g. 15.100000000000001) into the stored
+    // resource value or the warning/critical messages built from it below.
+    updated[key] = Math.round(Math.max(0, updated[key] - amount) * 10) / 10;
 
     const def = definitions[key];
     if (def) {
