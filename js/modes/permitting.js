@@ -185,6 +185,22 @@ const PERMIT_REVISION_PROFILES = [
   }
 ];
 
+// Paperwork load at/above this level makes the Compliance Admin lane the
+// genuinely urgent move — below it, admin work is available but not the
+// callout, so players aren't trained to spam it while pipeline win
+// conditions (permits approved) sit untouched. A permitter's starting
+// paperworkLoad already runs ~17-21 once area burden is folded in (engine
+// baseline 10 + half the area's compliance-profile burden, which spans
+// 14-22 across areas — see js/engine/professional.js and the
+// AREA_COMPLIANCE_PROFILES entries in js/data/professionalPractice.js), and
+// ordinary pipeline work (drafting/submitting/processing permits) adds
+// another 2-3 per action. 20 sits just above that starting band and below
+// the paperwork-burn consequence line (js/engine/effects.js triggers at
+// 20+), so the callout starts quiet, only lights up once neglect actually
+// pushes the load past where it starts to bite, and clears again once a
+// diligent admin cycle brings it back down.
+const PAPERWORK_ADMIN_URGENT_THRESHOLD = 20;
+
 function ensurePermittingProfessionalState(journey) {
   return ensureProfessionalComplianceState(journey);
 }
@@ -297,6 +313,113 @@ function progressPermittingPaperworkChain(journey, chainId, stepCount = 1) {
   const stepIndex = Math.min(chain.stepIndex, chain.steps.length) - 1;
   const stage = stepIndex >= 0 ? chain.steps[stepIndex] : chain.steps[0];
   return { chain, stage };
+}
+
+/**
+ * Compliance-metric deltas for a single Compliance Admin click on a given
+ * paperwork chain/stage. Pulled out as a pure lookup (rather than inlined in
+ * processAction) so the per-cycle paperwork math can be covered by a
+ * regression test without driving the full UI loop.
+ *
+ * Per full diligent cycle (every stage clicked once, in order):
+ *   registration: -8 paperworkLoad per click (single-stage relief, no ladder)
+ *   roadPermit:   screen +1, map +1, submit +1, maintenance -6   => net -3 / 4 clicks
+ *   specialUse:   screen +1, bundle +1, submit +1, conditions -6 => net -3 / 4 clicks
+ *   archaeology:  screen +1, field-review 0, permit-context -2   => net -1 / 3 clicks
+ * roadPermit/specialUse used to net +1 per cycle (screen/map/submit each
+ * added paperwork and only the final stage relieved -2) — a treadmill that
+ * lost ground against the ~+2 ambient paperwork growth from ordinary permit
+ * work. The final stage now relieves -6 so a full cycle nets clearly
+ * negative, in line with (here, better than) archaeology.
+ *
+ * @param {string} chainId - 'registration' | 'roadPermit' | 'specialUse' | 'archaeology'
+ * @param {string} stage - current stage name within the chain
+ * @returns {{changes: Object, message: string}|null}
+ */
+export function getPaperworkChainStageEffect(chainId, stage) {
+  if (chainId === 'registration') {
+    return {
+      changes: {
+        registrationStatus: 'active',
+        cpdHours: 8,
+        competenceRisk: -6,
+        paperworkLoad: -8,
+        auditExposure: -5,
+      },
+      message: 'Registration renewal and CPD housekeeping are back under control.'
+    };
+  }
+
+  if (chainId === 'roadPermit') {
+    if (stage === 'screen') {
+      return {
+        changes: { paperworkLoad: 1, auditExposure: 0, competenceRisk: -1 },
+        message: 'Road permit screening confirms the access needs district review.'
+      };
+    }
+    if (stage === 'map') {
+      return {
+        changes: { cpdHours: 1, paperworkLoad: 1, auditExposure: 0 },
+        message: 'Road permit mapping and Exhibit A detail now sit in the drafting stack.'
+      };
+    }
+    if (stage === 'submit') {
+      return {
+        changes: { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: 0 },
+        message: 'Road permit submission package is aligned and moving into review.'
+      };
+    }
+    return {
+      changes: { paperworkLoad: -6, auditExposure: -2, competenceRisk: -1 },
+      message: 'Road maintenance notes and deactivation planning are cleaned up.'
+    };
+  }
+
+  if (chainId === 'specialUse') {
+    if (stage === 'screen') {
+      return {
+        changes: { paperworkLoad: 1, auditExposure: 0 },
+        message: 'Special-use screening confirms the site needs a separate package.'
+      };
+    }
+    if (stage === 'bundle') {
+      return {
+        changes: { cpdHours: 1, paperworkLoad: 1, auditExposure: 0 },
+        message: 'Special-use bundle assembled and queued with the active permit work.'
+      };
+    }
+    if (stage === 'submit') {
+      return {
+        changes: { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: 0 },
+        message: 'Special-use submission is ready for district review.'
+      };
+    }
+    return {
+      changes: { paperworkLoad: -6, auditExposure: -2 },
+      message: 'Special-use conditions are lined up and the file is cleaner.'
+    };
+  }
+
+  if (chainId === 'archaeology') {
+    if (stage === 'screen') {
+      return {
+        changes: { paperworkLoad: 1, auditExposure: 0 },
+        message: 'Archaeology screening shows the file needs a proper field review path.'
+      };
+    }
+    if (stage === 'field-review') {
+      return {
+        changes: { cpdHours: 1, paperworkLoad: 0, competenceRisk: -1, auditExposure: -2 },
+        message: 'Field review notes and consultation context are better aligned.'
+      };
+    }
+    return {
+      changes: { paperworkLoad: -2, auditExposure: -2, competenceRisk: -1 },
+      message: 'Archaeology context is folded into the permit package.'
+    };
+  }
+
+  return null;
 }
 
 function pushPermittingGuideStep(steps, text) {
@@ -972,8 +1095,13 @@ function buildActionOptions(journey) {
   const primary = [];
   const support = [];
 
-  // Best move leads the menu — the lane action is always the recommended choice.
-  // Professional blockers carry a plain-English translation of the jargon.
+  // The lane action is always available, but it only earns the "Best move"
+  // callout when admin is actually urgent — otherwise players learn to spam
+  // it every turn while the real pipeline (backlog/drafting/review) sits
+  // untouched. Urgency mirrors the paperwork-burn consequence: a lapsed
+  // registration is always urgent, and a climbing paperwork load becomes
+  // urgent well before it reaches the "issue" threshold used elsewhere
+  // (getPermittingProfessionalIssues flags it at 40+).
   if (hoursLeft >= 2) {
     const professional = getPermittingProfessionalSnapshot(journey);
     const pieces = [];
@@ -986,11 +1114,15 @@ function buildActionOptions(journey) {
     if (professional?.paperworkLoad > 0) {
       pieces.push(`paperwork ${professional.paperworkLoad} (filing backlog slowing the desk)`);
     }
+    const adminUrgent = (professional?.paperworkLoad || 0) >= PAPERWORK_ADMIN_URGENT_THRESHOLD
+      || professional?.registrationStatus !== 'active';
+    const laneDetail = `Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel}`;
+    const prefix = adminUrgent ? 'Best move | ' : '';
     primary.push({
       label: `${laneAction.actionLabel} (2h)`,
       description: pieces.length
-        ? `Best move | Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel} | Clears: ${pieces.join(' | ')}`
-        : `Best move | Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel}`,
+        ? `${prefix}${laneDetail} | Clears: ${pieces.join(' | ')}`
+        : `${prefix}${laneDetail}`,
       value: 'professional_admin'
     });
   }
@@ -1322,57 +1454,13 @@ async function processAction(game, actionId) {
       journey.hoursRemaining -= 2;
       applyProtagonistCost(journey, { energy: 5, stress: 4 });
 
-      if (chainId === 'registration') {
-        applyPermittingProfessionalWork(journey, {
-          registrationStatus: 'active',
-          cpdHours: 8,
-          competenceRisk: -6,
-          paperworkLoad: -8,
-          auditExposure: -5,
-        });
-        ui.write('Registration renewal and CPD housekeeping are back under control.');
-      } else if (chainId === 'roadPermit') {
-        if (stage === 'screen') {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 0, competenceRisk: -1 });
-          ui.write('Road permit screening confirms the access needs district review.');
-        } else if (stage === 'map') {
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 0 });
-          ui.write('Road permit mapping and Exhibit A detail now sit in the drafting stack.');
-        } else if (stage === 'submit') {
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: 0 });
-          ui.write('Road permit submission package is aligned and moving into review.');
-        } else {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: -2, auditExposure: -2, competenceRisk: -1 });
-          ui.write('Road maintenance notes and deactivation planning are cleaned up.');
-        }
-      } else if (chainId === 'specialUse') {
-        if (stage === 'screen') {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 0 });
-          ui.write('Special-use screening confirms the site needs a separate package.');
-        } else if (stage === 'bundle') {
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 0 });
-          ui.write('Special-use bundle assembled and queued with the active permit work.');
-        } else if (stage === 'submit') {
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: 0 });
-          ui.write('Special-use submission is ready for district review.');
-        } else {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: -2, auditExposure: -2 });
-          ui.write('Special-use conditions are lined up and the file is cleaner.');
-        }
-      } else if (chainId === 'archaeology') {
-        if (stage === 'screen') {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 0 });
-          ui.write('Archaeology screening shows the file needs a proper field review path.');
-        } else if (stage === 'field-review') {
-          if (journey.relationships) {
-            journey.relationships.nations = Math.min(100, journey.relationships.nations + 2);
-          }
-          applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 0, competenceRisk: -1, auditExposure: -2 });
-          ui.write('Field review notes and consultation context are better aligned.');
-        } else {
-          applyPermittingProfessionalWork(journey, { paperworkLoad: -2, auditExposure: -2, competenceRisk: -1 });
-          ui.write('Archaeology context is folded into the permit package.');
-        }
+      const effect = getPaperworkChainStageEffect(chainId, stage);
+      if (effect) {
+        applyPermittingProfessionalWork(journey, effect.changes);
+        ui.write(effect.message);
+      }
+      if (chainId === 'archaeology' && stage === 'field-review' && journey.relationships) {
+        journey.relationships.nations = Math.min(100, journey.relationships.nations + 2);
       }
 
       applyPermittingLaneThroughput(journey, chainId, stage, ui);

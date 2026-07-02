@@ -136,7 +136,7 @@ export function writeFinalStatistics(ui, journey) {
       break;
 
     case 'manager':
-      ui.write(`Term Served: ${daysUsed}/${journey.deadline} days`);
+      ui.write(`Term Served: ${daysUsed}/${journey.deadline} months`);
       ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
       ui.write(`Reputation: ${Math.round(journey.metrics?.reputation ?? 50)}%`);
       if (journey.ceo) {
@@ -166,8 +166,16 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
     case 'field': {
       const blocksCount = journey.blocks?.length || 0;
       const activeCrew = journey.crew.filter(m => m.isActive).length;
-      return `${crewName} completed the ${journey.totalDistance} km traverse through ${areaName} as ${seasonName} settled in. ` +
-        `${activeCrew} crew members surveyed all ${blocksCount} blocks over ${daysUsed} shifts. ` +
+      // A recon win means every block package closed — not necessarily the
+      // whole traverse driven (packages can be finalized from notes and GPS),
+      // so only claim the traverse when the odometer backs it up.
+      const traverseDone = journey.totalDistance > 0
+        && journey.distanceTraveled >= journey.totalDistance;
+      const opening = traverseDone
+        ? `${crewName} completed the ${journey.totalDistance} km traverse through ${areaName} as ${seasonName} settled in.`
+        : `${crewName} closed out every block package in ${areaName} as ${seasonName} settled in.`;
+      return `${opening} ` +
+        `${activeCrew} crew members finalized all ${blocksCount} blocks over ${daysUsed} shifts. ` +
         `The reconnaissance data will guide forest operations in this area for years to come.`;
     }
     case 'silviculture':
@@ -184,7 +192,7 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
         `The permit pipeline in ${areaName} is flowing smoothly after ${daysUsed} days of diligent processing ` +
         `and relationship building.`;
     case 'manager':
-      return `${crewName} closed out the term in ${areaName} after ${daysUsed} days with the books balanced ` +
+      return `${crewName} closed out the term in ${areaName} after ${daysUsed} months with the books balanced ` +
         `and the board's confidence intact. The operation is set up to thrive under its new leadership.`;
     default:
       return journey.endReason || 'Expedition completed successfully.';
@@ -214,7 +222,7 @@ export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
       return `The permitting office in ${areaName} could not meet its targets. ` +
         `${reason} After ${daysUsed} days, the backlog remains.`;
     case 'manager':
-      return `${crewName}'s tenure leading the ${areaName} operation ended after ${daysUsed} days. ` +
+      return `${crewName}'s tenure leading the ${areaName} operation ended after ${daysUsed} months. ` +
         `${reason} The board is already interviewing replacements.`;
     default:
       return reason;

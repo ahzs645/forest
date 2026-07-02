@@ -8,8 +8,15 @@ import {
 } from '../js/engine.js';
 import { createPlanningJourney, createPermittingJourney } from '../js/journey/factory.js';
 import { getPlanningSubmissionReadiness } from '../js/modes/planning.js';
-import { getPermittingConstraintState } from '../js/modes/permitting.js';
+import { getPermittingConstraintState, getPaperworkChainStageEffect } from '../js/modes/permitting.js';
 import { executeDeskDay } from '../js/journey.js';
+
+function sumPaperworkLoad(chainId, stages) {
+  return stages.reduce((total, stage) => {
+    const effect = getPaperworkChainStageEffect(chainId, stage);
+    return total + (effect?.changes?.paperworkLoad || 0);
+  }, 0);
+}
 
 test('professional compliance state is initialized with chain tracking', () => {
   const state = createInitialState({
@@ -121,4 +128,26 @@ test('standard desk permit work now carries professional paperwork load forward'
   assert.ok(result.messages.some((message) => message.includes('Submitted a permit package for review.')));
   assert.ok(after.paperworkLoad > before.paperworkLoad);
   assert.ok(after.cpdHours > before.cpdHours);
+});
+
+test('roadPermit and specialUse paperwork chains net negative over a full diligent cycle', () => {
+  const roadPermitNet = sumPaperworkLoad('roadPermit', ['screen', 'map', 'submit', 'maintenance']);
+  const specialUseNet = sumPaperworkLoad('specialUse', ['screen', 'bundle', 'submit', 'conditions']);
+  const archaeologyNet = sumPaperworkLoad('archaeology', ['screen', 'field-review', 'permit-context']);
+
+  // Previously roadPermit/specialUse netted +1 per cycle (a treadmill that
+  // lost ground); a diligent full cycle must now be clearly negative, and at
+  // least as good as the archaeology chain's -1-per-cycle baseline.
+  assert.ok(roadPermitNet < 0, `roadPermit cycle should net negative, got ${roadPermitNet}`);
+  assert.ok(specialUseNet < 0, `specialUse cycle should net negative, got ${specialUseNet}`);
+  assert.ok(roadPermitNet <= archaeologyNet, 'roadPermit cycle should be at least as good as archaeology');
+  assert.ok(specialUseNet <= archaeologyNet, 'specialUse cycle should be at least as good as archaeology');
+  assert.equal(archaeologyNet, -1);
+  assert.equal(roadPermitNet, -3);
+  assert.equal(specialUseNet, -3);
+});
+
+test('registration chain relieves a flat -8 paperwork per admin click', () => {
+  const effect = getPaperworkChainStageEffect('registration', 'renewal');
+  assert.equal(effect.changes.paperworkLoad, -8);
 });

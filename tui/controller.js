@@ -92,6 +92,9 @@ function createSessionRng(rngOrSeed) {
   if (typeof rngOrSeed === "function") return rngOrSeed;
   // Default: look Math.random up *per call* so test/e2e harnesses that override
   // the global still take effect (capturing the reference would freeze it).
+  // NOTE: a Math.random run has no serializable rng state, so season-boundary
+  // autosave is disabled — real entry points must pass a numeric seed
+  // (see tui/useGameFlow.ts).
   if (rngOrSeed === undefined || rngOrSeed === null) return () => Math.random();
   return makeRng(rngOrSeed);
 }

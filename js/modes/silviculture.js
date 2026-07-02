@@ -125,7 +125,7 @@ export async function runSilvicultureDay(game) {
   }
 
   // Apply daily overhead cost
-  journey.resources.budget -= 850;
+  journey.resources.budget -= 550;
 
   // Check for contractor event (higher when morale/productivity is slipping).
   // Held back on day 1 so onboarding is not interrupted by a contractor crisis.
@@ -152,14 +152,25 @@ export async function runSilvicultureDay(game) {
     if (game.gameOver) return;
   }
 
+  // Get seasonal modifiers (season doesn't change mid-day)
+  const seasonMods = journey.season
+    ? getSeasonModifiers(currentSeason, 'silviculture')
+    : {};
+
+  // Zombie-tail tracking: if a whole day opens with no way to advance
+  // planting, brushing, or surveys (not even a survival check to unstick
+  // fill/brush), count it. Combined with a real resource-exhaustion check at
+  // end of day, this ends unwinnable runs instead of grinding to bankruptcy.
+  resolveActionableSilviculturePhase(journey, silvicultureState);
+  const advancingActionValues = new Set(['plant', 'fill', 'herbicide', 'survey', 'inspect']);
+  const dayOpeningOptions = buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultureState, zoneProfile);
+  const hasAdvancingAction = dayOpeningOptions.some((option) => advancingActionValues.has(option.value));
+  silvicultureState.zombieDays = hasAdvancingAction ? 0 : (silvicultureState.zombieDays || 0) + 1;
+
   // Multi-action loop
   while (journey.hoursRemaining > 0) {
+    resolveActionableSilviculturePhase(journey, silvicultureState);
     displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, zoneProfile);
-
-    // Get seasonal modifiers
-    const seasonMods = journey.season
-      ? getSeasonModifiers(currentSeason, 'silviculture')
-      : {};
 
     // Build action options based on season and hours
     const actionOptions = buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultureState, zoneProfile);
@@ -213,6 +224,16 @@ export async function runSilvicultureDay(game) {
   if (journey.resources.budget <= 0) {
     journey.isGameOver = true;
     journey.gameOverReason = 'Budget exhausted';
+  }
+
+  // Zombie tail: several days running with nothing left that can move the
+  // program forward, and the resources to finish are gone too. Call the
+  // season instead of grinding out empty days to bankruptcy.
+  if (!journey.isComplete && !journey.isGameOver &&
+      (silvicultureState.zombieDays || 0) >= 4 &&
+      isSilvicultureUnwinnable(journey)) {
+    journey.isGameOver = true;
+    journey.gameOverReason = 'The program can no longer reach its targets - the season is called.';
   }
 
   // Reset hours for next day
@@ -339,11 +360,30 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
       value: 'plant'
     });
   } else if (plantingEff <= 0 && hoursLeft >= 4) {
-    // Show disabled option so player knows why
+    // Show disabled option so player knows why. Deliberately does NOT start
+    // with "Plant Block" - this option is a no-op (no hours spent), and a
+    // greedy "pick whatever starts with Plant Block" strategy (a real
+    // player skimming the list, or a scripted priority picker) would
+    // otherwise latch onto it forever since it never stops being offered.
     actionOptions.push({
-      label: 'Plant Block (FROZEN)',
+      label: 'Planting frozen (winter lockout)',
       description: 'Ground is frozen. Planting impossible in winter.',
       value: 'plant_disabled'
+    });
+  } else if (!plantingOpen &&
+      plantingEff > 0 &&
+      journey.planting.blocksPlanted < journey.planting.blocksToPlant &&
+      hoursLeft >= 4) {
+    // The phase machine is invisible otherwise: without this, planting can
+    // vanish from the menu for a few actions while the current cohort's
+    // stand-tending work finishes, with no clue why. Name the step that
+    // reopens it, mirroring the "Survey (NEEDS BRUSH)" pattern below. Same
+    // "don't start with Plant Block" rule as the frozen case above - this
+    // is a no-op entry, not the real action.
+    actionOptions.push({
+      label: `Planting locked (needs ${formatSilviculturePhase(sequencePhase)})`,
+      description: `This cohort's ${formatSilviculturePhase(sequencePhase).toLowerCase()} step needs to close out first, then planting reopens.`,
+      value: 'plant_blocked'
     });
   }
 
@@ -406,7 +446,7 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
     }
   }
 
-  if (journey.contractors.length > 0 && hoursLeft >= 1) {
+  if (roster.rotatableCount > 0 && hoursLeft >= 1) {
     actionOptions.push({
       label: 'Contractor Rotation (1h)',
       description: `Deploy rested contractors or stand down tired ones (${roster.rotationSummary})`,
@@ -462,6 +502,10 @@ async function processAction(game, actionId, currentSeason, seasonMods, silvicul
 
     case 'plant_disabled':
       ui.writeWarning('Ground is frozen. Planting is impossible in winter.');
+      break;
+
+    case 'plant_blocked':
+      ui.writeWarning(`Close out this cohort's ${formatSilviculturePhase(silvicultureState.phase).toLowerCase()} step before planting the next block.`);
       break;
 
     case 'herbicide':
@@ -544,7 +588,7 @@ async function handlePlanting(game, seasonMods, stage = 'plant', silvicultureSta
     }, 0) / activeContractors.length
     : 50;
 
-  const baseSeedlings = stage === 'fill' ? 7000 : 12500;
+  const baseSeedlings = stage === 'fill' ? 7000 : 9500;
   const crowdingFactor = vegetationPressure > 0.15
     ? 1 - Math.min(0.18, vegetationPressure * 0.35)
     : 1;
@@ -571,8 +615,13 @@ async function handlePlanting(game, seasonMods, stage = 'plant', silvicultureSta
     journey.planting.seedlingsPlanted + seedlingsToPlant
   );
   journey.resources.seedlings -= seedlingsToPlant;
-  journey.resources.contractorCapacity -= 4;
-  journey.resources.budget -= 2800;
+  journey.resources.contractorCapacity -= stage === 'fill' ? 3 : 4;
+  // Fill planting moves roughly half the seedlings of a full plant block
+  // (baseSeedlings above), so it shouldn't cost the same $2,100 - that made
+  // the near-mandatory post-survival-check top-up as expensive as planting
+  // a fresh block and was the single biggest budget drain across a
+  // full-length campaign.
+  journey.resources.budget -= stage === 'fill' ? 950 : 1700;
 
   ui.write(stage === 'fill'
     ? `Filled ${seedlingsToPlant.toLocaleString()} seedlings into mortality gaps.`
@@ -652,7 +701,7 @@ async function handleHerbicide(game, seasonMods, silvicultureState = null, zoneP
     journey.brushing.hectaresComplete + hectaresTreated
   );
   journey.resources.contractorCapacity -= 2;
-  journey.resources.budget -= 1800;
+  journey.resources.budget -= 1400;
 
   ui.write(`Treated ${hectaresTreated} hectares of competing vegetation.`);
   if (pressure.brushPressure > 0.05) {
@@ -692,7 +741,7 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
   }
 
   journey.surveys.regenerationSurveys++;
-  journey.resources.budget -= 900;
+  journey.resources.budget -= 700;
 
   const hasSurveyor = journey.crew
     ? (crewHasRole(journey.crew, 'surveyor') || crewHasRole(journey.crew, 'spotter'))
@@ -751,9 +800,19 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
   }
 
   applySilvicultureContractorUsage(journey, activeContractors, pressure, 'survey');
-  activeState.phase = journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget
+  // This is the crux of the plant/survival/fill/brush/survey rhythm: as long
+  // as there is more of the block program left to plant, a survey attempt
+  // (success or fail) always hands the cycle back to 'plant' for the next
+  // cohort. Only once every block is planted does the phase keep looping
+  // brush/survey to mop up the free-growing checkpoints on their own -
+  // otherwise the campaign-wide survey target (5 checkpoints across 15
+  // blocks) would only ever send the phase back to 'plant' once, near the
+  // very end of the whole program.
+  const surveyDoneNow = journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget;
+  const plantingRemainingAfterSurvey = journey.planting.blocksPlanted < journey.planting.blocksToPlant;
+  activeState.phase = plantingRemainingAfterSurvey
     ? 'plant'
-    : (brushRatio < Math.max(0.35, plantRatio - 0.05) ? 'brush' : 'survey');
+    : (surveyDoneNow ? 'survey' : (brushRatio < Math.max(0.35, plantRatio - 0.05) ? 'brush' : 'survey'));
   activeState.lastAction = 'survey';
 
   return true;
@@ -943,10 +1002,12 @@ function ensureSilvicultureState(journey) {
       lastAction: null,
       lastSurvivalRate: null,
       zonePressure: null,
+      zombieDays: 0,
     };
   } else {
     journey.silvicultureState.phase ||= getInitialSilviculturePhase(journey);
     journey.silvicultureState.cycle ||= 1;
+    journey.silvicultureState.zombieDays ||= 0;
   }
 
   if (!journey.silvicultureState.zonePressure) {
@@ -974,6 +1035,82 @@ function getInitialSilviculturePhase(journey) {
     return 'survey';
   }
   return 'survey';
+}
+
+/**
+ * The phase token gives each planting cohort a legible rhythm (plant ->
+ * survival check -> fill (if needed) -> brush -> survey -> back to plant),
+ * but brushing (500ha) and free-growing surveys (5 checkpoints) are
+ * campaign-wide targets that can be satisfied well before all 15 planting
+ * blocks are in the ground - and each handler only knows how to advance the
+ * token forward by one step. Left alone, the token can end up pointing at a
+ * phase whose action has nothing left to do (its own target already met),
+ * which used to wedge the whole menu shut for the rest of the campaign. Walk
+ * the token forward here to the next phase that is actually actionable,
+ * always preferring to reopen 'plant' whenever there is still program left
+ * to plant.
+ */
+function resolveActionableSilviculturePhase(journey, silvicultureState) {
+  const plantingRemaining = (journey.planting.blocksPlanted || 0) < journey.planting.blocksToPlant;
+  const brushDone = journey.brushing.hectaresComplete >= journey.brushing.hectaresTarget;
+  const surveyDone = journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget;
+  const fillNeeded = (journey.planting.blocksPlanted || 0) > 0 &&
+    journey.planting.seedlingsPlanted < journey.planting.seedlingsAllocated &&
+    (journey.planting.survivalRate || 0) < 88;
+  const endgameFallback = () => (fillNeeded ? 'fill' : (!brushDone ? 'brush' : 'survey'));
+
+  let phase = silvicultureState.phase;
+  for (let guard = 0; guard < 6; guard++) {
+    if (phase === 'plant') {
+      if (plantingRemaining) break;
+      phase = endgameFallback();
+    } else if (phase === 'survival') {
+      if ((journey.planting.blocksPlanted || 0) > 0) break;
+      phase = plantingRemaining ? 'plant' : endgameFallback();
+    } else if (phase === 'fill') {
+      if (fillNeeded) break;
+      phase = 'brush';
+    } else if (phase === 'brush') {
+      if (!brushDone) break;
+      phase = plantingRemaining ? 'plant' : 'survey';
+    } else if (phase === 'survey') {
+      if (!surveyDone) break;
+      if (plantingRemaining) {
+        phase = 'plant';
+        continue;
+      }
+      break; // nothing left anywhere; hold here, the campaign should be closing out.
+    } else {
+      phase = 'plant';
+    }
+  }
+
+  silvicultureState.phase = phase;
+  return phase;
+}
+
+/**
+ * A "target-advancing" action is one that can move blocksPlanted,
+ * hectaresComplete, or freeGrowingComplete toward their targets (directly,
+ * or via a survival check that unlocks fill/brush next). If none of these
+ * are ever offered for several days running *and* the remaining resources
+ * make finishing mathematically impossible, grinding on to bankruptcy is a
+ * waste of the player's time - the run should call it and explain why.
+ */
+function isSilvicultureUnwinnable(journey) {
+  const remainingBlocks = journey.planting.blocksToPlant - (journey.planting.blocksPlanted || 0);
+  const remainingBrush = journey.brushing.hectaresTarget - journey.brushing.hectaresComplete;
+  const remainingSurveys = journey.surveys.freeGrowingTarget - journey.surveys.freeGrowingComplete;
+  const stillHasWorkToDo = remainingBlocks > 0 || remainingBrush > 0 || remainingSurveys > 0;
+  if (!stillHasWorkToDo) return false;
+
+  const capacityExhausted = journey.resources.contractorCapacity <= 0 && (remainingBlocks > 0 || remainingBrush > 0);
+  const seedlingsExhausted = journey.resources.seedlings <= 0 && journey.planting.seedlingsPlanted < journey.planting.seedlingsAllocated;
+  // $700 is the cheapest action left standing (a survey) once seedlings/capacity
+  // are gone; below that, nothing that advances the program is affordable.
+  const budgetCantAffordNextStep = journey.resources.budget < 700 && stillHasWorkToDo;
+
+  return capacityExhausted || seedlingsExhausted || budgetCantAffordNextStep;
 }
 
 function getSilvicultureZoneProfile(journey, silvicultureState = null) {
@@ -1147,7 +1284,7 @@ function getSilvicultureContractorRoster(journey, zoneProfile) {
     ? `stand down or rest tired crews`
     : `deploy ready contractors`;
 
-  return { lines, summary, rotationSummary };
+  return { lines, summary, rotationSummary, rotatableCount: deployed.length + ready.length };
 }
 
 function getSilvicultureTaskContractors(journey, zoneProfile, task, deployMissing = true) {
@@ -1431,27 +1568,44 @@ async function handleContractorRotation(game, silvicultureState = null, zoneProf
   const { ui, journey } = game;
   const activeState = silvicultureState || ensureSilvicultureState(journey);
   const pressure = zoneProfile || getSilvicultureZoneProfile(journey, activeState);
-  const options = (journey.contractors || []).map((contractor) => {
-    const state = ensureSilvicultureContractorState(contractor, journey, pressure);
-    const fit = Math.round(getSilvicultureContractorFit(contractor, pressure, contractor.specialty === 'brushing' ? 'brush' : 'plant') * 100);
-    const statusLabel = state.status === 'recovering'
-      ? `rest ${state.cooldownDays || 1}d`
-      : contractor.isActive
-        ? 'deployed'
-        : 'ready';
-    return {
-      label: `${contractor.name} (${contractor.specialty})`,
-      description: `${statusLabel} | ${fit}% fit | ${state.traits.slice(0, 2).join(', ') || 'general'}`,
-      value: contractor.id,
-    };
-  });
+  // Recovering contractors cannot be rotated, so they are not offered:
+  // listing them made a no-op selection possible that consumed no time (and
+  // could be repeated endlessly for free scrutiny relief).
+  const options = (journey.contractors || [])
+    .filter((contractor) => {
+      const state = ensureSilvicultureContractorState(contractor, journey, pressure);
+      return state.status !== 'recovering' && !(state.cooldownDays > 0);
+    })
+    .map((contractor) => {
+      const state = ensureSilvicultureContractorState(contractor, journey, pressure);
+      const fit = Math.round(getSilvicultureContractorFit(contractor, pressure, contractor.specialty === 'brushing' ? 'brush' : 'plant') * 100);
+      const statusLabel = contractor.isActive ? 'deployed' : 'ready';
+      return {
+        label: `${contractor.name} (${contractor.specialty})`,
+        description: `${statusLabel} | ${fit}% fit | ${state.traits.slice(0, 2).join(', ') || 'general'}`,
+        value: contractor.id,
+      };
+    });
 
   if (options.length === 0) {
-    ui.write('No contractors to rotate.');
+    ui.write('No contractors are available to rotate right now.');
     return false;
   }
 
+  // Always offer a way out. Without this, opening the submenu was a forced
+  // choice, and browsing it could accidentally cost a deployed contractor
+  // 1-3 days of availability.
+  options.push({
+    label: 'Never mind',
+    description: 'Leave the roster as-is.',
+    value: 'cancel',
+  });
+
   const choice = await ui.promptChoice('Adjust which contractor?', options);
+  if (choice.value === 'cancel') {
+    ui.write('Roster left as-is.');
+    return false;
+  }
   const contractor = journey.contractors.find((c) => c.id === choice.value);
   if (!contractor) {
     return false;
@@ -1460,14 +1614,25 @@ async function handleContractorRotation(game, silvicultureState = null, zoneProf
   const state = ensureSilvicultureContractorState(contractor, journey, pressure);
   if (state.status === 'recovering' || state.cooldownDays > 0) {
     ui.writeWarning(`${contractor.name} is still recovering for ${state.cooldownDays || 1} day${(state.cooldownDays || 1) === 1 ? '' : 's'}.`);
-    if (getScrutinyPressure(journey) > 0 && pressure.accessPressure > 0.08) {
-      adjustScrutiny(journey, -1);
-    }
     return false;
   }
 
   if (contractor.isActive) {
     const restDays = Math.max(1, Math.min(3, 1 + Math.floor((state.fatigue || 0) / 2) + (pressure.accessPressure > 0.08 ? 1 : 0)));
+    // Standing down a deployed contractor costs 1-3 days of their
+    // availability, so require an explicit second confirmation rather than
+    // letting a single click do it.
+    const confirmChoice = await ui.promptChoice(
+      `Stand down ${contractor.name}? They will be unavailable for ${restDays} day${restDays > 1 ? 's' : ''}.`,
+      [
+        { label: `Confirm - stand down ${contractor.name}`, description: `Costs ${restDays} day${restDays > 1 ? 's' : ''} of availability.`, value: 'confirm' },
+        { label: 'Never mind, keep them deployed', description: '', value: 'cancel' },
+      ]
+    );
+    if (confirmChoice.value !== 'confirm') {
+      ui.write(`${contractor.name} stays deployed.`);
+      return false;
+    }
     startSilvicultureContractorRecovery(contractor, restDays, 'rotation');
     ui.write(`${contractor.name} is stood down for ${restDays} day${restDays > 1 ? 's' : ''} of recovery.`);
     if (getScrutinyPressure(journey) > 0 && (pressure.surveyPressure > 0.05 || pressure.brushPressure > 0.05)) {

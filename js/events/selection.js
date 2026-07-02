@@ -304,6 +304,51 @@ function pickRandomCrewMember(crew) {
   return active[Math.floor(Math.random() * active.length)];
 }
 
+// How the shortcut bites depends on what kind of crime it is. Profiles are
+// matched against the act's tags so the 208-act library plays as distinct
+// dilemmas instead of one reskinned template. Ordered: first match wins.
+const TEMPTATION_TAG_PROFILES = [
+  {
+    tags: ['fraud', 'fabrication', 'reporting', 'laundering', 'mapping'],
+    outcome: 'The numbers land clean. The paper trail is now the problem.',
+    take: (gain, isDesk) => (isDesk
+      ? { budget: gain, compliance: -6, scrutiny: 6 }
+      : { budget: Math.min(gain, 1200), compliance: -5, scrutiny: 5 }),
+  },
+  {
+    tags: ['bribery', 'corruption', 'compliance'],
+    outcome: 'Money changes hands and the file moves. Someone now owns a piece of you.',
+    take: (gain, isDesk) => (isDesk
+      ? { budget: gain, politicalCapital: -7, scrutiny: 8 }
+      : { budget: Math.min(gain, 1200), politicalCapital: -4, scrutiny: 6 }),
+    riskInjury: null,
+  },
+  {
+    tags: ['fire', 'risk', 'safety'],
+    outcome: 'It works, this time. The crew saw how close it came.',
+    take: (gain, isDesk) => (isDesk
+      ? { budget: gain, crew_morale: -4, scrutiny: 4 }
+      : { budget: Math.min(gain, 1200), equipment: -6, crew_morale: -5 }),
+    riskInjury: 0.2,
+  },
+  {
+    tags: ['wildlife', 'old-growth', 'habitat', 'water', 'nursery'],
+    outcome: 'The block moves faster. What was living there does not.',
+    take: (gain, isDesk) => (isDesk
+      ? { budget: gain, reputation: -8, compliance: -4 }
+      : { budget: Math.min(gain, 1200), reputation: -6, compliance: -4 }),
+  },
+];
+
+function getTemptationProfileForAct(act) {
+  const tags = Array.isArray(act?.tags) ? act.tags : [];
+  return TEMPTATION_TAG_PROFILES.find((profile) => profile.tags.some((tag) => tags.includes(tag))) || null;
+}
+
+// Minimum days between shortcut offers, so a higher draw rate reads as texture
+// rather than a nag.
+const TEMPTATION_COOLDOWN_DAYS = 4;
+
 function maybeCreateTemptationEvent(journey) {
   if (!Array.isArray(ILLEGAL_ACTS) || ILLEGAL_ACTS.length === 0) {
     return null;
@@ -311,12 +356,19 @@ function maybeCreateTemptationEvent(journey) {
 
   // Manager temptations play at boardroom stakes, not bush stakes.
   const isDesk = isDeskJourney(journey.journeyType) || journey.journeyType === 'manager';
-  const chance = (isDesk ? 0.03 : 0.04) * getDifficultyEventModifier(journey);
+
+  // Cooldown gate: at most one offer per few days, never on day 1.
+  const day = Number(journey.day || 1);
+  const memory = journey.temptationMemory || (journey.temptationMemory = { lastDay: 0, seenActIds: [] });
+  if (day <= 1 || day - memory.lastDay < TEMPTATION_COOLDOWN_DAYS) return null;
+
+  const chance = (isDesk ? 0.1 : 0.12) * getDifficultyEventModifier(journey);
   if (Math.random() > chance) return null;
 
   const roleId = journey.roleId || journey.role?.id;
   const candidates = ILLEGAL_ACTS.filter((act) => {
     if (!act) return false;
+    if (memory.seenActIds.includes(act.id)) return false;
     if (!Array.isArray(act.roles) || act.roles.length === 0) return true;
     return roleId ? act.roles.includes(roleId) : true;
   });
@@ -324,16 +376,28 @@ function maybeCreateTemptationEvent(journey) {
   const pool = candidates.length ? candidates : ILLEGAL_ACTS;
   const act = pool[Math.floor(Math.random() * pool.length)];
   if (!act) return null;
+  memory.lastDay = day;
+  if (act.id) memory.seenActIds.push(act.id);
+
   const baseGain = isDesk ? 3500 : 650;
   const swing = isDesk ? 2500 : 550;
   const gain = Math.max(0, Math.round(baseGain + (Math.random() * 2 - 1) * swing));
 
-  const takeEffects = isDesk
-    ? { budget: gain, politicalCapital: -4 }
-    : { budget: Math.min(gain, 1200), equipment: -8, crew_morale: -3 };
+  const profile = getTemptationProfileForAct(act);
+  const takeEffects = profile
+    ? profile.take(gain, isDesk)
+    : isDesk
+      ? { budget: gain, politicalCapital: -4 }
+      : { budget: Math.min(gain, 1200), equipment: -8, crew_morale: -3 };
+  const takeOutcome = profile?.outcome || 'It pays off today. Tomorrow is a question mark.';
+  const takeRiskInjury = isDesk
+    ? undefined
+    : (profile && 'riskInjury' in profile ? profile.riskInjury ?? undefined : 0.12);
 
   const refuseEffects = isDesk ? { politicalCapital: 2 } : { crew_morale: 2 };
-  const reportEffects = isDesk ? { politicalCapital: 4, timeUsed: 2 } : { crew_morale: 1 };
+  const reportEffects = isDesk
+    ? { politicalCapital: 4, compliance: 2, timeUsed: 2 }
+    : { crew_morale: 1, compliance: 2, timeUsed: 2 };
 
   return {
     id: `legacy_temptation_${String(act.id || Math.random().toString(36).slice(2))}`,
@@ -350,9 +414,9 @@ function maybeCreateTemptationEvent(journey) {
       },
       {
         label: 'Take the shortcut (high risk)',
-        outcome: 'It pays off today. Tomorrow is a question mark.',
+        outcome: takeOutcome,
         effects: takeEffects,
-        riskInjury: isDesk ? undefined : 0.12
+        riskInjury: takeRiskInjury
       },
       {
         label: 'Document and report',

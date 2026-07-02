@@ -75,34 +75,42 @@ export function scoreStyleFit(state) {
   return 0;
 }
 
-// Tier is preserved from the original summary thresholds so scoring extraction
-// does not silently re-balance the game; the numeric score is supplementary.
+// Tier gates are calibrated against the simulated economy (see
+// reports/balance/): sensible "balanced" play lands a weighted average near
+// 53, expert "role-optimal" play near 60, and reckless play near 38. Forest
+// health rarely clears ~56 outside silviculture and budget rarely clears ~47
+// for anyone, so gates demanding 58-65 there made Solid and Outstanding dead
+// content. The intent of each tier:
+//   • solid       — a clearly good year for a decent player (~top third of
+//                    sensible play), which must include real delivery, not
+//                    just a defensive metrics screen.
+//   • outstanding — an expert year (~top sixth of optimal play) via one of
+//                    two role-flavored excellence paths over a shared
+//                    "nothing collapsed and work got delivered" floor.
 export function deriveTier(metrics = {}) {
   const averages = weightedMetricAverage(metrics);
-  const strongOutcomeFloors = metrics.compliance >= 62 && metrics.relationships >= 58 && metrics.forestHealth >= 58;
-  const stableOutcomeFloors = metrics.compliance >= 48 && metrics.relationships >= 45 && metrics.forestHealth >= 45;
-  const stewardshipStrong = metrics.compliance >= 75 && metrics.relationships >= 70 && metrics.forestHealth >= 55;
-  // Outstanding is judged on floors a disciplined run can actually clear. Budget
-  // and forest health sit structurally low (budget never tops ~60 across 6,300
-  // simulated years; forest health rarely clears ~60 outside silviculture), so
-  // requiring every meter ≥ 65 made the tier dead content. Instead, Outstanding
-  // has two role-flavored paths over a shared "nothing collapsed" floor:
-  //   • stewardship — an exceptional compliance + relationships year, and
-  //   • ecology     — an exceptional forest-health year that stayed defensible.
-  const nothingCollapsed = Object.values(metrics).every((value) => Number(value) >= 44);
-  const stewardshipExcellence = metrics.compliance >= 80 && metrics.relationships >= 76;
+  const strongOutcomeFloors =
+    metrics.compliance >= 60 && metrics.relationships >= 52 && metrics.forestHealth >= 48;
+  const stableOutcomeFloors =
+    metrics.compliance >= 45 && metrics.relationships >= 42 && metrics.forestHealth >= 42;
+  const stewardshipStrong =
+    metrics.compliance >= 80 && metrics.relationships >= 68 && metrics.forestHealth >= 50 && metrics.progress >= 30;
+  const nothingCollapsed = Object.values(metrics).every((value) => Number(value) >= 40);
+  const stewardshipExcellence = metrics.compliance >= 85 && metrics.relationships >= 70;
   const ecologicalExcellence =
-    metrics.forestHealth >= 60 && metrics.compliance >= 70 && metrics.relationships >= 66;
+    metrics.forestHealth >= 64 && metrics.compliance >= 72 && metrics.relationships >= 62;
 
   if (
-    averages >= 67
-    && metrics.progress >= 45
+    averages >= 62
+    && metrics.progress >= 42
     && nothingCollapsed
     && (stewardshipExcellence || ecologicalExcellence)
   ) {
     return "outstanding";
   }
-  if ((averages >= 64 && strongOutcomeFloors) || stewardshipStrong) return "solid";
+  if ((averages >= 55 && metrics.progress >= 35 && strongOutcomeFloors) || stewardshipStrong) {
+    return "solid";
+  }
   if (averages >= 45 && stableOutcomeFloors) return "mixed";
   return "stumbled";
 }

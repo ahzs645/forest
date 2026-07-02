@@ -579,10 +579,12 @@ export function createManagerJourney(options = {}) {
     resources: {
       ...baseDesk,
       ...baseField,
-      // Must cover the mandatory day-1 CEO hire ($180-200k), an optional
-      // certification ($80-150k), and the $500/day burn over a 100-day term.
+      // Must cover the mandatory month-1 CEO hire ($180-200k), an optional
+      // certification ($80-150k), and the monthly overhead across the term.
       budget: 500000,
-      politicalCapital: 100,
+      // Below the 100-point ceiling so the meter can actually move both ways;
+      // starting pinned at max made it read as dead UI for a whole term.
+      politicalCapital: 65,
     },
     professional: createProfessionalComplianceState(
       effectiveRoleId,

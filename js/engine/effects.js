@@ -294,9 +294,55 @@ export function applyRoundConsequences(state) {
     }
   }
 
+  applyEcologyDrift(state, round, consequences);
   applyRoundRecoveries(state, round, consequences);
 
   return consequences;
+}
+
+// End-of-season ecology response. Forest health barely moved through card
+// effects alone (a full simulated year shifted it 0–2 points), which left the
+// most prominent meter on the dashboard reading as dead UI and the ecology
+// excellence path effectively unreachable. The land now answers the way the
+// program was run each season: disciplined practice lets stands recover;
+// pushing production on thin safeguards degrades them.
+function applyEcologyDrift(state, round, consequences) {
+  const { metrics } = state;
+
+  // The opening season stays clean (same philosophy as temptation suppression):
+  // the land responds to a track record, not to week one.
+  if (round < 2) return;
+
+  if (metrics.compliance >= 65 && metrics.forestHealth < 72) {
+    applyEffects(
+      state,
+      { forestHealth: 3 },
+      {
+        type: "recovery",
+        id: "stand-recovery",
+        title: "Stands recovering under a disciplined program",
+        option: "Careful practice gave regeneration and retention room to work",
+        round,
+      },
+    );
+    consequences.push("stand-recovery");
+    return;
+  }
+
+  if (metrics.compliance < 45 && metrics.progress >= 50 && metrics.forestHealth > 20) {
+    applyEffects(
+      state,
+      { forestHealth: -3 },
+      {
+        type: "consequence",
+        id: "ecological-strain",
+        title: "Ecological strain from an aggressive program",
+        option: "Production outran its safeguards and the stands show it",
+        round,
+      },
+    );
+    consequences.push("ecological-strain");
+  }
 }
 
 // Positive end-of-season swings, kept separate from the punishment ladder so

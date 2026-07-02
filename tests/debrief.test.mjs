@@ -9,9 +9,64 @@ import {
   buildManagerEpilogue,
   updateServiceRecord,
   pickKeyMoments,
+  runFinalDebrief,
 } from '../js/game/debrief.js';
 import { buildEventReaction } from '../js/events/reactions.js';
 import { calculateScore } from '../js/scoring.js';
+
+// A minimal recording stand-in for TerminalUI, covering every method
+// runFinalDebrief() calls. promptChoice auto-resolves with the first option
+// (or a chosen index) so the whole staged sequence runs without a real DOM.
+function makeStubUi({ pickIndex = () => 0 } = {}) {
+  const calls = [];
+  return {
+    calls,
+    clear() { calls.push({ fn: 'clear' }); },
+    writeHeader(text) { calls.push({ fn: 'writeHeader', text }); },
+    write(text) { calls.push({ fn: 'write', text }); },
+    writeBox(text) { calls.push({ fn: 'writeBox', text }); },
+    writeDivider(text) { calls.push({ fn: 'writeDivider', text }); },
+    writePositive(text) { calls.push({ fn: 'writePositive', text }); },
+    writeWarning(text) { calls.push({ fn: 'writeWarning', text }); },
+    async promptChoice(prompt, options) {
+      calls.push({ fn: 'promptChoice', prompt, options: options.map((o) => o.value) });
+      return options[pickIndex(options)] || options[0];
+    },
+  };
+}
+
+function textOf(ui) {
+  return ui.calls
+    .filter((c) => ['writeHeader', 'write', 'writeDivider', 'writePositive', 'writeWarning'].includes(c.fn))
+    .map((c) => c.text)
+    .join('\n');
+}
+
+function makePlanningJourney(overrides = {}) {
+  return {
+    journeyType: 'planning',
+    area: { name: 'Fixture Timber Supply Area' },
+    companyName: 'Fixture Crew',
+    day: 21,
+    deadline: 28,
+    crew: [],
+    protagonist: { stress: 30, energy: 60, reputation: 55 },
+    plan: {
+      phase: 'ministerial_approval',
+      dataCompleteness: 100,
+      analysisQuality: 100,
+      stakeholderBuyIn: 100,
+      ministerialConfidence: 92,
+    },
+    values: { biodiversity: 70, timberSupply: 70, communityNeeds: 70, firstNationsValues: 70 },
+    resources: { budget: 12000, politicalCapital: 40, dataCredits: 20 },
+    log: [
+      { type: 'event', day: 4, eventTitle: 'Fixture Event', optionLabel: 'Handled it', severity: 'moderate' },
+    ],
+    season: null,
+    ...overrides,
+  };
+}
 
 function makeMember(overrides = {}) {
   return {
@@ -186,4 +241,56 @@ test('manager journeys now produce a real score', () => {
   assert.ok(result.totalScore > 40, `expected a real score, got ${result.totalScore}`);
   assert.notEqual(result.grade, 'F');
   assert.ok(result.components.objectives.label.includes('Reputation'));
+});
+
+// Regression: a Strategic Planner win used to be able to stop showing the
+// ending after the "sign-off" stage. This exercises the whole staged
+// sequence end-to-end (report -> road home/statistics -> epilogues ->
+// performance review -> service record) the way the real game drives it,
+// so a future change that short-circuits any stage fails loudly here
+// instead of only showing up as "returns to title screen" in the browser.
+test('planning victory: runFinalDebrief renders every stage through to the service record', async () => {
+  const journey = makePlanningJourney();
+  const ui = makeStubUi();
+
+  await runFinalDebrief(ui, journey, true);
+
+  const text = textOf(ui);
+  assert.match(text, /THE WORK IS DONE/, 'stage 1: professional sign-off scene');
+  assert.match(text, /EXPEDITION SUCCESSFUL/, 'stage 2: victory screen');
+  assert.match(text, /FINAL STATISTICS/, 'stage 2: final statistics');
+  assert.match(text, /WHERE ARE THEY NOW/, 'stage 3: epilogues');
+  assert.match(text, /PERFORMANCE REVIEW/, 'stage 4: performance review');
+  assert.match(text, /SERVICE RECORD/, 'stage 5: service record');
+
+  assert.ok(journey.finalReport, 'stage 1 recorded a final-report choice');
+  // The stage-5 "New personal best" line only appears once the record is
+  // actually folded and saved -- a stronger signal than merely seeing the
+  // "SERVICE RECORD" header, which would still print even if the save step
+  // were skipped.
+  assert.match(text, /Career expeditions: 1/, 'stage 5 wrote a persisted career line');
+});
+
+test('planning defeat: runFinalDebrief also renders every stage (parity with victory)', async () => {
+  const journey = makePlanningJourney({
+    plan: {
+      phase: 'stakeholder_review',
+      dataCompleteness: 60,
+      analysisQuality: 55,
+      stakeholderBuyIn: 40,
+      ministerialConfidence: 20,
+    },
+    resources: { budget: 0, politicalCapital: 5, dataCredits: 0 },
+    endReason: 'Budget exhausted',
+  });
+  const ui = makeStubUi();
+
+  await runFinalDebrief(ui, journey, false);
+
+  const text = textOf(ui);
+  assert.match(text, /THE WORK STOPS HERE/, 'stage 1: defeat sign-off framing');
+  assert.match(text, /EXPEDITION FAILED/, 'stage 2: defeat screen');
+  assert.match(text, /FINAL STATISTICS/, 'stage 2: final statistics');
+  assert.match(text, /PERFORMANCE REVIEW/, 'stage 4: performance review');
+  assert.match(text, /SERVICE RECORD/, 'stage 5: service record');
 });

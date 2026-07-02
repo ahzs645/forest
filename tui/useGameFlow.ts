@@ -9,7 +9,13 @@ export function useGameFlow(options: UseGameFlowOptions = {}) {
   const controllerRef = useRef<TuiGameController | null>(null);
 
   if (!controllerRef.current) {
-    controllerRef.current = new TuiGameController(options);
+    // A numeric seed (rather than the controller's bare-Math.random default)
+    // makes the run serializable: rng.state() exists, so the season-boundary
+    // autosave in persistSeasonalSave() can actually write. Drawing the seed
+    // from Math.random keeps e2e harnesses that override the global in
+    // control of the run.
+    const seed = Math.floor(Math.random() * 0x100000000);
+    controllerRef.current = new TuiGameController({ ...options, seed });
   }
 
   const controller = controllerRef.current;

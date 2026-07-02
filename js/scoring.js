@@ -58,18 +58,20 @@ export function calculateScore(journey, victory) {
 
   // Weighted total: Speed 25%, Crew 25%, Resources 20%, Objectives 20%, Events 10%
   const weights = { speed: 0.25, crewWelfare: 0.25, resourceEfficiency: 0.20, objectives: 0.20, events: 0.10 };
-  let totalScore = 0;
+  let weighted = 0;
   for (const [key, weight] of Object.entries(weights)) {
-    totalScore += (components[key]?.score || 0) * weight;
+    weighted += (components[key]?.score || 0) * weight;
   }
 
-  // Victory bonus
-  if (victory) totalScore = Math.min(100, totalScore + 10);
-
-  totalScore = Math.round(totalScore);
+  // Victory bonus is reported separately so the displayed breakdown always
+  // reconciles with the total (a silent +10 made "A (100/100)" contradict
+  // components that summed to ~94).
+  const baseScore = Math.round(weighted);
+  const victoryBonus = victory ? Math.min(10, 100 - baseScore) : 0;
+  const totalScore = baseScore + victoryBonus;
   const grade = getLetterGrade(totalScore);
 
-  return { totalScore, grade, components, victory };
+  return { totalScore, grade, components, victory, baseScore, victoryBonus };
 }
 
 export function getLetterGrade(score) {
@@ -118,10 +120,10 @@ function scorePermittingSpeed(journey) {
 
 // Manager "speed" is staying power: surviving deeper into the term scores higher.
 function scoreManagerTerm(journey) {
-  const daysUsed = journey.day - 1;
-  const deadline = journey.deadline || 100;
-  const score = Math.min(100, Math.round((daysUsed / deadline) * 100));
-  return { score, label: `${daysUsed}/${deadline} days served` };
+  const monthsServed = journey.day - 1;
+  const deadline = journey.deadline || 12;
+  const score = Math.min(100, Math.round((monthsServed / deadline) * 100));
+  return { score, label: `${monthsServed}/${deadline} months served` };
 }
 
 // --- Crew Welfare Scoring ---
@@ -324,6 +326,10 @@ export function formatScoreDisplay(scoreResult) {
     const weight = weights[key] || 0;
     const bar = makeBar(component.score, 10);
     lines.push(`  ${name.padEnd(14)} [${bar}] ${component.score}/100 (${weight}%) - ${component.label}`);
+  }
+
+  if (scoreResult.victoryBonus > 0) {
+    lines.push(`  ${'Completed'.padEnd(14)} +${scoreResult.victoryBonus} bonus for finishing the expedition`);
   }
 
   return lines;

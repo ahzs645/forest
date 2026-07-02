@@ -319,7 +319,9 @@
       {
         "label": "Wait him out",
         "outcome": "After 20 minutes of staring, he finally ambles off.",
-        "effects": {}
+        "effects": {
+          "timeUsed": 1
+        }
       },
       {
         "label": "Honk and inch forward",
@@ -536,7 +538,9 @@
       {
         "label": "Test it on foot first",
         "outcome": "You walk across. It holds. Trucks go one at a time, very slowly.",
-        "effects": {}
+        "effects": {
+          "timeUsed": 1
+        }
       },
       {
         "label": "Reinforce with fresh logs",
@@ -723,7 +727,8 @@
         "label": "Take a break and enjoy it",
         "outcome": "Moments like this remind everyone why they love this work.",
         "effects": {
-          "crew_morale": 15
+          "crew_morale": 15,
+          "timeUsed": 1
         }
       },
       {
@@ -1242,9 +1247,9 @@
     "options": [
       {
         "label": "Give them the full tour confidently",
-        "outcome": "You walk them through every operation. They note a few minor issues but overall seem satisfied.",
+        "outcome": "You walk them through every operation, and it takes most of the day. They note a few minor issues but leave satisfied.",
         "effects": {
-          "progress": -3,
+          "progress": -6,
           "compliance": 5,
           "relationships": 3
         }
@@ -1253,16 +1258,17 @@
         "label": "Be cooperative but let them lead",
         "outcome": "You answer questions honestly. They find what they find.",
         "effects": {
-          "progress": -4
+          "progress": -2,
+          "compliance": 2
         },
         "hiddenOutcome": true
       },
       {
         "label": "Distract them with coffee and stories",
-        "outcome": "You're charming, but inspectors have seen this before. They dig deeper.",
+        "outcome": "You keep the crews working while you pour coffee and spin stories. Inspectors have seen this before — they dig deeper.",
         "effects": {
-          "compliance": -5,
-          "progress": -5
+          "progress": -1,
+          "compliance": -5
         },
         "hiddenOutcome": true
       }
@@ -1300,7 +1306,8 @@
         "label": "Report to wildlife office",
         "outcome": "They log it and tell you to be cautious. Standard advice.",
         "effects": {
-          "compliance": 3
+          "compliance": 3,
+          "timeUsed": 1
         },
         "schedulesEvent": "wolf_pack_sighting",
         "scheduledDelay": 2
@@ -1954,17 +1961,18 @@
     "options": [
       {
         "label": "Post a watch for the rest of the night",
-        "outcome": "Nothing else happens, but the watchers are wrecked the next day.",
+        "outcome": "Nothing else happens. The watchers are wrecked the next day, but everyone else sleeps easier.",
         "effects": {
           "crew_health": -5,
-          "crew_morale": -3
+          "crew_morale": 2
         }
       },
       {
         "label": "Check tracks in the morning",
         "outcome": "Wolverine tracks. Impressive animal, not dangerous to the camp. Tensions ease.",
         "effects": {
-          "crew_morale": 3
+          "crew_morale": 3,
+          "timeUsed": 1
         }
       },
       {
@@ -2333,10 +2341,10 @@
       },
       {
         "label": "Try to find the original owner",
-        "outcome": "You radio around. Turns out it's from a crew that disbanded last season. They tell you to keep it.",
+        "outcome": "You track down a grateful survey crew from the next valley. The tools go home; the goodwill stays.",
         "effects": {
-          "equipment": 8,
-          "relationships": 3
+          "relationships": 4,
+          "timeUsed": 1
         }
       },
       {
@@ -2429,7 +2437,8 @@
         "effects": {
           "reputation": -15,
           "budget": -2000,
-          "compliance": -8
+          "compliance": -8,
+          "progress": 8
         }
       }
     ]

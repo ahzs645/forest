@@ -19,14 +19,16 @@
         "label": "Hire cryptozoologist to study them",
         "outcome": "Cryptozoologist discovers Sasquatch are excellent forest managers.",
         "effects": {
-          "budget": -3750
+          "budget": -3750,
+          "data": 3
         }
       },
       {
         "label": "Sell documentary rights and relocate block",
-        "outcome": "Netflix deal signed! Block relocated.",
+        "outcome": "Netflix deal signed! Block relocated. The crew is sick of film people within a week.",
         "effects": {
-          "budget": 5000
+          "budget": 5000,
+          "crew_morale": -3
         }
       },
       {
@@ -51,15 +53,14 @@
         "outcome": "Merchandise sales generate $30,000",
         "effects": {
           "budget": 1500,
-          "crew_morale": 6
+          "crew_morale": 6,
+          "timeUsed": 2
         }
       },
       {
         "label": "Stay focused",
-        "outcome": "You keep the crew on task and avoid distractions.",
-        "effects": {
-          "crew_morale": -1
-        }
+        "outcome": "The trend passes without you. The crew is mildly disappointed but the blocks get walked.",
+        "effects": {}
       }
     ]
   },
@@ -73,18 +74,18 @@
     "options": [
       {
         "label": "Lean into it",
-        "outcome": "You adapt and roll with it.",
+        "outcome": "The commercials are genuinely funny and the money is real — and now everyone is looking at your operation.",
         "effects": {
           "budget": 6000,
-          "crew_morale": 10
+          "crew_morale": 10,
+          "scrutiny": 5,
+          "timeUsed": 2
         }
       },
       {
         "label": "Stay focused",
-        "outcome": "You keep the crew on task and avoid distractions.",
-        "effects": {
-          "crew_morale": -1
-        }
+        "outcome": "You politely decline. The moment passes and the work continues.",
+        "effects": {}
       }
     ]
   },
@@ -99,19 +100,24 @@
       {
         "label": "Trade alien technology for Earth wood samples",
         "outcome": "Aliens give you a matter replicator.",
-        "effects": {}
+        "effects": {
+          "equipment": 8
+        }
       },
       {
         "label": "Offer aliens jobs in forest management",
-        "outcome": "Aliens join workforce as 'Interdimensional Forest Consultants'.",
+        "outcome": "Aliens join the workforce as 'Interdimensional Forest Consultants'. They invoice promptly.",
         "effects": {
-          "crew_morale": 8
+          "crew_morale": 8,
+          "budget": -1500
         }
       },
       {
         "label": "Ask aliens for advice on sustainable practices",
         "outcome": "Aliens share advanced ecological knowledge.",
-        "effects": {}
+        "effects": {
+          "data": 5
+        }
       }
     ]
   },

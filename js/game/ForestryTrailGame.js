@@ -353,8 +353,27 @@ export class ForestryTrailGame {
       }
     }
 
+    try {
+      await runFinalDebrief(this.ui, this.journey, this.victory);
+    } catch (error) {
+      // The debrief must never fail silently. A crash here used to leave the
+      // player mid-sequence with no explanation and no way forward; surface
+      // it explicitly (same idiom as the day-loop crash handler above) and
+      // still hand back control instead of stranding the run.
+      console.error('Final debrief error:', error);
+      this.ui.write('');
+      this.ui.writeDanger(`Something broke while closing out the expedition: ${error.message}`);
+      this.ui.write(`Mode: ${this.journey?.journeyType || 'unknown'} | Victory: ${this.victory}`, 'term-dim');
+      const isDevBuild = typeof import.meta !== 'undefined' && import.meta.env?.DEV;
+      if (isDevBuild && error.stack) {
+        this.ui.write(error.stack, 'term-dim');
+      }
+    }
+
+    // Clear the autosave only once the debrief has fully played out. Clearing
+    // it up front meant a page reload mid-debrief lost the finished run — no
+    // resume, no service record — and looked like the game "forgot" the win.
     clearActiveRun();
-    await runFinalDebrief(this.ui, this.journey, this.victory);
 
     await this.ui.promptChoice('', [{ label: 'New Expedition', value: 'restart' }]);
     this.start();

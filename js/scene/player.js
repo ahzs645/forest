@@ -29,6 +29,21 @@ function mountCanvas(terminal) {
 }
 
 /**
+ * Mount the "tap to skip" caption under a live scene. Without it, players sit
+ * through every animation because nothing says the input lockout is optional.
+ * @param {HTMLElement} terminal
+ * @returns {HTMLElement}
+ */
+function mountSkipHint(terminal) {
+  const hint = document.createElement('div');
+  hint.className = 'scene-skip-hint scene-keep';
+  hint.textContent = '▸ tap or press any key to skip';
+  terminal.appendChild(hint);
+  terminal.scrollTop = terminal.scrollHeight;
+  return hint;
+}
+
+/**
  * Play a frame deck and resolve when done (or skipped by tap/keypress).
  * @param {HTMLElement} terminal - The terminal container
  * @param {string[]} frames - Frame deck
@@ -58,11 +73,28 @@ export function playFrames(terminal, frames, opts = {}) {
     let loop = 0;
     let timer = null;
     let done = false;
+    const skipHint = skippable ? mountSkipHint(terminal) : null;
+
+    // Only a tap/click that actually lands on this animating scene (or its
+    // "tap to skip" caption) counts as a skip gesture. Vignettes play
+    // non-blocking, beside a decision (see playEventVignette), so real UI —
+    // a choice button, a Continue prompt — can be live and interactive at
+    // the very same time an animation is still running. Scoping the skip
+    // trigger to the scene's own elements, instead of the whole document,
+    // means a click anywhere else is never mistaken for a skip and so never
+    // arms the swallow-the-next-click guard below against it.
+    const isWithinScene = (e) => {
+      const target = e.target;
+      if (!target) return false;
+      return (canvas.isConnected && canvas.contains(target))
+        || (skipHint && skipHint.isConnected && skipHint.contains(target));
+    };
 
     const finish = (e) => {
       if (done) return;
       done = true;
       clearInterval(timer);
+      if (skipHint) skipHint.remove();
       if (skippable) {
         document.removeEventListener('pointerdown', skipPointer, true);
         document.removeEventListener('keydown', skipKey, true);
@@ -75,6 +107,8 @@ export function playFrames(terminal, frames, opts = {}) {
         if (e.type === 'pointerdown') {
           // WebKit synthesizes the tap's click after touchend and hit-tests it
           // against the new DOM — eat it so it can't press a fresh button.
+          // `once` limits this to the single click produced by THIS tap; a
+          // later, separate click is never touched by it.
           const swallow = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
           document.addEventListener('click', swallow, { capture: true, once: true });
           setTimeout(() => document.removeEventListener('click', swallow, true), 500);
@@ -85,8 +119,18 @@ export function playFrames(terminal, frames, opts = {}) {
       if (!holdLastFrame) canvas.remove();
       resolve();
     };
-    const skipPointer = (e) => finish(e);
-    const skipKey = (e) => finish(e);
+    const skipPointer = (e) => {
+      if (!isWithinScene(e)) return;
+      finish(e);
+    };
+    const skipKey = (e) => {
+      // Digits double as the keyboard accelerator for choice buttons (see
+      // js/ui.js promptChoice shortcuts). A choice screen can be showing —
+      // and the player pressing 1-9/0 to answer it — while a vignette is
+      // still animating behind it; never let the animation eat that key.
+      if (/^[0-9]$/.test(e.key)) return;
+      finish(e);
+    };
 
     if (skippable) {
       document.addEventListener('pointerdown', skipPointer, true);

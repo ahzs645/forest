@@ -27,18 +27,31 @@ export const PanelsMixin = {
 
     // Check for protagonist mode vs crew mode
     if (data.protagonist) {
-      // Protagonist mode - show energy
+      // Protagonist (desk) mode: these tiles show the protagonist's own energy
+      // and stress — label them as such. (They used to keep the CREW/MORALE
+      // labels, so "MORALE HIGH" actually meant *stress* was high.)
+      if (this.crewLabel) {
+        this.crewLabel.textContent = 'ENERGY';
+      }
       if (this.crewValue) {
         this.crewValue.textContent = `${data.protagonist.energy || 0}%`;
       }
+      if (this.moraleLabel) {
+        this.moraleLabel.textContent = 'STRESS';
+      }
       if (this.moraleValue) {
-        const stressLevel = data.protagonist.stress > 70 ? 'HIGH' : data.protagonist.stress > 40 ? 'MED' : 'LOW';
-        this.moraleValue.textContent = stressLevel;
+        this.moraleValue.textContent = `${data.protagonist.stress || 0}%`;
       }
     } else {
       // Crew mode - traditional display
+      if (this.crewLabel) {
+        this.crewLabel.textContent = 'CREW';
+      }
       if (this.crewValue) {
         this.crewValue.textContent = `${data.crewActive || 0}/${data.crewTotal || 5}`;
+      }
+      if (this.moraleLabel) {
+        this.moraleLabel.textContent = 'MORALE';
       }
       if (this.moraleValue) {
         this.moraleValue.textContent = `${data.morale || 0}%`;
@@ -71,12 +84,15 @@ export const PanelsMixin = {
 
       div.className = `crew-member ${statusClass}`.trim();
 
+      // Members who are gone (quit, left, dead) get no HP bar: a departed
+      // member with a healthy-looking bar reads as still on the roster.
+      const showHp = info.isActive;
       div.innerHTML = `
         <div class="crew-name">${info.name}</div>
         <div class="crew-role">${info.role}</div>
-        <div class="crew-stats">
+        ${showHp ? `<div class="crew-stats">
           <span>HP: ${progressBar(info.health, 8, true)}</span>
-        </div>
+        </div>` : ''}
         ${info.status !== 'Good' ? `<div class="crew-status">[${info.status}]</div>` : ''}
       `;
 
@@ -286,12 +302,21 @@ export const PanelsMixin = {
    */
   renderDeskStatusBox(journey) {
     const hasPermits = Boolean(journey.permits?.target);
-    const daysRemaining = Number.isFinite(journey.deadline) ? journey.deadline - journey.day : null;
+    // The manager term is denominated in months; every other desk journey in
+    // days. Displayed day clamps to the deadline so the debrief never shows
+    // "Day 13 of 12 | -1 remaining" after the final period ticks over.
+    const unit = journey.journeyType === 'manager' ? 'Month' : 'Day';
+    const shownDay = Number.isFinite(journey.deadline)
+      ? Math.min(journey.day, journey.deadline)
+      : journey.day;
+    const daysRemaining = Number.isFinite(journey.deadline)
+      ? Math.max(0, journey.deadline - journey.day)
+      : null;
     const progress = getOperationalProgress(journey);
     const lines = [
       Number.isFinite(journey.deadline)
-        ? `Day ${journey.day} of ${journey.deadline} | ${daysRemaining} days remaining`
-        : `Day ${journey.day} | ${journey.plan?.phase || journey.currentPhase || 'operations'}`,
+        ? `${unit} ${shownDay} of ${journey.deadline} | ${daysRemaining} ${unit.toLowerCase()}s remaining`
+        : `${unit} ${shownDay} | ${journey.plan?.phase || journey.currentPhase || 'operations'}`,
       ''
     ];
 

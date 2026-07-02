@@ -48,6 +48,14 @@ const CONSEQUENCE_INFO = {
     title: "Field-discipline rebound",
     cause: "The crew was still delivering, so pausing to clean up documentation clawed back some compliance.",
   },
+  "stand-recovery": {
+    title: "Stands recovering",
+    cause: "Compliance stayed strong, so retention, riparian buffers, and regeneration had room to work.",
+  },
+  "ecological-strain": {
+    title: "Ecological strain",
+    cause: "Production stayed high while compliance sat low, and the stands are starting to show it.",
+  },
 };
 
 function formatEffectText(effects = {}) {

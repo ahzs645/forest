@@ -115,7 +115,8 @@ test('checkForEvent serves manager journeys from both desk and field pools', () 
 test('manager events resolve through resolveEvent with desk-style money effects at corporate scale', () => {
   const journey = createManagerJourney();
   assert.equal(journey.resources.budget, 500000);
-  assert.equal(journey.resources.politicalCapital, 100);
+  // Starts below the 100 ceiling so the meter can move in both directions.
+  assert.equal(journey.resources.politicalCapital, 65);
 
   const event = { id: 'gm_test_event', title: 'Board Test', severity: 'moderate', options: [] };
   const option = {
@@ -134,7 +135,7 @@ test('manager events resolve through resolveEvent with desk-style money effects 
 
   // Budget must NOT clamp to the 100k desk ceiling (manager treasury is 500k)
   assert.equal(journey.resources.budget, 495000);
-  assert.equal(journey.resources.politicalCapital, 94);
+  assert.equal(journey.resources.politicalCapital, 59);
   assert.equal(journey.metrics.compliance, 54);
   assert.equal(journey.metrics.relationships, 47);
   assert.equal(journey.metrics.progress, 55);

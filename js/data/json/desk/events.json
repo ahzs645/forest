@@ -571,37 +571,37 @@
     "options": [
       {
         "label": "Conduct comprehensive consultations with all Nations",
-        "outcome": "You proceeded with the comprehensive approach. Cost: $10000.",
+        "outcome": "Full consultations take time and money, but every Nation is heard and the plan is stronger for it.",
         "effects": {
-          "relationships": 20,
-          "reputation": 20,
+          "relationships": 22,
+          "reputation": 15,
           "budget": -10000
         }
       },
       {
         "label": "Schedule individual meetings with each Nation",
-        "outcome": "You proceeded with the individual approach. Cost: $5000.",
+        "outcome": "One-on-one meetings build real understanding, though a shared table might have surfaced more.",
         "effects": {
-          "relationships": 10,
-          "reputation": 10,
+          "relationships": 12,
+          "reputation": 8,
           "budget": -5000
         }
       },
       {
         "label": "Send formal notification letters only (minimal compliance)",
-        "outcome": "You proceeded with the minimal approach. Cost: $2000.",
+        "outcome": "Letters go out and the legal box is ticked. Several Nations note that a letter is not consultation.",
         "effects": {
-          "relationships": 20,
-          "reputation": 20,
+          "relationships": -3,
+          "reputation": -3,
           "budget": -2000
         }
       },
       {
         "label": "Delay consultations (risk deteriorating relationships)",
-        "outcome": "You proceeded with the delay approach. Cost: $0.",
+        "outcome": "The file goes quiet. Word gets around that consultation is being put off, and trust erodes.",
         "effects": {
-          "relationships": 30,
-          "reputation": 30,
+          "relationships": -15,
+          "reputation": -10,
           "budget": 0
         }
       }

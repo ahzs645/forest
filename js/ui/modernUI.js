@@ -122,6 +122,7 @@ export const ModernUIMixin = {
         silviculture: 'Meet planting and survey targets within budget constraints.',
         planning: 'Build ministerial confidence through careful data analysis.',
         permitting: 'Process permit applications before deadline.',
+        manager: 'Lead the company through the full term with the books and the board onside.',
         desk: 'Complete administrative tasks efficiently.'
       };
       this.directiveText.textContent = directives[journey.journeyType] || directives.desk;
@@ -129,10 +130,14 @@ export const ModernUIMixin = {
 
     // Stat cards (duplicate of status bar for modern layout)
     if (this.statDayLabel) {
-      this.statDayLabel.textContent = isFieldType ? 'SHIFT' : 'DAY';
+      this.statDayLabel.textContent = isFieldType
+        ? 'SHIFT'
+        : journey.journeyType === 'manager' ? 'MONTH' : 'DAY';
     }
     if (this.statDayValue) {
-      this.statDayValue.textContent = journey.day;
+      this.statDayValue.textContent = Number.isFinite(journey.deadline)
+        ? Math.min(journey.day, journey.deadline)
+        : journey.day;
     }
     if (this.statProgressValue) {
       this.statProgressValue.textContent = `${progress}%`;
@@ -142,13 +147,19 @@ export const ModernUIMixin = {
     }
 
     if (isProtagonistMode && journey.protagonist) {
+      // Desk roles have no crew; these cards show the protagonist's own
+      // energy and stress, so label them that way.
+      if (this.statCrewLabel) this.statCrewLabel.textContent = 'ENERGY';
       if (this.statCrewValue) this.statCrewValue.textContent = `⚡ ${journey.protagonist.energy || 100}%`;
+      if (this.statMoraleLabel) this.statMoraleLabel.textContent = 'STRESS';
       if (this.statMoraleValue) this.statMoraleValue.textContent = `😰 ${journey.protagonist.stress || 0}%`;
     } else if (journey.crew) {
       const active = getActiveCrewCount(journey.crew);
       const total = journey.crew.length;
       const morale = Math.round(getAverageMorale(journey.crew));
+      if (this.statCrewLabel) this.statCrewLabel.textContent = 'CREW';
       if (this.statCrewValue) this.statCrewValue.textContent = `${active}/${total}`;
+      if (this.statMoraleLabel) this.statMoraleLabel.textContent = 'MORALE';
       if (this.statMoraleValue) this.statMoraleValue.textContent = `${morale}%`;
     }
   },

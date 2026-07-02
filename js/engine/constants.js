@@ -101,9 +101,9 @@ export const ROLE_TEMPTATION_PROFILES = {
   planner: {
     flavor: "Bureaucratic shortcut",
     chance: {
-      base: 0.03,
-      lateSeasonBonus: 0.02,
-      cap: 0.18,
+      base: 0.07,
+      lateSeasonBonus: 0.03,
+      cap: 0.24,
       pressure: {
         budget: { threshold: 34, bonus: 0.04 },
         progress: { threshold: 42, bonus: 0.04 },
@@ -135,9 +135,9 @@ export const ROLE_TEMPTATION_PROFILES = {
   permitter: {
     flavor: "Bureaucratic shortcut",
     chance: {
-      base: 0.035,
-      lateSeasonBonus: 0.02,
-      cap: 0.2,
+      base: 0.075,
+      lateSeasonBonus: 0.03,
+      cap: 0.26,
       pressure: {
         budget: { threshold: 35, bonus: 0.05 },
         progress: { threshold: 42, bonus: 0.04 },
@@ -169,9 +169,9 @@ export const ROLE_TEMPTATION_PROFILES = {
   recce: {
     flavor: "Field desperation",
     chance: {
-      base: 0.045,
-      lateSeasonBonus: 0.03,
-      cap: 0.22,
+      base: 0.085,
+      lateSeasonBonus: 0.04,
+      cap: 0.28,
       pressure: {
         budget: { threshold: 35, bonus: 0.05 },
         progress: { threshold: 40, bonus: 0.04 },
@@ -203,9 +203,9 @@ export const ROLE_TEMPTATION_PROFILES = {
   silviculture: {
     flavor: "Field desperation",
     chance: {
-      base: 0.05,
-      lateSeasonBonus: 0.03,
-      cap: 0.24,
+      base: 0.09,
+      lateSeasonBonus: 0.04,
+      cap: 0.3,
       pressure: {
         budget: { threshold: 34, bonus: 0.05 },
         progress: { threshold: 38, bonus: 0.04 },

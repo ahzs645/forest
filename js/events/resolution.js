@@ -384,11 +384,34 @@ function applyProgressEffects(journey, progressPoints, messages) {
 
     case 'silviculture':
       // Route program progress into the planting track that
-      // getOperationalProgress actually reads (~8 points per block).
+      // getOperationalProgress actually reads (~8 points per block). Blocks
+      // are a whole-number display ("X/15 blocks") - progressPoints/8 is
+      // rarely a whole number, so bank the fractional remainder on the
+      // journey instead of applying it directly, and only ever move
+      // blocksPlanted by whole blocks. Without the remainder carrying over,
+      // a string of small events could either get silently rounded away
+      // (never nudging the counter) or, worse, show the player a
+      // fractional block count like "0.125/15 blocks".
       if (journey.planting && typeof journey.planting.blocksToPlant === 'number') {
-        const blockDelta = progressPoints / 8;
-        journey.planting.blocksPlanted = Math.max(0,
-          Math.min(journey.planting.blocksToPlant, (journey.planting.blocksPlanted || 0) + blockDelta));
+        const remainder = (journey.planting._blockProgressRemainder || 0) + progressPoints / 8;
+        const wholeBlocks = Math.trunc(remainder);
+        journey.planting._blockProgressRemainder = remainder - wholeBlocks;
+
+        if (wholeBlocks !== 0) {
+          // A setback event can knock blocksPlanted down, but never below
+          // what has actually been planted (seedlingsPlanted / seedlingsAllocated
+          // in block terms) - otherwise a bad narrative roll could erase
+          // real, resource-backed planting progress and leave the block
+          // counter permanently unable to reach blocksToPlant even after
+          // every seedling in the allocation has gone into the ground.
+          const seedlingsImpliedBlocks = journey.planting.seedlingsAllocated > 0
+            ? Math.floor(((journey.planting.seedlingsPlanted || 0) / journey.planting.seedlingsAllocated) * journey.planting.blocksToPlant)
+            : 0;
+          const nextBlocksPlanted = (journey.planting.blocksPlanted || 0) + wholeBlocks;
+          journey.planting.blocksPlanted = Math.max(seedlingsImpliedBlocks,
+            Math.min(journey.planting.blocksToPlant, nextBlocksPlanted));
+        }
+
         const direction = progressPoints > 0 ? 'advanced' : 'slipped';
         messages.push(`Program progress ${direction} (${progressPoints > 0 ? '+' : ''}${progressPoints}).`);
       }

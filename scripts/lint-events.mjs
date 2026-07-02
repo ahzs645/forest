@@ -103,6 +103,116 @@ for (const { pool, event } of ALL) {
   }
 }
 
+// ── Decision-integrity checks ────────────────────────────────────────────────
+// Guards against the content-generation failure modes found in the 2026-07
+// audit: options that strictly dominate their siblings (no decision left),
+// and labels that promise a downside the effects don't deliver
+// (e.g. "Delay consultations (risk deteriorating relationships)" granting
+// +30 relationships).
+
+// Effect axes where higher is WORSE; everything else in VALID_EFFECT_KEYS is
+// higher-is-better (budget is signed dollars).
+const COST_EFFECT_KEYS = new Set(['timeUsed', 'scrutiny']);
+
+// Options with any of these carry a downside or randomness the effect vector
+// can't see, so dominance comparison against them is meaningless.
+function hasHiddenDownside(option) {
+  return Boolean(
+    option.riskInjury || option.riskCompliance || option.riskRejection
+    || option.crewEffect || option.schedulesEvent || option.gameOver
+    || (typeof option.chanceSuccess === 'number' && option.chanceSuccess < 1),
+  );
+}
+
+function effectVector(option) {
+  const vec = {};
+  for (const [key, value] of Object.entries(option.effects || {})) {
+    if (typeof value !== 'number') continue;
+    vec[key] = COST_EFFECT_KEYS.has(key) ? -value : value;
+  }
+  // timeUsed may also appear at the option level.
+  if (typeof option.timeUsed === 'number') {
+    vec.timeUsed = (vec.timeUsed || 0) - option.timeUsed;
+  }
+  return vec;
+}
+
+function dominates(a, b) {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  let strictlyBetter = false;
+  for (const key of keys) {
+    const av = a[key] || 0;
+    const bv = b[key] || 0;
+    if (av < bv) return false;
+    if (av > bv) strictlyBetter = true;
+  }
+  return strictlyBetter;
+}
+
+for (const { pool, event } of ALL) {
+  const options = event.options || [];
+  if (options.length < 2) continue;
+  if (options.some(hasHiddenDownside)) continue;
+  const vectors = options.map(effectVector);
+  for (let i = 0; i < options.length; i += 1) {
+    const beatsAll = vectors.every((other, j) => j === i || dominates(vectors[i], other));
+    if (beatsAll) {
+      errors.push(
+        `${pool}:${event.id} option ${i + 1} ("${options[i].label}") strictly dominates every`
+        + ` alternative — the event is no longer a decision`,
+      );
+    }
+  }
+}
+
+// Label ↔ effect contradictions.
+const NET_REWARD = (option) => Object.values(effectVector(option))
+  .reduce((sum, value) => sum + (Math.abs(value) >= 100 ? value / 1000 : value), 0);
+
+for (const { pool, event } of ALL) {
+  const options = event.options || [];
+  if (!options.length) continue;
+  const rewards = options.map(NET_REWARD);
+  const maxReward = Math.max(...rewards);
+
+  for (const [i, option] of options.entries()) {
+    const text = `${option.label || ''} ${option.outcome || ''}`;
+    const where = `${pool}:${event.id} option ${i + 1} ("${option.label}")`;
+
+    // An explicitly illegal/corrupt option must never be the best deal on the
+    // table, and must touch at least one professional-consequence axis.
+    if (/\bILLEGAL\b|\bbribe\b/i.test(text)) {
+      const fx = option.effects || {};
+      if (options.length > 1 && rewards[i] >= maxReward) {
+        errors.push(`${where}: illegal option has the best net effects in the event`);
+      }
+      if (!(fx.compliance < 0 || fx.scrutiny > 0 || fx.politicalCapital < 0)) {
+        errors.push(`${where}: illegal option carries no compliance/scrutiny/political fallout`);
+      }
+    }
+
+    // "…risk deteriorating relationships" style labels: the named metric must
+    // not be rewarded.
+    const threat = option.label && option.label.match(
+      /(?:risk\w*|deteriorat\w*|worsen\w*|damag\w*|strain\w*|erod\w*)[^.]*?\b(relationship|reputation|trust|compliance|morale)/i,
+    );
+    if (threat) {
+      const metricKey = { relationship: 'relationships', reputation: 'reputation', trust: 'relationships', compliance: 'compliance', morale: 'crew_morale' }[threat[1].toLowerCase()];
+      if (metricKey && (option.effects?.[metricKey] || 0) > 0) {
+        errors.push(`${where}: label warns about ${metricKey} but effects reward it (+${option.effects[metricKey]})`);
+      }
+    }
+
+    // relationships and reputation both feed stakeholder standing (see
+    // js/events/resolution.js), so stacked swings compound.
+    const rel = Math.abs(option.effects?.relationships || 0);
+    const rep = Math.abs(option.effects?.reputation || 0);
+    if (rel && rep && rel + rep > 40) {
+      errors.push(`${where}: relationships+reputation stack to ${rel + rep} (>40) — they compound on the same meter`);
+    }
+  }
+}
+
 // Chain resolvability: schedulesEvent targets must exist in some pool
 const allIds = new Set(ids.keys());
 const scheduledIds = new Set();

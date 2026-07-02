@@ -8,17 +8,22 @@
     "description": "Government announces additional old-growth deferrals - 2M hectares now under deferral",
     "options": [
       {
-        "label": "Lean into it",
-        "outcome": "You adapt and roll with it.",
+        "label": "Redesign the plan around the deferrals",
+        "outcome": "You pull the affected blocks and rebuild the schedule. Slower, but the plan is defensible and the ministry notices.",
         "effects": {
-          "politicalCapital": 4
+          "progress": -5,
+          "politicalCapital": 6,
+          "compliance": 3,
+          "timeUsed": 3
         }
       },
       {
-        "label": "Stay focused",
-        "outcome": "You keep the crew on task and avoid distractions.",
+        "label": "Argue block-by-block exemptions",
+        "outcome": "You keep some volume moving, but every exemption request spends goodwill and draws eyes to the file.",
         "effects": {
-          "politicalCapital": -1
+          "progress": 3,
+          "politicalCapital": -4,
+          "scrutiny": 5
         }
       }
     ]
@@ -32,17 +37,21 @@
     "description": "Provincial government phases out glyphosate use - chemical vegetation control no longer permitted",
     "options": [
       {
-        "label": "Lean into it",
-        "outcome": "You adapt and roll with it.",
+        "label": "Retool to manual brushing crews",
+        "outcome": "You hire brushing crews and rewrite the prescriptions. Expensive, but the program is clean on day one.",
         "effects": {
-          "politicalCapital": 6
+          "budget": -6000,
+          "compliance": 4,
+          "crew_morale": 2
         }
       },
       {
-        "label": "Stay focused",
-        "outcome": "You keep the crew on task and avoid distractions.",
+        "label": "Stretch the remaining chemical stock through the transition",
+        "outcome": "You use up what is legally on hand and hope the timeline holds. Cheaper, but auditors are watching the phase-out closely.",
         "effects": {
-          "politicalCapital": -1
+          "budget": -1000,
+          "compliance": -4,
+          "scrutiny": 6
         }
       }
     ]
@@ -56,17 +65,21 @@
     "description": "Major fires affect timber supply, government fast-tracks salvage permits (25-day timeline)",
     "options": [
       {
-        "label": "Lean into it",
-        "outcome": "You adapt and roll with it.",
+        "label": "Chase the fast-tracked salvage window",
+        "outcome": "You redirect crews into burned stands on the 25-day clock. Volume moves, but the pace grinds people down.",
         "effects": {
-          "permits_approved": 3
+          "permits_approved": 2,
+          "progress": 5,
+          "crew_health": -3,
+          "timeUsed": 4
         }
       },
       {
-        "label": "Stay focused",
-        "outcome": "You keep the crew on task and avoid distractions.",
+        "label": "Hold your planned program",
+        "outcome": "You keep crews on the original schedule and let others chase salvage. Steadier work, but volume stays on the table.",
         "effects": {
-          "politicalCapital": -1
+          "progress": -2,
+          "crew_morale": 2
         }
       }
     ]
@@ -80,17 +93,19 @@
     "description": "Forestry practices are under public scrutiny; how you handle the attention shapes trust in the file.",
     "options": [
       {
-        "label": "Lean into it",
-        "outcome": "You invite reporters to a site walk and answer the hard questions. Trust improves.",
+        "label": "Invite reporters out for a site walk",
+        "outcome": "You answer the hard questions standing on the block. It costs a day, and it buys trust.",
         "effects": {
           "relationships": 3,
-          "compliance": 1
+          "compliance": 1,
+          "timeUsed": 3
         }
       },
       {
-        "label": "Stay focused",
-        "outcome": "You keep crews working and decline interviews. The silence reads as defensiveness.",
+        "label": "Decline interviews and keep crews working",
+        "outcome": "The work gets done, but the silence reads as defensiveness in every story that runs.",
         "effects": {
+          "progress": 2,
           "relationships": -2,
           "compliance": -1
         }
@@ -106,15 +121,22 @@
     "description": "Court ruling strengthens First Nations land rights - stricter consultation requirements now in effect",
     "options": [
       {
-        "label": "Lean into it",
-        "outcome": "You adapt and roll with it.",
-        "effects": {}
+        "label": "Rebuild the consultation plan to the new standard",
+        "outcome": "You get ahead of the ruling and re-engage every affected Nation. The schedule slips, but the file gains real standing.",
+        "effects": {
+          "progress": -4,
+          "relationships": 6,
+          "compliance": 4,
+          "timeUsed": 4
+        }
       },
       {
-        "label": "Stay focused",
-        "outcome": "You keep the crew on task and avoid distractions.",
+        "label": "Wait for ministry guidance before changing anything",
+        "outcome": "You keep working to the old standard while the lawyers read the ruling. The delay is noticed by the Nations most affected.",
         "effects": {
-          "politicalCapital": -1
+          "progress": 2,
+          "relationships": -4,
+          "scrutiny": 4
         }
       }
     ]
@@ -128,14 +150,20 @@
     "description": "Beetle outbreak detected in harvest areas - 20-60% volume loss, salvage operations required",
     "options": [
       {
-        "label": "Lean into it",
-        "outcome": "You adapt and roll with it.",
-        "effects": {}
+        "label": "Pivot the program to beetle salvage",
+        "outcome": "You re-sequence toward hit stands before the blue stain sets in. Costly and rushed, but the wood is recovered.",
+        "effects": {
+          "budget": -3000,
+          "permits_approved": 1,
+          "progress": 3,
+          "timeUsed": 3
+        }
       },
       {
-        "label": "Stay focused",
-        "outcome": "You keep the crew on task and avoid distractions.",
+        "label": "Hold the plan and absorb the loss",
+        "outcome": "You stay the course and write off the hardest-hit blocks. The plan holds, but the lost volume shows in the numbers.",
         "effects": {
+          "progress": -4,
           "politicalCapital": -1
         }
       }
@@ -150,15 +178,22 @@
     "description": "Windstorm damages standing timber - 10-30% volume loss to windthrow",
     "options": [
       {
-        "label": "Lean into it",
-        "outcome": "You adapt and roll with it.",
-        "effects": {}
+        "label": "Divert crews to windthrow salvage",
+        "outcome": "You get the blowdown on the ground to a mill before it degrades. The planned program slips a beat.",
+        "effects": {
+          "budget": -2000,
+          "permits_approved": 1,
+          "compliance": 3,
+          "progress": -3
+        }
       },
       {
-        "label": "Stay focused",
-        "outcome": "You keep the crew on task and avoid distractions.",
+        "label": "Leave the blowdown and stay on plan",
+        "outcome": "You keep the schedule, but downed timber left on the block is a bark-beetle brood pile and everyone knows it.",
         "effects": {
-          "politicalCapital": -1
+          "progress": 2,
+          "compliance": -3,
+          "scrutiny": 4
         }
       }
     ]
@@ -680,19 +715,22 @@
       },
       {
         "label": "Minimize response, challenge WorkSafeBC findings in court",
-        "outcome": "Aggressive legal defense, minimal safety improvements",
+        "outcome": "Aggressive legal defense, minimal safety improvements. The lawyers are cheaper than the fix, but the regulator remembers.",
         "effects": {
-          "budget": -15000,
+          "budget": -9000,
           "politicalCapital": -2,
+          "scrutiny": 8,
           "timeUsed": 6
         }
       },
       {
         "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials",
+        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
         "effects": {
-          "budget": -10000,
-          "politicalCapital": -5,
+          "budget": -15000,
+          "politicalCapital": -15,
+          "compliance": -20,
+          "scrutiny": 20,
           "timeUsed": 6
         }
       }
@@ -726,19 +764,22 @@
       },
       {
         "label": "Minimize response, challenge WorkSafeBC findings in court",
-        "outcome": "Aggressive legal defense, minimal safety improvements",
+        "outcome": "Aggressive legal defense, minimal safety improvements. The lawyers are cheaper than the fix, but the regulator remembers.",
         "effects": {
-          "budget": -15000,
+          "budget": -9000,
           "politicalCapital": -2,
+          "scrutiny": 8,
           "timeUsed": 6
         }
       },
       {
         "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials",
+        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
         "effects": {
-          "budget": -10000,
-          "politicalCapital": -5,
+          "budget": -15000,
+          "politicalCapital": -15,
+          "compliance": -20,
+          "scrutiny": 20,
           "timeUsed": 6
         }
       }
@@ -772,19 +813,22 @@
       },
       {
         "label": "Minimize response, challenge WorkSafeBC findings in court",
-        "outcome": "Aggressive legal defense, minimal safety improvements",
+        "outcome": "Aggressive legal defense, minimal safety improvements. The lawyers are cheaper than the fix, but the regulator remembers.",
         "effects": {
-          "budget": -15000,
+          "budget": -9000,
           "politicalCapital": -2,
+          "scrutiny": 8,
           "timeUsed": 6
         }
       },
       {
         "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials",
+        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
         "effects": {
-          "budget": -10000,
-          "politicalCapital": -5,
+          "budget": -15000,
+          "politicalCapital": -15,
+          "compliance": -20,
+          "scrutiny": 20,
           "timeUsed": 6
         }
       }
@@ -818,19 +862,22 @@
       },
       {
         "label": "Minimize response, challenge WorkSafeBC findings in court",
-        "outcome": "Aggressive legal defense, minimal safety improvements",
+        "outcome": "Aggressive legal defense, minimal safety improvements. The lawyers are cheaper than the fix, but the regulator remembers.",
         "effects": {
-          "budget": -15000,
+          "budget": -9000,
           "politicalCapital": -2,
+          "scrutiny": 8,
           "timeUsed": 6
         }
       },
       {
         "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials",
+        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
         "effects": {
-          "budget": -10000,
-          "politicalCapital": -5,
+          "budget": -15000,
+          "politicalCapital": -15,
+          "compliance": -20,
+          "scrutiny": 20,
           "timeUsed": 6
         }
       }
@@ -864,19 +911,22 @@
       },
       {
         "label": "Minimize response, challenge WorkSafeBC findings in court",
-        "outcome": "Aggressive legal defense, minimal safety improvements",
+        "outcome": "Aggressive legal defense, minimal safety improvements. The lawyers are cheaper than the fix, but the regulator remembers.",
         "effects": {
-          "budget": -15000,
+          "budget": -9000,
           "politicalCapital": -2,
+          "scrutiny": 8,
           "timeUsed": 6
         }
       },
       {
         "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials",
+        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
         "effects": {
-          "budget": -10000,
-          "politicalCapital": -5,
+          "budget": -15000,
+          "politicalCapital": -15,
+          "compliance": -20,
+          "scrutiny": 20,
           "timeUsed": 6
         }
       }
@@ -910,19 +960,22 @@
       },
       {
         "label": "Minimize response, challenge WorkSafeBC findings in court",
-        "outcome": "Aggressive legal defense, minimal safety improvements",
+        "outcome": "Aggressive legal defense, minimal safety improvements. The lawyers are cheaper than the fix, but the regulator remembers.",
         "effects": {
-          "budget": -15000,
+          "budget": -9000,
           "politicalCapital": -2,
+          "scrutiny": 8,
           "timeUsed": 6
         }
       },
       {
         "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials",
+        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
         "effects": {
-          "budget": -10000,
-          "politicalCapital": -5,
+          "budget": -15000,
+          "politicalCapital": -15,
+          "compliance": -20,
+          "scrutiny": 20,
           "timeUsed": 6
         }
       }

@@ -57,7 +57,9 @@ export class TerminalUI {
     this.dayLabel = document.getElementById('day-label');
     this.dayValue = document.getElementById('day-value');
     this.progressValue = document.getElementById('progress-value');
+    this.crewLabel = document.getElementById('crew-label');
     this.crewValue = document.getElementById('crew-value');
+    this.moraleLabel = document.getElementById('morale-label');
     this.moraleValue = document.getElementById('morale-value');
 
     // Side panel elements
@@ -134,7 +136,9 @@ export class TerminalUI {
     this.statDayValue = document.getElementById('stat-day-value');
     this.statProgressValue = document.getElementById('stat-progress-value');
     this.statProgressFill = document.getElementById('stat-progress-fill');
+    this.statCrewLabel = document.getElementById('stat-crew-label');
     this.statCrewValue = document.getElementById('stat-crew-value');
+    this.statMoraleLabel = document.getElementById('stat-morale-label');
     this.statMoraleValue = document.getElementById('stat-morale-value');
 
     // Modern mode stats row (year / funds / eco-health / zone)
@@ -364,7 +368,9 @@ export class TerminalUI {
     // Status bar - label varies by journey type
     if (this.dayLabel) {
       const isFieldType = journey.journeyType === 'field' || journey.journeyType === 'recon';
-      this.dayLabel.textContent = isFieldType ? 'SHIFT' : 'DAY';
+      this.dayLabel.textContent = isFieldType
+        ? 'SHIFT'
+        : journey.journeyType === 'manager' ? 'MONTH' : 'DAY';
     }
 
     // Check for protagonist mode vs crew mode

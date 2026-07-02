@@ -577,6 +577,15 @@ export async function runPlanningDay(game) {
     ui.write('');
     await processAction(game, action.value, seasonInfo);
 
+    if (journey.isComplete) {
+      // 'submit' can clear ministerial approval with hours still on the
+      // clock. Once the plan is approved the expedition is over -- stop
+      // offering more actions on a day that's already been won so the day
+      // (and the end-of-run debrief) closes out immediately instead of
+      // leaving the player to burn remaining hours on a finished file.
+      break;
+    }
+
     ui.updateAllStatus(journey);
 
   }
@@ -1090,6 +1099,7 @@ async function processAction(game, actionValue, seasonInfo = null) {
       const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
       const valueDeficits = getValuesGateDeficits(journey);
       const guidance = buildPlanningActionGuidance(journey, seasonInfo);
+      ui.writeHeader(actionValue === 'submit_blocked' ? 'SUBMISSION BLOCKED' : 'STAKEHOLDER SESSION BLOCKED');
       if (valueDeficits.length > 0) {
         ui.writeWarning(`Cannot proceed. Recover these values first: ${formatValuesGateDeficits(valueDeficits)}.`);
       } else {
@@ -1103,6 +1113,13 @@ async function processAction(game, actionValue, seasonInfo = null) {
       if (guidance.steps.length > 0) {
         ui.write(`Follow-up: ${guidance.steps.join(' -> ')}`);
       }
+      // The day loop clears the screen the instant this function returns, so
+      // without a blocking prompt the explanation above is wiped before the
+      // browser ever paints it — the player sees nothing and can click the
+      // disabled option forever. Pausing on an explicit acknowledgement (same
+      // "show detail, then let the player close it" idiom as Review the File)
+      // guarantees the reasons are actually seen. Still costs 0 hours.
+      await ui.promptChoice('', [{ label: 'Back to the day', value: 'next' }]);
       break;
     }
 

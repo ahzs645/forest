@@ -7,5 +7,6 @@ test('landing shortcuts stay scoped to the landing screen actions', async ({ pag
   await page.keyboard.press('l');
 
   await expect(page.locator('#modal-title')).toHaveText('LOAD DATA');
-  await expect(page.locator('#modal-body')).toContainText('Save/Load functionality coming soon.');
+  // With no stored run, the load modal explains the autosave behaviour.
+  await expect(page.locator('#modal-body')).toContainText('No saved expedition found.');
 });

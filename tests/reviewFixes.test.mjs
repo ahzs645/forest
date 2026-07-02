@@ -53,6 +53,42 @@ test('silviculture progress effects land on the planting track', () => {
   assert.ok(journey.planting.blocksPlanted > 0, 'progress converts to planted blocks');
 });
 
+test('silviculture progress effects never leave blocksPlanted fractional', () => {
+  const journey = createSilvicultureJourney({ areaId: 'fort-st-john-plateau' });
+  // progress:1 -> blockDelta of 1/8 = 0.125, which used to be applied
+  // directly and could show the player "0.125/15 blocks" in the header.
+  for (let i = 0; i < 5; i++) {
+    const { option, event } = makeEvent({ label: 'nudge', outcome: 'x', effects: { progress: 1 } });
+    resolveEvent(journey, event, option);
+    assert.ok(Number.isInteger(journey.planting.blocksPlanted),
+      `blocksPlanted must stay a whole number, got ${journey.planting.blocksPlanted}`);
+  }
+
+  // The fractional remainder still accumulates across calls instead of
+  // being silently rounded away - eight +1 nudges (1 full block worth)
+  // eventually tips the counter over by one whole block.
+  const journey2 = createSilvicultureJourney({ areaId: 'fort-st-john-plateau' });
+  for (let i = 0; i < 8; i++) {
+    const { option, event } = makeEvent({ label: 'nudge', outcome: 'x', effects: { progress: 1 } });
+    resolveEvent(journey2, event, option);
+  }
+  assert.equal(journey2.planting.blocksPlanted, 1, 'eight +1 progress nudges should accumulate into one whole block');
+});
+
+test('silviculture setback events cannot drag blocksPlanted below what seedlings already back', () => {
+  const journey = createSilvicultureJourney({ areaId: 'fort-st-john-plateau' });
+  // Simulate a fully-seeded program (as if every plant/fill action had run)
+  // where a block counter of 15 is fully backed by the seedling pool.
+  journey.planting.seedlingsPlanted = journey.planting.seedlingsAllocated;
+  journey.planting.blocksPlanted = journey.planting.blocksToPlant;
+
+  const { option, event } = makeEvent({ label: 'setback', outcome: 'x', effects: { progress: -80 } });
+  resolveEvent(journey, event, option);
+
+  assert.equal(journey.planting.blocksPlanted, journey.planting.blocksToPlant,
+    'a narrative setback must not erase planting progress that seedlings already paid for');
+});
+
 test('gamble options use the failure branch when the roll misses', () => {
   const journey = createReconJourney({ areaId: 'fort-st-john-plateau' });
   const gamble = {
