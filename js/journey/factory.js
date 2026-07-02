@@ -16,6 +16,107 @@ import { createSeasonState } from "../season.js";
 import { createProfessionalComplianceState } from "../engine.js";
 
 /**
+ * Campaign-scale tuning (see docs/unified_campaign.md, section 3).
+ * `createJourney({ ..., scale: 'campaign' })` shrinks a normal, full-length
+ * journey down to a single ~8-12 in-game-day campaign season deployment.
+ * These constants and applyCampaignScale() are the only place that
+ * shrinkage happens - every creator below still builds its normal,
+ * full-size journey first and only trims it at the very end when scale is
+ * requested, so unscaled createJourney() calls are unaffected.
+ */
+const CAMPAIGN_RECON_BLOCK_COUNT = 6;
+const CAMPAIGN_STOCKPILE_SCALE = 0.45; // per-run field stockpiles (fuel/food/budget/...)
+const CAMPAIGN_BUDGET_SCALE = 0.5; // desk-role (planning/permitting) budgets
+// Resources that read as a condition/percentage (0-100) rather than a
+// depletable per-run stockpile - campaign scaling leaves these alone.
+const CAMPAIGN_PERCENT_RESOURCE_KEYS = new Set(["equipment"]);
+
+/**
+ * Trim an area's block list to a coherent, order-preserving subset for a
+ * campaign-length recon/field traverse. Keeps the first supply-bearing
+ * block if the natural leading subset would otherwise drop it.
+ */
+function selectCampaignBlocks(blocks, count = CAMPAIGN_RECON_BLOCK_COUNT) {
+  if (!Array.isArray(blocks) || blocks.length <= count) {
+    return blocks.slice();
+  }
+  const subset = blocks.slice(0, count);
+  if (!subset.some((block) => block.hasSupply)) {
+    const firstSupplyBlock = blocks.find((block) => block.hasSupply);
+    if (firstSupplyBlock) {
+      subset[subset.length - 1] = firstSupplyBlock;
+    }
+  }
+  return subset;
+}
+
+/**
+ * Scale per-run stockpile resources (fuel, food, budget, firstAid, ...) down
+ * for a campaign deployment, leaving percentage/condition resources (like
+ * equipment 0-100) untouched.
+ */
+function scaleStockpileResources(resources, factor = CAMPAIGN_STOCKPILE_SCALE) {
+  const scaled = { ...resources };
+  for (const key of Object.keys(scaled)) {
+    if (CAMPAIGN_PERCENT_RESOURCE_KEYS.has(key)) continue;
+    if (typeof scaled[key] !== "number") continue;
+    scaled[key] = Math.round(scaled[key] * factor);
+  }
+  return scaled;
+}
+
+/**
+ * Shrink a fully-built journey down to a campaign-season deployment
+ * (~8-12 in-game days). Applied once, after a creator has assembled its
+ * normal full-length journey. See docs/unified_campaign.md section 3 for
+ * the target numbers per role. Difficulty multipliers
+ * (applyDifficultyMultipliers in js/game/ForestryTrailGame.js) run after
+ * this, unchanged.
+ */
+function applyCampaignScale(journey, journeyType) {
+  switch (journeyType) {
+    case "field": {
+      journey.blocks = selectCampaignBlocks(journey.blocks);
+      journey.totalDistance = journey.blocks.reduce((sum, block) => sum + block.distance, 0);
+      journey.resources = scaleStockpileResources(journey.resources);
+      return journey;
+    }
+    case "silviculture": {
+      journey.planting.blocksToPlant = 5;
+      journey.planting.seedlingsAllocated = 80000;
+      journey.brushing.hectaresTarget = 150;
+      journey.surveys.freeGrowingTarget = 2;
+      journey.resources.seedlings = 80000;
+      journey.resources.budget = 45000;
+      journey.resources.contractorCapacity = Math.round(
+        journey.resources.contractorCapacity * CAMPAIGN_STOCKPILE_SCALE,
+      );
+      return journey;
+    }
+    case "planning": {
+      journey.deadline = 12;
+      journey.resources.budget = Math.round(journey.resources.budget * CAMPAIGN_BUDGET_SCALE);
+      return journey;
+    }
+    case "permitting": {
+      journey.permits.target = 5;
+      journey.deadline = 12;
+      journey.resources.budget = Math.round(journey.resources.budget * CAMPAIGN_BUDGET_SCALE);
+      return journey;
+    }
+    case "manager":
+      // Manager is not one of the four campaign roles (recon/silviculture/
+      // planning/permitting) - the campaign never deploys it, so a caller
+      // asking for a campaign-scale manager journey is a bug upstream.
+      throw new Error(
+        'createManagerJourney: scale "campaign" is not supported - manager is not used by the campaign (see docs/unified_campaign.md, sections 2 and 3).',
+      );
+    default:
+      return journey;
+  }
+}
+
+/**
  * Factory function to create the appropriate journey type
  * Routes to specialized journey creators based on role
  * @param {Object} options - Setup options including roleId
@@ -53,6 +154,10 @@ export function createJourney(options = {}) {
 export function createReconJourney(options = {}) {
   const baseJourney = createFieldJourney(options);
   const roleId = options.roleId || options.role?.id || "recce";
+  // baseJourney.resources is already campaign-scaled by createFieldJourney
+  // when scale is "campaign" (blocks/totalDistance too), so only the two
+  // recon-only stockpiles added below need scaling to match.
+  const campaignScale = options.scale === "campaign";
 
   return {
     ...baseJourney,
@@ -72,8 +177,8 @@ export function createReconJourney(options = {}) {
     // Recon resources (extend field resources)
     resources: {
       ...baseJourney.resources,
-      gpsUnits: 5,
-      flaggingTape: 50,
+      gpsUnits: campaignScale ? Math.round(5 * CAMPAIGN_STOCKPILE_SCALE) : 5,
+      flaggingTape: campaignScale ? Math.round(50 * CAMPAIGN_STOCKPILE_SCALE) : 50,
     },
     professional: createProfessionalComplianceState(
       roleId,
@@ -92,7 +197,7 @@ export function createSilvicultureJourney(options = {}) {
   const effectiveAreaId = areaId || area?.id;
   const effectiveRoleId = roleId || role?.id || "silviculture";
 
-  return {
+  const journey = {
     journeyType: "silviculture",
 
     // Area blocks give event selection terrain/feature context, opening the
@@ -159,6 +264,8 @@ export function createSilvicultureJourney(options = {}) {
     log: [],
     decisions: [],
   };
+
+  return options.scale === "campaign" ? applyCampaignScale(journey, "silviculture") : journey;
 }
 
 /**
@@ -199,7 +306,7 @@ export function createPlanningJourney(options = {}) {
   const effectiveRoleId = roleId || role?.id || "planner";
   const cadenceDays = getPlanningCadenceDays();
 
-  return {
+  const journey = {
     journeyType: "planning",
     companyName: companyName || crewName || "Strategic Planning Division",
     roleId: effectiveRoleId,
@@ -314,6 +421,8 @@ export function createPlanningJourney(options = {}) {
     log: [],
     decisions: [],
   };
+
+  return options.scale === "campaign" ? applyCampaignScale(journey, "planning") : journey;
 }
 
 /**
@@ -325,7 +434,7 @@ export function createPermittingJourney(options = {}) {
   const effectiveAreaId = areaId || area?.id;
   const effectiveRoleId = roleId || role?.id || "permitter";
 
-  return {
+  const journey = {
     journeyType: "permitting",
     companyName: companyName || crewName || "Permitting Office",
     roleId: effectiveRoleId,
@@ -412,6 +521,8 @@ export function createPermittingJourney(options = {}) {
     log: [],
     decisions: [],
   };
+
+  return options.scale === "campaign" ? applyCampaignScale(journey, "permitting") : journey;
 }
 
 /**
@@ -423,7 +534,7 @@ export function createFieldJourney(options = {}) {
   const blocks = scaleBlocksForShifts(getBlocksForArea(effectiveAreaId));
   const totalDistance = blocks.reduce((sum, block) => sum + block.distance, 0);
 
-  return {
+  const journey = {
     journeyType: "field",
     companyName: companyName || crewName || "Unnamed Crew",
     roleId: roleId || role?.id,
@@ -476,6 +587,8 @@ export function createFieldJourney(options = {}) {
     log: [],
     decisions: [],
   };
+
+  return options.scale === "campaign" ? applyCampaignScale(journey, "field") : journey;
 }
 
 function scaleBlocksForShifts(blocks = []) {
@@ -560,7 +673,7 @@ export function createManagerJourney(options = {}) {
   const baseField = createFieldResources(options.difficulty);
   const effectiveRoleId = options.roleId || options.role?.id || "manager";
 
-  return {
+  const journey = {
     ...options,
     journeyType: "manager",
     companyName: options.companyName || options.crewName || "Corporate Operations",
@@ -614,4 +727,6 @@ export function createManagerJourney(options = {}) {
     log: [],
     decisions: [],
   };
+
+  return options.scale === "campaign" ? applyCampaignScale(journey, "manager") : journey;
 }

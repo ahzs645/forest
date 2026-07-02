@@ -96,6 +96,16 @@ export const InitFlowMixin = {
       this.crisisModeBtn.hidden = false;
     }
 
+    // Campaign — the unified year-long mode (all four seasons, four hats).
+    this.campaignBtn?.addEventListener('click', () => {
+      this._hideLandingScreen();
+      if (this._resolveLanding) {
+        const resolve = this._resolveLanding;
+        this._resolveLanding = null;
+        resolve({ action: 'campaign' });
+      }
+    });
+
     // New Game button
     this.newGameBtn?.addEventListener('click', () => {
       this._hideLandingScreen();
@@ -106,8 +116,15 @@ export const InitFlowMixin = {
       }
     });
 
+    // Seasonal Strategy now runs inside this terminal (js/game/seasonalAdapter.js)
+    // instead of navigating to the separate React app — one site, one UI.
     this.tuiModeBtn?.addEventListener('click', () => {
-      window.location.assign('./tui.html');
+      this._hideLandingScreen();
+      if (this._resolveLanding) {
+        const resolve = this._resolveLanding;
+        this._resolveLanding = null;
+        resolve({ action: 'seasonal' });
+      }
     });
 
     this.crisisModeBtn?.addEventListener('click', () => {
@@ -168,8 +185,12 @@ export const InitFlowMixin = {
         e.preventDefault();
         this.tuiModeBtn?.click();
       } else if (e.key === 'c' || e.key === 'C') {
-        if (this.crisisModeBtn && !this.crisisModeBtn.hidden) {
-          e.preventDefault();
+        // [C] belongs to the Campaign; Crisis Command (also C, experimental)
+        // only claims the key when it is visible and Campaign is not.
+        e.preventDefault();
+        if (this.campaignBtn) {
+          this.campaignBtn.click();
+        } else if (this.crisisModeBtn && !this.crisisModeBtn.hidden) {
           this.crisisModeBtn.click();
         }
       } else if (e.key === 'l' || e.key === 'L') {
@@ -747,6 +768,10 @@ export const InitFlowMixin = {
       if (landingChoice?.action === 'load' && landingChoice.journey) {
         this._hideLandingScreen();
         return { action: 'load', journey: landingChoice.journey };
+      }
+      if (landingChoice?.action === 'seasonal' || landingChoice?.action === 'campaign') {
+        this._hideLandingScreen();
+        return { action: landingChoice.action };
       }
     }
 

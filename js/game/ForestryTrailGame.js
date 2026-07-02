@@ -37,8 +37,9 @@ import { saveActiveRun, loadActiveRun, clearActiveRun } from './saveLoad.js';
 
 /**
  * Apply difficulty multipliers to journey resources
+ * (exported for the campaign, which builds its own journeys per season)
  */
-function applyDifficultyMultipliers(journey, difficulty) {
+export function applyDifficultyMultipliers(journey, difficulty) {
   if (difficulty === 'normal') return;
 
   const resourceMult = difficulty === 'easy' ? 1.3 : 0.8;
@@ -139,6 +140,19 @@ export class ForestryTrailGame {
     this.gameOver = false;
     this.victory = false;
 
+    // Deep link from the retired standalone TUI page (tui.html forwards
+    // here): jump straight into the seasonal game. One-shot — the param is
+    // stripped so quitting back out lands on the normal hub.
+    if (typeof window !== 'undefined'
+      && new URLSearchParams(window.location.search).get('mode') === 'seasonal') {
+      window.history.replaceState(null, '', window.location.pathname);
+      const { runSeasonalGame } = await import('./seasonalAdapter.js');
+      this.ui._hideLandingScreen?.();
+      await runSeasonalGame(this.ui);
+      this.start();
+      return;
+    }
+
     // A saved run survives refreshes, tab evictions, and crashes
     const savedRun = loadActiveRun();
     if (savedRun) {
@@ -167,6 +181,23 @@ export class ForestryTrailGame {
     // Load Data on the landing screen resumes the auto-saved run directly.
     if (init?.action === 'load' && init.journey) {
       await this._resumeSavedRun(init.journey);
+      return;
+    }
+
+    // Seasonal Strategy plays in this same terminal via the adapter; when the
+    // year ends (or the player quits out), fall back to the landing screen.
+    if (init?.action === 'seasonal') {
+      const { runSeasonalGame } = await import('./seasonalAdapter.js');
+      await runSeasonalGame(this.ui);
+      this.start();
+      return;
+    }
+
+    // Campaign — the unified year (see docs/unified_campaign.md).
+    if (init?.action === 'campaign') {
+      const { runCampaign } = await import('./campaign.js');
+      await runCampaign(this);
+      this.start();
       return;
     }
 

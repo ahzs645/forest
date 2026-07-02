@@ -376,11 +376,12 @@ async function runFieldDay(game) {
       });
     }
 
-    if (openPackages.length > 0 && journey.hoursRemaining >= 2) {
-      const nextPackage = openPackages[0];
+    const notebookTargets = getReconNotebookTargets(journey);
+    if (notebookTargets.length > 0 && journey.hoursRemaining >= 2) {
+      const nextPackage = notebookTargets[0];
       primaryOptions.push({
         label: 'Field Notebook (2h)',
-        description: `Close an open package from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')})`,
+        description: `Write up a visited block from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')}) — paper-truthing draws scrutiny`,
         value: 'field_notebook'
       });
     }
@@ -510,9 +511,11 @@ async function runFieldDay(game) {
       }
       for (const msg of result.messages) ui.write(msg);
       hasTraveled = true;
-      // Let the journey beat land before the next header clears the screen
+      // The next header wipes the screen, so instead of pausing on a bare
+      // Continue every travel beat (two Continues per shift added up), the
+      // results are carried into the next screen as a recap block.
       if (journey.hoursRemaining > 0) {
-        await ui.promptChoice('', [{ label: 'Continue', value: 'next' }]);
+        journey.lastActionRecap = result.messages.slice(0, 6);
       }
     } else if (actionId === 'consult_map') {
       handleConsultMap(ui, journey);
@@ -596,6 +599,14 @@ function displayDayHeader(ui, journey) {
   ui.write(`[${progressBar}] Package Completion ${packagesDone}/${totalBlocks} (${completionPct}%) | Traverse ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
 
   ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'} | Hours: ${journey.hoursRemaining || 0}h`);
+
+  // Recap of the previous action's results (set by the travel branch), shown
+  // here because this header clears the screen those results were printed on.
+  if (Array.isArray(journey.lastActionRecap) && journey.lastActionRecap.length) {
+    ui.write('── last leg ──', 'term-dim');
+    for (const line of journey.lastActionRecap) ui.write(line, 'term-dim');
+    journey.lastActionRecap = null;
+  }
 
   const r = journey.resources;
   ui.write(`FUEL: ${Math.round(r.fuel)} | FOOD: ${Math.round(r.food)} | EQUIP: ${Math.round(r.equipment)}% | MEDS: ${r.firstAid} | CASH: $${Math.round(r.budget).toLocaleString()}`);
@@ -1044,11 +1055,26 @@ function handleValuesSweep(ui, journey, block) {
   maybeFinalizeReconAssessment(ui, journey, block);
 }
 
+// Notebook write-ups only work for ground the crew has actually reached: you
+// can catch up paperwork from real notes, but you cannot paper-truth a block
+// you never drove to. (Unrestricted, the notebook let a run "win" from camp at
+// 48% of the traverse — it dominated actually travelling.)
+function getReconNotebookTargets(journey) {
+  const blocks = Array.isArray(journey?.blocks) ? journey.blocks : [];
+  const currentIndex = Number(journey?.currentBlockIndex || 0);
+  return getReconOpenPackages(journey).filter(({ block }) => {
+    const index = blocks.indexOf(block);
+    return index > -1 && index <= currentIndex;
+  });
+}
+
 function handleFieldNotebook(ui, journey) {
-  const openPackages = getReconOpenPackages(journey);
-  const target = openPackages[0];
+  const target = getReconNotebookTargets(journey)[0];
   if (!target) {
-    ui.write('No open recon packages remain in the notebook.');
+    const remaining = getReconOpenPackages(journey).length;
+    ui.write(remaining > 0
+      ? 'No visited blocks left to write up — the remaining packages need you on the ground.'
+      : 'No open recon packages remain in the notebook.');
     return;
   }
 
@@ -1063,7 +1089,9 @@ function handleFieldNotebook(ui, journey) {
 
   ui.write(`Notebook catch-up closes ${target.block.name}: ${target.missing.join(', ')}.`);
   maybeFinalizeReconAssessment(ui, journey, target.block);
-  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 1);
+  // Paper-heavy files draw attention: closing from notes costs more scrutiny
+  // than doing the work on the ground.
+  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 2);
 }
 
 /**

@@ -18,7 +18,7 @@ async function seedBrowser(page, seed) {
 
 async function bootSeasonalTui(page, seed = DEFAULT_SEED) {
   await seedBrowser(page, seed);
-  await page.goto('/tui.html');
+  await page.goto('/tui.html?classic=1');
 
   await expect(page.locator('.tui-heading')).toContainText('Welcome to BC Forestry Trail');
 

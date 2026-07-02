@@ -27,7 +27,7 @@ export async function installDeterministicSeed(page, seed) {
 
 export async function gotoSeasonalTui(page, seed = SEASONAL_TUI_SEEDS[0]) {
   await installDeterministicSeed(page, seed);
-  await page.goto('/tui.html');
+  await page.goto('/tui.html?classic=1');
   await expect(page.locator('.tui-heading')).toContainText('Welcome to BC Forestry Trail');
 }
 

@@ -35,7 +35,7 @@ test('seasonal strategy TUI supports touch-first setup and play on mobile', asyn
   const runtimeErrors = attachRuntimeErrorCollector(page);
   await seedBrowser(page, MOBILE_SEED);
 
-  await page.goto('/tui.html');
+  await page.goto('/tui.html?classic=1');
 
   await expect(page.locator('#company-name')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Use Default' })).toBeVisible();
@@ -82,7 +82,7 @@ test('seasonal strategy TUI supports touch-first setup and play on mobile', asyn
 
 test('mobile exit button returns the TUI to the landing page', async ({ page }) => {
   await seedBrowser(page, MOBILE_SEED + 1);
-  await page.goto('/tui.html');
+  await page.goto('/tui.html?classic=1');
 
   await page.getByRole('button', { name: '← Main Menu' }).click();
 

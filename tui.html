@@ -10,6 +10,20 @@
   <body>
     <div id="root"></div>
     <noscript>This page requires JavaScript to run the seasonal strategy TUI in the browser.</noscript>
+    <script>
+      // The seasonal game now plays inside the main site's terminal
+      // (index.html → Seasonal Strategy). This page remains for two callers:
+      //   ?classic=1            — the original React view (transition escape
+      //                            hatch; also what the tui-browser e2e drives)
+      //   ?mode=crisis-command  — the Crisis Command deep-link
+      // Everything else forwards to the unified site.
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has('classic') && !params.has('mode')) {
+          window.location.replace('./?mode=seasonal');
+        }
+      })();
+    </script>
     <script type="module" src="./src/tui-browser/main.jsx"></script>
   </body>
 </html>

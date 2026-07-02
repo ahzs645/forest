@@ -1,17 +1,31 @@
 # BC Forestry Trail
 
-Two terminal-styled forestry games set across British Columbia — from the
-northern Interior to the coast and southern wetbelt — sharing one content
-library (`js/data/`) and a retro green-CRT aesthetic.
+One terminal-styled forestry game set across British Columbia — from the
+northern Interior to the coast and southern wetbelt — with one content library
+(`js/data/`), one retro green-CRT terminal, and one entry point
+(`index.html`). See [`docs/unified_campaign.md`](docs/unified_campaign.md)
+for how the frontends were unified.
 
-## The two games
+## The modes (all on the landing hub)
 
-### 1. Expedition mode (`index.html`) — the flagship
+### Campaign — "A Year in the District" (the flagship)
 
-An Oregon Trail-style crew simulator. Pick a forester role, an operating area, and a
-difficulty, then shepherd a multi-day expedition: travel, supplies, crew health and
-morale, field/desk events with consequences, milestones, and an interactive final
-debrief with persistent career records (saved in your browser).
+One year, one operating area, four seasons, four hats. Each season opens with
+a strategy briefing, plays a condensed Oregon Trail-style deployment — spring
+recon traverse, summer silviculture program, fall planning file, winter
+permitting push — then closes with a season review where the year's five
+meters (progress, forest health, relationships, compliance, budget) absorb
+what the deployment actually did, consequences and ecology drift included.
+The year ends in a tier, and the deployments are the story of how it got
+there. Autosaves at every day and season boundary.
+
+### Expedition (single deployment)
+
+The classic full-length run of any one journey. Pick a forester role, an
+operating area, and a difficulty, then shepherd a multi-day expedition:
+travel, supplies, crew health and morale, field/desk events with
+consequences, milestones, and an interactive final debrief with persistent
+career records (saved in your browser).
 
 **Five roles, five distinct journeys:**
 
@@ -21,22 +35,24 @@ debrief with persistent career records (saved in your browser).
 - **Silviculture Supervisor** — contractor management across planting, brushing, and surveys.
 - **General Manager** — executive mode: hire a CEO, pursue certifications, balance the books.
 
-Fully tap-playable on mobile. Everything is buttons; keyboard shortcuts ([S]tatus,
-[G]lossary, [P] Intel, number keys for choices) are accelerators, not requirements.
+### Seasonal Strategy (quick-play)
 
-### 2. Seasonal Strategy TUI (`tui.html`)
+The four-season strategy game (seasonal metrics engine, `js/engine/` +
+`tui/controller.js`) rendered in the same terminal via
+`js/game/seasonalAdapter.js`. Each season you complete role duties and react
+to contextual issues; five shared metrics track the year.
 
-A four-season, role-based strategy game built on the seasonal metrics engine
-(`js/engine/` + `tui/controller.js`). Each season you complete role duties and react
-to contextual issues; five shared metrics track the year. Fully client-side, hosted on
-GitHub Pages without a backend.
+Fully tap-playable on mobile. Everything is buttons; keyboard shortcuts
+([C]ampaign, [S]tatus, [G]lossary, [P] Intel, number keys for choices) are
+accelerators, not requirements. Fully client-side, hosted on GitHub Pages
+without a backend.
 
 ## Frontend status matrix
 
 | Entry point | Tech | Status |
 |---|---|---|
-| `index.html` (expedition) | Vanilla JS + DOM terminal | **Primary** |
-| `tui.html` (seasonal TUI) | React + `tui/controller.js` | **Primary** |
+| `index.html` (campaign + expedition + seasonal) | Vanilla JS + DOM terminal | **Primary — the one site** |
+| `tui.html` | Redirects to `/?mode=seasonal`; `?classic=1` loads the old React view, `?mode=crisis-command` the crisis deep-link | Transitional |
 | `cli-game.tsx` (`npm run play`) | @opentui/react + Bun, seasonal only | Experimental (frozen) |
 | `scripts/run-seasonal-sims.mjs` (`npm run sim:seasonal`) | Headless seasonal balance harness driving the real `TuiGameController` | **Primary tooling** |
 | `cli.mjs` | Headless seasonal sim for balance runs | Legacy (superseded by `run-seasonal-sims.mjs`; uses an older engine loop) |
