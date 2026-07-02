@@ -305,6 +305,16 @@ function buildAssignmentOptions(candidate) {
     }));
   }
 
+  // If the candidate (e.g. an area situation) supplies its own authored options,
+  // use those instead of the generic family template so the choice language
+  // matches the specific scenario.
+  if (Array.isArray(candidate.options) && candidate.options.length) {
+    return candidate.options.map((option) => ({
+      ...option,
+      stance: option.stance || "balanced",
+    }));
+  }
+
   const profile = ASSIGNMENT_RESPONSE_PROFILES[candidate.sourceFamily] || [];
   return profile.map((template) => {
     const option = {
@@ -594,6 +604,7 @@ function buildSituationCandidates(state, context) {
         context,
         "This seasonal constraint is already changing what safe, legal, or credible progress looks like.",
       ),
+      options: context.areaSituation.options,
       score: 40,
     }, state),
   ];

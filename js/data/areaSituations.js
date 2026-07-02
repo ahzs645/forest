@@ -20,7 +20,27 @@ const AREA_SITUATIONS = [
     deskTypeMultipliers: {
       technical: 1.15,
       compliance: 1.1
-    }
+    },
+    options: [
+      {
+        stance: 'cautious',
+        label: 'Stagger shifts and share the road schedule',
+        outcome: 'You coordinate hauling windows with gas-field traffic, keeping rigs and logging trucks out of each other\'s way.',
+        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+      },
+      {
+        stance: 'balanced',
+        label: 'Use radio escorts through the busiest corridors',
+        outcome: 'Traffic keeps moving with escorts and call-ins; a few delays, but no serious conflicts.',
+        effects: { progress: 2, compliance: 1 }
+      },
+      {
+        stance: 'aggressive',
+        label: 'Run convoys through peak industrial windows',
+        outcome: 'You squeeze more fibre out but create dust-ups with other operators and near-miss reports.',
+        effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 }
+      }
+    ]
   },
   {
     id: 'muskwa_runoff_slump',
@@ -36,7 +56,27 @@ const AREA_SITUATIONS = [
     deskStressMultiplier: 1.06,
     deskTypeMultipliers: {
       technical: 1.15
-    }
+    },
+    options: [
+      {
+        stance: 'cautious',
+        label: 'Stand down until geotech clears the slopes',
+        outcome: 'Work waits while slopes are assessed; contractors grumble, but nothing slides.',
+        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+      },
+      {
+        stance: 'balanced',
+        label: 'Shift to ridge-top spurs and dry benches',
+        outcome: 'You avoid the worst drainages and keep lighter crews moving on safer ground.',
+        effects: { progress: 2, compliance: 1 }
+      },
+      {
+        stance: 'aggressive',
+        label: 'Push the existing road before thaw deepens',
+        outcome: 'Hauling continues until a fill slumps, turning a schedule win into a cleanup bill.',
+        effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 }
+      }
+    ]
   },
   {
     id: 'bulkley_visual_backlash',
@@ -53,7 +93,27 @@ const AREA_SITUATIONS = [
     deskTypeMultipliers: {
       stakeholder: 1.2,
       political: 1.15
-    }
+    },
+    options: [
+      {
+        stance: 'cautious',
+        label: 'Post the work and hold a public walk-through',
+        outcome: 'You slow down and invite community observers; optics improve even if the schedule slips.',
+        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+      },
+      {
+        stance: 'balanced',
+        label: 'Add visual buffers and keep moving',
+        outcome: 'Retained edges and screening keep the public-facing slopes from looking raw.',
+        effects: { progress: 2, compliance: 1 }
+      },
+      {
+        stance: 'aggressive',
+        label: 'Clear the visible face before opposition organizes',
+        outcome: 'You get the timber out but photos of the fresh cut circulate quickly.',
+        effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 }
+      }
+    ]
   },
   {
     id: 'fraser_smoke_push',
@@ -70,7 +130,27 @@ const AREA_SITUATIONS = [
     deskTypeMultipliers: {
       political: 1.2,
       compliance: 1.08
-    }
+    },
+    options: [
+      {
+        stance: 'cautious',
+        label: 'Stand down until air quality and fire risk improve',
+        outcome: 'Crews stay safe at camp; the community notices you put people ahead of volume.',
+        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+      },
+      {
+        stance: 'balanced',
+        label: 'Work early mornings and monitor smoke indices',
+        outcome: 'You keep a limited window open while staying inside safe air-quality thresholds.',
+        effects: { progress: 2, compliance: 1 }
+      },
+      {
+        stance: 'aggressive',
+        label: 'Push crews through heavy smoke to beat closure',
+        outcome: 'Production holds, but morale drops and the district flags health-and-safety concerns.',
+        effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 }
+      }
+    ]
   },
   {
     id: 'skeena_crossing_stress',
@@ -88,7 +168,27 @@ const AREA_SITUATIONS = [
     deskTypeMultipliers: {
       technical: 1.25,
       compliance: 1.15
-    }
+    },
+    options: [
+      {
+        stance: 'cautious',
+        label: 'Defer crossing work until a fisheries window opens',
+        outcome: 'You protect the spawning channel and keep the file clean, even though access waits.',
+        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+      },
+      {
+        stance: 'balanced',
+        label: 'Install temporary crossings with habitat oversight',
+        outcome: 'A monitored culvert or bridge gets crews across without dewatering the channel.',
+        effects: { progress: 2, compliance: 1 }
+      },
+      {
+        stance: 'aggressive',
+        label: 'Ford the creek to keep the hauling schedule',
+        outcome: 'You move fibre now, but sediment and redd damage trigger a compliance order.',
+        effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 }
+      }
+    ]
   },
   {
     id: 'tahltan_supply_lag',
@@ -105,7 +205,27 @@ const AREA_SITUATIONS = [
     deskTypeMultipliers: {
       technical: 1.1,
       team: 1.1
-    }
+    },
+    options: [
+      {
+        stance: 'cautious',
+        label: 'Pre-position supplies before the weather window closes',
+        outcome: 'You spend upfront to stage fuel, food, and parts; contractors can keep working through the lag.',
+        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+      },
+      {
+        stance: 'balanced',
+        label: 'Consolidate trips and extend camp rotations',
+        outcome: 'Fewer hauls mean less exposure to road delays; crews work longer hitches.',
+        effects: { progress: 2, compliance: 1 }
+      },
+      {
+        stance: 'aggressive',
+        label: 'Run lean and single-trip everything',
+        outcome: 'You save hauling costs until a blown tire strands a crew without spares.',
+        effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 }
+      }
+    ]
   },
   {
     id: 'island_storm_window',
@@ -122,7 +242,27 @@ const AREA_SITUATIONS = [
     deskTypeMultipliers: {
       technical: 1.15,
       stakeholder: 1.1
-    }
+    },
+    options: [
+      {
+        stance: 'cautious',
+        label: 'Park equipment until the storm track passes',
+        outcome: 'You sit out the worst rains; creeks stay clear and the public sees restraint.',
+        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+      },
+      {
+        stance: 'balanced',
+        label: 'Work upland blocks and leave streamside for later',
+        outcome: 'You keep some crews busy on drier ground while sensitive crossings recover.',
+        effects: { progress: 2, compliance: 1 }
+      },
+      {
+        stance: 'aggressive',
+        label: 'Push through the wet window before streams peak',
+        outcome: 'You move more fibre but leave rutted roads and turbidity complaints behind.',
+        effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 }
+      }
+    ]
   },
   {
     id: 'wetbelt_runoff_scrutiny',
@@ -139,7 +279,27 @@ const AREA_SITUATIONS = [
     deskTypeMultipliers: {
       technical: 1.18,
       compliance: 1.1
-    }
+    },
+    options: [
+      {
+        stance: 'cautious',
+        label: 'Pause work and audit every culvert and ditch',
+        outcome: 'You find and fix several minor drainage issues before the community notices.',
+        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+      },
+      {
+        stance: 'balanced',
+        label: 'Add sediment controls and keep lower-risk blocks moving',
+        outcome: 'Silt fencing and spillways keep most runoff contained while work continues.',
+        effects: { progress: 2, compliance: 1 }
+      },
+      {
+        stance: 'aggressive',
+        label: 'Trust the existing drainage and push the road',
+        outcome: 'A plugged culvert sends sediment toward the community water intake.',
+        effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 }
+      }
+    ]
   },
   {
     id: 'drybelt_interface_smoke',
@@ -156,7 +316,27 @@ const AREA_SITUATIONS = [
     deskTypeMultipliers: {
       political: 1.18,
       stakeholder: 1.15
-    }
+    },
+    options: [
+      {
+        stance: 'cautious',
+        label: 'Suspend interface operations during high fire danger',
+        outcome: 'Homes stay safe and the public sees caution; the schedule takes a hit.',
+        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+      },
+      {
+        stance: 'balanced',
+        label: 'Work night shifts when humidity recovers',
+        outcome: 'Cooler nights keep ignition risk down while maintaining some production.',
+        effects: { progress: 2, compliance: 1 }
+      },
+      {
+        stance: 'aggressive',
+        label: 'Cut close to houses to beat an expected fire ban',
+        outcome: 'You get more out before the ban, but residents and the district react strongly.',
+        effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 }
+      }
+    ]
   }
 ];
 

@@ -77,18 +77,22 @@
     "type": "policy",
     "severity": "minor",
     "probability": 0.025,
-    "description": "Forestry practices under public scrutiny - outcome depends on current reputation",
+    "description": "Forestry practices are under public scrutiny; how you handle the attention shapes trust in the file.",
     "options": [
       {
         "label": "Lean into it",
-        "outcome": "You adapt and roll with it.",
-        "effects": {}
+        "outcome": "You invite reporters to a site walk and answer the hard questions. Trust improves.",
+        "effects": {
+          "relationships": 3,
+          "compliance": 1
+        }
       },
       {
         "label": "Stay focused",
-        "outcome": "You keep the crew on task and avoid distractions.",
+        "outcome": "You keep crews working and decline interviews. The silence reads as defensiveness.",
         "effects": {
-          "politicalCapital": -1
+          "relationships": -2,
+          "compliance": -1
         }
       }
     ]

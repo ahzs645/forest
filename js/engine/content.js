@@ -24,6 +24,7 @@ import {
 import {
   clamp,
   eventTouchesMetric,
+  formatMetricName,
   hasAnyTag,
   hasMatchingTag,
   humanizeLabel,
@@ -605,6 +606,18 @@ export function adaptOperationalEvent(event, state) {
   }, state, "event");
 }
 
+function summarizeTemptationRisk(successEffects, failEffects) {
+  const gains = Object.entries(successEffects || {})
+    .filter(([, value]) => Number(value) > 0)
+    .map(([key]) => formatMetricName(key));
+  const costs = Object.entries(failEffects || {})
+    .filter(([, value]) => Number(value) < 0)
+    .map(([key]) => formatMetricName(key));
+  const gainText = gains.length ? `${gains.join(", ")} up if it lands` : "";
+  const costText = costs.length ? `${costs.join(", ")} down if caught` : "";
+  return [gainText, costText].filter(Boolean).join(" · ");
+}
+
 export function adaptIllegalActTemptation(act, state, rng = Math.random) {
   const profile = getTemptationProfile(state);
   const rawSuccessEffects = buildIllegalActSuccessEffects(act, state, rng);
@@ -625,6 +638,7 @@ export function adaptIllegalActTemptation(act, state, rng = Math.random) {
       {
         label: "Take the shortcut (high risk)",
         outcome: "You attempt something risky...",
+        preview: summarizeTemptationRisk(rawSuccessEffects, rawFailEffects),
         risk: {
           baseSuccess: getIllegalActBaseSuccess(act, state),
           successEffects: adaptOperationalEventEffects(rawSuccessEffects),

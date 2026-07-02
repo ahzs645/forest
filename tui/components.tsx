@@ -54,14 +54,17 @@ export function Dashboard({ gameState }: { gameState: any }) {
 }
 
 function DashboardStats({ gs }: { gs: any }) {
-  const season = SEASONS[Math.min(gs.round - 1, SEASONS.length - 1)];
+  const isCrisis = gs.gameMode === "crisis-command";
+  const season = isCrisis
+    ? gs.crisis?.currentPhase
+    : SEASONS[Math.min(gs.round - 1, SEASONS.length - 1)];
   return (
     <>
       <text
-        content={gs.round > 0 ? `Season ${gs.round} of ${gs.totalRounds}` : "Setup Phase"}
+        content={gs.round > 0 ? `${isCrisis ? "Phase" : "Season"} ${gs.round} of ${gs.totalRounds}` : "Setup Phase"}
         style={{ fg: C.white, bold: true }}
       />
-      {gs.round > 0 && <text content={season} style={{ fg: C.green }} />}
+      {gs.round > 0 && season ? <text content={season} style={{ fg: C.green }} /> : null}
       <text content="" />
       <text content="Metrics" style={{ fg: C.white, bold: true }} />
       <text content={`Progress:      ${gs.metrics.progress}`} style={{ fg: C.yellow }} />
@@ -416,7 +419,7 @@ export function ContentView({ data }: { data: ContentData }) {
           ) : null}
           <text content="" />
           <text content="What am I deciding?" style={{ fg: C.white, bold: true }} />
-          <text content={data.decisionPrompt || "Choose the response that best protects the current work."} style={{ fg: C.white }} />
+          <text content={data.decisionPrompt || "How do you want to respond?"} style={{ fg: C.white }} />
           <text content="" />
           <text content={`${data.optionHeading || "Choose your response"}:`} style={{ fg: data.optionTone ? optionColor : C.white, bold: true }} />
           {data.optionDetails.map((opt, i) => (

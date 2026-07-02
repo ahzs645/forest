@@ -323,9 +323,9 @@
     "options": [
       {
         "label": "Comply immediately",
-        "outcome": "Extra paperwork but you stay ahead of enforcement.",
+        "outcome": "Extra paperwork slows the file, but you stay ahead of enforcement.",
         "effects": {
-          "timeUsed": 4,
+          "timeUsed": 3,
           "compliance": 8
         }
       },
@@ -365,9 +365,9 @@
       },
       {
         "label": "Prepare a transition briefing",
-        "outcome": "Good relationship management. The new contact appreciates it.",
+        "outcome": "Good relationship management. The new contact appreciates the context.",
         "effects": {
-          "timeUsed": 4,
+          "timeUsed": 3,
           "relationships": 8
         }
       },

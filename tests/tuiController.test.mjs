@@ -140,7 +140,7 @@ test('crisis command choices advance metrics and end at a crisis debrief', () =>
 
   const state = controller.getState();
   assert.equal(state.contentData.type, 'summary');
-  assert.equal(state.contentData.heading, 'Crisis Debrief');
+  assert.match(state.contentData.heading, /^Crisis Debrief/);
   assert.equal(state.gameState.crisis.commandLog.length, 4);
   assert.deepEqual(state.options, ['Play Again', 'Quit']);
 });

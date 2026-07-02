@@ -246,7 +246,7 @@ export const PAPERWORK_CHAIN_LIBRARY = [
         id: "desktop-screen",
         label: "Run the archaeology desktop screen early",
         description:
-          "Treat the screen as a trigger for more work, not as a silent clearance slip.",
+          "The desktop archaeology screen returned enough sensitivity that the planned footprint needs follow-up before it can be defended.",
         hours: 2,
         paperworkRelief: 6,
         auditRelief: 5,

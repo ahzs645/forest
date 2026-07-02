@@ -454,35 +454,38 @@
     "description": "A saw kicks back. There's blood. This is serious.",
     "options": [
       {
-        "label": "Emergency first aid",
-        "outcome": "The first aid kit gets heavy use. Bleeding stopped. Needs hospital.",
-        "effects": {
-          "firstAid": -3
-        },
-        "crewEffect": {
-          "injury": "severe_laceration",
-          "evacuate": true
-        }
-      },
-      {
         "label": "Call helicopter medevac",
-        "outcome": "Air ambulance arrives within the hour. They'll be okay. Expensive.",
+        "outcome": "Air ambulance arrives within the hour. The bill is steep, but the crew sees that people come before production.",
         "effects": {
-          "budget": -2000
+          "crew_morale": 6,
+          "compliance": 2
         },
         "crewEffect": {
           "evacuate": true
         }
       },
       {
-        "label": "Drive to hospital (4 hours)",
-        "outcome": "Someone drives fast. They make it. The crew is shaken.",
+        "label": "Apply first aid and drive to hospital",
+        "outcome": "Bleeding is controlled, but the long road ride costs time and worries everyone.",
         "effects": {
-          "crew_morale": -20,
-          "fuel": -15
+          "crew_morale": -6,
+          "fuel": -8,
+          "timeUsed": 1
         },
         "crewEffect": {
           "evacuate": true
+        }
+      },
+      {
+        "label": "Treat on site and keep crews working",
+        "outcome": "The wound is bandaged, but shock and infection risk rise. The crew is visibly shaken.",
+        "effects": {
+          "crew_morale": -18,
+          "firstAid": -4,
+          "progress": 2
+        },
+        "crewEffect": {
+          "injury": "severe_laceration"
         }
       }
     ]
@@ -629,24 +632,25 @@
     "options": [
       {
         "label": "Go back and search",
-        "outcome": "Found most of it scattered along the road. Lost time.",
+        "outcome": "Found most of it scattered along the road. Lost time and fuel.",
         "effects": {
           "progress": -3,
-          "food": -3
+          "fuel": -5
         }
       },
       {
         "label": "Write it off and continue",
-        "outcome": "Can't spare the time. That food is gone.",
+        "outcome": "Can't spare the time. The lost supplies go on the books.",
         "effects": {
-          "food": -10
+          "budget": -750
         }
       },
       {
         "label": "Secure remaining cargo",
         "outcome": "You stop to re-tie everything. No more losses.",
         "effects": {
-          "progress": -2
+          "progress": -1,
+          "crew_morale": 2
         }
       }
     ]

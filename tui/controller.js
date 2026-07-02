@@ -362,6 +362,15 @@ function snapshotGameState(gs) {
     // Standing role mandate + signature win, shown on the dashboard so the
     // player always knows what they're judged on.
     roleObjective: gs.role?.id ? getRoleObjective(gs.role.id) : null,
+    // Override mandate/win for crisis command so the dashboard matches the
+    // incident-command scenario instead of the underlying planner role.
+    crisisObjective:
+      gs.gameMode === "crisis-command"
+        ? {
+            mandate: "Coordinate containment, access, permits, and relationships without sacrificing legal or habitat outcomes.",
+            signatureWin: "Containment holds and the response stays defensible",
+          }
+        : null,
     // Live "what am I trying to do right now" strip: mandate + at-risk meters +
     // the single most pressing pressure, recomputed from current metrics.
     objectiveStrip: gs.role?.id ? buildObjectiveStrip(gs) : null,
@@ -609,12 +618,18 @@ export class TuiGameController {
       return;
     }
 
-    this.selectCb?.(this.state.selected);
+    const cb = this.selectCb;
+    if (!cb) return;
+    this.selectCb = null;
+    cb(this.state.selected);
   }
 
   selectOption(index) {
     if (index < 0 || index >= this.state.options.length) return;
-    this.selectCb?.(index);
+    const cb = this.selectCb;
+    if (!cb) return;
+    this.selectCb = null;
+    cb(index);
   }
 
   handleKey(key) {
@@ -946,6 +961,9 @@ export class TuiGameController {
     }
 
     const scenario = phase.data;
+    if (gs.crisis) {
+      gs.crisis.currentPhase = scenario.phase;
+    }
     const artText = this.ambientArt ? detectArt(`${scenario.title} ${scenario.description}`, gs) : null;
     const card = buildCrisisCard(gs, scenario, notice);
 
@@ -1051,15 +1069,13 @@ export class TuiGameController {
     }
 
     if (key.name === "return") {
-      this.selectCb?.(this.state.selected);
+      this.submitCurrent();
       return;
     }
 
     if (key.sequence && /^[1-9]$/.test(key.sequence)) {
       const num = parseInt(key.sequence, 10) - 1;
-      if (num < this.state.options.length) {
-        this.selectCb?.(num);
-      }
+      this.selectOption(num);
     }
   }
 }

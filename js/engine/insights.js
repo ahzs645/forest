@@ -261,7 +261,37 @@ function metricStatus(metric, value) {
  * single most pressing pressure. Pure function of role + current metrics, so the
  * controller can recompute it from any snapshot.
  */
+function buildCrisisObjectiveStrip(state) {
+  const metrics = state?.metrics || {};
+  const tracked = ["progress", "forestHealth", "relationships", "compliance", "budget"];
+  const risks = [];
+  let worst = null;
+  for (const metric of tracked) {
+    const status = metricStatus(metric, metrics[metric]);
+    if (status === "stable") continue;
+    const word = METRIC_RISK_WORDS[metric]?.[status] || `${formatMetricName(metric)} low`;
+    risks.push({ metric, status, label: word });
+    const bands = METRIC_STATUS_BANDS[metric] || { warning: 45 };
+    const deficit = bands.warning - Number(metrics[metric] ?? 50);
+    if (!worst || deficit > worst.deficit || (status === "danger" && worst.status !== "danger")) {
+      worst = { metric, status, deficit, label: word };
+    }
+  }
+
+  return {
+    goal: "Coordinate containment, access, permits, and relationships without sacrificing legal or habitat outcomes.",
+    winCondition: "Containment holds and the response stays defensible.",
+    primaryMetric: "progress",
+    primaryLabel: formatMetricName("progress"),
+    risks,
+    pressure: worst ? worst.label : "Response stable — keep the incident from spreading.",
+  };
+}
+
 export function buildObjectiveStrip(state) {
+  if (state?.gameMode === "crisis-command") {
+    return buildCrisisObjectiveStrip(state);
+  }
   const objective = getRoleObjective(state?.role?.id);
   if (!objective) return null;
   const metrics = state?.metrics || {};

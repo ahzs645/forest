@@ -185,14 +185,15 @@ function shortSeason(season) {
   return String(season || "").split(" ")[0] || season;
 }
 
-function ObjectiveReadout({ objective, strip }) {
-  if (!objective) return null;
+function ObjectiveReadout({ objective, crisisObjective, strip }) {
+  const active = crisisObjective || objective;
+  if (!active) return null;
   return (
     <div className="tui-dashboard-aside tui-objective">
       <div className="tui-dashboard-section-title">Your mandate</div>
-      <p className="tui-copy">{objective.mandate}</p>
-      {objective.signatureWin ? (
-        <p className="tui-copy dim">{`Win: ${objective.signatureWin}.`}</p>
+      <p className="tui-copy">{active.mandate}</p>
+      {active.signatureWin ? (
+        <p className="tui-copy dim">{`Win: ${active.signatureWin}.`}</p>
       ) : null}
       {strip ? (
         <p className="tui-copy dim">{`Right now: ${strip.pressure}`}</p>
@@ -259,7 +260,7 @@ function Dashboard({ gameState }) {
   const metaRows = !gameState
     ? [{ label: "Status", value: "Awaiting game start..." }]
     : [
-        { label: "Season", value: `${gameState.round || 0} / ${gameState.totalRounds || 4}` },
+        { label: gameState.gameMode === "crisis-command" ? "Phase" : "Season", value: `${gameState.round || 0} / ${gameState.totalRounds || 4}` },
         { label: "Company", value: gameState.companyName },
         { label: "Mode", value: gameState.modeLabel },
         { label: "Incident", value: gameState.crisis?.title },
@@ -320,7 +321,7 @@ function Dashboard({ gameState }) {
               <span className="tui-dashboard-value">{row.value}</span>
             </div>
           ))}
-          <ObjectiveReadout objective={gameState?.roleObjective} strip={gameState?.objectiveStrip} />
+          <ObjectiveReadout objective={gameState?.roleObjective} crisisObjective={gameState?.crisisObjective} strip={gameState?.objectiveStrip} />
           <DecisionTrail trail={gameState?.decisionTrail} />
           <StyleReadout style={gameState?.managementStyle} />
           <SeasonLog timeline={gameState?.seasonTimeline} />
@@ -610,7 +611,7 @@ function ContentView({ data, objective }) {
           <section className="tui-tui-window tui-window-actions">
             <div className="tui-window-title">COMMAND FOCUS</div>
             <div className="tui-subheading">What am I deciding?</div>
-            <p className="tui-copy preserve">{data.decisionPrompt || "Choose the response that best protects the current work."}</p>
+            <p className="tui-copy preserve">{data.decisionPrompt || "How do you want to respond?"}</p>
             <p className="tui-copy dim preserve">Use the command menu below to select and execute an action.</p>
           </section>
         </div>

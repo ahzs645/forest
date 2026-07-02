@@ -1,5 +1,6 @@
 import { createInitialState } from "../js/engine/state.js";
 import { applyOptionOutcome, formatMetricDelta } from "../js/engine/effects.js";
+import { formatMetricName } from "../js/engine/shared.js";
 import {
   getPlanningAreaSnapshot,
   getRoleAreaBriefing,
@@ -373,6 +374,31 @@ export function getNextCrisisScenario(state) {
   return CRISIS_SCENARIOS[index] || null;
 }
 
+function summarizeCrisisEffects(effects) {
+  const gains = [];
+  const costs = [];
+  for (const [key, value] of Object.entries(effects || {})) {
+    if (!value) continue;
+    (value > 0 ? gains : costs).push(formatMetricName(key));
+  }
+  if (!gains.length && !costs.length) return null;
+  const parts = [];
+  if (gains.length) parts.push(`${gains.join(", ")} up`);
+  if (costs.length) parts.push(`${costs.join(", ")} down`);
+  return parts.join(" · ");
+}
+
+function deriveCrisisRiskLevel(effects) {
+  const negatives = Object.values(effects || {})
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && v < 0);
+  if (!negatives.length) return "low";
+  const worst = Math.min(...negatives);
+  const totalDown = negatives.reduce((sum, v) => sum + v, 0);
+  if (worst <= -6 || totalDown <= -8) return "high";
+  return "medium";
+}
+
 export function buildCrisisCard(state, scenario, notice = null) {
   const intel = state.crisis?.intel || {};
   const area = state.area || {};
@@ -408,6 +434,8 @@ export function buildCrisisCard(state, scenario, notice = null) {
     optionDetails: scenario.options.map((option) => ({
       label: option.label,
       outcome: option.outcome,
+      preview: summarizeCrisisEffects(option.effects),
+      riskLevel: deriveCrisisRiskLevel(option.effects),
     })),
     notice,
   };
@@ -454,13 +482,17 @@ export function buildCrisisSummary(state) {
   const trust = Math.round((metrics.relationships + metrics.compliance) / 2);
   const commandLog = state.crisis?.commandLog || [];
   const stable = containment >= 62 && trust >= 55 && metrics.budget >= 25;
+  const score = Math.round((metrics.progress + metrics.forestHealth + metrics.relationships + metrics.compliance + metrics.budget) / 5);
+  const tier = stable ? "STRONG" : score >= 55 ? "MIXED" : "FRAGILE";
 
   return {
     type: "summary",
-    heading: "Crisis Debrief",
+    heading: `Crisis Debrief — ${tier}`,
     body: stable
       ? "The incident is contained enough to move from emergency response into monitored recovery."
       : "The incident remains unstable. Leadership needs a recovery plan before the next operating window.",
+    score,
+    tier,
     bullets: [
       `Containment index: ${containment}`,
       `Trust and defensibility index: ${trust}`,
