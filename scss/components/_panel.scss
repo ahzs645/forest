@@ -142,16 +142,14 @@
   font-weight: bold;
 }
 
-.mission-meter-track {
-  height: 6px;
-  background: var(--surface-inset);
-  border: 1px solid var(--border);
-}
-
-.mission-meter-fill {
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.3s ease;
+// Character meter: ██████░░░░░░░░ (filled by panels.js)
+.mission-meter-bar {
+  color: var(--accent);
+  font-size: var(--font-size-sm);
+  letter-spacing: -1px;
+  line-height: 1.1;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .mission-facts {

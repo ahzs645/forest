@@ -149,6 +149,8 @@ export const InputMixin = {
         // Save handler before hiding choices (which clears it)
         const handler = this._choiceHandler;
         this.write(`> ${option.label}`, 'term-dim');
+        // Matching action animation on the field radio (chainsaw, boots, ...)
+        this.playRadioAction?.(option.label);
         this._hideChoices();
         if (handler) {
           handler(option);

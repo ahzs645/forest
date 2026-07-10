@@ -75,7 +75,7 @@ export const PanelsMixin = {
             <span class="mission-meter-label">${escapeHtml(status.meter.label || 'Progress')}</span>
             <span class="mission-meter-value">${escapeHtml(status.meter.text || `${v}%`)}</span>
           </div>
-          <div class="mission-meter-track"><div class="mission-meter-fill" style="width: ${v}%"></div></div>
+          <div class="mission-meter-bar">${progressBar(v, 24, false)}</div>
         </div>
       `);
     }

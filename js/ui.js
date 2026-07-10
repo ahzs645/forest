@@ -22,7 +22,9 @@ import {
   ModalMixin,
   InitFlowMixin,
   ModernUIMixin,
-  applyMixins
+  RadioMixin,
+  applyMixins,
+  attachFrame
 } from './ui/index.js';
 
 /**
@@ -68,7 +70,13 @@ export class TerminalUI {
     this.missionPanel = document.getElementById('mission-panel');
     this.missionStrip = document.getElementById('mission-strip');
     this.choicesHint = document.getElementById('choices-hint');
+    this.radioSection = document.getElementById('radio-section');
+    this.radioPanel = document.getElementById('radio-panel');
     this.crewPanel = document.getElementById('crew-panel');
+
+    // Character-drawn frames around the main panes (classic mode)
+    attachFrame(document.getElementById('terminal-window'), { title: 'FIELD LOG' });
+    attachFrame(document.getElementById('action-area'), { title: 'RESPOND' });
     this.resourcesPanel = document.getElementById('resources-panel');
     this.locationPanel = document.getElementById('location-panel');
     this.panelBackdrop = document.getElementById('panel-backdrop');
@@ -414,6 +422,9 @@ export class TerminalUI {
     // Location panel varies by journey type
     this._updateLocationPanelByJourneyType(journey);
 
+    // Field radio ambience follows the journey (weather / desk)
+    this.updateRadioFromJourney(journey);
+
     // Update modern mode UI elements
     this._updateModernUI(journey, isProtagonistMode);
   }
@@ -544,5 +555,6 @@ applyMixins(
   PanelsMixin,
   ModalMixin,
   InitFlowMixin,
-  ModernUIMixin
+  ModernUIMixin,
+  RadioMixin
 );

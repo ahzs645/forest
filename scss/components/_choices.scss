@@ -17,31 +17,40 @@
   overflow-y: auto;
 }
 
-// Classic mode: TUI option cards, like the seasonal TUI's "How do you want
-// to respond?" panel — key badge, label + effects, risk chip. The focused
-// card is the selection (accent border + tinted background).
+// Classic mode: flat TUI menu rows — no boxes. A ❯ cursor plus an
+// inverse-video selection bar marks the focused row, like a real terminal
+// menu; risk tags render as colored ‹SAFE›-style text, not chips.
 .choices--classic {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 1px;
 }
 
 .choice-btn {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-sm);
+  display: grid;
+  grid-template-columns: 2ch 2ch 1fr auto;
+  column-gap: var(--space-xs);
+  align-items: baseline;
   width: 100%;
-  padding: var(--space-xs) var(--space-sm);
+  padding: 3px var(--space-xs);
   background: transparent;
-  border: 1px solid var(--border);
+  border: none;
   color: var(--text);
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
   text-align: left;
   cursor: pointer;
 
+  // Cursor cell — empty until the row is the selection
+  &::before {
+    content: '';
+    grid-column: 1;
+    color: var(--accent-contrast);
+    font-weight: bold;
+  }
+
   // Hover is a hint; focus IS the selection. Keeping them distinct means
-  // only one full-strength highlight is ever visible.
+  // only one full-strength bar is ever visible.
   &:hover {
     background: var(--selection);
     outline: none;
@@ -49,18 +58,22 @@
 
   &:focus,
   &:focus-visible {
-    background: var(--selection);
-    border-color: var(--accent);
+    background: var(--accent);
     outline: none;
 
-    .choice-key {
-      background: var(--accent);
-      border-color: var(--accent);
+    &::before {
+      content: '❯';
+    }
+
+    .choice-key,
+    .choice-label,
+    .choice-hint,
+    .choice-tag {
       color: var(--accent-contrast);
     }
 
-    .choice-label {
-      color: var(--text-bright);
+    .choice-hint {
+      opacity: 0.8;
     }
   }
 
@@ -70,23 +83,22 @@
 }
 
 .choice-key {
-  flex-shrink: 0;
-  min-width: 3ch;
-  padding: 0 2px;
-  border: 1px solid var(--border-strong);
-  color: var(--text-bright);
+  grid-column: 2;
+  color: var(--text-dim);
   font-size: var(--font-size-sm);
-  font-weight: bold;
-  text-align: center;
-  line-height: 1.4;
+  text-align: right;
+
+  // "1" reads as a hotkey when it renders like one: 1․
+  &::after {
+    content: ' ';
+  }
 }
 
 .choice-main {
-  flex: 1;
+  grid-column: 3;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
 }
 
 .choice-label {
@@ -101,15 +113,21 @@
   color: var(--text-muted);
 }
 
-// Risk chips, colored like the seasonal TUI's SAFE/TRADEOFF/RISKY tags
+// Risk tags as colored terminal text: ‹SAFE› ‹TRADEOFF› ‹RISKY›
 .choice-tag {
-  flex-shrink: 0;
-  align-self: center;
-  padding: 0 6px;
-  border: 1px solid currentColor;
+  grid-column: 4;
+  align-self: baseline;
   font-size: var(--font-size-xs);
   font-weight: bold;
   letter-spacing: 1px;
+
+  &::before {
+    content: '‹';
+  }
+
+  &::after {
+    content: '›';
+  }
 
   &.tag-safe {
     color: var(--ok);

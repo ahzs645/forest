@@ -1,0 +1,63 @@
+// =============================================
+// Character Pane Frames (js/ui/frames.js)
+// =============================================
+// The frame is drawn as text in four absolutely positioned edge strips;
+// the pane reserves one line top/bottom and ~1.5ch left/right for them.
+
+.tui-frame {
+  position: relative;
+  border: none !important;
+  padding: 17px 1.5ch;
+}
+
+// Modern mode keeps its own chrome — hide the character edges there and
+// give the pane its spacing back.
+body[data-display-mode='modern'] {
+  .tui-frame {
+    padding: var(--space-md);
+  }
+
+  .tui-frame-edge {
+    display: none;
+  }
+}
+
+.tui-frame-edge {
+  position: absolute;
+  pointer-events: none;
+  color: var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 15px;
+  white-space: pre;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.tui-frame-top {
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.tui-frame-bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.tui-frame-left,
+.tui-frame-right {
+  top: 15px;
+  bottom: 15px;
+  width: 1ch;
+}
+
+.tui-frame-left {
+  left: 0;
+}
+
+.tui-frame-right {
+  right: 0;
+  direction: rtl;
+}
