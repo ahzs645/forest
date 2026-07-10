@@ -65,9 +65,51 @@ for (const run of TEST_RUNS) {
   });
 }
 
+// The strategy bots below parse game state as text. Status moved from the
+// terminal log into the mission dashboard and supplies panes, so this reads
+// all three and normalizes the panes back to the old "Label: value" lines
+// the extractors expect.
+async function readGameText(page) {
+  const terminalText = await page.locator('#terminal').innerText();
+  const panesText = await page.evaluate(() => {
+    const lines = [];
+
+    const mission = document.getElementById('mission-panel');
+    if (mission) {
+      const objective = mission.querySelector('.mission-objective');
+      if (objective) lines.push(`Objective: ${objective.textContent.trim()}`);
+      for (const fact of mission.querySelectorAll('.mission-fact')) {
+        const label = fact.querySelector('.mission-fact-label')?.textContent.trim();
+        const value = fact.querySelector('.mission-fact-value')?.textContent.trim();
+        if (label && value) lines.push(`${label}: ${value}`);
+      }
+      for (const check of mission.querySelectorAll('.mission-check')) {
+        lines.push(check.textContent.replace(/\s+/g, ' ').trim());
+      }
+      const guidance = mission.querySelector('.mission-guidance');
+      if (guidance) lines.push(`Next Best Move: ${guidance.textContent.replace(/^❯\s*/, '').trim()}`);
+      for (const alert of mission.querySelectorAll('.mission-alert')) {
+        lines.push(alert.textContent.trim());
+      }
+    }
+
+    for (const row of document.querySelectorAll('#resources-panel .resource-row')) {
+      const label = row.querySelector('.resource-label')?.textContent.trim();
+      const value = row.querySelector('.resource-value')?.textContent.trim();
+      if (label && value) lines.push(`${label}: ${value}`);
+    }
+
+    const injured = document.querySelectorAll('#crew-panel .crew-member.injured, #crew-panel .crew-member.critical').length;
+    if (injured > 0) lines.push(`| ${injured} injured`);
+
+    return lines.join('\n');
+  });
+  return `${terminalText}\n${panesText}`;
+}
+
 async function autoPlayToEnd(page, strategyName, maxSteps = 900) {
   for (let step = 0; step < maxSteps; step++) {
-    const terminalText = await page.locator('#terminal').innerText();
+    const terminalText = await readGameText(page);
     if (isEndScreen(terminalText)) {
       return { ended: true, steps: step, terminalText };
     }
@@ -82,7 +124,7 @@ async function autoPlayToEnd(page, strategyName, maxSteps = 900) {
       return {
         ended: true,
         steps: step,
-        terminalText: await page.locator('#terminal').innerText()
+        terminalText: await readGameText(page)
       };
     }
 
@@ -93,7 +135,7 @@ async function autoPlayToEnd(page, strategyName, maxSteps = 900) {
   return {
     ended: false,
     steps: maxSteps,
-    terminalText: await page.locator('#terminal').innerText()
+    terminalText: await readGameText(page)
   };
 }
 
@@ -428,7 +470,9 @@ function findFirstMatching(labels, priorities) {
 }
 
 function normalizeChoiceLabel(label) {
-  return String(label || '').replace(/^\[\d+\]\s*/, '').trim();
+  // Accepts both the legacy "[1] Label" text and the TUI card markup, where
+  // the key badge renders as a bare leading digit ("1 Label").
+  return String(label || '').replace(/^\[?\d+\]?\s+/, '').trim();
 }
 
 function escapeRegExp(value) {

@@ -8,22 +8,22 @@
 // ...) are kept as aliases so existing styles keep working.
 
 :root {
-  // ---- Green phosphor (default) ----
-  --canvas: #050805;          // page background
-  --surface: #0a120a;         // panes, strips, sidebars
-  --surface-inset: #030603;   // inputs, wells inside panes
-  --border: #1d4d1d;          // pane borders
-  --border-strong: #2f7a2f;   // focused / highlighted borders
-  --text: #4ddb4d;            // body text
-  --text-bright: #8cff8c;     // headings, values
-  --text-muted: #3f9c3f;      // secondary text
-  --text-dim: #2a6b2a;        // hints, decorations
-  --accent: #2fe680;          // selection bar, primary actions
-  --accent-contrast: #04240f; // text on top of --accent
-  --ok: #52e685;
-  --warn: #e6c14d;
-  --danger: #f0554d;
-  --selection: rgba(47, 230, 128, 0.25);
+  // ---- TUI dark (default) — the seasonal-TUI look ----
+  --canvas: #0a0e14;          // page background
+  --surface: #10161f;         // panes, strips, sidebars
+  --surface-inset: #070b10;   // inputs, wells inside panes
+  --border: #2b3646;          // pane borders
+  --border-strong: #40506a;   // focused / highlighted borders
+  --text: #c3cedd;            // body text
+  --text-bright: #eaf1fa;     // headings, values
+  --text-muted: #8494ab;      // secondary text
+  --text-dim: #55637a;        // hints, decorations
+  --accent: #58a6ff;          // selection bar, primary actions
+  --accent-contrast: #04121f; // text on top of --accent
+  --ok: #3fb950;
+  --warn: #d29922;
+  --danger: #f85149;
+  --selection: rgba(88, 166, 255, 0.18);
 
   // ---- Legacy aliases (do not add new uses) ----
   --bg-dark: var(--canvas);
@@ -41,9 +41,9 @@
   --border-color: var(--border);
   --border-bright: var(--border-strong);
   --accent-2: var(--accent);
-  --glow: rgba(51, 255, 51, 0.12);
-  --card: rgba(16, 32, 16, 0.85);
-  --card-strong: rgba(20, 48, 20, 0.95);
+  --glow: rgba(88, 166, 255, 0.12);
+  --card: rgba(18, 26, 38, 0.85);
+  --card-strong: rgba(24, 34, 48, 0.95);
 
   // Typography
   --font-mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code',
@@ -63,6 +63,28 @@
   --header-height: 34px;
   --status-bar-height: 30px;
   --panel-width: 300px;
+}
+
+// ---- Green phosphor ----
+body[data-theme='green'] {
+  --canvas: #050805;
+  --surface: #0a120a;
+  --surface-inset: #030603;
+  --border: #1d4d1d;
+  --border-strong: #2f7a2f;
+  --text: #4ddb4d;
+  --text-bright: #8cff8c;
+  --text-muted: #3f9c3f;
+  --text-dim: #2a6b2a;
+  --accent: #2fe680;
+  --accent-contrast: #04240f;
+  --ok: #52e685;
+  --warn: #e6c14d;
+  --danger: #f0554d;
+  --selection: rgba(47, 230, 128, 0.25);
+  --glow: rgba(51, 255, 51, 0.12);
+  --card: rgba(16, 32, 16, 0.85);
+  --card-strong: rgba(20, 48, 20, 0.95);
 }
 
 // ---- Amber CRT ----

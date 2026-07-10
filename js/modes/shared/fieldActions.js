@@ -204,25 +204,3 @@ export function applyForageResults(ui, journey) {
   }
 }
 
-/**
- * Display crew status summary
- * @param {Object} ui - UI instance
- * @param {Object} journey - Journey state
- */
-export function displayCrewStatus(ui, journey) {
-  if (!journey.crew || journey.crew.length === 0) {
-    return;
-  }
-
-  const activeCrew = journey.crew.filter(m => m.isActive);
-  const activeCount = activeCrew.length;
-  const totalCount = journey.crew.length;
-  const avgHealth = activeCount > 0
-    ? Math.round(activeCrew.reduce((sum, m) => sum + m.health, 0) / activeCount)
-    : 0;
-  const injured = activeCrew.filter(m => m.statusEffects?.length > 0).length;
-
-  ui.write(`Crew: ${activeCount}/${totalCount} active | Avg Health: ${avgHealth}%${injured > 0 ? ` | ${injured} injured` : ''}`);
-  ui.write('(Crew details: the [S] Status button, or press S)');
-  ui.write('');
-}

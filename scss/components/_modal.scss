@@ -154,6 +154,10 @@
   height: 14px;
   border: 1px solid var(--border);
 
+  &[data-swatch='dark'] {
+    background: linear-gradient(90deg, #0a0e14 40%, #c3cedd 40%, #c3cedd 70%, #58a6ff 70%);
+  }
+
   &[data-swatch='green'] {
     background: linear-gradient(90deg, #050805 40%, #4ddb4d 40%, #4ddb4d 70%, #2fe680 70%);
   }
@@ -186,7 +190,7 @@
 
   &.active {
     border-color: var(--accent);
-    background: rgba(0, 255, 153, 0.1);
+    background: var(--selection);
   }
 
   .toggle-icon {

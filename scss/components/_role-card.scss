@@ -35,12 +35,12 @@
 
   &:hover {
     border-color: var(--fg-dim);
-    background: rgba(0, 255, 51, 0.03);
+    background: var(--selection);
   }
 
   &.selected {
     border-color: var(--accent);
-    background: rgba(0, 255, 153, 0.1);
+    background: var(--selection);
 
     .role-icon-box {
       background: var(--accent);

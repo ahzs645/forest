@@ -64,6 +64,10 @@ export class TerminalUI {
 
     // Side panel elements
     this.sidePanel = document.getElementById('side-panel');
+    this.missionSection = document.getElementById('mission-section');
+    this.missionPanel = document.getElementById('mission-panel');
+    this.missionStrip = document.getElementById('mission-strip');
+    this.choicesHint = document.getElementById('choices-hint');
     this.crewPanel = document.getElementById('crew-panel');
     this.resourcesPanel = document.getElementById('resources-panel');
     this.locationPanel = document.getElementById('location-panel');

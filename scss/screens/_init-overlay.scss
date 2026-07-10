@@ -415,7 +415,7 @@
 
   &.complete {
     color: var(--fg-bright);
-    border-color: rgba(0, 255, 51, 0.4);
+    border-color: var(--border-strong);
   }
 }
 

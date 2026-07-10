@@ -587,68 +587,71 @@ function displayDayHeader(ui, journey) {
   // ASCII block map (Phase 5.4)
   ui.write(buildBlockMap(journey));
 
-  // Compact progress line. Recon is won by closing every block package, not by
-  // reaching the end of the route, so the headline bar tracks Package
-  // Completion (verified packages / total) and distance is a secondary stat.
-  const totalBlocks = progressInfo.totalBlocks || journey.blocks?.length || 0;
-  const packagesDone = Math.min(totalBlocks, journey.blocksAssessed || 0);
-  const completionPct = totalBlocks > 0 ? Math.round((packagesDone / totalBlocks) * 100) : 0;
-  const progressBarWidth = 20;
-  const filledWidth = Math.max(0, Math.min(progressBarWidth, Math.round((completionPct / 100) * progressBarWidth)));
-  const progressBar = '\u2588'.repeat(filledWidth) + '\u2591'.repeat(progressBarWidth - filledWidth);
-  ui.write(`[${progressBar}] Package Completion ${packagesDone}/${totalBlocks} (${completionPct}%) | Traverse ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km | Block ${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}`);
-
-  ui.write(`Weather: ${journey.weather?.name || 'Clear'} | Terrain: ${currentBlock?.terrain || 'unknown'} | Hours: ${journey.hoursRemaining || 0}h`);
-
   // Recap of the previous action's results (set by the travel branch), shown
   // here because this header clears the screen those results were printed on.
   if (Array.isArray(journey.lastActionRecap) && journey.lastActionRecap.length) {
-    ui.write('── last leg ──', 'term-dim');
+    ui.write('\u2500\u2500 last leg \u2500\u2500', 'term-dim');
     for (const line of journey.lastActionRecap) ui.write(line, 'term-dim');
     journey.lastActionRecap = null;
   }
 
-  const r = journey.resources;
-  ui.write(`FUEL: ${Math.round(r.fuel)} | FOOD: ${Math.round(r.food)} | EQUIP: ${Math.round(r.equipment)}% | MEDS: ${r.firstAid} | CASH: $${Math.round(r.budget).toLocaleString()}`);
-
-  // Objective tracker: the win condition (finalize every package) and the
-  // checklist for THIS block, so closing packages is never a surprise.
+  // The status picture renders in the mission dashboard pane, not as prose.
+  // Recon is won by closing every block package, so the headline meter tracks
+  // Package Completion with this block's checklist underneath; resources and
+  // crew live in their own panes already.
+  const totalBlocks = progressInfo.totalBlocks || journey.blocks?.length || 0;
+  const packagesDone = Math.min(totalBlocks, journey.blocksAssessed || 0);
+  const completionPct = totalBlocks > 0 ? Math.round((packagesDone / totalBlocks) * 100) : 0;
   const packagesRemaining = Math.max(0, totalBlocks - packagesDone);
-  ui.write(
-    packagesRemaining > 0
-      ? `Win condition: finalize every block package — ${packagesRemaining} still open`
-      : `Win condition met: all ${totalBlocks} block packages finalized`
-  );
+
+  const facts = [
+    { label: 'Weather', value: journey.weather?.name || 'Clear' },
+    { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
+    { label: 'Hours left', value: `${journey.hoursRemaining || 0}h` },
+    { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km` },
+    { label: 'Block', value: `${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}` }
+  ];
+  const checklist = [];
+
   if (currentBlock) {
     const intel = getReconBlockIntel(journey, currentBlock);
     const sweep = getReconValueSweepProfile(currentBlock, journey);
-    const check = (done) => (done ? '[x]' : '[ ]');
-    const sweepLabel = sweep.needed
-      ? `${check(intel.valuesSwept)} values sweep`
-      : '[x] values sweep (not flagged)';
     const finalized = intel.accessGroundTruthed && (!sweep.needed || intel.valuesSwept);
-    ui.write(`${currentBlock.name} package: ${check(intel.accessGroundTruthed)} access  ${sweepLabel}  ${check(finalized)} finalized`);
-    // Current Intel on the shift header, not only behind Review the Briefing, so
-    // the player always knows what is still unverified on the block underfoot.
-    const accessIntelLabel = intel.accessGroundTruthed ? 'ground-truthed' : 'unverified';
-    const valuesIntelLabel = sweep.needed
-      ? (intel.valuesSwept ? 'swept' : 'pending')
-      : 'quiet';
-    ui.write(`Current Intel: access ${accessIntelLabel} | values ${valuesIntelLabel}`);
+    checklist.push({ label: 'access ground-truthed', done: intel.accessGroundTruthed });
+    checklist.push({
+      label: sweep.needed ? 'values sweep' : 'values sweep (not flagged)',
+      done: sweep.needed ? intel.valuesSwept : true
+    });
+    checklist.push({ label: 'package finalized', done: finalized });
+    facts.push({
+      label: 'Intel',
+      value: `access ${intel.accessGroundTruthed ? 'verified' : 'unverified'} \u00b7 values ${sweep.needed ? (intel.valuesSwept ? 'swept' : 'pending') : 'quiet'}`
+    });
   }
-  displayCrewStatus(ui, journey);
 
-  // Alerts only — the full picture lives in Review the Briefing
+  const alerts = [];
   const currentAccessVerdict = getBlockAccessVerdict(currentBlock, journey.weather, journey);
   if (currentAccessVerdict.id === 'no_go' || currentAccessVerdict.id === 'heli_only') {
-    ui.writeDanger(formatAccessVerdict(currentAccessVerdict));
+    alerts.push({ level: 'danger', text: formatAccessVerdict(currentAccessVerdict) });
   } else if (currentAccessVerdict.id !== 'passable_now') {
-    ui.writeWarning(formatAccessVerdict(currentAccessVerdict));
+    alerts.push({ level: 'warn', text: formatAccessVerdict(currentAccessVerdict) });
   }
   if (journey.rationPlan?.mode === 'short') {
-    ui.writeWarning(`Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`);
+    alerts.push({
+      level: 'warn',
+      text: `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
+    });
   }
-  ui.write('');
+
+  ui.setMissionStatus?.({
+    objective: packagesRemaining > 0
+      ? `Finalize every block package \u2014 ${packagesRemaining} still open`
+      : `Win condition met: all ${totalBlocks} block packages finalized`,
+    meter: { label: 'Packages', value: completionPct, text: `${packagesDone}/${totalBlocks}` },
+    facts,
+    checklist,
+    alerts
+  });
 
   // Crew dialogue (Phase 5.1) — an occasional voice, not a daily ritual
   const activeCrew = journey.crew.filter(m => m.isActive);
@@ -1383,24 +1386,6 @@ function applyForageResults(ui, journey, strategy = 'forage') {
   }
 }
 
-/**
- * Display crew status summary
- * @param {Object} ui - UI instance
- * @param {Object} journey - Journey state
- */
-function displayCrewStatus(ui, journey) {
-  const activeCrew = journey.crew.filter(m => m.isActive);
-  const activeCount = activeCrew.length;
-  const totalCount = journey.crew.length;
-  const avgHealth = activeCount > 0
-    ? Math.round(activeCrew.reduce((sum, m) => sum + m.health, 0) / activeCount)
-    : 0;
-  const injured = activeCrew.filter(m => m.statusEffects?.length > 0).length;
-
-  ui.write(`Crew: ${activeCount}/${totalCount} active | Avg Health: ${avgHealth}%${injured > 0 ? ` | ${injured} injured` : ''}`);
-  ui.write('(Crew details: the [S] Status button, or press S)');
-  ui.write('');
-}
 
 
 

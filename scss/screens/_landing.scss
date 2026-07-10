@@ -220,7 +220,7 @@
 
 .welcome-checks-combined .highlight {
   color: var(--fg-main);
-  background: rgba(0, 255, 51, 0.1);
+  background: var(--selection);
   padding: 1px 4px;
   border: 1px solid var(--border-color);
 }
@@ -253,7 +253,7 @@
 
   .highlight {
     color: var(--fg-main);
-    background: rgba(0, 255, 51, 0.1);
+    background: var(--selection);
     padding: 2px 6px;
     border: 1px solid var(--border-color);
   }

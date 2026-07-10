@@ -9,18 +9,21 @@ const THEME_KEY = 'bcForestry_theme';
 const CRT_KEY = 'bcForestry_crt';
 
 export const THEMES = [
+  { id: 'dark', label: 'TUI dark' },
   { id: 'green', label: 'Green phosphor' },
   { id: 'amber', label: 'Amber CRT' },
   { id: 'ice', label: 'Ice' }
 ];
 
-const DEFAULT_THEME = 'green';
+const DEFAULT_THEME = 'dark';
 const VALID_THEMES = new Set(THEMES.map(t => t.id));
 
 export class ThemeManager {
   constructor() {
     this._theme = this._load(THEME_KEY, DEFAULT_THEME, v => VALID_THEMES.has(v));
-    this._crt = this._load(CRT_KEY, 'on', v => v === 'on' || v === 'off');
+    // Scanlines read as CRT-retro; the default TUI-dark theme is cleaner
+    // without them, so they're opt-in.
+    this._crt = this._load(CRT_KEY, 'off', v => v === 'on' || v === 'off');
   }
 
   _load(key, fallback, isValid) {

@@ -129,47 +129,39 @@ function displayManagerHeader(ui, journey) {
   ui.clear();
   ui.writeHeader(`MANAGER - MONTH ${journey.day}/${journey.deadline}`);
 
-  ui.writeDivider("EXECUTIVE DASHBOARD");
-  ui.write(
-    `Budget: $${Math.round(journey.resources.budget).toLocaleString()}`
-    + ` | Political Capital: ${Math.round(journey.resources.politicalCapital)}`
-    + ` | Scrutiny: ${Math.round(journey.scrutiny || 0)}%`,
-  );
-
-  const repBar = createBar(journey.metrics.reputation, 10);
-  ui.write(`Reputation: [${repBar}] ${Math.round(journey.metrics.reputation)}%`);
-
-  ui.write(
-    journey.ceo
-      ? `CEO: ${journey.ceo.name} (${journey.ceo.background})`
-      : "CEO: Vacant - the board is watching the empty chair",
-  );
-
-  const certs = (journey.certifications || []).map((cert) => cert.id || cert.name).join(", ");
-  ui.write(`Certifications: ${certs || "None"}`);
-
-  ui.write(
-    `Metrics: ${formatMetricBar("Ops", journey.metrics.progress)}`
-    + ` | ${formatMetricBar("Forest", journey.metrics.forestHealth)}`
-    + ` | ${formatMetricBar("Rel", journey.metrics.relationships)}`
-    + ` | ${formatMetricBar("Comp", journey.metrics.compliance)}`,
-  );
-
-  const activeCrew = (journey.crew || []).filter((member) => member.isActive);
-  if (activeCrew.length > 0) {
-    const avgMorale = Math.round(
-      activeCrew.reduce((sum, member) => sum + member.morale, 0) / activeCrew.length,
-    );
-    ui.write(`Executive Crew: ${activeCrew.length} active | Avg Morale: ${avgMorale}%`);
-  }
-
-  // Sticky objective + the two survival gates the term victory check uses.
+  // Status renders in the mission dashboard pane; budget/political capital
+  // live in the supplies pane and the crew pane covers the executive team.
   const budgetOk = journey.resources.budget > 0;
   const repOk = (journey.metrics.reputation || 50) > 40;
-  ui.write(`Objective: Lead the company through all ${journey.deadline} months with the books and the board onside.`);
-  ui.write(`Survival Gates: [${budgetOk ? 'x' : ' '}] Solvent  [${repOk ? 'x' : ' '}] Reputation above 40%`);
-  ui.write(`Term Progress: ${getOperationalProgress(journey)}%`);
-  ui.write("");
+
+  const facts = [
+    { label: 'Reputation', value: `${Math.round(journey.metrics.reputation)}%`, tone: repOk ? undefined : 'danger' },
+    { label: 'Scrutiny', value: `${Math.round(journey.scrutiny || 0)}%`, tone: (journey.scrutiny || 0) > 70 ? 'warn' : undefined },
+    { label: 'CEO', value: journey.ceo ? `${journey.ceo.name} (${journey.ceo.background})` : 'Vacant', tone: journey.ceo ? undefined : 'warn' },
+    { label: 'Certifications', value: (journey.certifications || []).map((cert) => cert.id || cert.name).join(', ') || 'None' },
+    { label: 'Ops', value: `${Math.round(journey.metrics.progress)}%` },
+    { label: 'Forest', value: `${Math.round(journey.metrics.forestHealth)}%` },
+    { label: 'Relations', value: `${Math.round(journey.metrics.relationships)}%` },
+    { label: 'Compliance', value: `${Math.round(journey.metrics.compliance)}%` }
+  ];
+
+  const checklist = [
+    { label: 'books solvent', done: budgetOk },
+    { label: 'reputation above 40%', done: repOk }
+  ];
+
+  const alerts = [];
+  if (!journey.ceo) {
+    alerts.push({ level: 'warn', text: 'CEO chair is empty - the board is watching.' });
+  }
+
+  ui.setMissionStatus?.({
+    objective: `Lead the company through all ${journey.deadline} months with the books and the board onside.`,
+    meter: { label: 'Term', value: getOperationalProgress(journey), text: `Month ${journey.day}/${journey.deadline}` },
+    facts,
+    checklist,
+    alerts
+  });
 }
 
 /**
@@ -614,11 +606,4 @@ function recordDecision(journey, beat, choice) {
   journey.decisions.push({ day: journey.day, type: "strategic", beat, choice });
 }
 
-function formatMetricBar(label, value) {
-  return `${label} [${createBar(value, 5)}] ${Math.round(value)}`;
-}
 
-function createBar(value, width) {
-  const filled = Math.round((clampPercentValue(value) / 100) * width);
-  return "█".repeat(filled) + "░".repeat(width - filled);
-}

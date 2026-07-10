@@ -227,6 +227,8 @@ export const InitFlowMixin = {
       this.landingScreen.hidden = false;
       this.landingScreen.style.display = 'flex';
     }
+    // A mission belongs to a run; back on the landing hub there isn't one.
+    this.clearMissionStatus?.();
   },
 
   /**
