@@ -73,36 +73,33 @@
   border: 1px solid var(--border-color);
 }
 
-// Terminal glow effect
+// Terminal glow effect (retired: TUI look is crisp, no glow)
 @mixin terminal-glow {
-  text-shadow: 0 0 10px var(--glow);
+  text-shadow: none;
 }
 
 // Interactive hover state
 @mixin hover-glow {
-  transition: all 0.15s ease;
-
   &:hover,
   &:focus {
-    border-color: var(--fg-main);
-    background: rgba(51, 255, 51, 0.1);
+    border-color: var(--border-strong);
+    background: var(--selection);
     outline: none;
   }
 }
 
-// Primary button gradient
+// Primary button — flat inverse-video block, no gradient or glow
 @mixin primary-button {
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  color: #001a0a;
-  border: 1px solid var(--border-bright);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: 1px solid var(--accent);
   font-family: var(--font-mono);
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 0 12px rgba(0, 255, 153, 0.35);
 
   &:hover,
   &:focus {
-    filter: brightness(1.1);
+    filter: brightness(1.15);
     outline: none;
   }
 }

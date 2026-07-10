@@ -26,31 +26,11 @@
   position: relative;
   width: min(900px, 100%);
   max-height: 95vh;
-  background: linear-gradient(180deg, rgba(0, 20, 0, 0.95), rgba(5, 15, 5, 0.98));
-  border: 2px solid var(--fg-dim);
-  box-shadow:
-    0 0 40px rgba(0, 255, 51, 0.15),
-    inset 0 0 80px rgba(0, 255, 51, 0.03);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-
-  // CRT Scanline Effect
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-      transparent 50%,
-      rgba(0, 0, 0, 0.03) 50%
-    );
-    background-size: 100% 4px;
-    pointer-events: none;
-    z-index: 1;
-  }
 
   @include mobile-down {
     width: 100%;
@@ -150,7 +130,6 @@
   font-size: 14px;
   line-height: 1.2;
   margin: 0;
-  text-shadow: 0 0 10px var(--glow);
   text-align: left;
   display: inline-block;
 
@@ -187,29 +166,28 @@
   letter-spacing: 1px;
 }
 
-// System Ready Title
+// System Ready Title — ═ rails instead of a glow
 .system-ready-title {
-  font-size: clamp(28px, 7vw, 48px);
+  font-size: clamp(22px, 5vw, 32px);
   font-weight: bold;
-  letter-spacing: 4px;
-  color: var(--fg-bright);
-  text-shadow: 0 0 30px var(--glow);
+  letter-spacing: 6px;
+  color: var(--text-bright);
   text-align: center;
   margin: 0;
-  padding: var(--space-sm) 0;
-  border-top: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
+  padding: var(--space-xs) 0;
+  border-top: 1px double var(--border-strong);
+  border-bottom: 1px double var(--border-strong);
   width: 100%;
   max-width: 600px;
 
   @include mobile-down {
-    font-size: 24px;
-    letter-spacing: 2px;
+    font-size: 20px;
+    letter-spacing: 3px;
     padding: var(--space-xs) 0;
   }
 
   @include xs-down {
-    font-size: 22px;
+    font-size: 18px;
   }
 }
 
@@ -339,75 +317,103 @@
   }
 }
 
-// Landing Action Buttons
+// Landing Action Buttons — a framed TUI menu pane with the title set into
+// the border (┌─ MAIN MENU ─...─┐ look via the legend trick)
 .landing-actions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 1px;
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
+  position: relative;
+  border: 1px solid var(--border);
+  padding: var(--space-sm);
+  margin-top: var(--space-xs);
+
+  &::before {
+    content: 'MAIN MENU';
+    position: absolute;
+    top: -0.75em;
+    left: 12px;
+    padding: 0 1ch;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    letter-spacing: 2px;
+  }
 
   &.compact {
-    gap: var(--space-xs);
-    max-width: 350px;
+    gap: 1px;
+    max-width: 480px;
   }
 
   @include mobile-down {
     max-width: 100%;
-
-    &.compact {
-      gap: 4px;
-    }
   }
 }
 
+// TUI menu rows: no boxes — a cursor column plus an inverse-video
+// highlight bar on hover/focus, like a terminal boot menu.
 .landing-btn {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-sm) var(--space-md);
-  min-height: 44px;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 34px;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   letter-spacing: 1px;
+  white-space: nowrap;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid var(--border-color);
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
   text-transform: uppercase;
+  text-align: left;
 
-  &.primary {
-    background: linear-gradient(90deg, var(--accent), var(--accent-2));
-    color: #001a0a;
-    border-color: var(--accent);
-    font-weight: bold;
-    box-shadow: 0 0 20px rgba(0, 255, 153, 0.3);
+  // Cursor column: every row carries a ❯ that's invisible until active
+  .btn-icon {
+    color: transparent;
+  }
 
-    &:hover {
-      box-shadow: 0 0 30px rgba(0, 255, 153, 0.5);
-      transform: translateY(-1px);
+  &:hover {
+    background: var(--selection);
+    outline: none;
+  }
+
+  &:focus,
+  &:focus-visible {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border-left-color: var(--text-bright);
+    outline: none;
+
+    .btn-icon {
+      color: var(--accent-contrast);
+    }
+
+    .landing-btn-badge {
+      border-color: var(--accent-contrast);
+      color: var(--accent-contrast);
     }
   }
 
-  &.secondary {
-    background: transparent;
-    color: var(--fg-main);
+  &.primary {
+    color: var(--text-bright);
+    font-weight: bold;
 
-    &:hover {
-      background: rgba(0, 255, 51, 0.1);
-      border-color: var(--fg-main);
+    &:focus,
+    &:focus-visible {
+      color: var(--accent-contrast);
     }
   }
 
   &.ghost {
-    background: transparent;
-    color: var(--fg-muted);
+    color: var(--text-muted);
     flex: 1;
     justify-content: center;
-
-    &:hover {
-      color: var(--fg-main);
-      border-color: var(--fg-dim);
-    }
+    min-height: 34px;
   }
 
   @include mobile-down {

@@ -5,8 +5,8 @@
 
 .side-panel {
   width: var(--panel-width);
-  background: var(--bg-panel);
-  border-left: 2px solid var(--border-color);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -37,10 +37,10 @@
 }
 
 .panel-title {
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
   font-weight: bold;
   letter-spacing: 1px;
-  color: var(--fg-bright);
+  color: var(--text-bright);
 }
 
 .panel-content {
@@ -57,13 +57,28 @@
   }
 }
 
+// ── SECTION ─────── style titles
 .section-title {
-  font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  font-weight: normal;
+  color: var(--text-muted);
   letter-spacing: 1px;
   margin-bottom: var(--space-sm);
-  padding-bottom: var(--space-xs);
-  border-bottom: 1px dashed var(--border-color);
+
+  &::before {
+    content: '──';
+    color: var(--border);
+    flex-shrink: 0;
+  }
+
+  &::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--border);
+  }
 }
 
 .panel-placeholder {
@@ -96,32 +111,39 @@
   gap: var(--space-sm);
 }
 
+// Crew entries are rows, not cards: a 2px status edge instead of a full box
 .crew-member {
-  padding: var(--space-sm);
-  border: 1px solid var(--border-color);
-  background: var(--bg-input);
+  padding: var(--space-xs) var(--space-sm);
+  border-left: 2px solid var(--border);
 
   &.injured {
-    border-color: var(--fg-warning);
+    border-left-color: var(--warn);
   }
 
   &.critical {
-    border-color: var(--fg-danger);
+    border-left-color: var(--danger);
   }
 
   &.inactive {
     opacity: 0.5;
+    border-left-style: dotted;
   }
 }
 
 .crew-name {
   font-weight: bold;
-  margin-bottom: var(--space-xs);
+  display: inline;
 }
 
 .crew-role {
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--text-muted);
+  display: inline;
+
+  &::before {
+    content: ' · ';
+    color: var(--text-dim);
+  }
 }
 
 .crew-stats {
@@ -156,6 +178,25 @@
   color: var(--fg-dim);
 }
 
+// ASCII meter: █████░░░░░ rendered as text by panels.js
+.resource-bar-text {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  letter-spacing: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+
+  &.low {
+    color: var(--warn);
+  }
+
+  &.critical {
+    color: var(--danger);
+  }
+}
+
+// Legacy div-fill bar (still used by modern mode)
 .resource-bar {
   flex: 1;
   height: 16px;
@@ -205,10 +246,7 @@
 
 .location-season {
   font-size: var(--font-size-sm);
-  color: var(--fg-bright);
-  padding: var(--space-xs) var(--space-sm);
-  background: rgba(51, 255, 51, 0.1);
-  border: 1px solid var(--border-color);
+  color: var(--text-bright);
   margin-bottom: var(--space-sm);
   display: inline-block;
 }

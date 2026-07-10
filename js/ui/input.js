@@ -134,6 +134,28 @@ export const InputMixin = {
       this.choices.appendChild(btn);
     });
 
+    // Arrow-key navigation: ↑/↓ (and j/k) move the selection bar through the
+    // list, wrapping at the ends. Focus IS the selection — Enter activates.
+    this.choices.onkeydown = (e) => {
+      const isDown = e.key === 'ArrowDown' || e.key === 'j';
+      const isUp = e.key === 'ArrowUp' || e.key === 'k';
+      if (!isDown && !isUp) return;
+
+      const buttons = Array.from(
+        this.choices.querySelectorAll('.choice-btn, .decision-card')
+      );
+      if (!buttons.length) return;
+
+      e.preventDefault();
+      const current = buttons.indexOf(document.activeElement);
+      const delta = isDown ? 1 : -1;
+      const next = current === -1
+        ? (isDown ? 0 : buttons.length - 1)
+        : (current + delta + buttons.length) % buttons.length;
+      buttons[next].focus();
+      buttons[next].scrollIntoView({ block: 'nearest' });
+    };
+
     // Focus first button
     const firstBtn = this.choices.querySelector('.choice-btn, .decision-card');
     if (firstBtn) firstBtn.focus();

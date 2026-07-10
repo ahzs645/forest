@@ -22,7 +22,8 @@ export const PanelsMixin = {
       this.dayValue.textContent = data.day || '1';
     }
     if (this.progressValue) {
-      this.progressValue.textContent = `${data.progress || 0}%`;
+      // Progress is a goal meter, not a health meter — never colored as risk.
+      this._setMeterValue(this.progressValue, data.progress || 0, '%', false, false);
     }
 
     // Check for protagonist mode vs crew mode
@@ -34,13 +35,14 @@ export const PanelsMixin = {
         this.crewLabel.textContent = 'ENERGY';
       }
       if (this.crewValue) {
-        this.crewValue.textContent = `${data.protagonist.energy || 0}%`;
+        this._setMeterValue(this.crewValue, data.protagonist.energy || 0, '%');
       }
       if (this.moraleLabel) {
         this.moraleLabel.textContent = 'STRESS';
       }
       if (this.moraleValue) {
-        this.moraleValue.textContent = `${data.protagonist.stress || 0}%`;
+        // Stress reads inverted: high is bad.
+        this._setMeterValue(this.moraleValue, data.protagonist.stress || 0, '%', true);
       }
     } else {
       // Crew mode - traditional display
@@ -54,9 +56,24 @@ export const PanelsMixin = {
         this.moraleLabel.textContent = 'MORALE';
       }
       if (this.moraleValue) {
-        this.moraleValue.textContent = `${data.morale || 0}%`;
+        this._setMeterValue(this.moraleValue, data.morale || 0, '%');
       }
     }
+  },
+
+  /**
+   * Render "▓▓▓░░░ 42%" into a status-bar value slot: a compact ASCII meter
+   * plus the number. Meter color flags trouble (low value — or high, when
+   * inverted, for stress-like stats).
+   * @private
+   */
+  _setMeterValue(el, value, suffix = '', inverted = false, colorByRisk = true) {
+    const v = Math.max(0, Math.min(100, Math.round(value)));
+    const risk = inverted ? v : 100 - v;
+    const riskClass = colorByRisk
+      ? (risk >= 75 ? 'danger' : risk >= 50 ? 'warn' : '')
+      : '';
+    el.innerHTML = `<span class="status-meter ${riskClass}">${progressBar(v, 8, false)}</span> ${v}${suffix}`;
   },
 
   /**
@@ -191,9 +208,7 @@ export const PanelsMixin = {
 
       row.innerHTML = `
         <span class="resource-label">${def.shortLabel}</span>
-        <div class="resource-bar">
-          <div class="resource-fill ${fillClass}" style="width: ${percentage}%"></div>
-        </div>
+        <span class="resource-bar-text ${fillClass}">${progressBar(percentage, 10, false)}</span>
         <span class="resource-value">${Math.round(value)}</span>
       `;
 
@@ -216,7 +231,8 @@ export const PanelsMixin = {
     // Build season display if available
     let seasonHtml = '';
     if (data.season) {
-      const seasonIcons = { spring: '🌱', summer: '☀️', fall: '🍂', winter: '❄️' };
+      // Text glyphs, not emoji — emoji break the terminal aesthetic
+      const seasonIcons = { spring: '❀', summer: '☼', fall: '❧', winter: '❄' };
       const seasonNames = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' };
       const icon = seasonIcons[data.season.currentSeason] || '';
       const name = seasonNames[data.season.currentSeason] || data.season.currentSeason;

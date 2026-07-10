@@ -17,25 +17,29 @@
   }
 }
 
+// Dialog box, midnight-commander style: crisp frame, inverse-video title bar
 .modal-box {
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
-  background: var(--bg-panel);
-  border: 2px solid var(--border-color);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
 }
 
 .modal-header {
-  padding: var(--space-md);
-  border-bottom: 1px solid var(--border-color);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--accent);
 }
 
 .modal-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-sm);
   font-weight: bold;
-  color: var(--fg-bright);
+  letter-spacing: 1px;
+  color: var(--accent-contrast);
+  text-transform: uppercase;
 }
 
 .modal-body {
@@ -54,22 +58,41 @@
   border-top: 1px solid var(--border-color);
 }
 
+// [ Button ] — brackets appear via pseudo-elements, TUI dialog style
 .modal-btn {
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  color: var(--fg-main);
+  padding: var(--space-xs) var(--space-sm);
+  background: transparent;
+  border: none;
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
   cursor: pointer;
 
-  &:hover {
-    border-color: var(--fg-main);
-    background: rgba(51, 255, 51, 0.1);
+  &::before {
+    content: '[ ';
+    color: var(--text-dim);
+  }
+
+  &::after {
+    content: ' ]';
+    color: var(--text-dim);
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    outline: none;
+
+    &::before,
+    &::after {
+      color: var(--accent-contrast);
+    }
   }
 
   &.primary {
-    border-color: var(--fg-main);
+    color: var(--text-bright);
+    font-weight: bold;
   }
 }
 
@@ -121,8 +144,27 @@
 
 .settings-toggle-group {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: var(--space-sm);
+}
+
+// Theme preview swatch in the settings theme picker
+.toggle-swatch {
+  width: 100%;
+  height: 14px;
+  border: 1px solid var(--border);
+
+  &[data-swatch='green'] {
+    background: linear-gradient(90deg, #050805 40%, #4ddb4d 40%, #4ddb4d 70%, #2fe680 70%);
+  }
+
+  &[data-swatch='amber'] {
+    background: linear-gradient(90deg, #0a0602 40%, #e6a23c 40%, #e6a23c 70%, #ffb347 70%);
+  }
+
+  &[data-swatch='ice'] {
+    background: linear-gradient(90deg, #04070a 40%, #6db8e0 40%, #6db8e0 70%, #47c2ff 70%);
+  }
 }
 
 .settings-toggle-btn {

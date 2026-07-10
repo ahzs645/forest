@@ -28,6 +28,7 @@ import { checkEndConditions as evaluateEndConditions } from '../modes/shared/end
 
 // Import display mode manager
 import { displayMode } from '../displayMode.js';
+import { theme } from '../theme.js';
 
 // Import extracted display modules
 import { showJourneyIntro } from './intro.js';
@@ -64,6 +65,7 @@ export function applyDifficultyMultipliers(journey, difficulty) {
 export class ForestryTrailGame {
   constructor(ui = null) {
     displayMode.apply();
+    theme.apply();
 
     this.ui = ui || new TerminalUI();
     this.journey = null;
@@ -93,6 +95,8 @@ export class ForestryTrailGame {
   _bindKeyboard() {
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
+        // Already consumed (e.g. the UI just closed a modal or panel with it)
+        if (event.defaultPrevented) return;
         if (this.ui.isModalOpen()) return;
         event.preventDefault();
         this._promptRestart();

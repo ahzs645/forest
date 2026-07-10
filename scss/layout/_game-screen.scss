@@ -3,19 +3,22 @@
 // =============================================
 @use '../abstracts' as *;
 
+// Fixed-viewport TUI chrome: the frame never scrolls, only the terminal
+// log inside it does.
 .game-screen {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .action-area {
-  padding: var(--space-md);
-  background: var(--bg-panel);
-  border-top: 2px solid var(--border-color);
+  padding: var(--space-sm);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
 
   @include mobile-down {

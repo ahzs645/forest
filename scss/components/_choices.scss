@@ -13,54 +13,85 @@
 .choices {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
   max-height: 300px;
   overflow-y: auto;
 }
 
-// Classic mode choices
+// Classic mode: a TUI selection list. Rows, not buttons — the focused row
+// gets a ❯ cursor and an inverse-video highlight bar, like a terminal menu.
 .choices--classic {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 1px;
 }
 
 .choice-btn {
-  display: block;
+  display: grid;
+  grid-template-columns: 2ch 1fr;
+  column-gap: var(--space-xs);
+  align-items: baseline;
   width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  color: var(--fg-main);
+  padding: var(--space-xs) var(--space-sm);
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s ease;
 
-  &:hover,
-  &:focus {
-    border-color: var(--fg-main);
-    background: rgba(51, 255, 51, 0.1);
+  // Cursor cell — empty until the row is active
+  &::before {
+    content: '';
+    color: var(--accent-contrast);
+    font-weight: bold;
+  }
+
+  // Hover is a hint; focus IS the selection. Keeping them distinct means
+  // only one full-strength bar is ever visible.
+  &:hover {
+    background: var(--selection);
     outline: none;
-    box-shadow: 0 0 10px var(--glow);
+  }
+
+  &:focus,
+  &:focus-visible {
+    background: var(--accent);
+    border-left-color: var(--text-bright);
+    outline: none;
+
+    &::before {
+      content: '❯';
+    }
+
+    .choice-label {
+      color: var(--accent-contrast);
+    }
+
+    .choice-hint {
+      color: var(--accent-contrast);
+      opacity: 0.75;
+    }
   }
 
   &:active {
-    background: rgba(51, 255, 51, 0.2);
+    filter: brightness(1.15);
   }
 }
 
 .choice-label {
   display: block;
+  grid-column: 2;
   font-weight: bold;
+  color: var(--text-bright);
 }
 
 .choice-hint {
   display: block;
+  grid-column: 2;
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
-  margin-top: var(--space-xs);
+  color: var(--text-muted);
 }
 
 // Modern mode decision cards

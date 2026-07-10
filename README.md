@@ -2,8 +2,9 @@
 
 One terminal-styled forestry game set across British Columbia — from the
 northern Interior to the coast and southern wetbelt — with one content library
-(`js/data/`), one retro green-CRT terminal, and one entry point
-(`index.html`). See [`docs/unified_campaign.md`](docs/unified_campaign.md)
+(`js/data/`), one retro TUI-style terminal (green phosphor by default, with
+amber-CRT and ice themes plus a scanline toggle in Settings), and one entry
+point (`index.html`). See [`docs/unified_campaign.md`](docs/unified_campaign.md)
 for how the frontends were unified.
 
 ## The modes (all on the landing hub)

@@ -320,11 +320,14 @@ export class TerminalUI {
         this.showProfessionalComplianceIntel();
       }
 
-      // Escape to close panel or modal
+      // Escape to close panel or modal. Consume the event so later Escape
+      // handlers (the game's restart prompt) don't fire on the same press.
       if (e.key === 'Escape') {
         if (!this.modal?.hidden) {
+          e.preventDefault();
           this.closeModal();
         } else if (this._isPanelOpen) {
+          e.preventDefault();
           this.closeStatusPanel();
         }
       }
