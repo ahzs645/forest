@@ -26,6 +26,7 @@ import {
   applyMixins,
   attachFrame
 } from './ui/index.js';
+import { GridView } from './gridview/gridView.js';
 
 /**
  * TerminalUI Class
@@ -38,6 +39,10 @@ export class TerminalUI {
     this._initEventListeners();
     this._initLandingScreen();
     this._initIntroFlow();
+
+    // Full-ASCII canvas projection (display mode: grid)
+    this.gridView = new GridView(this);
+    if (displayMode.isGrid()) this.gridView.enable();
 
     // Listen for display mode changes
     displayMode.onChange((mode) => this._onDisplayModeChange(mode));

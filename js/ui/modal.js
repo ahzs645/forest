@@ -287,6 +287,11 @@ export const ModalMixin = {
               <span class="toggle-label">Classic</span>
               <span class="toggle-desc">Terminal style</span>
             </button>
+            <button type="button" class="settings-toggle-btn ${displayMode.mode === 'grid' ? 'active' : ''}" data-mode="grid">
+              <span class="toggle-icon">▦</span>
+              <span class="toggle-label">ASCII Grid</span>
+              <span class="toggle-desc">Character canvas</span>
+            </button>
             <button type="button" class="settings-toggle-btn ${displayMode.mode === 'modern' ? 'active' : ''}" data-mode="modern">
               <span class="toggle-icon">[C]</span>
               <span class="toggle-label">Modern</span>
