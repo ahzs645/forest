@@ -90,6 +90,12 @@ export const InitFlowMixin = {
   _initLandingScreen() {
     if (!this.landingScreen) return;
 
+    // The landing screen is visible on boot without going through
+    // _showLandingScreen, so start the hero animation here too.
+    if (!this.landingScreen.hidden) {
+      this._startLandingScene();
+    }
+
     // Experimental modes (Crisis Command) stay hidden until the core loop is
     // solid. Reveal them only when the player explicitly opts in.
     if (this.crisisModeBtn && this._isExperimentalEnabled()) {
@@ -227,6 +233,34 @@ export const InitFlowMixin = {
       this.landingScreen.hidden = false;
       this.landingScreen.style.display = 'flex';
     }
+    // A mission belongs to a run; back on the landing hub there isn't one.
+    this.clearMissionStatus?.();
+    this.stopRadio?.();
+    this._startLandingScene();
+  },
+
+  /**
+   * Animate the landing hero (drifting cloud, bird, swaying treeline).
+   * Still frame under prefers-reduced-motion.
+   * @private
+   */
+  async _startLandingScene() {
+    const host = this.landingScreen?.querySelector('.ascii-tree');
+    if (!host) return;
+    const { landingSceneFrames, LANDING_SCENE_DELAY } = await import('../animations/landingScene.js');
+    host.textContent = landingSceneFrames[0];
+    clearInterval(this._landingSceneTimer);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    let index = 0;
+    this._landingSceneTimer = setInterval(() => {
+      // Stop paying for frames nobody can see
+      if (this.landingScreen?.hidden) {
+        clearInterval(this._landingSceneTimer);
+        return;
+      }
+      index = (index + 1) % landingSceneFrames.length;
+      host.textContent = landingSceneFrames[index];
+    }, LANDING_SCENE_DELAY);
   },
 
   /**

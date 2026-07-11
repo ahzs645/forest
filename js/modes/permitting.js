@@ -990,28 +990,41 @@ function displayPermittingHeader(ui, journey) {
   ui.clear();
   ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - PERMITTING`);
 
-  ui.write(`Days Remaining: ${daysRemaining} | Hours: ${journey.hoursRemaining}h`);
+  // Status renders in the mission dashboard pane; energy/stress live in the
+  // protagonist pane and budget/political capital in the supplies pane.
+  const permits = journey.permits;
+  const permitProgress = Math.round((permits.approved / permits.target) * 100);
 
-  if (journey.protagonist) {
-    const energyBar = createBar(journey.protagonist.energy, 10);
-    const stressLevel = journey.protagonist.stress > 70 ? 'HIGH' : journey.protagonist.stress > 40 ? 'MODERATE' : 'LOW';
-    ui.write(`Energy: [${energyBar}] ${journey.protagonist.energy}% | Stress: ${stressLevel} (${journey.protagonist.stress}%) | Rep: ${journey.protagonist.reputation}`);
-  }
+  const facts = [
+    { label: 'Days left', value: `${daysRemaining}`, tone: daysRemaining <= 5 ? 'danger' : daysRemaining <= 10 ? 'warn' : undefined },
+    { label: 'Hours left', value: `${journey.hoursRemaining}h` },
+    { label: 'Lane', value: guidance.lane },
+    { label: 'Stage', value: laneAction.stageLabel }
+  ];
 
-  const permitProgress = Math.round((journey.permits.approved / journey.permits.target) * 100);
-  ui.write(`Pipeline: Backlog ${journey.permits.backlog || 0} | Drafting ${journey.permits.drafting || 0} | Submitted ${journey.permits.submitted} | In Review ${journey.permits.inReview} | Approved ${journey.permits.approved}/${journey.permits.target} (${permitProgress}%)`);
-  // Sticky objective block — lane, stage, and best move live here on every shift,
-  // not only behind Review the File.
-  ui.write(`Objective: Approve ${journey.permits.target} permits by Day ${journey.deadline} (${journey.permits.approved} done).`);
-  ui.write(`Lane Focus: ${guidance.lane} | Stage: ${laneAction.stageLabel}`);
-  ui.write(`Next Best Move: ${guidance.headline}`);
-  ui.write(`Budget: $${Math.round(journey.resources.budget).toLocaleString()} | Political Capital: ${journey.resources.politicalCapital}`);
+  // The pipeline is the mode's real state machine — as a checklist it reads
+  // as flow: each stage shows its count, done once nothing is stuck in it.
+  const checklist = [
+    { label: `backlog ${permits.backlog || 0}`, done: (permits.backlog || 0) === 0 },
+    { label: `drafting ${permits.drafting || 0}`, done: (permits.drafting || 0) === 0 },
+    { label: `submitted ${permits.submitted}`, done: permits.submitted === 0 },
+    { label: `in review ${permits.inReview}`, done: permits.inReview === 0 },
+    { label: `approved ${permits.approved}/${permits.target}`, done: permits.approved >= permits.target }
+  ];
 
-  // Alerts only — the full file lives behind Review the File
+  const alerts = [];
   if (daysRemaining <= 5) {
-    ui.writeWarning(`Deadline pressure: ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining.`);
+    alerts.push({ level: 'danger', text: `Deadline pressure: ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining.` });
   }
-  ui.write('');
+
+  ui.setMissionStatus?.({
+    objective: `Approve ${permits.target} permits by Day ${journey.deadline} (${permits.approved} done).`,
+    meter: { label: 'Approved', value: permitProgress, text: `${permits.approved}/${permits.target}` },
+    facts,
+    checklist,
+    guidance: guidance.headline || null,
+    alerts
+  });
 }
 
 /**
@@ -1738,16 +1751,6 @@ function getDeskPhase(journey) {
 
 
 
-/**
- * Create a visual progress bar
- * @param {number} value - Current value (0-100)
- * @param {number} width - Bar width in characters
- * @returns {string} Progress bar string
- */
-function createBar(value, width) {
-  const filled = Math.round((value / 100) * width);
-  return '█'.repeat(filled) + '░'.repeat(width - filled);
-}
 
 /**
  * Capitalize first letter

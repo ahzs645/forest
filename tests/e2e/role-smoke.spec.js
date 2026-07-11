@@ -49,8 +49,9 @@ test('planner smoke shows live lane guidance on boot', async ({ page }) => {
 
   await startRole(page, 0, 0, 'Greenhorn', 4001);
 
-  await expect(page.locator('#terminal')).toContainText('Lane Focus:');
-  await expect(page.locator('#terminal')).toContainText('Next Best Move:');
+  // Lane guidance renders in the mission dashboard pane now, not the log.
+  await expect(page.locator('#mission-panel .mission-fact-label').filter({ hasText: 'Lane' })).toBeVisible();
+  await expect(page.locator('#mission-panel .mission-guidance')).toBeVisible();
   await expect(page.locator('#choices button').first()).toBeVisible();
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
 });
@@ -68,13 +69,14 @@ test('permitter smoke shows file-lane guidance on boot', async ({ page }) => {
 
   await resolveUntil(
     page,
-    async () => (await page.locator('#terminal').textContent())?.includes('Lane Focus:') ?? false,
+    async () => (await page.locator('#mission-panel').textContent())?.includes('Lane') ?? false,
     2
   );
 
-  await expect(page.locator('#terminal')).toContainText('Lane Focus:');
-  await expect(page.locator('#terminal')).toContainText('Next Best Move:');
-  await expect(page.locator('#terminal')).toContainText('Stage:');
+  // Lane guidance renders in the mission dashboard pane now, not the log.
+  await expect(page.locator('#mission-panel .mission-fact-label').filter({ hasText: 'Lane' })).toBeVisible();
+  await expect(page.locator('#mission-panel .mission-fact-label').filter({ hasText: 'Stage' })).toBeVisible();
+  await expect(page.locator('#mission-panel .mission-guidance')).toBeVisible();
   await expect(page.locator('#choices button').first()).toBeVisible();
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
 });
@@ -90,7 +92,8 @@ test('recce smoke exposes role-specific ground-truth actions', async ({ page }) 
 
   await startRole(page, 2, 2, 'Greenhorn', 6001);
 
-  await expect(page.locator('#terminal')).toContainText('Current Intel:');
+  // Block intel renders as a mission-pane fact now, not a log line.
+  await expect(page.locator('#mission-panel .mission-fact-label').filter({ hasText: 'Intel' })).toBeVisible();
   await resolveUntil(
     page,
     async () => (await page.locator('#choices').textContent())?.includes('Ground-Truth Access') ?? false,

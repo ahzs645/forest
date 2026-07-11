@@ -9,10 +9,130 @@ import { getCrewDisplayInfo, getActiveCrewCount, getAverageMorale } from '../cre
 import { FIELD_RESOURCES, DESK_RESOURCES, getResourcePercentage } from '../resources.js';
 import { getOperationalProgress } from '../journey.js';
 
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
 /**
  * Panel management mixin
  */
 export const PanelsMixin = {
+  /**
+   * Set the mission dashboard: the structured status a mode used to print as
+   * prose into the log every day. Screen-composed like the seasonal TUI's
+   * Dashboard pane — the content view keeps only narrative.
+   *
+   * All fields optional:
+   * @param {Object} status
+   * @param {string} status.objective - The win condition / current goal
+   * @param {Object} status.meter - Headline progress: { label, value(0-100), text }
+   * @param {Array}  status.facts - [{ label, value, tone? }] quick state rows
+   * @param {Array}  status.checklist - [{ label, done }] current-step checklist
+   * @param {string} status.guidance - Next best move
+   * @param {Array}  status.alerts - [{ level: 'ok'|'warn'|'danger', text }]
+   */
+  setMissionStatus(status) {
+    this._missionStatus = status || null;
+    this._renderMissionPanel();
+  },
+
+  clearMissionStatus() {
+    this._missionStatus = null;
+    this._renderMissionPanel();
+  },
+
+  /** @private */
+  _renderMissionPanel() {
+    const status = this._missionStatus;
+
+    if (this.missionSection) {
+      this.missionSection.hidden = !status;
+    }
+    if (this.missionStrip) {
+      this.missionStrip.hidden = !status;
+    }
+    if (!status) {
+      if (this.missionPanel) this.missionPanel.innerHTML = '';
+      if (this.missionStrip) this.missionStrip.innerHTML = '';
+      return;
+    }
+
+    const parts = [];
+
+    if (status.objective) {
+      parts.push(`<div class="mission-objective">${escapeHtml(status.objective)}</div>`);
+    }
+
+    if (status.meter && Number.isFinite(status.meter.value)) {
+      const v = Math.max(0, Math.min(100, Math.round(status.meter.value)));
+      parts.push(`
+        <div class="mission-meter">
+          <div class="mission-meter-head">
+            <span class="mission-meter-label">${escapeHtml(status.meter.label || 'Progress')}</span>
+            <span class="mission-meter-value">${escapeHtml(status.meter.text || `${v}%`)}</span>
+          </div>
+          <div class="mission-meter-bar">${progressBar(v, 24, false)}</div>
+        </div>
+      `);
+    }
+
+    if (Array.isArray(status.facts) && status.facts.length) {
+      const rows = status.facts
+        .filter(f => f && f.value !== undefined && f.value !== null && f.value !== '')
+        .map(f => `
+          <div class="mission-fact${f.tone ? ` tone-${escapeHtml(f.tone)}` : ''}">
+            <span class="mission-fact-label">${escapeHtml(f.label)}</span>
+            <span class="mission-fact-value">${escapeHtml(f.value)}</span>
+          </div>
+        `).join('');
+      parts.push(`<div class="mission-facts">${rows}</div>`);
+    }
+
+    if (Array.isArray(status.checklist) && status.checklist.length) {
+      const rows = status.checklist.map(item => `
+        <div class="mission-check ${item.done ? 'done' : 'open'}">
+          <span class="mission-check-box">${item.done ? '[x]' : '[ ]'}</span>
+          <span class="mission-check-label">${escapeHtml(item.label)}</span>
+        </div>
+      `).join('');
+      parts.push(`<div class="mission-checklist">${rows}</div>`);
+    }
+
+    if (status.guidance) {
+      parts.push(`<div class="mission-guidance">❯ ${escapeHtml(status.guidance)}</div>`);
+    }
+
+    if (Array.isArray(status.alerts) && status.alerts.length) {
+      const rows = status.alerts
+        .filter(a => a && a.text)
+        .map(a => `<div class="mission-alert ${escapeHtml(a.level || 'warn')}">${escapeHtml(a.text)}</div>`)
+        .join('');
+      parts.push(rows);
+    }
+
+    if (this.missionPanel) {
+      this.missionPanel.innerHTML = parts.join('');
+    }
+
+    // Compact strip for mobile, where the dashboard hides behind [S]:
+    // headline meter + objective on one line.
+    if (this.missionStrip) {
+      const v = status.meter && Number.isFinite(status.meter.value)
+        ? Math.max(0, Math.min(100, Math.round(status.meter.value)))
+        : null;
+      const meterHtml = v === null ? '' : `
+        <span class="strip-meter">${progressBar(v, 6, false)}</span>
+        <span class="strip-meter-text">${escapeHtml(status.meter.text || `${v}%`)}</span>
+      `;
+      const objective = status.objective || status.guidance || '';
+      this.missionStrip.innerHTML = `${meterHtml}<span class="strip-objective">${escapeHtml(objective)}</span>`;
+    }
+  },
+
   /**
    * Update the quick status bar
    * @param {Object} data - Status data
@@ -22,7 +142,8 @@ export const PanelsMixin = {
       this.dayValue.textContent = data.day || '1';
     }
     if (this.progressValue) {
-      this.progressValue.textContent = `${data.progress || 0}%`;
+      // Progress is a goal meter, not a health meter — never colored as risk.
+      this._setMeterValue(this.progressValue, data.progress || 0, '%', false, false);
     }
 
     // Check for protagonist mode vs crew mode
@@ -34,13 +155,14 @@ export const PanelsMixin = {
         this.crewLabel.textContent = 'ENERGY';
       }
       if (this.crewValue) {
-        this.crewValue.textContent = `${data.protagonist.energy || 0}%`;
+        this._setMeterValue(this.crewValue, data.protagonist.energy || 0, '%');
       }
       if (this.moraleLabel) {
         this.moraleLabel.textContent = 'STRESS';
       }
       if (this.moraleValue) {
-        this.moraleValue.textContent = `${data.protagonist.stress || 0}%`;
+        // Stress reads inverted: high is bad.
+        this._setMeterValue(this.moraleValue, data.protagonist.stress || 0, '%', true);
       }
     } else {
       // Crew mode - traditional display
@@ -54,9 +176,24 @@ export const PanelsMixin = {
         this.moraleLabel.textContent = 'MORALE';
       }
       if (this.moraleValue) {
-        this.moraleValue.textContent = `${data.morale || 0}%`;
+        this._setMeterValue(this.moraleValue, data.morale || 0, '%');
       }
     }
+  },
+
+  /**
+   * Render "▓▓▓░░░ 42%" into a status-bar value slot: a compact ASCII meter
+   * plus the number. Meter color flags trouble (low value — or high, when
+   * inverted, for stress-like stats).
+   * @private
+   */
+  _setMeterValue(el, value, suffix = '', inverted = false, colorByRisk = true) {
+    const v = Math.max(0, Math.min(100, Math.round(value)));
+    const risk = inverted ? v : 100 - v;
+    const riskClass = colorByRisk
+      ? (risk >= 75 ? 'danger' : risk >= 50 ? 'warn' : '')
+      : '';
+    el.innerHTML = `<span class="status-meter ${riskClass}">${progressBar(v, 8, false)}</span> ${v}${suffix}`;
   },
 
   /**
@@ -191,9 +328,7 @@ export const PanelsMixin = {
 
       row.innerHTML = `
         <span class="resource-label">${def.shortLabel}</span>
-        <div class="resource-bar">
-          <div class="resource-fill ${fillClass}" style="width: ${percentage}%"></div>
-        </div>
+        <span class="resource-bar-text ${fillClass}">${progressBar(percentage, 10, false)}</span>
         <span class="resource-value">${Math.round(value)}</span>
       `;
 
@@ -216,7 +351,8 @@ export const PanelsMixin = {
     // Build season display if available
     let seasonHtml = '';
     if (data.season) {
-      const seasonIcons = { spring: '🌱', summer: '☀️', fall: '🍂', winter: '❄️' };
+      // Text glyphs, not emoji — emoji break the terminal aesthetic
+      const seasonIcons = { spring: '❀', summer: '☼', fall: '❧', winter: '❄' };
       const seasonNames = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' };
       const icon = seasonIcons[data.season.currentSeason] || '';
       const name = seasonNames[data.season.currentSeason] || data.season.currentSeason;

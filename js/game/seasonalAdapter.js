@@ -24,21 +24,58 @@ const METRIC_SHORT = {
   budget: 'Budget',
 };
 
-/** One-line dashboard above every card. */
+/**
+ * The seasonal dashboard. On a UI with a mission pane (the browser terminal)
+ * the five meters, season, role, and mandate render there; otherwise it
+ * falls back to the one-line text strip (capture UIs, sims).
+ */
 export function renderMetricStrip(ui, gameState = {}) {
   const metrics = gameState.metrics || {};
-  const parts = METRIC_ORDER
-    .filter((key) => metrics[key] !== undefined)
-    .map((key) => `${METRIC_SHORT[key] || formatMetricName(key)} ${Math.round(metrics[key])}`);
-  if (!parts.length) return;
+  const keys = METRIC_ORDER.filter((key) => metrics[key] !== undefined);
+  if (!keys.length) return;
 
   const season = gameState.currentSeasonContext?.label
     || (gameState.round ? `Season ${gameState.round}/${gameState.totalRounds || 4}` : '');
   const role = gameState.roleDisplayName || gameState.role?.name || '';
+  const strip = gameState.objectiveStrip;
+  const objective = typeof strip === 'string' ? strip : strip?.line;
+
+  if (typeof ui.setMissionStatus === 'function') {
+    const facts = keys.map((key) => {
+      const value = Math.round(metrics[key]);
+      return {
+        label: METRIC_SHORT[key] || formatMetricName(key),
+        value: `${value}`,
+        tone: value <= 25 ? 'danger' : value <= 40 ? 'warn' : undefined
+      };
+    });
+    if (season) facts.unshift({ label: 'Season', value: season });
+    if (role) facts.push({ label: 'Role', value: role });
+
+    const alerts = (strip?.risks || []).map((risk) => ({
+      level: 'warn',
+      text: risk.label || `${formatMetricName(risk.metric)} at risk`
+    }));
+
+    const goal = strip?.goal
+      ? (strip.winCondition ? `${strip.goal} Win: ${strip.winCondition}.` : strip.goal)
+      : (objective || null);
+    ui.setMissionStatus({
+      objective: goal,
+      meter: metrics.progress !== undefined
+        ? { label: 'Progress', value: Math.round(metrics.progress), text: `${Math.round(metrics.progress)}%` }
+        : null,
+      facts,
+      guidance: strip?.pressure || null,
+      alerts
+    });
+    return;
+  }
+
+  const parts = keys.map((key) => `${METRIC_SHORT[key] || formatMetricName(key)} ${Math.round(metrics[key])}`);
   const context = [season, role].filter(Boolean).join(' · ');
   if (context) ui.write(context, 'term-dim');
   ui.write(parts.join(' | '));
-  const objective = gameState.objectiveStrip?.line || gameState.objectiveStrip;
   if (typeof objective === 'string' && objective) ui.write(objective, 'term-dim');
 }
 

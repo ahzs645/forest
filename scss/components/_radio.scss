@@ -1,0 +1,18 @@
+// =============================================
+// Field Radio pane (sidebar ASCII animations)
+// =============================================
+
+.radio-panel {
+  margin: 0 auto;
+  padding: var(--space-xs) 0;
+  width: fit-content;
+  min-height: 7em;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.25;
+  color: var(--accent);
+  white-space: pre;
+  overflow: hidden;
+}

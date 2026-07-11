@@ -3,22 +3,65 @@
 // =============================================
 @use '../abstracts' as *;
 
+// Fixed-viewport TUI chrome: the frame never scrolls, only the terminal
+// log inside it does.
 .game-screen {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .action-area {
-  padding: var(--space-md);
-  background: var(--bg-panel);
-  border-top: 2px solid var(--border-color);
+  padding: var(--space-sm);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
 
   @include mobile-down {
     padding: var(--space-sm);
+  }
+}
+
+// Compact mission strip: meter + objective on one line. Mobile only —
+// the desktop dashboard renders the full mission pane instead.
+.mission-strip {
+  display: none;
+
+  @include mobile-down {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-size: var(--font-size-xs);
+    white-space: nowrap;
+    overflow: hidden;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .strip-meter {
+    color: var(--accent);
+    letter-spacing: -1px;
+    flex-shrink: 0;
+  }
+
+  .strip-meter-text {
+    color: var(--text-bright);
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+
+  .strip-objective {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }

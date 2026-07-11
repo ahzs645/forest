@@ -9,6 +9,8 @@ export { PanelsMixin } from './panels.js';
 export { ModalMixin } from './modal.js';
 export { InitFlowMixin, ROLE_ICONS } from './initFlow.js';
 export { ModernUIMixin } from './modernUI.js';
+export { RadioMixin } from './radio.js';
+export { attachFrame } from './frames.js';
 
 /**
  * Apply a mixin to a class prototype

@@ -4,6 +4,7 @@
  */
 
 import { displayMode } from '../displayMode.js';
+import { theme, THEMES } from '../theme.js';
 import { GLOSSARY_TERMS } from '../data/glossary.js';
 import { LEGACY_GLOSSARY_TERMS } from '../data/legacyGlossary.js';
 import {
@@ -286,6 +287,11 @@ export const ModalMixin = {
               <span class="toggle-label">Classic</span>
               <span class="toggle-desc">Terminal style</span>
             </button>
+            <button type="button" class="settings-toggle-btn ${displayMode.mode === 'grid' ? 'active' : ''}" data-mode="grid">
+              <span class="toggle-icon">▦</span>
+              <span class="toggle-label">ASCII Grid</span>
+              <span class="toggle-desc">Character canvas</span>
+            </button>
             <button type="button" class="settings-toggle-btn ${displayMode.mode === 'modern' ? 'active' : ''}" data-mode="modern">
               <span class="toggle-icon">[C]</span>
               <span class="toggle-label">Modern</span>
@@ -305,6 +311,55 @@ export const ModalMixin = {
         });
 
         wrapper.appendChild(displaySection);
+
+        // Theme Section
+        const themeSection = document.createElement('div');
+        themeSection.className = 'settings-section';
+        themeSection.innerHTML = `
+          <div class="settings-label">THEME</div>
+          <div class="settings-toggle-group">
+            ${THEMES.map(t => `
+              <button type="button" class="settings-toggle-btn ${theme.theme === t.id ? 'active' : ''}" data-theme-id="${t.id}">
+                <span class="toggle-swatch" data-swatch="${t.id}"></span>
+                <span class="toggle-label">${t.label}</span>
+              </button>
+            `).join('')}
+          </div>
+        `;
+        themeSection.querySelectorAll('[data-theme-id]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            theme.setTheme(btn.dataset.themeId);
+            themeSection.querySelectorAll('[data-theme-id]').forEach(b => {
+              b.classList.toggle('active', b.dataset.themeId === theme.theme);
+            });
+          });
+        });
+        wrapper.appendChild(themeSection);
+
+        // CRT Effect Section
+        const crtSection = document.createElement('div');
+        crtSection.className = 'settings-section';
+        crtSection.innerHTML = `
+          <div class="settings-label">CRT SCANLINES</div>
+          <div class="settings-toggle-group">
+            <button type="button" class="settings-toggle-btn ${theme.crt ? 'active' : ''}" data-crt="on">
+              <span class="toggle-label">On</span>
+            </button>
+            <button type="button" class="settings-toggle-btn ${!theme.crt ? 'active' : ''}" data-crt="off">
+              <span class="toggle-label">Off</span>
+            </button>
+          </div>
+        `;
+        crtSection.querySelectorAll('[data-crt]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            theme.setCrt(btn.dataset.crt === 'on');
+            crtSection.querySelectorAll('[data-crt]').forEach(b => {
+              b.classList.toggle('active', (b.dataset.crt === 'on') === theme.crt);
+            });
+          });
+        });
+        wrapper.appendChild(crtSection);
+
         container.appendChild(wrapper);
       },
       actions: [{ label: 'Close', primary: true, onSelect: () => this.closeModal() }]

@@ -1,10 +1,14 @@
 /**
  * Display Mode Manager
- * Handles Classic/Modern mode switching and persistence
+ * Handles Classic/Modern/Grid mode switching and persistence.
+ * 'grid' is the full-ASCII canvas renderer (js/gridview/) — the DOM game
+ * screen keeps running invisibly as the source of truth and the grid
+ * projects it, so everything except pixels behaves like classic mode.
  */
 
 const STORAGE_KEY = 'bcForestry_displayMode';
 const DEFAULT_MODE = 'classic';
+const VALID_MODES = new Set(['classic', 'modern', 'grid']);
 
 export class DisplayModeManager {
   constructor() {
@@ -19,7 +23,7 @@ export class DisplayModeManager {
   _loadMode() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      return stored === 'modern' ? 'modern' : DEFAULT_MODE;
+      return VALID_MODES.has(stored) ? stored : DEFAULT_MODE;
     } catch {
       return DEFAULT_MODE;
     }
@@ -50,7 +54,7 @@ export class DisplayModeManager {
    * @param {string} mode - 'classic' or 'modern'
    */
   setMode(mode) {
-    const newMode = mode === 'modern' ? 'modern' : 'classic';
+    const newMode = VALID_MODES.has(mode) ? mode : 'classic';
     if (this._mode === newMode) return;
 
     this._mode = newMode;
@@ -82,6 +86,14 @@ export class DisplayModeManager {
    */
   isClassic() {
     return this._mode === 'classic';
+  }
+
+  /**
+   * Check if current mode is the ASCII grid renderer
+   * @returns {boolean}
+   */
+  isGrid() {
+    return this._mode === 'grid';
   }
 
   /**

@@ -122,24 +122,6 @@ function getPlanningApprovalGaps(journey) {
   return gaps;
 }
 
-/**
- * The four ministerial approval thresholds, rendered as an always-visible
- * checklist so the player never has to guess why submission is still blocked.
- * Mirrors isPlanningApprovalReady() in shared/endConditions.js.
- */
-function formatPlanningApprovalGates(journey) {
-  const plan = journey?.plan || {};
-  const gates = [
-    { label: 'Data 80%', current: Math.round(plan.dataCompleteness || 0), target: 80 },
-    { label: 'Analysis 80%', current: Math.round(plan.analysisQuality || 0), target: 80 },
-    { label: 'Buy-in 75%', current: Math.round(plan.stakeholderBuyIn || 0), target: 75 },
-    { label: 'Confidence 80%', current: Math.round(plan.ministerialConfidence || 0), target: 80 }
-  ];
-  return gates.map((gate) => {
-    const met = gate.current >= gate.target;
-    return `[${met ? 'x' : ' '}] ${gate.label} (${gate.current}%)`;
-  });
-}
 
 function applyPlanningProfessionalWork(journey, changes = {}) {
   const professional = ensurePlanningProfessionalState(journey);
@@ -634,52 +616,72 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
     : `DAY ${journey.day} - STRATEGIC PLANNING`;
   ui.writeHeader(deadlineLabel);
 
+  // Status renders in the mission dashboard pane; the log keeps narrative.
+  // Energy/stress live in the protagonist pane and budget/political capital
+  // in the supplies pane, so neither repeats here.
+  const plan = journey.plan;
+  const facts = [];
   if (seasonInfo) {
-    ui.write(`${seasonInfo.icon} ${seasonInfo.name} - Year ${seasonInfo.year} | Hours: ${journey.hoursRemaining}h`);
+    facts.push({ label: 'Season', value: `${seasonInfo.name} \u00b7 Y${seasonInfo.year}` });
+  }
+  facts.push({ label: 'Hours left', value: `${journey.hoursRemaining}h` });
+  facts.push({ label: 'Phase', value: getPlanningPhaseLabel(plan.phase) });
+  if (Number.isFinite(journey.deadline)) {
+    const daysLeft = Math.max(0, journey.deadline - journey.day);
+    facts.push({ label: 'Days left', value: `${daysLeft}`, tone: daysLeft <= 3 ? 'danger' : daysLeft <= 7 ? 'warn' : undefined });
+  }
+  if (guidance.lane) {
+    facts.push({ label: 'Lane', value: guidance.lane });
   }
 
-  if (journey.protagonist) {
-    const energyBar = createBar(journey.protagonist.energy, 10);
-    const stressLevel = journey.protagonist.stress > 70 ? 'HIGH' : journey.protagonist.stress > 40 ? 'MODERATE' : 'LOW';
-    ui.write(`Energy: [${energyBar}] ${journey.protagonist.energy}% | Stress: ${stressLevel} (${journey.protagonist.stress}%) | Rep: ${journey.protagonist.reputation}`);
-  }
+  // The four ministerial approval thresholds as a live checklist — mirrors
+  // isPlanningApprovalReady() in shared/endConditions.js.
+  const gates = [
+    { label: 'Data', target: 80, current: Math.round(plan.dataCompleteness || 0) },
+    { label: 'Analysis', target: 80, current: Math.round(plan.analysisQuality || 0) },
+    { label: 'Buy-in', target: 75, current: Math.round(plan.stakeholderBuyIn || 0) },
+    { label: 'Confidence', target: 80, current: Math.round(plan.ministerialConfidence || 0) }
+  ];
+  const checklist = gates.map((gate) => ({
+    label: `${gate.label} ${gate.current}% of ${gate.target}%`,
+    done: gate.current >= gate.target
+  }));
 
-  ui.write(`Phase: ${getPlanningPhaseLabel(journey.plan.phase)}${Number.isFinite(journey.deadline) ? ` | Days left: ${Math.max(0, journey.deadline - journey.day)}` : ''}`);
-  ui.write(`Data: ${journey.plan.dataCompleteness}% | Analysis: ${journey.plan.analysisQuality}% | Buy-in: ${journey.plan.stakeholderBuyIn}% | Confidence: ${journey.plan.ministerialConfidence}%`);
-  // Sticky objective block — the player should never have to dig into Review the
-  // File to learn what they are doing right now or what is still blocking them.
-  const objectiveDeadline = Number.isFinite(journey.deadline) ? ` by Day ${journey.deadline}` : '';
-  ui.write(`Objective: Win ministerial approval of the landscape plan${objectiveDeadline}.`);
-  ui.write(`Lane Focus: ${guidance.lane}`);
-  ui.write(`Next Best Move: ${guidance.headline}`);
-  ui.write(`Approval Gates: ${formatPlanningApprovalGates(journey).join('  ')}`);
-  ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Political Capital: ${journey.resources.politicalCapital} | Data: ${journey.resources.dataCredits}`);
-
-  // Alerts only — the full file lives behind Review the File
-  if (journey.plan.phase === 'ministerial_approval') {
-    const gap = Math.max(0, 80 - journey.plan.ministerialConfidence);
+  const alerts = [];
+  if (plan.phase === 'ministerial_approval') {
+    const gap = Math.max(0, 80 - plan.ministerialConfidence);
     if (gap > 0) {
-      ui.writeWarning(`Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Use Ministerial Outreach before submission.`);
+      alerts.push({ level: 'warn', text: `Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Use Ministerial Outreach before submission.` });
     } else {
-      ui.writePositive('Approval threshold reached. A full submission can carry the plan across the line.');
+      alerts.push({ level: 'ok', text: 'Approval threshold reached. A full submission can carry the plan across the line.' });
     }
   }
   const fomAlert = syncFomStateFromActiveBlock(journey, seasonInfo);
   // Once the FOM is published, the public-review clock is one of the few
-  // hard deadlines in this mode - it used to only surface behind Review the
-  // File, so a player working the day-to-day menu could miss it closing in.
-  // Show it in the day header for as long as the window is open.
+  // hard deadlines in this mode. It stays a header line (the log is what a
+  // player scans after each day) and also lands in the dashboard alerts.
   if (fomAlert?.status === 'public_review') {
     const reviewDaysRemaining = Math.max(0, fomAlert.reviewDaysRemaining || 0);
     const commentLoad = Math.max(0, fomAlert.commentLoad || 0);
-    ui.write(`Public Review Window: ${reviewDaysRemaining}d remaining | ${commentLoad} open comment${commentLoad === 1 ? '' : 's'}`);
+    const windowLine = `Public Review Window: ${reviewDaysRemaining}d remaining | ${commentLoad} open comment${commentLoad === 1 ? '' : 's'}`;
+    ui.write(windowLine);
+    alerts.push({ level: reviewDaysRemaining <= 2 ? 'danger' : 'warn', text: windowLine });
   } else if (fomAlert?.status === 'revision_required') {
-    ui.writeWarning('FOM public review flagged revisions - address them before the window reopens.');
+    alerts.push({ level: 'warn', text: 'FOM public review flagged revisions - address them before the window reopens.' });
   }
   if (fomAlert?.roadBlocker) {
-    ui.writeWarning(`Road-engineering blocker: ${fomAlert.roadBlockerReasons.join(' | ')}`);
+    alerts.push({ level: 'warn', text: `Road-engineering blocker: ${fomAlert.roadBlockerReasons.join(' | ')}` });
   }
-  ui.write('');
+
+  const objectiveDeadline = Number.isFinite(journey.deadline) ? ` by Day ${journey.deadline}` : '';
+  ui.setMissionStatus?.({
+    objective: `Win ministerial approval of the landscape plan${objectiveDeadline}.`,
+    meter: { label: 'Confidence', value: plan.ministerialConfidence, text: `${Math.round(plan.ministerialConfidence)}%` },
+    facts,
+    checklist,
+    guidance: guidance.headline || null,
+    alerts
+  });
 }
 
 /**
@@ -1551,7 +1553,3 @@ function checkGameOver(game) {
 
 
 
-function createBar(value, width) {
-  const filled = Math.round((value / 100) * width);
-  return '█'.repeat(filled) + '░'.repeat(width - filled);
-}

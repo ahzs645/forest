@@ -154,7 +154,9 @@ function pickCollapseChoice(labels, terminalText, modeName) {
   }
 
   if (modeName === 'planner') {
-    if (labels.some((label) => label.startsWith('Cutblock ')) || labels.some((label) => label.startsWith('Opening '))) {
+    // Key badges render as a bare leading digit ("3 Cutblock ..."), so match
+    // the label after an optional key prefix rather than with startsWith.
+    if (labels.some((label) => /^(\[?\d+\]?\s+)?(Cutblock|Opening) /.test(label))) {
       return 0;
     }
     if (labels.some((label) => label.includes('Emphasize Timber Supply'))) {

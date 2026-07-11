@@ -2,13 +2,19 @@
 // Input Components
 // =============================================
 
+// Prompt line, not a boxed field: ❯ cursor, underlined input area
 .input-wrapper {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-sm);
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--surface-inset);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+
+  &:focus-within {
+    border-color: var(--border-strong);
+  }
 
   &[hidden] {
     display: none;
@@ -16,7 +22,7 @@
 }
 
 .input-prompt {
-  color: var(--fg-bright);
+  color: var(--accent);
   font-weight: bold;
 }
 
@@ -47,7 +53,6 @@
   &:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 10px rgba(0, 255, 153, 0.2);
   }
 }
 

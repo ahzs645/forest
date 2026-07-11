@@ -1,0 +1,30 @@
+// =============================================
+// ASCII Grid mode (display mode: grid)
+// =============================================
+// The canvas paints everything; the DOM game screen stays laid out and
+// focusable (it is the source of truth and the input surface for keyboard
+// events) but is invisible and untouchable by the pointer.
+
+.grid-canvas {
+  display: none;
+}
+
+body[data-display-mode='grid'] {
+  .grid-canvas {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  // opacity (not visibility) so the hidden DOM stays focusable — the grid
+  // relies on real button focus for arrow-key navigation.
+  .game-wrapper {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

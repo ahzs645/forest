@@ -1,5 +1,5 @@
 // =============================================
-// Header Layout
+// Header Layout — single-row TUI status strip
 // =============================================
 @use '../abstracts' as *;
 
@@ -8,30 +8,36 @@
   align-items: center;
   justify-content: space-between;
   height: var(--header-height);
-  padding: 0 var(--space-md);
-  background: var(--bg-panel);
-  border-bottom: 2px solid var(--border-color);
+  padding: 0 var(--space-sm);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  gap: var(--space-sm);
+  overflow: hidden;
 
   @include mobile-down {
-    padding: 0 var(--space-sm);
+    height: auto;
+    min-height: var(--header-height);
+    flex-wrap: wrap;
+    padding: var(--space-xs) var(--space-sm);
   }
 }
 
 .header-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-sm);
   font-weight: bold;
-  letter-spacing: 2px;
-  color: var(--fg-bright);
-  text-shadow: 0 0 10px var(--glow);
+  letter-spacing: 1px;
+  color: var(--text-bright);
+  white-space: nowrap;
 
-  @include mobile-down {
-    font-size: var(--font-size-base);
+  // ▲ pennant before the title, in place of a logo image
+  &::before {
+    content: '▲ ';
+    color: var(--accent);
   }
 
   @include small-down {
-    font-size: var(--font-size-sm);
-    letter-spacing: 1px;
+    letter-spacing: 0;
   }
 }
 
@@ -39,9 +45,9 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 
   @include small-down {
-    gap: 4px;
+    gap: 2px;
   }
 }

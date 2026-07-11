@@ -1,36 +1,57 @@
 // =============================================
 // SCSS Variables / Design Tokens
 // =============================================
+//
+// Semantic token layer (t1chat-style): every surface reads from a small set
+// of named roles — canvas, surface, border, text, muted, accent — and each
+// theme redefines only those roles. The legacy names (--bg-dark, --fg-main,
+// ...) are kept as aliases so existing styles keep working.
 
-// CSS Custom Properties (available in runtime)
 :root {
-  // Colors - Classic terminal green on black
-  --bg-dark: #0a0a0a;
-  --bg-panel: #0d1a0d;
-  --bg-input: #050a05;
-  --fg-main: #33ff33;
-  --fg-dim: #1a8c1a;
-  --fg-bright: #66ff66;
-  --fg-warning: #ffcc00;
-  --fg-danger: #ff4444;
-  --fg-positive: #44ff88;
-  --border-color: #1a5c1a;
-  --border-bright: #33ff33;
-  --glow: rgba(51, 255, 51, 0.3);
-  --bg-overlay: #040b04;
-  --card: rgba(16, 32, 16, 0.85);
-  --card-strong: rgba(20, 48, 20, 0.95);
-  --fg-muted: #66b566;
-  --fg-label: #77ff77;
-  --accent: #00ff99;
-  --accent-2: #00d87a;
+  // ---- TUI dark (default) — the seasonal-TUI look ----
+  --canvas: #0a0e14;          // page background
+  --surface: #10161f;         // panes, strips, sidebars
+  --surface-inset: #070b10;   // inputs, wells inside panes
+  --border: #2b3646;          // pane borders
+  --border-strong: #40506a;   // focused / highlighted borders
+  --text: #c3cedd;            // body text
+  --text-bright: #eaf1fa;     // headings, values
+  --text-muted: #8494ab;      // secondary text
+  --text-dim: #55637a;        // hints, decorations
+  --accent: #58a6ff;          // selection bar, primary actions
+  --accent-contrast: #04121f; // text on top of --accent
+  --ok: #3fb950;
+  --warn: #d29922;
+  --danger: #f85149;
+  --selection: rgba(88, 166, 255, 0.18);
+
+  // ---- Legacy aliases (do not add new uses) ----
+  --bg-dark: var(--canvas);
+  --bg-panel: var(--surface);
+  --bg-input: var(--surface-inset);
+  --bg-overlay: var(--canvas);
+  --fg-main: var(--text);
+  --fg-dim: var(--text-dim);
+  --fg-bright: var(--text-bright);
+  --fg-muted: var(--text-muted);
+  --fg-label: var(--text-bright);
+  --fg-warning: var(--warn);
+  --fg-danger: var(--danger);
+  --fg-positive: var(--ok);
+  --border-color: var(--border);
+  --border-bright: var(--border-strong);
+  --accent-2: var(--accent);
+  --glow: rgba(88, 166, 255, 0.12);
+  --card: rgba(18, 26, 38, 0.85);
+  --card-strong: rgba(24, 34, 48, 0.95);
 
   // Typography
-  --font-mono: 'Courier New', Courier, 'Lucida Console', monospace;
-  --font-size-base: 16px;
-  --font-size-sm: 14px;
-  --font-size-xs: 12px;
-  --font-size-lg: 18px;
+  --font-mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code',
+    Menlo, Consolas, 'DejaVu Sans Mono', 'Courier New', monospace;
+  --font-size-base: 15px;
+  --font-size-sm: 13px;
+  --font-size-xs: 11px;
+  --font-size-lg: 17px;
 
   // Spacing
   --space-xs: 4px;
@@ -39,9 +60,75 @@
   --space-lg: 24px;
 
   // Layout
-  --header-height: 48px;
-  --status-bar-height: 40px;
-  --panel-width: 320px;
+  --header-height: 34px;
+  --status-bar-height: 30px;
+  --panel-width: 300px;
+}
+
+// ---- Green phosphor ----
+body[data-theme='green'] {
+  --canvas: #050805;
+  --surface: #0a120a;
+  --surface-inset: #030603;
+  --border: #1d4d1d;
+  --border-strong: #2f7a2f;
+  --text: #4ddb4d;
+  --text-bright: #8cff8c;
+  --text-muted: #3f9c3f;
+  --text-dim: #2a6b2a;
+  --accent: #2fe680;
+  --accent-contrast: #04240f;
+  --ok: #52e685;
+  --warn: #e6c14d;
+  --danger: #f0554d;
+  --selection: rgba(47, 230, 128, 0.25);
+  --glow: rgba(51, 255, 51, 0.12);
+  --card: rgba(16, 32, 16, 0.85);
+  --card-strong: rgba(20, 48, 20, 0.95);
+}
+
+// ---- Amber CRT ----
+body[data-theme='amber'] {
+  --canvas: #0a0602;
+  --surface: #140d04;
+  --surface-inset: #080502;
+  --border: #5c3d10;
+  --border-strong: #8f6119;
+  --text: #e6a23c;
+  --text-bright: #ffd484;
+  --text-muted: #b57e2c;
+  --text-dim: #7a5518;
+  --accent: #ffb347;
+  --accent-contrast: #241202;
+  --ok: #a8d94d;
+  --warn: #ffd23d;
+  --danger: #f0554d;
+  --selection: rgba(255, 179, 71, 0.25);
+  --glow: rgba(255, 179, 71, 0.12);
+  --card: rgba(40, 26, 8, 0.85);
+  --card-strong: rgba(52, 34, 10, 0.95);
+}
+
+// ---- Ice (cool blue-grey) ----
+body[data-theme='ice'] {
+  --canvas: #04070a;
+  --surface: #0a1218;
+  --surface-inset: #030608;
+  --border: #1d3d52;
+  --border-strong: #2f6485;
+  --text: #6db8e0;
+  --text-bright: #b3e2ff;
+  --text-muted: #4e8cad;
+  --text-dim: #35617a;
+  --accent: #47c2ff;
+  --accent-contrast: #04202e;
+  --ok: #52e6a4;
+  --warn: #e6c14d;
+  --danger: #f0554d;
+  --selection: rgba(71, 194, 255, 0.25);
+  --glow: rgba(71, 194, 255, 0.12);
+  --card: rgba(12, 26, 36, 0.85);
+  --card-strong: rgba(16, 34, 48, 0.95);
 }
 
 // SCSS Variables (compile-time only)

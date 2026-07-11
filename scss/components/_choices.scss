@@ -13,54 +13,149 @@
 .choices {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
   max-height: 300px;
   overflow-y: auto;
 }
 
-// Classic mode choices
+// Classic mode: flat TUI menu rows — no boxes. A ❯ cursor plus an
+// inverse-video selection bar marks the focused row, like a real terminal
+// menu; risk tags render as colored ‹SAFE›-style text, not chips.
 .choices--classic {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 1px;
 }
 
 .choice-btn {
-  display: block;
+  display: grid;
+  grid-template-columns: 2ch 2ch 1fr auto;
+  column-gap: var(--space-xs);
+  align-items: baseline;
   width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  color: var(--fg-main);
+  padding: 3px var(--space-xs);
+  background: transparent;
+  border: none;
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s ease;
 
-  &:hover,
-  &:focus {
-    border-color: var(--fg-main);
-    background: rgba(51, 255, 51, 0.1);
+  // Cursor cell — empty until the row is the selection
+  &::before {
+    content: '';
+    grid-column: 1;
+    color: var(--accent-contrast);
+    font-weight: bold;
+  }
+
+  // Hover is a hint; focus IS the selection. Keeping them distinct means
+  // only one full-strength bar is ever visible.
+  &:hover {
+    background: var(--selection);
     outline: none;
-    box-shadow: 0 0 10px var(--glow);
+  }
+
+  &:focus,
+  &:focus-visible {
+    background: var(--accent);
+    outline: none;
+
+    &::before {
+      content: '❯';
+    }
+
+    .choice-key,
+    .choice-label,
+    .choice-hint,
+    .choice-tag {
+      color: var(--accent-contrast);
+    }
+
+    .choice-hint {
+      opacity: 0.8;
+    }
   }
 
   &:active {
-    background: rgba(51, 255, 51, 0.2);
+    filter: brightness(1.15);
   }
+}
+
+.choice-key {
+  grid-column: 2;
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+  text-align: right;
+
+  // "1" reads as a hotkey when it renders like one: 1․
+  &::after {
+    content: ' ';
+  }
+}
+
+.choice-main {
+  grid-column: 3;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .choice-label {
   display: block;
   font-weight: bold;
+  color: var(--text-bright);
 }
 
 .choice-hint {
   display: block;
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--text-muted);
+}
+
+// Risk tags as colored terminal text: ‹SAFE› ‹TRADEOFF› ‹RISKY›
+.choice-tag {
+  grid-column: 4;
+  align-self: baseline;
+  font-size: var(--font-size-xs);
+  font-weight: bold;
+  letter-spacing: 1px;
+
+  &::before {
+    content: '‹';
+  }
+
+  &::after {
+    content: '›';
+  }
+
+  &.tag-safe {
+    color: var(--ok);
+  }
+
+  &.tag-tradeoff {
+    color: var(--warn);
+  }
+
+  &.tag-risky {
+    color: var(--danger);
+  }
+}
+
+// Keyboard hint row under the options list
+.choices-hint {
   margin-top: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--text-dim);
+  text-align: right;
+
+  &[hidden] {
+    display: none;
+  }
+
+  @include mobile-down {
+    display: none;
+  }
 }
 
 // Modern mode decision cards
@@ -101,7 +196,7 @@
   &:focus {
     border-color: var(--accent);
     border-left-color: var(--accent);
-    background: rgba(0, 255, 153, 0.05);
+    background: var(--selection);
     outline: none;
 
     .card-checkbox {
@@ -123,7 +218,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  background: rgba(0, 255, 153, 0.15);
+  background: var(--selection);
   border: 1px solid var(--accent);
   color: var(--accent);
   font-weight: bold;

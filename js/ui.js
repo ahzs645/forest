@@ -22,8 +22,11 @@ import {
   ModalMixin,
   InitFlowMixin,
   ModernUIMixin,
-  applyMixins
+  RadioMixin,
+  applyMixins,
+  attachFrame
 } from './ui/index.js';
+import { GridView } from './gridview/gridView.js';
 
 /**
  * TerminalUI Class
@@ -36,6 +39,10 @@ export class TerminalUI {
     this._initEventListeners();
     this._initLandingScreen();
     this._initIntroFlow();
+
+    // Full-ASCII canvas projection (display mode: grid)
+    this.gridView = new GridView(this);
+    if (displayMode.isGrid()) this.gridView.enable();
 
     // Listen for display mode changes
     displayMode.onChange((mode) => this._onDisplayModeChange(mode));
@@ -64,7 +71,17 @@ export class TerminalUI {
 
     // Side panel elements
     this.sidePanel = document.getElementById('side-panel');
+    this.missionSection = document.getElementById('mission-section');
+    this.missionPanel = document.getElementById('mission-panel');
+    this.missionStrip = document.getElementById('mission-strip');
+    this.choicesHint = document.getElementById('choices-hint');
+    this.radioSection = document.getElementById('radio-section');
+    this.radioPanel = document.getElementById('radio-panel');
     this.crewPanel = document.getElementById('crew-panel');
+
+    // Character-drawn frames around the main panes (classic mode)
+    attachFrame(document.getElementById('terminal-window'), { title: 'FIELD LOG' });
+    attachFrame(document.getElementById('action-area'), { title: 'RESPOND' });
     this.resourcesPanel = document.getElementById('resources-panel');
     this.locationPanel = document.getElementById('location-panel');
     this.panelBackdrop = document.getElementById('panel-backdrop');
@@ -320,11 +337,14 @@ export class TerminalUI {
         this.showProfessionalComplianceIntel();
       }
 
-      // Escape to close panel or modal
+      // Escape to close panel or modal. Consume the event so later Escape
+      // handlers (the game's restart prompt) don't fire on the same press.
       if (e.key === 'Escape') {
         if (!this.modal?.hidden) {
+          e.preventDefault();
           this.closeModal();
         } else if (this._isPanelOpen) {
+          e.preventDefault();
           this.closeStatusPanel();
         }
       }
@@ -406,6 +426,9 @@ export class TerminalUI {
 
     // Location panel varies by journey type
     this._updateLocationPanelByJourneyType(journey);
+
+    // Field radio ambience follows the journey (weather / desk)
+    this.updateRadioFromJourney(journey);
 
     // Update modern mode UI elements
     this._updateModernUI(journey, isProtagonistMode);
@@ -537,5 +560,6 @@ applyMixins(
   PanelsMixin,
   ModalMixin,
   InitFlowMixin,
-  ModernUIMixin
+  ModernUIMixin,
+  RadioMixin
 );

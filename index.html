@@ -34,7 +34,6 @@
   /    \     FORESTRY OPERATIONS
  /______\    SIMULATOR v1.0.4
     ||</pre>
-            <div class="logo-tagline">|||| "SUSTAINABILITY THROUGH DATA" ||||</div>
           </div>
 
           <!-- System Ready -->
@@ -55,39 +54,39 @@
           <!-- Main Action Buttons -->
           <div class="landing-actions compact">
             <button id="campaign-btn" class="landing-btn primary" type="button">
-              <span class="btn-icon">&gt;</span>
+              <span class="btn-icon">❯</span>
               <span class="btn-text">[C]AMPAIGN — A YEAR IN THE DISTRICT</span>
             </button>
             <button id="new-game-btn" class="landing-btn secondary" type="button">
-              <span class="btn-icon">&gt;</span>
+              <span class="btn-icon">❯</span>
               <span class="btn-text">[N]EW EXPEDITION</span>
             </button>
             <button id="tui-mode-btn" class="landing-btn secondary" type="button">
-              <span class="btn-icon">#</span>
+              <span class="btn-icon">❯</span>
               <span class="btn-text">[T] SEASONAL STRATEGY</span>
             </button>
             <!-- Experimental: hidden until the core loop is solid. Opt in with
                  ?experimental=1 or localStorage forestExperimental=1. -->
             <button id="crisis-mode-btn" class="landing-btn secondary experimental" type="button" hidden>
-              <span class="btn-icon">!</span>
+              <span class="btn-icon">❯</span>
               <span class="btn-text">[C]RISIS COMMAND</span>
               <span class="landing-btn-badge">EXPERIMENTAL</span>
             </button>
             <button id="load-game-btn" class="landing-btn secondary" type="button">
-              <span class="btn-icon">=</span>
+              <span class="btn-icon">❯</span>
               <span class="btn-text">[L]OAD DATA</span>
             </button>
             <div class="landing-btn-row">
               <button id="compliance-intel-landing-btn" class="landing-btn ghost" type="button">
-                <span class="btn-icon">#</span>
+                <span class="btn-icon">❯</span>
                 <span class="btn-text">[P] COMPLIANCE INTEL</span>
               </button>
               <button id="help-landing-btn" class="landing-btn ghost" type="button">
-                <span class="btn-icon">?</span>
+                <span class="btn-icon">❯</span>
                 <span class="btn-text">[H]ELP</span>
               </button>
               <button id="settings-btn" class="landing-btn ghost" type="button">
-                <span class="btn-icon">*</span>
+                <span class="btn-icon">❯</span>
                 <span class="btn-text">SETTINGS</span>
               </button>
             </div>
@@ -376,6 +375,9 @@
           <div id="terminal" class="terminal" role="log" aria-live="polite"></div>
         </div>
 
+        <!-- Compact mission strip (mobile only; desktop shows the dashboard) -->
+        <div id="mission-strip" class="mission-strip" hidden></div>
+
         <!-- Decision area (buttons and input) -->
         <div id="action-area" class="action-area">
           <div id="decision-header" class="decision-header">
@@ -383,6 +385,7 @@
             <span class="decision-title" id="decision-title">AWAITING INPUT</span>
           </div>
           <div id="choices" class="choices"></div>
+          <div id="choices-hint" class="choices-hint" hidden>↑↓ select · Enter confirm · 1–9 jump</div>
           <div id="input-wrapper" class="input-wrapper" hidden>
             <span class="input-prompt">&gt;</span>
             <input
@@ -411,6 +414,16 @@
           <button id="close-panel" class="close-btn" type="button" aria-label="Close panel">[X]</button>
         </div>
         <div id="panel-content" class="panel-content">
+          <!-- Field radio: ambient/action ASCII animations (js/ui/radio.js) -->
+          <section class="panel-section" id="radio-section" hidden>
+            <h3 class="section-title">FIELD RADIO</h3>
+            <pre id="radio-panel" class="radio-panel" aria-hidden="true"></pre>
+          </section>
+          <!-- Mission section: objective, meter, facts, checklist, alerts -->
+          <section class="panel-section" id="mission-section" hidden>
+            <h3 class="section-title">MISSION</h3>
+            <div id="mission-panel" class="mission-panel"></div>
+          </section>
           <!-- Crew section -->
           <section class="panel-section">
             <h3 class="section-title">CREW</h3>
@@ -458,6 +471,11 @@
         </div>
       </footer>
     </div>
+
+    <!-- Full-ASCII grid renderer (display mode: grid). Projects the game
+         screen above onto a character cell canvas; the DOM stays the
+         source of truth and keeps receiving all input. -->
+    <canvas id="grid-canvas" class="grid-canvas" hidden aria-hidden="true"></canvas>
 
     <!-- Modal dialog -->
     <div id="modal" class="modal" hidden>

@@ -107,17 +107,41 @@ export const InputMixin = {
           </div>
         `;
       } else {
-        // Classic terminal style
+        // Classic mode: TUI option card — key badge, label, effects hint,
+        // risk-tag chip (parsed from the " [SAFE]"-style suffix some modes
+        // append to labels; shown as a chip instead of inline noise).
+        const TAG_RE = /\s*\[(SAFE|RISKY|TRADEOFF)\]\s*/;
+        let labelText = String(option.label ?? '');
+        const tagMatch = labelText.match(TAG_RE);
+        const tag = tagMatch ? tagMatch[1] : null;
+        if (tag) labelText = labelText.replace(TAG_RE, ' ').replace(/\s{2,}/g, ' ').trim();
+
+        const key = document.createElement('span');
+        key.className = 'choice-key';
+        key.textContent = shortcutKey || '·';
+        btn.appendChild(key);
+
+        const main = document.createElement('span');
+        main.className = 'choice-main';
+
         const label = document.createElement('span');
         label.className = 'choice-label';
-        label.textContent = `${prefix}${option.label}`;
-        btn.appendChild(label);
+        label.textContent = labelText;
+        main.appendChild(label);
 
         if (option.hint || option.description) {
           const hint = document.createElement('span');
           hint.className = 'choice-hint';
           hint.textContent = option.hint || option.description;
-          btn.appendChild(hint);
+          main.appendChild(hint);
+        }
+        btn.appendChild(main);
+
+        if (tag) {
+          const chip = document.createElement('span');
+          chip.className = `choice-tag tag-${tag.toLowerCase()}`;
+          chip.textContent = tag;
+          btn.appendChild(chip);
         }
       }
 
@@ -125,6 +149,8 @@ export const InputMixin = {
         // Save handler before hiding choices (which clears it)
         const handler = this._choiceHandler;
         this.write(`> ${option.label}`, 'term-dim');
+        // Matching action animation on the field radio (chainsaw, boots, ...)
+        this.playRadioAction?.(option.label);
         this._hideChoices();
         if (handler) {
           handler(option);
@@ -133,6 +159,33 @@ export const InputMixin = {
 
       this.choices.appendChild(btn);
     });
+
+    // Arrow-key navigation: ↑/↓ (and j/k) move the selection bar through the
+    // list, wrapping at the ends. Focus IS the selection — Enter activates.
+    this.choices.onkeydown = (e) => {
+      const isDown = e.key === 'ArrowDown' || e.key === 'j';
+      const isUp = e.key === 'ArrowUp' || e.key === 'k';
+      if (!isDown && !isUp) return;
+
+      const buttons = Array.from(
+        this.choices.querySelectorAll('.choice-btn, .decision-card')
+      );
+      if (!buttons.length) return;
+
+      e.preventDefault();
+      const current = buttons.indexOf(document.activeElement);
+      const delta = isDown ? 1 : -1;
+      const next = current === -1
+        ? (isDown ? 0 : buttons.length - 1)
+        : (current + delta + buttons.length) % buttons.length;
+      buttons[next].focus();
+      buttons[next].scrollIntoView({ block: 'nearest' });
+    };
+
+    // Keyboard hint under the list, only when there is a real choice to make
+    if (this.choicesHint) {
+      this.choicesHint.hidden = isModern || options.length < 2;
+    }
 
     // Focus first button
     const firstBtn = this.choices.querySelector('.choice-btn, .decision-card');
@@ -146,6 +199,9 @@ export const InputMixin = {
   _hideChoices() {
     if (this.choices) {
       this.choices.innerHTML = '';
+    }
+    if (this.choicesHint) {
+      this.choicesHint.hidden = true;
     }
     this._choiceHandler = null;
     this._currentOptions = null;

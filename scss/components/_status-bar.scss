@@ -6,34 +6,69 @@
   flex-shrink: 0;
 }
 
+// Single-row TUI strip: LABEL value │ LABEL value │ ...
 .status-bar {
   display: flex;
-  justify-content: space-around;
+  justify-content: flex-start;
   align-items: center;
   height: var(--status-bar-height);
-  padding: 0 var(--space-md);
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border-color);
+  padding: 0 var(--space-sm);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .status-item {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-xs);
+  white-space: nowrap;
+
+  // │ separator between items
+  & + &::before {
+    content: '│';
+    color: var(--border);
+    margin: 0 var(--space-sm);
+  }
 }
 
 .status-label {
   font-size: var(--font-size-xs);
-  color: var(--fg-dim);
+  color: var(--text-dim);
   letter-spacing: 1px;
 }
 
 .status-value {
   font-size: var(--font-size-sm);
   font-weight: bold;
-  color: var(--fg-bright);
+  color: var(--text-bright);
+}
+
+// Inline ASCII meter inside a status value (filled by panels.js)
+.status-meter {
+  font-weight: normal;
+  color: var(--text);
+  letter-spacing: -1px;
+
+  &.warn {
+    color: var(--warn);
+  }
+
+  &.danger {
+    color: var(--danger);
+  }
+
+  // Not enough columns for bars on a phone — numbers only
+  @media (max-width: 700px) {
+    display: none;
+  }
 }
 
 // Stat cards (for modern mode)

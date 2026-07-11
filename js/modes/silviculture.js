@@ -263,39 +263,50 @@ function displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, z
   ui.clear();
   ui.writeHeader(`DAY ${journey.day} - SILVICULTURE OPERATIONS`);
 
-  if (seasonInfo) {
-    ui.write(`${seasonInfo.icon} ${seasonInfo.name} - Year ${seasonInfo.year} | Hours: ${journey.hoursRemaining}h`);
-  }
-
-  // Compact program status
+  // Status renders in the mission dashboard pane; budget/seedlings/capacity
+  // live in the supplies pane already.
   const plantPct = Math.round(Math.min(1, journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
   const brushPct = Math.round(Math.min(1, journey.brushing.hectaresComplete / journey.brushing.hectaresTarget) * 100);
   const surveyPct = Math.round(Math.min(1, journey.surveys.freeGrowingComplete / journey.surveys.freeGrowingTarget) * 100);
-
-  ui.write(`Plant: ${plantPct}% (${Math.min(journey.planting.blocksPlanted, journey.planting.blocksToPlant)}/${journey.planting.blocksToPlant} blocks) | Brush: ${brushPct}% | Survey: ${surveyPct}% (${Math.min(journey.surveys.freeGrowingComplete, journey.surveys.freeGrowingTarget)}/${journey.surveys.freeGrowingTarget})`);
-
-  // Sticky objective + win gates so the regen targets are never a mystery.
   const plantDone = journey.planting.blocksPlanted >= journey.planting.blocksToPlant;
   const surveyDone = journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget;
-  ui.write(`Objective: Hit the regeneration targets — plant the block program and clear free-growing surveys.`);
-  ui.write(`Regen Gates: [${plantDone ? 'x' : ' '}] Planting (${plantPct}%)  [${surveyDone ? 'x' : ' '}] Free-growing surveys (${surveyPct}%)`);
-
-  // Compact contractors
   const roster = getSilvicultureContractorRoster(journey, zoneProfile);
-  ui.write(`Roster: ${roster.summary}`);
 
-  // Resources
-  ui.write(`Budget: $${journey.resources.budget.toLocaleString()} | Seedlings: ${journey.resources.seedlings.toLocaleString()} | Capacity: ${journey.resources.contractorCapacity} days`);
+  const facts = [];
+  if (seasonInfo) {
+    facts.push({ label: 'Season', value: `${seasonInfo.name} \u00b7 Y${seasonInfo.year}` });
+  }
+  facts.push({ label: 'Hours left', value: `${journey.hoursRemaining}h` });
+  facts.push({ label: 'Brushing', value: `${brushPct}%` });
+  facts.push({ label: 'Roster', value: roster.summary });
 
-  // Alerts only — the full program lives behind Review the Program Binder
+  const checklist = [
+    {
+      label: `planting ${plantPct}% (${Math.min(journey.planting.blocksPlanted, journey.planting.blocksToPlant)}/${journey.planting.blocksToPlant} blocks)`,
+      done: plantDone
+    },
+    {
+      label: `free-growing surveys ${surveyPct}% (${Math.min(journey.surveys.freeGrowingComplete, journey.surveys.freeGrowingTarget)}/${journey.surveys.freeGrowingTarget})`,
+      done: surveyDone
+    }
+  ];
+
+  const alerts = [];
   const vegetationPressure = getVegetationPressure(journey);
   if (vegetationPressure > 0.25) {
-    ui.writeWarning('Vegetation pressure: HIGH - brushing is lagging well behind planted ground.');
+    alerts.push({ level: 'warn', text: 'Vegetation pressure: HIGH - brushing is lagging well behind planted ground.' });
   }
   if (seasonInfo?.id === 'winter') {
-    ui.writeWarning('Winter lockout: ground is frozen - planting waits for spring.');
+    alerts.push({ level: 'warn', text: 'Winter lockout: ground is frozen - planting waits for spring.' });
   }
-  ui.write('');
+
+  ui.setMissionStatus?.({
+    objective: 'Hit the regeneration targets \u2014 plant the block program and clear free-growing surveys.',
+    meter: { label: 'Planting', value: plantPct, text: `${plantPct}%` },
+    facts,
+    checklist,
+    alerts
+  });
 }
 
 /**

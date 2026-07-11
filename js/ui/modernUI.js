@@ -178,6 +178,10 @@ export const ModernUIMixin = {
    * @param {string} mode - 'classic' or 'modern'
    */
   _onDisplayModeChange(mode) {
+    // The grid renderer projects the DOM, so it toggles on top of classic
+    if (mode === 'grid') this.gridView?.enable();
+    else this.gridView?.disable();
+
     // Re-render current choices if any are displayed
     if (this._currentOptions && this._choiceHandler) {
       this._showChoices(this._currentOptions);
