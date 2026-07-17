@@ -13,7 +13,11 @@ export default defineConfig({
     headless: true,
     viewport: { width: 1440, height: 1100 },
     screenshot: 'only-on-failure',
-    trace: 'on-first-retry'
+    trace: 'on-first-retry',
+    // Scenes and vignettes honor prefers-reduced-motion by rendering a
+    // single still frame; the drivers never tap-to-skip, so animated decks
+    // would otherwise stack several seconds of waiting into every game day.
+    contextOptions: { reducedMotion: 'reduce' }
   },
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined

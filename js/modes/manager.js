@@ -8,6 +8,7 @@
 
 import { checkForEvent } from "../events.js";
 import { handleEvent } from "./shared/handleEvent.js";
+import { buildBoardChartFrames } from "../scene/textmode/scenes.js";
 import { getOperationalProgress, recordProgressMilestones } from "../journey.js";
 
 import ceoProfiles from "../../docs/legacy_archive/game_content_datasets/ceo_profiles.json" with { type: "json" };
@@ -503,6 +504,16 @@ async function runBoardReview(game, threshold) {
     budget: "Budget Health",
     reputation: "Reputation",
   };
+
+  // The deck draws itself while the directors watch.
+  if (typeof ui.playScene === "function") {
+    await ui.playScene(buildBoardChartFrames(
+      Object.entries(metricLabels).map(([key, label]) => ({
+        label,
+        value: journey.metrics[key] ?? 50,
+      }))
+    ), { delay: 110 });
+  }
   let weakQuarter = false;
   for (const [key, label] of Object.entries(metricLabels)) {
     const before = Math.round(baseline[key] ?? 50);

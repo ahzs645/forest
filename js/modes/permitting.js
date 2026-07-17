@@ -6,6 +6,7 @@
 
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
+import { buildOfficeWindowFrames, buildStampFrames } from '../scene/textmode/scenes.js';
 import { calculateDeskConsumption, applyConsumption, applyDeskRegen, getFormattedResourceStatus, DESK_RESOURCES } from '../resources.js';
 import { executeDeskDay, DESK_ACTIONS } from '../journey.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
@@ -898,6 +899,16 @@ export async function runPermittingDay(game) {
   const { ui, journey } = game;
   ensurePermittingRevisionState(journey);
   ensurePermittingProfessionalState(journey);
+
+  // Morning at the office: the season outside the window, coffee inside.
+  if (typeof ui.playScene === 'function') {
+    await ui.playScene(buildOfficeWindowFrames({
+      weatherId: journey.weather?.id,
+      season: journey.season?.currentSeason,
+      seed: journey.day,
+    }), { delay: 140, holdLastFrame: false });
+  }
+
   const daysRemaining = journey.deadline - journey.day;
   const progressBeforeDay = getOperationalProgress(journey);
   let meetingsToday = 0;
@@ -1707,6 +1718,10 @@ function processPermitPipeline(ui, journey) {
       journey.permits.inReview -= approved;
       journey.permits.approved += approved;
       applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: -1, auditExposure: -1 });
+      // The stamp comes down beside the message — non-blocking, like vignettes.
+      if (typeof ui.playScene === 'function') {
+        ui.playScene(buildStampFrames('APPROVED'), { delay: 110 });
+      }
       ui.writePositive(`${approved} permit(s) APPROVED!`);
     }
     if (revisions > 0) {

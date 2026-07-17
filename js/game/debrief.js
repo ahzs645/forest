@@ -421,6 +421,11 @@ export async function runFinalDebrief(ui, journey, victory) {
   ui.write(`  ${'Final Report'.padEnd(14)} ${reportStyleLabel(reportStyle)} (${deltaLabel} pts)`);
   ui.write('');
   if (victory) {
+    // An A-grade run earns the sky.
+    if (String(scoreResult.grade).startsWith('A') && typeof ui.playScene === 'function') {
+      const { buildFireworksFrames } = await import('../scene/textmode/scenes.js');
+      await ui.playScene(buildFireworksFrames({ seed: scoreResult.totalScore + 1 }), { delay: 120 });
+    }
     ui.writePositive(gradeLine);
   } else {
     ui.writeWarning(gradeLine);

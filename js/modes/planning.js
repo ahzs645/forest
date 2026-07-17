@@ -6,6 +6,7 @@
 
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
+import { buildOfficeWindowFrames } from '../scene/textmode/scenes.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
 import {
   buildPlanningConstraintTriage,
@@ -520,6 +521,15 @@ export async function runPlanningDay(game) {
   const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
   const progressBeforeDay = getOperationalProgress(journey);
   ensurePlanningProfessionalState(journey);
+
+  // Morning at the office: the season outside the window, coffee inside.
+  if (typeof ui.playScene === 'function') {
+    await ui.playScene(buildOfficeWindowFrames({
+      weatherId: journey.weather?.id,
+      season: journey.season?.currentSeason,
+      seed: journey.day,
+    }), { delay: 140, holdLastFrame: false });
+  }
 
   // Reset hours for new day
   if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {

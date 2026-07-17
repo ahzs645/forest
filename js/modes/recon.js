@@ -34,6 +34,8 @@ import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journ
 import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
 import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
 import { buildCampfireFrames } from '../scene/textmode/effects.js';
+import { buildNightCampFrames } from '../scene/textmode/scenes.js';
+import { buildHuntFrames, scoreHunt } from '../scene/hunt.js';
 import { FIELD_RESOURCES } from '../resources.js';
 import {
   addDiscoveryTags,
@@ -509,6 +511,12 @@ async function runFieldDay(game) {
       // calendar advances once, after the loop, via endFieldDay().
       const result = executeFieldAction(journey, 'resting');
       dayResolved = true;
+      if (typeof ui.playScene === 'function') {
+        await ui.playScene(buildNightCampFrames({ seed: journey.day * 5 + 1 }), {
+          delay: 170,
+          loops: 2,
+        });
+      }
       for (const msg of result.messages) ui.write(msg);
       journey.hoursRemaining = 0;
       break;
@@ -603,7 +611,7 @@ async function runFieldDay(game) {
       handleFieldNotebook(ui, journey);
     } else if (actionId === 'forage') {
       journey.hoursRemaining -= 2;
-      applyForageResults(ui, journey, 'forage');
+      await handleForageAndHunt(game);
     } else if (actionId === 'maintain') {
       journey.hoursRemaining -= 2;
       await handleMaintenance(game);
@@ -1246,7 +1254,10 @@ async function maybeHandleFoodDecision(game) {
     rations.shortRationStreak = 0;
     journey.hoursRemaining = Math.max(0, (journey.hoursRemaining || 0) - 2);
     ui.write('You burn the first part of the shift trying to fill the food bins before pushing deeper.');
-    applyForageResults(ui, journey, 'hunt');
+    const hunted = await runHuntMinigame(game);
+    if (!hunted) {
+      applyForageResults(ui, journey, 'hunt');
+    }
     ui.write('');
     return;
   }
@@ -1706,6 +1717,81 @@ export async function handleMaintenance(game) {
  * @param {Object} journey - Journey state
  * @param {string} strategy - 'forage' or 'hunt'
  */
+/**
+ * The camp food action: forage the understory (a safe roll) or set up on
+ * the game trail (the hunt minigame — a real gamble on your timing).
+ */
+async function handleForageAndHunt(game) {
+  const { ui, journey } = game;
+  if (typeof ui.playScene !== 'function') {
+    applyForageResults(ui, journey, 'forage');
+    return;
+  }
+
+  const choice = await ui.promptChoice('Fill the food bins:', [
+    {
+      label: 'Forage the understory',
+      description: 'Berries, salvage, maybe a grouse — steady odds',
+      value: 'forage',
+    },
+    {
+      label: 'Set up on the game trail',
+      description: 'One shot at real meat. Timing is everything.',
+      value: 'hunt',
+    },
+  ]);
+
+  if (choice.value === 'hunt') {
+    const hunted = await runHuntMinigame(game);
+    if (!hunted) {
+      ui.write('Nothing shows before the light goes. The crew falls back to foraging.');
+      applyForageResults(ui, journey, 'forage');
+    }
+    return;
+  }
+  applyForageResults(ui, journey, 'forage');
+}
+
+/**
+ * Play the hunt scene and score the tap. Returns false when the minigame
+ * didn't effectively run (reduced motion, no tap, headless UI) so callers
+ * can fall back to the ordinary roll.
+ */
+async function runHuntMinigame(game) {
+  const { ui, journey } = game;
+  if (typeof ui.playScene !== 'function') return false;
+
+  ui.write('');
+  ui.writeHeader('THE GAME TRAIL');
+  ui.write('A moose works the willow line. One chance before the wind turns.', 'term-dim');
+  const result = await ui.playScene(buildHuntFrames({ seed: journey.day * 17 + 3 }), {
+    delay: 160,
+    holdLastFrame: false,
+  });
+  if (!result?.skipped) return false;
+
+  const score = scoreHunt(result.frameIndex);
+  ui.write('');
+  ui.writeHeader('HUNT RESULTS');
+  ui.write(score.line);
+  if (score.food > 0) {
+    journey.resources.food = Math.min(FIELD_RESOURCES.food.max, journey.resources.food + score.food);
+    ui.writePositive(`+${score.food} rations packed back to camp.`);
+    // Dressing game in the bush has its own risks.
+    if (score.quality === 'clean' && Math.random() < 0.08) {
+      const activeCrew = journey.crew.filter((m) => m.isActive);
+      const victim = activeCrew.length ? activeCrew[Math.floor(Math.random() * activeCrew.length)] : null;
+      if (victim) {
+        const illness = applyStatusEffect(victim, 'food_poisoning');
+        ui.writeWarning(`Field dressing in a hurry has consequences. ${illness.message}`);
+      }
+    }
+  } else {
+    ui.write('The bins stay light. Tomorrow the trail decides again.', 'term-dim');
+  }
+  return true;
+}
+
 function applyForageResults(ui, journey, strategy = 'forage') {
   const active = journey.crew.filter(m => m.isActive).length || 1;
   const isHunt = strategy === 'hunt';
