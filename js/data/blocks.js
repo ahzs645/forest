@@ -49,13 +49,24 @@ export function getTotalDistance(areaId) {
   return blocks.reduce((sum, block) => sum + block.distance, 0);
 }
 
+// Season character for the weather table: BC interior climate normals in
+// spirit — spring freshet rain and late snow, convective summer storms,
+// a wet unpredictable fall, a locked-up winter.
+const SEASONAL_WEATHER_SHIFTS = {
+  spring: { light_rain: +10, heavy_rain: +5, fog: +4, light_snow: +2, storm: +2, clear: -8, heavy_snow: -2 },
+  summer: { clear: +12, overcast: +2, storm: +2, light_snow: -5, heavy_snow: -3, freezing: -2, fog: -4 },
+  fall: { heavy_rain: +8, light_rain: +6, fog: +6, overcast: +4, light_snow: +2, clear: -10 },
+  winter: { light_snow: +12, heavy_snow: +8, freezing: +8, clear: -8, light_rain: -12, heavy_rain: -7, storm: +1 },
+};
+
 /**
  * Get random weather for a location
  * @param {Object} block - Current block
  * @param {number} day - Current day of journey
+ * @param {string} [seasonId] - 'spring' | 'summer' | 'fall' | 'winter'
  * @returns {Object} Weather condition
  */
-export function getRandomWeather(block, day) {
+export function getRandomWeather(block, day, seasonId = null) {
   // Weight towards mild weather, with seasonal effects
   const weights = {
     clear: 25,
@@ -69,6 +80,14 @@ export function getRandomWeather(block, day) {
     storm: 2
   };
 
+  // Season owns the sky before anything local adjusts it.
+  const shifts = SEASONAL_WEATHER_SHIFTS[seasonId];
+  if (shifts) {
+    for (const [id, delta] of Object.entries(shifts)) {
+      weights[id] = Math.max(0, (weights[id] || 0) + delta);
+    }
+  }
+
   // Adjust for terrain/features
   if (block?.features?.includes('alpine') || block?.features?.includes('pass')) {
     weights.heavy_snow += 5;
@@ -79,7 +98,7 @@ export function getRandomWeather(block, day) {
   // Later in journey = worse weather potential
   if (day > 20) {
     weights.heavy_rain += 3;
-    weights.heavy_snow += 3;
+    weights.heavy_snow += (seasonId === 'summer' ? 0 : 3);
   }
 
   // Weighted random selection

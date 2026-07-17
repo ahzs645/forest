@@ -27,6 +27,7 @@ import {
   FIELD_RESOURCES
 } from '../resources.js';
 import { TERRAIN_TYPES, getRandomWeather, getTemperature } from '../data/blocks.js';
+import { advanceDay as advanceSeasonDay } from '../season.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromAccess } from '../data/discoveryTags.js';
 
 const ACCESS_NO_GO_HAZARDS = new Set([
@@ -1013,7 +1014,15 @@ export function executeFieldAction(journey, paceId) {
  */
 export function endFieldDay(journey) {
   journey.day++;
-  journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day);
+  // The season calendar ticks with the field calendar, so long traverses
+  // cross into new weather regimes (summer recon runs into fall rain).
+  // Silviculture advances its season in its own loop and does not come
+  // through here.
+  if (journey.season?.currentSeason) {
+    const { state } = advanceSeasonDay(journey.season);
+    journey.season = state;
+  }
+  journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day, journey.season?.currentSeason);
   journey.temperature = getTemperature(journey.weather, getCurrentBlock(journey));
   journey.travelDelayHours = 0;
   journey.routePlan = null;

@@ -38,6 +38,7 @@ const KEYWORD_DECKS = [
 ];
 
 const TYPE_FALLBACKS = {
+  trade: () => deck(ANIMATIONS.truckDriving, 250),
   wildlife: () => deck(ASCII_ART.bear, 600),
   weather: () => deck(ASCII_ART.rain, 300),
   terrain: () => deck(Anim.bootAnimation, 300),

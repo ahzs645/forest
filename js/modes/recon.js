@@ -31,6 +31,7 @@ import {
   fordCrossing
 } from '../journey/riverCrossing.js';
 import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journey/blockNav.js';
+import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
 import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
 import { buildCampfireFrames } from '../scene/textmode/effects.js';
 import { FIELD_RESOURCES } from '../resources.js';
@@ -574,6 +575,7 @@ async function runFieldDay(game) {
         const arrivedBlock = journey.blocks[journey.currentBlockIndex];
         await runRiverCrossingBeat(game, arrivedBlock);
         if (game.gameOver) return;
+        showTrailMarkers(ui, journey, arrivedBlock);
       }
 
       // A crossed progress milestone earns the crew a fire and a breather.
@@ -641,6 +643,9 @@ async function runFieldDay(game) {
   // verification) get their camp beat here rather than mid-travel.
   await celebrateNewMilestones(game);
 
+  // Anyone lost today gets their marker before the day closes.
+  await maybeMemorializeFallen(game);
+
   // Advance the calendar exactly once, now that the shift is genuinely over.
   endFieldDay(journey);
 
@@ -652,6 +657,80 @@ async function runFieldDay(game) {
     ? `Continue... (Next: ${nextBlock.name}, ${nextBlock.terrain})`
     : 'Continue...';
   await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
+}
+
+/**
+ * Show markers left by earlier runs at a block the crew just reached.
+ * A run never sees its own fresh markers (epoch cutoff).
+ */
+function showTrailMarkers(ui, journey, block) {
+  if (!block) return;
+  if (!journey.trailMarkerEpoch) journey.trailMarkerEpoch = Date.now();
+  if (!journey.seenMarkerBlocks) journey.seenMarkerBlocks = [];
+  if (journey.seenMarkerBlocks.includes(block.id)) return;
+  journey.seenMarkerBlocks.push(block.id);
+
+  const markers = markersForBlock(journey.areaId, block.id, { before: journey.trailMarkerEpoch });
+  if (!markers.length) return;
+
+  ui.write('');
+  ui.write(markers.length === 1
+    ? 'A weathered marker stands off the cutline:'
+    : `${markers.length} weathered markers stand off the cutline:`);
+  for (const marker of markers.slice(-3)) {
+    const art = formatTrailMarker(marker);
+    if (typeof ui.writeBox === 'function') ui.writeBox(art);
+    else ui.write(art);
+  }
+  ui.write('The crew is quiet for a minute. Then the work goes on.', 'term-dim');
+}
+
+/**
+ * Offer a marker for anyone who died today. The epitaph is the player's
+ * to write — it will stand at this block for every future run.
+ */
+async function maybeMemorializeFallen(game) {
+  const { ui, journey } = game;
+  if (!journey.trailMarkerEpoch) journey.trailMarkerEpoch = Date.now();
+  if (!journey.memorializedIds) journey.memorializedIds = [];
+
+  for (const member of journey.crew) {
+    if (!member.isDead || journey.memorializedIds.includes(member.id)) continue;
+    journey.memorializedIds.push(member.id);
+
+    const block = journey.blocks[journey.currentBlockIndex];
+    const lastEffect = member.statusEffects?.[member.statusEffects.length - 1];
+    const cause = lastEffect ? String(lastEffect.effectId).replace(/_/g, ' ') : 'the trail';
+
+    ui.write('');
+    ui.writeHeader(`✝ ${member.name}`);
+    const choice = await ui.promptChoice('Mark the spot?', [
+      { label: 'Carve a marker', description: 'Write a line for whoever passes this way next', value: 'carve' },
+      { label: 'Let the bush take it quietly', description: 'No marker. The crew will remember.', value: 'skip' },
+    ]);
+    if (choice.value !== 'carve') {
+      ui.write('The crew stands a moment, then shoulders their packs.');
+      continue;
+    }
+
+    let epitaph = null;
+    if (typeof ui.promptText === 'function') {
+      epitaph = await ui.promptText('Epitaph (one line):', 'They loved this country');
+    }
+    const marker = recordTrailMarker({
+      name: member.name,
+      epitaph: epitaph || 'They loved this country',
+      areaId: journey.areaId,
+      blockId: block?.id,
+      blockName: block?.name,
+      day: journey.day,
+      cause,
+    });
+    const art = formatTrailMarker(marker);
+    if (typeof ui.writeBox === 'function') ui.writeBox(art);
+    else ui.write(art);
+    ui.write('It will stand here for whoever comes next.', 'term-dim');
+  }
 }
 
 /**
@@ -1453,6 +1532,17 @@ export async function handleResupply(game, block) {
   const cash = journey.resources.budget || 0;
   ui.writeHeader(`RESUPPLY: ${block?.name || 'Supply Point'}`);
   ui.write(`Cash on hand: $${Math.round(cash).toLocaleString()}`);
+
+  // Freight economics: the deeper into the traverse, the more everything
+  // costs — buy early or pay the remoteness premium.
+  const remoteness = journey.totalDistance > 0
+    ? Math.min(1, journey.distanceTraveled / journey.totalDistance)
+    : 0;
+  const priceFactor = 1 + remoteness * 0.45 + (journey.day > 15 ? 0.1 : 0);
+  const priced = (base) => Math.round((base * priceFactor) / 10) * 10;
+  if (priceFactor > 1.15) {
+    ui.write('Prices out here carry the freight bill.', 'term-dim');
+  }
   ui.write('');
 
   const clampToMax = (resourceId, value) => {
@@ -1462,15 +1552,15 @@ export async function handleResupply(game, block) {
   };
 
   const offers = [
-    { id: 'fuel_drum', label: 'Fuel Drum', description: '+40 fuel', cost: 180, apply: () => { journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 40); } },
-    { id: 'rations', label: 'Rations Crate', description: '+20 food', cost: 160, apply: () => { journey.resources.food = clampToMax('food', journey.resources.food + 20); } },
-    { id: 'first_aid', label: 'First Aid Kit', description: '+1 kit', cost: 120, apply: () => { journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 1); } },
-    { id: 'field_repair', label: 'Field Repair', description: '+15% equipment', cost: 220, apply: () => { journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 15); } },
+    { id: 'fuel_drum', label: 'Fuel Drum', description: '+40 fuel', cost: priced(180), apply: () => { journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 40); } },
+    { id: 'rations', label: 'Rations Crate', description: '+20 food', cost: priced(160), apply: () => { journey.resources.food = clampToMax('food', journey.resources.food + 20); } },
+    { id: 'first_aid', label: 'First Aid Kit', description: '+1 kit', cost: priced(120), apply: () => { journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 1); } },
+    { id: 'field_repair', label: 'Field Repair', description: '+15% equipment', cost: priced(220), apply: () => { journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 15); } },
     {
       id: 'full_restock',
       label: 'Full Restock',
       description: '+50 fuel, +25 food, +20% equip, +2 kits',
-      cost: 650,
+      cost: priced(650),
       apply: () => {
         journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 50);
         journey.resources.food = clampToMax('food', journey.resources.food + 25);

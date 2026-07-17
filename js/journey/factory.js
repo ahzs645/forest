@@ -552,7 +552,7 @@ export function createFieldJourney(options = {}) {
 
     // Current conditions
     pace: "normal",
-    weather: getRandomWeather(blocks[0], 1),
+    weather: getRandomWeather(blocks[0], 1, createSeasonState(roleId)?.currentSeason),
     temperature: "cool",
     travelDelayHours: 0,
     routePlan: null,

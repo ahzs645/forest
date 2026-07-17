@@ -245,6 +245,7 @@ export const InitFlowMixin = {
    * @private
    */
   async _startLandingScene() {
+    this._startCareerForest();
     const host = this.landingScreen?.querySelector('.ascii-tree');
     if (!host) return;
     const { landingSceneFrames, LANDING_SCENE_DELAY } = await import('../animations/landingScene.js');
@@ -261,6 +262,52 @@ export const InitFlowMixin = {
       index = (index + 1) % landingSceneFrames.length;
       host.textContent = landingSceneFrames[index];
     }, LANDING_SCENE_DELAY);
+  },
+
+  /**
+   * The career forest: the service record rendered as a growing stand
+   * (js/scene/forest.js). One tree per completed run; stars twinkle on a
+   * slow tick unless the player prefers reduced motion.
+   * @private
+   */
+  async _startCareerForest() {
+    const block = document.getElementById('career-forest-block');
+    const host = document.getElementById('career-forest');
+    const caption = document.getElementById('career-forest-caption');
+    if (!block || !host) return;
+
+    const [{ loadServiceRecord }, { renderCareerForestHTML }] = await Promise.all([
+      import('../career.js'),
+      import('../scene/forest.js'),
+    ]);
+    const record = loadServiceRecord();
+    if (!record?.runs) {
+      block.hidden = true;
+      return;
+    }
+
+    const cols = Math.max(36, Math.min(64, Math.floor((window.innerWidth || 640) / 10)));
+    let twinkle = 0;
+    const paint = () => {
+      const { html, count, biomeLabel } = renderCareerForestHTML(record, { cols, twinkle });
+      host.innerHTML = html;
+      if (caption) {
+        caption.innerHTML = `district record: ${count} tree${count === 1 ? '' : 's'} standing · <span class="cf-biome">[${biomeLabel}]</span>`;
+      }
+    };
+    paint();
+    block.hidden = false;
+
+    clearInterval(this._careerForestTimer);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    this._careerForestTimer = setInterval(() => {
+      if (this.landingScreen?.hidden) {
+        clearInterval(this._careerForestTimer);
+        return;
+      }
+      twinkle = (twinkle + 1) % 9999;
+      paint();
+    }, 1800);
   },
 
   /**
