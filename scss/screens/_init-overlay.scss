@@ -50,17 +50,6 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.window-dots {
-  display: flex;
-  gap: 6px;
-
-  // Square terminal pips, not macOS traffic lights
-  .dot {
-    width: 8px;
-    height: 8px;
-    background: var(--border);
-  }
-}
 
 .window-title {
   color: var(--fg-muted);

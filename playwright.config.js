@@ -11,6 +11,11 @@ export default defineConfig({
   use: {
     baseURL,
     headless: true,
+    // Sandboxes with a system Chromium (e.g. remote agents) can point the
+    // suite at it instead of downloading a matching browser build.
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
+      : {},
     viewport: { width: 1440, height: 1100 },
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',

@@ -53,7 +53,7 @@ function buildFrame(step) {
 
   // Stars twinkle on a slow cycle
   STARS.forEach((star, i) => {
-    grid[star.y][star.x] = (step + i) % 4 === 0 ? '✦' : '·';
+    grid[star.y][star.x] = (step + i) % 4 === 0 ? '*' : '·';
   });
 
   // Cloud drifts right, wrapping; bird flies left, flapping

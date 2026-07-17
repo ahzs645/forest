@@ -19,6 +19,21 @@
   animation: blink 1s infinite;
 }
 
+// ASCII window control ([■]) shared by the init overlay and the terminal
+// window title bars — the DOS-era stand-in for traffic-light dots.
+.window-sysbox {
+  color: var(--text-dim);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0;
+  user-select: none;
+}
+
+// Hard block cursor blink (on/off, no fade) for prompt cursors.
+@keyframes cursorBlink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
 // Animations
 @keyframes flash {
   0%, 100% { opacity: 1; }

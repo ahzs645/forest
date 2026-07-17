@@ -74,7 +74,7 @@ export const TerminalMixin = {
    * @param {string} text - Warning text
    */
   writeWarning(text) {
-    this.write(`⚠ ${text}`, 'term-warning');
+    this.write(`[!] ${text}`, 'term-warning');
   },
 
   /**
@@ -82,7 +82,7 @@ export const TerminalMixin = {
    * @param {string} text - Error text
    */
   writeDanger(text) {
-    this.write(`✗ ${text}`, 'term-danger');
+    this.write(`[x] ${text}`, 'term-danger');
   },
 
   /**
@@ -90,7 +90,7 @@ export const TerminalMixin = {
    * @param {string} text - Success text
    */
   writePositive(text) {
-    this.write(`✓ ${text}`, 'term-positive');
+    this.write(`[+] ${text}`, 'term-positive');
   },
 
   /**

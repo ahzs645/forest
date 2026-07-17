@@ -711,7 +711,7 @@ async function maybeMemorializeFallen(game) {
     const cause = lastEffect ? String(lastEffect.effectId).replace(/_/g, ' ') : 'the trail';
 
     ui.write('');
-    ui.writeHeader(`✝ ${member.name}`);
+    ui.writeHeader(`+ ${member.name} +`);
     const choice = await ui.promptChoice('Mark the spot?', [
       { label: 'Carve a marker', description: 'Write a line for whoever passes this way next', value: 'carve' },
       { label: 'Let the bush take it quietly', description: 'No marker. The crew will remember.', value: 'skip' },

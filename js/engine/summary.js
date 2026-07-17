@@ -9,24 +9,24 @@ export function buildSummary(state) {
 
   const messages = [];
   if (metrics.compliance < 35) {
-    messages.push("⚠️ Compliance concerns triggered a ministry audit.");
+    messages.push("[!] Compliance concerns triggered a ministry audit.");
   }
   if (metrics.relationships < 30) {
-    messages.push("⚠️ Community partners are distancing themselves from your program.");
+    messages.push("[!] Community partners are distancing themselves from your program.");
   }
   if (metrics.forestHealth > 70) {
-    messages.push("🌱 Forest health indicators improved markedly across your blocks.");
+    messages.push("[+] Forest health indicators improved markedly across your blocks.");
   }
   if (metrics.progress > 70) {
-    messages.push("🚚 Deliverables stayed ahead of schedule despite field surprises.");
+    messages.push("[+] Deliverables stayed ahead of schedule despite field surprises.");
   }
   if (metrics.budget < 30) {
-    messages.push("💸 Budget reserves are nearly depleted.");
+    messages.push("[$] Budget reserves are nearly depleted.");
   } else if (metrics.budget > 70) {
-    messages.push("💰 You protected capital for future seasons.");
+    messages.push("[$] You protected capital for future seasons.");
   }
   if (state.flags?.budgetLoanActive) {
-    messages.push("💳 Emergency loan repayments trimmed future budget gains by 20%.");
+    messages.push("[$] Emergency loan repayments trimmed future budget gains by 20%.");
   }
 
   const score = scoreRun(state);
@@ -37,7 +37,7 @@ export function buildSummary(state) {
     stumbled: "Operations stumbled. Leadership will expect a recovery plan before the next season.",
   }[score.tier];
   if (!messages.length) {
-    messages.push("✅ Stakeholders acknowledge the cohesive strategy you delivered.");
+    messages.push("[+] Stakeholders acknowledge the cohesive strategy you delivered.");
   }
 
   const timeline = Array.isArray(state.timeline) ? state.timeline.slice(1) : [];
@@ -115,22 +115,22 @@ function topDecisions(history = []) {
 function buildAchievements(metrics, trends, style) {
   const medals = [];
   if (style?.total >= 3 && style.dominant && style.label) {
-    medals.push(`🎯 ${style.label} – ${style.tendency}`);
+    medals.push(`[*] ${style.label} – ${style.tendency}`);
   }
   if (metrics.relationships >= 75 && metrics.compliance >= 65) {
-    medals.push("🏅 Balanced Steward – high trust and strong compliance sustained.");
+    medals.push("[*] Balanced Steward – high trust and strong compliance sustained.");
   }
   if (metrics.progress >= 75 && trends.progress >= 5) {
-    medals.push("🏅 Production Focus – crews consistently delivered ahead of plan.");
+    medals.push("[*] Production Focus – crews consistently delivered ahead of plan.");
   }
   if (metrics.forestHealth >= 72 && trends.forestHealth >= 4) {
-    medals.push("🏅 Ecosystem Guardian – habitat indicators trended upward all year.");
+    medals.push("[*] Ecosystem Guardian – habitat indicators trended upward all year.");
   }
   if (metrics.budget >= 70 && trends.budget >= 0) {
-    medals.push("🏅 Fiscal Anchor – reserves positioned the crew for future shocks.");
+    medals.push("[*] Fiscal Anchor – reserves positioned the crew for future shocks.");
   }
   if (!medals.length) {
-    medals.push("🎖️ Lessons Logged – carry forward insights to tighten next season's plan.");
+    medals.push("[*] Lessons Logged – carry forward insights to tighten next season's plan.");
   }
   return medals;
 }

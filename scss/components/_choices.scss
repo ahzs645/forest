@@ -17,7 +17,7 @@
   overflow-y: auto;
 }
 
-// Classic mode: flat TUI menu rows — no boxes. A ❯ cursor plus an
+// Classic mode: flat TUI menu rows — no boxes. A > cursor plus an
 // inverse-video selection bar marks the focused row, like a real terminal
 // menu; risk tags render as colored ‹SAFE›-style text, not chips.
 .choices--classic {
@@ -62,7 +62,7 @@
     outline: none;
 
     &::before {
-      content: '❯';
+      content: '>';
     }
 
     .choice-key,

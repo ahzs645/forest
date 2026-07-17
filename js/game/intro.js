@@ -40,7 +40,7 @@ export function showJourneyIntro(ui, journey) {
   // Show season info if available
   if (journey.season) {
     const seasonInfo = getCurrentSeasonInfo(journey.season);
-    ui.write(`Season: ${seasonInfo.icon} ${seasonInfo.name} - Year ${seasonInfo.year}`);
+    ui.write(`Season: ${seasonInfo.name} - Year ${seasonInfo.year}`);
     ui.write('');
   }
 
