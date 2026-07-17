@@ -1,5 +1,16 @@
 # More Oregon Trail, more motion — design worked through
 
+> **Status (2026-07-17): implemented.** All four phases of §7 shipped on this
+> branch — see the Phase A–D commits. Deliberate deviations from the plan
+> below: the ascii-anim port went through string-frame deck builders
+> (`js/scene/textmode/grid.js` + `effects.js`/`scenes.js`) rather than a live
+> grid-path adapter, because `GridView` already projects `.scene-canvas`
+> nodes, so one path covers all three renderers; the hunt minigame reads the
+> tap through `playFrames`' skip-frame rather than a new input surface; and
+> the aquarium engine was not ported (GPL) — the wildlife layer is sprite
+> hooks in the travel strip instead. Playwright now emulates
+> `prefers-reduced-motion` so autoplay drivers see stills.
+
 *Written 2026-07-17 against `main @ 8ac9f81`, cross-referenced with a full
 inventory of the ascii-anim repo. This is the follow-on to
 `docs/future_state_roadmap.md` (2026-06-12): much of that roadmap's scene
