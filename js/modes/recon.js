@@ -24,6 +24,15 @@ import {
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
 import { renderJourneyMap } from '../scene/areaMap.js';
+import {
+  getCrossingContext,
+  scoutCrossing,
+  winchCrossing,
+  fordCrossing
+} from '../journey/riverCrossing.js';
+import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journey/blockNav.js';
+import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
+import { buildCampfireFrames } from '../scene/textmode/effects.js';
 import { FIELD_RESOURCES } from '../resources.js';
 import {
   addDiscoveryTags,
@@ -269,13 +278,23 @@ async function runFieldDay(game) {
   // rolls over once, at the very end of the shift, via endFieldDay().
   let dayResolved = false;
 
-  // Check for random event at start of day. The first shift teaches the base
-  // loop — no surprise event fires before the player has seen a normal turn.
-  const event = journey.day > 1 ? checkForEvent(journey) : null;
-  if (event) {
-    displayDayHeader(ui, journey);
-    await handleEvent(game, event);
-    if (game.gameOver) return;
+  // Roll the day's random event, but hold it: Oregon Trail's rhythm is that
+  // trouble finds you ON the trail, so the event fires mid-travel (the strip
+  // pauses for it). If the shift never travels, it lands on camp instead.
+  // The first shift teaches the base loop — nothing fires on day 1.
+  let pendingEvent = journey.day > 1 ? checkForEvent(journey) : null;
+
+  // A crew that camped on the near bank of a crossing wakes up to the same
+  // river under new weather.
+  if (journey.pendingCrossing) {
+    const waitedBlock = journey.blocks.find((b) => b.id === journey.pendingCrossing);
+    journey.pendingCrossing = null;
+    if (waitedBlock) {
+      displayDayHeader(ui, journey);
+      ui.write('First light on the near bank. The river has had all night to think it over.');
+      await runRiverCrossingBeat(game, waitedBlock);
+      if (game.gameOver) return;
+    }
   }
 
   // Check for weather-forced camp day (Phase 3.3)
@@ -286,6 +305,12 @@ async function runFieldDay(game) {
     displayDayHeader(ui, journey);
     ui.writeDanger(`${journey.weather.name} has grounded all operations. The crew hunkers down.`);
     ui.write('');
+    if (pendingEvent) {
+      ui.write('The weather does not mean the day is quiet.');
+      await handleEvent(game, pendingEvent);
+      pendingEvent = null;
+      if (game.gameOver) return;
+    }
     journey.hoursRemaining = 0;
     const result = executeFieldAction(journey, 'resting');
     for (const msg of result.messages) ui.write(msg);
@@ -496,21 +521,63 @@ async function runFieldDay(game) {
       const progressBefore = journey.totalDistance > 0
         ? journey.distanceTraveled / journey.totalDistance
         : 0;
+      const blockIndexBefore = journey.currentBlockIndex;
       const result = executeFieldAction(journey, actionId);
       dayResolved = true;
+
+      const progressAfter = journey.totalDistance > 0
+        ? journey.distanceTraveled / journey.totalDistance
+        : progressBefore;
+      const stripCtx = {
+        weatherId: journey.weather?.id,
+        terrain: currentBlock?.terrain,
+        pace: actionId,
+        wildlife: pickTrailWildlife(journey, actionId),
+        seed: journey.day * 31 + journey.currentBlockIndex,
+      };
+
       if (typeof ui.playTravelStrip === 'function') {
-        await ui.playTravelStrip({
-          progressBefore,
-          progressAfter: journey.totalDistance > 0
-            ? journey.distanceTraveled / journey.totalDistance
-            : progressBefore,
-          weatherId: journey.weather?.id,
-          terrain: currentBlock?.terrain,
-          pace: actionId,
-        });
+        if (pendingEvent) {
+          // The day's event interrupts the traverse: the strip runs partway,
+          // trouble happens, and the crew moves on.
+          const midProgress = progressBefore + (progressAfter - progressBefore) * 0.45;
+          await ui.playTravelStrip({
+            ...stripCtx,
+            progressBefore,
+            progressAfter: midProgress,
+            frameCount: 8,
+          });
+          const interruptingEvent = pendingEvent;
+          pendingEvent = null;
+          await handleEvent(game, interruptingEvent);
+          if (game.gameOver) return;
+          await ui.playTravelStrip({
+            ...stripCtx,
+            progressBefore: midProgress,
+            progressAfter,
+            frameCount: 8,
+          });
+        } else {
+          await ui.playTravelStrip({ ...stripCtx, progressBefore, progressAfter });
+        }
+      } else if (pendingEvent) {
+        const interruptingEvent = pendingEvent;
+        pendingEvent = null;
+        await handleEvent(game, interruptingEvent);
+        if (game.gameOver) return;
       }
       for (const msg of result.messages) ui.write(msg);
       hasTraveled = true;
+
+      // Reaching a water crossing is a played decision, not terrain math.
+      if (journey.currentBlockIndex !== blockIndexBefore) {
+        const arrivedBlock = journey.blocks[journey.currentBlockIndex];
+        await runRiverCrossingBeat(game, arrivedBlock);
+        if (game.gameOver) return;
+      }
+
+      // A crossed progress milestone earns the crew a fire and a breather.
+      await celebrateNewMilestones(game);
       // The next header wipes the screen, so instead of pausing on a bare
       // Continue every travel beat (two Continues per shift added up), the
       // results are carried into the next screen as a recap block.
@@ -554,12 +621,25 @@ async function runFieldDay(game) {
     // If there are still hours, prompt between actions
   }
 
+  // A held event that never met the trail finds the crew in camp instead.
+  if (pendingEvent) {
+    ui.write('');
+    ui.write('Trouble finds camp anyway.');
+    await handleEvent(game, pendingEvent);
+    pendingEvent = null;
+    if (game.gameOver) return;
+  }
+
   // End of shift — if no action resolved the day yet (no travel, no rest), run
   // a camp_work pass so the day's resource/crew effects apply exactly once.
   if (!dayResolved) {
     const result = executeFieldAction(journey, 'camp_work');
     for (const msg of result.messages) ui.write(msg);
   }
+
+  // Milestones crossed by desk-side progress (notebook write-ups, package
+  // verification) get their camp beat here rather than mid-travel.
+  await celebrateNewMilestones(game);
 
   // Advance the calendar exactly once, now that the shift is genuinely over.
   endFieldDay(journey);
@@ -575,6 +655,192 @@ async function runFieldDay(game) {
 }
 
 /**
+ * Trail wildlife odds by pace: a quiet crew sees the country, a hammering
+ * one sees the trail. Returns a critter kind for the travel strip or null.
+ */
+function pickTrailWildlife(journey, paceId) {
+  const chance = { slow: 0.28, normal: 0.16, fast: 0.08, grueling: 0.03 }[paceId] || 0;
+  if (Math.random() >= chance) return null;
+  const block = journey.blocks[journey.currentBlockIndex];
+  const kinds = ['moose', 'deer'];
+  if (block?.hazards?.some((h) => /grizzly|bear/.test(h))) kinds.push('bear', 'bear');
+  if (block?.hazards?.some((h) => /moose|wildlife/.test(h))) kinds.push('moose');
+  return kinds[Math.floor(Math.random() * kinds.length)];
+}
+
+/**
+ * The river-crossing set piece: gauge readout, ford/scout/winch/wait
+ * decision, animated resolution, consequences on the shared systems.
+ * No-op for blocks without a crossing.
+ */
+async function runRiverCrossingBeat(game, block) {
+  const { ui, journey } = game;
+  let ctx = getCrossingContext(journey, block);
+  if (!ctx) return;
+
+  ui.write('');
+  ui.writeHeader(`WATER CROSSING — ${block.name}`);
+
+  while (true) {
+    ctx = getCrossingContext(journey, block);
+    if (typeof ui.playScene === 'function') {
+      await ui.playScene(buildCrossingApproachFrames(ctx, { seed: journey.day * 7 + ctx.gaugeIndex }), {
+        delay: 150,
+        loops: 2,
+        holdLastFrame: true,
+      });
+    }
+    ui.write(`The gauge reads ${ctx.gaugeLabel}. ${ctx.gaugeDescription}`);
+    if (ctx.scouted) {
+      ui.write('You know the line now. The odds are better than they look.', 'term-dim');
+    }
+
+    const options = [
+      { label: 'Ford it now', description: 'Take the channel as it stands', value: 'ford' },
+    ];
+    if (!ctx.scouted && journey.hoursRemaining >= 2) {
+      options.push({
+        label: 'Walk the line first (2h)',
+        description: 'Probe the crossing on foot — halves the risk',
+        value: 'scout',
+      });
+    }
+    if (ctx.canWinch && journey.hoursRemaining >= 3) {
+      options.push({
+        label: 'Rig a winch line (3h, fuel & gear)',
+        description: 'Slow and costly, but the water never gets a vote',
+        value: 'winch',
+      });
+    }
+    options.push({
+      label: 'Camp and wait for the level to drop',
+      description: 'Give up the rest of the shift; tomorrow is another river',
+      value: 'wait',
+    });
+
+    const choice = await ui.promptChoice('The far bank is right there:', options);
+    ui.write('');
+
+    if (choice.value === 'scout') {
+      journey.hoursRemaining = Math.max(0, journey.hoursRemaining - 2);
+      const result = scoutCrossing(journey, ctx);
+      for (const msg of result.messages) ui.write(msg);
+      ui.write('');
+      continue;
+    }
+
+    if (choice.value === 'wait') {
+      journey.hoursRemaining = 0;
+      journey.pendingCrossing = block.id;
+      ui.write('The crew makes camp on the near bank and listens to the water all night.');
+      break;
+    }
+
+    let result;
+    if (choice.value === 'winch') {
+      journey.hoursRemaining = Math.max(0, journey.hoursRemaining - 3);
+      result = winchCrossing(journey, ctx);
+    } else {
+      result = fordCrossing(journey, ctx);
+    }
+    if (typeof ui.playScene === 'function') {
+      await ui.playScene(buildCrossingResolveFrames(ctx, result, { seed: journey.day * 13 + 5 }), {
+        delay: 140,
+      });
+    }
+    for (const msg of result.messages) {
+      if (result.mishap) ui.writeWarning(msg);
+      else ui.write(msg);
+    }
+    journey.log?.push({
+      day: journey.day,
+      type: 'crossing',
+      summary: `${block.name}: ${ctx.gaugeLabel} water, ${choice.value}${result.mishap ? ' — mishap' : ''}`,
+      severity: result.severity === 'swept' ? 'high' : result.mishap ? 'medium' : 'low',
+    });
+    break;
+  }
+
+  ui.updateAllStatus(journey);
+}
+
+/**
+ * Celebrate progress milestones that haven't had their camp beat yet:
+ * campfire scene, a voice from the crew, and a small choice about morale
+ * versus supplies. Tracks celebrations on the journey so saves stay honest.
+ */
+async function celebrateNewMilestones(game) {
+  const { ui, journey } = game;
+  const reached = journey.milestonesReached || [];
+  if (!journey.milestonesCelebrated) journey.milestonesCelebrated = [];
+  for (const threshold of reached) {
+    if (journey.milestonesCelebrated.includes(threshold)) continue;
+    journey.milestonesCelebrated.push(threshold);
+    await runMilestoneCamp(game, threshold);
+    if (game.gameOver) return;
+  }
+}
+
+async function runMilestoneCamp(game, threshold) {
+  const { ui, journey } = game;
+  ui.write('');
+  ui.writeHeader(`TRAIL CAMP — ${threshold}% OF THE JOB DONE`);
+  if (typeof ui.playScene === 'function') {
+    await ui.playScene(buildCampfireFrames({ frames: 14, seed: threshold + journey.day * 3 }), {
+      delay: 160,
+      loops: 2,
+    });
+  }
+
+  // Someone always has something to say around a fire.
+  const active = journey.crew.filter((m) => m.isActive);
+  let voice = null;
+  for (const member of active) {
+    voice = getCrewComment(member, journey);
+    if (voice) {
+      voice = `${member.name}: "${voice}"`;
+      break;
+    }
+  }
+  if (!voice && active.length) {
+    const speaker = active[Math.floor(Math.random() * active.length)];
+    voice = `${speaker.name} pokes the fire and says nothing, which around here counts as high praise.`;
+  }
+  if (voice) ui.write(voice);
+
+  const canSplurge = (journey.resources.food || 0) > FIELD_RESOURCES.food.warning;
+  const choice = await ui.promptChoice('The fire burns down:', [
+    {
+      label: 'Keep it lean',
+      description: 'Bank the supplies; back at it at first light',
+      value: 'lean',
+    },
+    canSplurge
+      ? {
+        label: 'Break out the good coffee (-3 food)',
+        description: 'A morale night — the crew has earned it',
+        value: 'splurge',
+      }
+      : {
+        label: 'Ration watch',
+        description: 'Too thin to celebrate; the crew understands. Mostly.',
+        value: 'lean',
+      },
+  ]);
+
+  if (choice.value === 'splurge') {
+    journey.resources.food = Math.max(0, journey.resources.food - 3);
+    for (const member of active) {
+      member.morale = Math.min(100, member.morale + 6);
+    }
+    ui.writePositive('Real coffee, a dry log to sit on, and the job visibly shrinking. Morale climbs.');
+  } else {
+    ui.write('The crew turns in early. The trail will still be there tomorrow.');
+  }
+  ui.updateAllStatus(journey);
+}
+
+/**
  * Display compact day header with status (Phase 6.2)
  */
 function displayDayHeader(ui, journey) {
@@ -586,6 +852,18 @@ function displayDayHeader(ui, journey) {
 
   // ASCII block map (Phase 5.4)
   ui.write(buildBlockMap(journey));
+
+  // The landmark drumbeat: how far to the next named place, how far come.
+  const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
+  if (nextBlock) {
+    const segment = getCurrentSegmentLength(journey.blocks, journey.currentBlockIndex);
+    const into = getDistanceIntoCurrentSegment(journey);
+    const kmToNext = Math.max(0, segment - into);
+    ui.write(
+      `NEXT: ${nextBlock.name} — ${kmToNext.toFixed(1)} km   ·   TRAVELED: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`,
+      'term-dim'
+    );
+  }
 
   // Recap of the previous action's results (set by the travel branch), shown
   // here because this header clears the screen those results were printed on.
