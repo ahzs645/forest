@@ -12,6 +12,7 @@ import { getOperationalProgress, recordProgressMilestones } from '../journey.js'
 import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
 import { addDiscoveryTags, getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
+import { buildStandStrip } from '../scene/forest.js';
 
 // Contractor event templates (Phase 4.2)
 const CONTRACTOR_EVENTS = [
@@ -262,6 +263,13 @@ export async function runSilvicultureDay(game) {
 function displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, zoneProfile) {
   ui.clear();
   ui.writeHeader(`DAY ${journey.day} - SILVICULTURE OPERATIONS`);
+
+  // The stand at a glance: one glyph per program block, growing as the
+  // crew plants (^) and proves free-growing (♠).
+  const standStrip = buildStandStrip(journey);
+  if (standStrip) {
+    ui.write(standStrip, 'term-dim');
+  }
 
   // Status renders in the mission dashboard pane; budget/seedlings/capacity
   // live in the supplies pane already.

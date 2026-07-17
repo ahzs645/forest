@@ -172,6 +172,24 @@ export const TerminalMixin = {
   },
 
   /**
+   * Play any prebuilt frame deck as a scene. The general entry point for
+   * set-piece animations (river crossings, camp beats, season morphs,
+   * desk scenes) built by js/scene/ generators.
+   * @param {string[]} frames - Frame deck
+   * @param {Object} [opts] - playFrames options (delay, loops, holdLastFrame)
+   * @returns {Promise<{skipped: boolean, frameIndex: number}|void>}
+   */
+  playScene(frames, opts = {}) {
+    if (!this.terminal || !frames?.length) return Promise.resolve();
+    return playFrames(this.terminal, frames, {
+      delay: 130,
+      loops: 1,
+      holdLastFrame: true,
+      ...opts,
+    });
+  },
+
+  /**
    * Evict oldest lines past the cap, skipping live scene mounts
    * @private
    */

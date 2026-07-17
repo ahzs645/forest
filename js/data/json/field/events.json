@@ -1,2446 +1,2717 @@
 [
-  {
-    "id": "flat_tire",
-    "title": "Flat Tire",
-    "type": "equipment",
-    "severity": "minor",
-    "probability": 0.08,
-    "description": "The lead truck hits a sharp rock. Hissing air signals another flat.",
-    "options": [
-      {
-        "label": "Change it yourself (2 hours)",
-        "outcome": "The crew changes the tire in the rain. Back on the road, but behind schedule.",
-        "effects": {
-          "equipment": -5
-        },
-        "timeUsed": 2
-      },
-      {
-        "label": "Use the spare and continue",
-        "outcome": "Quick swap and you're moving again. Hope there are no more surprises.",
-        "effects": {
-          "equipment": -3
-        }
-      },
-      {
-        "label": "Wait for help",
-        "outcome": "Another crew passes by and helps. Cost you half a day.",
-        "effects": {
-          "progress": -5
-        },
-        "timeUsed": 4
-      }
-    ]
-  },
-  {
-    "id": "engine_trouble",
-    "title": "Engine Trouble",
-    "type": "equipment",
-    "severity": "moderate",
-    "probability": 0.05,
-    "description": "The skidder coughs and sputters. Smoke rises from the engine compartment.",
-    "options": [
-      {
-        "label": "Field repair with spare parts",
-        "outcome": "Your mechanic works through the problem. Fixed, but parts are depleted.",
-        "effects": {
-          "equipment": -15
-        },
-        "requiresRole": "mechanic"
-      },
-      {
-        "label": "Limp to the next block slowly",
-        "outcome": "Running on half power, you make it to a spot where proper repairs are possible.",
-        "effects": {
-          "equipment": -20,
-          "progress": -8
-        }
-      },
-      {
-        "label": "Call for tow truck ($500)",
-        "outcome": "The machine gets hauled out. Expensive, but the right choice.",
-        "effects": {
-          "budget": -500,
-          "equipment": -5
-        }
-      }
-    ]
-  },
-  {
-    "id": "chainsaw_failure",
-    "title": "Chainsaw Breakdown",
-    "type": "equipment",
-    "severity": "minor",
-    "probability": 0.06,
-    "description": "The primary saw throws its chain into a stump. Something's bent.",
-    "options": [
-      {
-        "label": "Swap to backup saw",
-        "outcome": "The backup saw is slower but works. Production drops for the day.",
-        "effects": {
-          "progress": -3
-        }
-      },
-      {
-        "label": "Send runner for parts",
-        "outcome": "Someone drives to town. Lost time but the good saw runs again.",
-        "effects": {
-          "fuel": -10,
-          "equipment": -8
-        }
-      },
-      {
-        "label": "Try to straighten the bar",
-        "outcome": "With patience and a hammer, it's serviceable. Probably.",
-        "effects": {
-          "equipment": -10
-        },
-        "riskInjury": 0.15
-      }
-    ],
-    "roles": [
-      "recce",
-      "silviculture"
-    ]
-  },
-  {
-    "id": "truck_stuck",
-    "title": "Truck Stuck in Mud",
-    "type": "equipment",
-    "severity": "moderate",
-    "probability": 0.06,
-    "terrainTrigger": [
-      "muskeg",
-      "river"
-    ],
-    "description": "The truck sinks to its axles in soft ground. It's not going anywhere without help.",
-    "options": [
-      {
-        "label": "Winch it out with the skidder",
-        "outcome": "Slow work, but eventually free. Equipment takes a beating.",
-        "effects": {
-          "equipment": -12,
-          "fuel": -5
-        }
-      },
-      {
-        "label": "Dig and lay brush road",
-        "outcome": "Everyone grabs shovels. Exhausting work but it works.",
-        "effects": {
-          "crew_health": -5,
-          "crew_morale": -8
-        },
-        "timeUsed": 4
-      },
-      {
-        "label": "Leave it and walk out",
-        "outcome": "You hike back with essential gear. The truck waits for drier weather.",
-        "effects": {
-          "progress": -10
-        }
-      }
-    ]
-  },
-  {
-    "id": "sudden_storm",
-    "title": "Sudden Storm",
-    "type": "weather",
-    "severity": "moderate",
-    "probability": 0.05,
-    "description": "Dark clouds roll in fast. Lightning flashes over the ridge.",
-    "options": [
-      {
-        "label": "Take shelter immediately",
-        "outcome": "Everyone piles into vehicles. Safe but no work gets done.",
-        "effects": {
-          "progress": -5
-        }
-      },
-      {
-        "label": "Push through to the next block",
-        "outcome": "You race the storm. Most make it, but conditions are dangerous.",
-        "effects": {
-          "crew_morale": -10
-        },
-        "riskInjury": 0.2
-      },
-      {
-        "label": "Set up emergency camp",
-        "outcome": "Tarps go up fast. You wait out the worst. Morale holds.",
-        "effects": {
-          "food": -3
-        }
-      }
-    ]
-  },
-  {
-    "id": "flash_flood",
-    "title": "Flash Flood Warning",
-    "type": "weather",
-    "severity": "severe",
-    "probability": 0.06,
-    "terrainTrigger": [
-      "river"
-    ],
-    "description": "The creek you crossed this morning is now a torrent. Water's rising fast.",
-    "options": [
-      {
-        "label": "Move to high ground immediately",
-        "outcome": "Everyone scrambles uphill. Equipment is safe but the day is lost.",
-        "effects": {
-          "progress": -8
-        }
-      },
-      {
-        "label": "Risk crossing now before it gets worse",
-        "outcome": "A gamble. The trucks make it across, barely.",
-        "effects": {
-          "crew_morale": -15,
-          "equipment": -10
-        },
-        "riskInjury": 0.25
-      },
-      {
-        "label": "Camp on this side overnight",
-        "outcome": "You wait for waters to drop. Lost a day but everyone's dry.",
-        "effects": {
-          "progress": -12,
-          "food": -5
-        }
-      }
-    ]
-  },
-  {
-    "id": "extreme_cold",
-    "title": "Extreme Cold Snap",
-    "type": "weather",
-    "severity": "moderate",
-    "probability": 0.08,
-    "description": "Temperature drops to -30C overnight. Everything is frozen solid.",
-    "options": [
-      {
-        "label": "Keep vehicles running all night",
-        "outcome": "Engines stay warm but fuel tanks drain fast.",
-        "effects": {
-          "fuel": -20
-        }
-      },
-      {
-        "label": "Bundle up and wait it out",
-        "outcome": "Everyone huddles in camp. A few frostbite scares but manageable.",
-        "effects": {
-          "crew_health": -8,
-          "crew_morale": -10
-        }
-      },
-      {
-        "label": "Light a big warming fire",
-        "outcome": "The fire keeps spirits high. Extra food consumed for energy.",
-        "effects": {
-          "food": -8
-        }
-      }
-    ]
-  },
-  {
-    "id": "bear_encounter",
-    "title": "Bear in Camp",
-    "type": "wildlife",
-    "severity": "moderate",
-    "probability": 0.06,
-    "description": "A black bear has found the food cache. It's not happy about being interrupted.",
-    "options": [
-      {
-        "label": "Make noise and back away slowly",
-        "outcome": "The bear eventually wanders off. Some food is ruined.",
-        "effects": {
-          "food": -8
-        }
-      },
-      {
-        "label": "Use bear spray",
-        "outcome": "Direct hit. The bear runs. Everyone's shaken but safe.",
-        "effects": {
-          "crew_morale": -5
-        }
-      },
-      {
-        "label": "Fire a warning shot",
-        "outcome": "The blast startles the bear into the bush. Compliance might ask questions.",
-        "effects": {
-          "compliance": -5
-        }
-      }
-    ]
-  },
-  {
-    "id": "grizzly_territory",
-    "title": "Grizzly Territory",
-    "type": "wildlife",
-    "severity": "severe",
-    "probability": 0.06,
-    "description": "Fresh grizzly signs everywhere. Tracks, scat, claw marks on trees. This is her home.",
-    "options": [
-      {
-        "label": "Post bear watch and continue",
-        "outcome": "Work continues with nervous glances. Productivity suffers.",
-        "effects": {
-          "progress": -5,
-          "crew_morale": -8
-        }
-      },
-      {
-        "label": "Relocate operations for the day",
-        "outcome": "You move to a different area. Safe but inefficient.",
-        "effects": {
-          "progress": -8,
-          "fuel": -5
-        }
-      },
-      {
-        "label": "Report and request guidance",
-        "outcome": "Wildlife officers advise caution. A two-day delay while they assess.",
-        "effects": {
-          "progress": -12,
-          "relationships": 5,
-          "compliance": 5
-        }
-      }
-    ]
-  },
-  {
-    "id": "moose_road",
-    "title": "Moose on the Road",
-    "type": "wildlife",
-    "severity": "minor",
-    "probability": 0.15,
-    "description": "A bull moose stands in the middle of the road. He's not moving.",
-    "options": [
-      {
-        "label": "Wait him out",
-        "outcome": "After 20 minutes of staring, he finally ambles off.",
-        "effects": {
-          "timeUsed": 1
-        }
-      },
-      {
-        "label": "Honk and inch forward",
-        "outcome": "The moose charges the truck! Minor dents but everyone's okay.",
-        "effects": {
-          "equipment": -5
-        }
-      },
-      {
-        "label": "Find an alternate route",
-        "outcome": "A longer path but no wildlife confrontation.",
-        "effects": {
-          "fuel": -3
-        }
-      }
-    ]
-  },
-  {
-    "id": "caribou_herd",
-    "title": "Caribou Herd Crossing",
-    "type": "wildlife",
-    "severity": "minor",
-    "probability": 0.1,
-    "description": "A herd of caribou is crossing ahead. Dozens of them, taking their time.",
-    "options": [
-      {
-        "label": "Stop and watch respectfully",
-        "outcome": "Beautiful sight. The crew takes photos. Good for morale.",
-        "effects": {
-          "crew_morale": 8
-        }
-      },
-      {
-        "label": "Radio ahead about the delay",
-        "outcome": "Office appreciates the update. Lost an hour.",
-        "effects": {
-          "relationships": 3
-        }
-      },
-      {
-        "label": "Try to pass slowly",
-        "outcome": "The herd scatters. You save time but feel bad about it.",
-        "effects": {
-          "crew_morale": -5,
-          "compliance": -3
-        }
-      }
-    ]
-  },
-  {
-    "id": "worker_injury",
-    "title": "Worker Injury",
-    "type": "injury",
-    "severity": "moderate",
-    "probability": 0.05,
-    "description": "A crew member slips on a log and goes down hard, clutching their ankle.",
-    "options": [
-      {
-        "label": "Apply first aid and continue",
-        "outcome": "Bandaged up and back to light duty. They'll be sore for days.",
-        "effects": {
-          "firstAid": -1
-        },
-        "crewEffect": {
-          "injury": "sprained_ankle"
-        }
-      },
-      {
-        "label": "Send them out for medical care",
-        "outcome": "One truck heads to town. You're short-handed but it's the right call.",
-        "effects": {
-          "fuel": -8,
-          "progress": -5
-        },
-        "crewEffect": {
-          "evacuate": true
-        }
-      },
-      {
-        "label": "Have them rest in camp",
-        "outcome": "They stay behind to heal. Might be fine tomorrow.",
-        "effects": {},
-        "crewEffect": {
-          "rest": 2
-        }
-      }
-    ]
-  },
-  {
-    "id": "food_poisoning",
-    "title": "Bad Food",
-    "type": "illness",
-    "severity": "moderate",
-    "probability": 0.08,
-    "description": "Half the crew woke up sick. Something in last night's dinner didn't agree.",
-    "options": [
-      {
-        "label": "Rest day for the sick",
-        "outcome": "Those affected stay in camp. Work continues short-handed.",
-        "effects": {
-          "progress": -8
-        },
-        "crewEffect": {
-          "illness": "food_poisoning",
-          "count": 2
-        }
-      },
-      {
-        "label": "Push through anyway",
-        "outcome": "Everyone works but productivity tanks. Some near-miss incidents.",
-        "effects": {
-          "progress": -3,
-          "crew_morale": -12
-        },
-        "riskInjury": 0.15
-      },
-      {
-        "label": "Dispose of suspect food",
-        "outcome": "You throw out everything questionable. Food stores depleted.",
-        "effects": {
-          "food": -15
-        }
-      }
-    ]
-  },
-  {
-    "id": "chainsaw_cut",
-    "title": "Chainsaw Accident",
-    "type": "injury",
-    "severity": "severe",
-    "probability": 0.05,
-    "description": "A saw kicks back. There's blood. This is serious.",
-    "options": [
-      {
-        "label": "Call helicopter medevac",
-        "outcome": "Air ambulance arrives within the hour. The bill is steep, but the crew sees that people come before production.",
-        "effects": {
-          "crew_morale": 6,
-          "compliance": 2
-        },
-        "crewEffect": {
-          "evacuate": true
-        }
-      },
-      {
-        "label": "Apply first aid and drive to hospital",
-        "outcome": "Bleeding is controlled, but the long road ride costs time and worries everyone.",
-        "effects": {
-          "crew_morale": -6,
-          "fuel": -8,
-          "timeUsed": 1
-        },
-        "crewEffect": {
-          "evacuate": true
-        }
-      },
-      {
-        "label": "Treat on site and keep crews working",
-        "outcome": "The wound is bandaged, but shock and infection risk rise. The crew is visibly shaken.",
-        "effects": {
-          "crew_morale": -18,
-          "firstAid": -4,
-          "progress": 2
-        },
-        "crewEffect": {
-          "injury": "severe_laceration"
-        }
-      }
-    ]
-  },
-  {
-    "id": "road_washout",
-    "title": "Road Washed Out",
-    "type": "terrain",
-    "severity": "moderate",
-    "probability": 0.1,
-    "description": "The road ahead has collapsed into the creek. No way through.",
-    "options": [
-      {
-        "label": "Build a bypass",
-        "outcome": "With shovels and chainsaws, you cut a rough detour. Takes all day.",
-        "effects": {
-          "progress": -8,
-          "equipment": -10,
-          "fuel": -5
-        }
-      },
-      {
-        "label": "Report and wait for road crew",
-        "outcome": "A proper crew will fix it in 2 days. You're stuck here.",
-        "effects": {
-          "progress": -15,
-          "compliance": 5
-        }
-      },
-      {
-        "label": "Try to ford the creek",
-        "outcome": "A risky crossing. The truck makes it but scrapes bottom badly.",
-        "effects": {
-          "equipment": -15
-        },
-        "riskInjury": 0.15
-      }
-    ]
-  },
-  {
-    "id": "bridge_questionable",
-    "title": "Questionable Bridge",
-    "type": "terrain",
-    "severity": "minor",
-    "probability": 0.12,
-    "description": "The log bridge ahead looks... tired. Uncertain if it will hold the truck.",
-    "options": [
-      {
-        "label": "Test it on foot first",
-        "outcome": "You walk across. It holds. Trucks go one at a time, very slowly.",
-        "effects": {
-          "timeUsed": 1
-        }
-      },
-      {
-        "label": "Reinforce with fresh logs",
-        "outcome": "An hour of cutting and the bridge is solid. Good work.",
-        "effects": {
-          "fuel": -2
-        }
-      },
-      {
-        "label": "Find another crossing",
-        "outcome": "A longer route around. Burns fuel but no bridge worries.",
-        "effects": {
-          "fuel": -8
-        }
-      }
-    ]
-  },
-  {
-    "id": "landslide",
-    "title": "Landslide Debris",
-    "type": "terrain",
-    "severity": "moderate",
-    "probability": 0.07,
-    "description": "A slope has let go across the road. Trees, mud, and rock block the path.",
-    "options": [
-      {
-        "label": "Clear it with equipment",
-        "outcome": "The skidder pushes debris aside. Hard on the machine.",
-        "effects": {
-          "equipment": -12,
-          "fuel": -8
-        }
-      },
-      {
-        "label": "Hand-clear a path",
-        "outcome": "Everyone grabs tools. Exhausting but it works.",
-        "effects": {
-          "crew_health": -8,
-          "crew_morale": -5
-        }
-      },
-      {
-        "label": "Turn back and report",
-        "outcome": "Safety first. The office will coordinate geotechnical review.",
-        "effects": {
-          "progress": -12,
-          "compliance": 8
-        }
-      }
-    ]
-  },
-  {
-    "id": "resupply_opportunity",
-    "title": "Passing Supply Truck",
-    "type": "supply",
-    "severity": "positive",
-    "probability": 0.15,
-    "description": "Another crew's supply truck is passing through. They've got extras.",
-    "options": [
-      {
-        "label": "Trade for fuel",
-        "outcome": "You swap some food for fuel. Fair trade.",
-        "effects": {
-          "fuel": 20,
-          "food": -5
-        }
-      },
-      {
-        "label": "Trade for food",
-        "outcome": "Fresh supplies for the camp. Morale rises.",
-        "effects": {
-          "fuel": -5,
-          "food": 15,
-          "crew_morale": 5
-        }
-      },
-      {
-        "label": "Just share news",
-        "outcome": "Good conversation and road updates. Nothing more.",
-        "effects": {
-          "crew_morale": 3
-        }
-      }
-    ]
-  },
-  {
-    "id": "lost_supplies",
-    "title": "Supplies Lost",
-    "type": "supply",
-    "severity": "moderate",
-    "probability": 0.08,
-    "description": "A load shifted on the rough road. A box of supplies bounced off somewhere.",
-    "options": [
-      {
-        "label": "Go back and search",
-        "outcome": "Found most of it scattered along the road. Lost time and fuel.",
-        "effects": {
-          "progress": -3,
-          "fuel": -5
-        }
-      },
-      {
-        "label": "Write it off and continue",
-        "outcome": "Can't spare the time. The lost supplies go on the books.",
-        "effects": {
-          "budget": -750
-        }
-      },
-      {
-        "label": "Secure remaining cargo",
-        "outcome": "You stop to re-tie everything. No more losses.",
-        "effects": {
-          "progress": -1,
-          "crew_morale": 2
-        }
-      }
-    ]
-  },
-  {
-    "id": "good_road_conditions",
-    "title": "Excellent Road Conditions",
-    "type": "terrain",
-    "severity": "positive",
-    "probability": 0.12,
-    "description": "The road ahead is in great shape - recently graded and smooth.",
-    "options": [
-      {
-        "label": "Make up time!",
-        "outcome": "The crew pushes forward quickly on the good road. Great progress!",
-        "effects": {
-          "progress": 8
-        }
-      },
-      {
-        "label": "Take it easy, save fuel",
-        "outcome": "You cruise at low RPMs. Fuel gauge barely moves.",
-        "effects": {
-          "fuel": 5
-        }
-      }
-    ]
-  },
-  {
-    "id": "abandoned_cache",
-    "title": "Abandoned Supply Cache",
-    "type": "supply",
-    "severity": "positive",
-    "probability": 0.1,
-    "description": "You spot an old camp with some leftover supplies. Looks usable.",
-    "options": [
-      {
-        "label": "Scavenge fuel and parts",
-        "outcome": "A few jerry cans of diesel and some spare belts. Score!",
-        "effects": {
-          "fuel": 15,
-          "equipment": 5
-        }
-      },
-      {
-        "label": "Grab the food supplies",
-        "outcome": "Canned goods and dried rations. Still good!",
-        "effects": {
-          "food": 12
-        }
-      },
-      {
-        "label": "Take the first aid kit",
-        "outcome": "A dusty but complete first aid kit. Could be a lifesaver.",
-        "effects": {
-          "firstAid": 2
-        }
-      }
-    ]
-  },
-  {
-    "id": "crew_morale_boost",
-    "title": "Beautiful Sunset",
-    "type": "morale",
-    "severity": "positive",
-    "probability": 0.12,
-    "description": "The evening sky puts on a spectacular show. Everyone stops to watch.",
-    "options": [
-      {
-        "label": "Take a break and enjoy it",
-        "outcome": "Moments like this remind everyone why they love this work.",
-        "effects": {
-          "crew_morale": 15,
-          "timeUsed": 1
-        }
-      },
-      {
-        "label": "Keep working but appreciate it",
-        "outcome": "Even while busy, the beauty lifts spirits.",
-        "effects": {
-          "crew_morale": 8
-        }
-      }
-    ]
-  },
-  {
-    "id": "helpful_locals",
-    "title": "Helpful Locals",
-    "type": "social",
-    "severity": "positive",
-    "probability": 0.08,
-    "description": "Some local First Nations members stop by with advice and coffee.",
-    "options": [
-      {
-        "label": "Share a meal and listen",
-        "outcome": "They point out a shortcut and warn about a washout ahead.",
-        "effects": {
-          "crew_morale": 10,
-          "progress": 5
-        }
-      },
-      {
-        "label": "Trade for supplies",
-        "outcome": "They have smoked salmon to trade. Delicious and nutritious!",
-        "effects": {
-          "food": 8,
-          "crew_morale": 5
-        }
-      }
-    ]
-  },
-  {
-    "id": "equipment_running_well",
-    "title": "Equipment Running Smoothly",
-    "type": "equipment",
-    "severity": "positive",
-    "probability": 0.1,
-    "description": "Everything is humming along perfectly today. Not a single mechanical issue.",
-    "options": [
-      {
-        "label": "Keep up the momentum",
-        "outcome": "A productive day with no breakdowns. Equipment looks even better.",
-        "effects": {
-          "equipment": 5,
-          "progress": 3
-        }
-      },
-      {
-        "label": "Do preventive maintenance",
-        "outcome": "With things running well, you take time to check everything over.",
-        "effects": {
-          "equipment": 10
-        }
-      }
-    ]
-  },
-  {
-    "id": "peat_crossing_pumping",
-    "title": "Peat Crossing Starts Pumping",
-    "type": "terrain",
-    "severity": "moderate",
-    "probability": 0.05,
-    "roles": [
-      "recce"
-    ],
-    "areaTags": [
-      "peatland",
-      "peace-region"
-    ],
-    "becCodes": [
-      "BWBSmw1"
-    ],
-    "terrainTrigger": [
-      "muskeg"
-    ],
-    "description": "A probe rod drops through the road edge and brown water wells up. The peat mat under the approach is losing strength faster than the road card suggested.",
-    "options": [
-      {
-        "label": "Flag the soft ground and back crews off",
-        "outcome": "You mark the weak spots, limit traffic, and keep the problem from becoming a full blowout.",
-        "effects": {
-          "progress": -4,
-          "equipment": -2
-        }
-      },
-      {
-        "label": "Lay brush and corduroy the approach",
-        "outcome": "The crew spends the shift reinforcing the crossing. It holds, but everyone feels the extra work.",
-        "effects": {
-          "progress": -2,
-          "crew_morale": -4,
-          "equipment": -3
-        }
-      },
-      {
-        "label": "Test it with one light pickup",
-        "outcome": "The pickup squeaks through, but the shoulders slump and the crossing is worse by evening.",
-        "effects": {
-          "progress": 2,
-          "equipment": -8
-        },
-        "riskInjury": 0.1
-      }
-    ]
-  },
-  {
-    "id": "salmon_crossing_red_flag",
-    "title": "Fish Passage Red Flag",
-    "type": "terrain",
-    "severity": "moderate",
-    "probability": 0.04,
-    "roles": [
-      "recce"
-    ],
-    "areaTags": [
-      "salmon",
-      "cwh"
-    ],
-    "becCodes": [
-      "CWHws2"
-    ],
-    "terrainTrigger": [
-      "river"
-    ],
-    "description": "The crossing looks rougher on the ground than on the map: fresh scour, perched flow, and salmon visible below the pipe but not above it.",
-    "options": [
-      {
-        "label": "Shut the crossing down and call it in",
-        "outcome": "You stop traffic, document the outlet, and force the fix into the engineering queue before more damage is done.",
-        "effects": {
-          "progress": -5,
-          "equipment": -1
-        }
-      },
-      {
-        "label": "Restrict loads and post a spotter",
-        "outcome": "The crossing survives the day, but everyone knows it is now on borrowed time.",
-        "effects": {
-          "progress": -2,
-          "crew_morale": -3
-        }
-      },
-      {
-        "label": "Keep moving and note it for later",
-        "outcome": "You buy a few production hours, but the crew knows this crossing just became a liability.",
-        "effects": {
-          "progress": 4,
-          "equipment": -5,
-          "crew_morale": -5
-        }
-      }
-    ]
-  },
-  {
-    "id": "smoke_hold",
-    "title": "Smoke Hold at Camp",
-    "type": "weather",
-    "severity": "moderate",
-    "probability": 0.04,
-    "roles": [
-      "recce",
-      "silviculture"
-    ],
-    "areaTags": [
-      "wildfire"
-    ],
-    "becCodes": [
-      "SBSwk1"
-    ],
-    "description": "Smoke settles over camp and the air quality keeps climbing. The block is still there, but the work window is shrinking by the hour.",
-    "options": [
-      {
-        "label": "Stand crews down and switch to low-exposure tasks",
-        "outcome": "You burn the shift on mapping, maintenance, and reporting until the air improves.",
-        "effects": {
-          "progress": -4,
-          "equipment": 2
-        }
-      },
-      {
-        "label": "Run a shortened shift with respirators",
-        "outcome": "Some work gets done, but nobody mistakes it for a normal day.",
-        "effects": {
-          "progress": 2,
-          "crew_morale": -4,
-          "budget": -600
-        }
-      },
-      {
-        "label": "Push full production",
-        "outcome": "The numbers look better by supper, but the crew is drained and the call feels harder to defend.",
-        "effects": {
-          "progress": 5,
-          "crew_morale": -8
-        },
-        "riskInjury": 0.12
-      }
-    ]
-  },
-  {
-    "id": "regen_stress_patch",
-    "title": "Patchy Regen Stress",
-    "type": "forest_health",
-    "severity": "moderate",
-    "probability": 0.05,
-    "roles": [
-      "silviculture"
-    ],
-    "areaTags": [
-      "beetle-recovery"
-    ],
-    "becCodes": [
-      "SBSwk1"
-    ],
-    "description": "A beetle-era planting block looks fine from the road, but the walk-through tells a different story: thin stocking on hot knolls, brush pressure in the draws, and seedlings already losing ground.",
-    "options": [
-      {
-        "label": "Re-stratify the block and hit the worst patches first",
-        "outcome": "You focus effort where survival is slipping fastest and get ahead of the worst failures.",
-        "effects": {
-          "progress": 1,
-          "equipment": -1,
-          "budget": -1200
-        }
-      },
-      {
-        "label": "Order fill-plant and brush follow-up",
-        "outcome": "The prescription gets more expensive, but the stand has a better chance of evening out.",
-        "effects": {
-          "progress": -1,
-          "budget": -2500
-        }
-      },
-      {
-        "label": "Leave it for the formal survey window",
-        "outcome": "You save today's budget and lose time while the weak patches keep declaring themselves.",
-        "effects": {
-          "progress": -3
-        }
-      }
-    ]
-  },
-  {
-    "id": "story_arc_ancientGrove_stage0",
-    "title": "Discovery of the Ancient Grove",
-    "type": "narrative",
-    "severity": "moderate",
-    "probability": 0.05,
-    "description": "Survey crews have found an untouched ancient cedar grove with trees older than 800 years",
-    "options": [
-      {
-        "label": "Protect the grove and seek heritage status",
-        "outcome": "You decided to Protect the grove and seek heritage status.",
-        "effects": {
-          "reputation": 5,
-          "budget": 0
-        },
-        "schedulesEvent": "story_arc_ancientGrove_stage1_protect"
-      },
-      {
-        "label": "Harvest the valuable timber",
-        "outcome": "The fallers take the grove down in two days. The mill pays a premium for clear old-growth cedar — $3,000 lands in the crew account. Word travels faster than the logging trucks.",
-        "effects": {
-          "reputation": -10,
-          "budget": 3000
-        },
-        "schedulesEvent": "story_arc_ancientGrove_stage1_harvest"
-      }
-    ]
-  },
-  {
-    "id": "crew_threatens_quit",
-    "title": "Crew Member Threatens to Quit",
-    "type": "social",
-    "severity": "moderate",
-    "probability": 0.05,
-    "description": "Your most experienced faller corners you after dinner. He says he's had enough — the pay isn't worth the conditions. He wants out tomorrow morning.",
-    "options": [
-      {
-        "label": "Let them go",
-        "outcome": "He packs up at dawn. The crew watches in silence. You're short-handed now.",
-        "effects": {
-          "crew_morale": -5
-        },
-        "crewEffect": {
-          "lose_member": true
-        }
-      },
-      {
-        "label": "Negotiate — offer a bonus and lighter duties",
-        "outcome": "You promise extra pay and shorter shifts. He thinks it over...",
-        "effects": {
-          "budget": -400,
-          "crew_morale": -3
-        },
-        "chanceSuccess": 0.6,
-        "failureOutcome": "He takes the money but quits anyway two days later. Waste of cash.",
-        "failureEffects": {
-          "budget": -400,
-          "crew_morale": -8
-        },
-        "hiddenOutcome": true
-      },
-      {
-        "label": "Ignore it — he'll cool off",
-        "outcome": "You shrug it off. But the rest of the crew noticed you didn't care. Tension rises.",
-        "effects": {
-          "crew_morale": -12
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "unauthorized_logging",
-    "title": "Unauthorized Logging Nearby",
-    "type": "social",
-    "severity": "moderate",
-    "probability": 0.04,
-    "description": "You find fresh-cut stumps on the adjacent block. Someone's been logging here without permits — and it's not your crew.",
-    "options": [
-      {
-        "label": "Report it to the district office",
-        "outcome": "You radio it in and file a report. The office appreciates it but sends an inspector, costing you a day of work.",
-        "effects": {
-          "progress": -5,
-          "compliance": 10,
-          "relationships": 5
-        }
-      },
-      {
-        "label": "Ignore it — not your problem",
-        "outcome": "You keep working. But if someone finds out you saw it and said nothing...",
-        "effects": {},
-        "hiddenOutcome": true,
-        "riskCompliance": 0.3
-      },
-      {
-        "label": "Investigate quietly on your own",
-        "outcome": "You poke around after hours. Fresh tire tracks lead to an unmarked road.",
-        "effects": {
-          "crew_morale": -3
-        },
-        "hiddenOutcome": true,
-        "schedulesEvent": "unauthorized_logging_followup",
-        "scheduledDelay": 3
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "unauthorized_logging_followup",
-    "title": "Confrontation at the Cutblock",
-    "type": "social",
-    "severity": "severe",
-    "probability": 0,
-    "description": "A battered pickup rolls up to your camp. Two rough-looking guys step out — they know you've been snooping around their operation.",
-    "options": [
-      {
-        "label": "Stand your ground and tell them to leave",
-        "outcome": "Tense standoff. They leave with threats but don't come back. Your crew is rattled.",
-        "effects": {
-          "crew_morale": -10
-        }
-      },
-      {
-        "label": "Offer to look the other way",
-        "outcome": "They leave you alone but you've compromised your integrity. Compliance risk if it comes out.",
-        "effects": {
-          "compliance": -15
-        },
-        "hiddenOutcome": true
-      },
-      {
-        "label": "Call the authorities immediately",
-        "outcome": "Conservation officers arrive within hours. The poachers scatter. You did the right thing.",
-        "effects": {
-          "progress": -5,
-          "compliance": 15,
-          "relationships": 8
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "helicopter_available",
-    "title": "Helicopter Available for Hire",
-    "type": "supply",
-    "severity": "minor",
-    "probability": 0.04,
-    "description": "A pilot radios in — his afternoon charter cancelled and he's offering discounted flight time. He could sling supplies to your next block or do an aerial recon.",
-    "options": [
-      {
-        "label": "Sling supplies ahead ($1500)",
-        "outcome": "Equipment and fuel are waiting at the next block. Massive time savings.",
-        "effects": {
-          "budget": -1500,
-          "progress": 12,
-          "fuel": 10
-        }
-      },
-      {
-        "label": "Aerial recon of the route ($800)",
-        "outcome": "From above you spot a washout, a good crossing, and the best path forward.",
-        "effects": {
-          "budget": -800,
-          "progress": 5
-        }
-      },
-      {
-        "label": "Save the money for emergencies",
-        "outcome": "You wave him off. The budget stays intact but you wonder what could have been.",
-        "effects": {}
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "best_worker_sick",
-    "title": "Your Best Worker Is Sick",
-    "type": "illness",
-    "severity": "moderate",
-    "probability": 0.06,
-    "description": "Your most productive crew member wakes up feverish and pale. He insists he can work but he's clearly struggling.",
-    "options": [
-      {
-        "label": "Send them back to rest in camp",
-        "outcome": "He sleeps all day. You lose your best producer but he should recover by tomorrow.",
-        "effects": {
-          "progress": -8
-        },
-        "crewEffect": {
-          "rest": 1
-        }
-      },
-      {
-        "label": "Let them do light duty",
-        "outcome": "He putters around camp doing small tasks. Not much help, but he doesn't get worse. Probably.",
-        "effects": {
-          "progress": -4
-        },
-        "hiddenOutcome": true,
-        "crewEffect": {
-          "illness": "flu",
-          "riskWorsen": 0.35
-        }
-      },
-      {
-        "label": "Medicate and push through",
-        "outcome": "You dose him up from the first aid kit. He works at half speed.",
-        "effects": {
-          "firstAid": -1,
-          "progress": -2
-        },
-        "hiddenOutcome": true,
-        "crewEffect": {
-          "illness": "exhaustion",
-          "riskWorsen": 0.5
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "safety_inspection_notice",
-    "title": "Safety Inspection Notice",
-    "type": "social",
-    "severity": "moderate",
-    "probability": 0.05,
-    "description": "A crackly radio message from district: a safety inspector will be visiting your operation in a few days. Better get things in order.",
-    "options": [
-      {
-        "label": "Spend the day prepping for inspection",
-        "outcome": "You clean up the site, check PPE, organize paperwork. Lost a day of production but you'll be ready.",
-        "effects": {
-          "progress": -6,
-          "compliance": 8
-        },
-        "schedulesEvent": "inspector_arrives",
-        "scheduledDelay": 3
-      },
-      {
-        "label": "Do a quick tidy and keep working",
-        "outcome": "A half-hearted cleanup. Things look okay-ish. You keep production moving.",
-        "effects": {
-          "progress": -2,
-          "compliance": 3
-        },
-        "schedulesEvent": "inspector_arrives",
-        "scheduledDelay": 3
-      },
-      {
-        "label": "Ignore it — we're always compliant",
-        "outcome": "You trust your standards. The crew keeps working at full pace.",
-        "effects": {},
-        "schedulesEvent": "inspector_arrives",
-        "scheduledDelay": 3
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "inspector_arrives",
-    "title": "Safety Inspector Arrives",
-    "type": "social",
-    "severity": "moderate",
-    "probability": 0,
-    "description": "A white government truck pulls into camp. The inspector steps out with a clipboard and a serious expression.",
-    "options": [
-      {
-        "label": "Give them the full tour confidently",
-        "outcome": "You walk them through every operation, and it takes most of the day. They note a few minor issues but leave satisfied.",
-        "effects": {
-          "progress": -6,
-          "compliance": 5,
-          "relationships": 3
-        }
-      },
-      {
-        "label": "Be cooperative but let them lead",
-        "outcome": "You answer questions honestly. They find what they find.",
-        "effects": {
-          "progress": -2,
-          "compliance": 2
-        },
-        "hiddenOutcome": true
-      },
-      {
-        "label": "Distract them with coffee and stories",
-        "outcome": "You keep the crews working while you pour coffee and spin stories. Inspectors have seen this before — they dig deeper.",
-        "effects": {
-          "progress": -1,
-          "compliance": -5
-        },
-        "hiddenOutcome": true
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "suspicious_tracks",
-    "title": "Suspicious Tracks Near Camp",
-    "type": "wildlife",
-    "severity": "minor",
-    "probability": 0.06,
-    "description": "Large canine tracks circle the camp perimeter. Too big for coyote. The food scraps from last night are gone.",
-    "options": [
-      {
-        "label": "Set up better food storage and carry on",
-        "outcome": "You hang food higher and secure the garbage. Probably just a lone wolf passing through.",
-        "effects": {
-          "food": -2
-        },
-        "schedulesEvent": "wolf_pack_sighting",
-        "scheduledDelay": 2
-      },
-      {
-        "label": "Post a night watch",
-        "outcome": "Someone stays up with a flashlight. Tired crew tomorrow.",
-        "effects": {
-          "crew_morale": -5,
-          "crew_health": -3
-        },
-        "schedulesEvent": "wolf_pack_sighting",
-        "scheduledDelay": 2
-      },
-      {
-        "label": "Report to wildlife office",
-        "outcome": "They log it and tell you to be cautious. Standard advice.",
-        "effects": {
-          "compliance": 3,
-          "timeUsed": 1
-        },
-        "schedulesEvent": "wolf_pack_sighting",
-        "scheduledDelay": 2
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "wolf_pack_sighting",
-    "title": "Wolf Pack Sighting",
-    "type": "wildlife",
-    "severity": "moderate",
-    "probability": 0,
-    "description": "At dusk, five grey wolves emerge from the treeline and watch your camp from the ridge. They're not afraid.",
-    "options": [
-      {
-        "label": "Light extra fires and make noise",
-        "outcome": "The wolves linger but keep distance. An uneasy night. They're gone by morning.",
-        "effects": {
-          "crew_morale": -8,
-          "food": -3
-        }
-      },
-      {
-        "label": "Move camp to a more open area",
-        "outcome": "A pain to relocate but worth it. No more wolf visits.",
-        "effects": {
-          "progress": -6,
-          "fuel": -5
-        }
-      },
-      {
-        "label": "Carry on — wolves don't attack people",
-        "outcome": "You're right, mostly. But the crew doesn't sleep well for days.",
-        "effects": {
-          "crew_morale": -12,
-          "crew_health": -5
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "radio_weather_warning",
-    "title": "Radio Report: Incoming Weather System",
-    "type": "weather",
-    "severity": "minor",
-    "probability": 0.06,
-    "description": "The weather service broadcasts a warning: a major system is building to the west. Heavy rain and wind expected within 48 hours.",
-    "options": [
-      {
-        "label": "Push hard now to get ahead of it",
-        "outcome": "The crew works double-time. Exhausting but you bank some progress before the storm.",
-        "effects": {
-          "progress": 6,
-          "crew_health": -8,
-          "crew_morale": -5
-        },
-        "schedulesEvent": "major_storm_hits",
-        "scheduledDelay": 2
-      },
-      {
-        "label": "Prepare camp for the storm",
-        "outcome": "You batten down the hatches. Tarps, drainage ditches, extra firewood. Ready as you'll ever be.",
-        "effects": {
-          "progress": -3,
-          "fuel": -3
-        },
-        "schedulesEvent": "major_storm_hits",
-        "scheduledDelay": 2
-      },
-      {
-        "label": "Fall back to a safer position",
-        "outcome": "You retreat to lower ground near the main road. Safe but far from the work site.",
-        "effects": {
-          "progress": -8,
-          "fuel": -8
-        },
-        "schedulesEvent": "major_storm_hits",
-        "scheduledDelay": 2
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "major_storm_hits",
-    "title": "Major Storm Hits",
-    "type": "weather",
-    "severity": "severe",
-    "probability": 0,
-    "description": "The storm arrives with a vengeance. Trees bend sideways, rain comes in sheets, and the road turns to soup. No one's working today.",
-    "options": [
-      {
-        "label": "Hunker down and ride it out",
-        "outcome": "A long, wet, miserable day. But everything holds together. Barely.",
-        "effects": {
-          "progress": -10,
-          "crew_morale": -8,
-          "food": -5
-        }
-      },
-      {
-        "label": "Evacuate to the main road",
-        "outcome": "A harrowing drive through the storm. Everyone makes it out but the camp is left behind.",
-        "effects": {
-          "progress": -15,
-          "fuel": -10,
-          "equipment": -5
-        }
-      },
-      {
-        "label": "Use the downtime for equipment maintenance",
-        "outcome": "Can't go anywhere, might as well wrench. Surprisingly productive shelter time.",
-        "effects": {
-          "progress": -8,
-          "equipment": 10,
-          "crew_morale": -3
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "old_growth_cedar",
-    "title": "Old-Growth Cedar Grove",
-    "type": "discovery",
-    "severity": "positive",
-    "probability": 0.04,
-    "description": "Pushing through dense brush, you stumble into a cathedral-like grove of ancient cedars. Some of these trees are 500 years old. Sunlight filters through the canopy like stained glass.",
-    "options": [
-      {
-        "label": "Report the grove to the district",
-        "outcome": "The office is grateful — this area needs protection. Your compliance record shines.",
-        "effects": {
-          "crew_morale": 10,
-          "compliance": 12,
-          "relationships": 5
-        }
-      },
-      {
-        "label": "Mark it on the map and move on quietly",
-        "outcome": "You GPS the location for your own records. A private treasure.",
-        "effects": {
-          "crew_morale": 8
-        }
-      },
-      {
-        "label": "Let the crew take a break here",
-        "outcome": "Everyone sits among the giants in awed silence. Someone says it's the best moment of the season.",
-        "effects": {
-          "crew_morale": 15,
-          "progress": -3
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "unmapped_creek",
-    "title": "Unmapped Creek Crossing",
-    "type": "discovery",
-    "severity": "minor",
-    "probability": 0.05,
-    "description": "Your planned route crosses a creek that doesn't appear on any map. It's not huge, but it's definitely fish-bearing — you can see spawning beds.",
-    "options": [
-      {
-        "label": "Report it and reroute — proper protocol",
-        "outcome": "The district is impressed by your diligence. A new buffer zone is established. Your route gets longer.",
-        "effects": {
-          "progress": -10,
-          "compliance": 15,
-          "relationships": 8
-        }
-      },
-      {
-        "label": "Cross carefully and note it for later",
-        "outcome": "You ford it gently and mark it on the map. Should have reported it first, but you saved time.",
-        "effects": {
-          "progress": -2,
-          "compliance": -8
-        },
-        "hiddenOutcome": true
-      },
-      {
-        "label": "Investigate the watershed",
-        "outcome": "You spend time mapping the drainage. Valuable data for future planning.",
-        "effects": {
-          "progress": -6,
-          "compliance": 8,
-          "data": 10
-        }
-      }
-    ],
-    "roles": [
-      "recce"
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "historical_survey_markers",
-    "title": "Historical Survey Markers",
-    "type": "discovery",
-    "severity": "positive",
-    "probability": 0.04,
-    "description": "Rusted iron pins and blazed trees — someone surveyed this area decades ago. The old markers could help confirm your boundary lines.",
-    "options": [
-      {
-        "label": "Record and photograph everything",
-        "outcome": "Detailed documentation of the old survey. This data is gold for boundary disputes.",
-        "effects": {
-          "progress": -3,
-          "data": 15,
-          "compliance": 5
-        }
-      },
-      {
-        "label": "Use them to verify your current lines",
-        "outcome": "Cross-referencing reveals your map is off by 40 meters. Good catch before you cut too far.",
-        "effects": {
-          "data": 10,
-          "compliance": 8
-        }
-      },
-      {
-        "label": "Note the location and keep moving",
-        "outcome": "You GPS the pins and carry on. Useful info but not explored fully.",
-        "effects": {
-          "data": 5
-        }
-      }
-    ],
-    "roles": [
-      "recce"
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "abandoned_trappers_cabin",
-    "title": "Abandoned Trapper's Cabin",
-    "type": "discovery",
-    "severity": "positive",
-    "probability": 0.04,
-    "description": "Hidden in a stand of spruce, you find a weathered log cabin. The roof is mostly intact. Inside: a rusty stove, some old traps, and shelves of dusty supplies.",
-    "options": [
-      {
-        "label": "Use it as an emergency shelter",
-        "outcome": "You patch the roof and clear it out. A solid backup shelter if weather turns nasty.",
-        "effects": {
-          "crew_morale": 8,
-          "progress": -2
-        }
-      },
-      {
-        "label": "Salvage the supplies",
-        "outcome": "Kerosene, rope, a hand axe, and some canned goods that are somehow still sealed. Lucky find.",
-        "effects": {
-          "fuel": 5,
-          "food": 6,
-          "equipment": 3
-        }
-      },
-      {
-        "label": "Leave it undisturbed — could be heritage",
-        "outcome": "You photograph it and report the location. The historical society is very interested.",
-        "effects": {
-          "relationships": 8,
-          "compliance": 5
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "crew_card_game",
-    "title": "High-Stakes Card Game",
-    "type": "morale",
-    "severity": "minor",
-    "probability": 0.07,
-    "description": "Tensions have been simmering. After dinner, a poker game gets heated. Two crew members are about to come to blows over a $200 pot.",
-    "options": [
-      {
-        "label": "Break it up and ban gambling",
-        "outcome": "Order is restored but everyone resents the fun police. Quiet, sullen camp.",
-        "effects": {
-          "crew_morale": -8
-        }
-      },
-      {
-        "label": "Mediate — split the pot and move on",
-        "outcome": "A fair-enough solution. Nobody's happy but nobody's fighting.",
-        "effects": {
-          "crew_morale": -3
-        }
-      },
-      {
-        "label": "Let them sort it out themselves",
-        "outcome": "They scuffle. One gets a black eye. But somehow, they respect each other more after.",
-        "effects": {
-          "crew_morale": 3
-        },
-        "hiddenOutcome": true,
-        "riskInjury": 0.2
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "radio_dead",
-    "title": "Radio Goes Dead",
-    "type": "equipment",
-    "severity": "moderate",
-    "probability": 0.05,
-    "description": "The camp radio crackles and dies mid-transmission. No signal, no spare parts. You're cut off from the outside.",
-    "options": [
-      {
-        "label": "Send someone to town for a replacement",
-        "outcome": "A full day's drive, round trip. You're without comms until they return.",
-        "effects": {
-          "fuel": -12,
-          "progress": -5
-        }
-      },
-      {
-        "label": "Try to fix it with what you have",
-        "outcome": "Your most tech-savvy crew member tinkers for hours. Might work, might not.",
-        "effects": {
-          "progress": -3
-        },
-        "hiddenOutcome": true,
-        "chanceSuccess": 0.4,
-        "failureOutcome": "Hours of tinkering. The radio stays dead, and its parts are spread across a tarp.",
-        "failureEffects": {
-          "progress": -5
-        }
-      },
-      {
-        "label": "Work without radio — check in when you can",
-        "outcome": "Risky to be out of contact, but you keep production moving.",
-        "effects": {
-          "compliance": -8
-        },
-        "hiddenOutcome": true
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "fuel_contamination",
-    "title": "Fuel Contamination",
-    "type": "equipment",
-    "severity": "moderate",
-    "probability": 0.04,
-    "description": "The diesel smells wrong. Water got into the fuel barrel somehow. Your equipment sputters and stalls.",
-    "options": [
-      {
-        "label": "Drain and filter what you can",
-        "outcome": "Tedious work. You save about half the fuel. Equipment runs rough for a day.",
-        "effects": {
-          "fuel": -15,
-          "equipment": -8,
-          "progress": -4
-        }
-      },
-      {
-        "label": "Dump it all and order fresh fuel",
-        "outcome": "The safe choice but you're grounded until the delivery arrives.",
-        "effects": {
-          "fuel": -30,
-          "budget": -300,
-          "progress": -8
-        }
-      },
-      {
-        "label": "Use it anyway — it's mostly diesel",
-        "outcome": "The equipment runs, barely. Something is going to break sooner rather than later.",
-        "effects": {
-          "fuel": -5
-        },
-        "hiddenOutcome": true,
-        "schedulesEvent": "engine_trouble",
-        "scheduledDelay": 2
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "competing_crew",
-    "title": "Competing Crew on Adjacent Block",
-    "type": "social",
-    "severity": "minor",
-    "probability": 0.06,
-    "description": "Another logging crew has set up on the next block over. They're loud, fast, and their foreman keeps 'accidentally' encroaching on your boundary.",
-    "options": [
-      {
-        "label": "Confront the foreman directly",
-        "outcome": "A heated but productive conversation. Boundaries are clarified. Uneasy truce.",
-        "effects": {
-          "crew_morale": 3,
-          "relationships": -5
-        }
-      },
-      {
-        "label": "Report the encroachment officially",
-        "outcome": "Paperwork and phone calls. The district sends a surveyor. Takes days to resolve.",
-        "effects": {
-          "progress": -5,
-          "compliance": 8,
-          "relationships": 3
-        }
-      },
-      {
-        "label": "Challenge them to a production race",
-        "outcome": "The crews push hard to outperform each other. Dangerous but motivating.",
-        "effects": {
-          "progress": 5,
-          "crew_morale": 8,
-          "crew_health": -5
-        },
-        "riskInjury": 0.15
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "satellite_phone_call",
-    "title": "Urgent Call from Home",
-    "type": "social",
-    "severity": "moderate",
-    "probability": 0.04,
-    "description": "The sat phone rings. It's for one of your crew members — a family emergency back home. He's white-faced and shaking.",
-    "options": [
-      {
-        "label": "Let him go immediately",
-        "outcome": "He drives out within the hour. The crew understands. You're short-handed but it's the right thing.",
-        "effects": {
-          "progress": -5,
-          "crew_morale": 5
-        },
-        "crewEffect": {
-          "leave": true
-        }
-      },
-      {
-        "label": "Ask him to stay until the shift ends",
-        "outcome": "He stays but his mind is elsewhere. Dangerous distraction. The crew is uncomfortable.",
-        "effects": {
-          "crew_morale": -10
-        },
-        "riskInjury": 0.15,
-        "hiddenOutcome": true
-      },
-      {
-        "label": "Drive him to town yourself",
-        "outcome": "You personally deliver him to the bus station. The crew respects the gesture enormously.",
-        "effects": {
-          "progress": -8,
-          "fuel": -10,
-          "crew_morale": 12
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "wildlife_nesting_area",
-    "title": "Raptor Nesting Area",
-    "type": "wildlife",
-    "severity": "moderate",
-    "probability": 0.05,
-    "description": "An eagle nest sits in a massive Douglas fir right in your planned cut path. Two chicks are visible. This tree is protected by law.",
-    "options": [
-      {
-        "label": "Establish a buffer zone and reroute",
-        "outcome": "You flag a 100-meter buffer. Adds distance but keeps you legal and ethical.",
-        "effects": {
-          "progress": -8,
-          "compliance": 12,
-          "crew_morale": 5
-        }
-      },
-      {
-        "label": "Report it and wait for wildlife assessment",
-        "outcome": "A biologist will come out... eventually. Could be days.",
-        "effects": {
-          "progress": -12,
-          "compliance": 15,
-          "relationships": 5
-        }
-      },
-      {
-        "label": "Work around it as close as regulations allow",
-        "outcome": "You cut right up to the legal minimum distance. Efficient but the eagles are stressed.",
-        "effects": {
-          "progress": -3,
-          "compliance": 3
-        },
-        "hiddenOutcome": true
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "gear_theft",
-    "title": "Missing Gear",
-    "type": "supply",
-    "severity": "moderate",
-    "probability": 0.03,
-    "description": "Two chainsaws and a fuel can are missing from camp. Either someone took them or a very talented bear has new hobbies.",
-    "options": [
-      {
-        "label": "Search the area thoroughly",
-        "outcome": "You find one saw tossed in the brush — dropped by whoever took it. The rest is gone.",
-        "effects": {
-          "progress": -4,
-          "equipment": -10
-        }
-      },
-      {
-        "label": "Report theft to RCMP",
-        "outcome": "Officers visit camp. Lots of questions, no answers. The crew feels violated.",
-        "effects": {
-          "progress": -6,
-          "equipment": -15,
-          "crew_morale": -8
-        }
-      },
-      {
-        "label": "Quietly increase camp security",
-        "outcome": "You set up watches and lock everything down. No more incidents but the crew is on edge.",
-        "effects": {
-          "equipment": -15,
-          "crew_morale": -5
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "spring_breakup",
-    "title": "Spring Breakup Starting",
-    "type": "terrain",
-    "severity": "moderate",
-    "probability": 0.06,
-    "description": "The frost is coming out of the ground. Roads that were solid yesterday are turning to mush. The window for heavy equipment is closing fast.",
-    "options": [
-      {
-        "label": "Push hard now — run equipment day and night",
-        "outcome": "You work around the clock while the ground still holds. Exhausting but productive.",
-        "effects": {
-          "progress": 10,
-          "crew_health": -10,
-          "crew_morale": -8,
-          "equipment": -10
-        }
-      },
-      {
-        "label": "Switch to lighter operations only",
-        "outcome": "Hand-falling and foot-based work. Slow going but no road damage.",
-        "effects": {
-          "progress": -5,
-          "compliance": 5
-        }
-      },
-      {
-        "label": "Shut down and wait for dry conditions",
-        "outcome": "The responsible choice. Equipment stays parked. Could be a week or more.",
-        "effects": {
-          "progress": -15,
-          "compliance": 10,
-          "crew_morale": -5
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "water_source_found",
-    "title": "Fresh Water Spring",
-    "type": "discovery",
-    "severity": "positive",
-    "probability": 0.05,
-    "description": "A crew member finds a clear, cold spring bubbling up through the rocks. Crystal-clear water, probably safe to drink.",
-    "options": [
-      {
-        "label": "Fill up all the water containers",
-        "outcome": "Fresh, cold water for the whole camp. Everyone's in better spirits.",
-        "effects": {
-          "crew_morale": 8,
-          "crew_health": 5
-        }
-      },
-      {
-        "label": "Test it first, use it if clean",
-        "outcome": "You use purification tablets just to be safe. Smart move — the water is perfect.",
-        "effects": {
-          "crew_health": 5,
-          "firstAid": -1
-        }
-      },
-      {
-        "label": "Note location and stick with camp water",
-        "outcome": "Better safe than sorry. You GPS the spring for future reference.",
-        "effects": {
-          "data": 3
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "drone_flyover",
-    "title": "Drone Flyover Opportunity",
-    "type": "equipment",
-    "severity": "positive",
-    "probability": 0.04,
-    "description": "A forestry tech from another operation offers to fly his drone over your block during his lunch break. He's got a mapping camera.",
-    "options": [
-      {
-        "label": "Accept — map the whole block",
-        "outcome": "Incredible aerial data. You can see drainage patterns, terrain features, and optimal routes from above.",
-        "effects": {
-          "data": 12,
-          "progress": 3
-        }
-      },
-      {
-        "label": "Ask him to scout the road ahead",
-        "outcome": "The drone reveals a major washout two kilometers ahead. You reroute and save a day.",
-        "effects": {
-          "progress": 5
-        }
-      },
-      {
-        "label": "Decline — don't need outside help",
-        "outcome": "Your choice. The crew shrugs.",
-        "effects": {}
-      }
-    ],
-    "roles": [
-      "recce"
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "night_visitor",
-    "title": "Something in the Dark",
-    "type": "wildlife",
-    "severity": "minor",
-    "probability": 0.07,
-    "description": "Something big crashes through the brush near camp at 2 AM. Flashlight beams catch reflective eyes before it disappears. Nobody's sure what it was.",
-    "options": [
-      {
-        "label": "Post a watch for the rest of the night",
-        "outcome": "Nothing else happens. The watchers are wrecked the next day, but everyone else sleeps easier.",
-        "effects": {
-          "crew_health": -5,
-          "crew_morale": 2
-        }
-      },
-      {
-        "label": "Check tracks in the morning",
-        "outcome": "Wolverine tracks. Impressive animal, not dangerous to the camp. Tensions ease.",
-        "effects": {
-          "crew_morale": 3,
-          "timeUsed": 1
-        }
-      },
-      {
-        "label": "Ignore it and go back to sleep",
-        "outcome": "Some crew members sleep well, others don't close their eyes until dawn.",
-        "effects": {
-          "crew_morale": -5
-        },
-        "hiddenOutcome": true
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "creek_crossing_decision",
-    "title": "Swollen Creek Crossing",
-    "type": "terrain",
-    "severity": "moderate",
-    "probability": 0.06,
-    "terrainTrigger": [
-      "river"
-    ],
-    "description": "Recent rain has the creek running high. It's passable, maybe, but the current is strong and the bottom is uncertain.",
-    "options": [
-      {
-        "label": "Probe on foot, then drive across",
-        "outcome": "You wade in waist-deep to test the bottom. Solid gravel. The trucks cross safely.",
-        "effects": {
-          "crew_health": -3
-        }
-      },
-      {
-        "label": "Wait for the water to drop",
-        "outcome": "By afternoon it's lower. Safe crossing but half a day lost.",
-        "effects": {
-          "progress": -5
-        }
-      },
-      {
-        "label": "Build a temporary crossing",
-        "outcome": "Logs and gravel create a rough bridge. Holds for one truck at a time.",
-        "effects": {
-          "progress": -3,
-          "fuel": -3,
-          "equipment": -5
-        }
-      }
-    ],
-    "roles": [
-      "recce"
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "first_nations_consultation_field",
-    "title": "First Nations Elder Visits",
-    "type": "social",
-    "severity": "moderate",
-    "probability": 0.04,
-    "description": "An elder from the local First Nations band arrives at camp. She says there are culturally modified trees nearby that need protection. She's calm but serious.",
-    "options": [
-      {
-        "label": "Stop work and walk the area with her",
-        "outcome": "She shows you bark-stripped cedars with centuries of history. You adjust your cut plan together.",
-        "effects": {
-          "progress": -8,
-          "relationships": 15,
-          "compliance": 10,
-          "crew_morale": 5
-        }
-      },
-      {
-        "label": "Acknowledge and promise to investigate later",
-        "outcome": "She's skeptical but accepts your word. The relationship is strained.",
-        "effects": {
-          "relationships": -5
-        },
-        "hiddenOutcome": true
-      },
-      {
-        "label": "Offer to hire her as a cultural monitor",
-        "outcome": "She agrees. An added cost but the relationship and compliance benefits are enormous.",
-        "effects": {
-          "budget": -600,
-          "relationships": 12,
-          "compliance": 12
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "mineral_lick_discovered",
-    "title": "Natural Mineral Lick",
-    "type": "discovery",
-    "severity": "minor",
-    "probability": 0.05,
-    "description": "You find a natural mineral lick heavily used by wildlife. Dozens of tracks — deer, elk, moose, bear — converge on this muddy depression.",
-    "options": [
-      {
-        "label": "Flag it and establish a buffer",
-        "outcome": "The right thing to do. Wildlife officers will be pleased with the data.",
-        "effects": {
-          "progress": -3,
-          "compliance": 8,
-          "data": 5
-        }
-      },
-      {
-        "label": "Route around it quietly",
-        "outcome": "You adjust the plan without formally reporting. Saves paperwork.",
-        "effects": {
-          "progress": -2
-        }
-      },
-      {
-        "label": "Set up a trail camera for fun",
-        "outcome": "The crew checks the camera every morning like kids on Christmas. Incredible footage.",
-        "effects": {
-          "crew_morale": 10,
-          "progress": -1
-        }
-      }
-    ],
-    "roles": [
-      "recce"
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "hydraulic_line_burst",
-    "title": "Hydraulic Line Burst",
-    "type": "equipment",
-    "severity": "severe",
-    "probability": 0.04,
-    "description": "The loader's hydraulic line ruptures, spraying hot fluid everywhere. The machine drops its load and goes dead. There's oil soaking into the ground.",
-    "options": [
-      {
-        "label": "Contain the spill immediately",
-        "outcome": "You deploy absorbent pads and dig a containment trench. Machine is down but the spill is managed.",
-        "effects": {
-          "equipment": -20,
-          "progress": -8,
-          "compliance": 5
-        }
-      },
-      {
-        "label": "Try to patch the line in the field",
-        "outcome": "A temporary fix with hose clamps. It holds, barely. The machine runs at reduced pressure.",
-        "effects": {
-          "equipment": -15
-        },
-        "hiddenOutcome": true,
-        "riskInjury": 0.1
-      },
-      {
-        "label": "Shut everything down and call for a mechanic",
-        "outcome": "Professional repair takes two days. Expensive but done right. You report the spill properly.",
-        "effects": {
-          "budget": -800,
-          "progress": -12,
-          "compliance": 10,
-          "equipment": -5
-        }
-      }
-    ],
-    "roles": [
-      "silviculture"
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "perfect_falling_day",
-    "title": "Perfect Falling Conditions",
-    "type": "morale",
-    "severity": "positive",
-    "probability": 0.08,
-    "description": "Cool air, no wind, dry ground, sharp saws. Every tree drops exactly where you aim. The crew is in a groove.",
-    "options": [
-      {
-        "label": "Ride the momentum — keep pushing",
-        "outcome": "An exceptional day of production. The crew celebrates with extra rations at dinner.",
-        "effects": {
-          "progress": 10,
-          "crew_morale": 10
-        }
-      },
-      {
-        "label": "Bank the good day and quit early",
-        "outcome": "Ahead of schedule, so you call it at 3 PM. Rest and recovery.",
-        "effects": {
-          "progress": 5,
-          "crew_health": 5,
-          "crew_morale": 8
-        }
-      }
-    ],
-    "roles": [
-      "silviculture"
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "fog_morning",
-    "title": "Dense Morning Fog",
-    "type": "weather",
-    "severity": "minor",
-    "probability": 0.08,
-    "description": "You can't see twenty feet. The forest has vanished into white. Falling trees in this is asking for trouble.",
-    "options": [
-      {
-        "label": "Wait for it to burn off",
-        "outcome": "By 10 AM the sun wins. Late start but safe.",
-        "effects": {
-          "progress": -4
-        }
-      },
-      {
-        "label": "Do ground work until it clears",
-        "outcome": "Limbing, bucking, road clearing — no falling. Decent use of time.",
-        "effects": {
-          "progress": -2
-        }
-      },
-      {
-        "label": "Fall carefully with extra spotters",
-        "outcome": "Slow and tense but productive. One close call that makes everyone sweat.",
-        "effects": {
-          "progress": -1,
-          "crew_morale": -5
-        },
-        "riskInjury": 0.2
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "supply_delivery_early",
-    "title": "Supply Delivery Arrives Early",
-    "type": "supply",
-    "severity": "positive",
-    "probability": 0.06,
-    "description": "The supply truck shows up two days early. The driver says he had a cancellation and thought he'd swing by.",
-    "options": [
-      {
-        "label": "Full resupply — load up on everything",
-        "outcome": "Fuel, food, parts — you take it all. Full stocks feel great.",
-        "effects": {
-          "fuel": 20,
-          "food": 15,
-          "equipment": 8,
-          "budget": -400
-        }
-      },
-      {
-        "label": "Just grab what you're low on",
-        "outcome": "A targeted resupply. Smart spending.",
-        "effects": {
-          "fuel": 10,
-          "food": 8,
-          "budget": -200
-        }
-      },
-      {
-        "label": "Send out your sick/injured crew member",
-        "outcome": "The truck can take someone to town for proper medical care. Good opportunity.",
-        "effects": {
-          "crew_morale": 5
-        },
-        "crewEffect": {
-          "evacuate_sick": true
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "boundary_dispute",
-    "title": "Boundary Line Unclear",
-    "type": "terrain",
-    "severity": "moderate",
-    "probability": 0.05,
-    "description": "The flagging tape ends abruptly and the boundary marks don't match your map. If you cut the wrong trees, there'll be hell to pay.",
-    "options": [
-      {
-        "label": "Stop cutting and survey properly",
-        "outcome": "You break out the GPS and compass. Takes half a day but the line is confirmed.",
-        "effects": {
-          "progress": -6,
-          "compliance": 10,
-          "data": 5
-        }
-      },
-      {
-        "label": "Use your best judgment and continue",
-        "outcome": "You eyeball it based on terrain features. Could be right. Could be very wrong.",
-        "effects": {},
-        "hiddenOutcome": true,
-        "riskCompliance": 0.4
-      },
-      {
-        "label": "Call the office for clarification",
-        "outcome": "They dig up the original survey data and talk you through it. Accurate but slow.",
-        "effects": {
-          "progress": -4,
-          "compliance": 5
-        }
-      }
-    ],
-    "roles": [
-      "recce"
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "apprentice_mistake",
-    "title": "Apprentice Makes a Bad Cut",
-    "type": "social",
-    "severity": "minor",
-    "probability": 0.07,
-    "description": "Your newest crew member drops a tree the wrong way. It hangs up in another tree — a dangerous 'widow maker' situation. He looks terrified.",
-    "options": [
-      {
-        "label": "Talk him through fixing it safely",
-        "outcome": "Patient coaching. He learns, the tree comes down safely. Takes an hour but builds his skills.",
-        "effects": {
-          "progress": -2,
-          "crew_morale": 5
-        }
-      },
-      {
-        "label": "Fix it yourself and send him to the truck",
-        "outcome": "You handle it quickly but he's humiliated. Other crew members snicker.",
-        "effects": {
-          "crew_morale": -5
-        }
-      },
-      {
-        "label": "Use the skidder to pull it down",
-        "outcome": "Brute force solution. Works but burns fuel and risks equipment damage.",
-        "effects": {
-          "fuel": -3,
-          "equipment": -5
-        }
-      }
-    ],
-    "roles": [
-      "silviculture"
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "lucky_find_tools",
-    "title": "Forgotten Tool Cache",
-    "type": "discovery",
-    "severity": "positive",
-    "probability": 0.04,
-    "description": "Under a deadfall, someone spots a weathered toolbox and a rolled-up tarp. Previous crew must have stashed them and forgot to come back.",
-    "options": [
-      {
-        "label": "Claim the tools for your crew",
-        "outcome": "A spare chain, two files, a peavey, and some wedges. The tarp is still waterproof. Great find.",
-        "effects": {
-          "equipment": 8
-        }
-      },
-      {
-        "label": "Try to find the original owner",
-        "outcome": "You track down a grateful survey crew from the next valley. The tools go home; the goodwill stays.",
-        "effects": {
-          "relationships": 4,
-          "timeUsed": 1
-        }
-      },
-      {
-        "label": "Leave it — could be someone's active cache",
-        "outcome": "You mark the spot and leave everything. Respectful, if a bit wasteful.",
-        "effects": {
-          "crew_morale": -2
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "campfire_storytelling",
-    "title": "Campfire Stories",
-    "type": "morale",
-    "severity": "positive",
-    "probability": 0.1,
-    "description": "After a long day, someone starts telling stories around the fire. One by one, the whole crew joins in. Laughter echoes through the trees.",
-    "options": [
-      {
-        "label": "Join in and share your own story",
-        "outcome": "You tell the one about the time you got lost for three days. Everyone howls. Best night of the season.",
-        "effects": {
-          "crew_morale": 12
-        }
-      },
-      {
-        "label": "Listen and let the crew bond",
-        "outcome": "Sometimes the boss just needs to shut up and listen. The crew appreciates it.",
-        "effects": {
-          "crew_morale": 8
-        }
-      },
-      {
-        "label": "Remind everyone about the early start tomorrow",
-        "outcome": "The mood deflates instantly. Professional but joyless.",
-        "effects": {
-          "crew_morale": -5,
-          "progress": 2
-        }
-      }
-    ],
-    "expeditionOnly": true
-  },
-  {
-    "id": "story_arc_ancientGrove_stage1_protect",
-    "title": "Eco-tourism Opportunity",
-    "type": "narrative",
-    "severity": "moderate",
-    "probability": 0,
-    "description": "A local entrepreneur wants to create an eco-tourism venture around the protected grove",
-    "options": [
-      {
-        "label": "Back the eco-tourism pitch ($1,500)",
-        "outcome": "You front the guiding outfit's first season. By fall, the boardwalk to the grove has a guestbook with three hundred names in it — several of them ministers' staff.",
-        "effects": {
-          "reputation": 10,
-          "budget": -1500
-        }
-      },
-      {
-        "label": "Decline politely",
-        "outcome": "You pass. The grove stays standing and protected on paper; the opportunity drives off in someone else's truck.",
-        "effects": {
-          "reputation": 2
-        }
-      }
-    ]
-  },
-  {
-    "id": "story_arc_ancientGrove_stage1_harvest",
-    "title": "Environmental Protest",
-    "type": "narrative",
-    "severity": "moderate",
-    "probability": 0,
-    "description": "Activists blockade the road to the grove, demanding its preservation",
-    "options": [
-      {
-        "label": "Negotiate and offer partial protection",
-        "outcome": "Two tense days at the blockade end with a map on a tailgate: the oldest stand stays, the rest is released. Nobody is happy, which the mediator calls success.",
-        "effects": {
-          "reputation": 5,
-          "crew_morale": 3
-        }
-      },
-      {
-        "label": "Call law enforcement to clear the blockade",
-        "outcome": "The RCMP clear the road by noon. The footage clears the evening news by six. Legal fees and a hostile district office follow.",
-        "effects": {
-          "reputation": -15,
-          "budget": -2000,
-          "compliance": -8,
-          "progress": 8
-        }
-      }
-    ]
-  }
+ {
+  "id": "flat_tire",
+  "title": "Flat Tire",
+  "type": "equipment",
+  "severity": "minor",
+  "probability": 0.08,
+  "description": "The lead truck hits a sharp rock. Hissing air signals another flat.",
+  "options": [
+   {
+    "label": "Change it yourself (2 hours)",
+    "outcome": "The crew changes the tire in the rain. Back on the road, but behind schedule.",
+    "effects": {
+     "equipment": -5
+    },
+    "timeUsed": 2
+   },
+   {
+    "label": "Use the spare and continue",
+    "outcome": "Quick swap and you're moving again. Hope there are no more surprises.",
+    "effects": {
+     "equipment": -3
+    }
+   },
+   {
+    "label": "Wait for help",
+    "outcome": "Another crew passes by and helps. Cost you half a day.",
+    "effects": {
+     "progress": -5
+    },
+    "timeUsed": 4
+   }
+  ]
+ },
+ {
+  "id": "engine_trouble",
+  "title": "Engine Trouble",
+  "type": "equipment",
+  "severity": "moderate",
+  "probability": 0.05,
+  "description": "The skidder coughs and sputters. Smoke rises from the engine compartment.",
+  "options": [
+   {
+    "label": "Field repair with spare parts",
+    "outcome": "Your mechanic works through the problem. Fixed, but parts are depleted.",
+    "effects": {
+     "equipment": -15
+    },
+    "requiresRole": "mechanic"
+   },
+   {
+    "label": "Limp to the next block slowly",
+    "outcome": "Running on half power, you make it to a spot where proper repairs are possible.",
+    "effects": {
+     "equipment": -20,
+     "progress": -8
+    }
+   },
+   {
+    "label": "Call for tow truck ($500)",
+    "outcome": "The machine gets hauled out. Expensive, but the right choice.",
+    "effects": {
+     "budget": -500,
+     "equipment": -5
+    }
+   }
+  ]
+ },
+ {
+  "id": "chainsaw_failure",
+  "title": "Chainsaw Breakdown",
+  "type": "equipment",
+  "severity": "minor",
+  "probability": 0.06,
+  "description": "The primary saw throws its chain into a stump. Something's bent.",
+  "options": [
+   {
+    "label": "Swap to backup saw",
+    "outcome": "The backup saw is slower but works. Production drops for the day.",
+    "effects": {
+     "progress": -3
+    }
+   },
+   {
+    "label": "Send runner for parts",
+    "outcome": "Someone drives to town. Lost time but the good saw runs again.",
+    "effects": {
+     "fuel": -10,
+     "equipment": -8
+    }
+   },
+   {
+    "label": "Try to straighten the bar",
+    "outcome": "With patience and a hammer, it's serviceable. Probably.",
+    "effects": {
+     "equipment": -10
+    },
+    "riskInjury": 0.15
+   }
+  ],
+  "roles": [
+   "recce",
+   "silviculture"
+  ]
+ },
+ {
+  "id": "truck_stuck",
+  "title": "Truck Stuck in Mud",
+  "type": "equipment",
+  "severity": "moderate",
+  "probability": 0.06,
+  "terrainTrigger": [
+   "muskeg",
+   "river"
+  ],
+  "description": "The truck sinks to its axles in soft ground. It's not going anywhere without help.",
+  "options": [
+   {
+    "label": "Winch it out with the skidder",
+    "outcome": "Slow work, but eventually free. Equipment takes a beating.",
+    "effects": {
+     "equipment": -12,
+     "fuel": -5
+    }
+   },
+   {
+    "label": "Dig and lay brush road",
+    "outcome": "Everyone grabs shovels. Exhausting work but it works.",
+    "effects": {
+     "crew_health": -5,
+     "crew_morale": -8
+    },
+    "timeUsed": 4
+   },
+   {
+    "label": "Leave it and walk out",
+    "outcome": "You hike back with essential gear. The truck waits for drier weather.",
+    "effects": {
+     "progress": -10
+    }
+   }
+  ]
+ },
+ {
+  "id": "sudden_storm",
+  "title": "Sudden Storm",
+  "type": "weather",
+  "severity": "moderate",
+  "probability": 0.05,
+  "description": "Dark clouds roll in fast. Lightning flashes over the ridge.",
+  "options": [
+   {
+    "label": "Take shelter immediately",
+    "outcome": "Everyone piles into vehicles. Safe but no work gets done.",
+    "effects": {
+     "progress": -5
+    }
+   },
+   {
+    "label": "Push through to the next block",
+    "outcome": "You race the storm. Most make it, but conditions are dangerous.",
+    "effects": {
+     "crew_morale": -10
+    },
+    "riskInjury": 0.2
+   },
+   {
+    "label": "Set up emergency camp",
+    "outcome": "Tarps go up fast. You wait out the worst. Morale holds.",
+    "effects": {
+     "food": -3
+    }
+   }
+  ]
+ },
+ {
+  "id": "flash_flood",
+  "title": "Flash Flood Warning",
+  "type": "weather",
+  "severity": "severe",
+  "probability": 0.06,
+  "terrainTrigger": [
+   "river"
+  ],
+  "description": "The creek you crossed this morning is now a torrent. Water's rising fast.",
+  "options": [
+   {
+    "label": "Move to high ground immediately",
+    "outcome": "Everyone scrambles uphill. Equipment is safe but the day is lost.",
+    "effects": {
+     "progress": -8
+    }
+   },
+   {
+    "label": "Risk crossing now before it gets worse",
+    "outcome": "A gamble. The trucks make it across, barely.",
+    "effects": {
+     "crew_morale": -15,
+     "equipment": -10
+    },
+    "riskInjury": 0.25
+   },
+   {
+    "label": "Camp on this side overnight",
+    "outcome": "You wait for waters to drop. Lost a day but everyone's dry.",
+    "effects": {
+     "progress": -12,
+     "food": -5
+    }
+   }
+  ]
+ },
+ {
+  "id": "extreme_cold",
+  "title": "Extreme Cold Snap",
+  "type": "weather",
+  "severity": "moderate",
+  "probability": 0.08,
+  "description": "Temperature drops to -30C overnight. Everything is frozen solid.",
+  "options": [
+   {
+    "label": "Keep vehicles running all night",
+    "outcome": "Engines stay warm but fuel tanks drain fast.",
+    "effects": {
+     "fuel": -20
+    }
+   },
+   {
+    "label": "Bundle up and wait it out",
+    "outcome": "Everyone huddles in camp. A few frostbite scares but manageable.",
+    "effects": {
+     "crew_health": -8,
+     "crew_morale": -10
+    }
+   },
+   {
+    "label": "Light a big warming fire",
+    "outcome": "The fire keeps spirits high. Extra food consumed for energy.",
+    "effects": {
+     "food": -8
+    }
+   }
+  ]
+ },
+ {
+  "id": "bear_encounter",
+  "title": "Bear in Camp",
+  "type": "wildlife",
+  "severity": "moderate",
+  "probability": 0.06,
+  "description": "A black bear has found the food cache. It's not happy about being interrupted.",
+  "options": [
+   {
+    "label": "Make noise and back away slowly",
+    "outcome": "The bear eventually wanders off. Some food is ruined.",
+    "effects": {
+     "food": -8
+    }
+   },
+   {
+    "label": "Use bear spray",
+    "outcome": "Direct hit. The bear runs. Everyone's shaken but safe.",
+    "effects": {
+     "crew_morale": -5
+    }
+   },
+   {
+    "label": "Fire a warning shot",
+    "outcome": "The blast startles the bear into the bush. Compliance might ask questions.",
+    "effects": {
+     "compliance": -5
+    }
+   }
+  ]
+ },
+ {
+  "id": "grizzly_territory",
+  "title": "Grizzly Territory",
+  "type": "wildlife",
+  "severity": "severe",
+  "probability": 0.06,
+  "description": "Fresh grizzly signs everywhere. Tracks, scat, claw marks on trees. This is her home.",
+  "options": [
+   {
+    "label": "Post bear watch and continue",
+    "outcome": "Work continues with nervous glances. Productivity suffers.",
+    "effects": {
+     "progress": -5,
+     "crew_morale": -8
+    }
+   },
+   {
+    "label": "Relocate operations for the day",
+    "outcome": "You move to a different area. Safe but inefficient.",
+    "effects": {
+     "progress": -8,
+     "fuel": -5
+    }
+   },
+   {
+    "label": "Report and request guidance",
+    "outcome": "Wildlife officers advise caution. A two-day delay while they assess.",
+    "effects": {
+     "progress": -12,
+     "relationships": 5,
+     "compliance": 5
+    }
+   }
+  ]
+ },
+ {
+  "id": "moose_road",
+  "title": "Moose on the Road",
+  "type": "wildlife",
+  "severity": "minor",
+  "probability": 0.15,
+  "description": "A bull moose stands in the middle of the road. He's not moving.",
+  "options": [
+   {
+    "label": "Wait him out",
+    "outcome": "After 20 minutes of staring, he finally ambles off.",
+    "effects": {
+     "timeUsed": 1
+    }
+   },
+   {
+    "label": "Honk and inch forward",
+    "outcome": "The moose charges the truck! Minor dents but everyone's okay.",
+    "effects": {
+     "equipment": -5
+    }
+   },
+   {
+    "label": "Find an alternate route",
+    "outcome": "A longer path but no wildlife confrontation.",
+    "effects": {
+     "fuel": -3
+    }
+   }
+  ]
+ },
+ {
+  "id": "caribou_herd",
+  "title": "Caribou Herd Crossing",
+  "type": "wildlife",
+  "severity": "minor",
+  "probability": 0.1,
+  "description": "A herd of caribou is crossing ahead. Dozens of them, taking their time.",
+  "options": [
+   {
+    "label": "Stop and watch respectfully",
+    "outcome": "Beautiful sight. The crew takes photos. Good for morale.",
+    "effects": {
+     "crew_morale": 8
+    }
+   },
+   {
+    "label": "Radio ahead about the delay",
+    "outcome": "Office appreciates the update. Lost an hour.",
+    "effects": {
+     "relationships": 3
+    }
+   },
+   {
+    "label": "Try to pass slowly",
+    "outcome": "The herd scatters. You save time but feel bad about it.",
+    "effects": {
+     "crew_morale": -5,
+     "compliance": -3
+    }
+   }
+  ]
+ },
+ {
+  "id": "worker_injury",
+  "title": "Worker Injury",
+  "type": "injury",
+  "severity": "moderate",
+  "probability": 0.05,
+  "description": "A crew member slips on a log and goes down hard, clutching their ankle.",
+  "options": [
+   {
+    "label": "Apply first aid and continue",
+    "outcome": "Bandaged up and back to light duty. They'll be sore for days.",
+    "effects": {
+     "firstAid": -1
+    },
+    "crewEffect": {
+     "injury": "sprained_ankle"
+    }
+   },
+   {
+    "label": "Send them out for medical care",
+    "outcome": "One truck heads to town. You're short-handed but it's the right call.",
+    "effects": {
+     "fuel": -8,
+     "progress": -5
+    },
+    "crewEffect": {
+     "evacuate": true
+    }
+   },
+   {
+    "label": "Have them rest in camp",
+    "outcome": "They stay behind to heal. Might be fine tomorrow.",
+    "effects": {},
+    "crewEffect": {
+     "rest": 2
+    }
+   }
+  ]
+ },
+ {
+  "id": "food_poisoning",
+  "title": "Bad Food",
+  "type": "illness",
+  "severity": "moderate",
+  "probability": 0.08,
+  "description": "Half the crew woke up sick. Something in last night's dinner didn't agree.",
+  "options": [
+   {
+    "label": "Rest day for the sick",
+    "outcome": "Those affected stay in camp. Work continues short-handed.",
+    "effects": {
+     "progress": -8
+    },
+    "crewEffect": {
+     "illness": "food_poisoning",
+     "count": 2
+    }
+   },
+   {
+    "label": "Push through anyway",
+    "outcome": "Everyone works but productivity tanks. Some near-miss incidents.",
+    "effects": {
+     "progress": -3,
+     "crew_morale": -12
+    },
+    "riskInjury": 0.15
+   },
+   {
+    "label": "Dispose of suspect food",
+    "outcome": "You throw out everything questionable. Food stores depleted.",
+    "effects": {
+     "food": -15
+    }
+   }
+  ]
+ },
+ {
+  "id": "chainsaw_cut",
+  "title": "Chainsaw Accident",
+  "type": "injury",
+  "severity": "severe",
+  "probability": 0.05,
+  "description": "A saw kicks back. There's blood. This is serious.",
+  "options": [
+   {
+    "label": "Call helicopter medevac",
+    "outcome": "Air ambulance arrives within the hour. The bill is steep, but the crew sees that people come before production.",
+    "effects": {
+     "crew_morale": 6,
+     "compliance": 2
+    },
+    "crewEffect": {
+     "evacuate": true
+    }
+   },
+   {
+    "label": "Apply first aid and drive to hospital",
+    "outcome": "Bleeding is controlled, but the long road ride costs time and worries everyone.",
+    "effects": {
+     "crew_morale": -6,
+     "fuel": -8,
+     "timeUsed": 1
+    },
+    "crewEffect": {
+     "evacuate": true
+    }
+   },
+   {
+    "label": "Treat on site and keep crews working",
+    "outcome": "The wound is bandaged, but shock and infection risk rise. The crew is visibly shaken.",
+    "effects": {
+     "crew_morale": -18,
+     "firstAid": -4,
+     "progress": 2
+    },
+    "crewEffect": {
+     "injury": "severe_laceration"
+    }
+   }
+  ]
+ },
+ {
+  "id": "road_washout",
+  "title": "Road Washed Out",
+  "type": "terrain",
+  "severity": "moderate",
+  "probability": 0.1,
+  "description": "The road ahead has collapsed into the creek. No way through.",
+  "options": [
+   {
+    "label": "Build a bypass",
+    "outcome": "With shovels and chainsaws, you cut a rough detour. Takes all day.",
+    "effects": {
+     "progress": -8,
+     "equipment": -10,
+     "fuel": -5
+    }
+   },
+   {
+    "label": "Report and wait for road crew",
+    "outcome": "A proper crew will fix it in 2 days. You're stuck here.",
+    "effects": {
+     "progress": -15,
+     "compliance": 5
+    }
+   },
+   {
+    "label": "Try to ford the creek",
+    "outcome": "A risky crossing. The truck makes it but scrapes bottom badly.",
+    "effects": {
+     "equipment": -15
+    },
+    "riskInjury": 0.15
+   }
+  ]
+ },
+ {
+  "id": "bridge_questionable",
+  "title": "Questionable Bridge",
+  "type": "terrain",
+  "severity": "minor",
+  "probability": 0.12,
+  "description": "The log bridge ahead looks... tired. Uncertain if it will hold the truck.",
+  "options": [
+   {
+    "label": "Test it on foot first",
+    "outcome": "You walk across. It holds. Trucks go one at a time, very slowly.",
+    "effects": {
+     "timeUsed": 1
+    }
+   },
+   {
+    "label": "Reinforce with fresh logs",
+    "outcome": "An hour of cutting and the bridge is solid. Good work.",
+    "effects": {
+     "fuel": -2
+    }
+   },
+   {
+    "label": "Find another crossing",
+    "outcome": "A longer route around. Burns fuel but no bridge worries.",
+    "effects": {
+     "fuel": -8
+    }
+   }
+  ]
+ },
+ {
+  "id": "landslide",
+  "title": "Landslide Debris",
+  "type": "terrain",
+  "severity": "moderate",
+  "probability": 0.07,
+  "description": "A slope has let go across the road. Trees, mud, and rock block the path.",
+  "options": [
+   {
+    "label": "Clear it with equipment",
+    "outcome": "The skidder pushes debris aside. Hard on the machine.",
+    "effects": {
+     "equipment": -12,
+     "fuel": -8
+    }
+   },
+   {
+    "label": "Hand-clear a path",
+    "outcome": "Everyone grabs tools. Exhausting but it works.",
+    "effects": {
+     "crew_health": -8,
+     "crew_morale": -5
+    }
+   },
+   {
+    "label": "Turn back and report",
+    "outcome": "Safety first. The office will coordinate geotechnical review.",
+    "effects": {
+     "progress": -12,
+     "compliance": 8
+    }
+   }
+  ]
+ },
+ {
+  "id": "resupply_opportunity",
+  "title": "Passing Supply Truck",
+  "type": "supply",
+  "severity": "positive",
+  "probability": 0.15,
+  "description": "Another crew's supply truck is passing through. They've got extras.",
+  "options": [
+   {
+    "label": "Trade for fuel",
+    "outcome": "You swap some food for fuel. Fair trade.",
+    "effects": {
+     "fuel": 20,
+     "food": -5
+    }
+   },
+   {
+    "label": "Trade for food",
+    "outcome": "Fresh supplies for the camp. Morale rises.",
+    "effects": {
+     "fuel": -5,
+     "food": 15,
+     "crew_morale": 5
+    }
+   },
+   {
+    "label": "Just share news",
+    "outcome": "Good conversation and road updates. Nothing more.",
+    "effects": {
+     "crew_morale": 3
+    }
+   }
+  ]
+ },
+ {
+  "id": "lost_supplies",
+  "title": "Supplies Lost",
+  "type": "supply",
+  "severity": "moderate",
+  "probability": 0.08,
+  "description": "A load shifted on the rough road. A box of supplies bounced off somewhere.",
+  "options": [
+   {
+    "label": "Go back and search",
+    "outcome": "Found most of it scattered along the road. Lost time and fuel.",
+    "effects": {
+     "progress": -3,
+     "fuel": -5
+    }
+   },
+   {
+    "label": "Write it off and continue",
+    "outcome": "Can't spare the time. The lost supplies go on the books.",
+    "effects": {
+     "budget": -750
+    }
+   },
+   {
+    "label": "Secure remaining cargo",
+    "outcome": "You stop to re-tie everything. No more losses.",
+    "effects": {
+     "progress": -1,
+     "crew_morale": 2
+    }
+   }
+  ]
+ },
+ {
+  "id": "good_road_conditions",
+  "title": "Excellent Road Conditions",
+  "type": "terrain",
+  "severity": "positive",
+  "probability": 0.12,
+  "description": "The road ahead is in great shape - recently graded and smooth.",
+  "options": [
+   {
+    "label": "Make up time!",
+    "outcome": "The crew pushes forward quickly on the good road. Great progress!",
+    "effects": {
+     "progress": 8
+    }
+   },
+   {
+    "label": "Take it easy, save fuel",
+    "outcome": "You cruise at low RPMs. Fuel gauge barely moves.",
+    "effects": {
+     "fuel": 5
+    }
+   }
+  ]
+ },
+ {
+  "id": "abandoned_cache",
+  "title": "Abandoned Supply Cache",
+  "type": "supply",
+  "severity": "positive",
+  "probability": 0.1,
+  "description": "You spot an old camp with some leftover supplies. Looks usable.",
+  "options": [
+   {
+    "label": "Scavenge fuel and parts",
+    "outcome": "A few jerry cans of diesel and some spare belts. Score!",
+    "effects": {
+     "fuel": 15,
+     "equipment": 5
+    }
+   },
+   {
+    "label": "Grab the food supplies",
+    "outcome": "Canned goods and dried rations. Still good!",
+    "effects": {
+     "food": 12
+    }
+   },
+   {
+    "label": "Take the first aid kit",
+    "outcome": "A dusty but complete first aid kit. Could be a lifesaver.",
+    "effects": {
+     "firstAid": 2
+    }
+   }
+  ]
+ },
+ {
+  "id": "crew_morale_boost",
+  "title": "Beautiful Sunset",
+  "type": "morale",
+  "severity": "positive",
+  "probability": 0.12,
+  "description": "The evening sky puts on a spectacular show. Everyone stops to watch.",
+  "options": [
+   {
+    "label": "Take a break and enjoy it",
+    "outcome": "Moments like this remind everyone why they love this work.",
+    "effects": {
+     "crew_morale": 15,
+     "timeUsed": 1
+    }
+   },
+   {
+    "label": "Keep working but appreciate it",
+    "outcome": "Even while busy, the beauty lifts spirits.",
+    "effects": {
+     "crew_morale": 8
+    }
+   }
+  ]
+ },
+ {
+  "id": "helpful_locals",
+  "title": "Helpful Locals",
+  "type": "social",
+  "severity": "positive",
+  "probability": 0.08,
+  "description": "Some local First Nations members stop by with advice and coffee.",
+  "options": [
+   {
+    "label": "Share a meal and listen",
+    "outcome": "They point out a shortcut and warn about a washout ahead.",
+    "effects": {
+     "crew_morale": 10,
+     "progress": 5
+    }
+   },
+   {
+    "label": "Trade for supplies",
+    "outcome": "They have smoked salmon to trade. Delicious and nutritious!",
+    "effects": {
+     "food": 8,
+     "crew_morale": 5
+    }
+   }
+  ]
+ },
+ {
+  "id": "equipment_running_well",
+  "title": "Equipment Running Smoothly",
+  "type": "equipment",
+  "severity": "positive",
+  "probability": 0.1,
+  "description": "Everything is humming along perfectly today. Not a single mechanical issue.",
+  "options": [
+   {
+    "label": "Keep up the momentum",
+    "outcome": "A productive day with no breakdowns. Equipment looks even better.",
+    "effects": {
+     "equipment": 5,
+     "progress": 3
+    }
+   },
+   {
+    "label": "Do preventive maintenance",
+    "outcome": "With things running well, you take time to check everything over.",
+    "effects": {
+     "equipment": 10
+    }
+   }
+  ]
+ },
+ {
+  "id": "peat_crossing_pumping",
+  "title": "Peat Crossing Starts Pumping",
+  "type": "terrain",
+  "severity": "moderate",
+  "probability": 0.05,
+  "roles": [
+   "recce"
+  ],
+  "areaTags": [
+   "peatland",
+   "peace-region"
+  ],
+  "becCodes": [
+   "BWBSmw1"
+  ],
+  "terrainTrigger": [
+   "muskeg"
+  ],
+  "description": "A probe rod drops through the road edge and brown water wells up. The peat mat under the approach is losing strength faster than the road card suggested.",
+  "options": [
+   {
+    "label": "Flag the soft ground and back crews off",
+    "outcome": "You mark the weak spots, limit traffic, and keep the problem from becoming a full blowout.",
+    "effects": {
+     "progress": -4,
+     "equipment": -2
+    }
+   },
+   {
+    "label": "Lay brush and corduroy the approach",
+    "outcome": "The crew spends the shift reinforcing the crossing. It holds, but everyone feels the extra work.",
+    "effects": {
+     "progress": -2,
+     "crew_morale": -4,
+     "equipment": -3
+    }
+   },
+   {
+    "label": "Test it with one light pickup",
+    "outcome": "The pickup squeaks through, but the shoulders slump and the crossing is worse by evening.",
+    "effects": {
+     "progress": 2,
+     "equipment": -8
+    },
+    "riskInjury": 0.1
+   }
+  ]
+ },
+ {
+  "id": "salmon_crossing_red_flag",
+  "title": "Fish Passage Red Flag",
+  "type": "terrain",
+  "severity": "moderate",
+  "probability": 0.04,
+  "roles": [
+   "recce"
+  ],
+  "areaTags": [
+   "salmon",
+   "cwh"
+  ],
+  "becCodes": [
+   "CWHws2"
+  ],
+  "terrainTrigger": [
+   "river"
+  ],
+  "description": "The crossing looks rougher on the ground than on the map: fresh scour, perched flow, and salmon visible below the pipe but not above it.",
+  "options": [
+   {
+    "label": "Shut the crossing down and call it in",
+    "outcome": "You stop traffic, document the outlet, and force the fix into the engineering queue before more damage is done.",
+    "effects": {
+     "progress": -5,
+     "equipment": -1
+    }
+   },
+   {
+    "label": "Restrict loads and post a spotter",
+    "outcome": "The crossing survives the day, but everyone knows it is now on borrowed time.",
+    "effects": {
+     "progress": -2,
+     "crew_morale": -3
+    }
+   },
+   {
+    "label": "Keep moving and note it for later",
+    "outcome": "You buy a few production hours, but the crew knows this crossing just became a liability.",
+    "effects": {
+     "progress": 4,
+     "equipment": -5,
+     "crew_morale": -5
+    }
+   }
+  ]
+ },
+ {
+  "id": "smoke_hold",
+  "title": "Smoke Hold at Camp",
+  "type": "weather",
+  "severity": "moderate",
+  "probability": 0.04,
+  "roles": [
+   "recce",
+   "silviculture"
+  ],
+  "areaTags": [
+   "wildfire"
+  ],
+  "becCodes": [
+   "SBSwk1"
+  ],
+  "description": "Smoke settles over camp and the air quality keeps climbing. The block is still there, but the work window is shrinking by the hour.",
+  "options": [
+   {
+    "label": "Stand crews down and switch to low-exposure tasks",
+    "outcome": "You burn the shift on mapping, maintenance, and reporting until the air improves.",
+    "effects": {
+     "progress": -4,
+     "equipment": 2
+    }
+   },
+   {
+    "label": "Run a shortened shift with respirators",
+    "outcome": "Some work gets done, but nobody mistakes it for a normal day.",
+    "effects": {
+     "progress": 2,
+     "crew_morale": -4,
+     "budget": -600
+    }
+   },
+   {
+    "label": "Push full production",
+    "outcome": "The numbers look better by supper, but the crew is drained and the call feels harder to defend.",
+    "effects": {
+     "progress": 5,
+     "crew_morale": -8
+    },
+    "riskInjury": 0.12
+   }
+  ]
+ },
+ {
+  "id": "regen_stress_patch",
+  "title": "Patchy Regen Stress",
+  "type": "forest_health",
+  "severity": "moderate",
+  "probability": 0.05,
+  "roles": [
+   "silviculture"
+  ],
+  "areaTags": [
+   "beetle-recovery"
+  ],
+  "becCodes": [
+   "SBSwk1"
+  ],
+  "description": "A beetle-era planting block looks fine from the road, but the walk-through tells a different story: thin stocking on hot knolls, brush pressure in the draws, and seedlings already losing ground.",
+  "options": [
+   {
+    "label": "Re-stratify the block and hit the worst patches first",
+    "outcome": "You focus effort where survival is slipping fastest and get ahead of the worst failures.",
+    "effects": {
+     "progress": 1,
+     "equipment": -1,
+     "budget": -1200
+    }
+   },
+   {
+    "label": "Order fill-plant and brush follow-up",
+    "outcome": "The prescription gets more expensive, but the stand has a better chance of evening out.",
+    "effects": {
+     "progress": -1,
+     "budget": -2500
+    }
+   },
+   {
+    "label": "Leave it for the formal survey window",
+    "outcome": "You save today's budget and lose time while the weak patches keep declaring themselves.",
+    "effects": {
+     "progress": -3
+    }
+   }
+  ]
+ },
+ {
+  "id": "story_arc_ancientGrove_stage0",
+  "title": "Discovery of the Ancient Grove",
+  "type": "narrative",
+  "severity": "moderate",
+  "probability": 0.05,
+  "description": "Survey crews have found an untouched ancient cedar grove with trees older than 800 years",
+  "options": [
+   {
+    "label": "Protect the grove and seek heritage status",
+    "outcome": "You decided to Protect the grove and seek heritage status.",
+    "effects": {
+     "reputation": 5,
+     "budget": 0
+    },
+    "schedulesEvent": "story_arc_ancientGrove_stage1_protect"
+   },
+   {
+    "label": "Harvest the valuable timber",
+    "outcome": "The fallers take the grove down in two days. The mill pays a premium for clear old-growth cedar — $3,000 lands in the crew account. Word travels faster than the logging trucks.",
+    "effects": {
+     "reputation": -10,
+     "budget": 3000
+    },
+    "schedulesEvent": "story_arc_ancientGrove_stage1_harvest"
+   }
+  ]
+ },
+ {
+  "id": "crew_threatens_quit",
+  "title": "Crew Member Threatens to Quit",
+  "type": "social",
+  "severity": "moderate",
+  "probability": 0.05,
+  "description": "Your most experienced faller corners you after dinner. He says he's had enough — the pay isn't worth the conditions. He wants out tomorrow morning.",
+  "options": [
+   {
+    "label": "Let them go",
+    "outcome": "He packs up at dawn. The crew watches in silence. You're short-handed now.",
+    "effects": {
+     "crew_morale": -5
+    },
+    "crewEffect": {
+     "lose_member": true
+    }
+   },
+   {
+    "label": "Negotiate — offer a bonus and lighter duties",
+    "outcome": "You promise extra pay and shorter shifts. He thinks it over...",
+    "effects": {
+     "budget": -400,
+     "crew_morale": -3
+    },
+    "chanceSuccess": 0.6,
+    "failureOutcome": "He takes the money but quits anyway two days later. Waste of cash.",
+    "failureEffects": {
+     "budget": -400,
+     "crew_morale": -8
+    },
+    "hiddenOutcome": true
+   },
+   {
+    "label": "Ignore it — he'll cool off",
+    "outcome": "You shrug it off. But the rest of the crew noticed you didn't care. Tension rises.",
+    "effects": {
+     "crew_morale": -12
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "unauthorized_logging",
+  "title": "Unauthorized Logging Nearby",
+  "type": "social",
+  "severity": "moderate",
+  "probability": 0.04,
+  "description": "You find fresh-cut stumps on the adjacent block. Someone's been logging here without permits — and it's not your crew.",
+  "options": [
+   {
+    "label": "Report it to the district office",
+    "outcome": "You radio it in and file a report. The office appreciates it but sends an inspector, costing you a day of work.",
+    "effects": {
+     "progress": -5,
+     "compliance": 10,
+     "relationships": 5
+    }
+   },
+   {
+    "label": "Ignore it — not your problem",
+    "outcome": "You keep working. But if someone finds out you saw it and said nothing...",
+    "effects": {},
+    "hiddenOutcome": true,
+    "riskCompliance": 0.3
+   },
+   {
+    "label": "Investigate quietly on your own",
+    "outcome": "You poke around after hours. Fresh tire tracks lead to an unmarked road.",
+    "effects": {
+     "crew_morale": -3
+    },
+    "hiddenOutcome": true,
+    "schedulesEvent": "unauthorized_logging_followup",
+    "scheduledDelay": 3
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "unauthorized_logging_followup",
+  "title": "Confrontation at the Cutblock",
+  "type": "social",
+  "severity": "severe",
+  "probability": 0,
+  "description": "A battered pickup rolls up to your camp. Two rough-looking guys step out — they know you've been snooping around their operation.",
+  "options": [
+   {
+    "label": "Stand your ground and tell them to leave",
+    "outcome": "Tense standoff. They leave with threats but don't come back. Your crew is rattled.",
+    "effects": {
+     "crew_morale": -10
+    }
+   },
+   {
+    "label": "Offer to look the other way",
+    "outcome": "They leave you alone but you've compromised your integrity. Compliance risk if it comes out.",
+    "effects": {
+     "compliance": -15
+    },
+    "hiddenOutcome": true
+   },
+   {
+    "label": "Call the authorities immediately",
+    "outcome": "Conservation officers arrive within hours. The poachers scatter. You did the right thing.",
+    "effects": {
+     "progress": -5,
+     "compliance": 15,
+     "relationships": 8
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "helicopter_available",
+  "title": "Helicopter Available for Hire",
+  "type": "supply",
+  "severity": "minor",
+  "probability": 0.04,
+  "description": "A pilot radios in — his afternoon charter cancelled and he's offering discounted flight time. He could sling supplies to your next block or do an aerial recon.",
+  "options": [
+   {
+    "label": "Sling supplies ahead ($1500)",
+    "outcome": "Equipment and fuel are waiting at the next block. Massive time savings.",
+    "effects": {
+     "budget": -1500,
+     "progress": 12,
+     "fuel": 10
+    }
+   },
+   {
+    "label": "Aerial recon of the route ($800)",
+    "outcome": "From above you spot a washout, a good crossing, and the best path forward.",
+    "effects": {
+     "budget": -800,
+     "progress": 5
+    }
+   },
+   {
+    "label": "Save the money for emergencies",
+    "outcome": "You wave him off. The budget stays intact but you wonder what could have been.",
+    "effects": {}
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "best_worker_sick",
+  "title": "Your Best Worker Is Sick",
+  "type": "illness",
+  "severity": "moderate",
+  "probability": 0.06,
+  "description": "Your most productive crew member wakes up feverish and pale. He insists he can work but he's clearly struggling.",
+  "options": [
+   {
+    "label": "Send them back to rest in camp",
+    "outcome": "He sleeps all day. You lose your best producer but he should recover by tomorrow.",
+    "effects": {
+     "progress": -8
+    },
+    "crewEffect": {
+     "rest": 1
+    }
+   },
+   {
+    "label": "Let them do light duty",
+    "outcome": "He putters around camp doing small tasks. Not much help, but he doesn't get worse. Probably.",
+    "effects": {
+     "progress": -4
+    },
+    "hiddenOutcome": true,
+    "crewEffect": {
+     "illness": "flu",
+     "riskWorsen": 0.35
+    }
+   },
+   {
+    "label": "Medicate and push through",
+    "outcome": "You dose him up from the first aid kit. He works at half speed.",
+    "effects": {
+     "firstAid": -1,
+     "progress": -2
+    },
+    "hiddenOutcome": true,
+    "crewEffect": {
+     "illness": "exhaustion",
+     "riskWorsen": 0.5
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "safety_inspection_notice",
+  "title": "Safety Inspection Notice",
+  "type": "social",
+  "severity": "moderate",
+  "probability": 0.05,
+  "description": "A crackly radio message from district: a safety inspector will be visiting your operation in a few days. Better get things in order.",
+  "options": [
+   {
+    "label": "Spend the day prepping for inspection",
+    "outcome": "You clean up the site, check PPE, organize paperwork. Lost a day of production but you'll be ready.",
+    "effects": {
+     "progress": -6,
+     "compliance": 8
+    },
+    "schedulesEvent": "inspector_arrives",
+    "scheduledDelay": 3
+   },
+   {
+    "label": "Do a quick tidy and keep working",
+    "outcome": "A half-hearted cleanup. Things look okay-ish. You keep production moving.",
+    "effects": {
+     "progress": -2,
+     "compliance": 3
+    },
+    "schedulesEvent": "inspector_arrives",
+    "scheduledDelay": 3
+   },
+   {
+    "label": "Ignore it — we're always compliant",
+    "outcome": "You trust your standards. The crew keeps working at full pace.",
+    "effects": {},
+    "schedulesEvent": "inspector_arrives",
+    "scheduledDelay": 3
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "inspector_arrives",
+  "title": "Safety Inspector Arrives",
+  "type": "social",
+  "severity": "moderate",
+  "probability": 0,
+  "description": "A white government truck pulls into camp. The inspector steps out with a clipboard and a serious expression.",
+  "options": [
+   {
+    "label": "Give them the full tour confidently",
+    "outcome": "You walk them through every operation, and it takes most of the day. They note a few minor issues but leave satisfied.",
+    "effects": {
+     "progress": -6,
+     "compliance": 5,
+     "relationships": 3
+    }
+   },
+   {
+    "label": "Be cooperative but let them lead",
+    "outcome": "You answer questions honestly. They find what they find.",
+    "effects": {
+     "progress": -2,
+     "compliance": 2
+    },
+    "hiddenOutcome": true
+   },
+   {
+    "label": "Distract them with coffee and stories",
+    "outcome": "You keep the crews working while you pour coffee and spin stories. Inspectors have seen this before — they dig deeper.",
+    "effects": {
+     "progress": -1,
+     "compliance": -5
+    },
+    "hiddenOutcome": true
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "suspicious_tracks",
+  "title": "Suspicious Tracks Near Camp",
+  "type": "wildlife",
+  "severity": "minor",
+  "probability": 0.06,
+  "description": "Large canine tracks circle the camp perimeter. Too big for coyote. The food scraps from last night are gone.",
+  "options": [
+   {
+    "label": "Set up better food storage and carry on",
+    "outcome": "You hang food higher and secure the garbage. Probably just a lone wolf passing through.",
+    "effects": {
+     "food": -2
+    },
+    "schedulesEvent": "wolf_pack_sighting",
+    "scheduledDelay": 2
+   },
+   {
+    "label": "Post a night watch",
+    "outcome": "Someone stays up with a flashlight. Tired crew tomorrow.",
+    "effects": {
+     "crew_morale": -5,
+     "crew_health": -3
+    },
+    "schedulesEvent": "wolf_pack_sighting",
+    "scheduledDelay": 2
+   },
+   {
+    "label": "Report to wildlife office",
+    "outcome": "They log it and tell you to be cautious. Standard advice.",
+    "effects": {
+     "compliance": 3,
+     "timeUsed": 1
+    },
+    "schedulesEvent": "wolf_pack_sighting",
+    "scheduledDelay": 2
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "wolf_pack_sighting",
+  "title": "Wolf Pack Sighting",
+  "type": "wildlife",
+  "severity": "moderate",
+  "probability": 0,
+  "description": "At dusk, five grey wolves emerge from the treeline and watch your camp from the ridge. They're not afraid.",
+  "options": [
+   {
+    "label": "Light extra fires and make noise",
+    "outcome": "The wolves linger but keep distance. An uneasy night. They're gone by morning.",
+    "effects": {
+     "crew_morale": -8,
+     "food": -3
+    }
+   },
+   {
+    "label": "Move camp to a more open area",
+    "outcome": "A pain to relocate but worth it. No more wolf visits.",
+    "effects": {
+     "progress": -6,
+     "fuel": -5
+    }
+   },
+   {
+    "label": "Carry on — wolves don't attack people",
+    "outcome": "You're right, mostly. But the crew doesn't sleep well for days.",
+    "effects": {
+     "crew_morale": -12,
+     "crew_health": -5
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "radio_weather_warning",
+  "title": "Radio Report: Incoming Weather System",
+  "type": "weather",
+  "severity": "minor",
+  "probability": 0.06,
+  "description": "The weather service broadcasts a warning: a major system is building to the west. Heavy rain and wind expected within 48 hours.",
+  "options": [
+   {
+    "label": "Push hard now to get ahead of it",
+    "outcome": "The crew works double-time. Exhausting but you bank some progress before the storm.",
+    "effects": {
+     "progress": 6,
+     "crew_health": -8,
+     "crew_morale": -5
+    },
+    "schedulesEvent": "major_storm_hits",
+    "scheduledDelay": 2
+   },
+   {
+    "label": "Prepare camp for the storm",
+    "outcome": "You batten down the hatches. Tarps, drainage ditches, extra firewood. Ready as you'll ever be.",
+    "effects": {
+     "progress": -3,
+     "fuel": -3
+    },
+    "schedulesEvent": "major_storm_hits",
+    "scheduledDelay": 2
+   },
+   {
+    "label": "Fall back to a safer position",
+    "outcome": "You retreat to lower ground near the main road. Safe but far from the work site.",
+    "effects": {
+     "progress": -8,
+     "fuel": -8
+    },
+    "schedulesEvent": "major_storm_hits",
+    "scheduledDelay": 2
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "major_storm_hits",
+  "title": "Major Storm Hits",
+  "type": "weather",
+  "severity": "severe",
+  "probability": 0,
+  "description": "The storm arrives with a vengeance. Trees bend sideways, rain comes in sheets, and the road turns to soup. No one's working today.",
+  "options": [
+   {
+    "label": "Hunker down and ride it out",
+    "outcome": "A long, wet, miserable day. But everything holds together. Barely.",
+    "effects": {
+     "progress": -10,
+     "crew_morale": -8,
+     "food": -5
+    }
+   },
+   {
+    "label": "Evacuate to the main road",
+    "outcome": "A harrowing drive through the storm. Everyone makes it out but the camp is left behind.",
+    "effects": {
+     "progress": -15,
+     "fuel": -10,
+     "equipment": -5
+    }
+   },
+   {
+    "label": "Use the downtime for equipment maintenance",
+    "outcome": "Can't go anywhere, might as well wrench. Surprisingly productive shelter time.",
+    "effects": {
+     "progress": -8,
+     "equipment": 10,
+     "crew_morale": -3
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "old_growth_cedar",
+  "title": "Old-Growth Cedar Grove",
+  "type": "discovery",
+  "severity": "positive",
+  "probability": 0.04,
+  "description": "Pushing through dense brush, you stumble into a cathedral-like grove of ancient cedars. Some of these trees are 500 years old. Sunlight filters through the canopy like stained glass.",
+  "options": [
+   {
+    "label": "Report the grove to the district",
+    "outcome": "The office is grateful — this area needs protection. Your compliance record shines.",
+    "effects": {
+     "crew_morale": 10,
+     "compliance": 12,
+     "relationships": 5
+    }
+   },
+   {
+    "label": "Mark it on the map and move on quietly",
+    "outcome": "You GPS the location for your own records. A private treasure.",
+    "effects": {
+     "crew_morale": 8
+    }
+   },
+   {
+    "label": "Let the crew take a break here",
+    "outcome": "Everyone sits among the giants in awed silence. Someone says it's the best moment of the season.",
+    "effects": {
+     "crew_morale": 15,
+     "progress": -3
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "unmapped_creek",
+  "title": "Unmapped Creek Crossing",
+  "type": "discovery",
+  "severity": "minor",
+  "probability": 0.05,
+  "description": "Your planned route crosses a creek that doesn't appear on any map. It's not huge, but it's definitely fish-bearing — you can see spawning beds.",
+  "options": [
+   {
+    "label": "Report it and reroute — proper protocol",
+    "outcome": "The district is impressed by your diligence. A new buffer zone is established. Your route gets longer.",
+    "effects": {
+     "progress": -10,
+     "compliance": 15,
+     "relationships": 8
+    }
+   },
+   {
+    "label": "Cross carefully and note it for later",
+    "outcome": "You ford it gently and mark it on the map. Should have reported it first, but you saved time.",
+    "effects": {
+     "progress": -2,
+     "compliance": -8
+    },
+    "hiddenOutcome": true
+   },
+   {
+    "label": "Investigate the watershed",
+    "outcome": "You spend time mapping the drainage. Valuable data for future planning.",
+    "effects": {
+     "progress": -6,
+     "compliance": 8,
+     "data": 10
+    }
+   }
+  ],
+  "roles": [
+   "recce"
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "historical_survey_markers",
+  "title": "Historical Survey Markers",
+  "type": "discovery",
+  "severity": "positive",
+  "probability": 0.04,
+  "description": "Rusted iron pins and blazed trees — someone surveyed this area decades ago. The old markers could help confirm your boundary lines.",
+  "options": [
+   {
+    "label": "Record and photograph everything",
+    "outcome": "Detailed documentation of the old survey. This data is gold for boundary disputes.",
+    "effects": {
+     "progress": -3,
+     "data": 15,
+     "compliance": 5
+    }
+   },
+   {
+    "label": "Use them to verify your current lines",
+    "outcome": "Cross-referencing reveals your map is off by 40 meters. Good catch before you cut too far.",
+    "effects": {
+     "data": 10,
+     "compliance": 8
+    }
+   },
+   {
+    "label": "Note the location and keep moving",
+    "outcome": "You GPS the pins and carry on. Useful info but not explored fully.",
+    "effects": {
+     "data": 5
+    }
+   }
+  ],
+  "roles": [
+   "recce"
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "abandoned_trappers_cabin",
+  "title": "Abandoned Trapper's Cabin",
+  "type": "discovery",
+  "severity": "positive",
+  "probability": 0.04,
+  "description": "Hidden in a stand of spruce, you find a weathered log cabin. The roof is mostly intact. Inside: a rusty stove, some old traps, and shelves of dusty supplies.",
+  "options": [
+   {
+    "label": "Use it as an emergency shelter",
+    "outcome": "You patch the roof and clear it out. A solid backup shelter if weather turns nasty.",
+    "effects": {
+     "crew_morale": 8,
+     "progress": -2
+    }
+   },
+   {
+    "label": "Salvage the supplies",
+    "outcome": "Kerosene, rope, a hand axe, and some canned goods that are somehow still sealed. Lucky find.",
+    "effects": {
+     "fuel": 5,
+     "food": 6,
+     "equipment": 3
+    }
+   },
+   {
+    "label": "Leave it undisturbed — could be heritage",
+    "outcome": "You photograph it and report the location. The historical society is very interested.",
+    "effects": {
+     "relationships": 8,
+     "compliance": 5
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "crew_card_game",
+  "title": "High-Stakes Card Game",
+  "type": "morale",
+  "severity": "minor",
+  "probability": 0.07,
+  "description": "Tensions have been simmering. After dinner, a poker game gets heated. Two crew members are about to come to blows over a $200 pot.",
+  "options": [
+   {
+    "label": "Break it up and ban gambling",
+    "outcome": "Order is restored but everyone resents the fun police. Quiet, sullen camp.",
+    "effects": {
+     "crew_morale": -8
+    }
+   },
+   {
+    "label": "Mediate — split the pot and move on",
+    "outcome": "A fair-enough solution. Nobody's happy but nobody's fighting.",
+    "effects": {
+     "crew_morale": -3
+    }
+   },
+   {
+    "label": "Let them sort it out themselves",
+    "outcome": "They scuffle. One gets a black eye. But somehow, they respect each other more after.",
+    "effects": {
+     "crew_morale": 3
+    },
+    "hiddenOutcome": true,
+    "riskInjury": 0.2
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "radio_dead",
+  "title": "Radio Goes Dead",
+  "type": "equipment",
+  "severity": "moderate",
+  "probability": 0.05,
+  "description": "The camp radio crackles and dies mid-transmission. No signal, no spare parts. You're cut off from the outside.",
+  "options": [
+   {
+    "label": "Send someone to town for a replacement",
+    "outcome": "A full day's drive, round trip. You're without comms until they return.",
+    "effects": {
+     "fuel": -12,
+     "progress": -5
+    }
+   },
+   {
+    "label": "Try to fix it with what you have",
+    "outcome": "Your most tech-savvy crew member tinkers for hours. Might work, might not.",
+    "effects": {
+     "progress": -3
+    },
+    "hiddenOutcome": true,
+    "chanceSuccess": 0.4,
+    "failureOutcome": "Hours of tinkering. The radio stays dead, and its parts are spread across a tarp.",
+    "failureEffects": {
+     "progress": -5
+    }
+   },
+   {
+    "label": "Work without radio — check in when you can",
+    "outcome": "Risky to be out of contact, but you keep production moving.",
+    "effects": {
+     "compliance": -8
+    },
+    "hiddenOutcome": true
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "fuel_contamination",
+  "title": "Fuel Contamination",
+  "type": "equipment",
+  "severity": "moderate",
+  "probability": 0.04,
+  "description": "The diesel smells wrong. Water got into the fuel barrel somehow. Your equipment sputters and stalls.",
+  "options": [
+   {
+    "label": "Drain and filter what you can",
+    "outcome": "Tedious work. You save about half the fuel. Equipment runs rough for a day.",
+    "effects": {
+     "fuel": -15,
+     "equipment": -8,
+     "progress": -4
+    }
+   },
+   {
+    "label": "Dump it all and order fresh fuel",
+    "outcome": "The safe choice but you're grounded until the delivery arrives.",
+    "effects": {
+     "fuel": -30,
+     "budget": -300,
+     "progress": -8
+    }
+   },
+   {
+    "label": "Use it anyway — it's mostly diesel",
+    "outcome": "The equipment runs, barely. Something is going to break sooner rather than later.",
+    "effects": {
+     "fuel": -5
+    },
+    "hiddenOutcome": true,
+    "schedulesEvent": "engine_trouble",
+    "scheduledDelay": 2
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "competing_crew",
+  "title": "Competing Crew on Adjacent Block",
+  "type": "social",
+  "severity": "minor",
+  "probability": 0.06,
+  "description": "Another logging crew has set up on the next block over. They're loud, fast, and their foreman keeps 'accidentally' encroaching on your boundary.",
+  "options": [
+   {
+    "label": "Confront the foreman directly",
+    "outcome": "A heated but productive conversation. Boundaries are clarified. Uneasy truce.",
+    "effects": {
+     "crew_morale": 3,
+     "relationships": -5
+    }
+   },
+   {
+    "label": "Report the encroachment officially",
+    "outcome": "Paperwork and phone calls. The district sends a surveyor. Takes days to resolve.",
+    "effects": {
+     "progress": -5,
+     "compliance": 8,
+     "relationships": 3
+    }
+   },
+   {
+    "label": "Challenge them to a production race",
+    "outcome": "The crews push hard to outperform each other. Dangerous but motivating.",
+    "effects": {
+     "progress": 5,
+     "crew_morale": 8,
+     "crew_health": -5
+    },
+    "riskInjury": 0.15
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "satellite_phone_call",
+  "title": "Urgent Call from Home",
+  "type": "social",
+  "severity": "moderate",
+  "probability": 0.04,
+  "description": "The sat phone rings. It's for one of your crew members — a family emergency back home. He's white-faced and shaking.",
+  "options": [
+   {
+    "label": "Let him go immediately",
+    "outcome": "He drives out within the hour. The crew understands. You're short-handed but it's the right thing.",
+    "effects": {
+     "progress": -5,
+     "crew_morale": 5
+    },
+    "crewEffect": {
+     "leave": true
+    }
+   },
+   {
+    "label": "Ask him to stay until the shift ends",
+    "outcome": "He stays but his mind is elsewhere. Dangerous distraction. The crew is uncomfortable.",
+    "effects": {
+     "crew_morale": -10
+    },
+    "riskInjury": 0.15,
+    "hiddenOutcome": true
+   },
+   {
+    "label": "Drive him to town yourself",
+    "outcome": "You personally deliver him to the bus station. The crew respects the gesture enormously.",
+    "effects": {
+     "progress": -8,
+     "fuel": -10,
+     "crew_morale": 12
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "wildlife_nesting_area",
+  "title": "Raptor Nesting Area",
+  "type": "wildlife",
+  "severity": "moderate",
+  "probability": 0.05,
+  "description": "An eagle nest sits in a massive Douglas fir right in your planned cut path. Two chicks are visible. This tree is protected by law.",
+  "options": [
+   {
+    "label": "Establish a buffer zone and reroute",
+    "outcome": "You flag a 100-meter buffer. Adds distance but keeps you legal and ethical.",
+    "effects": {
+     "progress": -8,
+     "compliance": 12,
+     "crew_morale": 5
+    }
+   },
+   {
+    "label": "Report it and wait for wildlife assessment",
+    "outcome": "A biologist will come out... eventually. Could be days.",
+    "effects": {
+     "progress": -12,
+     "compliance": 15,
+     "relationships": 5
+    }
+   },
+   {
+    "label": "Work around it as close as regulations allow",
+    "outcome": "You cut right up to the legal minimum distance. Efficient but the eagles are stressed.",
+    "effects": {
+     "progress": -3,
+     "compliance": 3
+    },
+    "hiddenOutcome": true
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "gear_theft",
+  "title": "Missing Gear",
+  "type": "supply",
+  "severity": "moderate",
+  "probability": 0.03,
+  "description": "Two chainsaws and a fuel can are missing from camp. Either someone took them or a very talented bear has new hobbies.",
+  "options": [
+   {
+    "label": "Search the area thoroughly",
+    "outcome": "You find one saw tossed in the brush — dropped by whoever took it. The rest is gone.",
+    "effects": {
+     "progress": -4,
+     "equipment": -10
+    }
+   },
+   {
+    "label": "Report theft to RCMP",
+    "outcome": "Officers visit camp. Lots of questions, no answers. The crew feels violated.",
+    "effects": {
+     "progress": -6,
+     "equipment": -15,
+     "crew_morale": -8
+    }
+   },
+   {
+    "label": "Quietly increase camp security",
+    "outcome": "You set up watches and lock everything down. No more incidents but the crew is on edge.",
+    "effects": {
+     "equipment": -15,
+     "crew_morale": -5
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "spring_breakup",
+  "title": "Spring Breakup Starting",
+  "type": "terrain",
+  "severity": "moderate",
+  "probability": 0.06,
+  "description": "The frost is coming out of the ground. Roads that were solid yesterday are turning to mush. The window for heavy equipment is closing fast.",
+  "options": [
+   {
+    "label": "Push hard now — run equipment day and night",
+    "outcome": "You work around the clock while the ground still holds. Exhausting but productive.",
+    "effects": {
+     "progress": 10,
+     "crew_health": -10,
+     "crew_morale": -8,
+     "equipment": -10
+    }
+   },
+   {
+    "label": "Switch to lighter operations only",
+    "outcome": "Hand-falling and foot-based work. Slow going but no road damage.",
+    "effects": {
+     "progress": -5,
+     "compliance": 5
+    }
+   },
+   {
+    "label": "Shut down and wait for dry conditions",
+    "outcome": "The responsible choice. Equipment stays parked. Could be a week or more.",
+    "effects": {
+     "progress": -15,
+     "compliance": 10,
+     "crew_morale": -5
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "water_source_found",
+  "title": "Fresh Water Spring",
+  "type": "discovery",
+  "severity": "positive",
+  "probability": 0.05,
+  "description": "A crew member finds a clear, cold spring bubbling up through the rocks. Crystal-clear water, probably safe to drink.",
+  "options": [
+   {
+    "label": "Fill up all the water containers",
+    "outcome": "Fresh, cold water for the whole camp. Everyone's in better spirits.",
+    "effects": {
+     "crew_morale": 8,
+     "crew_health": 5
+    }
+   },
+   {
+    "label": "Test it first, use it if clean",
+    "outcome": "You use purification tablets just to be safe. Smart move — the water is perfect.",
+    "effects": {
+     "crew_health": 5,
+     "firstAid": -1
+    }
+   },
+   {
+    "label": "Note location and stick with camp water",
+    "outcome": "Better safe than sorry. You GPS the spring for future reference.",
+    "effects": {
+     "data": 3
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "drone_flyover",
+  "title": "Drone Flyover Opportunity",
+  "type": "equipment",
+  "severity": "positive",
+  "probability": 0.04,
+  "description": "A forestry tech from another operation offers to fly his drone over your block during his lunch break. He's got a mapping camera.",
+  "options": [
+   {
+    "label": "Accept — map the whole block",
+    "outcome": "Incredible aerial data. You can see drainage patterns, terrain features, and optimal routes from above.",
+    "effects": {
+     "data": 12,
+     "progress": 3
+    }
+   },
+   {
+    "label": "Ask him to scout the road ahead",
+    "outcome": "The drone reveals a major washout two kilometers ahead. You reroute and save a day.",
+    "effects": {
+     "progress": 5
+    }
+   },
+   {
+    "label": "Decline — don't need outside help",
+    "outcome": "Your choice. The crew shrugs.",
+    "effects": {}
+   }
+  ],
+  "roles": [
+   "recce"
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "night_visitor",
+  "title": "Something in the Dark",
+  "type": "wildlife",
+  "severity": "minor",
+  "probability": 0.07,
+  "description": "Something big crashes through the brush near camp at 2 AM. Flashlight beams catch reflective eyes before it disappears. Nobody's sure what it was.",
+  "options": [
+   {
+    "label": "Post a watch for the rest of the night",
+    "outcome": "Nothing else happens. The watchers are wrecked the next day, but everyone else sleeps easier.",
+    "effects": {
+     "crew_health": -5,
+     "crew_morale": 2
+    }
+   },
+   {
+    "label": "Check tracks in the morning",
+    "outcome": "Wolverine tracks. Impressive animal, not dangerous to the camp. Tensions ease.",
+    "effects": {
+     "crew_morale": 3,
+     "timeUsed": 1
+    }
+   },
+   {
+    "label": "Ignore it and go back to sleep",
+    "outcome": "Some crew members sleep well, others don't close their eyes until dawn.",
+    "effects": {
+     "crew_morale": -5
+    },
+    "hiddenOutcome": true
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "creek_crossing_decision",
+  "title": "Swollen Creek Crossing",
+  "type": "terrain",
+  "severity": "moderate",
+  "probability": 0.06,
+  "terrainTrigger": [
+   "river"
+  ],
+  "description": "Recent rain has the creek running high. It's passable, maybe, but the current is strong and the bottom is uncertain.",
+  "options": [
+   {
+    "label": "Probe on foot, then drive across",
+    "outcome": "You wade in waist-deep to test the bottom. Solid gravel. The trucks cross safely.",
+    "effects": {
+     "crew_health": -3
+    }
+   },
+   {
+    "label": "Wait for the water to drop",
+    "outcome": "By afternoon it's lower. Safe crossing but half a day lost.",
+    "effects": {
+     "progress": -5
+    }
+   },
+   {
+    "label": "Build a temporary crossing",
+    "outcome": "Logs and gravel create a rough bridge. Holds for one truck at a time.",
+    "effects": {
+     "progress": -3,
+     "fuel": -3,
+     "equipment": -5
+    }
+   }
+  ],
+  "roles": [
+   "recce"
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "first_nations_consultation_field",
+  "title": "First Nations Elder Visits",
+  "type": "social",
+  "severity": "moderate",
+  "probability": 0.04,
+  "description": "An elder from the local First Nations band arrives at camp. She says there are culturally modified trees nearby that need protection. She's calm but serious.",
+  "options": [
+   {
+    "label": "Stop work and walk the area with her",
+    "outcome": "She shows you bark-stripped cedars with centuries of history. You adjust your cut plan together.",
+    "effects": {
+     "progress": -8,
+     "relationships": 15,
+     "compliance": 10,
+     "crew_morale": 5
+    }
+   },
+   {
+    "label": "Acknowledge and promise to investigate later",
+    "outcome": "She's skeptical but accepts your word. The relationship is strained.",
+    "effects": {
+     "relationships": -5
+    },
+    "hiddenOutcome": true
+   },
+   {
+    "label": "Offer to hire her as a cultural monitor",
+    "outcome": "She agrees. An added cost but the relationship and compliance benefits are enormous.",
+    "effects": {
+     "budget": -600,
+     "relationships": 12,
+     "compliance": 12
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "mineral_lick_discovered",
+  "title": "Natural Mineral Lick",
+  "type": "discovery",
+  "severity": "minor",
+  "probability": 0.05,
+  "description": "You find a natural mineral lick heavily used by wildlife. Dozens of tracks — deer, elk, moose, bear — converge on this muddy depression.",
+  "options": [
+   {
+    "label": "Flag it and establish a buffer",
+    "outcome": "The right thing to do. Wildlife officers will be pleased with the data.",
+    "effects": {
+     "progress": -3,
+     "compliance": 8,
+     "data": 5
+    }
+   },
+   {
+    "label": "Route around it quietly",
+    "outcome": "You adjust the plan without formally reporting. Saves paperwork.",
+    "effects": {
+     "progress": -2
+    }
+   },
+   {
+    "label": "Set up a trail camera for fun",
+    "outcome": "The crew checks the camera every morning like kids on Christmas. Incredible footage.",
+    "effects": {
+     "crew_morale": 10,
+     "progress": -1
+    }
+   }
+  ],
+  "roles": [
+   "recce"
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "hydraulic_line_burst",
+  "title": "Hydraulic Line Burst",
+  "type": "equipment",
+  "severity": "severe",
+  "probability": 0.04,
+  "description": "The loader's hydraulic line ruptures, spraying hot fluid everywhere. The machine drops its load and goes dead. There's oil soaking into the ground.",
+  "options": [
+   {
+    "label": "Contain the spill immediately",
+    "outcome": "You deploy absorbent pads and dig a containment trench. Machine is down but the spill is managed.",
+    "effects": {
+     "equipment": -20,
+     "progress": -8,
+     "compliance": 5
+    }
+   },
+   {
+    "label": "Try to patch the line in the field",
+    "outcome": "A temporary fix with hose clamps. It holds, barely. The machine runs at reduced pressure.",
+    "effects": {
+     "equipment": -15
+    },
+    "hiddenOutcome": true,
+    "riskInjury": 0.1
+   },
+   {
+    "label": "Shut everything down and call for a mechanic",
+    "outcome": "Professional repair takes two days. Expensive but done right. You report the spill properly.",
+    "effects": {
+     "budget": -800,
+     "progress": -12,
+     "compliance": 10,
+     "equipment": -5
+    }
+   }
+  ],
+  "roles": [
+   "silviculture"
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "perfect_falling_day",
+  "title": "Perfect Falling Conditions",
+  "type": "morale",
+  "severity": "positive",
+  "probability": 0.08,
+  "description": "Cool air, no wind, dry ground, sharp saws. Every tree drops exactly where you aim. The crew is in a groove.",
+  "options": [
+   {
+    "label": "Ride the momentum — keep pushing",
+    "outcome": "An exceptional day of production. The crew celebrates with extra rations at dinner.",
+    "effects": {
+     "progress": 10,
+     "crew_morale": 10
+    }
+   },
+   {
+    "label": "Bank the good day and quit early",
+    "outcome": "Ahead of schedule, so you call it at 3 PM. Rest and recovery.",
+    "effects": {
+     "progress": 5,
+     "crew_health": 5,
+     "crew_morale": 8
+    }
+   }
+  ],
+  "roles": [
+   "silviculture"
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "fog_morning",
+  "title": "Dense Morning Fog",
+  "type": "weather",
+  "severity": "minor",
+  "probability": 0.08,
+  "description": "You can't see twenty feet. The forest has vanished into white. Falling trees in this is asking for trouble.",
+  "options": [
+   {
+    "label": "Wait for it to burn off",
+    "outcome": "By 10 AM the sun wins. Late start but safe.",
+    "effects": {
+     "progress": -4
+    }
+   },
+   {
+    "label": "Do ground work until it clears",
+    "outcome": "Limbing, bucking, road clearing — no falling. Decent use of time.",
+    "effects": {
+     "progress": -2
+    }
+   },
+   {
+    "label": "Fall carefully with extra spotters",
+    "outcome": "Slow and tense but productive. One close call that makes everyone sweat.",
+    "effects": {
+     "progress": -1,
+     "crew_morale": -5
+    },
+    "riskInjury": 0.2
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "supply_delivery_early",
+  "title": "Supply Delivery Arrives Early",
+  "type": "supply",
+  "severity": "positive",
+  "probability": 0.06,
+  "description": "The supply truck shows up two days early. The driver says he had a cancellation and thought he'd swing by.",
+  "options": [
+   {
+    "label": "Full resupply — load up on everything",
+    "outcome": "Fuel, food, parts — you take it all. Full stocks feel great.",
+    "effects": {
+     "fuel": 20,
+     "food": 15,
+     "equipment": 8,
+     "budget": -400
+    }
+   },
+   {
+    "label": "Just grab what you're low on",
+    "outcome": "A targeted resupply. Smart spending.",
+    "effects": {
+     "fuel": 10,
+     "food": 8,
+     "budget": -200
+    }
+   },
+   {
+    "label": "Send out your sick/injured crew member",
+    "outcome": "The truck can take someone to town for proper medical care. Good opportunity.",
+    "effects": {
+     "crew_morale": 5
+    },
+    "crewEffect": {
+     "evacuate_sick": true
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "boundary_dispute",
+  "title": "Boundary Line Unclear",
+  "type": "terrain",
+  "severity": "moderate",
+  "probability": 0.05,
+  "description": "The flagging tape ends abruptly and the boundary marks don't match your map. If you cut the wrong trees, there'll be hell to pay.",
+  "options": [
+   {
+    "label": "Stop cutting and survey properly",
+    "outcome": "You break out the GPS and compass. Takes half a day but the line is confirmed.",
+    "effects": {
+     "progress": -6,
+     "compliance": 10,
+     "data": 5
+    }
+   },
+   {
+    "label": "Use your best judgment and continue",
+    "outcome": "You eyeball it based on terrain features. Could be right. Could be very wrong.",
+    "effects": {},
+    "hiddenOutcome": true,
+    "riskCompliance": 0.4
+   },
+   {
+    "label": "Call the office for clarification",
+    "outcome": "They dig up the original survey data and talk you through it. Accurate but slow.",
+    "effects": {
+     "progress": -4,
+     "compliance": 5
+    }
+   }
+  ],
+  "roles": [
+   "recce"
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "apprentice_mistake",
+  "title": "Apprentice Makes a Bad Cut",
+  "type": "social",
+  "severity": "minor",
+  "probability": 0.07,
+  "description": "Your newest crew member drops a tree the wrong way. It hangs up in another tree — a dangerous 'widow maker' situation. He looks terrified.",
+  "options": [
+   {
+    "label": "Talk him through fixing it safely",
+    "outcome": "Patient coaching. He learns, the tree comes down safely. Takes an hour but builds his skills.",
+    "effects": {
+     "progress": -2,
+     "crew_morale": 5
+    }
+   },
+   {
+    "label": "Fix it yourself and send him to the truck",
+    "outcome": "You handle it quickly but he's humiliated. Other crew members snicker.",
+    "effects": {
+     "crew_morale": -5
+    }
+   },
+   {
+    "label": "Use the skidder to pull it down",
+    "outcome": "Brute force solution. Works but burns fuel and risks equipment damage.",
+    "effects": {
+     "fuel": -3,
+     "equipment": -5
+    }
+   }
+  ],
+  "roles": [
+   "silviculture"
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "lucky_find_tools",
+  "title": "Forgotten Tool Cache",
+  "type": "discovery",
+  "severity": "positive",
+  "probability": 0.04,
+  "description": "Under a deadfall, someone spots a weathered toolbox and a rolled-up tarp. Previous crew must have stashed them and forgot to come back.",
+  "options": [
+   {
+    "label": "Claim the tools for your crew",
+    "outcome": "A spare chain, two files, a peavey, and some wedges. The tarp is still waterproof. Great find.",
+    "effects": {
+     "equipment": 8
+    }
+   },
+   {
+    "label": "Try to find the original owner",
+    "outcome": "You track down a grateful survey crew from the next valley. The tools go home; the goodwill stays.",
+    "effects": {
+     "relationships": 4,
+     "timeUsed": 1
+    }
+   },
+   {
+    "label": "Leave it — could be someone's active cache",
+    "outcome": "You mark the spot and leave everything. Respectful, if a bit wasteful.",
+    "effects": {
+     "crew_morale": -2
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "campfire_storytelling",
+  "title": "Campfire Stories",
+  "type": "morale",
+  "severity": "positive",
+  "probability": 0.1,
+  "description": "After a long day, someone starts telling stories around the fire. One by one, the whole crew joins in. Laughter echoes through the trees.",
+  "options": [
+   {
+    "label": "Join in and share your own story",
+    "outcome": "You tell the one about the time you got lost for three days. Everyone howls. Best night of the season.",
+    "effects": {
+     "crew_morale": 12
+    }
+   },
+   {
+    "label": "Listen and let the crew bond",
+    "outcome": "Sometimes the boss just needs to shut up and listen. The crew appreciates it.",
+    "effects": {
+     "crew_morale": 8
+    }
+   },
+   {
+    "label": "Remind everyone about the early start tomorrow",
+    "outcome": "The mood deflates instantly. Professional but joyless.",
+    "effects": {
+     "crew_morale": -5,
+     "progress": 2
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "story_arc_ancientGrove_stage1_protect",
+  "title": "Eco-tourism Opportunity",
+  "type": "narrative",
+  "severity": "moderate",
+  "probability": 0,
+  "description": "A local entrepreneur wants to create an eco-tourism venture around the protected grove",
+  "options": [
+   {
+    "label": "Back the eco-tourism pitch ($1,500)",
+    "outcome": "You front the guiding outfit's first season. By fall, the boardwalk to the grove has a guestbook with three hundred names in it — several of them ministers' staff.",
+    "effects": {
+     "reputation": 10,
+     "budget": -1500
+    }
+   },
+   {
+    "label": "Decline politely",
+    "outcome": "You pass. The grove stays standing and protected on paper; the opportunity drives off in someone else's truck.",
+    "effects": {
+     "reputation": 2
+    }
+   }
+  ]
+ },
+ {
+  "id": "story_arc_ancientGrove_stage1_harvest",
+  "title": "Environmental Protest",
+  "type": "narrative",
+  "severity": "moderate",
+  "probability": 0,
+  "description": "Activists blockade the road to the grove, demanding its preservation",
+  "options": [
+   {
+    "label": "Negotiate and offer partial protection",
+    "outcome": "Two tense days at the blockade end with a map on a tailgate: the oldest stand stays, the rest is released. Nobody is happy, which the mediator calls success.",
+    "effects": {
+     "reputation": 5,
+     "crew_morale": 3
+    }
+   },
+   {
+    "label": "Call law enforcement to clear the blockade",
+    "outcome": "The RCMP clear the road by noon. The footage clears the evening news by six. Legal fees and a hostile district office follow.",
+    "effects": {
+     "reputation": -15,
+     "budget": -2000,
+     "compliance": -8,
+     "progress": 8
+    }
+   }
+  ]
+ },
+ {
+  "id": "trade_hauling_contractor",
+  "title": "Hauler Short on Grub",
+  "type": "trade",
+  "severity": "minor",
+  "probability": 0.06,
+  "description": "A logging truck idles at the pullout. The hauler leans out: three days from town, cook shack burned through its stores, and he is offering diesel for anything resembling dinner.",
+  "options": [
+   {
+    "label": "Trade 10 food for a jerry transfer",
+    "outcome": "You pump 15 fuel off his saddle tank while he loads a rations box. Both crews leave happier.",
+    "effects": {
+     "food": -10,
+     "fuel": 15,
+     "crew_morale": 2
+    }
+   },
+   {
+    "label": "Give him a meal, no charge",
+    "outcome": "He eats, waves, and radios your good name up the road. Word travels on these frequencies.",
+    "effects": {
+     "food": -3,
+     "reputation": 2
+    }
+   },
+   {
+    "label": "Keep your stores",
+    "outcome": "He shrugs and grinds off. You keep your food and your anonymity.",
+    "effects": {}
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "trade_survey_crew_chains",
+  "title": "Survey Crew Wants Your Chains",
+  "type": "trade",
+  "severity": "minor",
+  "probability": 0.05,
+  "description": "A timber cruising crew flags you down. They are headed up the pass with bald tires and money, and they can see the tire chains lashed to your rack.",
+  "options": [
+   {
+    "label": "Sell the spare chains ($260)",
+    "outcome": "Cash changes hands. You hope the weather holds for you lower down.",
+    "effects": {
+     "budget": 260,
+     "equipment": -6
+    }
+   },
+   {
+    "label": "Swap chains for their first aid stock",
+    "outcome": "They carry doubles of everything. Two sealed kits for the chains — a trade both sides brag about.",
+    "effects": {
+     "equipment": -6,
+     "firstAid": 2
+    }
+   },
+   {
+    "label": "Not for sale",
+    "outcome": "They wish you luck with the tone of people who will need it more than you.",
+    "effects": {}
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "trade_camp_cook_surplus",
+  "title": "Camp Cook's Surplus",
+  "type": "trade",
+  "severity": "minor",
+  "probability": 0.05,
+  "description": "A silviculture camp is demobilizing early. Their cook has a wall of untouched food boxes and instructions not to haul them back over the pass.",
+  "options": [
+   {
+    "label": "Buy the lot cheap ($90)",
+    "outcome": "Twenty-five food for less than town prices. The cook throws in a bag of real coffee.",
+    "effects": {
+     "budget": -90,
+     "food": 25,
+     "crew_morale": 2
+    }
+   },
+   {
+    "label": "Trade a field repair for food",
+    "outcome": "Your mechanic tunes their generator; the cook loads your truck. Fair is fair.",
+    "effects": {
+     "equipment": -5,
+     "food": 18
+    }
+   },
+   {
+    "label": "Pass",
+    "outcome": "The boxes go to the gray jays. A crime, your crew mutters.",
+    "effects": {
+     "crew_morale": -1
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "trade_trapper_intel",
+  "title": "The Trapper's Price",
+  "type": "trade",
+  "severity": "minor",
+  "probability": 0.04,
+  "description": "An old trapper watches you glass the next drainage from his cabin step. He knows every crossing and washout ahead — and he knows what that knowledge is worth.",
+  "options": [
+   {
+    "label": "Trade 8 food for the lay of the land",
+    "outcome": "He draws the drainage in the dust: which crossing is honest, which road is a lie. Gold.",
+    "effects": {
+     "food": -8,
+     "progress": 5
+    }
+   },
+   {
+    "label": "Buy his route notes ($150)",
+    "outcome": "Pages of tight pencil from thirty winters. Your traverse plan just got smarter.",
+    "effects": {
+     "budget": -150,
+     "progress": 5
+    }
+   },
+   {
+    "label": "Decline politely",
+    "outcome": "He nods like he has seen your kind before. He has.",
+    "effects": {}
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "trade_grader_operator",
+  "title": "Grader Operator's Offer",
+  "type": "trade",
+  "severity": "minor",
+  "probability": 0.05,
+  "description": "A road grader is parked at the junction, operator eating lunch. For fuel or cash he could blade the worst kilometre of the spur you are dreading.",
+  "options": [
+   {
+    "label": "Pay for the blade work ($200)",
+    "outcome": "Thirty minutes of grader beats a day of winching. The spur rides smooth.",
+    "effects": {
+     "budget": -200,
+     "equipment": 5
+    }
+   },
+   {
+    "label": "Trade 12 fuel for the pass",
+    "outcome": "He tops up, you roll through behind the blade. Handshake economics.",
+    "effects": {
+     "fuel": -12,
+     "equipment": 5
+    }
+   },
+   {
+    "label": "Take the spur as it lies",
+    "outcome": "Your suspension files a grievance. The crew co-signs it.",
+    "effects": {
+     "equipment": -4,
+     "crew_morale": -1
+    }
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "trade_first_nations_monitors",
+  "title": "Monitors Heading In",
+  "type": "trade",
+  "severity": "minor",
+  "probability": 0.04,
+  "description": "Two Guardians from the local Nation are heading into the same country for water sampling. Their truck is heavy on gear and light on fuel; yours is the opposite.",
+  "options": [
+   {
+    "label": "Split fuel, share the road in",
+    "outcome": "You convoy in together, trading fuel for their read on the creeks. Their water knowledge is better than your maps.",
+    "effects": {
+     "fuel": -8,
+     "reputation": 3,
+     "progress": 3
+    }
+   },
+   {
+    "label": "Offer fuel, ask nothing",
+    "outcome": "They wave it off twice, take it once, and remember it longer than you will.",
+    "effects": {
+     "fuel": -8,
+     "reputation": 4
+    }
+   },
+   {
+    "label": "Tight nod, keep rolling",
+    "outcome": "Nothing lost. Nothing built, either.",
+    "effects": {}
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "trade_planter_bus",
+  "title": "Planter Bus at the Fork",
+  "type": "trade",
+  "severity": "minor",
+  "probability": 0.05,
+  "description": "A crummy full of tree planters is stopped at the fork, out of motion-sickness bags and nearly out of snacks. Their foreman holds up a first aid kit like a white flag.",
+  "options": [
+   {
+    "label": "Trade 6 food for the kit",
+    "outcome": "Granola bars go one way, a sealed kit comes the other. The bus erupts in weak cheering.",
+    "effects": {
+     "food": -6,
+     "firstAid": 1,
+     "crew_morale": 1
+    }
+   },
+   {
+    "label": "Sell snacks at bush prices ($80)",
+    "outcome": "Capitalism finds a way, even at a gravel fork. The foreman pays without blinking.",
+    "effects": {
+     "food": -6,
+     "budget": 80,
+     "reputation": -1
+    }
+   },
+   {
+    "label": "Wave and drive on",
+    "outcome": "In the mirror, forty hungry faces watch you go.",
+    "effects": {}
+   }
+  ],
+  "expeditionOnly": true
+ },
+ {
+  "id": "trade_outfitter_barter",
+  "title": "Outfitter's Barter",
+  "type": "trade",
+  "severity": "minor",
+  "probability": 0.04,
+  "description": "A hunting outfitter's wall tent camp sits above the creek. He has smoked meat, spare lantern fuel, and a broken generator he would dearly love running before clients fly in.",
+  "options": [
+   {
+    "label": "Fix his generator for meat and fuel",
+    "outcome": "An hour of wrenching buys smoked moose and ten litres of fuel. Everyone at the fire agrees this is the correct economy.",
+    "effects": {
+     "equipment": -3,
+     "food": 15,
+     "fuel": 10,
+     "timeUsed": 1
+    }
+   },
+   {
+    "label": "Buy smoked meat ($120)",
+    "outcome": "Expensive, and worth it. Camp dinner becomes an event.",
+    "effects": {
+     "budget": -120,
+     "food": 12,
+     "crew_morale": 3
+    }
+   },
+   {
+    "label": "Keep moving",
+    "outcome": "The smell of the smoker follows the truck for a kilometre. The crew suffers audibly.",
+    "effects": {
+     "crew_morale": -1
+    }
+   }
+  ],
+  "expeditionOnly": true
+ }
 ]

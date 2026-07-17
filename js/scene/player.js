@@ -52,11 +52,13 @@ function mountSkipHint(terminal) {
  * @param {number} opts.loops - times through the deck (default 1)
  * @param {boolean} opts.holdLastFrame - keep the final frame on screen (default true)
  * @param {boolean} opts.skippable - tap/keypress ends playback early (default true)
- * @returns {Promise<void>}
+ * @returns {Promise<{skipped: boolean, frameIndex: number}>} resolves with how
+ *   playback ended: whether the player skipped, and the frame showing at that
+ *   moment (interactive scenes like the hunt read the skip frame as input)
  */
 export function playFrames(terminal, frames, opts = {}) {
   const { delay = 150, loops = 1, holdLastFrame = true, skippable = true } = opts;
-  if (!terminal || !frames?.length) return Promise.resolve();
+  if (!terminal || !frames?.length) return Promise.resolve({ skipped: false, frameIndex: 0 });
 
   const canvas = mountCanvas(terminal);
   const finishFrame = frames[frames.length - 1];
@@ -65,7 +67,7 @@ export function playFrames(terminal, frames, opts = {}) {
     canvas.textContent = finishFrame;
     canvas.classList.remove('scene-keep');
     if (!holdLastFrame) canvas.remove();
-    return Promise.resolve();
+    return Promise.resolve({ skipped: false, frameIndex: frames.length - 1 });
   }
 
   return new Promise((resolve) => {
@@ -117,7 +119,7 @@ export function playFrames(terminal, frames, opts = {}) {
       canvas.textContent = finishFrame;
       canvas.classList.remove('scene-keep');
       if (!holdLastFrame) canvas.remove();
-      resolve();
+      resolve({ skipped: Boolean(e), frameIndex: index });
     };
     const skipPointer = (e) => {
       if (!isWithinScene(e)) return;

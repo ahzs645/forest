@@ -362,6 +362,22 @@ async function runCampaignSeason(game, campaign, season) {
   if (campaign.stanceIndex != null && campaign.activeJourney) {
     stance = BRIEFING_STANCES[campaign.stanceIndex];
   } else {
+    // The season turns over on screen: last season's name scrambles and
+    // resolves into the new one before the briefing card.
+    if (typeof ui.playScene === 'function') {
+      const prevLabel = CAMPAIGN_SEASONS[campaign.seasonIndex - 1]?.label?.toUpperCase()
+        || 'A YEAR IN THE DISTRICT';
+      const { buildTextMorphFrames } = await import('../scene/textmode/effects.js');
+      await ui.playScene(
+        buildTextMorphFrames(prevLabel, season.label.toUpperCase(), {
+          cols: 44,
+          rows: 3,
+          frames: 20,
+          seed: 17 + campaign.seasonIndex,
+        }),
+        { delay: 90, holdLastFrame: false }
+      );
+    }
     setExpeditionChromeHidden(true);
     const stanceIndex = await promptSeasonalCard(ui, {
       cardLabel: `${season.label} · Season ${campaign.seasonIndex + 1} of 4`,

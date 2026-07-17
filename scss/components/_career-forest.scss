@@ -1,0 +1,95 @@
+// Career Forest — the landing hub's living service record.
+// Every completed run plants a tree (js/scene/forest.js); colors resolve
+// per theme so the phosphor and amber terminals keep their monochrome soul.
+
+:root {
+  --cf-canopy-deep: #2d5b29;
+  --cf-canopy-dark: #3f7132;
+  --cf-canopy-light: #7cc96a;
+  --cf-canopy-bright: #a4e28d;
+  --cf-trunk: #8e6238;
+  --cf-trunk-dark: #6f4c2f;
+  --cf-trunk-light: #b18552;
+  --cf-trunk-pale: #d9d6d2;
+  --cf-bloom: #de93b8;
+  --cf-bloom-bright: #f0b7cf;
+  --cf-ground: #22492d;
+  --cf-ground-deep: #18361f;
+  --cf-star: var(--text-dim);
+}
+
+// Phosphor terminals see the forest in their own light.
+body[data-theme='green'] {
+  --cf-canopy-deep: #1d7a33;
+  --cf-canopy-dark: #26a041;
+  --cf-canopy-light: #4ade6d;
+  --cf-canopy-bright: #86f3a1;
+  --cf-trunk: #1a6b2e;
+  --cf-trunk-dark: #145725;
+  --cf-trunk-light: #2e8f47;
+  --cf-trunk-pale: #63d381;
+  --cf-bloom: #86f3a1;
+  --cf-bloom-bright: #b8ffc9;
+  --cf-ground: #0f4a1d;
+  --cf-ground-deep: #0a3514;
+}
+
+body[data-theme='amber'] {
+  --cf-canopy-deep: #8a5a00;
+  --cf-canopy-dark: #b57700;
+  --cf-canopy-light: #e6a219;
+  --cf-canopy-bright: #ffd07a;
+  --cf-trunk: #7a4d00;
+  --cf-trunk-dark: #5e3b00;
+  --cf-trunk-light: #a86e0a;
+  --cf-trunk-pale: #d9a63f;
+  --cf-bloom: #ffd07a;
+  --cf-bloom-bright: #ffe9bd;
+  --cf-ground: #4a3000;
+  --cf-ground-deep: #352200;
+}
+
+.career-forest-block {
+  margin: var(--space-sm) auto 0;
+  text-align: center;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.career-forest {
+  display: inline-block;
+  margin: 0 auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.15;
+  text-align: left;
+  user-select: none;
+  max-width: 100%;
+  overflow-x: hidden;
+
+  .cf-canopy-deep { color: var(--cf-canopy-deep); }
+  .cf-canopy-dark { color: var(--cf-canopy-dark); }
+  .cf-canopy-light { color: var(--cf-canopy-light); }
+  .cf-canopy-bright { color: var(--cf-canopy-bright); }
+  .cf-trunk { color: var(--cf-trunk); }
+  .cf-trunk-dark { color: var(--cf-trunk-dark); }
+  .cf-trunk-light { color: var(--cf-trunk-light); }
+  .cf-trunk-pale { color: var(--cf-trunk-pale); }
+  .cf-bloom { color: var(--cf-bloom); }
+  .cf-bloom-bright { color: var(--cf-bloom-bright); }
+  .cf-ground { color: var(--cf-ground); }
+  .cf-ground-deep { color: var(--cf-ground-deep); }
+  .cf-star { color: var(--cf-star); }
+}
+
+.career-forest-caption {
+  margin-top: 2px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+
+  .cf-biome {
+    color: var(--text-dim);
+  }
+}
