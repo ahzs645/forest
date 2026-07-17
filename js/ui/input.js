@@ -214,10 +214,13 @@ export const InputMixin = {
   _handleTextSubmit() {
     if (!this.textInput || !this._pending) return;
 
+    // An empty submit accepts the default: callers pass their fallback via
+    // `|| default`, so resolve with '' instead of swallowing the tap —
+    // otherwise [ENTER] appears dead, especially on mobile.
     const value = this.textInput.value.trim();
-    if (!value) return;
-
-    this.write(`> ${value}`, 'term-dim');
+    if (value) {
+      this.write(`> ${value}`, 'term-dim');
+    }
     this._hideInput();
 
     const resolver = this._pending;

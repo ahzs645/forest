@@ -723,7 +723,8 @@ async function maybeMemorializeFallen(game) {
 
     let epitaph = null;
     if (typeof ui.promptText === 'function') {
-      epitaph = await ui.promptText('Epitaph (one line):', 'They loved this country');
+      epitaph = (await ui.promptText('Epitaph (one line):', 'They loved this country'))
+        || 'They loved this country';
     }
     const marker = recordTrailMarker({
       name: member.name,
