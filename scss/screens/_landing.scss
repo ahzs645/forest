@@ -108,9 +108,13 @@
     padding: var(--space-sm);
     gap: var(--space-sm);
 
+    // Taller stacked menu + touch targets no longer fit one screen —
+    // let the body scroll instead of clipping menu entries.
     &.compact {
       padding: var(--space-sm);
       gap: var(--space-sm);
+      overflow-y: auto;
+      justify-content: flex-start;
     }
   }
 }
@@ -372,7 +376,7 @@
   text-transform: uppercase;
   text-align: left;
 
-  // Cursor column: every row carries a ❯ that's invisible until active
+  // Cursor column: every row carries a > that is invisible until active
   .btn-icon {
     color: transparent;
   }
@@ -426,7 +430,6 @@
   margin-left: auto;
   padding: 1px 6px;
   border: 1px solid var(--warning, #d8a000);
-  border-radius: 2px;
   color: var(--warning, #d8a000);
   font-size: 9px;
   font-weight: bold;
@@ -437,11 +440,6 @@
 .landing-btn-row {
   display: flex;
   gap: var(--space-sm);
-
-  @include mobile-down {
-    flex-direction: row;
-    gap: 4px;
-  }
 }
 
 .btn-icon {

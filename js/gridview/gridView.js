@@ -309,7 +309,7 @@ export class GridView {
         line(`${item.done ? '[x]' : '[ ]'} ${item.label}`, item.done ? C.ok : C.text);
       }
       if (mission.guidance) {
-        for (const l of wrap(`❯ ${mission.guidance}`, innerW - 1)) line(l, C.accent);
+        for (const l of wrap(`> ${mission.guidance}`, innerW - 1)) line(l, C.accent);
       }
       for (const alert of mission.alerts || []) {
         const tone = alert.level === 'danger' ? C.danger : alert.level === 'ok' ? C.ok : C.warn;
@@ -467,7 +467,7 @@ export class GridView {
 
       if (entry.focused) {
         t.fillRect(x + 1, rowY, w - 2, 1, C.accent);
-        t.drawText(`❯ ${text}`, innerX, rowY, C.accentContrast, C.accent);
+        t.drawText(`> ${text}`, innerX, rowY, C.accentContrast, C.accent);
         if (entry.tag) t.drawText(tagText, x + w - 2 - tagText.length, rowY, C.accentContrast, C.accent);
       } else {
         t.drawText('  ' + text.slice(2), innerX, rowY, C.text);
@@ -495,7 +495,7 @@ export class GridView {
     const placeholder = this.ui.textInput?.placeholder || '';
     const blink = Math.floor(Date.now() / 500) % 2 === 0;
     const shown = value || '';
-    t.drawText('❯ ', x + 2, y + 1, C.accent);
+    t.drawText('> ', x + 2, y + 1, C.accent);
     if (shown) {
       t.drawText(shown.slice(-(w - 10)), x + 4, y + 1, C.bright);
     } else {

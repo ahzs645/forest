@@ -82,10 +82,10 @@ export function getSprite(type, growth) {
 // Biome tiers by stand count (honeytree's arc, forestry labels).
 export const BIOMES = [
   { min: 0, density: 14, glyphs: ['·', '.', ' ', ' '], label: 'clearing' },
-  { min: 4, density: 9, glyphs: ['·', '·', '✦', '.'], label: 'regen stand' },
-  { min: 10, density: 7, glyphs: ['·', '✦', '✧', '·', '.'], label: 'young forest' },
-  { min: 20, density: 6, glyphs: ['✦', '✧', '·', '·', '.'], label: 'old growth' },
-  { min: 40, density: 5, glyphs: ['✦', '✧', '·', '✦', '⋆', '.'], label: 'ancient forest' },
+  { min: 4, density: 9, glyphs: ['·', '·', '*', '.'], label: 'regen stand' },
+  { min: 10, density: 7, glyphs: ['·', '*', '+', '·', '.'], label: 'young forest' },
+  { min: 20, density: 6, glyphs: ['*', '+', '·', '·', '.'], label: 'old growth' },
+  { min: 40, density: 5, glyphs: ['*', '+', '·', '*', '^', '.'], label: 'ancient forest' },
 ];
 
 export function getBiome(count) {

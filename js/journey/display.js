@@ -57,7 +57,7 @@ export function formatJourneyLog(journey) {
   const typeIcons = {
     travel: '→',
     event: '!',
-    milestone: '★',
+    milestone: '*',
     arrival: '◆'
   };
 

@@ -83,15 +83,15 @@ export function formatLog(journey, dayLabel = 'Day') {
   const typeIcons = {
     travel: '→',
     event: '!',
-    milestone: '★',
+    milestone: '*',
     arrival: '◆',
     action: '●',
     season: '◐',
-    contract: '✓',
-    planting: '🌱',
-    survey: '📋',
-    permit: '📄',
-    meeting: '👥'
+    contract: '+',
+    planting: '^',
+    survey: '#',
+    permit: '§',
+    meeting: '&'
   };
 
   return journey.log.map(entry => ({

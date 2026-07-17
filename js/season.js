@@ -8,7 +8,6 @@ export const SEASONS = {
   spring: {
     id: 'spring',
     name: 'Spring',
-    icon: '🌱',
     months: [3, 4, 5], // March, April, May
     daysPerSeason: 90,
     description: 'Thaw and renewal. Planting season begins.'
@@ -16,7 +15,6 @@ export const SEASONS = {
   summer: {
     id: 'summer',
     name: 'Summer',
-    icon: '☀️',
     months: [6, 7, 8], // June, July, August
     daysPerSeason: 90,
     description: 'Peak field season. Long days and active operations.'
@@ -24,7 +22,6 @@ export const SEASONS = {
   fall: {
     id: 'fall',
     name: 'Fall',
-    icon: '🍂',
     months: [9, 10, 11], // September, October, November
     daysPerSeason: 90,
     description: 'Harvest and assessment. Weather turns unpredictable.'
@@ -32,7 +29,6 @@ export const SEASONS = {
   winter: {
     id: 'winter',
     name: 'Winter',
-    icon: '❄️',
     months: [12, 1, 2], // December, January, February
     daysPerSeason: 90,
     description: 'Planning and preparation. Limited field access.'
@@ -256,11 +252,11 @@ export function isSeasonValid(actionSeason, currentSeason) {
 /**
  * Get display string for season
  * @param {object} seasonState - Season state
- * @returns {string} Display string like "🌱 Spring Y1"
+ * @returns {string} Display string like "Spring Y1"
  */
 export function getSeasonDisplayString(seasonState) {
   const season = SEASONS[seasonState.currentSeason];
-  return `${season.icon} ${season.name} Y${seasonState.year}`;
+  return `${season.name} Y${seasonState.year}`;
 }
 
 /**

@@ -89,7 +89,6 @@
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border-color);
   min-width: 100px;
-  border-radius: 4px;
 }
 
 .stat-card-label {
@@ -107,7 +106,6 @@
 .stat-card-bar {
   height: 4px;
   background: var(--bg-input);
-  border-radius: 2px;
   margin-top: 4px;
   overflow: hidden;
 }

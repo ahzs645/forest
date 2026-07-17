@@ -8,13 +8,13 @@ import { getPlanningAreaSnapshot } from "../data/planningBlocks.js";
 import { getRoleProfessionalContext } from "../data/professionalPractice.js";
 import { loadActiveRun } from "../game/saveLoad.js";
 
-// Role icons mapping (Unicode symbols matching reference)
+// Role icons mapping (ASCII/CP437 glyphs — no emoji, terminal-safe everywhere)
 export const ROLE_ICONS = {
-  planner: '☐',      // Empty checkbox - planning/analysis
-  permitter: '☑',    // Checked box - permits/approvals
-  recce: '⛷',        // Person figure - field recon
-  silviculture: '☘', // Plant/seedling - silviculture
-  default: '◉'
+  planner: '#',      // Grid/map - planning/analysis
+  permitter: '§',    // Document seal - permits/approvals
+  recce: '/\\',      // Mountain - field recon
+  silviculture: '^', // Seedling - silviculture
+  default: '@'
 };
 
 // Newer expedition roles that are playable but less battle-tested than the

@@ -87,7 +87,7 @@ async function readGameText(page) {
         lines.push(check.textContent.replace(/\s+/g, ' ').trim());
       }
       const guidance = mission.querySelector('.mission-guidance');
-      if (guidance) lines.push(`Next Best Move: ${guidance.textContent.replace(/^❯\s*/, '').trim()}`);
+      if (guidance) lines.push(`Next Best Move: ${guidance.textContent.replace(/^[>❯]\s*/, '').trim()}`);
       for (const alert of mission.querySelectorAll('.mission-alert')) {
         lines.push(alert.textContent.trim());
       }

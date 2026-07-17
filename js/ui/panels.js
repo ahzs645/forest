@@ -103,7 +103,7 @@ export const PanelsMixin = {
     }
 
     if (status.guidance) {
-      parts.push(`<div class="mission-guidance">❯ ${escapeHtml(status.guidance)}</div>`);
+      parts.push(`<div class="mission-guidance">&gt; ${escapeHtml(status.guidance)}</div>`);
     }
 
     if (Array.isArray(status.alerts) && status.alerts.length) {
@@ -351,12 +351,9 @@ export const PanelsMixin = {
     // Build season display if available
     let seasonHtml = '';
     if (data.season) {
-      // Text glyphs, not emoji — emoji break the terminal aesthetic
-      const seasonIcons = { spring: '❀', summer: '☼', fall: '❧', winter: '❄' };
       const seasonNames = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' };
-      const icon = seasonIcons[data.season.currentSeason] || '';
       const name = seasonNames[data.season.currentSeason] || data.season.currentSeason;
-      seasonHtml = `<div class="location-season">${icon} ${name} Y${data.season.year}</div>`;
+      seasonHtml = `<div class="location-season">${name} Y${data.season.year}</div>`;
     }
 
     this.locationPanel.innerHTML = `

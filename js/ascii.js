@@ -32,14 +32,14 @@ export const INDICATORS = {
   HEALTHY: '●',
   WARNING: '◐',
   CRITICAL: '○',
-  DEAD: '✕',
+  DEAD: 'X',
   ARROW_RIGHT: '►',
   ARROW_LEFT: '◄',
   ARROW_UP: '▲',
   ARROW_DOWN: '▼',
-  CHECK: '✓',
-  CROSS: '✗',
-  STAR: '★',
+  CHECK: '+',
+  CROSS: 'x',
+  STAR: '*',
   DIAMOND: '◆'
 };
 

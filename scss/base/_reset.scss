@@ -25,6 +25,22 @@ body {
   font-size: var(--font-size-base);
   line-height: 1.5;
   overflow-x: hidden;
+  // Mobile browsers inflate text in wide/overflowing blocks; a terminal
+  // must keep its metrics.
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+// Form controls don't inherit fonts by default — without this, buttons and
+// inputs render in the system sans and break the terminal illusion.
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  color: inherit;
 }
 
 ::selection {

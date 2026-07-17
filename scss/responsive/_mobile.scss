@@ -17,8 +17,47 @@
     padding: 2px 6px;
   }
 
+  // Keep the classic header to two compact rows: title strip, then a
+  // single horizontally-scrollable action row instead of a tall wrap.
+  .header-actions {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    .header-btn {
+      flex-shrink: 0;
+    }
+  }
+
   .status-bar {
     padding: 0 var(--space-sm);
+    height: auto;
+    min-height: var(--status-bar-height);
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  // The main-menu quick-action row can't fit three labels side by side —
+  // stack them like the rest of the menu.
+  .landing-btn-row {
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .landing-btn {
+    white-space: normal;
+
+    &.ghost {
+      justify-content: flex-start;
+    }
   }
 
   .status-label {
@@ -65,10 +104,28 @@
   }
 }
 
-// Touch devices: hide keyboard-only hints; respect iOS safe areas
+// Touch devices: hide keyboard-only hints, grow tap targets;
+// respect iOS safe areas
 @media (pointer: coarse) {
-  .kbd-hint {
+  .kbd-hint,
+  .choices-hint {
     display: none;
+  }
+
+  .landing-btn,
+  .choice-btn,
+  .header-btn,
+  .init-ghost,
+  .init-ghost-sm {
+    min-height: 44px;
+  }
+
+  // iOS zooms the whole page when focusing an input rendered below 16px —
+  // keep text inputs at 16px so the terminal frame stays put.
+  input[type='text'],
+  .text-input,
+  .init-input {
+    font-size: 16px;
   }
 }
 

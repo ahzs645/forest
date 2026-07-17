@@ -2,10 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>BC Forestry Trail — Expedition Mode</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="stylesheet" href="scss/main.scss" />
   </head>
   <body>
@@ -15,7 +18,7 @@
         <!-- Terminal Header -->
         <div class="terminal-header">
           <div class="terminal-header-left">
-            <span class="terminal-icon">▶</span>
+            <span class="terminal-icon">►</span>
             <span class="terminal-id">TERMINAL_ID: 88-X // STATUS: ONLINE</span>
           </div>
           <div class="terminal-header-right">
@@ -60,39 +63,39 @@
           <!-- Main Action Buttons -->
           <div class="landing-actions compact">
             <button id="campaign-btn" class="landing-btn primary" type="button">
-              <span class="btn-icon">❯</span>
+              <span class="btn-icon">&gt;</span>
               <span class="btn-text">[C]AMPAIGN — A YEAR IN THE DISTRICT</span>
             </button>
             <button id="new-game-btn" class="landing-btn secondary" type="button">
-              <span class="btn-icon">❯</span>
+              <span class="btn-icon">&gt;</span>
               <span class="btn-text">[N]EW EXPEDITION</span>
             </button>
             <button id="tui-mode-btn" class="landing-btn secondary" type="button">
-              <span class="btn-icon">❯</span>
+              <span class="btn-icon">&gt;</span>
               <span class="btn-text">[T] SEASONAL STRATEGY</span>
             </button>
             <!-- Experimental: hidden until the core loop is solid. Opt in with
                  ?experimental=1 or localStorage forestExperimental=1. -->
             <button id="crisis-mode-btn" class="landing-btn secondary experimental" type="button" hidden>
-              <span class="btn-icon">❯</span>
+              <span class="btn-icon">&gt;</span>
               <span class="btn-text">[C]RISIS COMMAND</span>
               <span class="landing-btn-badge">EXPERIMENTAL</span>
             </button>
             <button id="load-game-btn" class="landing-btn secondary" type="button">
-              <span class="btn-icon">❯</span>
+              <span class="btn-icon">&gt;</span>
               <span class="btn-text">[L]OAD DATA</span>
             </button>
             <div class="landing-btn-row">
               <button id="compliance-intel-landing-btn" class="landing-btn ghost" type="button">
-                <span class="btn-icon">❯</span>
+                <span class="btn-icon">&gt;</span>
                 <span class="btn-text">[P] COMPLIANCE INTEL</span>
               </button>
               <button id="help-landing-btn" class="landing-btn ghost" type="button">
-                <span class="btn-icon">❯</span>
+                <span class="btn-icon">&gt;</span>
                 <span class="btn-text">[H]ELP</span>
               </button>
               <button id="settings-btn" class="landing-btn ghost" type="button">
-                <span class="btn-icon">❯</span>
+                <span class="btn-icon">&gt;</span>
                 <span class="btn-text">SETTINGS</span>
               </button>
             </div>
@@ -113,11 +116,7 @@
       <div class="init-frame">
         <!-- Terminal Window Header -->
         <div class="init-window-header">
-          <div class="window-dots">
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
-          </div>
+          <span class="window-sysbox">[■]</span>
           <span class="window-title">TERMINAL_01.EXE</span>
         </div>
 
@@ -141,7 +140,7 @@
             </div>
 
             <button id="intro-continue-btn" class="init-primary full-width" type="button">
-              INITIALIZE SEQUENCE <span class="btn-arrow">▶</span>
+              INITIALIZE SEQUENCE <span class="btn-arrow">►</span>
             </button>
           </div>
         </section>
@@ -166,7 +165,7 @@
               <button id="role-glossary-btn" class="init-ghost-sm" type="button">[?] Glossary</button>
               <button id="role-intel-btn" class="init-ghost-sm" type="button">[P] Intel</button>
               <button id="role-continue-btn" class="init-primary-sm" type="button">
-                INITIALIZE SEQUENCE <span class="btn-arrow">▶</span>
+                INITIALIZE SEQUENCE <span class="btn-arrow">►</span>
               </button>
             </div>
           </div>
@@ -195,7 +194,7 @@
               <button id="area-glossary-btn" class="init-ghost" type="button">[?] Glossary</button>
               <button id="area-intel-btn" class="init-ghost" type="button">[P] Intel</button>
               <button id="area-continue-btn" class="init-primary" type="button">
-                DEPLOY CREW <span class="btn-arrow">▶</span>
+                DEPLOY CREW <span class="btn-arrow">►</span>
               </button>
             </div>
           </div>
@@ -216,7 +215,7 @@
       <!-- Modern mode: Header bar -->
       <header id="modern-header" class="modern-header">
         <div class="modern-header-left">
-          <span class="modern-logo-icon">🌲</span>
+          <span class="modern-logo-icon">/\</span>
           <div class="modern-title-group">
             <span class="modern-title">BC FORESTRY SIMULATOR</span>
             <span class="modern-subtitle">TERMINAL V1.0 // CONNECTED</span>
@@ -227,7 +226,7 @@
             <span class="status-dot"></span>
             <span>SYSTEM ONLINE</span>
           </div>
-          <button id="modern-settings-btn" class="modern-settings-btn" type="button" aria-label="Settings">⚙</button>
+          <button id="modern-settings-btn" class="modern-settings-btn" type="button" aria-label="Settings">≡</button>
         </div>
       </header>
 
@@ -251,7 +250,7 @@
         <div class="modern-stat-card">
           <span class="stat-card-label">ZONE</span>
           <div class="stat-card-zone">
-            <span class="zone-icon">🌲</span>
+            <span class="zone-icon">♠</span>
             <span class="stat-card-value" id="modern-zone-value">—</span>
           </div>
         </div>
@@ -371,11 +370,7 @@
         <!-- Terminal window (modern mode has window chrome) -->
         <div id="terminal-window" class="terminal-window">
           <div class="terminal-window-header">
-            <div class="window-dots">
-              <span class="dot red"></span>
-              <span class="dot yellow"></span>
-              <span class="dot green"></span>
-            </div>
+            <span class="window-sysbox">[■]</span>
             <span class="terminal-file-path" id="terminal-file-path">/VAR/LOG/SYSTEM.LOG</span>
           </div>
           <div id="terminal" class="terminal" role="log" aria-live="polite"></div>
@@ -387,7 +382,7 @@
         <!-- Decision area (buttons and input) -->
         <div id="action-area" class="action-area">
           <div id="decision-header" class="decision-header">
-            <span class="decision-icon">⚡</span>
+            <span class="decision-icon">»</span>
             <span class="decision-title" id="decision-title">AWAITING INPUT</span>
           </div>
           <div id="choices" class="choices"></div>
