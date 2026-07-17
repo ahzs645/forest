@@ -7,6 +7,7 @@
 
 import { ASCII_ART, ANIMATIONS } from '../ascii_art.js';
 import * as Anim from '../animations/index.js';
+import { buildFireFrames } from './textmode/effects.js';
 
 function deck(frames, delay) {
   if (!frames?.length) return null;
@@ -17,7 +18,8 @@ const KEYWORD_DECKS = [
   [/bear|grizzly/, () => deck(ASCII_ART.bear, 600)],
   [/moose|caribou|elk|deer/, () => deck(Anim.mooseAnimation, 500)],
   [/wolf|tracks|wildlife|nesting|raptor|eagle|bird/, () => deck(Anim.eagleAnimation, 400)],
-  [/fire|burn|smoke/, () => deck(Anim.wildfireAnimation, 250)],
+  // Live cellular fire (ascii-anim port) rather than a hand-drawn loop.
+  [/fire|burn|smoke/, () => deck(buildFireFrames({ cols: 44, rows: 9, frames: 18, seed: 11 }), 120)],
   [/storm|rain|wet|flood/, () => deck(ASCII_ART.rain, 300)],
   [/snow|cold|freez|winter|ice/, () => deck(ASCII_ART.snow, 400)],
   [/helicopter|airlift|medevac/, () => deck(Anim.helicopterAnimation, 200)],
