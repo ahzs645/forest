@@ -1,13 +1,169 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkForEvent, resolveEvent } from '../js/events.js';
+import { checkForEvent, formatEventForDisplay, resolveEvent } from '../js/events.js';
+import { createJourney } from '../js/journey.js';
+import { handleEvent } from '../js/modes/shared/handleEvent.js';
 import { eventMatchesJourneyContext } from '../js/events/selection.js';
 import {
   getPermittingConstraintState,
   resolvePermitRevisionResponse,
   seedPermitRevisionTickets
 } from '../js/modes/permitting.js';
+
+test('radio event copy uses one concise reporter lead', () => {
+  const formatted = formatEventForDisplay({
+    title: 'Helicopter Available for Hire',
+    description: "A local pilot's afternoon charter was cancelled.",
+    severity: 'minor',
+    type: 'supply',
+    reporter: {
+      name: 'Melissa',
+      role: 'Spotter',
+      task: 'flagging boundaries'
+    },
+    options: [{ label: 'Hire the pilot', effects: {} }]
+  }, 'recon');
+
+  assert.equal(
+    formatted.description,
+    "Radio from Melissa (Spotter): A local pilot's afternoon charter was cancelled."
+  );
+  assert.doesNotMatch(formatted.description, /radios in:.*radios in:/i);
+});
+
+test('event outcomes wait for acknowledgement before play resumes', async () => {
+  const writes = [];
+  const prompts = [];
+  const ui = {
+    write(text, className = '') {
+      writes.push({ text, className });
+    },
+    writeHeader(text) {
+      writes.push({ text, className: 'term-header' });
+    },
+    playEventVignette() {},
+    async promptChoice(prompt, options) {
+      prompts.push({ prompt, options });
+      return options[0];
+    }
+  };
+  const journey = {
+    journeyType: 'recon',
+    day: 2,
+    crew: [],
+    log: [],
+    scrutiny: 0,
+    resources: {}
+  };
+  const game = { ui, journey, gameOver: false };
+
+  await handleEvent(game, {
+    id: 'acknowledgement-test',
+    title: 'A Test Decision',
+    description: 'Something needs a call.',
+    severity: 'minor',
+    type: 'social',
+    options: [{
+      label: 'Make the call',
+      outcome: 'The decision lands.',
+      effects: {}
+    }]
+  });
+
+  assert.equal(prompts.length, 2);
+  assert.equal(prompts[0].prompt, 'What do you do?');
+  assert.equal(prompts[1].options[0].label, 'Acknowledge outcome and continue');
+  assert.ok(writes.some((entry) => entry.text === 'OUTCOME'));
+  assert.ok(writes.some((entry) => entry.text === 'The decision lands.'));
+});
+
+test('illegal-act temptations have a priority draw from day two with a cooldown', () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+
+  try {
+    const journey = createJourney({
+      roleId: 'recce',
+      areaId: 'fort-st-john-plateau',
+      crew: []
+    });
+
+    journey.day = 2;
+    const first = checkForEvent(journey);
+    assert.equal(first?.type, 'temptation');
+    assert.match(first?.id || '', /^legacy_temptation_/);
+
+    journey.day = 3;
+    const coolingDown = checkForEvent(journey);
+    assert.notEqual(coolingDown?.type, 'temptation');
+
+    journey.day = 6;
+    const nextEligible = checkForEvent(journey);
+    assert.equal(nextEligible?.type, 'temptation');
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('field temptation chance accepts a draw above the old twelve-percent rate', () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.17;
+
+  try {
+    const journey = createJourney({
+      roleId: 'recce',
+      areaId: 'fort-st-john-plateau',
+      crew: []
+    });
+    journey.day = 2;
+
+    assert.equal(checkForEvent(journey)?.type, 'temptation');
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('field event time costs work when authored inside effects', () => {
+  const journey = {
+    journeyType: 'recon',
+    day: 3,
+    crew: [],
+    log: [],
+    scrutiny: 0,
+    travelDelayHours: 0,
+    resources: {}
+  };
+
+  const result = resolveEvent(journey, { id: 'bridge-test', title: 'Bridge Test', severity: 'minor' }, {
+    label: 'Test it on foot first',
+    outcome: 'The crossing is checked.',
+    effects: { timeUsed: 1 }
+  });
+
+  assert.equal(journey.travelDelayHours, 1);
+  assert.ok(result.messages.some((message) => /Lost 1 hour/i.test(message)));
+});
+
+test('temptation lane guarantees an offer after three eligible misses', () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.99;
+  try {
+    const journey = createJourney({
+      roleId: 'recce',
+      areaId: 'fort-st-john-plateau',
+      crew: []
+    });
+    for (const day of [2, 3, 4]) {
+      journey.day = day;
+      checkForEvent(journey);
+    }
+    journey.day = 5;
+    assert.equal(checkForEvent(journey)?.type, 'temptation');
+  } finally {
+    Math.random = originalRandom;
+  }
+});
 
 test('permitting events update relationship and compliance tracks without legacy stakeholder state', () => {
   const journey = {

@@ -104,11 +104,11 @@ test('checkForEvent serves manager journeys from both desk and field pools', () 
   assert.ok(sawDesk, 'manager journeys should draw desk-context events');
   assert.ok(sawField, 'manager journeys should draw field-context events');
 
-  // Field-context events arrive as radio calls from the GM's crew, with the
+  // Field-context events arrive as radio reports from the GM's crew, with the
   // reporter baked into the description (manager is not a field journeyType,
   // so formatEventForDisplay would otherwise drop the reporter framing).
   assert.ok(fieldExample.reporter, 'field-context manager events carry a crew reporter');
-  assert.match(fieldExample.description, /radios in:/);
+  assert.match(fieldExample.description, /^Radio from /);
   assert.match(fieldExample.description, new RegExp(fieldExample.reporter.name));
 });
 

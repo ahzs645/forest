@@ -48,13 +48,13 @@ export function showJourneyIntro(ui, journey) {
     case 'recon':
       ui.write(`Mission: Verify a recon package for every one of the ${journey.blocks.length} forest blocks — reaching the end of the traverse is not the win.`);
       ui.write('Each block needs its access ground-truthed and, where values are flagged, a values sweep. Then the package finalizes.');
-      ui.write(`Field Notebook can close missed packages from notes, but it raises scrutiny. Each shift is about ${FIELD_SHIFT_HOURS} hours.`);
+      ui.write(`Field Notebook can close missed packages from notes, but each write-up adds 2 scrutiny. Each shift is about ${FIELD_SHIFT_HOURS} hours.`);
       ui.write('Manage fuel, food, and equipment while documenting hazards, cultural sites, and road/crossing condition.');
       ui.write('');
       ui.write('Starting supplies:');
       ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
       ui.write(`  Fuel: ${journey.resources.fuel} gallons`);
-      ui.write(`  Food: ${journey.resources.food} days worth`);
+      ui.write(`  Food: ${journey.resources.food} person-days`);
       ui.write(`  Equipment: ${journey.resources.equipment}% condition`);
       ui.write(`  GPS Units: ${journey.resources.gpsUnits || 5}`);
       break;
@@ -116,7 +116,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write('Starting supplies:');
       ui.write(`  Cash: $${journey.resources.budget?.toLocaleString() || 0}`);
       ui.write(`  Fuel: ${journey.resources.fuel} gallons`);
-      ui.write(`  Food: ${journey.resources.food} days worth`);
+      ui.write(`  Food: ${journey.resources.food} person-days`);
       ui.write(`  Equipment: ${journey.resources.equipment}% condition`);
       ui.write(`  First Aid: ${journey.resources.firstAid} kits`);
       break;

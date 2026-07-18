@@ -58,7 +58,8 @@ export function formatJourneyLog(journey) {
     travel: '→',
     event: '!',
     milestone: '*',
-    arrival: '◆'
+    arrival: '◆',
+    action: '●'
   };
 
   return journey.log.map(entry => ({
@@ -67,7 +68,9 @@ export function formatJourneyLog(journey) {
     icon: typeIcons[entry.type] || '·',
     type: entry.type,
     summary: entry.summary || entry.eventTitle || entry.action || 'Unknown',
-    detail: entry.optionLabel || entry.weather || ''
+    detail: entry.type === 'event'
+      ? [entry.optionLabel, entry.outcome, ...(entry.consequences || []).slice(0, 2)].filter(Boolean).join(' — ')
+      : (entry.detail || entry.weather || '')
   }));
 }
 

@@ -170,7 +170,7 @@ export const PanelsMixin = {
         this.crewLabel.textContent = 'CREW';
       }
       if (this.crewValue) {
-        this.crewValue.textContent = `${data.crewActive || 0}/${data.crewTotal || 5}`;
+        this.crewValue.textContent = `${data.crewActive ?? 0}/${data.crewTotal ?? 0}`;
       }
       if (this.moraleLabel) {
         this.moraleLabel.textContent = 'MORALE';
@@ -228,7 +228,7 @@ export const PanelsMixin = {
         <div class="crew-name">${info.name}</div>
         <div class="crew-role">${info.role}</div>
         ${showHp ? `<div class="crew-stats">
-          <span>HP: ${progressBar(info.health, 8, true)}</span>
+          <span>FIT: ${progressBar(info.health, 8, true)}</span>
         </div>` : ''}
         ${info.status !== 'Good' ? `<div class="crew-status">[${info.status}]</div>` : ''}
       `;
@@ -326,10 +326,12 @@ export const PanelsMixin = {
       const row = document.createElement('div');
       row.className = 'resource-row';
 
+      const displayLabel = key === 'food' ? 'FOOD (PD)' : def.shortLabel;
+      const displayValue = key === 'food' ? `${Math.round(value)} pd` : Math.round(value);
       row.innerHTML = `
-        <span class="resource-label">${def.shortLabel}</span>
+        <span class="resource-label">${displayLabel}</span>
         <span class="resource-bar-text ${fillClass}">${progressBar(percentage, 10, false)}</span>
-        <span class="resource-value">${Math.round(value)}</span>
+        <span class="resource-value">${displayValue}</span>
       `;
 
       this.resourcesPanel.appendChild(row);

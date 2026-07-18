@@ -17,6 +17,7 @@ import {
 import { checkScheduledEvents } from '../events.js';
 import { getCurrentSeasonInfo } from '../season.js';
 import { calculateScore, formatScoreDisplay } from '../scoring.js';
+import { FIELD_RESOURCES } from '../resources.js';
 
 // Import mode runners
 import { runReconDay } from '../modes/recon.js';
@@ -53,7 +54,11 @@ export function applyDifficultyMultipliers(journey, difficulty) {
 
   for (const key of Object.keys(r)) {
     if (!excludedKeys.has(key) && typeof r[key] === 'number') {
-      r[key] = Math.round(r[key] * resourceMult);
+      const scaled = Math.round(r[key] * resourceMult);
+      const fieldDefinition = ['field', 'recon'].includes(journey.journeyType)
+        ? FIELD_RESOURCES[key]
+        : null;
+      r[key] = fieldDefinition ? Math.min(fieldDefinition.max, scaled) : scaled;
     }
   }
 
@@ -90,6 +95,11 @@ export class ForestryTrailGame {
     }
     const logEntries = formatJourneyLog(this.journey);
     this.ui.showLog(logEntries);
+  }
+
+  /** Persist the current decision checkpoint, including an in-progress shift. */
+  checkpoint() {
+    saveActiveRun(this.journey);
   }
 
   _bindKeyboard() {
@@ -160,6 +170,10 @@ export class ForestryTrailGame {
     // A saved run survives refreshes, tab evictions, and crashes
     const savedRun = loadActiveRun();
     if (savedRun) {
+      // Keep the dashboard behind the modal truthful instead of showing the
+      // landing-page Day 1 placeholders beside a later saved checkpoint.
+      this.journey = savedRun;
+      this.ui.updateAllStatus(savedRun);
       const resume = await this._promptResume(savedRun);
       if (resume) {
         await this._resumeSavedRun(savedRun);
@@ -245,12 +259,10 @@ export class ForestryTrailGame {
 
     this.journey.difficulty = difficulty;
     applyDifficultyMultipliers(this.journey, difficulty);
-
+    this.ui.updateAllStatus(this.journey);
 
     this.ui.write('');
     this.ui.writeHeader(`${crewName.toUpperCase() || 'YOUR CREW'} - ${role.name}`);
-    this.ui.write(`Operating Area: ${area.name}`);
-    this.ui.write(`BEC Zone: ${area.becZone}`);
     if (area.dominantTrees?.length) {
       this.ui.write(`Dominant Species: ${area.dominantTrees.join(', ')}`);
     }
@@ -281,7 +293,9 @@ export class ForestryTrailGame {
     this.victory = false;
     this.ui.writeHeader('EXPEDITION RESUMED');
     this.ui.write(`${savedRun.companyName || 'Your crew'} — ${savedRun.area?.name || 'the operating area'}, day ${savedRun.day}.`);
-    this.ui.write('The daybook is where you left it. Back to work.', 'term-dim');
+    this.ui.write(savedRun.activeReconShift
+      ? `Restored the latest decision checkpoint with ${savedRun.hoursRemaining || 0}h left in the shift.`
+      : 'Restored the latest completed-shift checkpoint. Back to work.', 'term-dim');
     this.ui.write('');
     await this._mainLoop();
   }
@@ -299,7 +313,8 @@ export class ForestryTrailGame {
           const msg = document.createElement('p');
           const roleName = savedRun.role?.name || 'Forester';
           msg.textContent = `${savedRun.companyName || 'Your crew'} — ${roleName}, `
-            + `${savedRun.area?.name || 'operating area'}, day ${savedRun.day}.`;
+            + `${savedRun.area?.name || 'operating area'}, day ${savedRun.day}`
+            + `${savedRun.activeReconShift ? `, ${savedRun.hoursRemaining || 0}h remaining` : ''}.`;
           msg.style.marginTop = '0';
           container.appendChild(msg);
         },

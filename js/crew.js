@@ -17,6 +17,23 @@ let crewIdCounter = 0;
 const INJURY_EFFECT_IDS = new Set(['broken_leg', 'broken_arm', 'sprained_ankle', 'concussion']);
 const ILLNESS_EFFECT_IDS = new Set(['flu', 'cold', 'food_poisoning', 'dysentery', 'hypothermia', 'exhaustion', 'infection']);
 
+// The status panel reports field fitness, not just wounds. A serious condition
+// therefore cannot sit beside a perfect-looking meter, while the underlying
+// health mechanics and balance remain unchanged.
+const STATUS_FITNESS_CAPS = {
+  broken_leg: 45,
+  broken_arm: 80,
+  sprained_ankle: 85,
+  concussion: 60,
+  flu: 70,
+  cold: 90,
+  food_poisoning: 55,
+  dysentery: 50,
+  hypothermia: 45,
+  exhaustion: 75,
+  infection: 60
+};
+
 /**
  * Generate a unique crew member ID
  * @returns {string} Unique ID
@@ -655,10 +672,13 @@ export function getCrewDisplayInfo(member) {
     status = 'Unhappy';
   }
 
+  const fitnessCap = (member.statusEffects || []).reduce((cap, effect) =>
+    Math.min(cap, STATUS_FITNESS_CAPS[effect.effectId] ?? 100), 100);
+
   return {
     name: member.name,
     role: member.roleName,
-    health: member.health,
+    health: Math.min(member.health, fitnessCap),
     morale: member.morale,
     status,
     effects,

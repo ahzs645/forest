@@ -1,6 +1,6 @@
 /**
  * Run Persistence
- * Saves the active expedition to localStorage at end-of-day boundaries so a
+ * Saves the active expedition to localStorage at decision checkpoints so a
  * page refresh, tab eviction, or crash never destroys a run. The journey
  * object is plain serializable data by construction (see journey/factory.js).
  */

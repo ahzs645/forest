@@ -141,7 +141,7 @@ export const InitFlowMixin = {
     });
 
     // Load Data button — resumes the auto-saved expedition if one exists.
-    // Runs persist at every in-game day boundary, so this is the same run the
+    // Runs persist after resolved decisions, so this is the same run the
     // resume prompt offers after a refresh; there is no separate save slot.
     this.loadGameBtn?.addEventListener('click', () => {
       const savedRun = loadActiveRun();
@@ -157,8 +157,8 @@ export const InitFlowMixin = {
 
       this.showModal({
         title: 'LOAD DATA',
-        content: 'No saved expedition found. Runs save automatically at the end of '
-          + 'each in-game day — reload the page anytime to pick one back up, and '
+        content: 'No saved expedition found. Runs save automatically after '
+          + 'resolved decisions — reload the page anytime to pick one back up, and '
           + 'you will be asked before anything is overwritten.',
         actions: [{ label: 'OK', primary: true }]
       });
@@ -330,6 +330,18 @@ export const InitFlowMixin = {
 
     this.introContinueBtn?.addEventListener('click', () => {
       this._switchInitStep('role');
+      const selectedRole = this._initRoles?.find((role) => role.id === this._initState.roleId) || this._initRoles?.[0];
+      if (this.initZoneDisplay && selectedRole) {
+        const journeyTypeLabels = {
+          recce: 'RECON_OPS',
+          silviculture: 'SILV_OPS',
+          planner: 'PLANNING',
+          permitter: 'PERMITTING'
+        };
+        const modeLabel = journeyTypeLabels[selectedRole.id]
+          || (selectedRole.journeyType === 'field' ? 'FIELD_OPS' : 'DESK_OPS');
+        this.initZoneDisplay.textContent = `MODE: ${modeLabel}`;
+      }
     });
 
     this.roleContinueBtn?.addEventListener('click', () => {
@@ -448,6 +460,7 @@ export const InitFlowMixin = {
       card.type = 'button';
       const isSelected = this._initState.roleId === role.id;
       card.className = `role-card ${isSelected ? 'selected' : ''}`;
+      card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
 
       const icon = ROLE_ICONS[role.id] || ROLE_ICONS.default;
       const isExperimental = EXPERIMENTAL_ROLE_IDS.has(role.id);
@@ -528,8 +541,9 @@ export const InitFlowMixin = {
       ].filter(Boolean).join(' | ');
       const item = document.createElement('button');
       item.type = 'button';
-      item.className = `area-item ${this._initState.areaId === area.id ? 'selected' : ''}`;
-      item.setAttribute('role', 'listitem');
+      const isSelected = this._initState.areaId === area.id;
+      item.className = `area-item ${isSelected ? 'selected' : ''}`;
+      item.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
       item.innerHTML = `
         <div class="area-number">[${String(index + 1).padStart(2, '0')}]</div>
         <div>
@@ -877,17 +891,7 @@ export const InitFlowMixin = {
     this._switchInitStep('intro');
     this._showInitOverlay();
 
-    // Update initial zone display based on role ID
-    if (this.initZoneDisplay && roles[0]) {
-      const journeyTypeLabels = {
-        recce: 'RECON_OPS',
-        silviculture: 'SILV_OPS',
-        planner: 'PLANNING',
-        permitter: 'PERMITTING'
-      };
-      const modeLabel = journeyTypeLabels[roles[0].id] || (roles[0].journeyType === 'field' ? 'FIELD_OPS' : 'DESK_OPS');
-      this.initZoneDisplay.textContent = `MODE: ${modeLabel}`;
-    }
+    if (this.initZoneDisplay) this.initZoneDisplay.textContent = 'MODE: SELECT ROLE';
 
     // Store resolve function for the areaContinueBtn click handler
     return new Promise((resolve) => {

@@ -148,3 +148,19 @@ test('recon mode fails on the final block when mobility is gone and open package
     reason: 'Recon package stalled on the final block with no mobility left'
   });
 });
+
+test('a stalled silviculture program closes after the outside delivery window', () => {
+  const result = checkEndConditions({
+    journeyType: 'silviculture',
+    day: 121,
+    crew: [{ isActive: true }],
+    planting: { blocksPlanted: 1, blocksToPlant: 15 },
+    surveys: { freeGrowingComplete: 0, freeGrowingTarget: 5 },
+    resources: { budget: 21000, contractorCapacity: 3 }
+  });
+
+  assert.deepEqual(result, {
+    gameOver: true,
+    reason: 'Silviculture program fell short of its targets'
+  });
+});

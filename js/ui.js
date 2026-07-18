@@ -536,9 +536,9 @@ export class TerminalUI {
     this.updateStatusBar({
       day: 1,
       progress: 0,
-      crewActive: 5,
-      crewTotal: 5,
-      morale: 75
+      crewActive: 0,
+      crewTotal: 0,
+      morale: 0
     });
 
     // Reset panels with placeholder text

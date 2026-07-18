@@ -81,6 +81,14 @@ export function checkSilvicultureEndConditions(journey) {
     return { gameOver: true, reason: 'No contractor capacity remaining' };
   }
 
+  // A stalled program must eventually close instead of cycling through radio
+  // events forever. Four field months is the outside delivery window when a
+  // mode-specific deadline was not authored.
+  const programDeadline = Number.isFinite(journey.deadline) ? journey.deadline : 120;
+  if (journey.day > programDeadline) {
+    return { gameOver: true, reason: 'Silviculture program fell short of its targets' };
+  }
+
   return null;
 }
 

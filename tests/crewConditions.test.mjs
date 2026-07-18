@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   applyStatusEffect,
   generateCrewMember,
+  getCrewDisplayInfo,
   processDailyUpdate,
   treatCrewCondition
 } from '../js/crew.js';
@@ -51,4 +52,15 @@ test('severe treatment stabilizes a condition first and clears it after addition
   const secondTreatment = treatCrewCondition(member, 'infection', 2);
   assert.equal(secondTreatment.cleared, true);
   assert.equal(member.statusEffects.some((effect) => effect.effectId === 'infection'), false);
+});
+
+test('serious conditions move the displayed fitness below a perfect meter', () => {
+  const member = generateCrewMember('field');
+  member.health = 100;
+
+  applyStatusEffect(member, 'broken_arm');
+
+  assert.equal(member.health, 100, 'condition display should not rebalance underlying health');
+  assert.equal(getCrewDisplayInfo(member).health, 80);
+  assert.ok(member.statusEffects.some((effect) => effect.effectId === 'broken_arm'));
 });

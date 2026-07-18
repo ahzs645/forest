@@ -19,6 +19,10 @@ export const InputMixin = {
     this.write(prompt);
     this._hideChoices();
     this._showInput(placeholder);
+    // The action area grows after write() has already scrolled the log. Scroll
+    // again against the final layout so the new prompt is not pushed below the
+    // terminal viewport.
+    this._scrollToBottom?.();
 
     return new Promise((resolve) => {
       this._pending = resolve;
@@ -35,6 +39,9 @@ export const InputMixin = {
     this.write(prompt);
     this._hideInput();
     this._showChoices(options);
+    // Rendering choice cards makes the response pane taller and the log pane
+    // shorter. Re-anchor the log after that reflow so the prompt stays visible.
+    this._scrollToBottom?.();
 
     return new Promise((resolve) => {
       this._choiceHandler = resolve;

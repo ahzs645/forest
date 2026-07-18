@@ -31,6 +31,18 @@ const CREW_CHEERFUL = [
   (name) => `${name} starts humming. Somehow it helps.`,
 ];
 
+const CREW_COMPROMISED = [
+  (name) => `${name} goes quiet. "That does not go in the daybook, does it?"`,
+  (name) => `${name} looks away. Nobody mistakes the silence for agreement.`,
+  (name) => `${name} lowers their voice. "If this comes back, we all carry it."`,
+  (name) => `${name} writes nothing down and does not meet your eye.`,
+];
+
+const CREW_RESPONSIBLE = [
+  (name) => `${name} nods. "I will keep the notes and the radio log together."`,
+  (name) => `${name} starts the incident entry before the conversation is over.`,
+];
+
 const PROTAGONIST_CALM = [
   () => 'You note the decision in the file. Future-you will appreciate the paper trail.',
   () => 'You stretch, refill the coffee, and move the next folder to the centre of the desk.',
@@ -77,6 +89,12 @@ export function buildEventReaction(journey, option, rng = Math.random) {
   const active = (journey.crew || []).filter((m) => m.isActive);
   if (active.length > 0) {
     const member = active[Math.floor(rng() * active.length)];
+    if (option?.reactionTone === 'compromised') {
+      return pick(CREW_COMPROMISED, rng)(member.name);
+    }
+    if (option?.reactionTone === 'responsible') {
+      return pick(CREW_RESPONSIBLE, rng)(member.name);
+    }
     if (member.traits?.includes('cheerful') && rng() < 0.6) {
       return pick(CREW_CHEERFUL, rng)(member.name);
     }

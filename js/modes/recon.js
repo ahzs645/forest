@@ -247,6 +247,16 @@ function getReconAccessSeverity(verdict) {
   }
 }
 
+function getDisplayedAccessVerdict(journey, block) {
+  const recorded = block?.id ? journey.accessVerdicts?.[block.id] : null;
+  if (recorded
+    && recorded.day === journey.day
+    && recorded.weatherId === (journey.weather?.id || null)) {
+    return recorded;
+  }
+  return getBlockAccessVerdict(block, journey.weather, journey);
+}
+
 /**
  * Run a recon day (enhanced field day with survey mechanics)
  * @param {Object} game - Game instance
@@ -258,6 +268,68 @@ export async function runReconDay(game) {
   await runFieldDay(game);
 }
 
+function ensureActiveReconShift(journey, pendingEvent = null) {
+  const existing = journey.activeReconShift;
+  if (existing?.day === journey.day) return existing;
+  journey.activeReconShift = {
+    day: journey.day,
+    hasTraveled: false,
+    dayResolved: false,
+    pendingEvent
+  };
+  return journey.activeReconShift;
+}
+
+function checkpointReconShift(game, shift, pendingEvent) {
+  shift.hasTraveled = Boolean(shift.hasTraveled);
+  shift.dayResolved = Boolean(shift.dayResolved);
+  shift.pendingEvent = pendingEvent || null;
+  game.checkpoint?.();
+}
+
+async function acknowledgeActionResult(ui, label = 'Action') {
+  await ui.promptChoice('', [{
+    label: 'Acknowledge results and continue',
+    description: `${label} is complete; return to the shift`,
+    value: 'continue'
+  }]);
+}
+
+function summarizeFieldMessages(messages = []) {
+  const conditionGroups = new Map();
+  const remaining = [];
+  for (const message of messages) {
+    const match = String(message || '').match(/^(.+?) now has (.+)\.$/);
+    if (!match) {
+      remaining.push(message);
+      continue;
+    }
+    const [, name, condition] = match;
+    if (!conditionGroups.has(condition)) conditionGroups.set(condition, []);
+    conditionGroups.get(condition).push(name);
+  }
+  for (const [condition, names] of conditionGroups) {
+    if (names.length === 1) remaining.push(`${names[0]} now has ${condition}.`);
+    else remaining.push(`${names.length} crew members gained ${condition}: ${names.join(', ')}.`);
+  }
+  return remaining.filter(Boolean);
+}
+
+function writeFieldMessages(ui, messages = []) {
+  for (const message of summarizeFieldMessages(messages)) ui.write(message);
+}
+
+function logReconAction(journey, summary, detail = '') {
+  journey.log ||= [];
+  journey.log.push({
+    day: journey.day,
+    type: 'action',
+    summary,
+    detail,
+    location: journey.blocks?.[journey.currentBlockIndex]?.name || 'Unknown'
+  });
+}
+
 /**
  * Run a field day with multi-action system
  * Players get 9 hours per shift, travel costs 4-6h, camp actions fill remaining time
@@ -266,8 +338,10 @@ export async function runReconDay(game) {
 async function runFieldDay(game) {
   const { ui, journey } = game;
 
+  const resumingShift = journey.activeReconShift?.day === journey.day;
+
   // Initialize hours for the day
-  if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
+  if (!resumingShift && (!journey.hoursRemaining || journey.hoursRemaining <= 0)) {
     journey.hoursRemaining = journey.difficulty === 'easy'
       ? 10
       : journey.difficulty === 'hard'
@@ -275,17 +349,21 @@ async function runFieldDay(game) {
         : 9;
   }
 
-  let hasTraveled = false;
+  let hasTraveled = Boolean(resumingShift && journey.activeReconShift.hasTraveled);
   // Tracks whether this shift's daily resolution (resource burn, crew updates,
   // hardships) has already run via executeFieldAction. The calendar itself only
   // rolls over once, at the very end of the shift, via endFieldDay().
-  let dayResolved = false;
+  let dayResolved = Boolean(resumingShift && journey.activeReconShift.dayResolved);
 
   // Roll the day's random event, but hold it: Oregon Trail's rhythm is that
   // trouble finds you ON the trail, so the event fires mid-travel (the strip
   // pauses for it). If the shift never travels, it lands on camp instead.
   // The first shift teaches the base loop — nothing fires on day 1.
-  let pendingEvent = journey.day > 1 ? checkForEvent(journey) : null;
+  let pendingEvent = resumingShift
+    ? (journey.activeReconShift.pendingEvent || null)
+    : (journey.day > 1 ? checkForEvent(journey) : null);
+  const shiftState = ensureActiveReconShift(journey, pendingEvent);
+  checkpointReconShift(game, shiftState, pendingEvent);
 
   // A crew that camped on the near bank of a crossing wakes up to the same
   // river under new weather.
@@ -310,28 +388,41 @@ async function runFieldDay(game) {
     ui.write('');
     if (pendingEvent) {
       ui.write('The weather does not mean the day is quiet.');
-      await handleEvent(game, pendingEvent);
+      const interruptingEvent = pendingEvent;
       pendingEvent = null;
+      checkpointReconShift(game, shiftState, pendingEvent);
+      await handleEvent(game, interruptingEvent);
       if (game.gameOver) return;
     }
     journey.hoursRemaining = 0;
     const result = executeFieldAction(journey, 'resting');
-    for (const msg of result.messages) ui.write(msg);
-    endFieldDay(journey);
+    ui.writeHeader('SHIFT CONSEQUENCES');
+    writeFieldMessages(ui, result.messages);
+    shiftState.dayResolved = true;
+    checkpointReconShift(game, shiftState, null);
     ui.updateAllStatus(journey);
 
-    // Contextual continue (Phase 6.1)
+    // The current shift remains the source of truth until the player has read
+    // its consequences. Only then does the calendar/weather roll forward.
     const nextBlock = journey.blocks[journey.currentBlockIndex];
     await ui.promptChoice('', [{
-      label: `Continue... (Tomorrow: ${nextBlock?.name || 'Unknown'})`,
+      label: `Begin Shift ${journey.day + 1} at ${nextBlock?.name || 'Unknown'}`,
       value: 'next'
     }]);
+    journey.activeReconShift = null;
+    endFieldDay(journey);
+    ui.updateAllStatus(journey);
+    game.checkpoint?.();
     return;
   }
 
   if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.warning) {
     displayDayHeader(ui, journey);
     await maybeHandleFoodDecision(game);
+    ui.updateAllStatus(journey);
+    logReconAction(journey, 'Ration decision', `Food remaining: ${Math.round(journey.resources.food || 0)} person-days`);
+    checkpointReconShift(game, shiftState, pendingEvent);
+    await acknowledgeActionResult(ui, 'Ration decision');
   }
 
   // Multi-action loop: keep going while hours remain
@@ -341,13 +432,8 @@ async function runFieldDay(game) {
     const hasNextBlock = journey.currentBlockIndex < journey.blocks.length - 1;
     const canTravel = !hasTraveled && hasNextBlock && journey.resources.fuel > 0 && journey.resources.equipment > 0;
     const blockIntel = getReconBlockIntel(journey, currentBlock);
-    const accessVerdict = currentBlock ? getBlockAccessVerdict(currentBlock, journey.weather, journey) : null;
+    const accessVerdict = currentBlock ? getDisplayedAccessVerdict(journey, currentBlock) : null;
     const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
-
-    if (canTravel && journey.currentBlockIndex < journey.blocks.length - 1 && journey.routePlan?.day !== journey.day) {
-      displayDayHeader(ui, journey);
-      await maybePromptRouteChoice(game, currentBlock);
-    }
 
     displayDayHeader(ui, journey);
 
@@ -357,41 +443,10 @@ async function runFieldDay(game) {
     const primaryOptions = [];
     const supportOptions = [];
 
-    if (canTravel) {
-      const routeSuffix = journey.routePlan ? ` via ${journey.routePlan.shortLabel}` : '';
-      // Travel options (4-6 hours depending on pace)
-      primaryOptions.push({
-        label: `Cautious Recon${routeSuffix} (4h)`,
-        description: '60% coverage, low risk',
-        value: 'slow'
-      });
-      if (journey.hoursRemaining >= 5) {
-        primaryOptions.push({
-          label: `Standard Recon${routeSuffix} (5h)`,
-          description: '100% coverage, normal risk',
-          value: 'normal'
-        });
-      }
-      if (journey.hoursRemaining >= 6) {
-        primaryOptions.push({
-          label: `Extended Recon${routeSuffix} (6h)`,
-          description: '140% coverage, higher risk',
-          value: 'fast'
-        });
-      }
-      if (journey.hoursRemaining >= 8) {
-        primaryOptions.push({
-          label: `Max Effort${routeSuffix} (8h)`,
-          description: '180% coverage, grueling',
-          value: 'grueling'
-        });
-      }
-    }
-
     if (currentBlock && !blockIntel.accessGroundTruthed && journey.hoursRemaining >= 2) {
       primaryOptions.push({
         label: 'Ground-Truth Access (2h)',
-        description: `Verify crossings, road condition, and approach risk before moving on (${accessVerdict?.label || 'current access check'})`,
+        description: `Required for this package — verify crossings, road condition, and approach risk (${accessVerdict?.label || 'current access check'})`,
         value: 'ground_truth'
       });
     }
@@ -399,7 +454,7 @@ async function runFieldDay(game) {
     if (currentBlock && valuesSweep.needed && !blockIntel.valuesSwept && journey.hoursRemaining >= 2) {
       primaryOptions.push({
         label: 'Values Sweep (2h)',
-        description: `Ground-check riparian, cultural, wildlife, and visibility notes (${valuesSweep.notes[0]})`,
+        description: `Required for this package — ground-check riparian, cultural, wildlife, and visibility notes (${valuesSweep.notes[0]})`,
         value: 'values_sweep'
       });
     }
@@ -409,7 +464,7 @@ async function runFieldDay(game) {
       const nextPackage = notebookTargets[0];
       primaryOptions.push({
         label: 'Field Notebook (2h)',
-        description: `Write up a visited block from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')}) — paper-truthing draws scrutiny`,
+        description: `Write up a visited block from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')}) — adds 2 scrutiny`,
         value: 'field_notebook'
       });
     }
@@ -420,6 +475,37 @@ async function runFieldDay(game) {
         description: 'Buy fuel, food, repairs, kits',
         value: 'resupply'
       });
+    }
+
+    if (canTravel) {
+      // Route selection happens only after the player commits to travel. This
+      // keeps an unfinished package from paying a route-choice tax each shift.
+      primaryOptions.push({
+        label: 'Cautious Recon (4h)',
+        description: 'Travel onward: 60% pace, low risk',
+        value: 'slow'
+      });
+      if (journey.hoursRemaining >= 5) {
+        primaryOptions.push({
+          label: 'Standard Recon (5h)',
+          description: 'Travel onward: 100% pace, normal risk',
+          value: 'normal'
+        });
+      }
+      if (journey.hoursRemaining >= 6) {
+        primaryOptions.push({
+          label: 'Extended Recon (6h)',
+          description: 'Travel onward: 140% pace, higher risk',
+          value: 'fast'
+        });
+      }
+      if (journey.hoursRemaining >= 8) {
+        primaryOptions.push({
+          label: 'Max Effort (8h)',
+          description: 'Travel onward: 180% pace, grueling',
+          value: 'grueling'
+        });
+      }
     }
 
     // Camp actions (available anytime), one level down to keep the turn clean.
@@ -517,12 +603,22 @@ async function runFieldDay(game) {
           loops: 2,
         });
       }
-      for (const msg of result.messages) ui.write(msg);
+      ui.writeHeader('SHIFT CONSEQUENCES');
+      writeFieldMessages(ui, result.messages);
       journey.hoursRemaining = 0;
+      shiftState.dayResolved = true;
+      shiftState.hasTraveled = hasTraveled;
+      checkpointReconShift(game, shiftState, pendingEvent);
+      ui.updateAllStatus(journey);
       break;
     }
 
     if (['slow', 'normal', 'fast', 'grueling'].includes(actionId)) {
+      if (journey.routePlan?.day !== journey.day) {
+        displayDayHeader(ui, journey);
+        await maybePromptRouteChoice(game, currentBlock);
+        checkpointReconShift(game, shiftState, pendingEvent);
+      }
       applyReconTravelIntelPenalty(ui, journey, currentBlock, actionId);
       // Travel action — costs hours based on pace
       const hoursCost = { slow: 4, normal: 5, fast: 6, grueling: 8 };
@@ -558,6 +654,7 @@ async function runFieldDay(game) {
           });
           const interruptingEvent = pendingEvent;
           pendingEvent = null;
+          checkpointReconShift(game, shiftState, pendingEvent);
           await handleEvent(game, interruptingEvent);
           if (game.gameOver) return;
           await ui.playTravelStrip({
@@ -572,11 +669,15 @@ async function runFieldDay(game) {
       } else if (pendingEvent) {
         const interruptingEvent = pendingEvent;
         pendingEvent = null;
+        checkpointReconShift(game, shiftState, pendingEvent);
         await handleEvent(game, interruptingEvent);
         if (game.gameOver) return;
       }
-      for (const msg of result.messages) ui.write(msg);
+      ui.writeHeader('TRAVEL RESULTS');
+      writeFieldMessages(ui, result.messages);
       hasTraveled = true;
+      shiftState.hasTraveled = true;
+      shiftState.dayResolved = true;
 
       // Reaching a water crossing is a played decision, not terrain math.
       if (journey.currentBlockIndex !== blockIndexBefore) {
@@ -588,12 +689,9 @@ async function runFieldDay(game) {
 
       // A crossed progress milestone earns the crew a fire and a breather.
       await celebrateNewMilestones(game);
-      // The next header wipes the screen, so instead of pausing on a bare
-      // Continue every travel beat (two Continues per shift added up), the
-      // results are carried into the next screen as a recap block.
-      if (journey.hoursRemaining > 0) {
-        journey.lastActionRecap = result.messages.slice(0, 6);
-      }
+      ui.updateAllStatus(journey);
+      checkpointReconShift(game, shiftState, pendingEvent);
+      await acknowledgeActionResult(ui, 'Travel');
     } else if (actionId === 'consult_map') {
       handleConsultMap(ui, journey);
       await ui.promptChoice('', [{ label: 'Fold the map', value: 'next' }]);
@@ -603,30 +701,55 @@ async function runFieldDay(game) {
     } else if (actionId === 'ground_truth') {
       journey.hoursRemaining -= 2;
       handleGroundTruthAccess(ui, journey, currentBlock);
+      logReconAction(journey, 'Ground-truthed access', currentBlock?.name || 'Current block');
     } else if (actionId === 'values_sweep') {
       journey.hoursRemaining -= 2;
       handleValuesSweep(ui, journey, currentBlock);
+      logReconAction(journey, 'Completed values sweep', currentBlock?.name || 'Current block');
     } else if (actionId === 'field_notebook') {
       journey.hoursRemaining -= 2;
       handleFieldNotebook(ui, journey);
+      logReconAction(journey, 'Updated field notebook');
     } else if (actionId === 'forage') {
       journey.hoursRemaining -= 2;
       await handleForageAndHunt(game);
+      logReconAction(journey, 'Foraged and hunted', `Food remaining: ${Math.round(journey.resources.food || 0)} person-days`);
     } else if (actionId === 'maintain') {
       journey.hoursRemaining -= 2;
       await handleMaintenance(game);
+      logReconAction(journey, 'Maintained equipment', `Equipment: ${Math.round(journey.resources.equipment || 0)}%`);
     } else if (actionId === 'triage') {
       journey.hoursRemaining -= 1;
       await handleTriage(game);
+      logReconAction(journey, 'Treated crew injuries', `First-aid kits remaining: ${journey.resources.firstAid || 0}`);
     } else if (actionId === 'resupply') {
       journey.hoursRemaining -= 2;
       await handleResupply(game, currentBlock);
+      logReconAction(journey, 'Visited supply point', currentBlock?.name || 'Supply point');
     } else if (actionId === 'scout') {
       journey.hoursRemaining -= 2;
       handleScoutAhead(ui, journey);
+      logReconAction(journey, 'Scouted the next block');
     }
 
     ui.updateAllStatus(journey);
+    shiftState.hasTraveled = hasTraveled;
+    shiftState.dayResolved = dayResolved;
+    checkpointReconShift(game, shiftState, pendingEvent);
+
+    const acknowledgedActions = {
+      ground_truth: 'Ground-truth access',
+      values_sweep: 'Values sweep',
+      field_notebook: 'Field notebook',
+      forage: 'Forage and hunt',
+      maintain: 'Maintenance',
+      triage: 'Triage',
+      resupply: 'Resupply',
+      scout: 'Scouting'
+    };
+    if (acknowledgedActions[actionId]) {
+      await acknowledgeActionResult(ui, acknowledgedActions[actionId]);
+    }
 
     // If there are still hours, prompt between actions
   }
@@ -634,9 +757,12 @@ async function runFieldDay(game) {
   // A held event that never met the trail finds the crew in camp instead.
   if (pendingEvent) {
     ui.write('');
-    ui.write('Trouble finds camp anyway.');
-    await handleEvent(game, pendingEvent);
+    ui.writeHeader('EVENT BEFORE LIGHTS-OUT');
+    ui.write('Trouble reaches camp before lights-out.');
+    const campEvent = pendingEvent;
     pendingEvent = null;
+    checkpointReconShift(game, shiftState, pendingEvent);
+    await handleEvent(game, campEvent);
     if (game.gameOver) return;
   }
 
@@ -644,7 +770,11 @@ async function runFieldDay(game) {
   // a camp_work pass so the day's resource/crew effects apply exactly once.
   if (!dayResolved) {
     const result = executeFieldAction(journey, 'camp_work');
-    for (const msg of result.messages) ui.write(msg);
+    ui.writeHeader('SHIFT CONSEQUENCES');
+    writeFieldMessages(ui, result.messages);
+    dayResolved = true;
+    shiftState.dayResolved = true;
+    checkpointReconShift(game, shiftState, pendingEvent);
   }
 
   // Milestones crossed by desk-side progress (notebook write-ups, package
@@ -654,17 +784,19 @@ async function runFieldDay(game) {
   // Anyone lost today gets their marker before the day closes.
   await maybeMemorializeFallen(game);
 
-  // Advance the calendar exactly once, now that the shift is genuinely over.
-  endFieldDay(journey);
-
   ui.updateAllStatus(journey);
 
-  // Contextual continue with next-day info (Phase 6.1)
+  // Keep the completed shift's day, weather, hours, and location together on
+  // screen. The next shift starts only after this acknowledgement.
   const nextBlock = journey.blocks[journey.currentBlockIndex];
-  const continueLabel = nextBlock
-    ? `Continue... (Next: ${nextBlock.name}, ${nextBlock.terrain})`
-    : 'Continue...';
-  await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
+  await ui.promptChoice('', [{
+    label: `Begin Shift ${journey.day + 1} at ${nextBlock?.name || 'Unknown'}`,
+    value: 'next'
+  }]);
+  journey.activeReconShift = null;
+  endFieldDay(journey);
+  ui.updateAllStatus(journey);
+  game.checkpoint?.();
 }
 
 /**
@@ -940,6 +1072,7 @@ function displayDayHeader(ui, journey) {
 
   // ASCII block map (Phase 5.4)
   ui.write(buildBlockMap(journey));
+  ui.write('* supply point', 'term-dim');
 
   // The landmark drumbeat: how far to the next named place, how far come.
   const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
@@ -975,7 +1108,7 @@ function displayDayHeader(ui, journey) {
     { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
     { label: 'Hours left', value: `${journey.hoursRemaining || 0}h` },
     { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km` },
-    { label: 'Block', value: `${progressInfo.blocksCompleted}/${progressInfo.totalBlocks}` }
+    { label: 'Reached', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` }
   ];
   const checklist = [];
 
@@ -996,7 +1129,7 @@ function displayDayHeader(ui, journey) {
   }
 
   const alerts = [];
-  const currentAccessVerdict = getBlockAccessVerdict(currentBlock, journey.weather, journey);
+  const currentAccessVerdict = getDisplayedAccessVerdict(journey, currentBlock);
   if (currentAccessVerdict.id === 'no_go' || currentAccessVerdict.id === 'heli_only') {
     alerts.push({ level: 'danger', text: formatAccessVerdict(currentAccessVerdict) });
   } else if (currentAccessVerdict.id !== 'passable_now') {
@@ -1040,7 +1173,7 @@ function displayReconBriefing(ui, journey) {
   ui.write('');
   ui.writeHeader('FIELD BRIEFING');
 
-  const currentAccessVerdict = getBlockAccessVerdict(currentBlock, journey.weather, journey);
+  const currentAccessVerdict = getDisplayedAccessVerdict(journey, currentBlock);
   ui.write(formatAccessVerdict(currentAccessVerdict));
   const currentInfrastructureLine = formatInfrastructureStatus(currentAccessVerdict);
   if (currentInfrastructureLine) {
@@ -1070,7 +1203,7 @@ function displayReconBriefing(ui, journey) {
 
   const scrutinyValue = Number(journey.scrutiny ?? journey.heat ?? 0);
   if (Number.isFinite(scrutinyValue)) {
-    ui.write(`Scrutiny / Heat: ${Math.max(0, scrutinyValue)}`);
+    ui.write(`Scrutiny / Heat: ${Math.round(Math.max(0, scrutinyValue))}%`);
   }
   const areaSituation = getAreaSituationSummary(journey);
   if (areaSituation) {
@@ -1151,10 +1284,7 @@ function formatTerrainLabel(terrainId) {
 }
 
 function getRouteHazardSummary(currentBlock, nextBlock, weather) {
-  const hazardSet = new Set([
-    ...(currentBlock?.hazards || []),
-    ...(nextBlock?.hazards || [])
-  ]);
+  const hazardSet = new Set(nextBlock?.hazards || []);
   const details = [];
 
   if (nextBlock?.terrain) {

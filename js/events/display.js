@@ -6,6 +6,17 @@
 import { isFieldJourney } from './constants.js';
 
 /**
+ * Give field events one consistent radio lead without making the reporter's
+ * task compete grammatically with the event itself.
+ */
+export function formatRadioReport(description, reporter) {
+  if (!reporter) return description;
+
+  const roleLabel = reporter.role || 'Crew';
+  return `Radio from ${reporter.name} (${roleLabel}): ${description}`;
+}
+
+/**
  * Format event for display
  * @param {Object} event - Event object
  * @param {string} journeyType - Journey type
@@ -13,11 +24,7 @@ import { isFieldJourney } from './constants.js';
  */
 export function formatEventForDisplay(event, journeyType = 'field') {
   const reporter = isFieldJourney(journeyType) ? event.reporter : null;
-  const roleLabel = reporter?.role || 'Crew';
-  const taskClause = reporter?.task ? ` while ${reporter.task}` : '';
-  const description = reporter
-    ? `${reporter.name} (${roleLabel})${taskClause} radios in: ${event.description}`
-    : event.description;
+  const description = formatRadioReport(event.description, reporter);
   const title = event.title;
 
   return {

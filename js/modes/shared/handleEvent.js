@@ -66,8 +66,10 @@ export async function handleEvent(game, event) {
   const selectedOption = event.options[optionIndex] || event.options[usable[0].index];
 
   const result = resolveEvent(journey, event, selectedOption);
+  game.checkpoint?.();
 
   ui.write('');
+  ui.writeHeader('OUTCOME');
   for (const msg of result.messages) {
     ui.write(msg);
   }
@@ -76,4 +78,13 @@ export async function handleEvent(game, event) {
     game.gameOver = true;
     journey.endReason = selectedOption.gameOverReason || 'Event outcome';
   }
+
+  // Keep the result on screen until the player explicitly acknowledges it.
+  // Otherwise end-of-shift effects or another event can immediately displace
+  // the very consequence that makes this decision meaningful.
+  await ui.promptChoice('', [{
+    label: 'Acknowledge outcome and continue',
+    description: 'Return to the shift after reviewing the result',
+    value: 'continue'
+  }]);
 }

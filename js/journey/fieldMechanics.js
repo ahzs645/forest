@@ -146,13 +146,13 @@ function buildAccessSummary(verdictId, reasons, weather) {
 
   switch (verdictId) {
     case 'no_go':
-      return joined ? `${joined} makes this a no-go.` : 'This block is a no-go for now.';
+      return joined ? `No-go: do not proceed because of ${joined}.` : 'No-go under current conditions.';
     case 'heli_only':
-      return joined ? `${joined} points to heli-only access.` : 'Heli-only access is the cleanest option here.';
+      return joined ? `Use air access because of ${joined}.` : 'Use air access for this block.';
     case 'winter_only':
-      return joined ? `${joined} reads as winter-only until the ground firms up.` : 'Winter-only access looks safer here.';
+      return joined ? `Wait for frozen ground because of ${joined}.` : 'Wait for frozen ground before entering.';
     case 'rehab_needed':
-      return joined ? `${joined} means this block needs rehab before it is cleanly usable.` : 'This block needs rehab before it is cleanly usable.';
+      return joined ? `Repair the approach before routine use; main concern: ${joined}.` : 'Repair the approach before routine use.';
     default:
       return leadText
         ? `Routine access for now, with ${leadText} to keep watching.`
@@ -725,9 +725,7 @@ export function formatAccessVerdict(verdict) {
     return 'Access verdict: Passable now';
   }
 
-  const base = `Access verdict: ${verdict.label}${verdict.summary ? ` - ${verdict.summary}` : ''}`;
-  const infrastructure = formatInfrastructureStatus(verdict);
-  return infrastructure ? `${base} | ${infrastructure}` : base;
+  return `Access verdict: ${verdict.label}${verdict.summary ? ` — ${verdict.summary}` : ''}`;
 }
 
 function getCrewTravelModifier(journey) {
@@ -862,6 +860,8 @@ export function executeFieldAction(journey, paceId) {
       );
       recordAccessDiscoveryTags(journey, block, accessVerdict, weatherToday);
       messages.push(formatAccessVerdict(accessVerdict));
+      const infrastructureStatus = formatInfrastructureStatus(accessVerdict);
+      if (infrastructureStatus) messages.push(infrastructureStatus);
 
       const scrutinyDelta = applyAccessVerdictPressure(journey, accessVerdict, {
         stance: getAccessStance(routePlan, effectivePaceId)

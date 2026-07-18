@@ -101,8 +101,45 @@ test('recce smoke exposes role-specific ground-truth actions', async ({ page }) 
   );
   await expect(page.locator('#choices button').filter({ hasText: 'Ground-Truth Access' })).toBeVisible();
   await page.locator('#choices button').filter({ hasText: 'Ground-Truth Access' }).click();
+  await expect(page.locator('#choices button').filter({ hasText: 'Acknowledge results and continue' })).toBeVisible();
+  await page.locator('#choices button').filter({ hasText: 'Acknowledge results and continue' }).click();
   await expect(page.locator('#choices button').filter({ hasText: 'Rest & End Shift' })).toBeVisible();
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
+});
+
+test('response-pane reflow keeps the newest prompt visible at the bottom of a long field log', async ({ page }) => {
+  await startRole(page, 2, 0, 'Greenhorn', 6101);
+
+  await page.evaluate(() => {
+    const ui = window.__forestGame.ui;
+    ui._hideChoices();
+    for (let index = 0; index < 60; index += 1) {
+      ui.write(`Prior field result ${index + 1}`);
+    }
+    void ui.promptChoice('What do you do?', [
+      { label: 'First response', value: 'first' },
+      { label: 'Second response', value: 'second' },
+      { label: 'Third response', value: 'third' }
+    ]);
+  });
+
+  await expect(page.locator('#choices button')).toHaveCount(3);
+  const position = await page.locator('#terminal').evaluate((terminal) => {
+    const prompt = terminal.lastElementChild;
+    const terminalRect = terminal.getBoundingClientRect();
+    const promptRect = prompt?.getBoundingClientRect();
+    return {
+      bottomGap: terminal.scrollHeight - terminal.clientHeight - terminal.scrollTop,
+      promptVisible: Boolean(
+        promptRect
+          && promptRect.top >= terminalRect.top
+          && promptRect.bottom <= terminalRect.bottom
+      )
+    };
+  });
+
+  expect(Math.abs(position.bottomGap)).toBeLessThanOrEqual(1);
+  expect(position.promptVisible).toBeTruthy();
 });
 
 test('silviculture smoke reaches contractor rotation without runtime failure', async ({ page }) => {

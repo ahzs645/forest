@@ -16,6 +16,7 @@ import { ILLEGAL_ACTS } from '../data/illegalActs.js';
 import { PACE_OPTIONS } from '../journey/constants.js';
 import { getDiscoveryEventTypeMultipliers } from '../data/discoveryTags.js';
 import { getAreaSituationMultipliers } from '../data/areaSituations.js';
+import { formatRadioReport } from './display.js';
 
 /**
  * Check if a random event should occur
@@ -23,6 +24,14 @@ import { getAreaSituationMultipliers } from '../data/areaSituations.js';
  * @returns {Object|null} Event to resolve or null
  */
 export function checkForEvent(journey) {
+  // Temptations need their own draw lane. When they were only attempted after
+  // the large ordinary-event deck missed, their advertised chance collapsed
+  // to a few percent and the added illegal-act library was almost invisible.
+  const temptation = maybeCreateTemptationEvent(journey);
+  if (temptation) {
+    return temptation;
+  }
+
   if (journey.journeyType === 'manager') {
     return checkManagerEvent(journey);
   }
@@ -32,7 +41,7 @@ export function checkForEvent(journey) {
   if (event) {
     return isField ? attachFieldReporter(event, journey) : event;
   }
-  return maybeCreateTemptationEvent(journey);
+  return null;
 }
 
 // Manager days split roughly 60/40 between boardroom paper and operational
@@ -47,9 +56,7 @@ const MANAGER_DESK_EVENT_RATIO = 0.6;
 function checkManagerEvent(journey) {
   const wantsDesk = Math.random() < MANAGER_DESK_EVENT_RATIO;
   const event = wantsDesk ? checkDeskEvent(journey) : checkFieldEvent(journey);
-  if (!event) {
-    return maybeCreateTemptationEvent(journey);
-  }
+  if (!event) return null;
   return wantsDesk ? event : attachManagerFieldReporter(event, journey);
 }
 
@@ -65,10 +72,9 @@ function attachManagerFieldReporter(event, journey) {
     return reported;
   }
 
-  const taskClause = reporter.task ? ` while ${reporter.task}` : '';
   return {
     ...reported,
-    description: `${reporter.name} (${reporter.role})${taskClause} radios in: ${event.description}`
+    description: formatRadioReport(event.description, reporter)
   };
 }
 
@@ -287,6 +293,8 @@ function attachFieldReporter(event, journey) {
       name: reporter.name,
       role: reporter.roleName || reporter.role || 'Crew',
       roleId: reporter.role,
+      // Keep this context for logs/future event-aware copy, but the display
+      // intentionally omits a random task that may not match the incident.
       task: getRadioTask(reporter)
     }
   };
@@ -357,13 +365,20 @@ function maybeCreateTemptationEvent(journey) {
   // Manager temptations play at boardroom stakes, not bush stakes.
   const isDesk = isDeskJourney(journey.journeyType) || journey.journeyType === 'manager';
 
-  // Cooldown gate: at most one offer per few days, never on day 1.
+  // Cooldown gate: at most one offer per few days, never on day 1. A fresh
+  // memory has no previous draw, so it must not accidentally impose a four-day
+  // opening lockout.
   const day = Number(journey.day || 1);
-  const memory = journey.temptationMemory || (journey.temptationMemory = { lastDay: 0, seenActIds: [] });
-  if (day <= 1 || day - memory.lastDay < TEMPTATION_COOLDOWN_DAYS) return null;
+  const memory = journey.temptationMemory || (journey.temptationMemory = { lastDay: 0, seenActIds: [], missedEligibleDays: 0 });
+  if (day <= 1 || (memory.lastDay > 0 && day - memory.lastDay < TEMPTATION_COOLDOWN_DAYS)) return null;
 
-  const chance = (isDesk ? 0.1 : 0.12) * getDifficultyEventModifier(journey);
-  if (Math.random() > chance) return null;
+  const baseChance = isDesk ? 0.15 : 0.18;
+  const chance = Math.min(0.3, baseChance * getDifficultyEventModifier(journey));
+  const guaranteeAfterMisses = 3;
+  if (Math.random() > chance && Number(memory.missedEligibleDays || 0) < guaranteeAfterMisses) {
+    memory.missedEligibleDays = Number(memory.missedEligibleDays || 0) + 1;
+    return null;
+  }
 
   const roleId = journey.roleId || journey.role?.id;
   const candidates = ILLEGAL_ACTS.filter((act) => {
@@ -377,6 +392,7 @@ function maybeCreateTemptationEvent(journey) {
   const act = pool[Math.floor(Math.random() * pool.length)];
   if (!act) return null;
   memory.lastDay = day;
+  memory.missedEligibleDays = 0;
   if (act.id) memory.seenActIds.push(act.id);
 
   const baseGain = isDesk ? 3500 : 650;
@@ -405,7 +421,7 @@ function maybeCreateTemptationEvent(journey) {
     type: 'temptation',
     severity: 'moderate',
     probability: 0,
-    description: String(act.description || 'A tempting shortcut appears.'),
+    description: `Someone on the job quietly proposes a shortcut: “${String(act.description || 'Take a shortcut that should not be taken.')}”`,
     options: [
       {
         label: 'Refuse and keep it clean',
@@ -414,14 +430,16 @@ function maybeCreateTemptationEvent(journey) {
       },
       {
         label: 'Take the shortcut (high risk)',
-        outcome: takeOutcome,
+        outcome: `${takeOutcome} Avoided costs leave $${Math.min(gain, isDesk ? gain : 1200).toLocaleString()} available in the budget.`,
         effects: takeEffects,
-        riskInjury: takeRiskInjury
+        riskInjury: takeRiskInjury,
+        reactionTone: 'compromised'
       },
       {
         label: 'Document and report',
         outcome: 'You put it in writing. It takes time, but strengthens your position.',
-        effects: reportEffects
+        effects: reportEffects,
+        reactionTone: 'responsible'
       }
     ]
   };

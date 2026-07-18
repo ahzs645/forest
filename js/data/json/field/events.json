@@ -1122,11 +1122,11 @@
  },
  {
   "id": "helicopter_available",
-  "title": "Helicopter Available for Hire",
+  "title": "Discounted Flight Time",
   "type": "supply",
   "severity": "minor",
   "probability": 0.04,
-  "description": "A pilot radios in — his afternoon charter cancelled and he's offering discounted flight time. He could sling supplies to your next block or do an aerial recon.",
+  "description": "A local pilot's afternoon charter was cancelled. At a reduced rate, the pilot can sling supplies to your next block or fly an aerial reconnaissance.",
   "options": [
    {
     "label": "Sling supplies ahead ($1500)",
@@ -1155,15 +1155,15 @@
  },
  {
   "id": "best_worker_sick",
-  "title": "Your Best Worker Is Sick",
+  "title": "A Key Crew Member Is Sick",
   "type": "illness",
   "severity": "moderate",
   "probability": 0.06,
-  "description": "Your most productive crew member wakes up feverish and pale. He insists he can work but he's clearly struggling.",
+  "description": "One of your strongest crew members is feverish, pale, and clearly struggling. They insist they can keep working.",
   "options": [
    {
     "label": "Send them back to rest in camp",
-    "outcome": "He sleeps all day. You lose your best producer but he should recover by tomorrow.",
+    "outcome": "They sleep through the shift. You lose a strong producer today, but rest gives them the best chance to recover by tomorrow.",
     "effects": {
      "progress": -8
     },
@@ -1173,7 +1173,7 @@
    },
    {
     "label": "Let them do light duty",
-    "outcome": "He putters around camp doing small tasks. Not much help, but he doesn't get worse. Probably.",
+    "outcome": "They handle small tasks around camp. It helps a little, and they do not seem to get worse—yet.",
     "effects": {
      "progress": -4
     },
@@ -1185,7 +1185,7 @@
    },
    {
     "label": "Medicate and push through",
-    "outcome": "You dose him up from the first aid kit. He works at half speed.",
+    "outcome": "You use the first-aid kit to manage the symptoms. They work at half speed, but the illness may worsen.",
     "effects": {
      "firstAid": -1,
      "progress": -2

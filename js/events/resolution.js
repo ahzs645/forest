@@ -92,11 +92,12 @@ export function resolveEvent(journey, event, option) {
     messages.push('That call comes back on you.');
   }
 
-  if (isFieldJourney(journey.journeyType) && typeof option.timeUsed === 'number') {
-    const hours = Math.max(0, Math.min(8, option.timeUsed));
+  const fieldTimeUsed = option.timeUsed ?? effects?.timeUsed;
+  if (isFieldJourney(journey.journeyType) && typeof fieldTimeUsed === 'number') {
+    const hours = Math.max(0, Math.min(8, fieldTimeUsed));
     journey.travelDelayHours = Math.min(8, (journey.travelDelayHours || 0) + hours);
     if (hours > 0) {
-      messages.push(`Lost ${hours} hours dealing with the situation.`);
+      messages.push(`Lost ${hours} hour${hours === 1 ? '' : 's'} dealing with the situation.`);
     }
   }
 
@@ -122,7 +123,7 @@ export function resolveEvent(journey, event, option) {
   const scrutinyDelta = Number(journey.scrutiny || 0) - scrutinyBefore;
   if (scrutinyDelta !== 0) {
     const direction = scrutinyDelta > 0 ? 'rose' : 'eased';
-    messages.push(`Scrutiny ${direction} to ${journey.scrutiny}%.`);
+    messages.push(`Scrutiny ${direction} to ${Math.round(journey.scrutiny)}%.`);
   }
 
   const reaction = buildEventReaction(journey, option);
@@ -137,6 +138,9 @@ export function resolveEvent(journey, event, option) {
     eventId: event.id,
     eventTitle: event.title,
     optionLabel: option.label,
+    outcome: outcome || '',
+    consequences: messages.filter((message) => message && message !== outcome),
+    effects: effects ? { ...effects } : {},
     severity: event.severity,
     ...(injuryVictim ? { victimId: injuryVictim.id, victimName: injuryVictim.name } : {})
   });
