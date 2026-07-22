@@ -35,7 +35,6 @@ import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journe
 import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
 import { buildCampfireFrames } from '../scene/textmode/effects.js';
 import { buildNightCampFrames } from '../scene/textmode/scenes.js';
-import { buildHuntFrames, scoreHunt } from '../scene/hunt.js';
 import { FIELD_RESOURCES } from '../resources.js';
 import {
   addDiscoveryTags,
@@ -248,6 +247,13 @@ function getReconAccessSeverity(verdict) {
 }
 
 function getDisplayedAccessVerdict(journey, block) {
+  if (block && !getReconBlockIntel(journey, block).accessGroundTruthed) {
+    return {
+      id: 'unverified',
+      label: 'Unverified',
+      summary: 'Ground-truth the crossing, road condition, and approach before relying on this route.'
+    };
+  }
   const recorded = block?.id ? journey.accessVerdicts?.[block.id] : null;
   if (recorded
     && recorded.day === journey.day
@@ -420,6 +426,7 @@ async function runFieldDay(game) {
     displayDayHeader(ui, journey);
     await maybeHandleFoodDecision(game);
     ui.updateAllStatus(journey);
+    updateReconMissionStatus(ui, journey);
     logReconAction(journey, 'Ration decision', `Food remaining: ${Math.round(journey.resources.food || 0)} person-days`);
     checkpointReconShift(game, shiftState, pendingEvent);
     await acknowledgeActionResult(ui, 'Ration decision');
@@ -432,7 +439,6 @@ async function runFieldDay(game) {
     const hasNextBlock = journey.currentBlockIndex < journey.blocks.length - 1;
     const canTravel = !hasTraveled && hasNextBlock && journey.resources.fuel > 0 && journey.resources.equipment > 0;
     const blockIntel = getReconBlockIntel(journey, currentBlock);
-    const accessVerdict = currentBlock ? getDisplayedAccessVerdict(journey, currentBlock) : null;
     const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
 
     displayDayHeader(ui, journey);
@@ -446,7 +452,7 @@ async function runFieldDay(game) {
     if (currentBlock && !blockIntel.accessGroundTruthed && journey.hoursRemaining >= 2) {
       primaryOptions.push({
         label: 'Ground-Truth Access (2h)',
-        description: `Required for this package — verify crossings, road condition, and approach risk (${accessVerdict?.label || 'current access check'})`,
+        description: 'Required for this package — access is unverified; inspect crossings, road condition, and approach risk',
         value: 'ground_truth'
       });
     }
@@ -510,11 +516,13 @@ async function runFieldDay(game) {
 
     // Camp actions (available anytime), one level down to keep the turn clean.
     if (journey.hoursRemaining >= 2) {
+      if ((journey.resources.fuel || 0) >= 3) {
       supportOptions.push({
-        label: 'Forage & Hunt (2h)',
-        description: 'Search for food and salvage; moderate risk',
-        value: 'forage'
+        label: 'Retrieve Cached Rations (2h)',
+        description: 'Detour to a marked emergency cache; restores food but uses fuel',
+        value: 'food_cache'
       });
+      }
       supportOptions.push({
         label: 'Maintenance (2h)',
         description: 'Repair equipment',
@@ -555,7 +563,7 @@ async function runFieldDay(game) {
     if (supportOptions.length > 0) {
       primaryOptions.push({
         label: 'Camp & Support ▸',
-        description: 'Forage, repairs, triage, scouting, map and briefing',
+        description: 'Cached rations, repairs, triage, scouting, map and briefing',
         value: 'support_menu'
       });
     }
@@ -710,10 +718,10 @@ async function runFieldDay(game) {
       journey.hoursRemaining -= 2;
       handleFieldNotebook(ui, journey);
       logReconAction(journey, 'Updated field notebook');
-    } else if (actionId === 'forage') {
+    } else if (actionId === 'food_cache') {
       journey.hoursRemaining -= 2;
-      await handleForageAndHunt(game);
-      logReconAction(journey, 'Foraged and hunted', `Food remaining: ${Math.round(journey.resources.food || 0)} person-days`);
+      retrieveCachedRations(ui, journey);
+      logReconAction(journey, 'Retrieved cached rations', `Food remaining: ${Math.round(journey.resources.food || 0)} person-days`);
     } else if (actionId === 'maintain') {
       journey.hoursRemaining -= 2;
       await handleMaintenance(game);
@@ -733,6 +741,7 @@ async function runFieldDay(game) {
     }
 
     ui.updateAllStatus(journey);
+    updateReconMissionStatus(ui, journey);
     shiftState.hasTraveled = hasTraveled;
     shiftState.dayResolved = dayResolved;
     checkpointReconShift(game, shiftState, pendingEvent);
@@ -741,7 +750,7 @@ async function runFieldDay(game) {
       ground_truth: 'Ground-truth access',
       values_sweep: 'Values sweep',
       field_notebook: 'Field notebook',
-      forage: 'Forage and hunt',
+      food_cache: 'Cached-ration retrieval',
       maintain: 'Maintenance',
       triage: 'Triage',
       resupply: 'Resupply',
@@ -1060,12 +1069,71 @@ async function runMilestoneCamp(game, threshold) {
   ui.updateAllStatus(journey);
 }
 
+/** Refresh the mission pane without clearing the action result on screen. */
+export function updateReconMissionStatus(ui, journey) {
+  const currentBlock = journey.blocks?.[journey.currentBlockIndex];
+  const progressInfo = getFieldProgressInfo(journey);
+  const totalBlocks = progressInfo.totalBlocks || journey.blocks?.length || 0;
+  const packagesDone = Math.min(totalBlocks, journey.blocksAssessed || 0);
+  const completionPct = totalBlocks > 0 ? Math.round((packagesDone / totalBlocks) * 100) : 0;
+  const packagesRemaining = Math.max(0, totalBlocks - packagesDone);
+  const facts = [
+    { label: 'Weather', value: journey.weather?.name || 'Clear' },
+    { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
+    { label: 'Hours left', value: `${journey.hoursRemaining || 0}h` },
+    { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km` },
+    { label: 'Reached', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` }
+  ];
+  const checklist = [];
+
+  if (currentBlock) {
+    const intel = getReconBlockIntel(journey, currentBlock);
+    const sweep = getReconValueSweepProfile(currentBlock, journey);
+    const finalized = intel.accessGroundTruthed && (!sweep.needed || intel.valuesSwept);
+    checklist.push({ label: 'access ground-truthed', done: intel.accessGroundTruthed });
+    checklist.push({
+      label: sweep.needed ? 'values sweep' : 'values sweep (not flagged)',
+      done: sweep.needed ? intel.valuesSwept : true
+    });
+    checklist.push({ label: 'package finalized', done: finalized });
+    facts.push({
+      label: 'Intel',
+      value: `access ${intel.accessGroundTruthed ? 'verified' : 'unverified'} · values ${sweep.needed ? (intel.valuesSwept ? 'swept' : 'pending') : 'quiet'}`
+    });
+  }
+
+  const alerts = [];
+  const currentAccessVerdict = getDisplayedAccessVerdict(journey, currentBlock);
+  if (currentAccessVerdict.id === 'no_go' || currentAccessVerdict.id === 'heli_only') {
+    alerts.push({ level: 'danger', text: formatAccessVerdict(currentAccessVerdict) });
+  } else if (currentAccessVerdict.id !== 'passable_now') {
+    alerts.push({ level: 'warn', text: formatAccessVerdict(currentAccessVerdict) });
+  }
+  if (journey.rationPlan?.mode === 'short') {
+    alerts.push({
+      level: 'warn',
+      text: `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
+    });
+  }
+
+  const status = {
+    objective: packagesRemaining > 0
+      ? `Finalize every block package — ${packagesRemaining} still open`
+      : `Win condition met: all ${totalBlocks} block packages finalized`,
+    meter: { label: 'Packages', value: completionPct, text: `${packagesDone}/${totalBlocks}` },
+    facts,
+    checklist,
+    alerts
+  };
+  ui.setMissionStatus?.(status);
+  return status;
+}
+
 /**
  * Display compact day header with status (Phase 6.2)
  */
 function displayDayHeader(ui, journey) {
   const currentBlock = journey.blocks[journey.currentBlockIndex];
-  const progressInfo = getFieldProgressInfo(journey);
 
   ui.clear();
   ui.writeHeader(`SHIFT ${journey.day} - ${currentBlock?.name || 'Unknown Territory'}`);
@@ -1094,63 +1162,7 @@ function displayDayHeader(ui, journey) {
     journey.lastActionRecap = null;
   }
 
-  // The status picture renders in the mission dashboard pane, not as prose.
-  // Recon is won by closing every block package, so the headline meter tracks
-  // Package Completion with this block's checklist underneath; resources and
-  // crew live in their own panes already.
-  const totalBlocks = progressInfo.totalBlocks || journey.blocks?.length || 0;
-  const packagesDone = Math.min(totalBlocks, journey.blocksAssessed || 0);
-  const completionPct = totalBlocks > 0 ? Math.round((packagesDone / totalBlocks) * 100) : 0;
-  const packagesRemaining = Math.max(0, totalBlocks - packagesDone);
-
-  const facts = [
-    { label: 'Weather', value: journey.weather?.name || 'Clear' },
-    { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
-    { label: 'Hours left', value: `${journey.hoursRemaining || 0}h` },
-    { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km` },
-    { label: 'Reached', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` }
-  ];
-  const checklist = [];
-
-  if (currentBlock) {
-    const intel = getReconBlockIntel(journey, currentBlock);
-    const sweep = getReconValueSweepProfile(currentBlock, journey);
-    const finalized = intel.accessGroundTruthed && (!sweep.needed || intel.valuesSwept);
-    checklist.push({ label: 'access ground-truthed', done: intel.accessGroundTruthed });
-    checklist.push({
-      label: sweep.needed ? 'values sweep' : 'values sweep (not flagged)',
-      done: sweep.needed ? intel.valuesSwept : true
-    });
-    checklist.push({ label: 'package finalized', done: finalized });
-    facts.push({
-      label: 'Intel',
-      value: `access ${intel.accessGroundTruthed ? 'verified' : 'unverified'} \u00b7 values ${sweep.needed ? (intel.valuesSwept ? 'swept' : 'pending') : 'quiet'}`
-    });
-  }
-
-  const alerts = [];
-  const currentAccessVerdict = getDisplayedAccessVerdict(journey, currentBlock);
-  if (currentAccessVerdict.id === 'no_go' || currentAccessVerdict.id === 'heli_only') {
-    alerts.push({ level: 'danger', text: formatAccessVerdict(currentAccessVerdict) });
-  } else if (currentAccessVerdict.id !== 'passable_now') {
-    alerts.push({ level: 'warn', text: formatAccessVerdict(currentAccessVerdict) });
-  }
-  if (journey.rationPlan?.mode === 'short') {
-    alerts.push({
-      level: 'warn',
-      text: `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
-    });
-  }
-
-  ui.setMissionStatus?.({
-    objective: packagesRemaining > 0
-      ? `Finalize every block package \u2014 ${packagesRemaining} still open`
-      : `Win condition met: all ${totalBlocks} block packages finalized`,
-    meter: { label: 'Packages', value: completionPct, text: `${packagesDone}/${totalBlocks}` },
-    facts,
-    checklist,
-    alerts
-  });
+  updateReconMissionStatus(ui, journey);
 
   // Crew dialogue (Phase 5.1) — an occasional voice, not a daily ritual
   const activeCrew = journey.crew.filter(m => m.isActive);
@@ -1356,11 +1368,11 @@ async function maybeHandleFoodDecision(game) {
     : 'Food stores are running thin. Decide how to handle rations today.';
   const options = [];
 
-  if ((journey.hoursRemaining || 0) >= 2) {
+  if ((journey.hoursRemaining || 0) >= 2 && (journey.resources.fuel || 0) >= 3) {
     options.push({
-      label: 'Hunt & Forage Before Moving (2h)',
-      description: 'Best chance to restock food, but it can cost time, blood, or clean meat',
-      value: 'hunt'
+      label: 'Retrieve Emergency Ration Cache (2h)',
+      description: 'Use two hours and a little fuel to recover sealed field rations',
+      value: 'cache'
     });
   }
 
@@ -1380,15 +1392,12 @@ async function maybeHandleFoodDecision(game) {
   const choice = await ui.promptChoice(prompt, options);
   rations.lastDecisionDay = journey.day;
 
-  if (choice.value === 'hunt') {
+  if (choice.value === 'cache') {
     rations.mode = 'normal';
     rations.shortRationStreak = 0;
     journey.hoursRemaining = Math.max(0, (journey.hoursRemaining || 0) - 2);
-    ui.write('You burn the first part of the shift trying to fill the food bins before pushing deeper.');
-    const hunted = await runHuntMinigame(game);
-    if (!hunted) {
-      applyForageResults(ui, journey, 'hunt');
-    }
+    ui.write('You spend the first part of the shift reaching the marked emergency cache before pushing deeper.');
+    retrieveCachedRations(ui, journey);
     ui.write('');
     return;
   }
@@ -1842,133 +1851,20 @@ export async function handleMaintenance(game) {
   }
 }
 
-/**
- * Apply forage results - finding supplies in the field
- * @param {Object} ui - UI instance
- * @param {Object} journey - Journey state
- * @param {string} strategy - 'forage' or 'hunt'
- */
-/**
- * The camp food action: forage the understory (a safe roll) or set up on
- * the game trail (the hunt minigame — a real gamble on your timing).
- */
-async function handleForageAndHunt(game) {
-  const { ui, journey } = game;
-  if (typeof ui.playScene !== 'function') {
-    applyForageResults(ui, journey, 'forage');
-    return;
-  }
+/** Recover a known emergency cache instead of treating wildlife as routine provisioning. */
+function retrieveCachedRations(ui, journey) {
+  const foodBefore = Number(journey.resources.food || 0);
+  const fuelBefore = Number(journey.resources.fuel || 0);
+  const foodRecovered = Math.min(12, Math.max(0, FIELD_RESOURCES.food.max - foodBefore));
+  const fuelUsed = Math.min(3, fuelBefore);
 
-  const choice = await ui.promptChoice('Fill the food bins:', [
-    {
-      label: 'Forage the understory',
-      description: 'Berries, salvage, maybe a grouse — steady odds',
-      value: 'forage',
-    },
-    {
-      label: 'Set up on the game trail',
-      description: 'One shot at real meat. Timing is everything.',
-      value: 'hunt',
-    },
-  ]);
-
-  if (choice.value === 'hunt') {
-    const hunted = await runHuntMinigame(game);
-    if (!hunted) {
-      ui.write('Nothing shows before the light goes. The crew falls back to foraging.');
-      applyForageResults(ui, journey, 'forage');
-    }
-    return;
-  }
-  applyForageResults(ui, journey, 'forage');
-}
-
-/**
- * Play the hunt scene and score the tap. Returns false when the minigame
- * didn't effectively run (reduced motion, no tap, headless UI) so callers
- * can fall back to the ordinary roll.
- */
-async function runHuntMinigame(game) {
-  const { ui, journey } = game;
-  if (typeof ui.playScene !== 'function') return false;
+  journey.resources.food = foodBefore + foodRecovered;
+  journey.resources.fuel = Math.max(0, fuelBefore - fuelUsed);
 
   ui.write('');
-  ui.writeHeader('THE GAME TRAIL');
-  ui.write('A moose works the willow line. One chance before the wind turns.', 'term-dim');
-  const result = await ui.playScene(buildHuntFrames({ seed: journey.day * 17 + 3 }), {
-    delay: 160,
-    holdLastFrame: false,
-  });
-  if (!result?.skipped) return false;
-
-  const score = scoreHunt(result.frameIndex);
-  ui.write('');
-  ui.writeHeader('HUNT RESULTS');
-  ui.write(score.line);
-  if (score.food > 0) {
-    journey.resources.food = Math.min(FIELD_RESOURCES.food.max, journey.resources.food + score.food);
-    ui.writePositive(`+${score.food} rations packed back to camp.`);
-    // Dressing game in the bush has its own risks.
-    if (score.quality === 'clean' && Math.random() < 0.08) {
-      const activeCrew = journey.crew.filter((m) => m.isActive);
-      const victim = activeCrew.length ? activeCrew[Math.floor(Math.random() * activeCrew.length)] : null;
-      if (victim) {
-        const illness = applyStatusEffect(victim, 'food_poisoning');
-        ui.writeWarning(`Field dressing in a hurry has consequences. ${illness.message}`);
-      }
-    }
-  } else {
-    ui.write('The bins stay light. Tomorrow the trail decides again.', 'term-dim');
-  }
-  return true;
-}
-
-function applyForageResults(ui, journey, strategy = 'forage') {
-  const active = journey.crew.filter(m => m.isActive).length || 1;
-  const isHunt = strategy === 'hunt';
-  const spotterBonus = crewHasRole(journey.crew, 'spotter') ? 1.1 : 1;
-  const foodBase = isHunt ? 10 : 6;
-  const foodVariance = isHunt ? 12 : 10;
-  const foodFound = Math.round((foodBase + Math.random() * foodVariance) * (active / 5) * spotterBonus);
-  const fuelFound = !isHunt && Math.random() < 0.25 ? Math.round(5 + Math.random() * 10) : 0;
-  const cashFound = !isHunt && Math.random() < 0.15 ? Math.round(120 + Math.random() * 480) : 0;
-
-  journey.resources.food = Math.min(FIELD_RESOURCES.food.max, journey.resources.food + foodFound);
-  if (fuelFound > 0) {
-    journey.resources.fuel = Math.min(FIELD_RESOURCES.fuel.max, journey.resources.fuel + fuelFound);
-  }
-  if (cashFound > 0) {
-    journey.resources.budget = Math.min(FIELD_RESOURCES.budget.max, journey.resources.budget + cashFound);
-  }
-
-  ui.write('');
-  ui.writeHeader(isHunt ? 'HUNT RESULTS' : 'FORAGE RESULTS');
-  ui.writePositive(`Found food: +${foodFound} rations`);
-  if (fuelFound > 0) ui.writePositive(`Recovered fuel: +${fuelFound} gallons`);
-  if (cashFound > 0) ui.writePositive(`Sold salvage: +$${cashFound.toLocaleString()}`);
-  if (isHunt) {
-    ui.write('The crew spends extra time tracking sign, dressing game, and packing meat back to camp.');
-  }
-
-  const complicationRoll = Math.random();
-  const injuryChance = isHunt ? 0.18 : 0.12;
-  const illnessChance = isHunt ? 0.10 : 0.05;
-  if (complicationRoll < injuryChance) {
-    const activeCrew = journey.crew.filter(m => m.isActive);
-    const victim = activeCrew.length ? activeCrew[Math.floor(Math.random() * activeCrew.length)] : null;
-    if (victim) {
-      const injury = applyRandomInjury(victim, isHunt ? 'moderate' : 'minor');
-      ui.writeWarning(`${isHunt ? 'Hunting' : 'Foraging'} accident! ${injury.message}`);
-    }
-  } else if (complicationRoll < injuryChance + illnessChance) {
-    const activeCrew = journey.crew.filter(m => m.isActive);
-    const victim = activeCrew.length ? activeCrew[Math.floor(Math.random() * activeCrew.length)] : null;
-    if (victim) {
-      const illnessId = isHunt && Math.random() < 0.5 ? 'food_poisoning' : 'dysentery';
-      const illness = applyStatusEffect(victim, illnessId);
-      ui.writeWarning(`Bad field prep catches up with the crew. ${illness.message}`);
-    }
-  }
+  ui.writeHeader('RATION CACHE');
+  ui.writePositive(`Recovered ${foodRecovered} person-days of sealed field rations.`);
+  ui.write(`Fuel used reaching the cache: ${fuelUsed}. Food now ${Math.round(journey.resources.food)} person-days.`);
 }
 
 

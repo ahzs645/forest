@@ -488,6 +488,7 @@ export const InitFlowMixin = {
         this._initState.roleId = role.id;
         this._renderRoleCards(roles);
         this._setRoleGlossaryTerms(role);
+        this._updateLaunchLabel(role);
         const activeArea = this._initAreas?.find((candidate) => candidate.id === this._initState.areaId) || this._initAreas?.[0];
         if (activeArea) {
           this._renderAreaDetail(activeArea, role);
@@ -507,6 +508,19 @@ export const InitFlowMixin = {
 
       this.roleGrid.appendChild(card);
     });
+  },
+
+  /** Keep the final setup action aligned with field and desk roles. */
+  _updateLaunchLabel(role = null) {
+    if (!this.areaContinueBtn) return;
+    const selectedRole = role || this._initRoles?.find((candidate) => candidate.id === this._initState.roleId);
+    const label = {
+      planner: 'OPEN PLANNING FILE',
+      permitter: 'OPEN PERMIT DESK',
+      recce: 'DEPLOY FIELD CREW',
+      silviculture: 'START FIELD PROGRAM',
+    }[selectedRole?.id] || 'START ASSIGNMENT';
+    this.areaContinueBtn.innerHTML = `${label} <span class="btn-arrow">►</span>`;
   },
 
   /**
@@ -885,6 +899,7 @@ export const InitFlowMixin = {
 
     this._renderRoleCards(roles);
     this._setRoleGlossaryTerms(roles[0]);
+    this._updateLaunchLabel(roles[0]);
     this._renderAreaList(areas);
     this._renderAreaDetail(areas[0], roles[0]);
     this._renderAreaGlossary(areas[0]);

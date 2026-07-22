@@ -245,13 +245,13 @@ function pickReconChoice(labels, terminalText) {
     return findFirstMatching(labels, ['Stay Mainline', 'Safe Detour', 'Risky Shortcut']);
   }
 
-  if (labels.some((label) => label.includes('Hunt & Forage Before Moving')) ||
+  if (labels.some((label) => label.includes('Retrieve Emergency Ration Cache')) ||
       labels.some((label) => label.includes('Keep Full Rations')) ||
       labels.some((label) => label.includes('Short Rations and Push On'))) {
     if (food <= 10) {
-      return findFirstMatching(labels, ['Hunt & Forage Before Moving', 'Keep Full Rations', 'Short Rations and Push On']);
+      return findFirstMatching(labels, ['Retrieve Emergency Ration Cache', 'Keep Full Rations', 'Short Rations and Push On']);
     }
-    return findFirstMatching(labels, ['Keep Full Rations', 'Hunt & Forage Before Moving', 'Short Rations and Push On']);
+    return findFirstMatching(labels, ['Keep Full Rations', 'Retrieve Emergency Ration Cache', 'Short Rations and Push On']);
   }
 
   if (terminalText.includes('RESUPPLY')) {
@@ -271,18 +271,18 @@ function pickReconChoice(labels, terminalText) {
   }
 
   if (food <= 12) {
-    return findFirstMatching(labels, ['Resupply', 'Forage & Hunt', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Resupply', 'Retrieve Cached Rations', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
   }
 
   if (fuel <= 25 || equipment <= 35) {
-    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Forage & Hunt', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Retrieve Cached Rations', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
   }
 
   if (injuredCount >= 2 && meds > 0) {
-    return findFirstMatching(labels, ['Triage', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Forage & Hunt', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Triage', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Retrieve Cached Rations', 'Rest & End Shift']);
   }
 
-  return findFirstMatching(labels, ['Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Forage & Hunt', 'Triage', 'Rest & End Shift']);
+  return findFirstMatching(labels, ['Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Retrieve Cached Rations', 'Triage', 'Rest & End Shift']);
 }
 
 function getRecommendedActionLabel(terminalText) {

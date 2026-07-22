@@ -138,7 +138,7 @@ function pickCollapseChoice(labels, terminalText, modeName) {
   }
 
   if (modeName === 'recce' && (labels.some((label) => label.includes('Keep Full Rations')) || labels.some((label) => label.includes('Short Rations and Push On')))) {
-    return findFirstMatching(labels, ['Keep Full Rations', 'Short Rations and Push On', 'Hunt & Forage Before Moving']);
+    return findFirstMatching(labels, ['Keep Full Rations', 'Short Rations and Push On', 'Retrieve Emergency Ration Cache']);
   }
 
   if (labels.some((label) => label.includes('Safe Detour')) || labels.some((label) => label.includes('Risky Shortcut'))) {
@@ -146,7 +146,7 @@ function pickCollapseChoice(labels, terminalText, modeName) {
   }
 
   if (labels.some((label) => label.includes('Keep Full Rations')) || labels.some((label) => label.includes('Short Rations and Push On'))) {
-    return findFirstMatching(labels, ['Short Rations and Push On', 'Keep Full Rations', 'Hunt & Forage Before Moving']);
+    return findFirstMatching(labels, ['Short Rations and Push On', 'Keep Full Rations', 'Retrieve Emergency Ration Cache']);
   }
 
   if (terminalText.includes('RESUPPLY')) {

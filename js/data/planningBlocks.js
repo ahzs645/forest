@@ -358,6 +358,61 @@ function scorePlanningBlockForTriage(block, triageKey, area = null, seasonInfo =
   return score;
 }
 
+function getTriageEvidenceValue(block, triageKey, area = null, seasonInfo = null) {
+  const metrics = block?.metrics || {};
+  if (triageKey === "access") return Math.round(Number(metrics.technicalComplexity || 0));
+  if (triageKey === "water") {
+    const water = getPlanningBlockWaterContext(block, area, seasonInfo);
+    return Math.round(Number(metrics.biodiversitySensitivity || 0) + water.timingPressure * 5);
+  }
+  if (triageKey === "community") {
+    return Math.round(Number(metrics.firstNationsSensitivity || 0) + (block?.indicators?.firstNationsReserveNearby ? 25 : 0));
+  }
+  return Math.round(Number(metrics.timberOpportunity || 0));
+}
+
+function selectDiverseTriageOptions(blocks, count, triageKey, area = null, seasonInfo = null) {
+  if (!triageKey) return blocks.slice(0, count);
+  const selected = [];
+  const seenEvidence = new Set();
+
+  for (const block of blocks) {
+    const evidence = getTriageEvidenceValue(block, triageKey, area, seasonInfo);
+    if (seenEvidence.has(evidence)) continue;
+    selected.push(block);
+    seenEvidence.add(evidence);
+    if (selected.length >= count) return selected;
+  }
+
+  for (const block of blocks) {
+    if (!selected.includes(block)) selected.push(block);
+    if (selected.length >= count) break;
+  }
+  return selected;
+}
+
+export function formatPlanningBlockTriageEvidence(block, triageKey, candidates = [], area = null, seasonInfo = null) {
+  const rank = Math.max(1, candidates.findIndex((candidate) => candidate?.id === block?.id) + 1);
+  const count = Math.max(1, candidates.length);
+  const metrics = block?.metrics || {};
+
+  if (triageKey === "access") {
+    return `Access evidence: engineering complexity ${Math.round(Number(metrics.technicalComplexity || 0))}/100 · fit rank ${rank}/${count} (lower lift is better)`;
+  }
+  if (triageKey === "water") {
+    const water = getPlanningBlockWaterContext(block, area, seasonInfo);
+    return `Water evidence: ecology sensitivity ${Math.round(Number(metrics.biodiversitySensitivity || 0))}/100 · hydrology ${water.gate.toUpperCase()} · fit rank ${rank}/${count}`;
+  }
+  if (triageKey === "community") {
+    const reserve = block?.indicators?.firstNationsReserveNearby ? "yes" : "no";
+    return `Consultation evidence: FN sensitivity ${Math.round(Number(metrics.firstNationsSensitivity || 0))}/100 · reserve nearby ${reserve} · fit rank ${rank}/${count}`;
+  }
+  if (triageKey === "timber") {
+    return `Timber evidence: opportunity ${Math.round(Number(metrics.timberOpportunity || 0))}/100 · fit rank ${rank}/${count} (higher opportunity is better)`;
+  }
+  return "Balanced evidence: compare timber, ecology, consultation, and engineering together.";
+}
+
 function getTriageOptions(recommendedKey) {
   const orderedKeys = [
     recommendedKey,
@@ -420,8 +475,8 @@ export function buildPlanningConstraintTriage(areaId, area = null, blocks = []) 
   const secondary = ranked[1];
   const summary = ranked.length
     ? [
-        leading ? `${leading.label} leads` : "",
-        secondary ? `next up: ${secondary.label}` : "",
+        leading ? `Strongest area signal: ${leading.label}` : "",
+        secondary ? `second: ${secondary.label}` : "",
       ]
         .filter(Boolean)
         .join(" | ")
@@ -584,7 +639,14 @@ export function pickPlanningBlockOptions(areaId, historyIds = [], count = 3, tri
         return (bScore + bWater) - (aScore + aWater);
       });
 
-  return [...rankedUnseen, ...rankedSeen].slice(0, clamp(count, 1, 6));
+  const optionCount = clamp(count, 1, 6);
+  return selectDiverseTriageOptions(
+    [...rankedUnseen, ...rankedSeen],
+    optionCount,
+    triageKey,
+    resolvedArea,
+    seasonInfo,
+  );
 }
 
 export function summarizePlanningBlock(block, area = null, triageKey = null, seasonInfo = null) {

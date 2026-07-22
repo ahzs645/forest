@@ -87,9 +87,16 @@ function riskTag(detail) {
   return '';
 }
 
-function collectDetailLines(contentData = {}) {
+export function collectDetailLines(contentData = {}) {
   const lines = [];
-  if (contentData.context) lines.push(contentData.context);
+  const context = contentData.context;
+  if (typeof context === 'string') {
+    lines.push(context);
+  } else if (context && typeof context === 'object') {
+    if (context.operation) lines.push(`Operation: ${context.operation}`);
+    if (context.objective) lines.push(`Objective: ${context.objective}`);
+    if (context.stakes) lines.push(`Stakes: ${context.stakes}`);
+  }
   if (contentData.whyNow) lines.push(`Why now: ${contentData.whyNow}`);
   if (contentData.flavor) lines.push(contentData.flavor);
   if (contentData.surfaceReason) lines.push(contentData.surfaceReason);
@@ -247,6 +254,17 @@ export function setExpeditionChromeHidden(hidden) {
     const el = document.getElementById(id);
     if (el) el.style.display = hidden ? 'none' : '';
   }
+
+  // Seasonal Strategy owns the mission dashboard, but it has no expedition
+  // crew, supply stockpile, or current field location. Hide those sections
+  // instead of leaving expedition placeholders in an otherwise valid mode.
+  for (const panelId of ['radio-panel', 'crew-panel', 'resources-panel', 'location-panel']) {
+    const section = document.getElementById(panelId)?.closest('.panel-section');
+    if (section) section.style.display = hidden ? 'none' : '';
+  }
+
+  const panelTitle = document.querySelector('.panel-title');
+  if (panelTitle) panelTitle.textContent = hidden ? 'STRATEGY DASHBOARD' : 'STATUS REPORT';
 }
 
 export async function runSeasonalGame(ui, options = {}) {

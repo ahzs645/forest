@@ -471,8 +471,10 @@ export class TerminalUI {
         };
         this.updateLocationPanel({
           name: `Strategic Planning`,
-          description: `Phase: ${phaseLabels[journey.plan?.phase] || 'Planning'}`,
-          phase: journey.plan?.phase,
+          description: Number.isFinite(journey.deadline)
+            ? `Landscape plan · Day ${journey.day} of ${journey.deadline}`
+            : `Landscape plan · Day ${journey.day}`,
+          phase: phaseLabels[journey.plan?.phase] || 'Planning',
           season: journey.season
         });
         break;

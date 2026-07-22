@@ -68,7 +68,7 @@ const CAMPAIGN_SEASONS = [
 const BRIEFING_STANCES = [
   {
     label: 'Run it careful',
-    preview: 'Compliance up · Progress down a step',
+    preview: 'Compliance +3 · Progress -2 · Extra first-aid kit and +5 equipment',
     riskLevel: 'low',
     yearEffects: { compliance: 3, progress: -2 },
     perkLine: 'The crew packs an extra first-aid kit and double-checks the gear.',
@@ -80,7 +80,7 @@ const BRIEFING_STANCES = [
   },
   {
     label: 'Balance the season',
-    preview: 'No posture bonus — judged on the work',
+    preview: 'No meter or supply modifier — judged entirely on the deployment',
     riskLevel: 'medium',
     yearEffects: {},
     perkLine: 'No shortcuts, no padding. The season is what you make of it.',
@@ -88,7 +88,7 @@ const BRIEFING_STANCES = [
   },
   {
     label: 'Push for delivery',
-    preview: 'Progress up · Compliance down a step',
+    preview: 'Progress +3 · Compliance -2 · Fuel +15% and budget +8%',
     riskLevel: 'high',
     yearEffects: { progress: 3, compliance: -2 },
     perkLine: 'Extra fuel and money up front — the district expects numbers for it.',

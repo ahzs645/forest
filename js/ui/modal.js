@@ -243,7 +243,7 @@ export const ModalMixin = {
       buildContent: (container) => {
         container.innerHTML = `
           <p><strong>BC FORESTRY TRAIL</strong></p>
-          <p>Guide your crew through the northern BC wilderness.</p>
+          <p>Guide forestry decisions across British Columbia's varied operating regions.</p>
           <br>
           <p><strong>Controls:</strong></p>
           <p>[1-9] - Select options</p>

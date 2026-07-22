@@ -204,26 +204,27 @@ function buildDecisionTrail(gs, limit = 5) {
   return entries.slice(-limit).reverse();
 }
 
-// Turn a raw effects delta into a short tradeoff hint shown *before* the player
-// commits. We surface the direction of the swing (which meters rise, which
-// fall) without spoiling the magnitude or the narrative outcome — that lands
-// after the choice in the result notice.
-function summarizeEffects(effects) {
+// Turn a raw effects delta into a concrete tradeoff hint shown *before* the
+// player commits. Exact magnitudes and time costs keep two "safe" options from
+// looking accidentally dominated when their real strengths differ.
+export function summarizeEffects(effects, option = null) {
   if (!effects || typeof effects !== "object") return null;
 
-  const gains = [];
-  const costs = [];
+  const changes = [];
   for (const [key, value] of Object.entries(effects)) {
-    if (!value) continue;
-    (value > 0 ? gains : costs).push(formatMetricName(key));
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric === 0 || key === "timeUsed") continue;
+    changes.push(`${formatMetricName(key)} ${numeric > 0 ? "+" : ""}${numeric}`);
   }
 
-  if (!gains.length && !costs.length) return null;
+  const timeUsed = Number.isFinite(Number(option?.timeUsed))
+    ? Number(option.timeUsed)
+    : Number(effects.timeUsed);
+  if (Number.isFinite(timeUsed) && timeUsed > 0) {
+    changes.push(`Time ${timeUsed}h`);
+  }
 
-  const parts = [];
-  if (gains.length) parts.push(`${gains.join(", ")} up`);
-  if (costs.length) parts.push(`${costs.join(", ")} down`);
-  return parts.join(" · ");
+  return changes.length ? changes.join(" · ") : null;
 }
 
 // Classify an option's downside into one readable risk band — SAFE / TRADEOFF /
@@ -259,7 +260,7 @@ function presentOption(option) {
   return {
     label: option.label,
     // Authored hint wins; otherwise derive a neutral tradeoff from the effects.
-    preview: option.preview ?? summarizeEffects(option.effects),
+    preview: option.preview ?? summarizeEffects(option.effects, option),
     // Kept for the post-choice result notice and danger-issue copy tests.
     outcome: option.outcome,
     // Surfaced for headless strategy policies (sims/tests). The browser UI
@@ -300,7 +301,7 @@ function presentDangerIssueOption(item, option, index) {
     if (crisisCopy) {
       return {
         ...crisisCopy,
-        preview: summarizeEffects(option?.effects),
+        preview: summarizeEffects(option?.effects, option),
         riskLevel: deriveRiskLevel(option, { danger: true }),
       };
     }
@@ -308,7 +309,7 @@ function presentDangerIssueOption(item, option, index) {
 
   return {
     label: option?.label || `Option ${index + 1}`,
-    preview: option?.preview ?? summarizeEffects(option?.effects),
+    preview: option?.preview ?? summarizeEffects(option?.effects, option),
     outcome: option?.outcome,
     riskLevel: deriveRiskLevel(option, { danger: true }),
   };

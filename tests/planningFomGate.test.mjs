@@ -63,7 +63,7 @@ test('the public-review countdown surfaces in the day header once the FOM is pub
 
     const fom = syncFomStateFromActiveBlock(journey, null);
     fom.status = 'public_review';
-    fom.reviewDaysRemaining = 6;
+    fom.reviewDaysRemaining = 30;
     fom.commentLoad = 2;
 
     const ui = makeCaptureUi();
@@ -72,7 +72,7 @@ test('the public-review countdown surfaces in the day header once the FOM is pub
     await runPlanningDay(game);
 
     assert.ok(
-      ui.lines.some((line) => /Public Review Window: 6d remaining/.test(line)),
+      ui.lines.some((line) => /Public Review Window: 30 calendar days remaining/.test(line)),
       `expected the day header to surface the review countdown, lines were: ${JSON.stringify(ui.lines.slice(0, 15))}`
     );
   });
