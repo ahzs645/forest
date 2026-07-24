@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkForEvent, formatEventForDisplay, resolveEvent } from '../js/events.js';
+import { checkForEvent, formatEventForDisplay, formatOptionEffects, resolveEvent } from '../js/events.js';
+import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
+import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { createJourney } from '../js/journey.js';
 import { handleEvent } from '../js/modes/shared/handleEvent.js';
 import { eventMatchesJourneyContext } from '../js/events/selection.js';
@@ -780,4 +782,98 @@ test('selected events can seed carry-forward discovery tags', () => {
 
   assert.ok(journey.discoveryTags.some((tag) => tag.id === 'community_visibility'));
   assert.ok(result.messages.some((message) => /Carry-forward intel/i.test(message)));
+});
+
+// ── Option hint honesty ──────────────────────────────────────────────────────
+// The bracket hint is the player's only forecast of an option. Every clause
+// must state a fact the resolver actually backs; the fallback may claim
+// "no cost" only when the option truly has nothing modelled on it.
+
+test('an option with nothing modelled reads as no cost, not a safety promise', () => {
+  assert.equal(formatOptionEffects({ label: 'Stay focused', effects: {} }, 'recon'), 'no cost');
+  // crewEffect.rest is a no-op in resolution.js, so it earns no clause either
+  assert.equal(
+    formatOptionEffects({ label: 'Have them rest in camp', effects: {}, crewEffect: { rest: 2 } }, 'recon'),
+    'no cost'
+  );
+});
+
+test('hint clauses cover the consequence paths the resolver runs', () => {
+  assert.equal(
+    formatOptionEffects({ label: 'Send them out', effects: { fuel: -8 }, crewEffect: { evacuate: true } }, 'recon'),
+    '-8 fuel, crew member out'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Treat on site', crewEffect: { injury: 'severe_laceration' } }, 'recon'),
+    'crew injury'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Let them go', crewEffect: { lose_member: true } }, 'recon'),
+    'crew member leaves'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Light duty', crewEffect: { illness: 'flu', riskWorsen: 0.35 }, hiddenOutcome: false }, 'recon'),
+    '35% illness risk'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Submit with old data', riskCompliance: 0.3 }, 'permitting'),
+    '30% compliance risk'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Ignore it', schedulesEvent: 'safety_inspection_followup' }, 'recon'),
+    'consequences later'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Walk away', gameOver: true, gameOverReason: 'Quit' }, 'recon'),
+    'ends the run'
+  );
+});
+
+test('scrutiny and reputation effects show up as deltas instead of vanishing', () => {
+  assert.equal(
+    formatOptionEffects({ label: 'Cut the corner', effects: { scrutiny: 5, reputation: -4 } }, 'permitting'),
+    '+5 scrutiny, -4 reputation'
+  );
+});
+
+test('gamble hints state the failure chance and its costs in the same vocabulary', () => {
+  const hint = formatOptionEffects({
+    label: 'risk it',
+    effects: { progress: 5 },
+    chanceSuccess: 0.4,
+    failureOutcome: 'It fails.',
+    failureEffects: { progress: -5 }
+  }, 'recon');
+  assert.equal(hint, '+5 km traverse, 60% it goes wrong, then -5 km traverse');
+
+  assert.equal(
+    formatOptionEffects({ label: 'coin flip', chanceSuccess: 0.5, failureOutcome: 'Nope.' }, 'recon'),
+    '50% it goes wrong'
+  );
+});
+
+test('hidden outcomes read in the same factual register', () => {
+  assert.equal(formatOptionEffects({ label: 'Gamble', hiddenOutcome: true }, 'recon'), 'outcome unknown');
+});
+
+test('no option in either deck renders the retired hint vocabulary', () => {
+  const pools = [
+    { events: FIELD_EVENTS, journeyType: 'field' },
+    { events: DESK_EVENTS, journeyType: 'permitting' }
+  ];
+  for (const { events, journeyType } of pools) {
+    for (const event of events) {
+      const formatted = formatEventForDisplay(event, journeyType);
+      for (const option of formatted.options) {
+        assert.ok(option.hint && option.hint.length > 0,
+          `${event.id} option "${option.label}" has an empty hint`);
+        assert.notEqual(option.hint, 'Safe choice',
+          `${event.id} option "${option.label}" still claims safety`);
+        assert.notEqual(option.hint, 'Outcome uncertain',
+          `${event.id} option "${option.label}" uses the retired uncertainty wording`);
+        assert.doesNotMatch(option.hint, /success odds/,
+          `${event.id} option "${option.label}" uses the retired gamble wording`);
+      }
+    }
+  }
 });
