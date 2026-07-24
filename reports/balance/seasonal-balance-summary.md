@@ -1,6 +1,6 @@
 # Seasonal Balance Summary
 
-Generated: 2026-07-02T04:00:38.470Z
+Generated: 2026-07-24T22:34:55.070Z
 Runs: 10080 · seeds 1000–1039 · roles 4 · areas 9 · strategies 7
 
 Tier rank: outstanding 3 · solid 2 · mixed 1 · stumbled 0.
@@ -9,72 +9,72 @@ Tier rank: outstanding 3 · solid 2 · mixed 1 · stumbled 0.
 
 | Strategy | Mean tier | Outstanding | Solid | Mixed | Stumbled | Avg P/FH/R/C/B |
 |---|---|---|---|---|---|---|
-| greedy | 2.16 | 416 | 836 | 188 | 0 | 44.1/65.1/72.2/84.8/47.1 |
-| role-optimal | 1.96 | 239 | 909 | 292 | 0 | 40.6/64.5/71.5/85.5/43.3 |
-| cautious | 1.48 | 27 | 643 | 770 | 0 | 29.7/64.9/73.8/85.5/48.5 |
-| weakest-metric | 1.32 | 13 | 510 | 845 | 72 | 52.4/55.4/53.5/63.7/44.1 |
-| balanced | 1.17 | 0 | 453 | 782 | 205 | 44.6/55.8/51.7/66.7/39.1 |
-| random | 1.04 | 3 | 370 | 743 | 324 | 48.7/54.8/52.1/58.7/40.1 |
-| aggressive | 0 | 0 | 0 | 0 | 1440 | 64/38.5/24.8/21.6/29.6 |
+| greedy | 2.22 | 489 | 778 | 173 | 0 | 47.5/67.4/79.1/90/43.6 |
+| role-optimal | 2.01 | 299 | 855 | 286 | 0 | 42/66.8/78/91/39.2 |
+| balanced | 1.51 | 0 | 775 | 621 | 44 | 45.1/58.7/57.2/76.6/36.8 |
+| cautious | 1.46 | 21 | 617 | 802 | 0 | 27.7/67.3/81.2/91.2/43.8 |
+| weakest-metric | 1.24 | 8 | 524 | 719 | 189 | 50.4/56/54.1/64.6/42.6 |
+| random | 0.84 | 7 | 313 | 568 | 552 | 43.2/55.4/49.7/56.6/34.6 |
+| aggressive | 0 | 0 | 0 | 0 | 1440 | 66.1/37.5/16.2/15.3/25 |
 
 Dominant strategy: **greedy**.
 
 ## Role × area difficulty
 
-Easiest: **silviculture @ bulkley-valley** (mean tier 1.53).
+Easiest: **silviculture @ bulkley-valley** (mean tier 1.58).
 
-Most punishing: **planner @ fraser-plateau** (mean tier 0.9).
+Most punishing: **planner @ fraser-plateau** (mean tier 0.88).
 
 | Role @ Area | Mean tier |
 |---|---|
-| silviculture @ bulkley-valley | 1.53 |
-| silviculture @ tahltan-highland | 1.49 |
-| silviculture @ okanagan-shuswap-drybelt | 1.49 |
-| silviculture @ fraser-plateau | 1.48 |
-| silviculture @ vancouver-island-coast | 1.48 |
-| silviculture @ kootenay-wetbelt | 1.46 |
-| silviculture @ muskwa-foothills | 1.44 |
-| permitter @ okanagan-shuswap-drybelt | 1.43 |
-| permitter @ fraser-plateau | 1.42 |
-| recce @ okanagan-shuswap-drybelt | 1.42 |
-| silviculture @ fort-st-john-plateau | 1.41 |
-| permitter @ bulkley-valley | 1.4 |
-| permitter @ skeena-nass | 1.4 |
+| silviculture @ bulkley-valley | 1.58 |
+| silviculture @ vancouver-island-coast | 1.58 |
+| silviculture @ skeena-nass | 1.53 |
+| silviculture @ tahltan-highland | 1.53 |
+| silviculture @ okanagan-shuswap-drybelt | 1.53 |
+| silviculture @ fraser-plateau | 1.52 |
+| silviculture @ kootenay-wetbelt | 1.52 |
+| recce @ bulkley-valley | 1.47 |
+| recce @ okanagan-shuswap-drybelt | 1.46 |
+| recce @ skeena-nass | 1.45 |
+| silviculture @ fort-st-john-plateau | 1.45 |
+| silviculture @ muskwa-foothills | 1.45 |
+| permitter @ bulkley-valley | 1.44 |
+| permitter @ tahltan-highland | 1.44 |
+| permitter @ okanagan-shuswap-drybelt | 1.44 |
+| permitter @ fraser-plateau | 1.43 |
+| permitter @ skeena-nass | 1.42 |
+| recce @ kootenay-wetbelt | 1.42 |
 | permitter @ kootenay-wetbelt | 1.4 |
-| recce @ skeena-nass | 1.39 |
-| silviculture @ skeena-nass | 1.39 |
-| permitter @ fort-st-john-plateau | 1.38 |
-| permitter @ tahltan-highland | 1.38 |
-| permitter @ vancouver-island-coast | 1.37 |
-| recce @ bulkley-valley | 1.37 |
-| permitter @ muskwa-foothills | 1.35 |
-| recce @ tahltan-highland | 1.35 |
-| recce @ fraser-plateau | 1.34 |
-| recce @ kootenay-wetbelt | 1.34 |
-| recce @ fort-st-john-plateau | 1.3 |
-| recce @ vancouver-island-coast | 1.3 |
-| recce @ muskwa-foothills | 1.26 |
-| planner @ skeena-nass | 1.14 |
-| planner @ vancouver-island-coast | 1.08 |
-| planner @ tahltan-highland | 1.05 |
-| planner @ kootenay-wetbelt | 1.05 |
-| planner @ muskwa-foothills | 1.02 |
-| planner @ okanagan-shuswap-drybelt | 1.02 |
+| recce @ tahltan-highland | 1.4 |
+| recce @ vancouver-island-coast | 1.4 |
+| permitter @ fort-st-john-plateau | 1.39 |
+| recce @ fraser-plateau | 1.39 |
+| permitter @ vancouver-island-coast | 1.38 |
+| recce @ fort-st-john-plateau | 1.37 |
+| recce @ muskwa-foothills | 1.37 |
+| permitter @ muskwa-foothills | 1.36 |
 | planner @ bulkley-valley | 1.01 |
-| planner @ fort-st-john-plateau | 0.94 |
-| planner @ fraser-plateau | 0.9 |
+| planner @ skeena-nass | 0.99 |
+| planner @ vancouver-island-coast | 0.99 |
+| planner @ kootenay-wetbelt | 0.99 |
+| planner @ muskwa-foothills | 0.98 |
+| planner @ okanagan-shuswap-drybelt | 0.98 |
+| planner @ tahltan-highland | 0.92 |
+| planner @ fort-st-john-plateau | 0.9 |
+| planner @ fraser-plateau | 0.88 |
 
 ## Consequence firing rate
 
 | Consequence | Runs fired |
 |---|---|
-| contractor-attrition | 117 |
-| trust-deficit | 1102 |
-| audit-escalation | 1489 |
-| registration-lapse | 482 |
+| contractor-attrition | 1127 |
+| trust-deficit | 1474 |
+| audit-escalation | 1565 |
+| registration-lapse | 571 |
 | paperwork-burn | 840 |
-| professional-audit | 1284 |
-| ecological-strain | 1730 |
+| professional-audit | 1312 |
+| ecological-strain | 1666 |
 
 Every consequence fired at least once.
 
@@ -82,19 +82,19 @@ Every consequence fired at least once.
 
 | Issue | Runs seen |
 |---|---|
-| special-use-permit-stack | 2000 |
-| riparian-reclassification-call | 1980 |
-| labour-job-action | 1894 |
-| archaeology-escalation-pause | 1884 |
-| road-use-permit-standoff | 1667 |
-| fom-consistency-gap | 1344 |
-| compliance-drone-sweep | 1308 |
-| fsp-comment-surge | 1232 |
-| scaler-pressure-memo | 1174 |
-| lumber-market-crash | 994 |
-| policy-funding-cut | 980 |
-| snow-press-browse-signal | 960 |
+| labour-job-action | 2658 |
+| riparian-reclassification-call | 2652 |
+| special-use-permit-stack | 2507 |
+| archaeology-escalation-pause | 2412 |
+| road-use-permit-standoff | 2128 |
+| fsp-comment-surge | 2080 |
+| scaler-pressure-memo | 1839 |
+| compliance-drone-sweep | 1797 |
+| contractor-bankruptcy | 1770 |
+| cruise-design-grid-shortcut | 1754 |
+| snow-press-browse-signal | 1670 |
+| elected-midproject | 1657 |
 
 ## Average final metrics (all runs)
 
-Progress 46.3 · Forest Health 57 · Relationships 57.1 · Compliance 66.6 · Budget 41.7
+Progress 46 · Forest Health 58.4 · Relationships 59.4 · Compliance 69.3 · Budget 37.9

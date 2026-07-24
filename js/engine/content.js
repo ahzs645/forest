@@ -57,12 +57,16 @@ export function getRoleTasks(state) {
   });
 }
 
-export function drawSeasonalEvent(state, rng = Math.random) {
+// `advancePending` exists because a season now draws more than one event: the
+// pending-delay tick must happen exactly once per round or scheduled fallout
+// arrives earlier than authored. `excludeIds` keeps a season's second draw
+// from repeating its first — cooldowns only see previous rounds.
+export function drawSeasonalEvent(state, rng = Math.random, { advancePending = true, excludeIds = [] } = {}) {
   if (!state?.role) {
     return null;
   }
 
-  if (Array.isArray(state.pendingEvents)) {
+  if (advancePending && Array.isArray(state.pendingEvents)) {
     for (const pending of state.pendingEvents) {
       if (!pending || typeof pending.delay !== "number") {
         continue;
@@ -90,7 +94,9 @@ export function drawSeasonalEvent(state, rng = Math.random) {
     }
   }
 
-  const pool = getOperationalEventLibrary(state).filter((event) => eventMatchesSeasonalContext(event, state));
+  const pool = getOperationalEventLibrary(state)
+    .filter((event) => !excludeIds.includes(event.id))
+    .filter((event) => eventMatchesSeasonalContext(event, state));
   const freshPool = pool.filter((event) => !isEventInCooldown(state, event.id));
   const selectablePool = freshPool.length ? freshPool : pool;
 
@@ -140,7 +146,9 @@ export function drawSeasonalTemptation(state, rng = Math.random) {
   return selected ? adaptIllegalActTemptation(selected, state, rng) : null;
 }
 
-export function drawIssue(state, rng = Math.random) {
+// Same `advancePending` / `excludeIds` contract as drawSeasonalEvent: tick
+// scheduled fallout once per round, and never repeat an issue within a season.
+export function drawIssue(state, rng = Math.random, { advancePending = true, excludeIds = [] } = {}) {
   if (!state) {
     return null;
   }
@@ -149,7 +157,7 @@ export function drawIssue(state, rng = Math.random) {
   const seasonIndex = Math.max(0, Math.min(SEASONS.length - 1, (state.round || 1) - 1));
   const season = SEASONS[seasonIndex];
 
-  if (Array.isArray(state.pendingIssues)) {
+  if (advancePending && Array.isArray(state.pendingIssues)) {
     for (const pending of state.pendingIssues) {
       if (!pending || typeof pending.delay !== "number") {
         continue;
@@ -175,7 +183,9 @@ export function drawIssue(state, rng = Math.random) {
   }
 
   const allIssues = [...ISSUE_LIBRARY, ...CHAINED_ISSUES];
-  const pool = allIssues.filter((issue) => issueMatchesContext(issue, state, tags));
+  const pool = allIssues
+    .filter((issue) => !excludeIds.includes(issue.id))
+    .filter((issue) => issueMatchesContext(issue, state, tags));
   const freshPool = pool.filter((issue) => !isIssueInCooldown(state, issue.id));
   const selectablePool = freshPool.length ? freshPool : pool;
 

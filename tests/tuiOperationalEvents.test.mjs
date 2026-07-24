@@ -294,7 +294,7 @@ test('seasonal temptation draws from illegal acts with a risk-based shortcut opt
   assert.ok(failKeys.every((key) => TUI_METRICS.includes(key)), `unexpected fail metric keys: ${failKeys.join(', ')}`);
 });
 
-test('temptations are suppressed in the opening season and stay rare under normal conditions', () => {
+test('temptations are suppressed in the opening season and stay bounded under normal conditions', () => {
   const state = createInitialState({
     companyName: 'Temptation Rate Test',
     roleId: 'planner',
@@ -304,8 +304,11 @@ test('temptations are suppressed in the opening season and stay rare under norma
   state.round = 1;
   assert.equal(drawSeasonalTemptation(state, () => 0), null);
 
+  // The 2026-07 pacing pass raised the per-season chance so a typical year
+  // actually meets a shortcut offer, but it stays a minority outcome: with no
+  // metric under pressure, a roll above the planner base chance still passes.
   state.round = 2;
-  assert.equal(drawSeasonalTemptation(state, () => 0.1), null);
+  assert.equal(drawSeasonalTemptation(state, () => 0.6), null);
 });
 
 test('temptation chance ramps up only under later-season pressure', () => {

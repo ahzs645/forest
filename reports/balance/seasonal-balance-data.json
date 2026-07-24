@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-07-02T04:00:38.470Z",
+    "generatedAt": "2026-07-24T22:34:55.070Z",
     "runs": 40,
     "seedBase": 1000,
     "roles": [
@@ -36,115 +36,115 @@
       {
         "strategy": "greedy",
         "runs": 1440,
-        "tierScore": 2.16,
+        "tierScore": 2.22,
         "tiers": {
-          "outstanding": 416,
-          "solid": 836,
-          "mixed": 188,
+          "outstanding": 489,
+          "solid": 778,
+          "mixed": 173,
           "stumbled": 0,
           "unknown": 0
         },
         "metrics": {
-          "progress": 44.1,
-          "forestHealth": 65.1,
-          "relationships": 72.2,
-          "compliance": 84.8,
-          "budget": 47.1
+          "progress": 47.5,
+          "forestHealth": 67.4,
+          "relationships": 79.1,
+          "compliance": 90,
+          "budget": 43.6
         }
       },
       {
         "strategy": "role-optimal",
         "runs": 1440,
-        "tierScore": 1.96,
+        "tierScore": 2.01,
         "tiers": {
-          "outstanding": 239,
-          "solid": 909,
-          "mixed": 292,
+          "outstanding": 299,
+          "solid": 855,
+          "mixed": 286,
           "stumbled": 0,
           "unknown": 0
         },
         "metrics": {
-          "progress": 40.6,
-          "forestHealth": 64.5,
-          "relationships": 71.5,
-          "compliance": 85.5,
-          "budget": 43.3
-        }
-      },
-      {
-        "strategy": "cautious",
-        "runs": 1440,
-        "tierScore": 1.48,
-        "tiers": {
-          "outstanding": 27,
-          "solid": 643,
-          "mixed": 770,
-          "stumbled": 0,
-          "unknown": 0
-        },
-        "metrics": {
-          "progress": 29.7,
-          "forestHealth": 64.9,
-          "relationships": 73.8,
-          "compliance": 85.5,
-          "budget": 48.5
-        }
-      },
-      {
-        "strategy": "weakest-metric",
-        "runs": 1440,
-        "tierScore": 1.32,
-        "tiers": {
-          "outstanding": 13,
-          "solid": 510,
-          "mixed": 845,
-          "stumbled": 72,
-          "unknown": 0
-        },
-        "metrics": {
-          "progress": 52.4,
-          "forestHealth": 55.4,
-          "relationships": 53.5,
-          "compliance": 63.7,
-          "budget": 44.1
+          "progress": 42,
+          "forestHealth": 66.8,
+          "relationships": 78,
+          "compliance": 91,
+          "budget": 39.2
         }
       },
       {
         "strategy": "balanced",
         "runs": 1440,
-        "tierScore": 1.17,
+        "tierScore": 1.51,
         "tiers": {
           "outstanding": 0,
-          "solid": 453,
-          "mixed": 782,
-          "stumbled": 205,
+          "solid": 775,
+          "mixed": 621,
+          "stumbled": 44,
           "unknown": 0
         },
         "metrics": {
-          "progress": 44.6,
-          "forestHealth": 55.8,
-          "relationships": 51.7,
-          "compliance": 66.7,
-          "budget": 39.1
+          "progress": 45.1,
+          "forestHealth": 58.7,
+          "relationships": 57.2,
+          "compliance": 76.6,
+          "budget": 36.8
+        }
+      },
+      {
+        "strategy": "cautious",
+        "runs": 1440,
+        "tierScore": 1.46,
+        "tiers": {
+          "outstanding": 21,
+          "solid": 617,
+          "mixed": 802,
+          "stumbled": 0,
+          "unknown": 0
+        },
+        "metrics": {
+          "progress": 27.7,
+          "forestHealth": 67.3,
+          "relationships": 81.2,
+          "compliance": 91.2,
+          "budget": 43.8
+        }
+      },
+      {
+        "strategy": "weakest-metric",
+        "runs": 1440,
+        "tierScore": 1.24,
+        "tiers": {
+          "outstanding": 8,
+          "solid": 524,
+          "mixed": 719,
+          "stumbled": 189,
+          "unknown": 0
+        },
+        "metrics": {
+          "progress": 50.4,
+          "forestHealth": 56,
+          "relationships": 54.1,
+          "compliance": 64.6,
+          "budget": 42.6
         }
       },
       {
         "strategy": "random",
         "runs": 1440,
-        "tierScore": 1.04,
+        "tierScore": 0.84,
         "tiers": {
-          "outstanding": 3,
-          "solid": 370,
-          "mixed": 743,
-          "stumbled": 324,
+          "outstanding": 7,
+          "solid": 313,
+          "mixed": 568,
+          "stumbled": 552,
           "unknown": 0
         },
         "metrics": {
-          "progress": 48.7,
-          "forestHealth": 54.8,
-          "relationships": 52.1,
-          "compliance": 58.7,
-          "budget": 40.1
+          "progress": 43.2,
+          "forestHealth": 55.4,
+          "relationships": 49.7,
+          "compliance": 56.6,
+          "budget": 34.6
         }
       },
       {
@@ -159,78 +159,103 @@
           "unknown": 0
         },
         "metrics": {
-          "progress": 64,
-          "forestHealth": 38.5,
-          "relationships": 24.8,
-          "compliance": 21.6,
-          "budget": 29.6
+          "progress": 66.1,
+          "forestHealth": 37.5,
+          "relationships": 16.2,
+          "compliance": 15.3,
+          "budget": 25
         }
       }
     ],
     "comboSummary": [
       {
         "combo": "silviculture @ bulkley-valley",
+        "tierScore": 1.58,
+        "runs": 280
+      },
+      {
+        "combo": "silviculture @ vancouver-island-coast",
+        "tierScore": 1.58,
+        "runs": 280
+      },
+      {
+        "combo": "silviculture @ skeena-nass",
         "tierScore": 1.53,
         "runs": 280
       },
       {
         "combo": "silviculture @ tahltan-highland",
-        "tierScore": 1.49,
+        "tierScore": 1.53,
         "runs": 280
       },
       {
         "combo": "silviculture @ okanagan-shuswap-drybelt",
-        "tierScore": 1.49,
+        "tierScore": 1.53,
         "runs": 280
       },
       {
         "combo": "silviculture @ fraser-plateau",
-        "tierScore": 1.48,
-        "runs": 280
-      },
-      {
-        "combo": "silviculture @ vancouver-island-coast",
-        "tierScore": 1.48,
+        "tierScore": 1.52,
         "runs": 280
       },
       {
         "combo": "silviculture @ kootenay-wetbelt",
+        "tierScore": 1.52,
+        "runs": 280
+      },
+      {
+        "combo": "recce @ bulkley-valley",
+        "tierScore": 1.47,
+        "runs": 280
+      },
+      {
+        "combo": "recce @ okanagan-shuswap-drybelt",
         "tierScore": 1.46,
         "runs": 280
       },
       {
+        "combo": "recce @ skeena-nass",
+        "tierScore": 1.45,
+        "runs": 280
+      },
+      {
+        "combo": "silviculture @ fort-st-john-plateau",
+        "tierScore": 1.45,
+        "runs": 280
+      },
+      {
         "combo": "silviculture @ muskwa-foothills",
+        "tierScore": 1.45,
+        "runs": 280
+      },
+      {
+        "combo": "permitter @ bulkley-valley",
+        "tierScore": 1.44,
+        "runs": 280
+      },
+      {
+        "combo": "permitter @ tahltan-highland",
         "tierScore": 1.44,
         "runs": 280
       },
       {
         "combo": "permitter @ okanagan-shuswap-drybelt",
-        "tierScore": 1.43,
+        "tierScore": 1.44,
         "runs": 280
       },
       {
         "combo": "permitter @ fraser-plateau",
-        "tierScore": 1.42,
-        "runs": 280
-      },
-      {
-        "combo": "recce @ okanagan-shuswap-drybelt",
-        "tierScore": 1.42,
-        "runs": 280
-      },
-      {
-        "combo": "silviculture @ fort-st-john-plateau",
-        "tierScore": 1.41,
-        "runs": 280
-      },
-      {
-        "combo": "permitter @ bulkley-valley",
-        "tierScore": 1.4,
+        "tierScore": 1.43,
         "runs": 280
       },
       {
         "combo": "permitter @ skeena-nass",
-        "tierScore": 1.4,
+        "tierScore": 1.42,
+        "runs": 280
+      },
+      {
+        "combo": "recce @ kootenay-wetbelt",
+        "tierScore": 1.42,
         "runs": 280
       },
       {
@@ -239,98 +264,43 @@
         "runs": 280
       },
       {
-        "combo": "recce @ skeena-nass",
-        "tierScore": 1.39,
+        "combo": "recce @ tahltan-highland",
+        "tierScore": 1.4,
         "runs": 280
       },
       {
-        "combo": "silviculture @ skeena-nass",
-        "tierScore": 1.39,
+        "combo": "recce @ vancouver-island-coast",
+        "tierScore": 1.4,
         "runs": 280
       },
       {
         "combo": "permitter @ fort-st-john-plateau",
-        "tierScore": 1.38,
+        "tierScore": 1.39,
         "runs": 280
       },
       {
-        "combo": "permitter @ tahltan-highland",
-        "tierScore": 1.38,
+        "combo": "recce @ fraser-plateau",
+        "tierScore": 1.39,
         "runs": 280
       },
       {
         "combo": "permitter @ vancouver-island-coast",
+        "tierScore": 1.38,
+        "runs": 280
+      },
+      {
+        "combo": "recce @ fort-st-john-plateau",
         "tierScore": 1.37,
         "runs": 280
       },
       {
-        "combo": "recce @ bulkley-valley",
+        "combo": "recce @ muskwa-foothills",
         "tierScore": 1.37,
         "runs": 280
       },
       {
         "combo": "permitter @ muskwa-foothills",
-        "tierScore": 1.35,
-        "runs": 280
-      },
-      {
-        "combo": "recce @ tahltan-highland",
-        "tierScore": 1.35,
-        "runs": 280
-      },
-      {
-        "combo": "recce @ fraser-plateau",
-        "tierScore": 1.34,
-        "runs": 280
-      },
-      {
-        "combo": "recce @ kootenay-wetbelt",
-        "tierScore": 1.34,
-        "runs": 280
-      },
-      {
-        "combo": "recce @ fort-st-john-plateau",
-        "tierScore": 1.3,
-        "runs": 280
-      },
-      {
-        "combo": "recce @ vancouver-island-coast",
-        "tierScore": 1.3,
-        "runs": 280
-      },
-      {
-        "combo": "recce @ muskwa-foothills",
-        "tierScore": 1.26,
-        "runs": 280
-      },
-      {
-        "combo": "planner @ skeena-nass",
-        "tierScore": 1.14,
-        "runs": 280
-      },
-      {
-        "combo": "planner @ vancouver-island-coast",
-        "tierScore": 1.08,
-        "runs": 280
-      },
-      {
-        "combo": "planner @ tahltan-highland",
-        "tierScore": 1.05,
-        "runs": 280
-      },
-      {
-        "combo": "planner @ kootenay-wetbelt",
-        "tierScore": 1.05,
-        "runs": 280
-      },
-      {
-        "combo": "planner @ muskwa-foothills",
-        "tierScore": 1.02,
-        "runs": 280
-      },
-      {
-        "combo": "planner @ okanagan-shuswap-drybelt",
-        "tierScore": 1.02,
+        "tierScore": 1.36,
         "runs": 280
       },
       {
@@ -339,92 +309,122 @@
         "runs": 280
       },
       {
+        "combo": "planner @ skeena-nass",
+        "tierScore": 0.99,
+        "runs": 280
+      },
+      {
+        "combo": "planner @ vancouver-island-coast",
+        "tierScore": 0.99,
+        "runs": 280
+      },
+      {
+        "combo": "planner @ kootenay-wetbelt",
+        "tierScore": 0.99,
+        "runs": 280
+      },
+      {
+        "combo": "planner @ muskwa-foothills",
+        "tierScore": 0.98,
+        "runs": 280
+      },
+      {
+        "combo": "planner @ okanagan-shuswap-drybelt",
+        "tierScore": 0.98,
+        "runs": 280
+      },
+      {
+        "combo": "planner @ tahltan-highland",
+        "tierScore": 0.92,
+        "runs": 280
+      },
+      {
         "combo": "planner @ fort-st-john-plateau",
-        "tierScore": 0.94,
+        "tierScore": 0.9,
         "runs": 280
       },
       {
         "combo": "planner @ fraser-plateau",
-        "tierScore": 0.9,
+        "tierScore": 0.88,
         "runs": 280
       }
     ],
     "dominantStrategy": "greedy",
     "easiestCombo": {
       "combo": "silviculture @ bulkley-valley",
-      "tierScore": 1.53,
+      "tierScore": 1.58,
       "runs": 280
     },
     "hardestCombo": {
       "combo": "planner @ fraser-plateau",
-      "tierScore": 0.9,
+      "tierScore": 0.88,
       "runs": 280
     },
     "overallMetrics": {
-      "progress": 46.3,
-      "forestHealth": 57,
-      "relationships": 57.1,
-      "compliance": 66.6,
-      "budget": 41.7
+      "progress": 46,
+      "forestHealth": 58.4,
+      "relationships": 59.4,
+      "compliance": 69.3,
+      "budget": 37.9
     },
     "consequenceCounts": {
-      "contractor-attrition": 117,
-      "trust-deficit": 1102,
-      "audit-escalation": 1489,
-      "registration-lapse": 482,
+      "contractor-attrition": 1127,
+      "trust-deficit": 1474,
+      "audit-escalation": 1565,
+      "registration-lapse": 571,
       "paperwork-burn": 840,
-      "professional-audit": 1284,
-      "ecological-strain": 1730
+      "professional-audit": 1312,
+      "ecological-strain": 1666
     },
     "neverFiredConsequences": [],
     "topIssues": [
       [
-        "special-use-permit-stack",
-        2000
+        "labour-job-action",
+        2658
       ],
       [
         "riparian-reclassification-call",
-        1980
+        2652
       ],
       [
-        "labour-job-action",
-        1894
+        "special-use-permit-stack",
+        2507
       ],
       [
         "archaeology-escalation-pause",
-        1884
+        2412
       ],
       [
         "road-use-permit-standoff",
-        1667
-      ],
-      [
-        "fom-consistency-gap",
-        1344
-      ],
-      [
-        "compliance-drone-sweep",
-        1308
+        2128
       ],
       [
         "fsp-comment-surge",
-        1232
+        2080
       ],
       [
         "scaler-pressure-memo",
-        1174
+        1839
       ],
       [
-        "lumber-market-crash",
-        994
+        "compliance-drone-sweep",
+        1797
       ],
       [
-        "policy-funding-cut",
-        980
+        "contractor-bankruptcy",
+        1770
+      ],
+      [
+        "cruise-design-grid-shortcut",
+        1754
       ],
       [
         "snow-press-browse-signal",
-        960
+        1670
+      ],
+      [
+        "elected-midproject",
+        1657
       ]
     ]
   }

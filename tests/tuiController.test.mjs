@@ -69,7 +69,9 @@ test('planner assignment selection updates the dashboard metrics in the controll
   assert.equal(state.gameState.metrics.progress, 50);
   assert.equal(state.gameState.metrics.relationships, 52);
   assert.equal(state.gameState.metrics.compliance, 53);
-  assert.match(state.contentData.notice.heading, /^Decision Logged:/);
+  // Acknowledgements are typed now: a round-1 assignment reads as the season
+  // plan taking shape rather than a generic "Decision Logged" stamp.
+  assert.match(state.contentData.notice.heading, /^Season plan set:/);
   assert.match(state.contentData.notice.body, /Compliance \+3/);
   assert.match(state.contentData.notice.body, /Relationships \+2/);
 });
@@ -155,7 +157,9 @@ test('first playable seasonal card exposes the contract fields and neutral promp
   assert.ok(state.contentData.context?.operation);
   assert.ok(state.contentData.context?.objective);
   assert.ok(state.contentData.context?.stakes);
-  assert.match(state.contentData.decisionPrompt || '', /^How do you want to respond\?$/i);
+  // The ask varies by card type and season now; a spring assignment frames the
+  // decision as setting the season up.
+  assert.match(state.contentData.decisionPrompt || '', /^How do you set the season up\?$/i);
   assert.equal(state.contentData.optionHeading, 'Choose your response');
   assert.equal(state.art, null);
   assert.ok(state.options.length > 1);
