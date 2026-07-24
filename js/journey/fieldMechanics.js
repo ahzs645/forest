@@ -877,7 +877,13 @@ export function executeFieldAction(journey, paceId) {
   // Check for travel completion. Recon still needs verified assessments before it counts as a win.
   if (journey.distanceTraveled >= journey.totalDistance || journey.currentBlockIndex >= journey.blocks.length - 1) {
     if (journey.journeyType === 'recon') {
-      messages.push('You have reached the end of the block sequence, but the recon package still needs to be verified.');
+      // Announce the hand-off to the close-out phase exactly once. This
+      // condition stays true for every remaining shift at the final camp,
+      // and repeating the line each shift read as a stuck state.
+      if (!journey.reconTraverseComplete) {
+        journey.reconTraverseComplete = true;
+        messages.push('End of the block sequence. The traverse is done; the assessment file is not.');
+      }
     } else {
       journey.isComplete = true;
       messages.push('You have completed the block sequence!');

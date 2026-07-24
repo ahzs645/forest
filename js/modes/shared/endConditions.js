@@ -47,6 +47,27 @@ export function checkReconEndConditions(journey) {
     return { gameOver: true, reason: 'Recon package stalled on the final block with no mobility left' };
   }
 
+  // The district filing deadline is the hard stop on the close-out phase
+  // (set by maybeStartReconCloseout in js/modes/recon.js): once it passes,
+  // the file goes in as it stands. A mostly-closed file scrapes through
+  // with deficiency flags; a file that is mostly holes comes back.
+  const closeout = journey.reconCloseout;
+  if (closeout?.deadlineDay && journey.day > closeout.deadlineDay &&
+      totalBlocks > 0 && surveyedBlocks < totalBlocks) {
+    const openCount = totalBlocks - surveyedBlocks;
+    const allowedDeficiencies = Math.max(1, Math.floor(totalBlocks * 0.25));
+    if (openCount <= allowedDeficiencies) {
+      return {
+        victory: true,
+        reason: `File submitted with ${openCount} deficiency flag${openCount === 1 ? '' : 's'} — the district accepts it, with comments`
+      };
+    }
+    return {
+      gameOver: true,
+      reason: `District deadline passed with ${openCount} packages still open — the file comes back marked deficient`
+    };
+  }
+
   return null;
 }
 
