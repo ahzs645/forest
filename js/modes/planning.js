@@ -681,11 +681,16 @@ export async function runPlanningDay(game) {
     if (actionNeedsReceipt(action.value)) {
       const receipt = buildPlanningActionReceipt(actionBefore, journey);
       if (receipt) ui.write(`State change: ${receipt}`, 'term-dim');
-      await ui.promptChoice('', [{
-        label: 'Acknowledge results and continue',
-        description: `${action.label || 'Action'} is complete; return to the planning day`,
-        value: 'continue'
-      }]);
+      // The action menu redraws with this receipt still on screen, so only the
+      // last action of the day — the one about to be buried under the
+      // end-of-day roll-up — needs the player to click past it.
+      if (journey.hoursRemaining <= 0 || journey.isComplete) {
+        await ui.promptChoice('', [{
+          label: 'Acknowledge results and continue',
+          description: `${action.label || 'Action'} is complete; return to the planning day`,
+          value: 'continue'
+        }]);
+      }
     }
 
     if (journey.isComplete) {

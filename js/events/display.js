@@ -40,6 +40,37 @@ export function formatEventForDisplay(event, journeyType = 'field') {
   };
 }
 
+// Which way the losing branch hurts, in the order a player cares about.
+const DOWNSIDE_LABELS = [
+  ['budget', (v) => (Math.abs(v) >= 1000 ? `-$${Math.round(Math.abs(v) / 1000)}k` : `-$${Math.abs(v)}`)],
+  ['compliance', (v) => `${v} compliance`],
+  ['politicalCapital', (v) => `${v} capital`],
+  ['reputation', (v) => `${v} standing`],
+  ['relationships', (v) => `${v} relations`],
+  ['crew_morale', (v) => `${v} morale`],
+  ['equipment', (v) => `${v}% equip`],
+  ['scrutiny', (v) => `+${v} scrutiny`]
+];
+
+/**
+ * Compress a failure branch into the two or three costs worth reading before
+ * committing to the bet.
+ */
+function summarizeDownside(failureEffects, journeyType) {
+  if (!failureEffects) return '';
+  const parts = [];
+  for (const [key, format] of DOWNSIDE_LABELS) {
+    const value = failureEffects[key];
+    if (typeof value !== 'number' || value === 0) continue;
+    if (key === 'scrutiny' && value < 0) continue;
+    if (key !== 'scrutiny' && value > 0) continue;
+    if (key === 'equipment' && !isFieldJourney(journeyType)) continue;
+    parts.push(format(value));
+    if (parts.length === 3) break;
+  }
+  return parts.join(', ');
+}
+
 /**
  * Generate a hint about an option's effects
  */
@@ -111,7 +142,12 @@ function getOptionHint(option, journeyType) {
   }
 
   if (typeof option.chanceSuccess === 'number') {
-    hints.push(`${Math.round(option.chanceSuccess * 100)}% success odds`);
+    // A gamble has two prices. Showing only the winning branch made every
+    // "high risk" option read as a free upside with a percentage attached.
+    const failPct = Math.round((1 - option.chanceSuccess) * 100);
+    hints.push(`${failPct}% it goes wrong`);
+    const downside = summarizeDownside(option.failureEffects, journeyType);
+    if (downside) hints.push(`then ${downside}`);
   }
 
   // Managers have no hours mechanic — don't advertise a cost that never lands

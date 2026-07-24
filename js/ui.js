@@ -75,6 +75,7 @@ export class TerminalUI {
     this.missionPanel = document.getElementById('mission-panel');
     this.missionStrip = document.getElementById('mission-strip');
     this.choicesHint = document.getElementById('choices-hint');
+    this.decisionTitle = document.getElementById('decision-title');
     this.radioSection = document.getElementById('radio-section');
     this.radioPanel = document.getElementById('radio-panel');
     this.crewPanel = document.getElementById('crew-panel');

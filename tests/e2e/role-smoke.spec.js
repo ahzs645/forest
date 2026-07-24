@@ -101,8 +101,9 @@ test('recce smoke exposes role-specific ground-truth actions', async ({ page }) 
   );
   await expect(page.locator('#choices button').filter({ hasText: 'Ground-Truth Access' })).toBeVisible();
   await page.locator('#choices button').filter({ hasText: 'Ground-Truth Access' }).click();
-  await expect(page.locator('#choices button').filter({ hasText: 'Acknowledge results and continue' })).toBeVisible();
-  await page.locator('#choices button').filter({ hasText: 'Acknowledge results and continue' }).click();
+  // Mid-shift actions return straight to the shift menu with their result
+  // still on screen; only the action that closes out the shift asks for a
+  // confirm click.
   await expect(page.locator('#choices button').filter({ hasText: 'Rest & End Shift' })).toBeVisible();
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
 });

@@ -429,7 +429,6 @@ async function runFieldDay(game) {
     updateReconMissionStatus(ui, journey);
     logReconAction(journey, 'Ration decision', `Food remaining: ${Math.round(journey.resources.food || 0)} person-days`);
     checkpointReconShift(game, shiftState, pendingEvent);
-    await acknowledgeActionResult(ui, 'Ration decision');
   }
 
   // Multi-action loop: keep going while hours remain
@@ -699,7 +698,9 @@ async function runFieldDay(game) {
       await celebrateNewMilestones(game);
       ui.updateAllStatus(journey);
       checkpointReconShift(game, shiftState, pendingEvent);
-      await acknowledgeActionResult(ui, 'Travel');
+      if (journey.hoursRemaining <= 0) {
+        await acknowledgeActionResult(ui, 'Travel');
+      }
     } else if (actionId === 'consult_map') {
       handleConsultMap(ui, journey);
       await ui.promptChoice('', [{ label: 'Fold the map', value: 'next' }]);
@@ -756,7 +757,12 @@ async function runFieldDay(game) {
       resupply: 'Resupply',
       scout: 'Scouting'
     };
-    if (acknowledgedActions[actionId]) {
+    // Confirm beats only where they buy something. The shift menu comes back
+    // with the action's own result block still on screen, so a confirm click
+    // after every action was pure ceremony; the one case worth pausing on is
+    // the last action of the shift, where end-of-day consequences are about to
+    // push the result off the top.
+    if (acknowledgedActions[actionId] && journey.hoursRemaining <= 0) {
       await acknowledgeActionResult(ui, acknowledgedActions[actionId]);
     }
 

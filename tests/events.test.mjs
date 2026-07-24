@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { checkForEvent, formatEventForDisplay, resolveEvent } from '../js/events.js';
 import { createJourney } from '../js/journey.js';
 import { handleEvent } from '../js/modes/shared/handleEvent.js';
-import { eventMatchesJourneyContext } from '../js/events/selection.js';
+import { eventMatchesJourneyContext, getTemptationDetectionChance } from '../js/events/selection.js';
+import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
 import {
   getPermittingConstraintState,
   resolvePermitRevisionResponse,
@@ -32,7 +33,7 @@ test('radio event copy uses one concise reporter lead', () => {
   assert.doesNotMatch(formatted.description, /radios in:.*radios in:/i);
 });
 
-test('event outcomes wait for acknowledgement before play resumes', async () => {
+function createEventHarness() {
   const writes = [];
   const prompts = [];
   const ui = {
@@ -56,7 +57,11 @@ test('event outcomes wait for acknowledgement before play resumes', async () => 
     scrutiny: 0,
     resources: {}
   };
-  const game = { ui, journey, gameOver: false };
+  return { writes, prompts, game: { ui, journey, gameOver: false } };
+}
+
+test('routine event outcomes return straight to play without a confirm beat', async () => {
+  const { writes, prompts, game } = createEventHarness();
 
   await handleEvent(game, {
     id: 'acknowledgement-test',
@@ -71,11 +76,30 @@ test('event outcomes wait for acknowledgement before play resumes', async () => 
     }]
   });
 
-  assert.equal(prompts.length, 2);
+  assert.equal(prompts.length, 1);
   assert.equal(prompts[0].prompt, 'What do you do?');
-  assert.equal(prompts[1].options[0].label, 'Acknowledge outcome and continue');
   assert.ok(writes.some((entry) => entry.text === 'OUTCOME'));
   assert.ok(writes.some((entry) => entry.text === 'The decision lands.'));
+});
+
+test('consequential event outcomes still wait for acknowledgement', async () => {
+  const { prompts, game } = createEventHarness();
+
+  await handleEvent(game, {
+    id: 'acknowledgement-major-test',
+    title: 'A Serious Call',
+    description: 'This one matters.',
+    severity: 'major',
+    type: 'compliance',
+    options: [{
+      label: 'Make the call',
+      outcome: 'The decision lands hard.',
+      effects: {}
+    }]
+  });
+
+  assert.equal(prompts.length, 2);
+  assert.equal(prompts[1].options[0].label, 'Acknowledge outcome and continue');
 });
 
 test('illegal-act temptations have a priority draw from day two with a cooldown', () => {
@@ -780,4 +804,142 @@ test('selected events can seed carry-forward discovery tags', () => {
 
   assert.ok(journey.discoveryTags.some((tag) => tag.id === 'community_visibility'));
   assert.ok(result.messages.some((message) => /Carry-forward intel/i.test(message)));
+});
+
+test('shortcut offers are a real bet: odds, a losing branch, and a stated downside', () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+
+  try {
+    const journey = createJourney({
+      roleId: 'recce',
+      areaId: 'fort-st-john-plateau',
+      crew: []
+    });
+    journey.day = 2;
+
+    const temptation = checkForEvent(journey);
+    assert.equal(temptation?.type, 'temptation');
+
+    const take = temptation.options.find((option) => option.temptationChoice === 'taken');
+    assert.ok(take, 'the shortcut option is tagged so the ledger can see it');
+    assert.equal(typeof take.chanceSuccess, 'number');
+    assert.ok(take.chanceSuccess > 0 && take.chanceSuccess < 1, 'taking it is a gamble, not a purchase');
+    assert.ok(take.failureEffects, 'the losing branch has its own effects');
+    assert.ok(Number(take.failureEffects.budget) < 0, 'getting caught costs money, it does not pay');
+    assert.ok(Number(take.effects.budget) > 0, 'the winning branch pays');
+
+    const formatted = formatEventForDisplay(temptation, 'recon');
+    const takeHint = formatted.options.find((option) => /Take the shortcut/.test(option.label))?.hint || '';
+    assert.match(takeHint, /it goes wrong/, 'the odds of it surfacing are on the button');
+    assert.match(takeHint, /then /, 'so is what it costs when it does');
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('shortcut detection climbs with scrutiny and with every shortcut already taken', () => {
+  const tier = { detection: 0.3 };
+  const clean = getTemptationDetectionChance({ scrutiny: 0, difficulty: 'normal' }, tier, 0);
+  const hot = getTemptationDetectionChance({ scrutiny: 80, difficulty: 'normal' }, tier, 0);
+  const repeat = getTemptationDetectionChance({ scrutiny: 0, difficulty: 'normal' }, tier, 3);
+  const hard = getTemptationDetectionChance({ scrutiny: 0, difficulty: 'hard' }, tier, 0);
+
+  assert.ok(hot > clean, 'a run under scrutiny is a worse place to try it');
+  assert.ok(repeat > clean, 'the third shortcut is riskier than the first');
+  assert.ok(hard > clean, 'hard runs are watched more closely');
+  assert.ok(getTemptationDetectionChance({ scrutiny: 100 }, { detection: 0.85 }, 9) <= 0.85, 'odds stay bounded');
+});
+
+test('brazen shortcuts pay more and get caught more often than corner-cutting', () => {
+  const originalRandom = Math.random;
+  const gains = {};
+  const odds = {};
+
+  try {
+    for (const [label, actId] of [['brazen', 'permit-fastpass'], ['petty', 'carbon-offset-spin']]) {
+      Math.random = () => 0.05;
+      const journey = createJourney({ roleId: 'permitter', areaId: 'fort-st-john-plateau', crew: [] });
+      journey.day = 2;
+      // Force the draw onto a known act by pre-seeding every other id as seen.
+      journey.temptationMemory = {
+        lastDay: 0,
+        missedEligibleDays: 0,
+        seenActIds: ILLEGAL_ACTS.filter((act) => act.id !== actId).map((act) => act.id)
+      };
+      const temptation = checkForEvent(journey);
+      const take = temptation.options.find((option) => option.temptationChoice === 'taken');
+      gains[label] = Number(take.effects.budget);
+      odds[label] = 1 - Number(take.chanceSuccess);
+    }
+
+    assert.ok(gains.brazen > gains.petty, 'the flagrant one is worth more');
+    assert.ok(odds.brazen > odds.petty, 'and is likelier to surface');
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('the run keeps a shortcut ledger the debrief can read', () => {
+  const journey = {
+    journeyType: 'recon',
+    day: 4,
+    crew: [],
+    log: [],
+    scrutiny: 0,
+    resources: { budget: 2000 }
+  };
+  const event = { id: 'legacy_temptation_x', title: 'Bootleg Fibre Shuffle', temptation: { actTitle: 'Bootleg Fibre Shuffle' } };
+
+  resolveEvent(journey, event, {
+    label: 'Take it',
+    outcome: 'It holds.',
+    effects: { budget: 400 },
+    chanceSuccess: 1,
+    temptationChoice: 'taken'
+  });
+  resolveEvent(journey, event, {
+    label: 'Take it',
+    outcome: 'It holds.',
+    failureOutcome: 'It does not.',
+    effects: { budget: 400 },
+    failureEffects: { budget: -400, compliance: -10 },
+    chanceSuccess: 0,
+    temptationChoice: 'taken'
+  });
+  resolveEvent(journey, event, { label: 'No', outcome: 'You walk.', effects: {}, temptationChoice: 'refused' });
+
+  assert.equal(journey.temptationLedger.taken, 2);
+  assert.equal(journey.temptationLedger.held, 1);
+  assert.equal(journey.temptationLedger.caught, 1);
+  assert.equal(journey.temptationLedger.refused, 1);
+  assert.deepEqual(journey.temptationLedger.caughtActs, ['Bootleg Fibre Shuffle']);
+});
+
+test('a busted desk shortcut books its own follow-up, a clean one does not', () => {
+  const base = () => ({
+    journeyType: 'permitting',
+    day: 5,
+    crew: [],
+    log: [],
+    scrutiny: 10,
+    resources: { budget: 20000, politicalCapital: 40 }
+  });
+  const option = {
+    label: 'Take it',
+    outcome: 'It holds.',
+    failureOutcome: 'It does not.',
+    effects: { budget: 3000 },
+    failureEffects: { budget: -2400, compliance: -12 },
+    failureSchedulesEvent: 'surprise_audit',
+    temptationChoice: 'taken'
+  };
+
+  const held = base();
+  resolveEvent(held, { id: 't', title: 'T' }, { ...option, chanceSuccess: 1 });
+  assert.equal(held.scheduledEvents?.length ?? 0, 0, 'a shortcut that held schedules nothing');
+
+  const caught = base();
+  resolveEvent(caught, { id: 't', title: 'T' }, { ...option, chanceSuccess: 0 });
+  assert.equal(caught.scheduledEvents?.[0]?.eventId, 'surprise_audit');
 });

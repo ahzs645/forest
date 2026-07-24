@@ -325,6 +325,48 @@ async function next(ui, label = 'Continue') {
 }
 
 /**
+ * What the run did when nobody was checking. A shortcut that held is still a
+ * shortcut, so the ledger names it either way — the difference is whether it
+ * stayed inside the crew or ended up on someone's desk.
+ * @param {Object} journey - Journey state
+ * @returns {string[]} lines, empty when no shortcut was ever offered
+ */
+export function buildShortcutLedgerLines(journey) {
+  const ledger = journey?.temptationLedger;
+  if (!ledger || !ledger.offered) return [];
+
+  const lines = [];
+  const declined = (ledger.refused || 0) + (ledger.reported || 0);
+
+  if (!ledger.taken) {
+    lines.push(`${ledger.offered} shortcut${ledger.offered === 1 ? ' was' : 's were'} put in front of you. You took none of them.`);
+    if (ledger.reported) {
+      lines.push(`${ledger.reported} went on the record in writing.`);
+    }
+    return lines;
+  }
+
+  lines.push(`Offered ${ledger.offered} · taken ${ledger.taken} · declined ${declined}`);
+
+  if (ledger.heldActs?.length) {
+    lines.push(`Still buried: ${ledger.heldActs.join('; ')}.`);
+  }
+  if (ledger.caughtActs?.length) {
+    lines.push(`Surfaced and cost you: ${ledger.caughtActs.join('; ')}.`);
+  }
+
+  if (ledger.caught === 0) {
+    lines.push('Nothing came back on you this run. Files keep longer than crews do.');
+  } else if (ledger.caught === ledger.taken) {
+    lines.push('Every one of them landed back on your desk.');
+  } else {
+    lines.push("Some of it held. The rest is somebody else's file now.");
+  }
+
+  return lines;
+}
+
+/**
  * Run the interactive final debrief.
  * @param {Object} ui - TerminalUI instance
  * @param {Object} journey - Journey state
@@ -369,6 +411,15 @@ export async function runFinalDebrief(ui, journey, victory) {
     for (const m of moments) {
       const injury = m.victimName ? ` ${m.victimName} carries the scar.` : '';
       ui.write(`${dayLabel} ${m.day} — ${m.title}. You chose: ${m.choice}.${injury}`);
+    }
+  }
+
+  const ledgerLines = buildShortcutLedgerLines(journey);
+  if (ledgerLines.length) {
+    ui.write('');
+    ui.writeDivider('THE SHORTCUT LEDGER');
+    for (const line of ledgerLines) {
+      ui.write(line);
     }
   }
   await next(ui);

@@ -780,6 +780,16 @@ function issueMatchesContext(issue, state, tags, options = {}) {
   if (!issue.roles?.includes(state.role.id)) {
     return false;
   }
+  // seasonBias only reweights, which is right for cards that merely lean
+  // seasonal. Cards whose copy names the season ("Mid-winter rain threatens
+  // the ice bridge") read as a bug when they land in spring, so those opt into
+  // a hard gate with seasonLock.
+  if (issue.seasonLock && Array.isArray(issue.seasonBias) && issue.seasonBias.length) {
+    const seasonIndex = Math.max(0, Math.min(SEASONS.length - 1, (state.round || 1) - 1));
+    if (!issue.seasonBias.includes(SEASONS[seasonIndex])) {
+      return false;
+    }
+  }
   const ignoreRequirements = Boolean(options.ignoreRequirements);
   if (!ignoreRequirements && Array.isArray(issue.requiresFlags)) {
     const hasFlags = issue.requiresFlags.every((flag) => Boolean(state.flags?.[flag]));

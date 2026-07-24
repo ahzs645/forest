@@ -6,6 +6,16 @@
 import { displayMode } from '../displayMode.js';
 
 /**
+ * Trim to a length without leaving a word cut in half.
+ */
+function truncateAtWord(text, limit) {
+  if (text.length <= limit) return text;
+  const clipped = text.slice(0, limit);
+  const lastSpace = clipped.lastIndexOf(' ');
+  return `${(lastSpace > limit * 0.5 ? clipped.slice(0, lastSpace) : clipped).trimEnd()}...`;
+}
+
+/**
  * Input handling mixin
  */
 export const InputMixin = {
@@ -38,6 +48,7 @@ export const InputMixin = {
   async promptChoice(prompt, options) {
     this.write(prompt);
     this._hideInput();
+    this._setDecisionTitle(prompt, options);
     this._showChoices(options);
     // Rendering choice cards makes the response pane taller and the log pane
     // shorter. Re-anchor the log after that reflow so the prompt stays visible.
@@ -46,6 +57,43 @@ export const InputMixin = {
     return new Promise((resolve) => {
       this._choiceHandler = resolve;
     });
+  },
+
+  /**
+   * Label the response pane with what is actually being asked. The header sat
+   * on a hardcoded "AWAITING INPUT" for every prompt in the game, which told
+   * the player nothing and made consecutive prompts look identical.
+   * @private
+   */
+  _setDecisionTitle(prompt, options = []) {
+    if (!this.decisionTitle) return;
+
+    const text = String(prompt || '').trim();
+
+    // The action menus prompt with a bare clock ("8 hours remaining:"), which
+    // is a status line, not a question. Say what the menu is for and keep the
+    // clock as the qualifier.
+    const clock = text.match(/^(\d+)\s*(?:h|hours?)\s*remaining/i);
+    if (clock) {
+      this.decisionTitle.textContent = `NEXT ACTION · ${clock[1]}H LEFT`;
+      return;
+    }
+
+    if (text) {
+      // Prompts often lead with context and end with the actual ask ("Food
+      // stores are running thin. Decide how to handle rations today.") — the
+      // ask is the useful half, so title from the last sentence.
+      const condensed = text.replace(/\s+/g, ' ').replace(/[:：]\s*$/, '');
+      const sentences = condensed.split(/(?<=[.!?])\s+/).filter(Boolean);
+      const ask = (sentences[sentences.length - 1] || condensed).replace(/[.]$/, '');
+      this.decisionTitle.textContent = truncateAtWord(ask, 44).toUpperCase();
+      return;
+    }
+
+    // Silent prompts are the confirm/continue beats — name them for what they
+    // are rather than leaving the previous question stranded above them.
+    const single = options.length === 1 ? String(options[0]?.label || '') : '';
+    this.decisionTitle.textContent = single ? 'CONFIRM TO CONTINUE' : 'AWAITING INPUT';
   },
 
   /**
