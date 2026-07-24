@@ -24,7 +24,11 @@ export async function handleEvent(game, event) {
   const formatted = formatEventForDisplay(event, journey.journeyType);
 
   ui.write('');
-  const headerLabel = event.reporter ? 'RADIO CHECK' : 'EVENT';
+  // RADIO CHECK is the crew-lead voice; the GM's field-context events are
+  // divisions escalating a decision upward, and the header should say so.
+  const headerLabel = event.reporter
+    ? (journey.journeyType === 'manager' ? 'OPS ESCALATION' : 'RADIO CHECK')
+    : 'EVENT';
   ui.writeHeader(`${headerLabel}: ${formatted.title}`);
   if (typeof ui.playEventVignette === 'function') {
     ui.playEventVignette(event);

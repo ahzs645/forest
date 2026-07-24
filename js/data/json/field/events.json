@@ -178,6 +178,7 @@
   "title": "Flash Flood Warning",
   "type": "weather",
   "severity": "severe",
+  "managerEscalation": false,
   "probability": 0.06,
   "terrainTrigger": [
    "river"
@@ -278,6 +279,7 @@
   "title": "Grizzly Territory",
   "type": "wildlife",
   "severity": "severe",
+  "managerEscalation": false,
   "probability": 0.06,
   "description": "Fresh grizzly signs everywhere. Tracks, scat, claw marks on trees. This is her home.",
   "options": [
@@ -453,6 +455,34 @@
   "type": "injury",
   "severity": "severe",
   "probability": 0.05,
+  "managerVariant": {
+   "title": "Serious Injury - Medevac Decision",
+   "description": "A faller took a kickback to the leg on the north block. First aid has the bleeding controlled, barely. The superintendent needs an answer while the helicopter company holds the line.",
+   "options": [
+    {
+     "label": "Authorize the medevac charter",
+     "outcome": "The helicopter is airborne in twenty minutes. The invoice is a number; the alternative wasn't.",
+     "effects": {
+      "budget": -9000,
+      "crew_morale": 6,
+      "compliance": 4
+     }
+    },
+    {
+     "label": "Send him out by road with the first aid attendant",
+     "outcome": "Three hours of logging road with a compression bandage. He makes it. The division logs every kilometre."
+    },
+    {
+     "label": "Tell them to stabilize on site and finish the shift",
+     "outcome": "Production holds. So does the story, which is already moving from camp to camp - and WorkSafeBC takes calls from anyone.",
+     "effects": {
+      "crew_morale": -18,
+      "progress": 2,
+      "compliance": -8
+     }
+    }
+   ]
+  },
   "description": "A saw kicks back. There's blood. This is serious.",
   "options": [
    {
@@ -497,7 +527,26 @@
   "title": "Road Washed Out",
   "type": "terrain",
   "severity": "moderate",
+  "managerEscalation": true,
   "probability": 0.1,
+  "managerVariant": {
+   "title": "Mainline Washout",
+   "description": "The mainline went into the creek overnight and nothing is moving in or out. The road contractor wants direction before he mobilizes, and the division wants it in writing.",
+   "options": [
+    {
+     "label": "Authorize an emergency bypass",
+     "outcome": "The contractor punches a rough detour through in two days. It's ugly, it's over budget, and it moves wood."
+    },
+    {
+     "label": "Stand the division down for the engineered repair",
+     "outcome": "A proper fix, a proper delay. The quarter absorbs it; the safety file appreciates it."
+    },
+    {
+     "label": "Let them push loads through the low-water crossing",
+     "outcome": "It works until it doesn't. Equipment takes a beating, and everyone downstream develops an opinion."
+    }
+   ]
+  },
   "description": "The road ahead has collapsed into the creek. No way through.",
   "options": [
    {
@@ -2031,7 +2080,26 @@
   "title": "First Nations Elder Visits",
   "type": "social",
   "severity": "moderate",
+  "managerEscalation": true,
   "probability": 0.04,
+  "managerVariant": {
+   "title": "Culturally Modified Trees - Work Paused",
+   "description": "An Elder from the local Nation has identified culturally modified trees inside the active block. The superintendent has paused work at the boundary and wants head office direction before another tree comes down.",
+   "options": [
+    {
+     "label": "Stand the block down and walk it with her",
+     "outcome": "The stewardship forester spends a day among bark-stripped cedars with centuries of history. The cut plan changes; the relationship doesn't have to."
+    },
+    {
+     "label": "Log the concern and keep the block moving",
+     "outcome": "The file notes it. She notices what the file is for."
+    },
+    {
+     "label": "Retain her as a cultural monitor for the division",
+     "outcome": "An added line in the budget and a standing seat at the table. The auditors and the Nation both approve."
+    }
+   ]
+  },
   "description": "An elder from the local First Nations band arrives at camp. She says there are culturally modified trees nearby that need protection. She's calm but serious.",
   "options": [
    {
