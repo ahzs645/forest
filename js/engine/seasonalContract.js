@@ -1,4 +1,4 @@
-import { humanizeLabel } from "./shared.js";
+import { humanizeLabel, normalizeBudgetDelta } from "./shared.js";
 
 export const VALID_RISK_CLASSES = ["routine", "calculated", "unethical"];
 export const GENERIC_BC_AREA_TAG = "bc-wide";
@@ -176,32 +176,62 @@ function metricStakeLabel(metric) {
   }[metric] || humanizeLabel(metric);
 }
 
-function collectMetricStakes(item) {
-  const stakes = new Set();
-  const options = Array.isArray(item?.options) ? item.options : [];
-
-  for (const option of options) {
-    for (const [metric, value] of Object.entries(option?.effects || {})) {
-      if (Number.isFinite(Number(value)) && Math.abs(Number(value)) >= 2) {
-        stakes.add(metricStakeLabel(metric));
-      }
-    }
-
-    for (const [metric, value] of Object.entries(option?.risk?.failEffects || {})) {
-      if (Number.isFinite(Number(value)) && Math.abs(Number(value)) >= 2) {
-        stakes.add(metricStakeLabel(metric));
-      }
-    }
-  }
-
-  return [...stakes];
+// Budget is authored in raw dollars while every other metric moves in points;
+// put it on the points scale before comparing swings across metrics.
+function comparableSwing(metric, value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return metric === "budget" ? Math.abs(normalizeBudgetDelta(numeric)) : Math.abs(numeric);
 }
 
-function listToSentence(items = []) {
-  if (!items.length) return "";
-  if (items.length === 1) return items[0];
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+// Measure how far each metric can actually move on this card — best gain and
+// worst loss across every option, including both branches of a gamble — so the
+// stakes line can talk about the meters that dominate instead of naming
+// everything the card touches.
+function collectMetricSwings(item) {
+  const swings = new Map();
+  const options = Array.isArray(item?.options) ? item.options : [];
+
+  const record = (metric, value) => {
+    if (metric === "timeUsed") return;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || Math.abs(numeric) < 2) return;
+    const magnitude = comparableSwing(metric, numeric);
+    const entry = swings.get(metric) || { up: 0, down: 0 };
+    if (numeric > 0 && magnitude > entry.up) entry.up = magnitude;
+    if (numeric < 0 && magnitude > entry.down) entry.down = magnitude;
+    swings.set(metric, entry);
+  };
+
+  for (const option of options) {
+    for (const [metric, value] of Object.entries(option?.effects || {})) record(metric, value);
+    for (const [metric, value] of Object.entries(option?.risk?.successEffects || {})) record(metric, value);
+    for (const [metric, value] of Object.entries(option?.risk?.failEffects || {})) record(metric, value);
+  }
+
+  return swings;
+}
+
+// A stakes line that listed five metrics told the player nothing — when
+// everything matters, nothing does — and overflowed the one-line headline.
+// Name only the biggest swing in each direction and say which way it cuts.
+function buildMetricStakesLine(swings) {
+  if (!swings?.size) return "";
+
+  const entries = [...swings.entries()].map(([metric, entry]) => ({ metric, ...entry }));
+  const topUp = entries.filter((entry) => entry.up > 0).sort((a, b) => b.up - a.up)[0] || null;
+  const topDown = entries.filter((entry) => entry.down > 0).sort((a, b) => b.down - a.down)[0] || null;
+
+  if (topUp && topDown && topUp.metric !== topDown.metric) {
+    return `The upside here is ${metricStakeLabel(topUp.metric)}; the exposure is ${metricStakeLabel(topDown.metric)}.`;
+  }
+  if (topUp && topDown) {
+    return `This is mostly a ${metricStakeLabel(topUp.metric)} call, and it can move hard either way.`;
+  }
+  if (topDown) {
+    return `There is no real win on offer — the job is limiting the ${metricStakeLabel(topDown.metric)} damage.`;
+  }
+  return `The main thing on offer is ${metricStakeLabel(topUp.metric)}.`;
 }
 
 function inferRiskClass(item, type) {
@@ -241,14 +271,64 @@ function inferCardLabel(item, type, riskClass) {
   return riskClass === "calculated" ? "Operational constraint" : "Operational issue";
 }
 
-function inferDecisionPrompt(type, riskClass, context) {
+// When a meter is already in trouble and this card can push it further down,
+// the ask names that squeeze instead of asking a generic question.
+const PRESSURED_METRIC_PROMPTS = {
+  compliance: "Which of these could you still defend under audit?",
+  relationships: "Who are you prepared to strain to get this done?",
+  budget: "The budget is already thin. What is this worth?",
+  progress: "The schedule is already slipping. What gives?",
+  forestHealth: "The stands are already stressed. How much more can they carry?",
+};
+
+// Planned work reads as scheduling, so its ask tracks where the year is.
+const SEASONAL_TASK_PROMPTS = {
+  spring: "How do you set the season up?",
+  summer: "How do you play it with the season running?",
+  fall: "What do you lock in before freeze-up?",
+  winter: "What do you square away before spring?",
+};
+
+// The card can only aggravate a metric it actually pushes down; among those,
+// the lowest current meter is the one the player is sweating.
+function pickPressuredMetric(state, swings) {
+  if (!swings?.size) return null;
+  let pressured = null;
+  for (const [metric, entry] of swings) {
+    if (entry.down < 3) continue;
+    const current = Number(state?.metrics?.[metric]);
+    if (!Number.isFinite(current) || current >= 45) continue;
+    if (!pressured || current < pressured.value) {
+      pressured = { metric, value: current };
+    }
+  }
+  return pressured?.metric || null;
+}
+
+// One template question everywhere made every card end on the same beat. The
+// ask now keys on what kind of call this is, which meter is under pressure,
+// and where the year is — so the variation tracks the situation instead of
+// shuffling synonyms.
+function inferDecisionPrompt(item, state, type, riskClass, operationState, swings) {
   if (type === "temptation") {
     return "Decide whether to refuse, report, or take a shortcut that could damage the file if it comes back on you.";
   }
-  // There is no per-card authored question, and the role/season objective is
-  // generic, so asking a grounded question that points at the briefing above
-  // reads better than splicing in a goal that doesn't match this situation.
-  return "How do you want to respond?";
+
+  const pressuredMetric = pickPressuredMetric(state, swings);
+  if (pressuredMetric && PRESSURED_METRIC_PROMPTS[pressuredMetric]) {
+    return PRESSURED_METRIC_PROMPTS[pressuredMetric];
+  }
+
+  if (type === "assignment" || type === "task") {
+    return SEASONAL_TASK_PROMPTS[operationState?.seasonId] || "How do you set the season up?";
+  }
+  if (riskClass === "calculated") {
+    return "How much exposure are you willing to carry on this one?";
+  }
+  if (type === "event") {
+    return "How do you handle it?";
+  }
+  return "Where do you land on this?";
 }
 
 function rewriteAmbiguousTerminology(text) {
@@ -348,7 +428,7 @@ export function matchesPreconditions(itemOrPreconditions, state, operationState 
 export function normalizeSeasonalCard(item, state, type, extras = {}) {
   const operationState = getRoleOperationState(state);
   const riskClass = inferRiskClass(item, type);
-  const metricStakes = collectMetricStakes(item);
+  const metricSwings = collectMetricSwings(item);
   const options = Array.isArray(item?.options)
     ? item.options.map((option) => ({
         ...option,
@@ -369,11 +449,8 @@ export function normalizeSeasonalCard(item, state, type, extras = {}) {
     stakes: rewriteAmbiguousTerminology(
       item?.context?.stakes
         || extras.context?.stakes
-        || (
-          metricStakes.length
-            ? `This call is most likely to affect ${listToSentence(metricStakes)} this season.`
-            : "This decision changes how much trust, time, and defensibility you carry into the next step."
-        )
+        || buildMetricStakesLine(metricSwings)
+        || "This decision changes how much trust, time, and defensibility you carry into the next step."
     ),
   };
 
@@ -388,7 +465,7 @@ export function normalizeSeasonalCard(item, state, type, extras = {}) {
     preconditions: item?.preconditions || null,
     riskClass,
     cardLabel: item?.cardLabel || inferCardLabel(item, type, riskClass),
-    decisionPrompt: item?.decisionPrompt || inferDecisionPrompt(type, riskClass, context),
+    decisionPrompt: item?.decisionPrompt || inferDecisionPrompt(item, state, type, riskClass, operationState, metricSwings),
     operationState,
   };
 }

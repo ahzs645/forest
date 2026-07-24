@@ -112,7 +112,28 @@ function createViewState() {
   };
 }
 
-function buildOutcomeNotice(option, outcomeResult) {
+// "Decision Logged" rubber-stamped every result identically. Acknowledge in the
+// register of the call that was made instead: planned work reads as the season
+// taking shape, operational surprises as things handled, contested calls as
+// judgment, a refused shortcut as something now on the record.
+const ASSIGNMENT_ACK_BY_ROUND = {
+  1: "Season plan set",
+  2: "Mid-season call",
+  3: "Locked in for fall",
+  4: "Closed out",
+};
+
+function outcomeAcknowledgement(cardType, round) {
+  if (cardType === "assignment" || cardType === "task") {
+    return ASSIGNMENT_ACK_BY_ROUND[round] || "Season plan set";
+  }
+  if (cardType === "event") return "Handled";
+  if (cardType === "issue") return "Call made";
+  if (cardType === "temptation") return "On the record";
+  return "Decision logged";
+}
+
+function buildOutcomeNotice(option, outcomeResult, cardType = null, round = null) {
   const riskResult = outcomeResult?.riskResult ?? null;
   const outcomeText = outcomeResult?.outcome ?? option?.outcome ?? "";
   const deltaText = formatMetricDelta(outcomeResult?.effects || {});
@@ -132,7 +153,7 @@ function buildOutcomeNotice(option, outcomeResult) {
   }
 
   return {
-    heading: `Decision Logged: ${option.label}`,
+    heading: `${outcomeAcknowledgement(cardType, round)}: ${option.label}`,
     body,
     tone: "info",
   };
@@ -172,6 +193,85 @@ function buildMissionBriefing(gs) {
   };
 }
 
+/**
+ * Keep two cards of the same kind from landing back to back.
+ *
+ * A season draws a second event or a second contested call, and when the
+ * shortcut offer that would have sat between them does not draw, the pair ends
+ * up adjacent — two cards under the same "OPERATIONAL ISSUE" label in a row,
+ * which reads as the game repeating itself rather than the season developing.
+ * Walks the season's slice of the queue and swaps a duplicate forward to the
+ * next card of a different kind; leaves the order alone when no swap helps
+ * (a season of nothing but issues has no better arrangement).
+ *
+ * @param {Array} queue - the controller queue
+ * @param {number} start - index where this season's cards begin
+ */
+function separateAdjacentCardTypes(queue, start, previousType = null) {
+  const cards = queue.slice(start);
+  if (!cards.length) return previousType;
+  if (cards.length < 2) return cards[cards.length - 1].type;
+
+  // Greedy interleave: always emit the earliest remaining card whose kind
+  // differs from the one just emitted, falling back to the earliest remaining
+  // card when every candidate matches. Reordering rather than swapping matters
+  // because the duplicate is usually last in the season, with nothing after it
+  // to trade places with.
+  const remaining = cards.slice();
+  const ordered = [];
+
+  // The season's planned work opens it — that is the arc, not an accident of
+  // ordering — so the assignment stays pinned in front.
+  if (remaining[0]?.type === "assignment" || remaining[0]?.type === "task") {
+    ordered.push(remaining.shift());
+  }
+
+  while (remaining.length) {
+    // Seeded with the previous season's closing card, so the guard holds
+    // across the season boundary too — a fall that ends on a contested call
+    // and a winter that opens on one still read as two of the same thing.
+    const priorType = ordered.length ? ordered[ordered.length - 1].type : previousType;
+
+    // Spend the most-repeated kind first. Taking merely the earliest
+    // non-matching card is short-sighted: with one event and two contested
+    // calls it emits event, call, call and strands the duplicate at the end,
+    // where there is nothing left to separate it from.
+    const counts = new Map();
+    for (const entry of remaining) counts.set(entry.type, (counts.get(entry.type) || 0) + 1);
+
+    let index = -1;
+    let bestCount = -1;
+    for (let i = 0; i < remaining.length; i += 1) {
+      if (remaining[i].type === priorType) continue;
+      const count = counts.get(remaining[i].type);
+      if (count > bestCount) {
+        bestCount = count;
+        index = i;
+      }
+    }
+    if (index === -1) index = 0;
+    ordered.push(remaining.splice(index, 1)[0]);
+  }
+
+  for (let i = 0; i < ordered.length; i += 1) {
+    queue[start + i] = ordered[i];
+  }
+
+  return ordered[ordered.length - 1].type;
+}
+
+// Clip overlong copy at a word boundary — a mid-word cut ("budget flexibility,
+// an…") reads as a rendering bug, not a summary.
+function clipAtWordBoundary(text, limit) {
+  if (text.length <= limit) return text;
+  const cut = text.slice(0, limit - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  // Only backtrack when a space is reasonably close; a single unbroken token
+  // (a URL, say) still gets a hard cut rather than an empty headline.
+  const clipped = lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut;
+  return `${clipped.replace(/[\s,;:—-]+$/, "")}…`;
+}
+
 // One scannable line the player reads before the four-question body: the season
 // plus what's actually at stake right now. Keeps the first read fast even when
 // the card's full context runs long.
@@ -181,7 +281,7 @@ function buildCardHeadline(gs, item) {
   const why = item?.context?.stakes || item?.whyNow || item?.surfaceReason || "";
   const trimmed = why ? String(why).replace(/\s+/g, " ").trim() : "";
   const tail = trimmed
-    ? (trimmed.length > 120 ? `${trimmed.slice(0, 117)}…` : trimmed)
+    ? clipAtWordBoundary(trimmed, 120)
     : (item?.title || "A call needs making");
   return seasonShort ? `${seasonShort}: ${tail}` : tail;
 }
@@ -734,8 +834,20 @@ export class TuiGameController {
       const issue = drawIssue(gs, this.rng);
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
+        this.lastSeasonCardType = "issue";
       }
     } else {
+      // Season arc: planned work, an operational surprise, a contested call,
+      // (sometimes) a shortcut offer, then one more beat — a second surprise
+      // while the field season is open (rounds 1–2), a second contested call
+      // once the year's earlier choices start coming due (rounds 3–4). At
+      // three cards a season was over before its situation could develop, and
+      // the temptation deck almost never surfaced inside a 12-card year. Two
+      // extra cards per season was tried and rejected: the stacked time and
+      // dollar costs ground careful play's progress to the floor and the
+      // ending tiers stopped discriminating.
+      const seasonCardStart = this.queue.length;
+
       const assignment = drawSeasonalAssignment(gs, context);
       if (assignment) {
         recordAssignmentSelection(gs, assignment);
@@ -747,15 +859,39 @@ export class TuiGameController {
         this.queue.push({ type: "event", data: event });
       }
 
+      const issue = drawIssue(gs, this.rng);
+      if (issue) {
+        this.queue.push({ type: "issue", data: issue });
+      }
+
       const temptation = drawSeasonalTemptation(gs, this.rng);
       if (temptation) {
         this.queue.push({ type: "temptation", data: temptation });
       }
 
-      const issue = drawIssue(gs, this.rng);
-      if (issue) {
-        this.queue.push({ type: "issue", data: issue });
+      if (gs.round <= 2) {
+        const secondEvent = drawSeasonalEvent(gs, this.rng, {
+          advancePending: false,
+          excludeIds: event ? [event.id] : [],
+        });
+        if (secondEvent) {
+          this.queue.push({ type: "event", data: secondEvent });
+        }
+      } else {
+        const secondIssue = drawIssue(gs, this.rng, {
+          advancePending: false,
+          excludeIds: issue ? [issue.id] : [],
+        });
+        if (secondIssue) {
+          this.queue.push({ type: "issue", data: secondIssue });
+        }
       }
+
+      this.lastSeasonCardType = separateAdjacentCardTypes(
+        this.queue,
+        seasonCardStart,
+        this.lastSeasonCardType ?? null,
+      );
     }
 
     this.queue.push({
@@ -917,7 +1053,7 @@ export class TuiGameController {
           gs.lastDecision = buildLastDecision(option, outcomeResult);
           this.emit();
 
-          this.processNext(buildOutcomeNotice(option, outcomeResult));
+          this.processNext(buildOutcomeNotice(option, outcomeResult, phase.type, gs.round));
         },
         artText,
       );

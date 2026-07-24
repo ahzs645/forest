@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkForEvent, formatEventForDisplay, resolveEvent } from '../js/events.js';
+import { checkForEvent, formatEventForDisplay, formatOptionEffects, resolveEvent } from '../js/events.js';
+import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
+import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { createJourney } from '../js/journey.js';
 import { handleEvent } from '../js/modes/shared/handleEvent.js';
-import { eventMatchesJourneyContext } from '../js/events/selection.js';
+import { eventMatchesJourneyContext, getTemptationDetectionChance } from '../js/events/selection.js';
+import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
 import {
   getPermittingConstraintState,
   resolvePermitRevisionResponse,
@@ -32,7 +35,7 @@ test('radio event copy uses one concise reporter lead', () => {
   assert.doesNotMatch(formatted.description, /radios in:.*radios in:/i);
 });
 
-test('event outcomes wait for acknowledgement before play resumes', async () => {
+function createEventHarness() {
   const writes = [];
   const prompts = [];
   const ui = {
@@ -56,7 +59,11 @@ test('event outcomes wait for acknowledgement before play resumes', async () => 
     scrutiny: 0,
     resources: {}
   };
-  const game = { ui, journey, gameOver: false };
+  return { writes, prompts, game: { ui, journey, gameOver: false } };
+}
+
+test('routine event outcomes return straight to play without a confirm beat', async () => {
+  const { writes, prompts, game } = createEventHarness();
 
   await handleEvent(game, {
     id: 'acknowledgement-test',
@@ -71,11 +78,30 @@ test('event outcomes wait for acknowledgement before play resumes', async () => 
     }]
   });
 
-  assert.equal(prompts.length, 2);
+  assert.equal(prompts.length, 1);
   assert.equal(prompts[0].prompt, 'What do you do?');
-  assert.equal(prompts[1].options[0].label, 'Acknowledge outcome and continue');
   assert.ok(writes.some((entry) => entry.text === 'OUTCOME'));
   assert.ok(writes.some((entry) => entry.text === 'The decision lands.'));
+});
+
+test('consequential event outcomes still wait for acknowledgement', async () => {
+  const { prompts, game } = createEventHarness();
+
+  await handleEvent(game, {
+    id: 'acknowledgement-major-test',
+    title: 'A Serious Call',
+    description: 'This one matters.',
+    severity: 'major',
+    type: 'compliance',
+    options: [{
+      label: 'Make the call',
+      outcome: 'The decision lands hard.',
+      effects: {}
+    }]
+  });
+
+  assert.equal(prompts.length, 2);
+  assert.equal(prompts[1].options[0].label, 'Acknowledge outcome and continue');
 });
 
 test('illegal-act temptations have a priority draw from day two with a cooldown', () => {
@@ -780,4 +806,252 @@ test('selected events can seed carry-forward discovery tags', () => {
 
   assert.ok(journey.discoveryTags.some((tag) => tag.id === 'community_visibility'));
   assert.ok(result.messages.some((message) => /Carry-forward intel/i.test(message)));
+});
+
+test('shortcut offers are a real bet: odds, a losing branch, and a stated downside', () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+
+  try {
+    const journey = createJourney({
+      roleId: 'recce',
+      areaId: 'fort-st-john-plateau',
+      crew: []
+    });
+    journey.day = 2;
+
+    const temptation = checkForEvent(journey);
+    assert.equal(temptation?.type, 'temptation');
+
+    const take = temptation.options.find((option) => option.temptationChoice === 'taken');
+    assert.ok(take, 'the shortcut option is tagged so the ledger can see it');
+    assert.equal(typeof take.chanceSuccess, 'number');
+    assert.ok(take.chanceSuccess > 0 && take.chanceSuccess < 1, 'taking it is a gamble, not a purchase');
+    assert.ok(take.failureEffects, 'the losing branch has its own effects');
+    assert.ok(Number(take.failureEffects.budget) < 0, 'getting caught costs money, it does not pay');
+    assert.ok(Number(take.effects.budget) > 0, 'the winning branch pays');
+
+    const formatted = formatEventForDisplay(temptation, 'recon');
+    const takeHint = formatted.options.find((option) => /Take the shortcut/.test(option.label))?.hint || '';
+    assert.match(takeHint, /it goes wrong/, 'the odds of it surfacing are on the button');
+    assert.match(takeHint, /then /, 'so is what it costs when it does');
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('shortcut detection climbs with scrutiny and with every shortcut already taken', () => {
+  const tier = { detection: 0.3 };
+  const clean = getTemptationDetectionChance({ scrutiny: 0, difficulty: 'normal' }, tier, 0);
+  const hot = getTemptationDetectionChance({ scrutiny: 80, difficulty: 'normal' }, tier, 0);
+  const repeat = getTemptationDetectionChance({ scrutiny: 0, difficulty: 'normal' }, tier, 3);
+  const hard = getTemptationDetectionChance({ scrutiny: 0, difficulty: 'hard' }, tier, 0);
+
+  assert.ok(hot > clean, 'a run under scrutiny is a worse place to try it');
+  assert.ok(repeat > clean, 'the third shortcut is riskier than the first');
+  assert.ok(hard > clean, 'hard runs are watched more closely');
+  assert.ok(getTemptationDetectionChance({ scrutiny: 100 }, { detection: 0.85 }, 9) <= 0.85, 'odds stay bounded');
+});
+
+test('brazen shortcuts pay more and get caught more often than corner-cutting', () => {
+  const originalRandom = Math.random;
+  const gains = {};
+  const odds = {};
+
+  try {
+    for (const [label, actId] of [['brazen', 'permit-fastpass'], ['petty', 'carbon-offset-spin']]) {
+      Math.random = () => 0.05;
+      const journey = createJourney({ roleId: 'permitter', areaId: 'fort-st-john-plateau', crew: [] });
+      journey.day = 2;
+      // Force the draw onto a known act by pre-seeding every other id as seen.
+      journey.temptationMemory = {
+        lastDay: 0,
+        missedEligibleDays: 0,
+        seenActIds: ILLEGAL_ACTS.filter((act) => act.id !== actId).map((act) => act.id)
+      };
+      const temptation = checkForEvent(journey);
+      const take = temptation.options.find((option) => option.temptationChoice === 'taken');
+      gains[label] = Number(take.effects.budget);
+      odds[label] = 1 - Number(take.chanceSuccess);
+    }
+
+    assert.ok(gains.brazen > gains.petty, 'the flagrant one is worth more');
+    assert.ok(odds.brazen > odds.petty, 'and is likelier to surface');
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('the run keeps a shortcut ledger the debrief can read', () => {
+  const journey = {
+    journeyType: 'recon',
+    day: 4,
+    crew: [],
+    log: [],
+    scrutiny: 0,
+    resources: { budget: 2000 }
+  };
+  const event = { id: 'legacy_temptation_x', title: 'Bootleg Fibre Shuffle', temptation: { actTitle: 'Bootleg Fibre Shuffle' } };
+
+  resolveEvent(journey, event, {
+    label: 'Take it',
+    outcome: 'It holds.',
+    effects: { budget: 400 },
+    chanceSuccess: 1,
+    temptationChoice: 'taken'
+  });
+  resolveEvent(journey, event, {
+    label: 'Take it',
+    outcome: 'It holds.',
+    failureOutcome: 'It does not.',
+    effects: { budget: 400 },
+    failureEffects: { budget: -400, compliance: -10 },
+    chanceSuccess: 0,
+    temptationChoice: 'taken'
+  });
+  resolveEvent(journey, event, { label: 'No', outcome: 'You walk.', effects: {}, temptationChoice: 'refused' });
+
+  assert.equal(journey.temptationLedger.taken, 2);
+  assert.equal(journey.temptationLedger.held, 1);
+  assert.equal(journey.temptationLedger.caught, 1);
+  assert.equal(journey.temptationLedger.refused, 1);
+  assert.deepEqual(journey.temptationLedger.caughtActs, ['Bootleg Fibre Shuffle']);
+});
+
+test('a busted desk shortcut books its own follow-up, a clean one does not', () => {
+  const base = () => ({
+    journeyType: 'permitting',
+    day: 5,
+    crew: [],
+    log: [],
+    scrutiny: 10,
+    resources: { budget: 20000, politicalCapital: 40 }
+  });
+  const option = {
+    label: 'Take it',
+    outcome: 'It holds.',
+    failureOutcome: 'It does not.',
+    effects: { budget: 3000 },
+    failureEffects: { budget: -2400, compliance: -12 },
+    failureSchedulesEvent: 'surprise_audit',
+    temptationChoice: 'taken'
+  };
+
+  const held = base();
+  resolveEvent(held, { id: 't', title: 'T' }, { ...option, chanceSuccess: 1 });
+  assert.equal(held.scheduledEvents?.length ?? 0, 0, 'a shortcut that held schedules nothing');
+
+  const caught = base();
+  resolveEvent(caught, { id: 't', title: 'T' }, { ...option, chanceSuccess: 0 });
+  assert.equal(caught.scheduledEvents?.[0]?.eventId, 'surprise_audit');
+});
+// ── Option hint honesty ──────────────────────────────────────────────────────
+// The bracket hint is the player's only forecast of an option. Every clause
+// must state a fact the resolver actually backs; the fallback may claim
+// "no cost" only when the option truly has nothing modelled on it.
+
+test('an option with nothing modelled reads as no cost, not a safety promise', () => {
+  assert.equal(formatOptionEffects({ label: 'Stay focused', effects: {} }, 'recon'), 'no cost');
+  // crewEffect.rest is a no-op in resolution.js, so it earns no clause either
+  assert.equal(
+    formatOptionEffects({ label: 'Have them rest in camp', effects: {}, crewEffect: { rest: 2 } }, 'recon'),
+    'no cost'
+  );
+});
+
+test('hint clauses cover the consequence paths the resolver runs', () => {
+  assert.equal(
+    formatOptionEffects({ label: 'Send them out', effects: { fuel: -8 }, crewEffect: { evacuate: true } }, 'recon'),
+    '-8 fuel, crew member out'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Treat on site', crewEffect: { injury: 'severe_laceration' } }, 'recon'),
+    'crew injury'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Let them go', crewEffect: { lose_member: true } }, 'recon'),
+    'crew member leaves'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Light duty', crewEffect: { illness: 'flu', riskWorsen: 0.35 }, hiddenOutcome: false }, 'recon'),
+    '35% illness risk'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Submit with old data', riskCompliance: 0.3 }, 'permitting'),
+    '30% compliance risk'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Ignore it', schedulesEvent: 'safety_inspection_followup' }, 'recon'),
+    'consequences later'
+  );
+  assert.equal(
+    formatOptionEffects({ label: 'Walk away', gameOver: true, gameOverReason: 'Quit' }, 'recon'),
+    'ends the run'
+  );
+});
+
+test('scrutiny and reputation effects show up as deltas instead of vanishing', () => {
+  assert.equal(
+    formatOptionEffects({ label: 'Cut the corner', effects: { scrutiny: 5, reputation: -4 } }, 'permitting'),
+    '+5 scrutiny, -4 reputation'
+  );
+});
+
+test('gamble hints state the failure chance and its costs in the same vocabulary', () => {
+  const hint = formatOptionEffects({
+    label: 'risk it',
+    effects: { progress: 5 },
+    chanceSuccess: 0.4,
+    failureOutcome: 'It fails.',
+    failureEffects: { progress: -5 }
+  }, 'recon');
+  assert.equal(hint, '+5 km traverse, 60% it goes wrong, then -5 km traverse');
+
+  assert.equal(
+    formatOptionEffects({ label: 'coin flip', chanceSuccess: 0.5, failureOutcome: 'Nope.' }, 'recon'),
+    '50% it goes wrong'
+  );
+});
+
+test('hidden outcomes read in the same factual register', () => {
+  assert.equal(formatOptionEffects({ label: 'Gamble', hiddenOutcome: true }, 'recon'), 'outcome unknown');
+});
+
+test('no option in either deck renders the retired hint vocabulary', () => {
+  const pools = [
+    { events: FIELD_EVENTS, journeyType: 'field' },
+    { events: DESK_EVENTS, journeyType: 'permitting' }
+  ];
+  for (const { events, journeyType } of pools) {
+    for (const event of events) {
+      const formatted = formatEventForDisplay(event, journeyType);
+      for (const option of formatted.options) {
+        assert.ok(option.hint && option.hint.length > 0,
+          `${event.id} option "${option.label}" has an empty hint`);
+        assert.notEqual(option.hint, 'Safe choice',
+          `${event.id} option "${option.label}" still claims safety`);
+        assert.notEqual(option.hint, 'Outcome uncertain',
+          `${event.id} option "${option.label}" uses the retired uncertainty wording`);
+        assert.doesNotMatch(option.hint, /success odds/,
+          `${event.id} option "${option.label}" uses the retired gamble wording`);
+      }
+    }
+  }
+});
+
+test('a gamble hint stays short enough to read on a phone button', () => {
+  // The shortcut offers carry the widest failure branch in the game, so they
+  // are the case that would overflow first.
+  const hint = formatOptionEffects({
+    label: 'Take the shortcut',
+    effects: { budget: 730, equipment: -6, crew_morale: -5, compliance: -2, scrutiny: 5 },
+    chanceSuccess: 0.68,
+    failureEffects: { budget: -584, crew_morale: -8, compliance: -10, scrutiny: 20, reputation: -8 },
+    riskInjury: 0.2
+  }, 'recon');
+
+  const failureClause = hint.split('it goes wrong, then ')[1] || '';
+  assert.ok(failureClause.split(', ').length <= 3,
+    `failure branch listed too many costs: ${failureClause}`);
+  assert.match(hint, /% it goes wrong, then /);
 });

@@ -24,7 +24,11 @@ export async function handleEvent(game, event) {
   const formatted = formatEventForDisplay(event, journey.journeyType);
 
   ui.write('');
-  const headerLabel = event.reporter ? 'RADIO CHECK' : 'EVENT';
+  // RADIO CHECK is the crew-lead voice; the GM's field-context events are
+  // divisions escalating a decision upward, and the header should say so.
+  const headerLabel = event.reporter
+    ? (journey.journeyType === 'manager' ? 'OPS ESCALATION' : 'RADIO CHECK')
+    : 'EVENT';
   ui.writeHeader(`${headerLabel}: ${formatted.title}`);
   if (typeof ui.playEventVignette === 'function') {
     ui.playEventVignette(event);
@@ -79,12 +83,33 @@ export async function handleEvent(game, event) {
     journey.endReason = selectedOption.gameOverReason || 'Event outcome';
   }
 
-  // Keep the result on screen until the player explicitly acknowledges it.
-  // Otherwise end-of-shift effects or another event can immediately displace
-  // the very consequence that makes this decision meaningful.
-  await ui.promptChoice('', [{
-    label: 'Acknowledge outcome and continue',
-    description: 'Return to the shift after reviewing the result',
-    value: 'continue'
-  }]);
+  // Hold the screen only when the result is worth holding it for. An
+  // acknowledgement button after every routine outcome turned the most common
+  // interaction in the game into pressing next; now it fires for the beats a
+  // player would actually want to stop on — someone hurt, a bet that went
+  // wrong, a consequence booked for later, or a run-ending call.
+  if (needsAcknowledgement(event, selectedOption, result)) {
+    await ui.promptChoice('', [{
+      label: 'Acknowledge outcome and continue',
+      description: 'Return to the shift after reviewing the result',
+      value: 'continue'
+    }]);
+  }
+}
+
+/**
+ * Whether a resolved event earns its own confirm beat.
+ * @param {Object} event - Event definition
+ * @param {Object} option - The chosen option
+ * @param {Object} result - resolveEvent result
+ * @returns {boolean}
+ */
+export function needsAcknowledgement(event, option, result) {
+  if (option?.gameOver) return true;
+  if (result?.injuryVictim) return true;
+  if (result?.gambleFailed) return true;
+  if (option?.temptationChoice === 'taken') return true;
+  if (event?.severity === 'major' || event?.severity === 'critical') return true;
+  if (Math.abs(Number(result?.scrutinyDelta) || 0) >= 8) return true;
+  return (result?.messages || []).some((message) => /consequences later/i.test(String(message)));
 }

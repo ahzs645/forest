@@ -62,6 +62,7 @@ without a backend.
 | `tui.html` | Redirects to `/?mode=seasonal`; `?classic=1` loads the old React view, `?mode=crisis-command` the crisis deep-link | Transitional |
 | `cli-game.tsx` (`npm run play`) | @opentui/react + Bun, seasonal only | Experimental (frozen) |
 | `scripts/run-seasonal-sims.mjs` (`npm run sim:seasonal`) | Headless seasonal balance harness driving the real `TuiGameController` | **Primary tooling** |
+| `scripts/playthrough-log.mjs` (`npm run playtest:log`) | Drives the built site in a browser and writes a full turn-by-turn transcript plus prompt/choice repetition counts | **Primary tooling** (feel + repetition checks) |
 | `cli.mjs` | Headless seasonal sim for balance runs | Legacy (superseded by `run-seasonal-sims.mjs`; uses an older engine loop) |
 | ~~`cli-game.js` (blessed)~~ | — | Removed |
 

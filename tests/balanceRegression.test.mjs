@@ -28,12 +28,12 @@ test("every role × area × strategy finishes a full seasonal year", () => {
 test("Outstanding is reachable under a known seed", () => {
   // Regression guard for the reachable-Outstanding tuning pass. The witness
   // seed is re-picked whenever draw-order changes shift the RNG stream (last:
-  // the 2026-07 temptation-frequency bump).
+  // the 2026-07 seasonal depth increase + excellence-gate raise).
   const run = simulateRun({
     roleId: "permitter",
     areaId: "fort-st-john-plateau",
     strategy: "greedy",
-    seed: 1001,
+    seed: 1004,
   });
   assert.equal(run.endingTier, "outstanding");
 });
@@ -66,10 +66,13 @@ test("no single issue dominates the matrix beyond a cap", () => {
   }
   const [topId, topCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || [null, 0];
   const share = topCount / MATRIX.length;
-  // The flattened issue weighting keeps the most frequent issue near ~22% of
-  // runs; 30% is a regression guard, not a target.
+  // A year now has six issue slots (up from four when this guard was set at
+  // 30%), so any issue's per-run appearance share scales up ~1.5× by
+  // arithmetic alone. The flattened weighting keeps the top issue near ~37%
+  // of runs — the same ~6% per-slot concentration as before the depth change.
+  // 45% is the regression guard, not a target.
   assert.ok(
-    share <= 0.3,
-    `top issue ${topId} appeared in ${(100 * share).toFixed(1)}% of runs (cap 30%)`,
+    share <= 0.45,
+    `top issue ${topId} appeared in ${(100 * share).toFixed(1)}% of runs (cap 45%)`,
   );
 });

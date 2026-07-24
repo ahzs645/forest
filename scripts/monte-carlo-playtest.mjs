@@ -248,7 +248,7 @@ function parseHintScore(text) {
   const fuel = normalized.match(/([+-]\d+)\s+fuel/i);
   if (fuel) score += Number(fuel[1]) * 0.7;
 
-  if (normalized.includes('Safe choice')) score += 1;
+  if (normalized.includes('no cost')) score += 1;
   return score;
 }
 

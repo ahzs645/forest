@@ -44,6 +44,36 @@ function pickMultipleCrewMembers(crew, count) {
 }
 
 /**
+ * Keep the run's shortcut record. Without it a run that took four bribes and a
+ * riparian trespass ends with exactly the same closing text as a clean one.
+ * @param {Object} journey - Journey state
+ * @param {Object} event - The temptation event
+ * @param {Object} option - Selected option
+ * @param {boolean} caught - Whether the gamble branch failed
+ */
+function recordTemptationChoice(journey, event, option, caught) {
+  const ledger = journey.temptationLedger || (journey.temptationLedger = {
+    offered: 0, taken: 0, held: 0, caught: 0, refused: 0, reported: 0, caughtActs: [], heldActs: []
+  });
+  const title = event?.temptation?.actTitle || event?.title || 'a shortcut';
+
+  if (option.temptationChoice === 'taken') {
+    ledger.taken += 1;
+    if (caught) {
+      ledger.caught += 1;
+      ledger.caughtActs.push(title);
+    } else {
+      ledger.held += 1;
+      ledger.heldActs.push(title);
+    }
+    return;
+  }
+
+  if (option.temptationChoice === 'refused') ledger.refused += 1;
+  if (option.temptationChoice === 'reported') ledger.reported += 1;
+}
+
+/**
  * Resolve an event by applying the selected option
  * @param {Object} journey - Journey state
  * @param {Object} event - Event being resolved
@@ -57,9 +87,15 @@ export function resolveEvent(journey, event, option) {
   // Gamble options: roll once, then use the resolved branch throughout
   let outcome = option.outcome;
   let effects = option.effects;
+  let gambleFailed = false;
   if (typeof option.chanceSuccess === 'number' && Math.random() >= option.chanceSuccess) {
+    gambleFailed = true;
     outcome = option.failureOutcome || outcome;
     effects = option.failureEffects || effects;
+  }
+
+  if (option.temptationChoice) {
+    recordTemptationChoice(journey, event, option, gambleFailed);
   }
 
   if (outcome) {
@@ -109,10 +145,16 @@ export function resolveEvent(journey, event, option) {
     messages.push(`Permits approved: ${journey.permits.approved}/${journey.permits.target}`);
   }
 
-  if (option.schedulesEvent) {
+  // A gamble can carry its own follow-up: the branch that actually resolved
+  // decides whether one gets booked, so a shortcut that held does not schedule
+  // the audit that only a busted one earns.
+  const scheduledEventId = gambleFailed
+    ? (option.failureSchedulesEvent || option.schedulesEvent)
+    : option.schedulesEvent;
+  if (scheduledEventId) {
     if (!journey.scheduledEvents) journey.scheduledEvents = [];
     journey.scheduledEvents.push({
-      eventId: option.schedulesEvent,
+      eventId: scheduledEventId,
       triggerDay: journey.day + (option.scheduledDelay || 3)
     });
     messages.push('This may have consequences later...');
@@ -145,7 +187,7 @@ export function resolveEvent(journey, event, option) {
     ...(injuryVictim ? { victimId: injuryVictim.id, victimName: injuryVictim.name } : {})
   });
 
-  return { journey, messages };
+  return { journey, messages, injuryVictim, gambleFailed, scrutinyDelta };
 }
 
 /**
