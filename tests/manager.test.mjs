@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { getOperationalProgress, recordProgressMilestones } from '../js/journey.js';
 import { createManagerJourney } from '../js/journey/factory.js';
 import { checkForEvent, resolveEvent } from '../js/events.js';
+import { escalateFieldEventForManager, isManagerFieldEscalation } from '../js/events/selection.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 
@@ -110,6 +111,120 @@ test('checkForEvent serves manager journeys from both desk and field pools', () 
   assert.ok(fieldExample.reporter, 'field-context manager events carry a crew reporter');
   assert.match(fieldExample.description, /^Radio from /);
   assert.match(fieldExample.description, new RegExp(fieldExample.reporter.name));
+});
+
+test('the manager field lane is gated to division-level escalations', () => {
+  // The rule: explicit managerEscalation flag wins; otherwise issue-type and
+  // severe events escalate; chain children (probability 0) and events that
+  // schedule follow-ups never do (manager mode never drains scheduledEvents).
+  const byId = (id) => FIELD_EVENTS.find((event) => event.id === id);
+
+  assert.equal(isManagerFieldEscalation(byId('peatland-subsidence_field')), true, 'issue events escalate by default');
+  assert.equal(isManagerFieldEscalation(byId('chainsaw_cut')), true, 'severe events escalate by default');
+  assert.equal(isManagerFieldEscalation(byId('road_washout')), true, 'managerEscalation: true opts a moderate event in');
+  assert.equal(isManagerFieldEscalation(byId('first_nations_consultation_field')), true);
+  assert.equal(isManagerFieldEscalation(byId('flash_flood')), false, 'managerEscalation: false opts a severe event out');
+  assert.equal(isManagerFieldEscalation(byId('grizzly_territory')), false);
+  assert.equal(isManagerFieldEscalation(byId('major_storm_hits')), false, 'chain children (probability 0) stay out');
+  assert.equal(isManagerFieldEscalation(byId('safety_inspection_notice')), false, 'events that schedule follow-ups stay out');
+
+  // The transcript offenders: crew-scale noise a GM should never adjudicate.
+  for (const id of ['resupply_opportunity', 'worker_injury', 'crew_card_game', 'lost_supplies']) {
+    assert.equal(isManagerFieldEscalation(byId(id)), false, `${id} is division business, not GM business`);
+  }
+
+  // Behavioural check: nothing outside the gate ever comes through the pipeline.
+  const journey = createManagerJourney({ role: { id: 'manager' } });
+  const fieldIds = new Set(FIELD_EVENTS.map((event) => event.id));
+  const seen = new Set();
+  for (let i = 0; i < 2000; i++) {
+    const event = checkForEvent(journey);
+    if (event && event.type !== 'temptation' && fieldIds.has(event.id)) seen.add(event.id);
+  }
+  assert.ok(seen.size > 0, 'the field lane still serves events');
+  for (const id of seen) {
+    assert.ok(isManagerFieldEscalation(byId(id)), `${id} reached the GM but is not escalation-worthy`);
+  }
+});
+
+test('escalated field events translate crew-wallet effects to the corporate ledger', () => {
+  const event = {
+    id: 'gm_escalation_probe',
+    title: 'Probe',
+    type: 'supply',
+    severity: 'severe',
+    probability: 0.2,
+    description: 'A load shifted on the mainline.',
+    options: [
+      {
+        label: 'Absorb it',
+        outcome: 'Absorbed.',
+        effects: { fuel: -10, food: 5, budget: -500, timeUsed: 2, progress: -3, crew_health: -4, crew_morale: -2 },
+        riskInjury: 0.2,
+        crewEffect: { injury: 'sprain' }
+      }
+    ]
+  };
+
+  const escalated = escalateFieldEventForManager(event);
+  const option = escalated.options[0];
+
+  // Stocks and hours never reach the GM; their cost lands on the treasury:
+  // fuel -10 * $150 + food +5 * $200 + budget -500 * 10 = -$5,500.
+  for (const key of ['fuel', 'food', 'firstAid', 'equipment', 'timeUsed']) {
+    assert.equal(option.effects[key], undefined, `${key} should not survive translation`);
+  }
+  assert.equal(option.effects.budget, -5500);
+  assert.equal(option.effects.progress, -3);
+  // crew_health folds into crew_morale (division mood), not executive bruises.
+  assert.equal(option.effects.crew_morale, -6);
+  // An injury 300 km away comes back as a compliance problem, not a hurt analyst.
+  assert.equal(option.riskInjury, undefined);
+  assert.equal(option.riskCompliance, 0.2);
+  assert.equal(option.crewEffect, undefined);
+
+  // The framing is a division escalating upward over the radio.
+  assert.match(escalated.description, /^Radio from /);
+  assert.match(escalated.description, /head office/);
+  assert.ok(escalated.reporter?.name && escalated.reporter?.role);
+
+  // The source event is untouched: field journeys keep the bush-scale original.
+  assert.equal(event.options[0].effects.fuel, -10);
+  assert.equal(event.options[0].riskInjury, 0.2);
+});
+
+test('managerVariant rewrites tailgate copy at executive altitude', () => {
+  const chainsaw = FIELD_EVENTS.find((event) => event.id === 'chainsaw_cut');
+  const escalated = escalateFieldEventForManager(chainsaw);
+
+  assert.equal(escalated.title, 'Serious Injury - Medevac Decision');
+  assert.equal(escalated.options[0].label, 'Authorize the medevac charter');
+  // Variant effects are authored at corporate scale and bypass translation.
+  assert.equal(escalated.options[0].effects.budget, -9000);
+  assert.equal(escalated.options[0].crewEffect, undefined);
+  // Options without variant effects keep systemic translation under new copy:
+  // fuel -8 * $150 = -$1,200, and the hour disappears with the hours mechanic.
+  assert.equal(escalated.options[1].label, 'Send him out by road with the first aid attendant');
+  assert.deepEqual(escalated.options[1].effects, { crew_morale: -6, budget: -1200 });
+  assert.equal(escalated.options[2].effects.compliance, -8);
+  assert.equal(escalated.options[2].effects.firstAid, undefined);
+});
+
+test('escalated events resolve against the treasury, not the crew wallet', () => {
+  const journey = createManagerJourney();
+  const budgetBefore = journey.resources.budget;
+  const fuelBefore = journey.resources.fuel;
+
+  const chainsaw = FIELD_EVENTS.find((event) => event.id === 'chainsaw_cut');
+  const escalated = escalateFieldEventForManager(chainsaw);
+  const result = resolveEvent(journey, escalated, escalated.options[1]);
+
+  assert.equal(journey.resources.budget, budgetBefore - 1200);
+  assert.equal(journey.resources.fuel, fuelBefore, 'division fuel is not the GM\'s meter');
+  assert.ok(result.messages.some((message) => message.includes('Budget: -$1,200')));
+  // The original option carries crewEffect.evacuate; escalation strips it so
+  // no executive staffer gets evacuated by an incident 300 km away.
+  assert.ok(journey.crew.every((member) => member.isActive));
 });
 
 test('manager events resolve through resolveEvent with desk-style money effects at corporate scale', () => {

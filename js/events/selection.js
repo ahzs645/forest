@@ -51,30 +51,153 @@ const MANAGER_DESK_EVENT_RATIO = 0.6;
 /**
  * Check for manager events: roll desk-context vs field-context 60/40, with
  * both lanes running through the same cooldown/context/modifier pipeline the
- * dedicated modes use.
+ * dedicated modes use. The field lane is gated and reframed so what reaches
+ * the GM is a division escalating a decision upward, not a tailgate call.
  */
 function checkManagerEvent(journey) {
   const wantsDesk = Math.random() < MANAGER_DESK_EVENT_RATIO;
-  const event = wantsDesk ? checkDeskEvent(journey) : checkFieldEvent(journey);
+  const event = wantsDesk ? checkDeskEvent(journey) : checkFieldEvent(journey, { managerLane: true });
   if (!event) return null;
-  return wantsDesk ? event : attachManagerFieldReporter(event, journey);
+  return wantsDesk ? event : escalateFieldEventForManager(event);
 }
 
 /**
- * Manager journeys keep a crew, so field-context events still arrive as radio
- * calls — but formatEventForDisplay only narrates reporters for field journey
- * types, so the radio framing is baked into the description here.
+ * Which field events a division would actually put on the GM's desk. The GM
+ * hears from the bush constantly; only calls above a superintendent's
+ * authority get escalated:
+ *   - a `managerEscalation` flag on the event wins in both directions — it is
+ *     the per-event opt-in for moderate events that are head-office business
+ *     anyway (a washed-out mainline) and the opt-out for severe events that
+ *     are decided at the scene before any radio call connects (a flash flood);
+ *   - `issue`-type events are landscape/program-scale by construction, so
+ *     they escalate by default;
+ *   - other `severe` events are the incidents head office hears about within
+ *     the hour, so they escalate by default too.
+ * Everything else — a sprained ankle, a poker pot, a fuel barter — is
+ * division business and never reaches this journey type. Chain children
+ * (probability 0) and events whose options schedule follow-ups are excluded
+ * because manager mode never drains journey.scheduledEvents, so the setup or
+ * the payoff of the chain could never arrive.
  */
-function attachManagerFieldReporter(event, journey) {
-  const reported = attachFieldReporter(event, journey);
-  const reporter = reported?.reporter;
-  if (!reporter) {
-    return reported;
+export function isManagerFieldEscalation(event) {
+  if (!event || !(Number(event.probability) > 0)) return false;
+  if (event.options?.some((option) => option?.schedulesEvent)) return false;
+  if (typeof event.managerEscalation === 'boolean') return event.managerEscalation;
+  return event.type === 'issue' || event.severity === 'severe';
+}
+
+// Bush per-day probabilities are tuned for ~100-day field journeys; at the
+// GM's monthly cadence, with the escalation gate shrinking the pool to ~18
+// events, the raw weights would leave the ops lane nearly silent for a whole
+// term. Escalations therefore draw at a floor instead of their field weight.
+const MANAGER_ESCALATION_MIN_PROBABILITY = 0.08;
+
+// What a crew-wallet stock hit costs the corporate ledger when a division
+// absorbs it: the GM does not track gallons and ration-days, but the invoice
+// for them still lands on the treasury. Rates are sized so translated hits
+// sit alongside the manager desk events' $1k-$20k range.
+const MANAGER_STOCK_LEDGER_RATES = { fuel: 150, food: 200, firstAid: 400, equipment: 250 };
+
+// Field-event dollar figures are bush invoices (a mechanic call-out, hazard
+// pay); the same incident at division scale is an order of magnitude larger.
+const MANAGER_BUDGET_SCALE = 10;
+
+// Field-context calls reach the GM from the division side of the radio, not
+// from the executive staff down the hall (attachFieldReporter's pool). The
+// caller is matched to the kind of incident; `issue`-type events span every
+// portfolio, so they draw from the whole roster.
+const MANAGER_ESCALATION_CALLERS = [
+  { name: 'Berg', role: 'Woodlands Superintendent', types: ['terrain', 'equipment', 'supply', 'weather', 'trade', 'morale'] },
+  { name: 'Okafor', role: 'Stewardship Forester', types: ['wildlife', 'forest_health', 'discovery', 'narrative'] },
+  { name: 'Castillo', role: 'Camp Supervisor', types: ['injury', 'illness', 'social'] }
+];
+
+function pickManagerEscalationCaller(event) {
+  const matched = MANAGER_ESCALATION_CALLERS.filter((caller) => caller.types.includes(event?.type));
+  const pool = matched.length ? matched : MANAGER_ESCALATION_CALLERS;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/**
+ * Translate a field option's effects to the corporate ledger. Stocks become
+ * dollars, bush invoices scale up, and hours vanish (managers have no hours
+ * mechanic). crew_morale passes through: the executive crew already stands in
+ * for division mood everywhere in manager mode (see bumpCrewMorale in
+ * js/modes/manager.js), and crew_health folds into it — a division taking
+ * casualties reads at head office as a morale problem, not as bruises on the
+ * executive team.
+ */
+function translateManagerEffects(effects) {
+  if (!effects) return effects;
+  const translated = {};
+  let budget = 0;
+  for (const [key, value] of Object.entries(effects)) {
+    if (typeof value !== 'number') {
+      translated[key] = value;
+      continue;
+    }
+    if (key === 'budget') {
+      budget += value * MANAGER_BUDGET_SCALE;
+    } else if (MANAGER_STOCK_LEDGER_RATES[key]) {
+      budget += value * MANAGER_STOCK_LEDGER_RATES[key];
+    } else if (key === 'timeUsed') {
+      continue;
+    } else if (key === 'crew_health' || key === 'crew_morale') {
+      translated.crew_morale = (translated.crew_morale || 0) + value;
+    } else {
+      translated[key] = value;
+    }
   }
+  if (budget !== 0) translated.budget = Math.round(budget);
+  return translated;
+}
+
+function escalateManagerOption(option, variantOption) {
+  const escalated = { ...option, effects: translateManagerEffects(option.effects) };
+  if (option.failureEffects) {
+    escalated.failureEffects = translateManagerEffects(option.failureEffects);
+  }
+  // An injury 300 km from the corner office cannot land on the executive
+  // team; what reaches the GM later is the incident coming back as a
+  // compliance problem, which riskCompliance already models.
+  if (typeof escalated.riskInjury === 'number') {
+    escalated.riskCompliance = Math.max(Number(option.riskCompliance) || 0, escalated.riskInjury);
+    delete escalated.riskInjury;
+  }
+  // crewEffect (injuries, evacuations, quits) operates on whoever holds the
+  // journey's crew array — in manager mode that is the executive staff, so it
+  // must not fire from a division incident.
+  delete escalated.crewEffect;
+  if (variantOption) {
+    if (variantOption.label) escalated.label = variantOption.label;
+    if (variantOption.outcome) escalated.outcome = variantOption.outcome;
+    // Variant effects are authored at corporate scale and bypass translation.
+    if (variantOption.effects) escalated.effects = { ...variantOption.effects };
+  }
+  return escalated;
+}
+
+/**
+ * Reframe a gated field event as a division escalating a decision to head
+ * office. Events may carry a `managerVariant` block ({ title, description,
+ * options: [{ label, outcome, effects }] }, parallel by index) for copy whose
+ * base text stands the player at the tailgate; events without one keep their
+ * copy — the `issue` pool is already written to the licensee — and get an
+ * explicit escalation tail instead.
+ */
+export function escalateFieldEventForManager(event) {
+  const variant = event.managerVariant || {};
+  const variantOptions = Array.isArray(variant.options) ? variant.options : [];
+  const caller = pickManagerEscalationCaller(event);
+  const description = variant.description || event.description;
+  const tail = variant.description ? '' : ' The division wants head office to make the call.';
 
   return {
-    ...reported,
-    description: formatRadioReport(event.description, reporter)
+    ...event,
+    title: variant.title || event.title,
+    reporter: { name: caller.name, role: caller.role },
+    description: `${formatRadioReport(description, caller)}${tail}`,
+    options: (event.options || []).map((option, index) => escalateManagerOption(option, variantOptions[index]))
   };
 }
 
@@ -170,12 +293,12 @@ export function eventMatchesJourneyContext(event, journey, options = {}) {
 /**
  * Check for field events
  */
-function checkFieldEvent(journey) {
+function checkFieldEvent(journey, { managerLane = false } = {}) {
   const currentBlock = Array.isArray(journey.blocks)
     ? (journey.blocks[journey.currentBlockIndex] || journey.blocks[0] || null)
     : null;
 
-  const applicableEvents = filterRecentEvents(
+  let applicableEvents = filterRecentEvents(
     journey,
     getApplicableFieldEvents({
       terrain: currentBlock?.terrain,
@@ -186,6 +309,15 @@ function checkFieldEvent(journey) {
         && eventMatchesJourneyContext(event, journey, { currentBlock })
     )
   );
+
+  if (managerLane) {
+    applicableEvents = applicableEvents
+      .filter(isManagerFieldEscalation)
+      .map((event) => ({
+        ...event,
+        probability: Math.max(Number(event.probability) || 0, MANAGER_ESCALATION_MIN_PROBABILITY)
+      }));
+  }
 
   const paceModifier = getPaceEventModifier(journey.pace);
   const terrainModifier = getTerrainEventModifier(currentBlock?.terrain);
