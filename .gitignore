@@ -5,3 +5,6 @@ dist
 FPBC Source/test-results/
 test-results/
 playwright-report/
+
+# Transient git worktrees created for background agents
+.claude/worktrees/
