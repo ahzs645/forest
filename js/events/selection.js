@@ -86,11 +86,30 @@ export function isManagerFieldEscalation(event) {
   return event.type === 'issue' || event.severity === 'severe';
 }
 
-// Bush per-day probabilities are tuned for ~100-day field journeys; at the
-// GM's monthly cadence, with the escalation gate shrinking the pool to ~18
-// events, the raw weights would leave the ops lane nearly silent for a whole
-// term. Escalations therefore draw at a floor instead of their field weight.
-const MANAGER_ESCALATION_MIN_PROBABILITY = 0.08;
+// Bush per-day probabilities are tuned for ~100-day field journeys, and the
+// field modifiers they are rolled against (pace, terrain, weather) do not
+// exist for a GM. Rolling each surviving event separately against those
+// meanings-free modifiers left the ops lane silent: four twelve-month terms
+// produced one escalation between them, which trades one wrong note (the GM
+// running the camp) for another (the GM never hearing from the bush at all).
+// Cadence is therefore set once at the lane level — if an escalation is due
+// this month, one is drawn from the gated pool — so it stays put no matter
+// how many events survive the gate in a given area.
+const MANAGER_ESCALATION_LANE_CHANCE = 0.55;
+
+/**
+ * How likely the divisions are to put something on the GM's desk this month.
+ * Difficulty and a shaky compliance record both make the bush noisier, which
+ * are the only two field modifiers that still mean anything at this altitude.
+ * @param {Object} journey - Manager journey state
+ * @returns {number} probability in [0, 0.9]
+ */
+export function getManagerEscalationChance(journey) {
+  const raw = MANAGER_ESCALATION_LANE_CHANCE
+    * getDifficultyEventModifier(journey)
+    * getScrutinyEventModifier(journey);
+  return Math.max(0, Math.min(0.9, raw));
+}
 
 // What a crew-wallet stock hit costs the corporate ledger when a division
 // absorbs it: the GM does not track gallons and ration-days, but the invoice
@@ -311,12 +330,10 @@ function checkFieldEvent(journey, { managerLane = false } = {}) {
   );
 
   if (managerLane) {
-    applicableEvents = applicableEvents
-      .filter(isManagerFieldEscalation)
-      .map((event) => ({
-        ...event,
-        probability: Math.max(Number(event.probability) || 0, MANAGER_ESCALATION_MIN_PROBABILITY)
-      }));
+    const pool = applicableEvents.filter(isManagerFieldEscalation);
+    if (!pool.length) return null;
+    if (Math.random() >= getManagerEscalationChance(journey)) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   const paceModifier = getPaceEventModifier(journey.pace);

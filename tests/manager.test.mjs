@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { getOperationalProgress, recordProgressMilestones } from '../js/journey.js';
 import { createManagerJourney } from '../js/journey/factory.js';
 import { checkForEvent, resolveEvent } from '../js/events.js';
-import { escalateFieldEventForManager, isManagerFieldEscalation } from '../js/events/selection.js';
+import { escalateFieldEventForManager, getManagerEscalationChance, isManagerFieldEscalation } from '../js/events/selection.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 
@@ -281,4 +281,17 @@ test('manager field-side stocks absorb field event effects without desk caps lea
   for (const member of journey.crew.filter((m) => m.isActive)) {
     assert.ok(member.morale <= 100);
   }
+});
+
+test('the ops lane still reaches the GM at a readable cadence', () => {
+  // Gating the pool is only half the job: if escalations then draw against
+  // field modifiers that mean nothing at this altitude, the divisions go
+  // silent for a whole term and the mode loses the texture the 60/40 split
+  // exists for.
+  const clean = getManagerEscalationChance({ journeyType: 'manager', difficulty: 'normal', scrutiny: 20 });
+  assert.ok(clean > 0.3 && clean < 0.9, `escalation cadence out of range: ${clean}`);
+
+  const hot = getManagerEscalationChance({ journeyType: 'manager', difficulty: 'hard', scrutiny: 80 });
+  assert.ok(hot > clean, 'a hard term under scrutiny hears from the divisions more often');
+  assert.ok(hot <= 0.9, 'the lane never becomes a certainty');
 });
