@@ -30,7 +30,11 @@ import {
   winchCrossing,
   fordCrossing
 } from '../journey/riverCrossing.js';
-import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journey/blockNav.js';
+import {
+  getCumulativeDistanceToIndex,
+  getCurrentSegmentLength,
+  getDistanceIntoCurrentSegment
+} from '../journey/blockNav.js';
 import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
 import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
 import { buildCampfireFrames } from '../scene/textmode/effects.js';
@@ -150,7 +154,7 @@ function getReconBlockIntel(journey, block) {
   return state.byBlock[key];
 }
 
-function getReconOpenPackages(journey) {
+export function getReconOpenPackages(journey) {
   const blocks = Array.isArray(journey?.blocks) ? journey.blocks : [];
   return blocks
     .map((block) => {
@@ -196,6 +200,66 @@ function maybeFinalizeReconAssessment(ui, journey, block) {
   journey.verifiedBlocks = Math.min((journey.blocks?.length || 0), (journey.verifiedBlocks || 0) + 1);
   ui.writePositive(`Assessment package complete for ${block.name}. Blocks assessed: ${journey.blocksAssessed}/${journey.blocks?.length || 0}.`);
   return true;
+}
+
+// ── File close-out phase ─────────────────────────────────────────────────
+// When the traverse runs out before the paperwork does, the run stops
+// pretending to be travel. The crew holds at the final camp and closes out
+// the assessment file against a district filing deadline. The deadline is
+// sized so closing everything from notes leaves a little slack while doing
+// every package properly on the ground spends every remaining hour — the
+// last shifts become a squeeze instead of an idle loop, and the deadline
+// itself guarantees the run ends (see checkReconEndConditions).
+const CLOSEOUT_WRITEUP_HOURS = 2;
+const CLOSEOUT_DAY_TRIP_HOURS = 4;
+const CLOSEOUT_RADIO_HOURS = 1;
+
+export function maybeStartReconCloseout(journey) {
+  if (!journey || journey.journeyType !== 'recon') {
+    return journey?.reconCloseout || null;
+  }
+  if (journey.reconCloseout) {
+    return journey.reconCloseout;
+  }
+
+  const blocks = journey.blocks || [];
+  if (!blocks.length || journey.currentBlockIndex < blocks.length - 1) {
+    return null;
+  }
+
+  const open = getReconOpenPackages(journey);
+  if (!open.length) {
+    return null;
+  }
+
+  const shifts = Math.max(2, Math.ceil(open.length / 2));
+  journey.reconCloseout = {
+    startDay: journey.day,
+    // The last shift the crew gets to work; the morning after, the file goes
+    // in as it stands.
+    deadlineDay: journey.day + shifts - 1,
+    extensionUsed: false,
+    announced: false
+  };
+  return journey.reconCloseout;
+}
+
+export function getReconCloseoutShiftsLeft(journey) {
+  const closeout = journey?.reconCloseout;
+  if (!closeout) {
+    return null;
+  }
+  return Math.max(0, closeout.deadlineDay - journey.day + 1);
+}
+
+// Fuel to re-drive the mainline back to a block and return: far-off blocks
+// cost real gallons, which is why they got written up from notes in the
+// first place.
+function getCloseoutDayTripFuelCost(journey, block) {
+  const blocks = journey.blocks || [];
+  const index = blocks.indexOf(block);
+  const kmBack = Math.max(0, (journey.totalDistance || 0) - getCumulativeDistanceToIndex(blocks, index));
+  return Math.max(2, Math.min(8, Math.round(kmBack * 0.5)));
 }
 
 function getReconValueSweepProfile(block, journey) {
@@ -384,6 +448,11 @@ async function runFieldDay(game) {
     }
   }
 
+  // The close-out clock starts the first shift the crew wakes up at the end
+  // of the line with packages still open — a storm shift at the final camp
+  // burns deadline time like any other.
+  maybeStartReconCloseout(journey);
+
   // Check for weather-forced camp day (Phase 3.3)
   const weatherForcesCamp = journey.weather &&
     (journey.weather.id === 'storm' || journey.weather.id === 'heavy_snow');
@@ -410,13 +479,13 @@ async function runFieldDay(game) {
 
     // The current shift remains the source of truth until the player has read
     // its consequences. Only then does the calendar/weather roll forward.
-    const nextBlock = journey.blocks[journey.currentBlockIndex];
     await ui.promptChoice('', [{
-      label: `Begin Shift ${journey.day + 1} at ${nextBlock?.name || 'Unknown'}`,
+      label: getNextShiftPromptLabel(journey),
       value: 'next'
     }]);
     journey.activeReconShift = null;
     endFieldDay(journey);
+    writeCloseoutSubmissionBeat(ui, journey);
     ui.updateAllStatus(journey);
     game.checkpoint?.();
     return;
@@ -440,8 +509,21 @@ async function runFieldDay(game) {
     const canTravel = !hasTraveled && hasNextBlock && journey.resources.fuel > 0 && journey.resources.equipment > 0;
     const blockIntel = getReconBlockIntel(journey, currentBlock);
     const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
+    // Traversal can end mid-shift, so the phase check runs every turn.
+    const closeout = maybeStartReconCloseout(journey);
 
     displayDayHeader(ui, journey);
+
+    if (closeout && !closeout.announced) {
+      closeout.announced = true;
+      ui.write('');
+      ui.writeHeader('END OF THE LINE');
+      ui.write('The traverse is done. The trucks back into the trees off the last landing, and the maps come out for good.');
+      ui.write(`${openPackages.length} assessment package${openPackages.length === 1 ? ' is' : 's are'} still open. The district wants the file by the end of shift ${closeout.deadlineDay}.`);
+      ui.write('Anything still open when it goes in gets flagged deficient.', 'term-dim');
+      ui.write('');
+      checkpointReconShift(game, shiftState, pendingEvent);
+    }
 
     // The shift menu is split so each turn reads as a decision, not an audit:
     //   primary  = the main work choices (travel / verify / notebook) + resupply
@@ -465,14 +547,37 @@ async function runFieldDay(game) {
       });
     }
 
-    const notebookTargets = getReconNotebookTargets(journey);
-    if (notebookTargets.length > 0 && journey.hoursRemaining >= 2) {
-      const nextPackage = notebookTargets[0];
-      primaryOptions.push({
-        label: 'Field Notebook (2h)',
-        description: `Write up a visited block from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')}) — adds 2 scrutiny`,
-        value: 'field_notebook'
-      });
+    if (closeout) {
+      // The generic notebook button becomes named pieces of work: one option
+      // per open package, each opening a paper-versus-ground choice. The
+      // final camp's own block keeps its regular on-the-ground options above.
+      const remotePackages = journey.hoursRemaining >= CLOSEOUT_WRITEUP_HOURS
+        ? getReconNotebookTargets(journey).filter((pkg) => pkg.block !== currentBlock)
+        : [];
+      for (const pkg of remotePackages) {
+        primaryOptions.push({
+          label: `Close Out: ${pkg.block.name} ▸`,
+          description: `${pkg.missing.join(' + ')} still open — from notes or back on the ground`,
+          value: `closeout_pkg:${pkg.block.id}`
+        });
+      }
+      if (!closeout.extensionUsed && journey.hoursRemaining >= CLOSEOUT_RADIO_HOURS) {
+        primaryOptions.push({
+          label: `Radio the District (${CLOSEOUT_RADIO_HOURS}h)`,
+          description: 'Ask for one more shift on the filing deadline — once, and they will remember asking',
+          value: 'closeout_radio'
+        });
+      }
+    } else {
+      const notebookTargets = getReconNotebookTargets(journey);
+      if (notebookTargets.length > 0 && journey.hoursRemaining >= 2) {
+        const nextPackage = notebookTargets[0];
+        primaryOptions.push({
+          label: 'Field Notebook (2h)',
+          description: `Write up a visited block from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')}) — adds 2 scrutiny`,
+          value: 'field_notebook'
+        });
+      }
     }
 
     if (currentBlock?.hasSupply && journey.hoursRemaining >= 2) {
@@ -576,9 +681,44 @@ async function runFieldDay(game) {
 
     // Resolve the menu, drilling into the support submenu when chosen.
     let actionId = 'end_shift';
+    let closeoutTarget = null;
     while (true) {
       const action = await ui.promptChoice(`${journey.hoursRemaining}h remaining:`, primaryOptions);
       const chosen = action.value || 'end_shift';
+      if (typeof chosen === 'string' && chosen.startsWith('closeout_pkg:')) {
+        const blockId = chosen.slice('closeout_pkg:'.length);
+        const pkg = getReconOpenPackages(journey).find((p) => p.block.id === blockId);
+        if (!pkg) {
+          displayDayHeader(ui, journey);
+          continue;
+        }
+        const fuelCost = getCloseoutDayTripFuelCost(journey, pkg.block);
+        const packageOptions = [{
+          label: `Write it up from notes (${CLOSEOUT_WRITEUP_HOURS}h)`,
+          description: `Close ${pkg.missing.join(' + ')} from the notebook and GPS marks — adds 2 scrutiny`,
+          value: 'closeout_writeup'
+        }];
+        if (journey.hoursRemaining >= CLOSEOUT_DAY_TRIP_HOURS && (journey.resources.fuel || 0) > fuelCost) {
+          packageOptions.push({
+            label: `Drive back and do it on the ground (${CLOSEOUT_DAY_TRIP_HOURS}h, ${fuelCost} fuel)`,
+            description: 'Re-walk the piece properly — no paper flags, eases scrutiny',
+            value: 'closeout_daytrip'
+          });
+        }
+        packageOptions.push({
+          label: 'Back',
+          description: 'Leave this one open for now',
+          value: 'closeout_back'
+        });
+        const sub = await ui.promptChoice(`${pkg.block.name} — ${pkg.missing.join(' + ')}:`, packageOptions);
+        if (!sub.value || sub.value === 'closeout_back') {
+          displayDayHeader(ui, journey);
+          continue;
+        }
+        closeoutTarget = pkg;
+        actionId = sub.value;
+        break;
+      }
       if (chosen === 'support_menu') {
         const sub = await ui.promptChoice('Camp & support:', [
           ...supportOptions,
@@ -718,6 +858,18 @@ async function runFieldDay(game) {
       journey.hoursRemaining -= 2;
       handleFieldNotebook(ui, journey);
       logReconAction(journey, 'Updated field notebook');
+    } else if (actionId === 'closeout_writeup') {
+      journey.hoursRemaining -= CLOSEOUT_WRITEUP_HOURS;
+      handleFieldNotebook(ui, journey, closeoutTarget);
+      logReconAction(journey, 'Closed a package from notes', closeoutTarget?.block?.name || 'Open package');
+    } else if (actionId === 'closeout_daytrip') {
+      journey.hoursRemaining -= CLOSEOUT_DAY_TRIP_HOURS;
+      handleCloseoutDayTrip(ui, journey, closeoutTarget);
+      logReconAction(journey, 'Drove back for ground work', closeoutTarget?.block?.name || 'Open package');
+    } else if (actionId === 'closeout_radio') {
+      journey.hoursRemaining -= CLOSEOUT_RADIO_HOURS;
+      handleCloseoutRadio(ui, journey);
+      logReconAction(journey, 'Radioed the district for a filing extension');
     } else if (actionId === 'food_cache') {
       journey.hoursRemaining -= 2;
       retrieveCachedRations(ui, journey);
@@ -750,6 +902,9 @@ async function runFieldDay(game) {
       ground_truth: 'Ground-truth access',
       values_sweep: 'Values sweep',
       field_notebook: 'Field notebook',
+      closeout_writeup: 'Package write-up',
+      closeout_daytrip: 'Ground work',
+      closeout_radio: 'Radio call',
       food_cache: 'Cached-ration retrieval',
       maintain: 'Maintenance',
       triage: 'Triage',
@@ -797,15 +952,51 @@ async function runFieldDay(game) {
 
   // Keep the completed shift's day, weather, hours, and location together on
   // screen. The next shift starts only after this acknowledgement.
-  const nextBlock = journey.blocks[journey.currentBlockIndex];
   await ui.promptChoice('', [{
-    label: `Begin Shift ${journey.day + 1} at ${nextBlock?.name || 'Unknown'}`,
+    label: getNextShiftPromptLabel(journey),
     value: 'next'
   }]);
   journey.activeReconShift = null;
   endFieldDay(journey);
+  writeCloseoutSubmissionBeat(ui, journey);
   ui.updateAllStatus(journey);
   game.checkpoint?.();
+}
+
+/**
+ * Label for the end-of-shift acknowledgement. During close-out the crew is
+ * off the trail, and on the last allowed shift the button is the submission
+ * itself — the calendar advance right after it is what trips the deadline in
+ * checkReconEndConditions.
+ */
+function getNextShiftPromptLabel(journey) {
+  const closeout = journey.reconCloseout;
+  if (closeout) {
+    if (journey.day >= closeout.deadlineDay) {
+      return getReconOpenPackages(journey).length > 0
+        ? 'Seal the file as it stands and send it to the district'
+        : 'Send the finished file to the district';
+    }
+    return `Begin Shift ${journey.day + 1} at the final camp`;
+  }
+  const nextBlock = journey.blocks[journey.currentBlockIndex];
+  return `Begin Shift ${journey.day + 1} at ${nextBlock?.name || 'Unknown'}`;
+}
+
+/** The morning-after beat when the filing deadline forces the file in. */
+function writeCloseoutSubmissionBeat(ui, journey) {
+  const closeout = journey.reconCloseout;
+  if (!closeout || journey.day <= closeout.deadlineDay) {
+    return;
+  }
+  const open = getReconOpenPackages(journey);
+  if (open.length === 0) {
+    return;
+  }
+  ui.write('');
+  ui.writeHeader('THE FILE GOES IN');
+  ui.write(`First light. The package is sealed with ${open.length} block${open.length === 1 ? '' : 's'} flagged deficient: ${open.map((pkg) => pkg.block.name).join(', ')}.`);
+  ui.write('The driver does not ask how the season went.', 'term-dim');
 }
 
 /**
@@ -1116,9 +1307,25 @@ export function updateReconMissionStatus(ui, journey) {
     });
   }
 
+  // Close-out reframes the panel: the traverse facts are history, the
+  // deadline is the thing that moves.
+  const closeout = journey.reconCloseout;
+  if (closeout) {
+    const shiftsLeft = getReconCloseoutShiftsLeft(journey);
+    facts.push({
+      label: 'Deadline',
+      value: `shift ${closeout.deadlineDay} (${shiftsLeft} left)`
+    });
+    if (packagesRemaining > 0 && shiftsLeft <= 1) {
+      alerts.push({ level: 'danger', text: 'Filing deadline: the file goes in tonight' });
+    }
+  }
+
   const status = {
     objective: packagesRemaining > 0
-      ? `Finalize every block package — ${packagesRemaining} still open`
+      ? (closeout
+        ? `Close out the file — ${packagesRemaining} package${packagesRemaining === 1 ? '' : 's'} open, district deadline shift ${closeout.deadlineDay}`
+        : `Finalize every block package — ${packagesRemaining} still open`)
       : `Win condition met: all ${totalBlocks} block packages finalized`,
     meter: { label: 'Packages', value: completionPct, text: `${packagesDone}/${totalBlocks}` },
     facts,
@@ -1134,24 +1341,49 @@ export function updateReconMissionStatus(ui, journey) {
  */
 function displayDayHeader(ui, journey) {
   const currentBlock = journey.blocks[journey.currentBlockIndex];
+  const closeout = journey.reconCloseout;
 
   ui.clear();
-  ui.writeHeader(`SHIFT ${journey.day} - ${currentBlock?.name || 'Unknown Territory'}`);
 
-  // ASCII block map (Phase 5.4)
-  ui.write(buildBlockMap(journey));
-  ui.write('* supply point', 'term-dim');
+  if (closeout) {
+    // The traverse is over; the header stops pretending otherwise. The trail
+    // strip gives way to the open file, and the drumbeat is the deadline.
+    ui.writeHeader(`SHIFT ${journey.day} - FILE CLOSE-OUT - ${currentBlock?.name || 'Final Camp'}`);
+    const openPackages = getReconOpenPackages(journey);
+    const totalBlocks = journey.blocks?.length || 0;
+    ui.write(`THE FILE: ${totalBlocks - openPackages.length}/${totalBlocks} packages closed`, 'term-dim');
+    for (const pkg of openPackages.slice(0, 6)) {
+      ui.write(`  [ ] ${pkg.block.name} — ${pkg.missing.join(' + ')}`);
+    }
+    if (openPackages.length > 6) {
+      ui.write(`  ...and ${openPackages.length - 6} more in the notebook`, 'term-dim');
+    }
+    const shiftsLeft = getReconCloseoutShiftsLeft(journey);
+    if (openPackages.length === 0) {
+      ui.write('Every package is closed. Rest the crew; the file goes in complete.', 'term-dim');
+    } else if (shiftsLeft <= 1) {
+      ui.writeWarning('DEADLINE: the file goes to the district at the end of this shift, ready or not.');
+    } else {
+      ui.write(`DEADLINE: district filing at the end of shift ${closeout.deadlineDay} — ${shiftsLeft} shifts left`, 'term-dim');
+    }
+  } else {
+    ui.writeHeader(`SHIFT ${journey.day} - ${currentBlock?.name || 'Unknown Territory'}`);
 
-  // The landmark drumbeat: how far to the next named place, how far come.
-  const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
-  if (nextBlock) {
-    const segment = getCurrentSegmentLength(journey.blocks, journey.currentBlockIndex);
-    const into = getDistanceIntoCurrentSegment(journey);
-    const kmToNext = Math.max(0, segment - into);
-    ui.write(
-      `NEXT: ${nextBlock.name} — ${kmToNext.toFixed(1)} km   ·   TRAVELED: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`,
-      'term-dim'
-    );
+    // ASCII block map (Phase 5.4)
+    ui.write(buildBlockMap(journey));
+    ui.write('* supply point', 'term-dim');
+
+    // The landmark drumbeat: how far to the next named place, how far come.
+    const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
+    if (nextBlock) {
+      const segment = getCurrentSegmentLength(journey.blocks, journey.currentBlockIndex);
+      const into = getDistanceIntoCurrentSegment(journey);
+      const kmToNext = Math.max(0, segment - into);
+      ui.write(
+        `NEXT: ${nextBlock.name} — ${kmToNext.toFixed(1)} km   ·   TRAVELED: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`,
+        'term-dim'
+      );
+    }
   }
 
   // Recap of the previous action's results (set by the travel branch), shown
@@ -1579,8 +1811,8 @@ function getReconNotebookTargets(journey) {
   });
 }
 
-function handleFieldNotebook(ui, journey) {
-  const target = getReconNotebookTargets(journey)[0];
+function handleFieldNotebook(ui, journey, chosenTarget = null) {
+  const target = chosenTarget || getReconNotebookTargets(journey)[0];
   if (!target) {
     const remaining = getReconOpenPackages(journey).length;
     ui.write(remaining > 0
@@ -1603,6 +1835,81 @@ function handleFieldNotebook(ui, journey) {
   // Paper-heavy files draw attention: closing from notes costs more scrutiny
   // than doing the work on the ground.
   journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 2);
+}
+
+/**
+ * Close-out day trip: burn hours and fuel to re-drive the line back to an
+ * open block and finish its package on the ground instead of on paper.
+ */
+function handleCloseoutDayTrip(ui, journey, target) {
+  if (!target?.block) {
+    ui.write('No open package left to drive back for.');
+    return;
+  }
+
+  const block = target.block;
+  const intel = getReconBlockIntel(journey, block);
+  const fuelCost = getCloseoutDayTripFuelCost(journey, block);
+  journey.resources.fuel = Math.max(0, (journey.resources.fuel || 0) - fuelCost);
+
+  ui.writeHeader(`GROUND WORK — ${block.name}`);
+  ui.write(`You take the truck back up the line and put boots on ${block.name} instead of trusting the notes. Fuel -${fuelCost}.`);
+
+  if (!intel.accessGroundTruthed) {
+    const verdict = recordAccessVerdict(
+      journey,
+      block,
+      getBlockAccessVerdict(block, journey.weather, journey),
+      journey.weather
+    );
+    intel.accessGroundTruthed = true;
+    intel.lastAccessDay = journey.day;
+    addDiscoveryTags(journey, inferDiscoveryTagsFromAccess(block, verdict, journey.weather), {
+      source: `closeout-ground-truth:${block.id}`,
+      severity: verdict.id === 'no_go' ? 3 : verdict.id === 'heli_only' || verdict.id === 'winter_only' ? 2 : 1,
+      note: verdict.summary,
+      details: { blockId: block.id, verdict: verdict.id }
+    });
+    ui.write(formatAccessVerdict(verdict));
+  }
+
+  const sweep = getReconValueSweepProfile(block, journey);
+  if (sweep.needed && !intel.valuesSwept) {
+    intel.valuesSwept = true;
+    intel.lastValuesDay = journey.day;
+    addDiscoveryTags(journey, sweep.tags, {
+      source: `closeout-values-sweep:${block.id}`,
+      severity: 2,
+      note: sweep.notes.join(' | '),
+      details: { blockId: block.id, weather: journey.weather?.id || null }
+    });
+    ui.write(`Values re-checked on the ground: ${sweep.tags.join(', ')}.`);
+  }
+
+  // Ground work reads clean where a paper close would have drawn an audit.
+  journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
+  ui.write('The package closes on real observations. Nobody will have to defend this one from memory.');
+  maybeFinalizeReconAssessment(ui, journey, block);
+}
+
+/**
+ * One radio call, one extra shift. The district grants it, notes it, and the
+ * file's reception cools by exactly that much.
+ */
+function handleCloseoutRadio(ui, journey) {
+  const closeout = journey.reconCloseout;
+  if (!closeout || closeout.extensionUsed) {
+    ui.write('The district has already given all the time it is going to give.');
+    return;
+  }
+
+  closeout.extensionUsed = true;
+  closeout.deadlineDay += 1;
+  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 3);
+
+  ui.writeHeader('RADIO — DISTRICT OFFICE');
+  ui.write('You raise the district on the evening sched and ask for one more shift on the file.');
+  ui.write(`A pause, then: "One. The review meeting moves for nobody after that." New deadline: end of shift ${closeout.deadlineDay}. Scrutiny +3.`);
 }
 
 /**
