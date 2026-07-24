@@ -80,11 +80,17 @@ export function chooseOption(strategy, opts, metrics, roleId, rng) {
   if (strategy === "cautious" || strategy === "balanced" || strategy === "aggressive") {
     const stanceMatch = opts.findIndex((opt) => opt?.stance === strategy);
     if (stanceMatch >= 0) return stanceMatch;
+    // An explicit gamble carries no plain effects, which made it score as the
+    // smallest swing on the card — so "balanced" players kept taking the one
+    // option tagged RISKY. Read the gamble flag the way a player reads the
+    // tag: balanced and cautious only gamble when every option is a gamble.
     if (strategy === "balanced") {
-      // No authored stance: take the most moderate option (smallest swing).
-      return argbest(n, (i) => -Math.abs(weightedGain(effects(i))));
+      return argbest(n, (i) => (opts[i]?.risk ? -Infinity : -Math.abs(weightedGain(effects(i)))));
     }
-    return argbest(n, (i) => weightedScore(effects(i), STANCE_WEIGHTS[strategy]));
+    if (strategy === "cautious") {
+      return argbest(n, (i) => weightedScore(effects(i), STANCE_WEIGHTS.cautious) - (opts[i]?.risk ? 1000 : 0));
+    }
+    return argbest(n, (i) => weightedScore(effects(i), STANCE_WEIGHTS.aggressive));
   }
 
   if (strategy === "random") {
