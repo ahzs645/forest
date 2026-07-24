@@ -40,6 +40,9 @@ export function formatEventForDisplay(event, journeyType = 'field') {
   };
 }
 
+// How many cost clauses a gamble's failure branch is allowed to list.
+const MAX_FAILURE_CLAUSES = 3;
+
 /**
  * Format an effects object as signed-delta clauses.
  * Shared between the success branch and a gamble's failure branch so both
@@ -173,10 +176,14 @@ function getOptionHint(option, journeyType) {
   }
 
   // Gambles show the downside branch: the failure chance and what it costs,
-  // in the same delta vocabulary as the success effects listed above.
+  // in the same delta vocabulary as the success effects listed above. A bet
+  // spells out both branches, so it is the one option that can run long enough
+  // to overflow a phone-width button — the failure list gets the three costs
+  // that decide the call, not an itemised invoice.
   if (typeof option.chanceSuccess === 'number' && option.chanceSuccess < 1) {
     const failPct = Math.round((1 - option.chanceSuccess) * 100);
-    const failCosts = formatEffectDeltas(option.failureEffects, journeyType, { includeTime: true });
+    const failCosts = formatEffectDeltas(option.failureEffects, journeyType, { includeTime: true })
+      .slice(0, MAX_FAILURE_CLAUSES);
     hints.push(failCosts.length > 0
       ? `${failPct}% it goes wrong, then ${failCosts.join(', ')}`
       : `${failPct}% it goes wrong`);

@@ -1038,3 +1038,20 @@ test('no option in either deck renders the retired hint vocabulary', () => {
     }
   }
 });
+
+test('a gamble hint stays short enough to read on a phone button', () => {
+  // The shortcut offers carry the widest failure branch in the game, so they
+  // are the case that would overflow first.
+  const hint = formatOptionEffects({
+    label: 'Take the shortcut',
+    effects: { budget: 730, equipment: -6, crew_morale: -5, compliance: -2, scrutiny: 5 },
+    chanceSuccess: 0.68,
+    failureEffects: { budget: -584, crew_morale: -8, compliance: -10, scrutiny: 20, reputation: -8 },
+    riskInjury: 0.2
+  }, 'recon');
+
+  const failureClause = hint.split('it goes wrong, then ')[1] || '';
+  assert.ok(failureClause.split(', ').length <= 3,
+    `failure branch listed too many costs: ${failureClause}`);
+  assert.match(hint, /% it goes wrong, then /);
+});
