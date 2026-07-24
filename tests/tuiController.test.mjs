@@ -827,3 +827,32 @@ test('planning readiness carries forward area-level road intel without blocking 
   assert.ok(readiness.fom.roadEngineeringReadiness < 100);
   assert.match(readiness.fom.roadNote, /carry-forward access intel/i);
 });
+
+test('a season never plays two cards of the same kind back to back', () => {
+  // The deeper season draws a second event or a second contested call, and the
+  // shortcut offer that would sit between them does not always draw. Two cards
+  // under the same label in a row read as the game repeating itself, which is
+  // the opposite of what the extra depth is for.
+  for (const seed of [20260411, 4242, 909, 13, 77771]) {
+    const controller = new TuiGameController({ seed, storage: null, onExit: () => {} });
+    const types = [];
+    let guard = 0;
+
+    advanceFromSetupToFirstPlannerTask(controller);
+
+    while (guard < 200) {
+      guard += 1;
+      const content = controller.getState().contentData;
+      if (content?.type === 'summary') break;
+      if (['assignment', 'task', 'event', 'issue', 'temptation'].includes(content?.type)) {
+        types.push(content.type);
+      }
+      controller.selectOption(0);
+    }
+
+    for (let i = 1; i < types.length; i += 1) {
+      assert.notEqual(`${types[i]}@${i}`, `${types[i - 1]}@${i}`,
+        `seed ${seed}: ${types[i]} played twice in a row at index ${i} (${types.join(', ')})`);
+    }
+  }
+});
