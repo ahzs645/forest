@@ -226,6 +226,22 @@ test('campaign scale: silviculture arithmetic is winnable within a season', () =
   assert.ok(capacityNeeded <= hardCapacity, `estimated capacity use ${capacityNeeded} should fit hard-mode capacity ${hardCapacity}`);
 });
 
+test('recon and silviculture ship a real season deadline, full-length and campaign', () => {
+  const recon = createJourney({ roleId: 'recce', areaId: 'fort-st-john-plateau' });
+  const reconCampaign = createJourney({ roleId: 'recce', areaId: 'fort-st-john-plateau', scale: 'campaign' });
+  assert.equal(recon.deadline, 32, 'full-length recon runs to a 32-shift access season');
+  assert.equal(reconCampaign.deadline, 20, 'campaign recon shares the twenty-day season');
+
+  const silv = createSilvicultureJourney({ roleId: 'silviculture', areaId: 'fort-st-john-plateau' });
+  const silvCampaign = createSilvicultureJourney({
+    roleId: 'silviculture',
+    areaId: 'fort-st-john-plateau',
+    scale: 'campaign'
+  });
+  assert.equal(silv.deadline, 36, 'full-length silviculture runs to a 36-day planting season');
+  assert.equal(silvCampaign.deadline, 20, 'campaign silviculture shares the twenty-day season');
+});
+
 test('campaign scale: planning shortens the deadline and scales budget, leaves gate thresholds alone', () => {
   const normal = createPlanningJourney({ roleId: 'planner', areaId: 'fort-st-john-plateau' });
   const scaled = createPlanningJourney({ roleId: 'planner', areaId: 'fort-st-john-plateau', scale: 'campaign' });

@@ -84,9 +84,14 @@ function applyCampaignScale(journey, journeyType) {
       journey.blocks = selectCampaignBlocks(journey.blocks);
       journey.totalDistance = journey.blocks.reduce((sum, block) => sum + block.distance, 0);
       journey.resources = scaleStockpileResources(journey.resources);
+      // Same twenty-day season the other campaign deployments run to. A
+      // campaign recon lands in 13-19 shifts, so the window is real without
+      // being a coin flip.
+      journey.deadline = 20;
       return journey;
     }
     case "silviculture": {
+      journey.deadline = 20;
       journey.planting.blocksToPlant = 3;
       journey.planting.seedlingsAllocated = 55000;
       journey.brushing.hectaresTarget = 100;
@@ -176,6 +181,16 @@ export function createReconJourney(options = {}) {
     ...baseJourney,
     journeyType: "recon",
 
+    // The access season closes. Recon used to ship without a deadline at all —
+    // the mission pane printed "Days left" and nothing enforced it, so no day
+    // ever competed with any other day (docs/day_as_situation.md section 3).
+    // Sized off scripts/simulate-expeditions.mjs: a competent full-length run
+    // lands in 27-38 shifts, so 32 clears the median and bites the long tail.
+    // Spelled out per scale because this object spread lands *after*
+    // createFieldJourney has already campaign-scaled baseJourney — a bare
+    // literal here would clobber the twenty-day campaign season.
+    deadline: campaignScale ? 20 : 32,
+
     // Season integration
     season: createSeasonState(roleId),
     scrutiny: 28,
@@ -229,6 +244,13 @@ export function createSilvicultureJourney(options = {}) {
     season: createSeasonState(effectiveRoleId),
     scrutiny: 12,
     day: 1,
+
+    // The planting season closes too. Without this, checkSilvicultureEndConditions
+    // fell back to its 120-day "outside delivery window", which a 30-37 day
+    // program never reached — so the deadline was decoration here as well.
+    // 36 clears the competent median (34 over 24 sim runs) and bites the tail
+    // that drifts to 37-38.
+    deadline: 36,
 
     // Planting Program. Each cohort runs plant -> survival -> fill, so a block
     // is roughly three one-action days (js/journey/dayPlan.js); the program is
