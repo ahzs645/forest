@@ -6,7 +6,7 @@
 
 import { checkForEvent } from '../events.js';
 import { runDaySituation } from '../journey/daySituation.js';
-import { formatStatusLine } from '../journey/dayCard.js';
+import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { buildOfficeWindowFrames } from '../scene/textmode/scenes.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
 import {
@@ -693,11 +693,46 @@ export async function runPlanningDay(game) {
     }
 
     const actionOptions = buildActionOptions(journey, seasonInfo);
+    const guidance = buildPlanningActionGuidance(journey, seasonInfo);
+    const daysLeft = Number.isFinite(journey.deadline)
+      ? Math.max(0, journey.deadline - journey.day)
+      : null;
 
-    const action = await ui.promptChoice(dayPrompt(journey), actionOptions);
+    let chosen = await presentDayCard(ui, {
+      dayHeader: Number.isFinite(journey.deadline)
+        ? `DAY ${journey.day} of ${journey.deadline} - STRATEGIC PLANNING`
+        : `DAY ${journey.day} - STRATEGIC PLANNING`,
+      statusLine: formatStatusLine([
+        getPlanningPhaseLabel(journey.plan.phase),
+        daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
+        `confidence ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
+        `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
+      ]),
+      label: 'AT THE DESK',
+      title: 'THE FILE, AS IT STANDS',
+      body: guidance.headline || 'The file is yours today. Pick the lane that moves it.',
+      context: buildPlanningContextLines(journey, seasonInfo),
+      prompt: dayPrompt(journey),
+      options: actionOptions,
+    });
 
-    if (action.value === 'end') {
+    if (chosen === 'desk_menu') {
+      const desk = await ui.promptChoice('Desk & self:', [
+        ...buildPlanningDeskOptions(journey),
+        { label: 'Back', description: 'Return to the day', value: 'desk_back' }
+      ]);
+      chosen = desk.value === 'desk_back' ? 'noop' : (desk.value || 'noop');
+    }
+
+    const action = actionOptions.find((option) => option.value === chosen)
+      || { value: chosen, label: chosen };
+
+    if (chosen === 'end') {
       break;
+    }
+    if (chosen === 'noop') {
+      if (settleDayPass(journey, freeChoices, ui)) break;
+      continue;
     }
 
     ui.write('');
@@ -1151,34 +1186,14 @@ function buildActionOptions(journey, seasonInfo = null) {
     });
   }
 
-  {
-    actionOptions.push({
-      label: 'Clear the Inbox',
-      description: 'Lane: admin support | Handle correspondence and clear inbox drag',
-      value: 'email'
-    });
-  }
-
-  {
-    actionOptions.push({
-      label: 'Network',
-      description: 'Lane: support | Build political capital for the next gate',
-      value: 'network'
-    });
-  }
-
-  if (journey.protagonist) {
-    actionOptions.push({
-      label: 'Take a Break',
-      description: 'Lane: recovery | Reduce stress and recover energy',
-      value: 'rest'
-    });
-  }
-
+  // The supporting lanes go behind one door, the way recon's camp upkeep does.
+  // Ten options on a phone leaves the log pane about seven rows
+  // (docs/day_as_situation.md section 4); the gate-advancing work above is the
+  // decision, and this is everything else.
   actionOptions.push({
-    label: 'Review the File',
-    description: 'Values, situation, FOM detail, and carry-forward notes',
-    value: 'briefing'
+    label: 'Desk & self',
+    description: 'Inbox, networking, a break — the work that is not the gate',
+    value: 'desk_menu'
   });
 
   actionOptions.push({
@@ -1188,6 +1203,55 @@ function buildActionOptions(journey, seasonInfo = null) {
   });
 
   return actionOptions;
+}
+
+/**
+ * The supporting lane, one level down. "Review the File" is not here: it is
+ * reference material and lives in the day card's free "More context".
+ */
+function buildPlanningDeskOptions(journey) {
+  const options = [
+    {
+      label: 'Clear the Inbox',
+      description: 'Handle correspondence and clear inbox drag',
+      value: 'email'
+    },
+    {
+      label: 'Network',
+      description: 'Build political capital for the next gate',
+      value: 'network'
+    }
+  ];
+  if (journey.protagonist) {
+    options.push({
+      label: 'Take a Break',
+      description: 'Reduce stress and recover energy',
+      value: 'rest'
+    });
+  }
+  return options;
+}
+
+/**
+ * Reference material for the planning day card, free behind "More context".
+ * This is what "Review the File" used to cost a slot on the menu to show.
+ */
+function buildPlanningContextLines(journey, seasonInfo) {
+  const plan = journey.plan || {};
+  const lines = [
+    `Data ${Math.round(plan.dataCompleteness || 0)}% of 80%`,
+    `Analysis ${Math.round(plan.analysisQuality || 0)}% of 80%`,
+    `Buy-in ${Math.round(plan.stakeholderBuyIn || 0)}% of 75%`,
+    `Confidence ${Math.round(plan.ministerialConfidence || 0)}% of 80%`,
+  ];
+  if (seasonInfo) lines.push(`Season: ${seasonInfo.name} - Year ${seasonInfo.year}`);
+  const scrutiny = Number(journey.scrutiny ?? journey.heat ?? 0);
+  if (Number.isFinite(scrutiny)) lines.push(`Scrutiny: ${Math.round(Math.max(0, scrutiny))}%`);
+  lines.push(`Political capital: ${Math.round(journey.resources.politicalCapital || 0)}`);
+  lines.push(`Data credits: ${Math.round(journey.resources.dataCredits || 0)}`);
+  const notes = getDiscoveryTagNotes(journey, journey.roleId || 'planner', 2);
+  if (notes.length > 0) lines.push(`Carry-forward: ${notes.join(' | ')}`);
+  return lines.filter(Boolean);
 }
 
 /**

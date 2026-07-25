@@ -150,6 +150,10 @@ export function buildEventCardContent(formatted, event, usable) {
     options: usable.map(({ opt, index }) => ({
       label: opt.label,
       description: opt.hint || '',
+      // Graded from the option's own downside by formatEventForDisplay. Without
+      // this the chip renderer above had no input on event cards, so the only
+      // tagged option a player ever saw was the one that declines to play.
+      tag: opt.tag,
       value: index,
     })),
   };

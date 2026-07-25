@@ -210,8 +210,16 @@ function planningPolicy(journey, options) {
 
   const protagonist = journey.protagonist;
   if (protagonist && (protagonist.energy <= 25 || protagonist.stress >= 75)) {
-    const rest = pick(options, ['rest']);
+    // Rest lives behind 'desk_menu' now, alongside the inbox and networking.
+    const rest = pick(options, ['rest', 'desk_menu']);
     if (rest) return rest;
+  }
+  // Inside the desk submenu: never back out empty-handed or the day spins.
+  if (options.some((option) => option.value === 'desk_back')) {
+    const wanted = protagonist && (protagonist.energy <= 25 || protagonist.stress >= 75)
+      ? ['rest', 'network', 'email']
+      : ['network', 'email', 'rest'];
+    return pick(options, wanted) || options[0];
   }
   return pick(options, [
     'submit', 'stakeholder', 'analyze', 'gather_data', 'outreach',
