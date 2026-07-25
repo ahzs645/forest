@@ -3,9 +3,10 @@
  * Pure data definitions for field/desk mechanics
  */
 
-export const FIELD_SHIFT_HOURS = 9;
 export const FIELD_DISTANCE_SCALE = 0.5;
-export const BASE_DAILY_TRAVEL_KM = 9;
+// A shift is one job (js/journey/dayPlan.js), so a travel day is the whole
+// day on the road rather than four hours of it wedged around camp chores.
+export const BASE_DAILY_TRAVEL_KM = 12;
 export const DAILY_TRAVEL_VARIANCE = 0.12;
 
 // Role to journey type mapping
@@ -122,41 +123,38 @@ export const PACE_OPTIONS = {
   }
 };
 
-// Desk action definitions
+// Desk action definitions. Each one is a day's work now (see
+// js/journey/dayPlan.js) — what used to be a two-hour slice of a shift is the
+// thing the desk did that day.
 export const DESK_ACTIONS = {
   process_permits: {
     id: 'process_permits',
     name: 'Process Permits',
-    description: 'Work on permit paperwork and reviews',
-    hoursRequired: 2,
+    description: 'Spend the day on permit paperwork and reviews',
     energyCost: 10
   },
   stakeholder_meeting: {
     id: 'stakeholder_meeting',
     name: 'Stakeholder Meeting',
     description: 'Meet with ministry, nations, or community',
-    hoursRequired: 3,
     energyCost: 15
   },
   crisis_management: {
     id: 'crisis_management',
     name: 'Handle Crisis',
-    description: 'Deal with urgent issues (uses whole day)',
-    hoursRequired: 8,
+    description: 'Drop everything and deal with the urgent file',
     energyCost: 30
   },
   team_morale: {
     id: 'team_morale',
     name: 'Team Building',
     description: 'Boost crew morale with coffee and encouragement',
-    hoursRequired: 2,
     energyCost: 5
   },
   end_day: {
     id: 'end_day',
-    name: 'End Day',
-    description: 'Wrap up and head home',
-    hoursRequired: 0,
+    name: 'Quiet Day',
+    description: 'Keep the desk ticking over and head home early',
     energyCost: 0
   }
 };

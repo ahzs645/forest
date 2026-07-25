@@ -10,6 +10,15 @@
   padding: 0;
 }
 
+// The UA sheet's [hidden] { display: none } loses to any author `display`
+// rule of equal specificity, so a component that sets `display: flex` stays
+// on screen while marked hidden — that is how the experimental Crisis
+// Command entry was showing on the landing menu. Components that need to
+// override this (none today) must be more specific on purpose.
+[hidden] {
+  display: none !important;
+}
+
 html {
   height: 100%;
   background: var(--bg-dark);

@@ -3,7 +3,6 @@
  * Role-specific intro text shown at journey start
  */
 
-import { FIELD_SHIFT_HOURS } from '../journey/constants.js';
 import { getCurrentSeasonInfo } from '../season.js';
 import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
@@ -48,7 +47,7 @@ export function showJourneyIntro(ui, journey) {
     case 'recon':
       ui.write(`Mission: Verify a recon package for every one of the ${journey.blocks.length} forest blocks — reaching the end of the traverse is not the win.`);
       ui.write('Each block needs its access ground-truthed and, where values are flagged, a values sweep. Then the package finalizes.');
-      ui.write(`Field Notebook can close missed packages from notes, but each write-up adds 2 scrutiny. Each shift is about ${FIELD_SHIFT_HOURS} hours.`);
+      ui.write('Field Notebook can close missed packages from notes, but each write-up adds 2 scrutiny. One shift is one job — pick it and live with it.');
       ui.write('Manage fuel, food, and equipment while documenting hazards, cultural sites, and road/crossing condition.');
       ui.write('');
       ui.write('Starting supplies:');
@@ -110,7 +109,7 @@ export function showJourneyIntro(ui, journey) {
 
     case 'field':
       ui.write(`Mission: Survey ${journey.totalDistance} km of traverse across ${journey.blocks.length} forest blocks.`);
-      ui.write(`Each shift is about ${FIELD_SHIFT_HOURS} hours. The crew returns to camp nightly.`);
+      ui.write('One shift is one job. The crew returns to camp nightly.');
       ui.write('Manage fuel, food, and equipment while keeping radio contact.');
       ui.write('');
       ui.write('Starting supplies:');
@@ -141,7 +140,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write('Starting resources:');
       ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
       ui.write(`  Political Capital: ${journey.resources.politicalCapital}`);
-      ui.write(`  Daily Energy: ${journey.hoursRemaining} hours`);
+      ui.write('  Daily Pace: one substantive action per day');
       break;
   }
 

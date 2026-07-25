@@ -11,7 +11,6 @@ import { generateCrew, getCrewDisplayInfo } from '../crew.js';
 import {
   createJourney,
   formatJourneyLog,
-  FIELD_SHIFT_HOURS,
   getSurveyedBlockCount
 } from '../journey.js';
 import { checkScheduledEvents } from '../events.js';
@@ -294,7 +293,7 @@ export class ForestryTrailGame {
     this.ui.writeHeader('EXPEDITION RESUMED');
     this.ui.write(`${savedRun.companyName || 'Your crew'} — ${savedRun.area?.name || 'the operating area'}, day ${savedRun.day}.`);
     this.ui.write(savedRun.activeReconShift
-      ? `Restored the latest decision checkpoint with ${savedRun.hoursRemaining || 0}h left in the shift.`
+      ? 'Restored the latest decision checkpoint. The day is still yours to spend.'
       : 'Restored the latest completed-shift checkpoint. Back to work.', 'term-dim');
     this.ui.write('');
     await this._mainLoop();
@@ -314,7 +313,7 @@ export class ForestryTrailGame {
           const roleName = savedRun.role?.name || 'Forester';
           msg.textContent = `${savedRun.companyName || 'Your crew'} — ${roleName}, `
             + `${savedRun.area?.name || 'operating area'}, day ${savedRun.day}`
-            + `${savedRun.activeReconShift ? `, ${savedRun.hoursRemaining || 0}h remaining` : ''}.`;
+            + `${savedRun.activeReconShift ? ' — mid-shift' : ''}.`;
           msg.style.marginTop = '0';
           container.appendChild(msg);
         },

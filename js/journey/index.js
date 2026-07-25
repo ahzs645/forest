@@ -3,7 +3,15 @@
  * Re-exports all public symbols for backward compatibility
  */
 
-export { FIELD_SHIFT_HOURS, PACE_OPTIONS, DESK_ACTIONS } from './constants.js';
+export { PACE_OPTIONS, DESK_ACTIONS } from './constants.js';
+
+export {
+  ACTIONS_PER_DAY,
+  startDay,
+  spendDay,
+  dayIsSpent,
+  dayPrompt
+} from './dayPlan.js';
 
 export {
   createJourney,

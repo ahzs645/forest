@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createReconJourney } from '../js/journey/factory.js';
+import { dayIsSpent } from '../js/journey/dayPlan.js';
 import { runReconDay } from '../js/modes/recon.js';
 import { OPERATING_AREAS } from '../js/data/index.js';
 
@@ -32,11 +33,11 @@ function createScriptedUI() {
   };
 }
 
-test('recon Rest & End Shift advances the day exactly once', async () => {
+test('recon Stand Down advances the day exactly once', async () => {
   // Build the journey (and its crew) with the real RNG — crew name generation
   // rejection-samples for uniqueness and would spin under a constant stub.
   const journey = createReconJourney({ roleId: 'recce', areaId: OPERATING_AREAS[0].id });
-  // Keep the day on the normal multi-action path (not a weather-forced camp)
+  // Keep the day on the normal shift-menu path (not a weather-forced camp)
   // and clear of the low-food decision prompt.
   journey.weather = { id: 'clear', name: 'Clear' };
   journey.resources.food = 100;
@@ -58,7 +59,7 @@ test('recon Rest & End Shift advances the day exactly once', async () => {
       dayBefore + 1,
       'ending the shift should advance the calendar by one day, not two'
     );
-    assert.equal(journey.hoursRemaining, 0, 'the shift should be fully spent');
+    assert.ok(dayIsSpent(journey), 'the shift should be fully spent');
   } finally {
     Math.random = realRandom;
   }

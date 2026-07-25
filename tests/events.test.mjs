@@ -124,14 +124,14 @@ test('field temptation chance accepts a draw above the old twelve-percent rate',
   }
 });
 
-test('field event time costs work when authored inside effects', () => {
+test('field event time costs read as lost ground when authored inside effects', () => {
   const journey = {
     journeyType: 'recon',
     day: 3,
     crew: [],
     log: [],
     scrutiny: 0,
-    travelDelayHours: 0,
+    travelSetback: 0,
     resources: {}
   };
 
@@ -141,8 +141,30 @@ test('field event time costs work when authored inside effects', () => {
     effects: { timeUsed: 1 }
   });
 
-  assert.equal(journey.travelDelayHours, 1);
-  assert.ok(result.messages.some((message) => /Lost 1 hour/i.test(message)));
+  // Content still rates delays on the retired eight-hour scale; the shift
+  // turns that into the share of the day's ground the trouble cost.
+  assert.equal(journey.travelSetback, 1 / 8);
+  assert.ok(result.messages.some((message) => /cost the crew ground/i.test(message)));
+});
+
+test('a heavy field delay never takes the whole shift', () => {
+  const journey = {
+    journeyType: 'recon',
+    day: 4,
+    crew: [],
+    log: [],
+    scrutiny: 0,
+    travelSetback: 0,
+    resources: {}
+  };
+
+  resolveEvent(journey, { id: 'washout', title: 'Washout', severity: 'major' }, {
+    label: 'Dig it out',
+    outcome: 'The road is passable again.',
+    effects: { timeUsed: 12 }
+  });
+
+  assert.equal(journey.travelSetback, 0.75, 'the crew always makes some ground');
 });
 
 test('temptation lane guarantees an offer after three eligible misses', () => {
@@ -170,7 +192,7 @@ test('permitting events update relationship and compliance tracks without legacy
     journeyType: 'permitting',
     day: 4,
     log: [],
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     permits: {
       target: 15,
       backlog: 3,
@@ -222,7 +244,7 @@ test('a generic negative-progress event slips reviews back but never revokes an 
     journeyType: 'permitting',
     day: 10,
     log: [],
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     permits: {
       target: 5,
       backlog: 0,
@@ -271,7 +293,7 @@ test('a negative-progress event with nothing left to slip leaves approved permit
     journeyType: 'permitting',
     day: 20,
     log: [],
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     permits: {
       target: 5,
       backlog: 0,
@@ -312,7 +334,7 @@ test('planning events advance the active phase instead of no-oping against permi
     journeyType: 'planning',
     day: 7,
     log: [],
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     resources: {
       budget: 48000,
       politicalCapital: 40
@@ -356,7 +378,7 @@ test('planning mode ignores permit-only approval effects instead of crashing on 
     journeyType: 'planning',
     day: 3,
     log: [],
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     resources: {
       budget: 47000,
       politicalCapital: 44
@@ -497,7 +519,7 @@ test('permitting revision tickets reflect area context and create actionable def
   const journey = {
     day: 9,
     currentPhase: 'review',
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     area: {
       becCode: 'CWHws2',
       tags: ['watershed', 'community-interface', 'river']
@@ -515,8 +537,10 @@ test('permitting revision tickets reflect area context and create actionable def
 
   assert.equal(queue.length, 2);
   assert.equal(queue[0].profileId, 'community-watershed');
-  assert.equal(queue[0].clean.hours, 3);
-  assert.equal(queue[0].fast.hours, 2);
+  // A deficiency response is a whole day either way now, so the choice is
+  // purely the scrutiny trade: clean it up, or push it back out fast.
+  assert.ok(queue[0].clean.scrutiny < 0, 'a clean response should cool scrutiny');
+  assert.ok(queue[0].fast.scrutiny > 0, 'a fast-track should heat scrutiny');
   assert.match(queue[0].summary, /hydrology/i);
 });
 
@@ -665,11 +689,11 @@ test('permitting revision tickets follow road asset intel toward engineering and
   assert.equal(watershedQueue[0].profileId, 'community-watershed');
 });
 
-test('permitting revision responses trade time for scrutiny and political capital', () => {
+test('permitting revision responses trade the day for scrutiny and political capital', () => {
   const cleanJourney = {
     day: 11,
     currentPhase: 'review',
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     scrutiny: 30,
     area: {
       becCode: 'CWHws2',
@@ -698,7 +722,7 @@ test('permitting revision responses trade time for scrutiny and political capita
   const cleanResult = resolvePermitRevisionResponse(cleanJourney, cleanTicket.id, 'clean');
 
   assert.equal(cleanResult.resolved, true);
-  assert.equal(cleanJourney.hoursRemaining, 5);
+  assert.equal(cleanJourney.actionsRemaining, 0, 'a deficiency response is the day');
   assert.equal(cleanJourney.scrutiny, 27);
   assert.equal(cleanJourney.permits.needsRevision, 0);
   assert.equal(cleanJourney.permits.submitted, 1);
@@ -709,7 +733,7 @@ test('permitting revision responses trade time for scrutiny and political capita
   const fastJourney = {
     day: 11,
     currentPhase: 'review',
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     scrutiny: 30,
     area: {
       becCode: 'CWHws2',
@@ -738,7 +762,7 @@ test('permitting revision responses trade time for scrutiny and political capita
   const fastResult = resolvePermitRevisionResponse(fastJourney, fastTicket.id, 'fast');
 
   assert.equal(fastResult.resolved, true);
-  assert.equal(fastJourney.hoursRemaining, 6);
+  assert.equal(fastJourney.actionsRemaining, 0, 'a fast-track still costs the day');
   assert.equal(fastJourney.scrutiny, 34);
   assert.equal(fastJourney.resources.politicalCapital, 39);
   assert.equal(fastJourney.permits.needsRevision, 0);
@@ -752,7 +776,7 @@ test('selected events can seed carry-forward discovery tags', () => {
     journeyType: 'permitting',
     day: 12,
     log: [],
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     discoveryTags: [],
     permits: {
       target: 15,

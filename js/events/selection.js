@@ -19,6 +19,32 @@ import { getAreaSituationMultipliers } from '../data/areaSituations.js';
 import { formatRadioReport } from './display.js';
 
 /**
+ * Chance that an ordinary day carries an event at all.
+ *
+ * Event selection walks the whole applicable deck and rolls each entry on its
+ * own, so with a pool this size something fired on very nearly every day.
+ * That read as texture when a day held three or four actions. Against one
+ * action a day (js/journey/dayPlan.js) it meant the day's event was as loud as
+ * the day's decision, and the steady drip of event costs outran every budget
+ * in scripts/simulate-expeditions.mjs. So the day gets rolled first, and only
+ * then does the deck decide which event it is.
+ *
+ * Temptations keep their own lane below: they already have a multi-day
+ * cooldown, and gating them twice would bury the shortcut library again.
+ */
+const DAY_HAS_EVENT_CHANCE = 0.5;
+
+/**
+ * Whether today is an event day at all, before the deck picks which one.
+ * @param {Object} journey
+ * @returns {boolean}
+ */
+function dayCarriesEvent(journey) {
+  const chance = Math.min(0.85, DAY_HAS_EVENT_CHANCE * getDifficultyEventModifier(journey));
+  return Math.random() < chance;
+}
+
+/**
  * Check if a random event should occur
  * @param {Object} journey - Current journey state
  * @returns {Object|null} Event to resolve or null
@@ -30,6 +56,10 @@ export function checkForEvent(journey) {
   const temptation = maybeCreateTemptationEvent(journey);
   if (temptation) {
     return temptation;
+  }
+
+  if (!dayCarriesEvent(journey)) {
+    return null;
   }
 
   if (journey.journeyType === 'manager') {

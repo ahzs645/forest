@@ -77,10 +77,11 @@ test('FOM publication requires baseline data and analysis and opens a 30-calenda
   const ui = makeUi();
 
   assert.deepEqual(getFomPublicationGaps(journey), ['data 0%/30%', 'analysis 0%/15%']);
-  const hoursBeforeBlockedAttempt = journey.hoursRemaining;
+  const actionsBeforeBlockedAttempt = journey.actionsRemaining;
   await processAction({ ui, journey }, 'fom_review', null);
   assert.equal(journey.blockPlanning.fom.status, 'draft');
-  assert.equal(journey.hoursRemaining, hoursBeforeBlockedAttempt);
+  assert.equal(journey.actionsRemaining, actionsBeforeBlockedAttempt,
+    'a blocked publication must not spend the day');
   assert.ok(ui.lines.some((line) => line.includes('publication blocked')));
 
   journey.plan.dataCompleteness = 30;
@@ -103,8 +104,10 @@ test('planning mission status and action receipt reflect the post-action state i
   const status = updatePlanningMissionStatus(ui, journey, null);
   const receipt = buildPlanningActionReceipt(before, journey);
 
-  assert.ok(status.checklist.some((item) => item.label === 'Data 10% of 80%'));
-  assert.match(receipt, /Data \+10 → 10%/);
+  // One action is a day's work now (js/journey/dayPlan.js), so a day of data
+  // gathering moves the track by DAY_OF_DATA rather than a three-hour slice.
+  assert.ok(status.checklist.some((item) => item.label === 'Data 18% of 80%'));
+  assert.match(receipt, /Data \+18 → 18%/);
   assert.match(receipt, /Budget -\$900/);
   assert.match(receipt, /Energy -10/);
   assert.match(receipt, /Stress \+6/);

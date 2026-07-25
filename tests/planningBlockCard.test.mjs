@@ -85,15 +85,15 @@ test('Cutblock Priority Decision fires at most twice in a campaign-length planni
   await withSeededRandom(9001, async () => {
     const area = OPERATING_AREAS.find((candidate) => candidate.id === 'fraser-plateau');
     const journey = createPlanningJourney({ roleId: 'planner', areaId: 'fraser-plateau', area, scale: 'campaign' });
-    // Campaign scale sets a 12-day deadline with a 3-day selection cadence,
-    // which used to put this card on screen 4 times (day 1, 4, 7, 10) with
-    // identical wording each time.
-    assert.equal(journey.deadline, 12);
+    // Campaign scale runs a 20-day window with a 3-day selection cadence, so
+    // the cadence alone would put this card on screen six or seven times with
+    // identical wording; MAX_BLOCK_SELECTIONS_PER_RUN is what holds it down.
+    assert.equal(journey.deadline, 20);
     const ui = makeCaptureUi();
     const game = { ui, journey, gameOver: false };
 
     let guard = 0;
-    while (journey.day <= journey.deadline && !journey.isComplete && !journey.isGameOver && !game.gameOver && guard < 30) {
+    while (journey.day <= journey.deadline && !journey.isComplete && !journey.isGameOver && !game.gameOver && guard < 40) {
       await runPlanningDay(game);
       guard += 1;
     }

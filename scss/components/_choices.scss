@@ -32,6 +32,9 @@
   column-gap: var(--space-xs);
   align-items: baseline;
   width: 100%;
+  // The menu is a flex column with a capped height. Without this, a long
+  // option's rows get compressed and its hint text spills into the row below.
+  flex-shrink: 0;
   padding: 3px var(--space-xs);
   background: transparent;
   border: none;

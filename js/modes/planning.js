@@ -34,6 +34,19 @@ import { isPlanningApprovalReady } from './shared/endConditions.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
+import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
+
+/**
+ * What a day on each track of the planning file is worth.
+ *
+ * These used to be the yield of a three or four hour block, taken two or three
+ * times a day. A day is one action now (js/journey/dayPlan.js), so each track
+ * moves by a day's worth instead — otherwise the file cannot reach its gates
+ * inside the cabinet window. Sized with scripts/simulate-expeditions.mjs.
+ */
+const DAY_OF_DATA = 18;
+const DAY_OF_ANALYSIS = 26;
+const DAY_OF_CONSULTATION = 18;
 
 // The professional reference carried by the game specifies a 30-calendar-day
 // comment period. A planning "day" is a compressed turn, so the statutory
@@ -280,13 +293,13 @@ function getFomActionLabel(fom, roadContext = null) {
   const roadSuffix = roadContext?.hasData ? ' + Road Review' : '';
   switch (fom?.status) {
     case 'public_review':
-      return `Update FOM Review${roadSuffix} (2h)`;
+      return `Update FOM Review${roadSuffix}`;
     case 'revision_required':
-      return `Revise FOM${roadSuffix} (2h)`;
+      return `Revise FOM${roadSuffix}`;
     case 'approved':
-      return roadContext?.hasData ? 'Check FOM / Road Record (1h)' : 'Check FOM Record (1h)';
+      return roadContext?.hasData ? 'Check FOM / Road Record' : 'Check FOM Record';
     default:
-      return `Open FOM Review${roadSuffix} (2h)`;
+      return `Open FOM Review${roadSuffix}`;
   }
 }
 
@@ -531,7 +544,6 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
 
 export function capturePlanningActionState(journey) {
   return {
-    hours: Number(journey.hoursRemaining || 0),
     phase: journey.plan?.phase || '',
     data: Number(journey.plan?.dataCompleteness || 0),
     analysis: Number(journey.plan?.analysisQuality || 0),
@@ -562,8 +574,6 @@ export function buildPlanningActionReceipt(before, journey) {
   if (!before || !journey) return '';
   const after = capturePlanningActionState(journey);
   const parts = [];
-  const hoursUsed = before.hours - after.hours;
-  if (hoursUsed > 0) parts.push(`Time ${hoursUsed}h`);
 
   const percentFields = [
     ['Data', 'data'],
@@ -623,10 +633,7 @@ export async function runPlanningDay(game) {
     }), { delay: 140, holdLastFrame: false });
   }
 
-  // Reset hours for new day
-  if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
-    journey.hoursRemaining = 8;
-  }
+  startDay(journey);
 
   // Periodic real-data block decision: selected block influences events and values.
   await maybePromptForBlockSelection(game, seasonInfo);
@@ -653,8 +660,11 @@ export async function runPlanningDay(game) {
     return;
   }
 
-  // Multi-action loop (Phase 2.3)
-  while (journey.hoursRemaining > 0) {
+  // One file gets the day. Reviewing the file is free and leaves the day
+  // unspent, so the loop comes back to the real decision; the tally closes a
+  // day whose menu turns out to be nothing but look-ups and blocked gates.
+  const freeChoices = { count: 0 };
+  while (!dayIsSpent(journey)) {
     displayPlanningHeader(ui, journey, seasonInfo);
 
     // Check protagonist energy mid-day
@@ -666,7 +676,7 @@ export async function runPlanningDay(game) {
 
     const actionOptions = buildActionOptions(journey, seasonInfo);
 
-    const action = await ui.promptChoice(`${journey.hoursRemaining}h remaining:`, actionOptions);
+    const action = await ui.promptChoice(dayPrompt(journey), actionOptions);
 
     if (action.value === 'end') {
       break;
@@ -686,6 +696,10 @@ export async function runPlanningDay(game) {
         description: `${action.label || 'Action'} is complete; return to the planning day`,
         value: 'continue'
       }]);
+    }
+
+    if (settleDayPass(journey, freeChoices, ui)) {
+      break;
     }
 
     if (journey.isComplete) {
@@ -726,7 +740,7 @@ export function updatePlanningMissionStatus(ui, journey, seasonInfo = null) {
   const plan = journey.plan;
   const facts = [];
   if (seasonInfo) facts.push({ label: 'Season', value: `${seasonInfo.name} · Y${seasonInfo.year}` });
-  facts.push({ label: 'Hours left', value: `${journey.hoursRemaining}h` });
+
   facts.push({ label: 'Phase', value: getPlanningPhaseLabel(plan.phase) });
   if (Number.isFinite(journey.deadline)) {
     const daysLeft = Math.max(0, journey.deadline - journey.day);
@@ -957,35 +971,34 @@ function applyValuesConsequences(journey) {
  */
 function buildActionOptions(journey, seasonInfo = null) {
   const actionOptions = [];
-  const hoursLeft = journey.hoursRemaining || 8;
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
   const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock || null);
   const approvalGaps = getPlanningApprovalGaps(journey);
 
   // Phase-specific primary actions
-  if (journey.plan.phase === 'data_gathering' && journey.resources.dataCredits > 0 && hoursLeft >= 3) {
+  if (journey.plan.phase === 'data_gathering' && journey.resources.dataCredits > 0) {
     actionOptions.push({
-      label: 'Gather Data (3h)',
+      label: 'Gather Data',
       description: 'Lane: technical file | Compile LiDAR, inventory, and baseline data',
       value: 'gather_data'
     });
   }
 
-  if (journey.plan.phase === 'analysis' && hoursLeft >= 4) {
+  if (journey.plan.phase === 'analysis') {
     actionOptions.push({
-      label: 'Run Analysis (4h)',
+      label: 'Run Analysis',
       description: 'Lane: technical file | Spatial analysis and modeling',
       value: 'analyze'
     });
   }
 
-  if (journey.plan.phase === 'stakeholder_review' && hoursLeft >= 4) {
+  if (journey.plan.phase === 'stakeholder_review') {
     // Check values gate (Phase 4.1)
     const deficits = getValuesGateDeficits(journey);
     const valuesOk = deficits.length === 0;
     if (valuesOk) {
       actionOptions.push({
-        label: 'Stakeholder Session (4h)',
+        label: 'Stakeholder Session',
         description: 'Lane: consultation file | Host consultation and bank buy-in',
         value: 'stakeholder'
       });
@@ -999,28 +1012,28 @@ function buildActionOptions(journey, seasonInfo = null) {
     }
   }
 
-  if (journey.plan.phase === 'ministerial_approval' && approvalGaps.some((gap) => gap.key === 'data') && hoursLeft >= 3) {
+  if (journey.plan.phase === 'ministerial_approval' && approvalGaps.some((gap) => gap.key === 'data')) {
     actionOptions.push({
-      label: 'Gather Data (3h)',
+      label: 'Gather Data',
       description: 'Lane: technical recovery | Rebuild baseline completeness before final approval work',
       value: 'gather_data'
     });
   }
 
-  if (journey.plan.phase === 'ministerial_approval' && approvalGaps.some((gap) => gap.key === 'analysis') && hoursLeft >= 4) {
+  if (journey.plan.phase === 'ministerial_approval' && approvalGaps.some((gap) => gap.key === 'analysis')) {
     actionOptions.push({
-      label: 'Run Analysis (4h)',
+      label: 'Run Analysis',
       description: 'Lane: technical recovery | Reopen the model package and restore submission readiness',
       value: 'analyze'
     });
   }
 
-  if (journey.plan.phase === 'ministerial_approval' && approvalGaps.some((gap) => gap.key === 'stakeholder') && hoursLeft >= 4) {
+  if (journey.plan.phase === 'ministerial_approval' && approvalGaps.some((gap) => gap.key === 'stakeholder')) {
     const deficits = getValuesGateDeficits(journey);
     const valuesOk = deficits.length === 0;
     if (valuesOk) {
       actionOptions.push({
-        label: 'Stakeholder Session (4h)',
+        label: 'Stakeholder Session',
         description: 'Lane: consultation recovery | Rebuild buy-in before the final package',
         value: 'stakeholder'
       });
@@ -1034,14 +1047,14 @@ function buildActionOptions(journey, seasonInfo = null) {
     }
   }
 
-  if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 6) {
+  if (journey.plan.phase === 'ministerial_approval') {
     const deficits = getValuesGateDeficits(journey);
     const valuesOk = deficits.length === 0;
     const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
     const professionalIssues = getPlanningProfessionalIssues(journey);
     if (valuesOk && submissionReadiness.ready && professionalIssues.length === 0 && approvalGaps.length === 0) {
       actionOptions.push({
-        label: 'Prepare Submission (6h)',
+        label: 'Prepare Submission',
         description: 'Lane: submission package | Fastest approval push once the FOM, road, and professional gates are clear',
         value: 'submit'
       });
@@ -1055,9 +1068,9 @@ function buildActionOptions(journey, seasonInfo = null) {
     }
   }
 
-  if (hoursLeft >= 2) {
+  if (true) {
     const professional = getPlanningProfessionalSnapshot(journey);
-    const label = professional?.registrationActive ? 'Compliance Admin (2h)' : 'Renew Registration (2h)';
+    const label = professional?.registrationActive ? 'Compliance Admin' : 'Renew Registration';
     const pieces = [];
     if (professional?.registrationStatus !== 'active') {
       pieces.push(`registration ${professional.registrationStatus} (your licence to sign off is not current)`);
@@ -1077,15 +1090,15 @@ function buildActionOptions(journey, seasonInfo = null) {
     });
   }
 
-  if (journey.plan.phase === 'ministerial_approval' && hoursLeft >= 2 && journey.plan.ministerialConfidence < 80) {
+  if (journey.plan.phase === 'ministerial_approval' && journey.plan.ministerialConfidence < 80) {
     actionOptions.push({
-      label: 'Ministerial Outreach (2h)',
+      label: 'Ministerial Outreach',
       description: 'Lane: ministerial brief | Brief decision-makers and recover confidence up to 80%',
       value: 'outreach'
     });
   }
 
-  if (journey.blockPlanning?.activeBlock && hoursLeft >= 2) {
+  if (journey.blockPlanning?.activeBlock) {
     const publicationGaps = fom?.status === 'draft' ? getFomPublicationGaps(journey) : [];
     if (publicationGaps.length > 0) {
       actionOptions.push({
@@ -1103,43 +1116,42 @@ function buildActionOptions(journey, seasonInfo = null) {
   }
 
   // Values workshop - now with tradeoffs (Phase 4.1)
-  if (hoursLeft >= 3) {
+  {
     actionOptions.push({
-      label: 'Values Workshop (3h)',
+      label: 'Values Workshop',
       description: 'Lane: values file | Balance competing interests with explicit tradeoffs',
       value: 'values'
     });
   }
 
   // Timber assessment (new - Phase 4.1)
-  if (hoursLeft >= 3) {
+  {
     actionOptions.push({
-      label: 'Timber Assessment (3h)',
+      label: 'Timber Assessment',
       description: 'Lane: timber file | Assess timber supply (+timber, -biodiversity)',
       value: 'timber'
     });
   }
 
-  // Quick actions (Phase 2.3)
-  if (hoursLeft >= 1) {
+  {
     actionOptions.push({
-      label: 'Check Email (1h)',
+      label: 'Clear the Inbox',
       description: 'Lane: admin support | Handle correspondence and clear inbox drag',
       value: 'email'
     });
   }
 
-  if (hoursLeft >= 2) {
+  {
     actionOptions.push({
-      label: 'Network (2h)',
+      label: 'Network',
       description: 'Lane: support | Build political capital for the next gate',
       value: 'network'
     });
   }
 
-  if (hoursLeft >= 2 && journey.protagonist) {
+  if (journey.protagonist) {
     actionOptions.push({
-      label: 'Take a Break (2h)',
+      label: 'Take a Break',
       description: 'Lane: recovery | Reduce stress and recover energy',
       value: 'rest'
     });
@@ -1152,8 +1164,8 @@ function buildActionOptions(journey, seasonInfo = null) {
   });
 
   actionOptions.push({
-    label: 'End Day',
-    description: 'Wrap up work',
+    label: 'Hold the Line',
+    description: 'Keep the file ticking over and give the day back to the team',
     value: 'end'
   });
 
@@ -1177,7 +1189,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
 
     case 'gather_data': {
       const recoveryRun = journey.plan.phase === 'ministerial_approval';
-      journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + 10);
+      journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + DAY_OF_DATA);
       if (discoveryTags.length > 0) {
         const bonus = Math.min(3, discoveryTags.length);
         journey.plan.dataCompleteness = Math.min(100, journey.plan.dataCompleteness + bonus);
@@ -1185,7 +1197,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       }
       journey.resources.dataCredits -= 10;
       journey.resources.budget = Math.max(0, journey.resources.budget - 900);
-      journey.hoursRemaining -= 3;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 10, stress: 6 });
       applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: recoveryRun ? 1 : 2, competenceRisk: -1, auditExposure: 1 });
       ui.write(`Data gathering progressed. Completeness: ${journey.plan.dataCompleteness}%`);
@@ -1200,14 +1212,14 @@ export async function processAction(game, actionValue, seasonInfo = null) {
 
     case 'analyze': {
       const recoveryRun = journey.plan.phase === 'ministerial_approval';
-      journey.plan.analysisQuality = Math.min(100, journey.plan.analysisQuality + 15);
+      journey.plan.analysisQuality = Math.min(100, journey.plan.analysisQuality + DAY_OF_ANALYSIS);
       if (discoveryTags.length > 0) {
         const bonus = Math.min(4, discoveryTags.length * 2);
         journey.plan.analysisQuality = Math.min(100, journey.plan.analysisQuality + bonus);
         ui.write(`Existing ground intel tightened the analysis (+${bonus}).`);
       }
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
-      journey.hoursRemaining -= 4;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 15, stress: 12 });
       applyPlanningProfessionalWork(journey, { cpdHours: 3, paperworkLoad: recoveryRun ? 1 : 2, competenceRisk: -1, auditExposure: 1 });
       ui.write(`Analysis progressed. Quality: ${journey.plan.analysisQuality}%`);
@@ -1222,14 +1234,14 @@ export async function processAction(game, actionValue, seasonInfo = null) {
 
     case 'stakeholder': {
       const recoveryRun = journey.plan.phase === 'ministerial_approval';
-      journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 10);
+      journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + DAY_OF_CONSULTATION);
       if (discoveryIds.has('community_visibility') || discoveryIds.has('cultural_hold') || discoveryIds.has('watershed_watch')) {
         journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
         ui.write('Concrete field findings gave the stakeholder session more weight (+2 buy-in).');
       }
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 6);
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
-      journey.hoursRemaining -= 4;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 20, stress: 16 });
       applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: recoveryRun ? 2 : 3, competenceRisk: -1, auditExposure: 2 });
       if (journey.protagonist) {
@@ -1292,7 +1304,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
         const confidenceGain = submissionReadiness.waterContext.gate === 'clear' ? 18 : 14;
         journey.plan.ministerialConfidence = Math.min(100, journey.plan.ministerialConfidence + confidenceGain);
       }
-      journey.hoursRemaining -= 6;
+      spendDay(journey);
       journey.resources.budget = Math.max(0, journey.resources.budget - 2200);
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
       applyProtagonistCost(journey, { energy: 25, stress: 20 });
@@ -1324,7 +1336,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
         break;
       }
       if (fom.status === 'approved') {
-        journey.hoursRemaining -= 1;
+        spendDay(journey);
         applyProtagonistCost(journey, { energy: 3, stress: 2 });
         ui.write('Forest Operations Map record checked. The approved review file stays in place.');
         if (roadContext.hasData) {
@@ -1334,8 +1346,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       }
 
       const waterContext = getPlanningBlockWaterContext(activeBlock, journey.area, seasonInfo);
-      const reviewCost = 2;
-      journey.hoursRemaining -= reviewCost;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 6, stress: 5 });
       const chainProgress = progressPlanningPaperworkChain(journey, 'fom', 1);
       fom.lastUpdatedDay = journey.day;
@@ -1399,7 +1410,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
       journey.resources.budget = Math.max(0, journey.resources.budget - 600);
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 8, stress: 7 });
       applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: 1 });
 
@@ -1421,7 +1432,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
         paperworkLoad: -10,
         auditExposure: -6,
       });
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 5, stress: 4 });
       if (didRenewal) {
         ui.write('Registration renewal paperwork cleared and active status is restored.');
@@ -1435,10 +1446,10 @@ export async function processAction(game, actionValue, seasonInfo = null) {
     }
 
     case 'values': {
-      // Values workshop with tradeoffs (Phase 4.1). Balanced Approach costs 5h
-      // total, so it is only offered when the player can actually afford it —
-      // otherwise the nested choice would spend more time than they have.
-      const choices = buildValuesWorkshopChoices(journey.hoursRemaining);
+      // Values workshop with tradeoffs (Phase 4.1). Every emphasis takes the
+      // same day; Balanced Approach is the one that costs you personally,
+      // because holding four interests level in one session is a long day.
+      const choices = buildValuesWorkshopChoices();
       const pick = await ui.promptChoice('Choose values focus:', choices);
 
       switch (pick.value) {
@@ -1463,11 +1474,12 @@ export async function processAction(game, actionValue, seasonInfo = null) {
           journey.values.timberSupply = Math.min(100, journey.values.timberSupply + 3);
           journey.values.communityNeeds = Math.min(100, journey.values.communityNeeds + 3);
           journey.values.firstNationsValues = Math.min(100, journey.values.firstNationsValues + 3);
-          journey.hoursRemaining -= 2; // Extra 2h for balanced (total 5h)
+          applyProtagonistCost(journey, BALANCED_WORKSHOP_SURCHARGE);
+          ui.write('Holding all four interests level ran the session long.', 'term-dim');
           break;
       }
 
-      journey.hoursRemaining -= 3;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 10, stress: 5 });
       applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 1 });
       ui.write('Values workshop completed. Balance updated.');
@@ -1478,7 +1490,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       // New timber assessment action (Phase 4.1)
       journey.values.timberSupply = Math.min(100, journey.values.timberSupply + 15);
       journey.values.biodiversity = Math.max(0, journey.values.biodiversity - 5);
-      journey.hoursRemaining -= 3;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 10, stress: 5 });
       applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 1 });
       ui.write(`Timber supply assessment completed. Timber: ${journey.values.timberSupply}%, Biodiversity: ${journey.values.biodiversity}%`);
@@ -1486,7 +1498,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
 
     case 'email': {
       // Quick email check with random effect (Phase 2.3)
-      journey.hoursRemaining -= 1;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 3, stress: 2 });
       const roll = Math.random();
       if (roll < 0.3) {
@@ -1507,7 +1519,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
 
     case 'network':
       journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 4);
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 8, stress: 3 });
       applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1 });
       if (journey.protagonist) {
@@ -1521,7 +1533,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
         journey.protagonist.energy = Math.min(100, journey.protagonist.energy + 25);
         journey.protagonist.stress = Math.max(0, journey.protagonist.stress - 15);
       }
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       applyPlanningProfessionalWork(journey, { auditExposure: -1, competenceRisk: -1 });
       ui.write('You take a break. Feeling refreshed.');
       break;
@@ -1530,22 +1542,22 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       break;
   }
 
-  // Safety net: no single action may push the shift into negative hours.
-  // Action costs are gated when options are built, but this guarantees the
-  // time economy stays trustworthy even if a new action slips through.
-  if (journey.hoursRemaining < 0) {
-    journey.hoursRemaining = 0;
-  }
 }
 
 /**
- * Build the Values Workshop sub-menu. The four single-emphasis options cost
- * the workshop's base 3h; Balanced Approach costs 5h total and is only listed
- * when the player has at least 5h left.
- * @param {number} hoursRemaining
+ * Extra toll for running a balanced values session. Every workshop takes the
+ * same day (see js/journey/dayPlan.js); this is what the balanced one takes
+ * out of you on top.
+ */
+export const BALANCED_WORKSHOP_SURCHARGE = { energy: 8, stress: 6 };
+
+/**
+ * Build the Values Workshop sub-menu. Every emphasis is one day's session, so
+ * all five are always on the table — Balanced Approach pays for its spread in
+ * energy and stress instead of in hours.
  * @returns {Array<{label: string, description: string, value: string}>}
  */
-export function buildValuesWorkshopChoices(hoursRemaining = 0) {
+export function buildValuesWorkshopChoices() {
   const choices = [
     { label: 'Emphasize Biodiversity', description: '+8 bio, -3 timber', value: 'bio' },
     { label: 'Emphasize Timber Supply', description: '+8 timber, -3 bio', value: 'timber_v' },
@@ -1553,9 +1565,11 @@ export function buildValuesWorkshopChoices(hoursRemaining = 0) {
     { label: 'Emphasize First Nations', description: '+8 FN values, -3 community', value: 'fn' }
   ];
 
-  if (hoursRemaining >= 5) {
-    choices.push({ label: 'Balanced Approach (5h total)', description: '+3 all values', value: 'balanced' });
-  }
+  choices.push({
+    label: 'Balanced Approach',
+    description: `+3 all values, but a long day: -${BALANCED_WORKSHOP_SURCHARGE.energy} energy, +${BALANCED_WORKSHOP_SURCHARGE.stress} stress`,
+    value: 'balanced'
+  });
 
   return choices;
 }
@@ -1627,7 +1641,7 @@ async function advanceToNextDay(game) {
   }
 
   journey.day++;
-  journey.hoursRemaining = 8;
+  startDay(journey);
 
   // Protagonist recovery
   if (journey.protagonist) {

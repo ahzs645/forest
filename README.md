@@ -29,10 +29,17 @@ there. Autosaves at every day and season boundary.
 ### Expedition (single deployment)
 
 The classic full-length run of any one journey. Pick a forester role, an
-operating area, and a difficulty, then shepherd a multi-day expedition:
+operating area, and a difficulty, then shepherd a season-long expedition:
 travel, supplies, crew health and morale, field/desk events with
 consequences, milestones, and an interactive final debrief with persistent
 career records (saved in your browser).
+
+**One action a day.** A day is a single substantive decision — travel a leg,
+ground-truth a block, run a stakeholder session, answer the reviewer — plus
+whatever the day sends your way. Reference look-ups (the area map, the
+briefing, the file you already wrote) are free and leave the day unspent. The
+contract lives in [`js/journey/dayPlan.js`](js/journey/dayPlan.js); the
+deployments are sized against it with `npm run sim:expeditions`.
 
 **Five roles, five distinct journeys:**
 
@@ -91,6 +98,17 @@ Strategies: `cautious`, `balanced`, `aggressive`, `random`, `greedy`,
 `weakest-metric`, `role-optimal`. Without `--json`, a markdown + JSON balance
 report is written to `reports/balance/` (mean ending tier per strategy, role ×
 area difficulty, consequence firing rates, most frequent issues).
+
+The expedition modes have their own harness. It drives the real day-runners
+(`js/modes/*.js`) with a competent-player policy per role and reports how long
+a deployment takes and how often it lands — this is what sized the
+deployments for one-action days.
+
+```bash
+npm run sim:expeditions                      # all roles, full length
+npm run sim:expeditions -- --scale campaign  # campaign-season deployments
+npm run sim:expeditions -- --role recon --runs 12 --verbose
+```
 
 Production builds use the `/forest/` base path for GitHub Pages
 (`VITE_BASE_PATH=/ npm run build` for a root-path build). Every push to `main`

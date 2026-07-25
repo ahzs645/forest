@@ -95,14 +95,20 @@ start of the saved day or at the next season briefing.
 ### 3. Factory scale option (`js/journey/factory.js`)
 
 `createJourney({ ..., scale: 'campaign' })` shrinks each mode to a season-
-sized deployment (~8–12 days of play):
+sized deployment. A day is one substantive action
+([`js/journey/dayPlan.js`](../js/journey/dayPlan.js)), so a deployment is
+~12–20 days of play rather than the ~8–12 it was when a day held three or four
+actions. The numbers below are measured, not estimated — re-check them with
+`npm run sim:expeditions -- --scale campaign`:
 
-- recon: ~6 blocks (subset of area blocks), traverse trimmed to match
-- silviculture: 5 blocks / ~80k seedlings / brush 150 ha / 2 surveys,
-  budget + overhead scaled to match (~$45k, same daily overhead)
-- planning: deadline 12 (from 28), gate thresholds unchanged
-- permitting: 5 permits / deadline 12 (from 15/30)
-- resources scaled ~0.45× where they are per-run stockpiles
+- recon: ~6 blocks (subset of area blocks), traverse trimmed to match — lands
+  in 13–21 days
+- silviculture: 3 blocks / ~55k seedlings / brush 100 ha / 2 surveys,
+  budget + overhead scaled to match (~$45k, same daily overhead) — 12–19 days
+- planning: deadline 20 (from 28), gate thresholds unchanged — 14–18 days
+- permitting: 12 permits / deadline 20 (from 15/30) — 10–16 days
+- per-run field stockpiles scaled ~0.45×; desk budgets ~0.68×, because the
+  same daily overhead is now charged over a longer calendar
 
 Difficulty multipliers apply after scale, unchanged.
 

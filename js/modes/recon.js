@@ -42,6 +42,7 @@ import {
   inferDiscoveryTagsFromAccess
 } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
+import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
 
 const TREATMENT_PRIORITY = [
   'infection',
@@ -337,23 +338,20 @@ function logReconAction(journey, summary, detail = '') {
 }
 
 /**
- * Run a field day with multi-action system
- * Players get 9 hours per shift, travel costs 4-6h, camp actions fill remaining time
+ * Run a field day: one job, then whatever the bush sends.
+ *
+ * A shift is a single substantive action — travel a leg, ground-truth a
+ * block, sweep values, write up a package, run a resupply — plus the day's
+ * event and the day's consequences. Consulting the map or re-reading the
+ * briefing costs nothing and leaves the shift unspent. See
+ * js/journey/dayPlan.js for why the hour budget went away.
  * @param {Object} game - Game instance
  */
 async function runFieldDay(game) {
   const { ui, journey } = game;
 
   const resumingShift = journey.activeReconShift?.day === journey.day;
-
-  // Initialize hours for the day
-  if (!resumingShift && (!journey.hoursRemaining || journey.hoursRemaining <= 0)) {
-    journey.hoursRemaining = journey.difficulty === 'easy'
-      ? 10
-      : journey.difficulty === 'hard'
-        ? 8
-        : 9;
-  }
+  startDay(journey, { resuming: resumingShift });
 
   let hasTraveled = Boolean(resumingShift && journey.activeReconShift.hasTraveled);
   // Tracks whether this shift's daily resolution (resource burn, crew updates,
@@ -400,7 +398,7 @@ async function runFieldDay(game) {
       await handleEvent(game, interruptingEvent);
       if (game.gameOver) return;
     }
-    journey.hoursRemaining = 0;
+    spendDay(journey);
     const result = executeFieldAction(journey, 'resting');
     ui.writeHeader('SHIFT CONSEQUENCES');
     writeFieldMessages(ui, result.messages);
@@ -432,8 +430,11 @@ async function runFieldDay(game) {
     await acknowledgeActionResult(ui, 'Ration decision');
   }
 
-  // Multi-action loop: keep going while hours remain
-  while (journey.hoursRemaining > 0) {
+  // One job a shift. Free look-ups (map, briefing) leave the shift unspent,
+  // so the loop comes back around to the real decision; the tally closes a
+  // shift whose menu turns out to be nothing but look-ups.
+  const freeChoices = { count: 0 };
+  while (!dayIsSpent(journey)) {
     const currentBlock = journey.blocks[journey.currentBlockIndex];
     const openPackages = getReconOpenPackages(journey);
     const hasNextBlock = journey.currentBlockIndex < journey.blocks.length - 1;
@@ -449,36 +450,36 @@ async function runFieldDay(game) {
     const primaryOptions = [];
     const supportOptions = [];
 
-    if (currentBlock && !blockIntel.accessGroundTruthed && journey.hoursRemaining >= 2) {
+    if (currentBlock && !blockIntel.accessGroundTruthed) {
       primaryOptions.push({
-        label: 'Ground-Truth Access (2h)',
+        label: 'Ground-Truth Access',
         description: 'Required for this package — access is unverified; inspect crossings, road condition, and approach risk',
         value: 'ground_truth'
       });
     }
 
-    if (currentBlock && valuesSweep.needed && !blockIntel.valuesSwept && journey.hoursRemaining >= 2) {
+    if (currentBlock && valuesSweep.needed && !blockIntel.valuesSwept) {
       primaryOptions.push({
-        label: 'Values Sweep (2h)',
+        label: 'Values Sweep',
         description: `Required for this package — ground-check riparian, cultural, wildlife, and visibility notes (${valuesSweep.notes[0]})`,
         value: 'values_sweep'
       });
     }
 
     const notebookTargets = getReconNotebookTargets(journey);
-    if (notebookTargets.length > 0 && journey.hoursRemaining >= 2) {
+    if (notebookTargets.length > 0) {
       const nextPackage = notebookTargets[0];
       primaryOptions.push({
-        label: 'Field Notebook (2h)',
+        label: 'Field Notebook',
         description: `Write up a visited block from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')}) — adds 2 scrutiny`,
         value: 'field_notebook'
       });
     }
 
-    if (currentBlock?.hasSupply && journey.hoursRemaining >= 2) {
+    if (currentBlock?.hasSupply) {
       primaryOptions.push({
-        label: 'Resupply (2h)',
-        description: 'Buy fuel, food, repairs, kits',
+        label: 'Resupply',
+        description: 'Run the day into the supply point: fuel, food, repairs, kits',
         value: 'resupply'
       });
     }
@@ -486,63 +487,56 @@ async function runFieldDay(game) {
     if (canTravel) {
       // Route selection happens only after the player commits to travel. This
       // keeps an unfinished package from paying a route-choice tax each shift.
+      // The paces are a wear-versus-coverage call now, not a time cost.
       primaryOptions.push({
-        label: 'Cautious Recon (4h)',
-        description: 'Travel onward: 60% pace, low risk',
+        label: 'Cautious Recon',
+        description: 'Travel onward: 60% pace, low risk, easy on the crew',
         value: 'slow'
       });
-      if (journey.hoursRemaining >= 5) {
-        primaryOptions.push({
-          label: 'Standard Recon (5h)',
-          description: 'Travel onward: 100% pace, normal risk',
-          value: 'normal'
-        });
-      }
-      if (journey.hoursRemaining >= 6) {
-        primaryOptions.push({
-          label: 'Extended Recon (6h)',
-          description: 'Travel onward: 140% pace, higher risk',
-          value: 'fast'
-        });
-      }
-      if (journey.hoursRemaining >= 8) {
-        primaryOptions.push({
-          label: 'Max Effort (8h)',
-          description: 'Travel onward: 180% pace, grueling',
-          value: 'grueling'
-        });
-      }
+      primaryOptions.push({
+        label: 'Standard Recon',
+        description: 'Travel onward: 100% pace, normal risk',
+        value: 'normal'
+      });
+      primaryOptions.push({
+        label: 'Extended Recon',
+        description: 'Travel onward: 140% pace, higher risk and more wear',
+        value: 'fast'
+      });
+      primaryOptions.push({
+        label: 'Max Effort',
+        description: 'Travel onward: 180% pace, grueling on crew and gear',
+        value: 'grueling'
+      });
     }
 
     // Camp actions (available anytime), one level down to keep the turn clean.
-    if (journey.hoursRemaining >= 2) {
-      if ((journey.resources.fuel || 0) >= 3) {
+    if ((journey.resources.fuel || 0) >= 3) {
       supportOptions.push({
-        label: 'Retrieve Cached Rations (2h)',
+        label: 'Retrieve Cached Rations',
         description: 'Detour to a marked emergency cache; restores food but uses fuel',
         value: 'food_cache'
       });
-      }
-      supportOptions.push({
-        label: 'Maintenance (2h)',
-        description: 'Repair equipment',
-        value: 'maintain'
-      });
     }
+    supportOptions.push({
+      label: 'Maintenance',
+      description: 'Spend the shift on the trucks, saws, and radios',
+      value: 'maintain'
+    });
 
     // Scouting (Phase 4.3)
-    if (journey.hoursRemaining >= 2 && journey.currentBlockIndex < journey.blocks.length - 1) {
+    if (journey.currentBlockIndex < journey.blocks.length - 1) {
       supportOptions.push({
-        label: 'Scout Ahead (2h)',
+        label: 'Scout Ahead',
         description: 'Reveal next block conditions',
         value: 'scout'
       });
     }
 
     const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
-    if (hasAnyInjured && journey.resources.firstAid > 0 && journey.hoursRemaining >= 1) {
+    if (hasAnyInjured && journey.resources.firstAid > 0) {
       supportOptions.push({
-        label: 'Triage (1h)',
+        label: 'Triage',
         description: 'Treat an injured crew member',
         value: 'triage'
       });
@@ -569,15 +563,15 @@ async function runFieldDay(game) {
     }
 
     primaryOptions.push({
-      label: 'Rest & End Shift',
-      description: 'Recover health/morale, end the day',
+      label: 'Stand Down',
+      description: 'Give the shift to the crew: recover health and morale, no ground gained',
       value: 'end_shift'
     });
 
     // Resolve the menu, drilling into the support submenu when chosen.
     let actionId = 'end_shift';
     while (true) {
-      const action = await ui.promptChoice(`${journey.hoursRemaining}h remaining:`, primaryOptions);
+      const action = await ui.promptChoice(dayPrompt(journey), primaryOptions);
       const chosen = action.value || 'end_shift';
       if (chosen === 'support_menu') {
         const sub = await ui.promptChoice('Camp & support:', [
@@ -600,9 +594,10 @@ async function runFieldDay(game) {
 
     // Process the chosen action
     if (actionId === 'end_shift') {
-      // End the shift early with rest benefits. This resolves the day, so the
-      // end-of-shift camp_work pass below must not fire a second time. The
-      // calendar advances once, after the loop, via endFieldDay().
+      // Standing down is a real use of the shift, not a leftover-time sweep.
+      // It resolves the day, so the end-of-shift camp_work pass below must
+      // not fire a second time. The calendar advances once, after the loop,
+      // via endFieldDay().
       const result = executeFieldAction(journey, 'resting');
       dayResolved = true;
       if (typeof ui.playScene === 'function') {
@@ -613,7 +608,7 @@ async function runFieldDay(game) {
       }
       ui.writeHeader('SHIFT CONSEQUENCES');
       writeFieldMessages(ui, result.messages);
-      journey.hoursRemaining = 0;
+      spendDay(journey);
       shiftState.dayResolved = true;
       shiftState.hasTraveled = hasTraveled;
       checkpointReconShift(game, shiftState, pendingEvent);
@@ -628,9 +623,9 @@ async function runFieldDay(game) {
         checkpointReconShift(game, shiftState, pendingEvent);
       }
       applyReconTravelIntelPenalty(ui, journey, currentBlock, actionId);
-      // Travel action — costs hours based on pace
-      const hoursCost = { slow: 4, normal: 5, fast: 6, grueling: 8 };
-      journey.hoursRemaining -= hoursCost[actionId];
+      // Travelling is the shift. Pace is what it costs the crew and the gear,
+      // not what it costs the clock.
+      spendDay(journey);
       const progressBefore = journey.totalDistance > 0
         ? journey.distanceTraveled / journey.totalDistance
         : 0;
@@ -707,35 +702,35 @@ async function runFieldDay(game) {
       displayReconBriefing(ui, journey);
       await ui.promptChoice('', [{ label: 'Back to work', value: 'next' }]);
     } else if (actionId === 'ground_truth') {
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       handleGroundTruthAccess(ui, journey, currentBlock);
       logReconAction(journey, 'Ground-truthed access', currentBlock?.name || 'Current block');
     } else if (actionId === 'values_sweep') {
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       handleValuesSweep(ui, journey, currentBlock);
       logReconAction(journey, 'Completed values sweep', currentBlock?.name || 'Current block');
     } else if (actionId === 'field_notebook') {
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       handleFieldNotebook(ui, journey);
       logReconAction(journey, 'Updated field notebook');
     } else if (actionId === 'food_cache') {
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       retrieveCachedRations(ui, journey);
       logReconAction(journey, 'Retrieved cached rations', `Food remaining: ${Math.round(journey.resources.food || 0)} person-days`);
     } else if (actionId === 'maintain') {
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       await handleMaintenance(game);
       logReconAction(journey, 'Maintained equipment', `Equipment: ${Math.round(journey.resources.equipment || 0)}%`);
     } else if (actionId === 'triage') {
-      journey.hoursRemaining -= 1;
+      spendDay(journey);
       await handleTriage(game);
       logReconAction(journey, 'Treated crew injuries', `First-aid kits remaining: ${journey.resources.firstAid || 0}`);
     } else if (actionId === 'resupply') {
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       await handleResupply(game, currentBlock);
       logReconAction(journey, 'Visited supply point', currentBlock?.name || 'Supply point');
     } else if (actionId === 'scout') {
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       handleScoutAhead(ui, journey);
       logReconAction(journey, 'Scouted the next block');
     }
@@ -760,7 +755,8 @@ async function runFieldDay(game) {
       await acknowledgeActionResult(ui, acknowledgedActions[actionId]);
     }
 
-    // If there are still hours, prompt between actions
+    settleDayPass(journey, freeChoices, ui);
+
   }
 
   // A held event that never met the trail finds the crew in camp instead.
@@ -795,7 +791,7 @@ async function runFieldDay(game) {
 
   ui.updateAllStatus(journey);
 
-  // Keep the completed shift's day, weather, hours, and location together on
+  // Keep the completed shift's day, weather, and location together on
   // screen. The next shift starts only after this acknowledgement.
   const nextBlock = journey.blocks[journey.currentBlockIndex];
   await ui.promptChoice('', [{
@@ -927,16 +923,18 @@ async function runRiverCrossingBeat(game, block) {
     const options = [
       { label: 'Ford it now', description: 'Take the channel as it stands', value: 'ford' },
     ];
-    if (!ctx.scouted && journey.hoursRemaining >= 2) {
+    // The crossing is part of the shift that walked into it, so its choices
+    // trade risk and gear rather than hours off a clock.
+    if (!ctx.scouted) {
       options.push({
-        label: 'Walk the line first (2h)',
+        label: 'Walk the line first',
         description: 'Probe the crossing on foot — halves the risk',
         value: 'scout',
       });
     }
-    if (ctx.canWinch && journey.hoursRemaining >= 3) {
+    if (ctx.canWinch) {
       options.push({
-        label: 'Rig a winch line (3h, fuel & gear)',
+        label: 'Rig a winch line (fuel & gear)',
         description: 'Slow and costly, but the water never gets a vote',
         value: 'winch',
       });
@@ -951,7 +949,6 @@ async function runRiverCrossingBeat(game, block) {
     ui.write('');
 
     if (choice.value === 'scout') {
-      journey.hoursRemaining = Math.max(0, journey.hoursRemaining - 2);
       const result = scoutCrossing(journey, ctx);
       for (const msg of result.messages) ui.write(msg);
       ui.write('');
@@ -959,7 +956,7 @@ async function runRiverCrossingBeat(game, block) {
     }
 
     if (choice.value === 'wait') {
-      journey.hoursRemaining = 0;
+      spendDay(journey);
       journey.pendingCrossing = block.id;
       ui.write('The crew makes camp on the near bank and listens to the water all night.');
       break;
@@ -967,7 +964,6 @@ async function runRiverCrossingBeat(game, block) {
 
     let result;
     if (choice.value === 'winch') {
-      journey.hoursRemaining = Math.max(0, journey.hoursRemaining - 3);
       result = winchCrossing(journey, ctx);
     } else {
       result = fordCrossing(journey, ctx);
@@ -1080,7 +1076,7 @@ export function updateReconMissionStatus(ui, journey) {
   const facts = [
     { label: 'Weather', value: journey.weather?.name || 'Clear' },
     { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
-    { label: 'Hours left', value: `${journey.hoursRemaining || 0}h` },
+    { label: 'Days left', value: Number.isFinite(journey.deadline) ? `${Math.max(0, journey.deadline - journey.day)}` : '—' },
     { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km` },
     { label: 'Reached', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` }
   ];
@@ -1362,20 +1358,15 @@ async function maybeHandleFoodDecision(game) {
     return;
   }
 
+
   const foodLevel = journey.resources.food || 0;
   const prompt = foodLevel <= FIELD_RESOURCES.food.critical
     ? 'Food stores are critically low. Decide how to handle the crew\'s meals.'
     : 'Food stores are running thin. Decide how to handle rations today.';
   const options = [];
 
-  if ((journey.hoursRemaining || 0) >= 2 && (journey.resources.fuel || 0) >= 3) {
-    options.push({
-      label: 'Retrieve Emergency Ration Cache (2h)',
-      description: 'Use two hours and a little fuel to recover sealed field rations',
-      value: 'cache'
-    });
-  }
-
+  // Setting the day's ration policy is a call, not a job. Actually going out
+  // to the cache is a shift's work and lives on the shift menu instead.
   options.push(
     {
       label: 'Keep Full Rations',
@@ -1391,16 +1382,6 @@ async function maybeHandleFoodDecision(game) {
 
   const choice = await ui.promptChoice(prompt, options);
   rations.lastDecisionDay = journey.day;
-
-  if (choice.value === 'cache') {
-    rations.mode = 'normal';
-    rations.shortRationStreak = 0;
-    journey.hoursRemaining = Math.max(0, (journey.hoursRemaining || 0) - 2);
-    ui.write('You spend the first part of the shift reaching the marked emergency cache before pushing deeper.');
-    retrieveCachedRations(ui, journey);
-    ui.write('');
-    return;
-  }
 
   if (choice.value === 'short') {
     rations.mode = 'short';

@@ -23,8 +23,12 @@
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border-color);
 
+  // On a phone the step already scrolls, and nesting a 200px scroller inside
+  // it showed two and a half areas of nine with the third sliced in half.
+  // Let the list flow into the step's own scroll instead.
   @include mobile-down {
-    max-height: 200px;
+    max-height: none;
+    overflow-y: visible;
   }
 }
 
@@ -58,6 +62,18 @@
   .muted {
     font-size: var(--font-size-xs);
     color: var(--fg-muted);
+  }
+}
+
+// Nine areas have to stay scannable on a phone. The blurb is the longest part
+// of a row and the detail pane repeats it in full, so clamp it in the list.
+.area-item-desc {
+  @include mobile-down {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
   }
 }
 
