@@ -402,6 +402,68 @@ function getTemptationProfileForAct(act) {
 // rather than a nag.
 const TEMPTATION_COOLDOWN_DAYS = 4;
 
+/**
+ * The shortcut, as an actual gamble.
+ *
+ * This option was labelled "(high risk)" and carried no roll at all: every
+ * shortcut in the 208-act library paid out, every time, at exactly its
+ * advertised price. The only thing that could go wrong was an unrelated injury
+ * side-roll. Crime paid at list price.
+ *
+ * Three bands, because "nobody noticed", "someone noticed" and "it became a
+ * file with your name on it" are genuinely different futures rather than three
+ * sizes of the same one:
+ *
+ *   clean   - the money, and it stays buried
+ *   noticed - the money, but it leaves a mark that draws attention afterwards
+ *   caught  - no money at all, and the file follows you
+ *
+ * The odds move on things the player controls, which is the point: a clean
+ * record and standing with people genuinely buy cover, and a run that has
+ * already been cutting corners stops getting the benefit of the doubt. That
+ * last one matters most — `seenActIds` already tracked prior shortcuts purely
+ * to avoid showing the same act twice. Now it is also the thing that hangs you.
+ */
+function buildShortcutOption({ act, gain, isDesk, profile, takeOutcome, takeEffects, takeRiskInjury }) {
+  const shown = Math.min(gain, isDesk ? gain : 1200);
+  const caughtEffects = isDesk
+    ? { compliance: -14, politicalCapital: -10, scrutiny: 22, reputation: -8 }
+    : { compliance: -12, crew_morale: -8, scrutiny: 20, reputation: -6 };
+  const noticedEffects = { ...takeEffects, scrutiny: Number(takeEffects.scrutiny || 0) + 8 };
+
+  return {
+    label: 'Take the shortcut',
+    // Clean band.
+    outcome: `${takeOutcome} Avoided costs leave $${shown.toLocaleString()} available in the budget, and nobody asks.`,
+    effects: takeEffects,
+    // Noticed band: the money still lands, but so does the attention.
+    partialOutcome: `${takeOutcome} The money is real. So is the fact that somebody wrote down what they saw.`,
+    partialEffects: noticedEffects,
+    // Caught band: the gain never arrives. That is the whole deterrent — a
+    // shortcut whose worst case still pays is not a gamble, it is a discount.
+    failureOutcome: act?.consequence
+      ? `It does not hold. ${String(act.consequence)}`
+      : 'It does not hold. The file lands on a desk that asks questions, and your name is on every page of it.',
+    failureEffects: caughtEffects,
+    chanceSuccess: 0.5,
+    chancePartial: 0.3,
+    oddsModifiers: [
+      // A dirty file gets less benefit of the doubt.
+      { when: 'scrutinyAbove:55', move: 0.15, from: 'good', to: 'bad' },
+      { when: 'scrutinyBelow:20', move: 0.10, from: 'bad', to: 'good' },
+      // People look the other way for someone they rate (desk lane).
+      { when: 'relationshipsAbove:70', move: 0.10, from: 'bad', to: 'good' },
+      // Doing it repeatedly is how people get caught.
+      { when: 'priorShortcuts:2', move: 0.10, from: 'good', to: 'partial' },
+      { when: 'priorShortcuts:4', move: 0.15, from: 'good', to: 'bad' },
+      { when: 'difficulty:hard', move: 0.10, from: 'good', to: 'bad' },
+      { when: 'difficulty:easy', move: 0.10, from: 'bad', to: 'good' },
+    ],
+    riskInjury: takeRiskInjury,
+    reactionTone: 'compromised'
+  };
+}
+
 function maybeCreateTemptationEvent(journey) {
   if (!Array.isArray(ILLEGAL_ACTS) || ILLEGAL_ACTS.length === 0) {
     return null;
@@ -473,13 +535,7 @@ function maybeCreateTemptationEvent(journey) {
         outcome: 'You walk away. It keeps the run boring, but safe.',
         effects: refuseEffects
       },
-      {
-        label: 'Take the shortcut (high risk)',
-        outcome: `${takeOutcome} Avoided costs leave $${Math.min(gain, isDesk ? gain : 1200).toLocaleString()} available in the budget.`,
-        effects: takeEffects,
-        riskInjury: takeRiskInjury,
-        reactionTone: 'compromised'
-      },
+      buildShortcutOption({ act, gain, isDesk, profile, takeOutcome, takeEffects, takeRiskInjury }),
       {
         label: 'Document and report',
         outcome: 'You put it in writing. It takes time, but strengthens your position.',

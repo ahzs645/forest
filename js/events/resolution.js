@@ -9,6 +9,7 @@ import { syncBlocksFromDistance } from '../journey/blockNav.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
 import { buildEventReaction } from './reactions.js';
+import { resolveOutcomeBand } from './odds.js';
 /**
  * Ceiling on how much ground a single day's trouble can cost a field crew.
  * Event content still rates delays on the retired eight-hour scale; this
@@ -66,13 +67,13 @@ export function resolveEvent(journey, event, option) {
   const messages = [];
   const scrutinyBefore = Number(journey.scrutiny || 0);
 
-  // Gamble options: roll once, then use the resolved branch throughout
-  let outcome = option.outcome;
-  let effects = option.effects;
-  if (typeof option.chanceSuccess === 'number' && Math.random() >= option.chanceSuccess) {
-    outcome = option.failureOutcome || outcome;
-    effects = option.failureEffects || effects;
-  }
+  // Gamble options: roll once against odds shifted by the state the player has
+  // actually built (js/events/odds.js), then use the resolved band throughout.
+  // Options with no chanceSuccess resolve to the good band, which is exactly
+  // what they did before this existed.
+  const resolved = resolveOutcomeBand(option, journey);
+  const outcome = resolved.outcome;
+  const effects = resolved.effects;
 
   if (outcome) {
     messages.push(outcome);
@@ -82,8 +83,14 @@ export function resolveEvent(journey, event, option) {
     applyEventEffects(journey, effects, messages);
   }
 
+  // Band-specific crew consequences fire in addition to any the option always
+  // carries, so "you get away with it" and "someone gets hurt doing it" can be
+  // different futures rather than the same one at two sizes.
   if (option.crewEffect) {
     handleCrewEffect(journey, option.crewEffect, messages);
+  }
+  if (resolved.crewEffect) {
+    handleCrewEffect(journey, resolved.crewEffect, messages);
   }
 
   let injuryVictim = null;
