@@ -2534,7 +2534,35 @@
     "outcome": "A spare chain, two files, a peavey, and some wedges. The tarp is still waterproof. Great find.",
     "effects": {
      "equipment": 8
-    }
+    },
+    "failureOutcome": "Three days on, a trapper walks into camp with your tire tracks memorized. The gear goes back plus a case of food to settle it, and his account of company crews travels the valley ahead of you.",
+    "failureEffects": {
+     "food": -5,
+     "relationships": -5,
+     "reputation": -2,
+     "crew_morale": -2
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "season:winter",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Try to find the original owner",
@@ -2542,7 +2570,34 @@
     "effects": {
      "relationships": 4,
      "timeUsed": 1
-    }
+    },
+    "failureOutcome": "Two camps and a radio relay later, nobody claims it. The toolbox rides in the truck bed, still not yours, and the day is spent.",
+    "failureEffects": {
+     "timeUsed": 1,
+     "fuel": -2,
+     "crew_morale": -2
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:storm",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Leave it — could be someone's active cache",
@@ -2601,7 +2656,34 @@
     "effects": {
      "reputation": 10,
      "budget": -1500
-    }
+    },
+    "failureOutcome": "The outfit folds before Labour Day — two cancelled bookings and a van that was never paid for. The boardwalk grays half-built, and every coffee-row skeptic in the district now has their example of what protection pays.",
+    "failureEffects": {
+     "budget": -1500,
+     "reputation": -4,
+     "relationships": -2
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "season:spring",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "season:fall",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Decline politely",
@@ -2626,7 +2708,41 @@
     "effects": {
      "reputation": 5,
      "crew_morale": 3
-    }
+    },
+    "partialOutcome": "The moderates sign the tailgate map; the hardliners walk into the trees without a word. Within the week there are fresh spikes chalked on the haul road and someone glassing the block from the ridge.",
+    "partialEffects": {
+     "reputation": 3,
+     "progress": -3,
+     "scrutiny": 5
+    },
+    "failureOutcome": "Two days of talk end with the mediator packing up mid-sentence. The blockade is wider than it was Monday, a camera crew is due Thursday, and clearing it or conceding the grove are both uglier choices now.",
+    "failureEffects": {
+     "progress": -8,
+     "crew_morale": -4,
+     "timeUsed": 1
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:rain",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Call law enforcement to clear the blockade",
@@ -2636,7 +2752,36 @@
      "budget": -2000,
      "compliance": -8,
      "progress": 8
-    }
+    },
+    "failureOutcome": "An officer drags a grey-haired birdwatcher across the cattle guard on camera and the clip runs nationally by morning. A judge signs an interim injunction before the weekend — the grove is off-limits until the hearing, and your name is in the affidavit.",
+    "failureEffects": {
+     "reputation": -20,
+     "budget": -3000,
+     "compliance": -12,
+     "scrutiny": 15,
+     "progress": -6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -2802,7 +2947,41 @@
     "effects": {
      "equipment": -4,
      "crew_morale": -1
-    }
+    },
+    "failureOutcome": "The dreaded kilometre is worse than advertised. The lead truck drops to the frame in a rut and a leaf spring lets go coming out; half a day on the winch and you make camp late with the toolbox open.",
+    "failureEffects": {
+     "equipment": -12,
+     "fuel": -4,
+     "progress": -4,
+     "crew_morale": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -2890,7 +3069,35 @@
      "food": 15,
      "fuel": 10,
      "timeUsed": 1
-    }
+    },
+    "failureOutcome": "You pull the cover and the smell tells you first — windings, fried, no field fix. The hour is gone, the payment was contingent, and his clients fly into a dark camp with your name attached to the story.",
+    "failureEffects": {
+     "equipment": -2,
+     "timeUsed": 1,
+     "relationships": -3,
+     "crew_morale": -2
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.2,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Buy smoked meat ($120)",
