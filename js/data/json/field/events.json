@@ -573,6 +573,12 @@
       "from": "bad",
       "to": "partial"
      }
+    ],
+    "partialFlags": [
+     "bridge_condemned"
+    ],
+    "failureFlags": [
+     "bridge_condemned"
     ]
    },
    {
@@ -1098,6 +1104,9 @@
       "from": "bad",
       "to": "good"
      }
+    ],
+    "partialFlags": [
+     "crew_precedent_set"
     ]
    },
    {
@@ -2111,6 +2120,9 @@
       "from": "bad",
       "to": "good"
      }
+    ],
+    "failureFlags": [
+     "blocks_crossing"
     ]
    },
    {

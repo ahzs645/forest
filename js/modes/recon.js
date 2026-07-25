@@ -24,6 +24,7 @@ import {
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
 import { runDaySituation } from '../journey/daySituation.js';
+import { getCondemnedCrossingPenalty } from '../events/consequences.js';
 import { renderJourneyMap } from '../scene/areaMap.js';
 import {
   getCrossingContext,
@@ -1111,6 +1112,16 @@ async function runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent 
     checkpointReconShift(game, shiftState, pendingEvent);
   }
   applyReconTravelIntelPenalty(ui, journey, currentBlock, paceId);
+
+  // A crossing the crew broke behind them keeps costing. This is the standing
+  // half of a bad band that would otherwise have been a one-day bill
+  // (js/events/consequences.js).
+  const condemned = getCondemnedCrossingPenalty(journey);
+  if (condemned.fuel > 0 || condemned.equipment > 0) {
+    journey.resources.fuel = Math.max(0, journey.resources.fuel - condemned.fuel);
+    journey.resources.equipment = Math.max(0, journey.resources.equipment - condemned.equipment);
+    ui.writeWarning(`${condemned.note} Fuel -${condemned.fuel}, equipment -${condemned.equipment}.`);
+  }
 
   spendDay(journey);
   const progressBefore = journey.totalDistance > 0

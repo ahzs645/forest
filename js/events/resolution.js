@@ -10,6 +10,7 @@ import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
 import { buildEventReaction } from './reactions.js';
 import { resolveOutcomeBand } from './odds.js';
+import { applyConsequenceFlags, getCrewPrecedentMultiplier } from './consequences.js';
 /**
  * Ceiling on how much ground a single day's trouble can cost a field crew.
  * Event content still rates delays on the retired eight-hour scale; this
@@ -91,6 +92,12 @@ export function resolveEvent(journey, event, option) {
   }
   if (resolved.crewEffect) {
     handleCrewEffect(journey, resolved.crewEffect, messages);
+  }
+
+  // What the band leaves behind. This is what stops a bad outcome from being
+  // just a larger negative number (js/events/consequences.js).
+  if (Array.isArray(resolved.flags) && resolved.flags.length) {
+    applyConsequenceFlags(journey, resolved.flags, messages);
   }
 
   let injuryVictim = null;
@@ -288,10 +295,20 @@ function applyEventEffects(journey, effects, messages) {
   if (effects.crew_morale) {
     const active = (journey.crew || []).filter((m) => m.isActive);
     if (active.length > 0) {
+      // Paying one person to stay teaches the rest what leverage is worth, so
+      // later morale losses land harder. This is the delayed half of the bad
+      // band on crew_threatens_quit (js/events/consequences.js).
+      const precedent = getCrewPrecedentMultiplier(journey);
+      const delta = effects.crew_morale < 0
+        ? effects.crew_morale * precedent
+        : effects.crew_morale;
       for (const member of active) {
-        member.morale = Math.max(0, Math.min(100, member.morale + effects.crew_morale));
+        member.morale = Math.max(0, Math.min(100, member.morale + delta));
       }
       messages.push(effects.crew_morale > 0 ? 'Crew morale improved.' : 'Crew morale dropped.');
+      if (precedent > 1 && effects.crew_morale < 0) {
+        messages.push('It lands harder than it would have before the bonus.');
+      }
     } else if (journey.protagonist) {
       // Protagonist desk modes have no crew: morale maps to stress, the same
       // equivalence checkDeskEvent uses (avgMorale = 100 - stress).
