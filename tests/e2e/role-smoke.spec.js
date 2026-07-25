@@ -94,13 +94,18 @@ test('recce smoke exposes role-specific ground-truth actions', async ({ page }) 
 
   // Block intel renders as a mission-pane fact now, not a log line.
   await expect(page.locator('#mission-panel .mission-fact-label').filter({ hasText: 'Intel' })).toBeVisible();
+  // The outstanding block work is one option now ("Work the block", described
+  // by whichever step is actually outstanding) rather than a separate
+  // Ground-Truth Access / Values Sweep pair — see docs/day_as_situation.md.
   await resolveUntil(
     page,
-    async () => (await page.locator('#choices').textContent())?.includes('Ground-Truth Access') ?? false,
+    async () => (await page.locator('#choices').textContent())?.includes('Work the block') ?? false,
     2
   );
-  await expect(page.locator('#choices button').filter({ hasText: 'Ground-Truth Access' })).toBeVisible();
-  await page.locator('#choices button').filter({ hasText: 'Ground-Truth Access' }).click();
+  const workTheBlock = page.locator('#choices button').filter({ hasText: 'Work the block' });
+  await expect(workTheBlock).toBeVisible();
+  await expect(workTheBlock).toContainText('Access is unverified');
+  await workTheBlock.click();
   await expect(page.locator('#choices button').filter({ hasText: 'Acknowledge results and continue' })).toBeVisible();
   await page.locator('#choices button').filter({ hasText: 'Acknowledge results and continue' }).click();
   // Ground-truthing a block is the shift (js/journey/dayPlan.js), so the day

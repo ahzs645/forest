@@ -31,6 +31,8 @@ import {
   fordCrossing
 } from '../journey/riverCrossing.js';
 import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journey/blockNav.js';
+import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
+import { PACE_OPTIONS } from '../journey/constants.js';
 import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
 import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
 import { buildCampfireFrames } from '../scene/textmode/effects.js';
@@ -442,152 +444,141 @@ async function runFieldDay(game) {
     const blockIntel = getReconBlockIntel(journey, currentBlock);
     const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
 
-    displayDayHeader(ui, journey);
+    updateReconMissionStatus(ui, journey);
 
-    // The shift menu is split so each turn reads as a decision, not an audit:
-    //   primary  = the main work choices (travel / verify / notebook) + resupply
-    //   support  = camp upkeep and orientation, one level down behind "Camp & Support"
-    const primaryOptions = [];
-    const supportOptions = [];
+    // A quiet shift: nothing on the radio, so the crew's day is the player's
+    // to spend. This is where the old nine-item chore menu went — it is no
+    // longer the default shape of a day, it is what you do with a gift.
+    // Pace left this menu entirely: it is a carried setting now (Set the
+    // tempo, below), not four of nine slots asking the same question.
+    // Kept deliberately short. The point of moving to a card was to give the
+    // log pane back its screen: on a 390x844 phone the old nine-item list took
+    // 66% of the viewport and left the game seven rows. A list of twelve is
+    // not an improvement on a list of nine, so the outstanding block work
+    // collapses into one option, camp upkeep goes back behind one door, and
+    // the reference material lives in the card's free "More context".
+    const options = [];
 
-    if (currentBlock && !blockIntel.accessGroundTruthed) {
-      primaryOptions.push({
-        label: 'Ground-Truth Access',
-        description: 'Required for this package — access is unverified; inspect crossings, road condition, and approach risk',
+    const blockWorkPending = currentBlock && !blockIntel.accessGroundTruthed
+      ? 'access'
+      : currentBlock && valuesSweep.needed && !blockIntel.valuesSwept
+        ? 'values'
+        : null;
+
+    if (blockWorkPending === 'access') {
+      options.push({
+        label: 'Work the block',
+        description: 'Access is unverified — drive the spur, walk the crossings, log what the road actually is',
+        tag: 'SAFE',
         value: 'ground_truth'
+      });
+    } else if (blockWorkPending === 'values') {
+      options.push({
+        label: 'Work the block',
+        description: `Values still to sweep — ${valuesSweep.notes[0]}`,
+        tag: 'SAFE',
+        value: 'values_sweep'
       });
     }
 
-    if (currentBlock && valuesSweep.needed && !blockIntel.valuesSwept) {
-      primaryOptions.push({
-        label: 'Values Sweep',
-        description: `Required for this package — ground-check riparian, cultural, wildlife, and visibility notes (${valuesSweep.notes[0]})`,
-        value: 'values_sweep'
+    if (canTravel) {
+      const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
+      options.push({
+        label: `Move on to ${nextBlock?.name || 'the next block'}`,
+        description: `Cover ground at ${PACE_OPTIONS[getReconPace(journey)]?.name || 'Standard'} pace`,
+        value: 'travel'
       });
     }
 
     const notebookTargets = getReconNotebookTargets(journey);
     if (notebookTargets.length > 0) {
       const nextPackage = notebookTargets[0];
-      primaryOptions.push({
-        label: 'Field Notebook',
-        description: `Write up a visited block from notes and GPS marks (${nextPackage.block.name}: ${nextPackage.missing.join(', ')}) — adds 2 scrutiny`,
+      options.push({
+        label: 'Catch up the notebook',
+        description: `Close ${nextPackage.block.name} from notes and GPS marks — +2 scrutiny`,
+        tag: 'RISKY',
         value: 'field_notebook'
       });
     }
 
     if (currentBlock?.hasSupply) {
-      primaryOptions.push({
-        label: 'Resupply',
-        description: 'Run the day into the supply point: fuel, food, repairs, kits',
+      options.push({
+        label: 'Run into the supply point',
+        description: 'Fuel, food, repairs, kits',
         value: 'resupply'
       });
     }
 
-    if (canTravel) {
-      // Route selection happens only after the player commits to travel. This
-      // keeps an unfinished package from paying a route-choice tax each shift.
-      // The paces are a wear-versus-coverage call now, not a time cost.
-      primaryOptions.push({
-        label: 'Cautious Recon',
-        description: 'Travel onward: 60% pace, low risk, easy on the crew',
-        value: 'slow'
-      });
-      primaryOptions.push({
-        label: 'Standard Recon',
-        description: 'Travel onward: 100% pace, normal risk',
-        value: 'normal'
-      });
-      primaryOptions.push({
-        label: 'Extended Recon',
-        description: 'Travel onward: 140% pace, higher risk and more wear',
-        value: 'fast'
-      });
-      primaryOptions.push({
-        label: 'Max Effort',
-        description: 'Travel onward: 180% pace, grueling on crew and gear',
-        value: 'grueling'
-      });
-    }
-
-    // Camp actions (available anytime), one level down to keep the turn clean.
-    if ((journey.resources.fuel || 0) >= 3) {
-      supportOptions.push({
-        label: 'Retrieve Cached Rations',
-        description: 'Detour to a marked emergency cache; restores food but uses fuel',
-        value: 'food_cache'
-      });
-    }
-    supportOptions.push({
-      label: 'Maintenance',
-      description: 'Spend the shift on the trucks, saws, and radios',
-      value: 'maintain'
+    options.push({
+      label: 'Camp & crew',
+      description: 'Stand down, work on the gear, patch someone up, send a scout ahead',
+      value: 'camp_menu'
     });
 
-    // Scouting (Phase 4.3)
-    if (journey.currentBlockIndex < journey.blocks.length - 1) {
-      supportOptions.push({
-        label: 'Scout Ahead',
-        description: 'Reveal next block conditions',
-        value: 'scout'
-      });
-    }
+    // Free, and therefore never the day. The area map and the briefing moved
+    // into "More context" — reading your own reference material should not
+    // cost a slot on the decision list.
+    options.push({
+      label: 'Set the tempo',
+      description: `${PACE_OPTIONS[getReconPace(journey)]?.name || 'Standard'}, ${journey.rationPlan?.mode === 'short' ? 'short rations' : 'full rations'} (free)`,
+      value: 'set_tempo'
+    });
 
+    const campOptions = [
+      {
+        label: 'Stand down',
+        description: 'Give the shift to the crew: health and morale back, no ground gained',
+        value: 'end_shift'
+      },
+      {
+        label: 'Work on the gear',
+        description: 'A shift on the trucks, the saws, and the radios',
+        value: 'maintain'
+      }
+    ];
     const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
     if (hasAnyInjured && journey.resources.firstAid > 0) {
-      supportOptions.push({
-        label: 'Triage',
-        description: 'Treat an injured crew member',
+      campOptions.push({
+        label: 'Patch up the crew',
+        description: 'Treat whoever is carrying an injury',
         value: 'triage'
       });
     }
-
-    // Orientation is always free
-    supportOptions.push({
-      label: 'Consult the Area Map',
-      description: 'Plot the traverse, camps, and remaining blocks',
-      value: 'consult_map'
-    });
-    supportOptions.push({
-      label: 'Review the Briefing',
-      description: 'Access intel, area situation, and carry-forward notes',
-      value: 'briefing'
-    });
-
-    if (supportOptions.length > 0) {
-      primaryOptions.push({
-        label: 'Camp & Support ▸',
-        description: 'Cached rations, repairs, triage, scouting, map and briefing',
-        value: 'support_menu'
+    if (journey.currentBlockIndex < journey.blocks.length - 1) {
+      campOptions.push({
+        label: 'Send someone ahead',
+        description: 'Scout the next block before the crew commits to it',
+        value: 'scout'
+      });
+    }
+    if ((journey.resources.fuel || 0) >= 3 && (journey.resources.food || 0) <= FIELD_RESOURCES.food.warning) {
+      campOptions.push({
+        label: 'Go get the cache',
+        description: 'Detour to a marked emergency cache; restores food, costs fuel',
+        value: 'food_cache'
       });
     }
 
-    primaryOptions.push({
-      label: 'Stand Down',
-      description: 'Give the shift to the crew: recover health and morale, no ground gained',
-      value: 'end_shift'
+    let actionId = await presentDayCard(ui, {
+      dayHeader: buildReconDayHeader(journey),
+      statusLine: buildReconStatusLine(journey),
+      label: 'QUIET SHIFT',
+      title: buildQuietShiftTitle(journey),
+      body: buildQuietShiftBody(journey),
+      context: buildReconContextLines(journey),
+      prompt: dayPrompt(journey),
+      options,
+      onRender: () => { maybeSpeakCrew(ui, journey); },
     });
 
-    // Resolve the menu, drilling into the support submenu when chosen.
-    let actionId = 'end_shift';
-    while (true) {
-      const action = await ui.promptChoice(dayPrompt(journey), primaryOptions);
-      const chosen = action.value || 'end_shift';
-      if (chosen === 'support_menu') {
-        const sub = await ui.promptChoice('Camp & support:', [
-          ...supportOptions,
-          { label: 'Back', description: 'Return to the main shift menu', value: 'support_back' }
-        ]);
-        const subChoice = sub.value || 'support_back';
-        if (subChoice === 'support_back') {
-          displayDayHeader(ui, journey);
-          continue;
-        }
-        actionId = subChoice;
-        break;
-      }
-      actionId = chosen;
-      break;
+    if (actionId === 'camp_menu') {
+      const camp = await ui.promptChoice('Camp & crew:', [
+        ...campOptions,
+        { label: 'Back', description: 'Return to the shift', value: 'camp_back' }
+      ]);
+      // Backing out is a free look-up, not a spent shift; settleDayPass below
+      // counts it against FREE_LOOKUPS_PER_DAY so the loop cannot spin.
+      actionId = camp.value === 'camp_back' ? 'noop' : (camp.value || 'noop');
     }
 
     ui.write('');
@@ -616,13 +607,17 @@ async function runFieldDay(game) {
       break;
     }
 
-    if (['slow', 'normal', 'fast', 'grueling'].includes(actionId)) {
+    if (actionId === 'travel') {
+      // The pace is the standing order the player already set; the route is
+      // the one call worth making at the moment of leaving, because it is the
+      // only one that depends on what is actually ahead. It used to be asked
+      // *after* the player had already committed to an intensity.
+      const paceId = getReconPace(journey);
       if (journey.routePlan?.day !== journey.day) {
-        displayDayHeader(ui, journey);
         await maybePromptRouteChoice(game, currentBlock);
         checkpointReconShift(game, shiftState, pendingEvent);
       }
-      applyReconTravelIntelPenalty(ui, journey, currentBlock, actionId);
+      applyReconTravelIntelPenalty(ui, journey, currentBlock, paceId);
       // Travelling is the shift. Pace is what it costs the crew and the gear,
       // not what it costs the clock.
       spendDay(journey);
@@ -630,7 +625,7 @@ async function runFieldDay(game) {
         ? journey.distanceTraveled / journey.totalDistance
         : 0;
       const blockIndexBefore = journey.currentBlockIndex;
-      const result = executeFieldAction(journey, actionId);
+      const result = executeFieldAction(journey, paceId);
       dayResolved = true;
 
       const progressAfter = journey.totalDistance > 0
@@ -639,8 +634,8 @@ async function runFieldDay(game) {
       const stripCtx = {
         weatherId: journey.weather?.id,
         terrain: currentBlock?.terrain,
-        pace: actionId,
-        wildlife: pickTrailWildlife(journey, actionId),
+        pace: paceId,
+        wildlife: pickTrailWildlife(journey, paceId),
         seed: journey.day * 31 + journey.currentBlockIndex,
       };
 
@@ -695,12 +690,8 @@ async function runFieldDay(game) {
       ui.updateAllStatus(journey);
       checkpointReconShift(game, shiftState, pendingEvent);
       await acknowledgeActionResult(ui, 'Travel');
-    } else if (actionId === 'consult_map') {
-      handleConsultMap(ui, journey);
-      await ui.promptChoice('', [{ label: 'Fold the map', value: 'next' }]);
-    } else if (actionId === 'briefing') {
-      displayReconBriefing(ui, journey);
-      await ui.promptChoice('', [{ label: 'Back to work', value: 'next' }]);
+    } else if (actionId === 'set_tempo') {
+      await handleSetTempo(ui, journey);
     } else if (actionId === 'ground_truth') {
       spendDay(journey);
       handleGroundTruthAccess(ui, journey, currentBlock);
@@ -1125,6 +1116,188 @@ export function updateReconMissionStatus(ui, journey) {
   return status;
 }
 
+/** Paces the player can carry. Ordered easiest-first for the tempo prompt. */
+const RECON_PACE_IDS = ['slow', 'normal', 'fast', 'grueling'];
+
+/**
+ * The crew's carried pace.
+ *
+ * Pace used to be four of the nine daily menu items — the same verb at four
+ * intensities, asked again every shift, and asked *before* the route ahead was
+ * described. It is a standing order now: set once, changed when the country or
+ * the crew changes, the way Oregon Trail has always done it.
+ */
+function getReconPace(journey) {
+  const carried = journey.paceSetting || journey.pace;
+  return RECON_PACE_IDS.includes(carried) ? carried : 'normal';
+}
+
+/**
+ * Change the carried pace and ration policy. Free — setting a standing order
+ * is not how a shift gets spent — so it returns without touching the day.
+ */
+async function handleSetTempo(ui, journey) {
+  const current = getReconPace(journey);
+  const paceChoice = await ui.promptChoice('Standing order for the crew:', [
+    ...RECON_PACE_IDS.map((id) => ({
+      label: `${PACE_OPTIONS[id].name}${id === current ? ' (current)' : ''}`,
+      description: `${Math.round(PACE_OPTIONS[id].distanceMultiplier * 100)}% coverage - ${PACE_OPTIONS[id].description.toLowerCase()}`,
+      value: id,
+    })),
+    { label: 'Leave it', description: 'Keep the current standing order', value: 'keep' },
+  ]);
+
+  if (paceChoice.value !== 'keep') {
+    journey.paceSetting = paceChoice.value;
+    ui.write(`Standing order: ${PACE_OPTIONS[paceChoice.value].name}.`);
+  }
+
+  const rations = ensureRationPlan(journey);
+  const rationChoice = await ui.promptChoice('Rations:', [
+    {
+      label: `Full rations${rations.mode !== 'short' ? ' (current)' : ''}`,
+      description: 'Normal draw on food; the crew holds up better',
+      value: 'normal',
+    },
+    {
+      label: `Short rations${rations.mode === 'short' ? ' (current)' : ''}`,
+      description: '65% portions; stretches the food, the crew feels it',
+      value: 'short',
+    },
+  ]);
+
+  if (rationChoice.value === 'short' && rations.mode !== 'short') {
+    rations.mode = 'short';
+    rations.shortRationStreak = Number(rations.shortRationStreak || 0) + 1;
+    ui.writeWarning('Short rations ordered.');
+  } else if (rationChoice.value === 'normal' && rations.mode === 'short') {
+    rations.mode = 'normal';
+    rations.shortRationStreak = 0;
+    ui.write('Back on full rations.');
+  }
+}
+
+/** An occasional voice from the crew — not a daily ritual. */
+function maybeSpeakCrew(ui, journey) {
+  const activeCrew = journey.crew.filter((m) => m.isActive);
+  if (activeCrew.length === 0 || Math.random() >= 0.35) return;
+  const speaker = activeCrew[Math.floor(Math.random() * activeCrew.length)];
+  const comment = getCrewComment(speaker, journey);
+  if (comment) ui.write(comment);
+}
+
+/**
+ * A quiet shift still needs to read like a morning, not like a form. The title
+ * and body come off the actual state so two quiet days in different weather at
+ * different points in the season do not open with identical text.
+ */
+function buildQuietShiftTitle(journey) {
+  const weather = normalizeReconToken(journey.weather?.id);
+  if (weather === 'rain' || weather === 'drizzle') return 'A WET START';
+  if (weather === 'snow' || weather === 'heavy_snow') return 'SNOW ON THE TRUCKS';
+  if (weather === 'fog') return 'SOCKED IN';
+  if (weather === 'heat' || weather === 'heat_dome') return 'ALREADY HOT AT SEVEN';
+  if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.warning) return 'THIN IN THE FOOD BOX';
+  if (journey.crew.some((m) => m.isActive && m.health < 60)) return 'A SLOW MORNING IN CAMP';
+  return 'NOTHING ON THE RADIO';
+}
+
+function buildQuietShiftBody(journey) {
+  const currentBlock = journey.blocks[journey.currentBlockIndex];
+  const openHere = currentBlock ? !getReconBlockIntel(journey, currentBlock).assessmentComplete : false;
+  const daysLeft = Number.isFinite(journey.deadline) ? Math.max(0, journey.deadline - journey.day) : null;
+
+  const parts = ['The radio stays quiet through breakfast. Whatever today is, it is yours to decide.'];
+  if (openHere) {
+    parts.push(`${currentBlock.name} is still open in the file.`);
+  }
+  if (daysLeft !== null && daysLeft <= 5) {
+    parts.push(`The season closes in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.`);
+  }
+  return parts.join(' ');
+}
+
+/**
+ * The day card's header line: which shift, and where the crew is standing.
+ */
+function buildReconDayHeader(journey) {
+  const currentBlock = journey.blocks[journey.currentBlockIndex];
+  return `SHIFT ${journey.day} - ${currentBlock?.name || 'Unknown Territory'}`;
+}
+
+/**
+ * The drumbeat under the header: weather, how far to the next named place,
+ * how much season is left, and what is in the truck. One row, because on a
+ * phone the card body is competing with the option list for the same pixels
+ * (docs/day_as_situation.md section 4).
+ */
+function buildReconStatusLine(journey) {
+  const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
+  const segments = [journey.weather?.name || 'Clear'];
+
+  if (nextBlock) {
+    const segment = getCurrentSegmentLength(journey.blocks, journey.currentBlockIndex);
+    const into = getDistanceIntoCurrentSegment(journey);
+    segments.push(`${Math.max(0, segment - into).toFixed(1)} km to ${nextBlock.name}`);
+  } else {
+    segments.push('final block');
+  }
+
+  if (Number.isFinite(journey.deadline)) {
+    const left = Math.max(0, journey.deadline - journey.day);
+    segments.push(`${left} day${left === 1 ? '' : 's'} left`);
+  }
+
+  segments.push(`food ${Math.round(journey.resources.food || 0)}`);
+  segments.push(`fuel ${Math.round(journey.resources.fuel || 0)}`);
+
+  return formatStatusLine(segments);
+}
+
+/**
+ * Reference material, free and behind "More context": the block strip, the
+ * traverse total, and whatever the last shift left on the table. This used to
+ * be printed into the log every single day, where it pushed the actual
+ * decision off a seven-row pane.
+ */
+function buildReconContextLines(journey) {
+  const lines = [buildBlockMap(journey), '* supply point'];
+  lines.push(`Traverse: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`);
+  lines.push(`Packages: ${journey.blocksAssessed || 0}/${journey.blocks?.length || 0} finalized`);
+
+  // The briefing used to cost a slot on the decision list. It is reference
+  // material, so it belongs here, behind the card's free "More context".
+  const currentBlock = journey.blocks[journey.currentBlockIndex];
+  const verdict = getDisplayedAccessVerdict(journey, currentBlock);
+  lines.push(formatAccessVerdict(verdict));
+  const infrastructure = formatInfrastructureStatus(verdict);
+  if (infrastructure) lines.push(infrastructure);
+
+  const scrutinyValue = Number(journey.scrutiny ?? journey.heat ?? 0);
+  if (Number.isFinite(scrutinyValue)) {
+    lines.push(`Scrutiny: ${Math.round(Math.max(0, scrutinyValue))}%`);
+  }
+  const areaSituation = getAreaSituationSummary(journey);
+  if (areaSituation) lines.push(`Area: ${areaSituation}`);
+  const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'recce', 2);
+  if (discoveryNotes.length > 0) lines.push(`Carry-forward: ${discoveryNotes.join(' | ')}`);
+
+  // The Braille area map, likewise: a set piece worth looking at, not worth a
+  // slot competing with "move on".
+  const mapFrame = renderJourneyMap(journey);
+  if (mapFrame) {
+    lines.push('-- area map --');
+    for (const row of String(mapFrame).split('\n')) lines.push(row);
+  }
+
+  if (Array.isArray(journey.lastActionRecap) && journey.lastActionRecap.length) {
+    lines.push('-- last leg --');
+    for (const line of journey.lastActionRecap) lines.push(line);
+  }
+
+  return lines.filter(Boolean);
+}
+
 /**
  * Display compact day header with status (Phase 6.2)
  */
@@ -1172,56 +1345,6 @@ function displayDayHeader(ui, journey) {
   }
 }
 
-/**
- * The long-form picture, on demand: intel, situation, plans, carry-forward
- */
-function displayReconBriefing(ui, journey) {
-  const currentBlock = journey.blocks[journey.currentBlockIndex];
-
-  ui.write('');
-  ui.writeHeader('FIELD BRIEFING');
-
-  const currentAccessVerdict = getDisplayedAccessVerdict(journey, currentBlock);
-  ui.write(formatAccessVerdict(currentAccessVerdict));
-  const currentInfrastructureLine = formatInfrastructureStatus(currentAccessVerdict);
-  if (currentInfrastructureLine) {
-    ui.write(currentInfrastructureLine);
-  }
-
-  const routeText = journey.routePlan ? `${journey.routePlan.label}` : 'Route undecided';
-  const rationText = journey.rationPlan?.mode === 'short'
-    ? `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
-    : 'Full rations';
-  ui.write(`Route: ${routeText} | Rations: ${rationText}`);
-
-  const blockIntel = getReconBlockIntel(journey, currentBlock);
-  const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
-  const accessIntelLabel = blockIntel.accessGroundTruthed ? 'ground-truthed' : 'unverified';
-  const valuesIntelLabel = valuesSweep.needed
-    ? (blockIntel.valuesSwept ? 'swept' : 'pending')
-    : 'quiet';
-  ui.write(`Current Intel: access ${accessIntelLabel} | values ${valuesIntelLabel}`);
-  ui.write(`Assessment: ${journey.blocksAssessed || 0}/${journey.blocks?.length || 0} blocks verified`);
-
-  const openPackages = getReconOpenPackages(journey);
-  if (openPackages.length > 0) {
-    const nextPackage = openPackages[0];
-    ui.write(`Field Notebook: ${nextPackage.block.name} needs ${nextPackage.missing.join(' + ')}`);
-  }
-
-  const scrutinyValue = Number(journey.scrutiny ?? journey.heat ?? 0);
-  if (Number.isFinite(scrutinyValue)) {
-    ui.write(`Scrutiny / Heat: ${Math.round(Math.max(0, scrutinyValue))}%`);
-  }
-  const areaSituation = getAreaSituationSummary(journey);
-  if (areaSituation) {
-    ui.write(`Area Situation: ${areaSituation}`);
-  }
-  const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'recce', 2);
-  if (discoveryNotes.length > 0) {
-    ui.write(`Carry-forward: ${discoveryNotes.join(' | ')}`);
-  }
-}
 
 /**
  * Build ASCII block progress map (Phase 5.4)
@@ -1853,19 +1976,3 @@ function retrieveCachedRations(ui, journey) {
 
 
 
-/**
- * Render the Braille area map of the traverse
- * @param {Object} ui - TerminalUI instance
- * @param {Object} journey - Journey state
- */
-function handleConsultMap(ui, journey) {
-  const frame = renderJourneyMap(journey);
-  if (!frame) {
-    ui.write('The map tube is empty. Someone left the area map at the office.');
-    return;
-  }
-  ui.write('');
-  ui.writeHeader('AREA MAP');
-  ui.writeBox(frame);
-  ui.write('You trace the route with a finger and feel better about where you stand.', 'term-dim');
-}

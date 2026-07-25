@@ -106,48 +106,65 @@ function reconPolicy(journey, options, prompt) {
   const hurting = crew.filter((member) => member.isActive && member.health < 45).length;
   const food = journey.resources?.food ?? 0;
   const equipment = journey.resources?.equipment ?? 100;
-  const atShiftMenu = options.some((option) => option.value === 'end_shift');
-  const inSupportMenu = options.some((option) => option.value === 'support_back');
+  // The quiet-shift card is the only prompt carrying 'set_tempo'. Detect on
+  // that rather than on 'end_shift', which lives in the camp submenu now.
+  const atQuietCard = options.some((option) => option.value === 'set_tempo');
 
-  // The camp submenu. Never back out empty-handed: the shift menu would just
-  // send us straight back in and the run would spin instead of simulating.
-  if (inSupportMenu) {
+  // The camp & crew submenu. Never back out empty-handed: the quiet card
+  // would send us straight back in and the run would spin instead of
+  // simulating.
+  if (options.some((option) => option.value === 'camp_back')) {
     const wanted = [];
+    // A crew that is falling over needs the shift off, not a kit. Standing
+    // down is the only action that restores health and morale together, and
+    // triage is gated on first-aid kits that a long run has usually spent.
+    if (hurting >= 2) wanted.push('end_shift', 'triage');
+    else if (hurting >= 1) wanted.push('triage', 'end_shift');
     if (food <= 12) wanted.push('food_cache');
-    if (hurting >= 1) wanted.push('triage');
-    wanted.push('maintain', 'food_cache', 'triage', 'scout');
+    if (equipment <= 30) wanted.push('maintain');
+    wanted.push('maintain', 'triage', 'food_cache', 'scout', 'end_shift');
     return pick(options, wanted) || options[0];
   }
 
-  // Ration policy: short rations the moment the pantry is thin.
-  if (!atShiftMenu && options.some((option) => option.value === 'full')) {
-    return pick(options, food <= 15 ? ['short', 'full'] : ['full', 'short']);
-  }
-
-  // Other sub-prompts (route, crossing, resupply) — prefer the safe line.
-  if (!atShiftMenu) {
-    const sub = pick(options, ['detour', 'mainline', 'scout', 'ford', 'rations', 'done', 'cancel', 'next', 'continue']);
+  if (!atQuietCard) {
+    // Ration policy: short rations only when the pantry is genuinely thin.
+    // Two prompts ask this with different vocabularies - the forced low-food
+    // beat offers full/short, the voluntary tempo prompt offers normal/short -
+    // so resolve which word means "feed them properly" before picking, or the
+    // fallback silently starves the crew on every single day.
+    if (options.some((option) => option.value === 'short')) {
+      const generous = options.some((option) => option.value === 'full') ? 'full' : 'normal';
+      return pick(options, food <= 15 ? ['short', generous] : [generous, 'short']);
+    }
+    // Route, crossing, resupply, acknowledgements — prefer the safe line.
+    const sub = pick(options, [
+      'detour', 'mainline', 'scout', 'ford', 'keep',
+      'rations', 'done', 'cancel', 'lean', 'skip', 'next', 'continue'
+    ]);
     if (sub) return sub;
+    // An authored event card: options are numeric indices, so there is no
+    // vocabulary to match on. Take the first, which is the authored default.
+    return options[0];
   }
 
   // A crew that is falling over covers no ground; recovering is the work.
-  if (hurting >= 2) {
-    const care = pick(options, ['end_shift']);
+  // Stand down, triage, maintenance and the ration cache all sit behind
+  // 'camp_menu' now, so upkeep means opening that door.
+  if (hurting >= 1 || equipment <= 30) {
+    const care = pick(options, ['camp_menu']);
     if (care) return care;
   }
   if (food <= 12) {
-    const feed = pick(options, ['resupply', 'support_menu']);
+    const feed = pick(options, ['resupply', 'camp_menu']);
     if (feed) return feed;
   }
-  if (equipment <= 30) {
-    const fix = pick(options, ['support_menu']);
-    if (fix) return fix;
-  }
 
-  // Otherwise: finish the package under foot, then move on.
+  // Otherwise: finish the package under foot, then cover ground. Never picks
+  // the free options (set_tempo, consult_map, briefing) — a policy that did
+  // would spin the day against FREE_LOOKUPS_PER_DAY instead of simulating.
   return pick(options, [
-    'ground_truth', 'values_sweep', 'field_notebook',
-    'normal', 'slow', 'fast', 'end_shift', 'next', 'continue'
+    'ground_truth', 'values_sweep', 'travel', 'field_notebook',
+    'end_shift', 'next', 'continue'
   ]);
 }
 
