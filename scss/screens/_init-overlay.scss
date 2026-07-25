@@ -84,6 +84,9 @@
 
   @include mobile-down {
     padding: var(--space-md);
+    // The sticky step footer sits at the bottom of this scrollport; any bottom
+    // padding here becomes a strip below it where scrolling rows show through.
+    padding-bottom: 0;
   }
 }
 
@@ -200,7 +203,11 @@
   padding-bottom: var(--space-xs);
 
   @include mobile-down {
-    padding-top: var(--space-xs);
+    // Same bleed as .init-footer-actions: .init-content drops its bottom
+    // padding on mobile, so this bar has to cover the frame edge to edge.
+    margin-inline: calc(-1 * var(--space-md));
+    padding: var(--space-xs) var(--space-md) var(--space-sm);
+    background: var(--surface);
   }
 }
 
@@ -221,12 +228,26 @@
   background: var(--surface-inset);
   padding-bottom: var(--space-sm);
 
+  // Sticky on a phone means this bar is permanently on screen, so it has to
+  // stay short: the two ghost lookups share a row and only the CTA gets its
+  // own. Stacking all three cost ~165px of a 844px screen.
   @include mobile-down {
-    flex-direction: column;
-    gap: var(--space-sm);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-xs);
+    // Bleed to the frame edges so nothing scrolls past it in the gutters.
+    margin-inline: calc(-1 * var(--space-md));
+    padding: var(--space-xs) var(--space-md) var(--space-sm);
+    background: var(--surface);
 
     .init-primary {
+      grid-column: 1 / -1;
       width: 100%;
+    }
+
+    .init-ghost {
+      width: 100%;
+      justify-content: center;
     }
   }
 }

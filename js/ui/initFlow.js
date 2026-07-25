@@ -562,7 +562,7 @@ export const InitFlowMixin = {
         <div class="area-number">[${String(index + 1).padStart(2, '0')}]</div>
         <div>
           <strong>${area.name}</strong>
-          <div class="muted">${area.description}</div>
+          <div class="muted area-item-desc">${area.description}</div>
           <div class="muted">${selectionLine}</div>
         </div>
       `;

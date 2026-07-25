@@ -13,36 +13,48 @@
 // Mobile
 @include mobile-down {
   .header-btn {
-    font-size: var(--font-size-xs);
-    padding: 2px 6px;
+    font-size: var(--font-size-sm);
+    padding: 2px var(--space-xs);
+    flex-shrink: 0;
   }
 
-  // Keep the classic header to two compact rows: title strip, then a
-  // single horizontally-scrollable action row instead of a tall wrap.
-  .header-actions {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    width: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-
-    .header-btn {
-      flex-shrink: 0;
-    }
-  }
-
+  // The status strip has to fit four stats in ~390px. An equal-width grid
+  // keeps the last one clear of the edge; the │ rules go, since the columns
+  // already separate the stats and the separators were the overflow.
   .status-bar {
-    padding: 0 var(--space-sm);
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     height: auto;
     min-height: var(--status-bar-height);
-    flex-wrap: wrap;
-    row-gap: 2px;
-    padding-top: 2px;
-    padding-bottom: 2px;
+    padding: 2px var(--space-sm);
+    gap: var(--space-xs);
+    overflow-x: visible;
+  }
+
+  .status-item {
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+
+    // A │ glyph per gap is what overflowed the strip; a hairline rule reads
+    // the same and costs no width.
+    & + & {
+      padding-left: var(--space-xs);
+      border-left: 1px solid var(--border);
+    }
+
+    & + &::before {
+      content: none;
+    }
+  }
+
+  .status-label,
+  .status-value {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   // The main-menu quick-action row can't fit three labels side by side —
@@ -79,6 +91,40 @@
     min-height: 44px;
   }
 
+  // A phone can't afford a fixed 300px menu box: a ten-option shift menu
+  // overflowed it silently, leaving the last options invisible with no
+  // scrollbar to hint at them. Let the menu claim up to two thirds of the
+  // screen and take the space from the log, which is scrollable anyway.
+  .action-area {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 1;
+    min-height: 0;
+    max-height: 66dvh;
+  }
+
+  .choices {
+    max-height: none;
+    min-height: 0;
+    flex: 0 1 auto;
+  }
+
+  .terminal-window {
+    min-height: 5.5rem;
+  }
+
+  // Whatever still doesn't fit gets an explicit marker, so a cut-off menu
+  // never reads as the whole menu.
+  .action-area.has-more-choices::after {
+    content: '▼ more below';
+    display: block;
+    padding-top: 2px;
+    font-size: var(--font-size-xs);
+    color: var(--accent);
+    text-align: center;
+    flex-shrink: 0;
+  }
+
   .close-btn {
     display: flex;
   }
@@ -92,15 +138,8 @@
 // Small mobile
 @include small-down {
   .status-bar {
-    height: auto;
-    padding: var(--space-xs) var(--space-sm);
-    flex-wrap: wrap;
+    padding: 2px var(--space-xs);
     gap: var(--space-xs);
-  }
-
-  .status-item {
-    flex: 1;
-    min-width: 60px;
   }
 }
 

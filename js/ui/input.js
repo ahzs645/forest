@@ -197,6 +197,41 @@ export const InputMixin = {
     // Focus first button
     const firstBtn = this.choices.querySelector('.choice-btn, .decision-card');
     if (firstBtn) firstBtn.focus();
+
+    this._watchChoiceOverflow();
+  },
+
+  /**
+   * Flag a menu that is taller than the space it was given. On a phone the
+   * options list is capped and scrolls, and a silently cut-off menu reads as
+   * the whole menu — the marker (styled in responsive/_mobile.scss) says
+   * otherwise. Re-checked on scroll and resize while the menu is up.
+   * @private
+   */
+  _watchChoiceOverflow() {
+    if (!this.choices) return;
+
+    const sync = () => {
+      const list = this.choices;
+      const area = list?.closest('.action-area');
+      if (!area) return;
+      const overflowing = list.scrollHeight - list.clientHeight > 2;
+      const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 2;
+      area.classList.toggle('has-more-choices', overflowing && !atBottom);
+    };
+
+    if (!this._choiceOverflowSync) {
+      this._choiceOverflowSync = sync;
+      this.choices.addEventListener('scroll', () => this._choiceOverflowSync?.(), { passive: true });
+      window.addEventListener('resize', () => this._choiceOverflowSync?.());
+    } else {
+      this._choiceOverflowSync = sync;
+    }
+
+    sync();
+    // Fonts and scene mounts can still be settling on the frame the menu is
+    // built in; re-measure once the layout has landed.
+    requestAnimationFrame(sync);
   },
 
   /**
@@ -206,6 +241,7 @@ export const InputMixin = {
   _hideChoices() {
     if (this.choices) {
       this.choices.innerHTML = '';
+      this.choices.closest('.action-area')?.classList.remove('has-more-choices');
     }
     if (this.choicesHint) {
       this.choicesHint.hidden = true;

@@ -15,11 +15,18 @@
   gap: var(--space-sm);
   overflow: hidden;
 
+  // A phone has no room for a title strip plus six labelled actions. Keep the
+  // header to one row: the ▲ pennant stands in for the title and the actions
+  // collapse to their hotkeys, so every control stays on screen and tappable
+  // instead of scrolling out of reach.
+  // Touch devices grow .header-btn to a 44px tap target, so the strip has to
+  // be tall enough to hold one rather than clipping it.
   @include mobile-down {
     height: auto;
     min-height: var(--header-height);
-    flex-wrap: wrap;
-    padding: var(--space-xs) var(--space-sm);
+    flex-wrap: nowrap;
+    padding: 0 var(--space-xs);
+    gap: var(--space-xs);
   }
 }
 
@@ -39,6 +46,20 @@
   @include small-down {
     letter-spacing: 0;
   }
+
+  @include mobile-down {
+    flex-shrink: 0;
+
+    &::before {
+      content: '▲';
+    }
+  }
+}
+
+.header-title-text {
+  @include mobile-down {
+    display: none;
+  }
 }
 
 .header-actions {
@@ -49,5 +70,18 @@
 
   @include small-down {
     gap: 2px;
+  }
+
+  @include mobile-down {
+    flex: 1;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 0;
+  }
+}
+
+.header-btn-label {
+  @include mobile-down {
+    display: none;
   }
 }

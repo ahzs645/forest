@@ -5,6 +5,9 @@
 
 // Header button — plain hotkey text, TUI style: no box, inverse video on hover
 .header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -13,6 +16,7 @@
   padding: 2px var(--space-xs);
   cursor: pointer;
   transition: none;
+  white-space: nowrap;
 
   &:hover,
   &:focus-visible {
