@@ -124,6 +124,29 @@ const STEEP_EFFECT_THRESHOLDS = {
 };
 
 /**
+ * State an option's authored odds.
+ *
+ * A three-band option cannot be described by one percentage. "50% success
+ * odds" on a 50/32/18 split reads as a coin flip when in fact four times in
+ * five it does not go badly — which would make the honest number more
+ * frightening than the mechanic. Both ends get named instead.
+ *
+ * These are the authored base odds, before js/events/odds.js shifts them for
+ * the state of the run. Deliberately so: the shifts depend on things the
+ * player can see for themselves (a dirty file, a tired crew, weather), and
+ * quoting a live number here would turn every card into a spreadsheet.
+ * @param {Object} option
+ * @returns {string} empty when the option carries no roll
+ */
+function formatOddsHint(option) {
+  if (typeof option.chanceSuccess !== 'number') return '';
+  const good = Math.round(option.chanceSuccess * 100);
+  if (typeof option.chancePartial !== 'number') return `${good}% success odds`;
+  const bad = Math.max(0, 100 - good - Math.round(option.chancePartial * 100));
+  return `${good}% clean, ${bad}% badly wrong`;
+}
+
+/**
  * Generate a hint about an option's effects
  */
 function getOptionHint(option, journeyType) {
@@ -133,9 +156,7 @@ function getOptionHint(option, journeyType) {
   // whole corpus carrying chanceSuccess are also hiddenOutcome, the "% success
   // odds" hint was unreachable: the game rolled a number it could not show.
   if (option.hiddenOutcome) {
-    return typeof option.chanceSuccess === 'number'
-      ? `${Math.round(option.chanceSuccess * 100)}% success odds, outcome uncertain`
-      : 'Outcome uncertain';
+    return formatOddsHint(option) || 'Outcome uncertain';
   }
 
   const hints = [];
@@ -201,8 +222,9 @@ function getOptionHint(option, journeyType) {
     hints.push(`${riskPct}% injury risk`);
   }
 
-  if (typeof option.chanceSuccess === 'number') {
-    hints.push(`${Math.round(option.chanceSuccess * 100)}% success odds`);
+  const oddsHint = formatOddsHint(option);
+  if (oddsHint) {
+    hints.push(oddsHint);
   }
 
   // Managers have no hours mechanic — don't advertise a cost that never lands
@@ -233,11 +255,13 @@ function getOptionHint(option, journeyType) {
     }
   }
   if (option.schedulesEvent) hints.push('this comes back');
-  if (typeof option.riskCompliance === 'number') {
-    hints.push(`${Math.round(option.riskCompliance * 100)}% compliance blowback`);
-  }
-  if (typeof option.riskRejection === 'number') {
-    hints.push(`${Math.round(option.riskRejection * 100)}% rejection risk`);
+  // riskRejection is an alias, not a second mechanic: resolution.js:108 reads
+  // `option.riskCompliance ?? option.riskRejection` and both land the same
+  // compliance blowback. Advertising one of them as a "rejection risk" would
+  // promise the player a rejection the engine never delivers.
+  const complianceRisk = option.riskCompliance ?? option.riskRejection;
+  if (typeof complianceRisk === 'number') {
+    hints.push(`${Math.round(complianceRisk * 100)}% chance it comes back on you`);
   }
   if (option.effects?.scrutiny) {
     const value = option.effects.scrutiny;

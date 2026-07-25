@@ -1,0 +1,622 @@
+[
+  {
+    "eventId": "flat_tire",
+    "optionLabel": "Change it yourself (2 hours)",
+    "roll": false,
+    "why": "known purchasable cost: two hours of labor"
+  },
+  {
+    "eventId": "flat_tire",
+    "optionLabel": "Use the spare and continue",
+    "roll": true,
+    "bands": 2,
+    "why": "spare's condition and a hurried install are unseen; outcome text already hedges ('hope there are no more surprises')",
+    "badBandIdea": "the spare lets go an hour down the same sharp-rock road \u2014 now zero spares, you crawl the rest of the route and must detour for tires before the next block"
+  },
+  {
+    "eventId": "flat_tire",
+    "optionLabel": "Wait for help",
+    "roll": false,
+    "why": "known purchasable cost: spending half a day"
+  },
+  {
+    "eventId": "engine_trouble",
+    "optionLabel": "Field repair with spare parts",
+    "roll": true,
+    "bands": 3,
+    "why": "what's actually wrong inside the engine is unseen; whether the spares on hand cover it is the real question",
+    "badBandIdea": "it's not fixable in the field \u2014 the skidder is down for good until towed, and the parts you burned trying are gone; middle band is a patch that schedules another breakdown"
+  },
+  {
+    "eventId": "engine_trouble",
+    "optionLabel": "Limp to the next block slowly",
+    "roll": true,
+    "bands": 2,
+    "why": "whether a smoking engine survives the limp depends on the unseen fault",
+    "badBandIdea": "the engine seizes mid-route \u2014 dead machine blocking the road, tow needed from a far worse spot than camp"
+  },
+  {
+    "eventId": "engine_trouble",
+    "optionLabel": "Call for tow truck ($500)",
+    "roll": false,
+    "why": "known purchasable cost: $500 tow"
+  },
+  {
+    "eventId": "chainsaw_failure",
+    "optionLabel": "Swap to backup saw",
+    "roll": false,
+    "why": "known fallback with a fixed production cost"
+  },
+  {
+    "eventId": "chainsaw_failure",
+    "optionLabel": "Send runner for parts",
+    "roll": true,
+    "bands": 2,
+    "why": "whether a small-town dealer has the parts in stock is something the player cannot see before burning the fuel",
+    "badBandIdea": "the runner comes back empty-handed \u2014 days on the slow backup saw, production capped until a proper parts order arrives"
+  },
+  {
+    "eventId": "chainsaw_failure",
+    "optionLabel": "Try to straighten the bar",
+    "roll": true,
+    "bands": 2,
+    "why": "the outcome text itself hedges ('serviceable. Probably.') \u2014 a bent bar's temper is unseen",
+    "badBandIdea": "the bar cracks under the hammer \u2014 the good saw is scrap, you're down to the backup for the duration and must buy a replacement"
+  },
+  {
+    "eventId": "truck_stuck",
+    "optionLabel": "Winch it out with the skidder",
+    "roll": true,
+    "bands": 2,
+    "why": "what's under the mud and whether the anchor holds are unseen until the winch loads up",
+    "badBandIdea": "the skidder bogs in beside the truck \u2014 two machines stuck, nothing left to pull with, you wait for drier weather or outside help"
+  },
+  {
+    "eventId": "truck_stuck",
+    "optionLabel": "Dig and lay brush road",
+    "roll": false,
+    "why": "known purchasable cost: hours of labor that reliably works"
+  },
+  {
+    "eventId": "truck_stuck",
+    "optionLabel": "Leave it and walk out",
+    "roll": false,
+    "why": "refusal/walk-away with a fixed progress cost"
+  },
+  {
+    "eventId": "sudden_storm",
+    "optionLabel": "Take shelter immediately",
+    "roll": false,
+    "why": "known safe cost: shelter and lose the work"
+  },
+  {
+    "eventId": "sudden_storm",
+    "optionLabel": "Push through to the next block",
+    "roll": true,
+    "bands": 2,
+    "why": "racing lightning over a ridge \u2014 whether the storm catches you is exactly what you cannot know",
+    "badBandIdea": "a snag comes down across the road with the crew strung out \u2014 an injury and you're pinned in the open until it passes, sheltering anyway from the worst position"
+  },
+  {
+    "eventId": "sudden_storm",
+    "optionLabel": "Set up emergency camp",
+    "roll": false,
+    "why": "known purchasable cost: food and a paused day"
+  },
+  {
+    "eventId": "flash_flood",
+    "optionLabel": "Move to high ground immediately",
+    "roll": false,
+    "why": "known safe cost: lose the day, keep everything"
+  },
+  {
+    "eventId": "flash_flood",
+    "optionLabel": "Risk crossing now before it gets worse",
+    "roll": true,
+    "bands": 3,
+    "why": "the outcome text calls itself 'a gamble'; the channel under rising water is unseen",
+    "badBandIdea": "a truck swamps and washes sideways \u2014 drowned engine, you're back on the near bank with the water still rising; crossing blocked, camp and reroute (mirrors the creek sample); middle = truck stuck mid-channel, winched out, gear soaked but across"
+  },
+  {
+    "eventId": "flash_flood",
+    "optionLabel": "Camp on this side overnight",
+    "roll": false,
+    "why": "known purchasable cost: a lost day and food"
+  },
+  {
+    "eventId": "extreme_cold",
+    "optionLabel": "Keep vehicles running all night",
+    "roll": false,
+    "why": "known purchasable cost: fuel for warm engines"
+  },
+  {
+    "eventId": "extreme_cold",
+    "optionLabel": "Bundle up and wait it out",
+    "roll": true,
+    "bands": 2,
+    "why": "whether 'frostbite scares' become frostbite depends on gear and bodies the player can't audit at -30",
+    "badBandIdea": "a crew member takes real frostbite \u2014 fingers bandaged, out of work and possibly evacuated, you're short-handed into the cold snap"
+  },
+  {
+    "eventId": "extreme_cold",
+    "optionLabel": "Light a big warming fire",
+    "roll": false,
+    "why": "known purchasable cost: extra food for a warming fire"
+  },
+  {
+    "eventId": "bear_encounter",
+    "optionLabel": "Make noise and back away slowly",
+    "roll": true,
+    "bands": 2,
+    "why": "a food-conditioned bear's willingness to leave is genuinely unknowable from across the camp",
+    "badBandIdea": "she won't be moved \u2014 the cache is torn through and she's learned where dinner lives; food gutted and the camp has a returning bear problem to solve"
+  },
+  {
+    "eventId": "bear_encounter",
+    "optionLabel": "Use bear spray",
+    "roll": true,
+    "bands": 2,
+    "why": "spray at close range depends on wind and the bear's temperament, neither visible before committing",
+    "badBandIdea": "a gust turns the cloud back into your own crew \u2014 two people down coughing for the day while the bear finishes the cache anyway"
+  },
+  {
+    "eventId": "bear_encounter",
+    "optionLabel": "Fire a warning shot",
+    "roll": false,
+    "why": "warning shots reliably move black bears; the real price is the known compliance question"
+  },
+  {
+    "eventId": "grizzly_territory",
+    "optionLabel": "Post bear watch and continue",
+    "roll": true,
+    "bands": 2,
+    "why": "whether the sow comes through while you work is the whole gamble \u2014 she is the thing you cannot see",
+    "badBandIdea": "she shows up mid-shift \u2014 full pull-out under charge conditions, the block is off-limits until officers assess, and the crew won't work it again without convincing"
+  },
+  {
+    "eventId": "grizzly_territory",
+    "optionLabel": "Relocate operations for the day",
+    "roll": false,
+    "why": "known purchasable cost: relocate and eat the inefficiency"
+  },
+  {
+    "eventId": "grizzly_territory",
+    "optionLabel": "Report and request guidance",
+    "roll": false,
+    "why": "pure report/information option with a fixed delay"
+  },
+  {
+    "eventId": "moose_road",
+    "optionLabel": "Wait him out",
+    "roll": false,
+    "why": "known purchasable cost: wait him out"
+  },
+  {
+    "eventId": "moose_road",
+    "optionLabel": "Honk and inch forward",
+    "roll": true,
+    "bands": 2,
+    "why": "a bull moose's response to being crowded is genuinely unpredictable \u2014 the current fixed outcome already has him charging",
+    "badBandIdea": "the charge takes out the radiator \u2014 truck disabled on a bush road, repair or tow before anything else moves today"
+  },
+  {
+    "eventId": "moose_road",
+    "optionLabel": "Find an alternate route",
+    "roll": false,
+    "why": "known purchasable cost: the long way round"
+  },
+  {
+    "eventId": "caribou_herd",
+    "optionLabel": "Stop and watch respectfully",
+    "roll": false,
+    "why": "pure flavor with a fixed morale gain"
+  },
+  {
+    "eventId": "caribou_herd",
+    "optionLabel": "Radio ahead about the delay",
+    "roll": false,
+    "why": "pure information/report option"
+  },
+  {
+    "eventId": "caribou_herd",
+    "optionLabel": "Try to pass slowly",
+    "roll": true,
+    "bands": 2,
+    "why": "how a herd reacts to a truck pushing through is unseen, and caribou are watched animals",
+    "badBandIdea": "the herd panics into the ditch line and a wildlife officer's truck is parked at the junction watching \u2014 harassment complaint filed, compliance and relationships take the hit and the district starts paying attention to you"
+  },
+  {
+    "eventId": "worker_injury",
+    "optionLabel": "Apply first aid and continue",
+    "roll": true,
+    "bands": 2,
+    "why": "whether it's a sprain or a fracture is exactly what nobody on site can see",
+    "badBandIdea": "it's broken \u2014 by evening they can't bear weight; forced evacuation tomorrow having lost the day, the worker, and the crew's confidence in your judgment"
+  },
+  {
+    "eventId": "worker_injury",
+    "optionLabel": "Send them out for medical care",
+    "roll": false,
+    "why": "known safe cost: send them out, eat the fuel and progress"
+  },
+  {
+    "eventId": "worker_injury",
+    "optionLabel": "Have them rest in camp",
+    "roll": true,
+    "bands": 2,
+    "why": "the outcome text itself hedges ('Might be fine tomorrow')",
+    "badBandIdea": "the ankle balloons overnight \u2014 evac anyway with a day lost, and now the injury has a head start on healing wrong"
+  },
+  {
+    "eventId": "food_poisoning",
+    "optionLabel": "Rest day for the sick",
+    "roll": false,
+    "why": "known cost: rest the sick, work short-handed"
+  },
+  {
+    "eventId": "food_poisoning",
+    "optionLabel": "Push through anyway",
+    "roll": true,
+    "bands": 2,
+    "why": "how sick people perform around saws and machines is not knowable at morning muster",
+    "badBandIdea": "someone faints on the landing next to running equipment \u2014 a real injury on top of the illness, work stops, and the near-miss goes in the record"
+  },
+  {
+    "eventId": "food_poisoning",
+    "optionLabel": "Dispose of suspect food",
+    "roll": false,
+    "why": "known purchasable cost: throw out the food stores"
+  },
+  {
+    "eventId": "chainsaw_cut",
+    "optionLabel": "Call helicopter medevac",
+    "roll": false,
+    "why": "purchasable safety \u2014 the expensive, reliable choice should stay reliable"
+  },
+  {
+    "eventId": "chainsaw_cut",
+    "optionLabel": "Apply first aid and drive to hospital",
+    "roll": true,
+    "bands": 2,
+    "why": "whether a serious bleed stays controlled over hours of rough road is unseen when you choose the truck over the helicopter",
+    "badBandIdea": "they deteriorate en route \u2014 season-ending harm that the crew knows the helicopter would have prevented; morale craters and the incident review asks why you drove"
+  },
+  {
+    "eventId": "chainsaw_cut",
+    "optionLabel": "Treat on site and keep crews working",
+    "roll": true,
+    "bands": 3,
+    "why": "the outcome text already promises uncertainty ('shock and infection risk rise')",
+    "badBandIdea": "the wound goes septic \u2014 emergency medevac days later from a worse position, plus a WorkSafe file on why a severe laceration was treated with a bandage; middle = infection forces a planned evac in a few days, losing the worker anyway"
+  },
+  {
+    "eventId": "road_washout",
+    "optionLabel": "Build a bypass",
+    "roll": false,
+    "why": "known purchasable cost: a full day of labor for a working detour"
+  },
+  {
+    "eventId": "road_washout",
+    "optionLabel": "Report and wait for road crew",
+    "roll": false,
+    "why": "pure report-and-wait with a fixed two-day cost"
+  },
+  {
+    "eventId": "road_washout",
+    "optionLabel": "Try to ford the creek",
+    "roll": true,
+    "bands": 3,
+    "why": "the creek bottom at an unbuilt ford is the canonical unseen variable (mirrors the proposal's creek sample)",
+    "badBandIdea": "the truck drops a wheel through and takes water \u2014 drowned engine on the near side, the washout still uncrossed, and you now build the bypass anyway minus one truck; middle = across but hung up on boulders, undercarriage and hours lost"
+  },
+  {
+    "eventId": "bridge_questionable",
+    "optionLabel": "Test it on foot first",
+    "roll": true,
+    "bands": 3,
+    "why": "the event's own premise is 'uncertain if it will hold' and a foot test cannot prove truck-load capacity",
+    "badBandIdea": "it lets go under the first truck despite the foot test \u2014 box down on the cribbing, crossing finished, rest of the day on recovery and the long route from now on; middle = the walk reveals a cracked stringer, you condemn it yourself and reroute without losing a truck"
+  },
+  {
+    "eventId": "bridge_questionable",
+    "optionLabel": "Reinforce with fresh logs",
+    "roll": false,
+    "why": "known purchasable fix: an hour of cutting converts the risk into cost"
+  },
+  {
+    "eventId": "bridge_questionable",
+    "optionLabel": "Find another crossing",
+    "roll": false,
+    "why": "known purchasable cost: the long way round"
+  },
+  {
+    "eventId": "landslide",
+    "optionLabel": "Clear it with equipment",
+    "roll": true,
+    "bands": 2,
+    "why": "whether the slope is done moving is unseeable, and the operator can't hear it over the engine",
+    "badBandIdea": "a second pulse comes down on the machine \u2014 skidder half-buried and damaged, you retreat and report anyway, now waiting on geotech with a wounded machine"
+  },
+  {
+    "eventId": "landslide",
+    "optionLabel": "Hand-clear a path",
+    "roll": true,
+    "bands": 2,
+    "why": "same unseen slope-stability variable with people standing in the runout",
+    "badBandIdea": "the slope moves again while the crew is in the cut \u2014 injuries and buried tools, everyone pulls back and the road stays closed pending review"
+  },
+  {
+    "eventId": "landslide",
+    "optionLabel": "Turn back and report",
+    "roll": false,
+    "why": "refusal/report option with fixed costs"
+  },
+  {
+    "eventId": "resupply_opportunity",
+    "optionLabel": "Trade for fuel",
+    "roll": false,
+    "why": "known trade at visible terms"
+  },
+  {
+    "eventId": "resupply_opportunity",
+    "optionLabel": "Trade for food",
+    "roll": false,
+    "why": "known trade at visible terms"
+  },
+  {
+    "eventId": "resupply_opportunity",
+    "optionLabel": "Just share news",
+    "roll": false,
+    "why": "pure information/social option"
+  },
+  {
+    "eventId": "lost_supplies",
+    "optionLabel": "Go back and search",
+    "roll": true,
+    "bands": 2,
+    "why": "where the box went and what state it's in cannot be known before burning the fuel to look",
+    "badBandIdea": "the box burst on a rock bluff \u2014 contents scattered and ruined; you eat the write-off anyway plus the fuel and hours, and the shortfall forces an early resupply run"
+  },
+  {
+    "eventId": "lost_supplies",
+    "optionLabel": "Write it off and continue",
+    "roll": false,
+    "why": "known purchasable cost: the write-off"
+  },
+  {
+    "eventId": "lost_supplies",
+    "optionLabel": "Secure remaining cargo",
+    "roll": false,
+    "why": "known small time cost that reliably prevents repeats"
+  },
+  {
+    "eventId": "good_road_conditions",
+    "optionLabel": "Make up time!",
+    "roll": false,
+    "why": "pure bonus, fully visible"
+  },
+  {
+    "eventId": "good_road_conditions",
+    "optionLabel": "Take it easy, save fuel",
+    "roll": false,
+    "why": "pure bonus, fully visible"
+  },
+  {
+    "eventId": "abandoned_cache",
+    "optionLabel": "Scavenge fuel and parts",
+    "roll": true,
+    "bands": 2,
+    "why": "old diesel in abandoned jerry cans is unverifiable until it's in a tank",
+    "badBandIdea": "the diesel was half water \u2014 filters plug the next morning and a machine goes down; a mechanic day and the 'free' fuel costs more than it gave"
+  },
+  {
+    "eventId": "abandoned_cache",
+    "optionLabel": "Grab the food supplies",
+    "roll": true,
+    "bands": 2,
+    "why": "the age and safety of abandoned canned goods is exactly what you can't see through the tin",
+    "badBandIdea": "half the crew is sick the next morning \u2014 a food-poisoning day short-handed, and the suspect haul gets thrown out anyway"
+  },
+  {
+    "eventId": "abandoned_cache",
+    "optionLabel": "Take the first aid kit",
+    "roll": false,
+    "why": "a first aid kit can be inspected on the spot; known small gain"
+  },
+  {
+    "eventId": "crew_morale_boost",
+    "optionLabel": "Take a break and enjoy it",
+    "roll": false,
+    "why": "pure flavor with a fixed morale gain"
+  },
+  {
+    "eventId": "crew_morale_boost",
+    "optionLabel": "Keep working but appreciate it",
+    "roll": false,
+    "why": "pure flavor with a fixed morale gain"
+  },
+  {
+    "eventId": "helpful_locals",
+    "optionLabel": "Share a meal and listen",
+    "roll": false,
+    "why": "pure information/social option"
+  },
+  {
+    "eventId": "helpful_locals",
+    "optionLabel": "Trade for supplies",
+    "roll": false,
+    "why": "known trade at visible terms"
+  },
+  {
+    "eventId": "equipment_running_well",
+    "optionLabel": "Keep up the momentum",
+    "roll": false,
+    "why": "pure bonus, fully visible"
+  },
+  {
+    "eventId": "equipment_running_well",
+    "optionLabel": "Do preventive maintenance",
+    "roll": false,
+    "why": "known purchasable maintenance"
+  },
+  {
+    "eventId": "peat_crossing_pumping",
+    "optionLabel": "Flag the soft ground and back crews off",
+    "roll": false,
+    "why": "careful containment with known costs \u2014 the back-off option"
+  },
+  {
+    "eventId": "peat_crossing_pumping",
+    "optionLabel": "Lay brush and corduroy the approach",
+    "roll": true,
+    "bands": 2,
+    "why": "the event's stated premise is that the peat mat is weaker than the road card says \u2014 whether corduroy holds on it is unseeable",
+    "badBandIdea": "the corduroy floats and the approach blows out under the first loaded pass \u2014 the shift is spent AND the crossing is closed; everything reroutes the long way from tomorrow"
+  },
+  {
+    "eventId": "peat_crossing_pumping",
+    "optionLabel": "Test it with one light pickup",
+    "roll": true,
+    "bands": 3,
+    "why": "probing an unstable crossing with a live vehicle is the definitional roll \u2014 the mat's strength is the unseen variable",
+    "badBandIdea": "the pickup drops through the mat \u2014 vehicle recovery on pumping ground, the crossing destroyed outright, and the block reroutes for the rest of the run; middle = squeaks through but the shoulders slump, crossing degraded to light traffic only (today's fixed outcome)"
+  },
+  {
+    "eventId": "salmon_crossing_red_flag",
+    "optionLabel": "Shut the crossing down and call it in",
+    "roll": false,
+    "why": "shut-down-and-report option with known costs"
+  },
+  {
+    "eventId": "salmon_crossing_red_flag",
+    "optionLabel": "Restrict loads and post a spotter",
+    "roll": true,
+    "bands": 2,
+    "why": "the outcome text says the crossing is 'on borrowed time' \u2014 whether the pipe survives even restricted loads is unseen",
+    "badBandIdea": "the outlet lets go under a restricted load anyway \u2014 sediment through visible spawners, the crossing closed, and a fisheries compliance case with your name on the traffic log"
+  },
+  {
+    "eventId": "salmon_crossing_red_flag",
+    "optionLabel": "Keep moving and note it for later",
+    "roll": true,
+    "bands": 3,
+    "why": "running full loads over a failing fish-passage pipe stakes the day on structure and witnesses you cannot see",
+    "badBandIdea": "the culvert washes out mid-haul \u2014 a sediment plume through spawning salmon, major compliance action, and the crossing gone; middle = it holds but a hatchery crew photographs the perched outlet, and the district opens a file \u2014 scrutiny follows you, genuinely different from either end"
+  },
+  {
+    "eventId": "smoke_hold",
+    "optionLabel": "Stand crews down and switch to low-exposure tasks",
+    "roll": false,
+    "why": "known safe cost: stand down and do low-exposure work"
+  },
+  {
+    "eventId": "smoke_hold",
+    "optionLabel": "Run a shortened shift with respirators",
+    "roll": false,
+    "why": "purchased mitigation at a visible price ($600 and morale)"
+  },
+  {
+    "eventId": "smoke_hold",
+    "optionLabel": "Push full production",
+    "roll": true,
+    "bands": 2,
+    "why": "who goes down in heavy smoke, and whether an air-quality order lands mid-shift, are both invisible at morning muster",
+    "badBandIdea": "a faller collapses on the hill just as the stand-down order arrives \u2014 forced shutdown anyway, a smoke-injury on the books, and a production call you can't defend to anyone"
+  },
+  {
+    "eventId": "regen_stress_patch",
+    "optionLabel": "Re-stratify the block and hit the worst patches first",
+    "roll": false,
+    "why": "budget-allocation choice at a visible price"
+  },
+  {
+    "eventId": "regen_stress_patch",
+    "optionLabel": "Order fill-plant and brush follow-up",
+    "roll": false,
+    "why": "known purchasable cost: the $2,500 prescription"
+  },
+  {
+    "eventId": "regen_stress_patch",
+    "optionLabel": "Leave it for the formal survey window",
+    "roll": false,
+    "why": "deferral with a known, stated decline"
+  },
+  {
+    "eventId": "story_arc_ancientGrove_stage0",
+    "optionLabel": "Protect the grove and seek heritage status",
+    "roll": false,
+    "why": "story-arc branch point; consequences live in the scheduled stages"
+  },
+  {
+    "eventId": "story_arc_ancientGrove_stage0",
+    "optionLabel": "Harvest the valuable timber",
+    "roll": false,
+    "why": "story-arc branch point with a fixed payout; the arc carries the fallout"
+  },
+  {
+    "eventId": "crew_threatens_quit",
+    "optionLabel": "Let them go",
+    "roll": false,
+    "why": "refusal/accept option with known costs"
+  },
+  {
+    "eventId": "crew_threatens_quit",
+    "optionLabel": "Negotiate \u2014 offer a bonus and lighter duties",
+    "roll": true,
+    "bands": 3,
+    "why": "already one of the game's two authored gambles; the proposal's Sample 3 upgrades exactly this option",
+    "badBandIdea": "he takes the $400, works two days, and leaves on the supply run \u2014 down a set of hands and out the bonus; middle = he stays but everyone learns the price (crew_precedent_set), a genuinely different future"
+  },
+  {
+    "eventId": "crew_threatens_quit",
+    "optionLabel": "Ignore it \u2014 he'll cool off",
+    "roll": true,
+    "bands": 2,
+    "why": "whether he actually cools off is precisely what you can't know when you shrug",
+    "badBandIdea": "he's gone at dawn and the crew watched you not care \u2014 lose the member AND the morale, short-handed with a resentful camp"
+  },
+  {
+    "eventId": "unauthorized_logging",
+    "optionLabel": "Report it to the district office",
+    "roll": false,
+    "why": "report option with known costs"
+  },
+  {
+    "eventId": "unauthorized_logging",
+    "optionLabel": "Ignore it \u2014 not your problem",
+    "roll": true,
+    "bands": 2,
+    "why": "already carries riskCompliance 0.3 and hiddenOutcome \u2014 whether it ever surfaces is the unseen variable; this formalizes it",
+    "badBandIdea": "the investigation later establishes you saw the stumps and said nothing \u2014 compliance hit and a mark on your file that raises scrutiny for the rest of the run"
+  },
+  {
+    "eventId": "unauthorized_logging",
+    "optionLabel": "Investigate quietly on your own",
+    "roll": true,
+    "bands": 2,
+    "why": "poking around an illegal operation after dark \u2014 whether you're spotted is unknowable, and the two futures are completely different",
+    "badBandIdea": "they spot you \u2014 the confrontation comes to your camp (schedules the followup); good band finds the evidence unseen, letting you report with proof instead"
+  },
+  {
+    "eventId": "unauthorized_logging_followup",
+    "optionLabel": "Stand your ground and tell them to leave",
+    "roll": true,
+    "bands": 2,
+    "why": "whether two rough men actually back down from a bluff is not something you control or can read in advance",
+    "badBandIdea": "they leave quietly and come back at night \u2014 slashed tires and sugar in a fuel tank; equipment down, the crew wants out of this camp, and you call the authorities from a weaker position"
+  },
+  {
+    "eventId": "unauthorized_logging_followup",
+    "optionLabel": "Offer to look the other way",
+    "roll": true,
+    "bands": 2,
+    "why": "hiddenOutcome already flags it \u2014 whether the arrangement ever comes out is the unseen variable",
+    "badBandIdea": "they get caught months later and name you as the one who looked away \u2014 compliance craters and your file is dirty for every inspection that follows"
+  },
+  {
+    "eventId": "unauthorized_logging_followup",
+    "optionLabel": "Call the authorities immediately",
+    "roll": false,
+    "why": "report option with known costs \u2014 the reliable right thing"
+  }
+]

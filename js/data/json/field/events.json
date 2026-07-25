@@ -537,10 +537,43 @@
   "options": [
    {
     "label": "Test it on foot first",
-    "outcome": "You walk across. It holds. Trucks go one at a time, very slowly.",
+    "outcome": "You walk it, bouncing on the stringers at the mid-span. It talks back but it does not move. Trucks go one at a time, very slowly, and everyone watches.",
     "effects": {
      "timeUsed": 1
-    }
+    },
+    "partialOutcome": "Underfoot it is fine. Under nine tonnes it is not — a stringer splits on the first truck and the deck sags four inches. You get across. Nothing loaded is coming back this way.",
+    "partialEffects": {
+     "timeUsed": 1,
+     "progress": -4
+    },
+    "failureOutcome": "It holds you and lets go under the truck. The rear duals drop through the deck onto the cribbing and stop there, which is the only luck in it. The rest of the day is spent getting the box out, and the crossing is finished.",
+    "failureEffects": {
+     "equipment": -18,
+     "fuel": -6,
+     "progress": -8
+    },
+    "chanceSuccess": 0.55,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "equipmentBelow:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:spring",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:faller",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Reinforce with fresh logs",
@@ -1025,18 +1058,47 @@
    },
    {
     "label": "Negotiate — offer a bonus and lighter duties",
-    "outcome": "You promise extra pay and shorter shifts. He thinks it over...",
+    "outcome": "He thinks about it for a long minute and puts his gloves back on. Word gets around camp that you sorted it out instead of letting him walk.",
     "effects": {
      "budget": -400,
-     "crew_morale": -3
+     "crew_morale": 4
     },
-    "chanceSuccess": 0.6,
-    "failureOutcome": "He takes the money but quits anyway two days later. Waste of cash.",
+    "chanceSuccess": 0.45,
+    "failureOutcome": "He takes the money, works two more days, and is gone with the Thursday supply run. You are down a set of hands and out the bonus.",
     "failureEffects": {
      "budget": -400,
      "crew_morale": -8
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "partialOutcome": "He stays, and he is careful to let everyone know exactly what it took. By supper two others have found reasons to mention how tired they are.",
+    "partialEffects": {
+     "budget": -400,
+     "crew_morale": -2
+    },
+    "failureCrewEffect": {
+     "lose_member": true
+    },
+    "chancePartial": 0.35,
+    "oddsModifiers": [
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.2,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "shortRationStreak:3",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleAbove:70",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Ignore it — he'll cool off",
@@ -1999,10 +2061,57 @@
   "options": [
    {
     "label": "Probe on foot, then drive across",
-    "outcome": "You wade in waist-deep to test the bottom. Solid gravel. The trucks cross safely.",
+    "outcome": "You wade in waist-deep, feeling for the bottom with a peavey. Solid gravel the whole way. The trucks cross one at a time and nobody says much about how cold you are.",
     "effects": {
      "crew_health": -3
-    }
+    },
+    "partialOutcome": "Halfway across, the lead truck finds the soft spot you missed. It settles to the axle and stays there. Two hours on the winch and everything in the boxes is wet.",
+    "partialEffects": {
+     "crew_health": -5,
+     "equipment": -8,
+     "fuel": -4,
+     "crew_morale": -4
+    },
+    "failureOutcome": "The bottom is not gravel, it is rounded cobble over silt, and it moves. The truck slews downstream and takes water through the intake before you get a line on it. You are back on the near bank with a drowned engine and a creek that is still rising.",
+    "failureEffects": {
+     "equipment": -22,
+     "crew_health": -8,
+     "crew_morale": -10
+    },
+    "chanceSuccess": 0.55,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:storm",
+      "move": 0.25,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Wait for the water to drop",
@@ -2121,12 +2230,45 @@
    },
    {
     "label": "Try to patch the line in the field",
-    "outcome": "A temporary fix with hose clamps. It holds, barely. The machine runs at reduced pressure.",
+    "outcome": "Hose clamps and a length of spare line. It holds at reduced pressure and the loader finishes the shift, slowly, with somebody watching the coupling the whole time.",
     "effects": {
      "equipment": -15
     },
     "hiddenOutcome": true,
-    "riskInjury": 0.1
+    "riskInjury": 0.1,
+    "partialOutcome": "The patch holds until the middle of the next shift, then lets go again in a worse place. You end up making the mechanic call you were trying to avoid, and cleaning up a second spill to go with the first.",
+    "partialEffects": {
+     "equipment": -22,
+     "budget": -800,
+     "progress": -6,
+     "compliance": -4
+    },
+    "failureOutcome": "The clamp lets go while the line is still charged and catches the man working next to it across the forearm. Hot fluid at pressure does not care about a glove. The machine is down anyway and now so is he.",
+    "failureEffects": {
+     "equipment": -20,
+     "compliance": -8,
+     "scrutiny": 10,
+     "crew_morale": -8
+    },
+    "failureCrewEffect": {
+     "injury": "burn"
+    },
+    "chanceSuccess": 0.5,
+    "chancePartial": 0.32,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.12,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Shut everything down and call for a mechanic",
@@ -2268,10 +2410,53 @@
    },
    {
     "label": "Use your best judgment and continue",
-    "outcome": "You eyeball it based on terrain features. Could be right. Could be very wrong.",
-    "effects": {},
+    "outcome": "You read it off the draw and the ridge and back yourself. When the real survey catches up weeks later you were inside a few metres the whole way. Nobody ever finds out you guessed.",
+    "effects": {
+     "data": 3
+    },
     "hiddenOutcome": true,
-    "riskCompliance": 0.4
+    "riskCompliance": 0.4,
+    "partialOutcome": "You are off, but you are off on your own side. The block edge wanders where it should run straight, and the shape of it is going to be somebody's question at the next audit.",
+    "partialEffects": {
+     "progress": -4,
+     "compliance": -4,
+     "scrutiny": 6
+    },
+    "failureOutcome": "You were very wrong. The line you eyeballed put fallers forty metres into the neighbouring licence, and the stumps do not move. Stop-work goes on the block while two companies' lawyers work out whose mistake it was.",
+    "failureEffects": {
+     "compliance": -14,
+     "scrutiny": 18,
+     "budget": -1500,
+     "progress": -10
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.35,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:fog",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Call the office for clarification",
