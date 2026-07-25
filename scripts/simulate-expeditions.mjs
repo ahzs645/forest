@@ -99,6 +99,28 @@ function makeUi(journey, policy, tally) {
   };
 }
 
+/**
+ * Triage: should this policy decline the day's situation?
+ *
+ * Every mode's day can now open with an authored situation that costs the day
+ * to answer, plus an explicit way to decline it (js/journey/daySituation.js).
+ * A policy that answers everything spends its whole season on the radio and
+ * delivers nothing, so model the call a competent professional makes: when the
+ * file is running behind the calendar, wear the scrutiny and keep the day.
+ *
+ * @param {Object} journey
+ * @param {Array} options
+ * @param {number} progress - 0-1, how much of the mode's actual job is done
+ * @returns {Object|null} the set-aside option, or null to answer the situation
+ */
+function maybeSetAside(journey, options, progress) {
+  const setAside = options.find((option) => option.value === 'set_aside');
+  if (!setAside) return null;
+  const deadline = journey.deadline || 30;
+  const elapsed = (journey.day || 1) / deadline;
+  return progress < elapsed ? setAside : null;
+}
+
 // ── Role policies ───────────────────────────────────────────────────────────
 
 function reconPolicy(journey, options, prompt) {
@@ -146,14 +168,12 @@ function reconPolicy(journey, options, prompt) {
     // everything: when the season is running ahead of the file, they drive on
     // and wear the scrutiny. Model that, or the policy spends every day of the
     // run answering the radio and finishes three blocks out of eleven.
-    const walkAway = options.find((option) => option.value === 'walk_away');
-    if (walkAway) {
-      const deadline = journey.deadline || 32;
-      const seasonElapsed = (journey.day || 1) / deadline;
-      const totalBlocks = journey.blocks?.length || 1;
-      const packagesDone = (journey.blocksAssessed || 0) / totalBlocks;
-      if (packagesDone < seasonElapsed) return walkAway;
-    }
+    const setAside = maybeSetAside(
+      journey,
+      options,
+      (journey.blocksAssessed || 0) / (journey.blocks?.length || 1)
+    );
+    if (setAside) return setAside;
     // Otherwise take the authored default.
     return options[0];
   }
@@ -180,6 +200,14 @@ function reconPolicy(journey, options, prompt) {
 }
 
 function planningPolicy(journey, options) {
+  const plan = journey.plan || {};
+  const gates = (Math.min(1, (plan.dataCompleteness || 0) / 80)
+    + Math.min(1, (plan.analysisQuality || 0) / 80)
+    + Math.min(1, (plan.stakeholderBuyIn || 0) / 75)
+    + Math.min(1, (plan.ministerialConfidence || 0) / 80)) / 4;
+  const setAside = maybeSetAside(journey, options, gates);
+  if (setAside) return setAside;
+
   const protagonist = journey.protagonist;
   if (protagonist && (protagonist.energy <= 25 || protagonist.stress >= 75)) {
     const rest = pick(options, ['rest']);
@@ -193,6 +221,10 @@ function planningPolicy(journey, options) {
 }
 
 function permittingPolicy(journey, options) {
+  const permits = journey.permits || {};
+  const setAside = maybeSetAside(journey, options, (permits.approved || 0) / (permits.target || 1));
+  if (setAside) return setAside;
+
   const protagonist = journey.protagonist;
   const inSupportMenu = options.some((option) => option.value === 'support_back');
   if (inSupportMenu) {
@@ -206,7 +238,6 @@ function permittingPolicy(journey, options) {
   // Deficiencies are answered when they stack up, not the instant one lands —
   // chasing every ticket the day it arrives starves the pipeline that produces
   // the approvals in the first place.
-  const permits = journey.permits || {};
   if ((permits.needsRevision || 0) >= 3) {
     const revise = pick(options, ['revise_permit:']);
     if (revise) return revise;
@@ -220,6 +251,14 @@ function permittingPolicy(journey, options) {
 }
 
 function silviculturePolicy(journey, options, prompt) {
+  const planting = journey.planting || {};
+  const setAside = maybeSetAside(
+    journey,
+    options,
+    (planting.blocksPlanted || 0) / (planting.blocksToPlant || 1)
+  );
+  if (setAside) return setAside;
+
   if (prompt.startsWith('Stand down ')) {
     return pick(options, ['cancel']) || options[0];
   }

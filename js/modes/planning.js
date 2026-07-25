@@ -5,7 +5,8 @@
  */
 
 import { checkForEvent } from '../events.js';
-import { handleEvent } from './shared/handleEvent.js';
+import { runDaySituation } from '../journey/daySituation.js';
+import { formatStatusLine } from '../journey/dayCard.js';
 import { buildOfficeWindowFrames } from '../scene/textmode/scenes.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
 import {
@@ -645,9 +646,26 @@ export async function runPlanningDay(game) {
   // the normal planning loop before the game starts throwing disruptions.
   const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
-    displayPlanningHeader(ui, journey, seasonInfo);
-    await handleEvent(game, event);
-    if (game.gameOver) return;
+    const daysLeft = Number.isFinite(journey.deadline)
+      ? Math.max(0, journey.deadline - journey.day)
+      : null;
+    const outcome = await runDaySituation(game, event, {
+      frame: {
+        dayHeader: Number.isFinite(journey.deadline)
+          ? `DAY ${journey.day} of ${journey.deadline} - STRATEGIC PLANNING`
+          : `DAY ${journey.day} - STRATEGIC PLANNING`,
+        statusLine: formatStatusLine([
+          getPlanningPhaseLabel(journey.plan.phase),
+          daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
+          `confidence ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
+          `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
+        ]),
+      },
+      setAsideDescription: 'Not today. Keep the day for the file.',
+    });
+    if (outcome.gameOver) return;
+    // A situation worth a day is the day — the action menu below never opens.
+    if (outcome.spendsDay) spendDay(journey);
   }
 
   // Check protagonist energy

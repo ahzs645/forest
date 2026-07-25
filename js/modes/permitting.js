@@ -5,7 +5,8 @@
  */
 
 import { checkForEvent } from '../events.js';
-import { handleEvent } from './shared/handleEvent.js';
+import { runDaySituation } from '../journey/daySituation.js';
+import { formatStatusLine } from '../journey/dayCard.js';
 import { buildOfficeWindowFrames, buildStampFrames } from '../scene/textmode/scenes.js';
 import { calculateDeskConsumption, applyConsumption, applyDeskRegen, getFormattedResourceStatus, DESK_RESOURCES } from '../resources.js';
 import { executeDeskDay, DESK_ACTIONS } from '../journey.js';
@@ -929,10 +930,20 @@ export async function runPermittingDay(game) {
   // the player sees the normal permitting loop before any exception arrives.
   const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
-    ui.clear();
-    ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - ${(journey.currentPhase || 'PERMITTING').toUpperCase()}`);
-    await handleEvent(game, event);
-    if (game.gameOver) return;
+    const daysLeft = Math.max(0, journey.deadline - journey.day);
+    const outcome = await runDaySituation(game, event, {
+      frame: {
+        dayHeader: `DAY ${journey.day} of ${journey.deadline} - ${(journey.currentPhase || 'PERMITTING').toUpperCase()}`,
+        statusLine: formatStatusLine([
+          `${journey.permits?.approved || 0}/${journey.permits?.target || 0} approved`,
+          `${journey.permits?.backlog || 0} in the backlog`,
+          `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
+        ]),
+      },
+      setAsideDescription: 'Not today. Keep the day for the queue.',
+    });
+    if (outcome.gameOver) return;
+    if (outcome.spendsDay) spendDay(journey);
   }
 
   // One file gets the day. Look-ups leave it unspent and the loop comes back

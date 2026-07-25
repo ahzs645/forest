@@ -176,17 +176,57 @@ what generates the consequence three shifts later when the culvert lets go.
 Net: the deployment modes should get materially smaller, and converge on the
 renderer the seasonal mode already uses.
 
+## 6a. What shipped, and what it measured
+
+All five modes now run the day through `js/journey/daySituation.js`:
+
+- **Every mode's day can open with a situation**, rendered through the shared
+  card (`js/journey/dayCard.js`) with the mode's own day header and drumbeat.
+- **Declining is always available and always costs.** Scrutiny always; morale
+  (or a desk protagonist's stress) only when the thing mattered. Setting aside
+  hands the day *back* — it does not force the crew onto the road, because
+  block work only happens on days the player owns.
+- **Answering only costs the day when the situation was a day's work.** Minor
+  and positive severities are handled and the day carries on; moderate and
+  severe are the day.
+- `DAY_HAS_EVENT_CHANCE` 0.5 → **0.65**, measured: at 0.8 a competent recon
+  policy wins 5/16 because the traverse stops fitting the season.
+
+Because answering a situation now costs a day that used to be free, every
+deployment was resized against `npm run sim:expeditions` (16 runs each):
+
+| mode | before | after | season |
+|---|---|---|---|
+| recon | 8/8, no deadline | 10/16, 32–37 days | 40 |
+| planning | 8/8, 14–20 days | 13/16, 20–34 days | 34 |
+| permitting | 8/8, 19–30 days | 16/16, 21–30 days | 30 |
+| silviculture | 8/8, no deadline | 10/16, 35–42 days | 42 |
+
+Recon's quiet card on a 390×844 phone: log pane **114px → 249px**, option list
+**557px → 422px**, options **9 → 7**.
+
+Planning's budget and political capital were raised (68000/62 → 82000/74)
+because a third more situations draw on the same two pools — its losses moved
+off the cabinet clock and onto money.
+
 ## 7. Order of work
 
-1. Extract the seasonal card renderer into a shared day-card loop that any
-   mode can call.
-2. Convert **recon** onto it as the reference implementation, including the
-   deadline fix and the pace/rations move to carried settings.
-3. Re-sim. Recon should get losable, and days should stop being
-   interchangeable.
-4. Convert planning, permitting, silviculture, manager onto the same loop.
-5. Re-point the campaign wrapper and the debrief at whatever the new day
-   records.
+1. ~~Extract the seasonal card renderer into a shared day-card loop.~~ Done —
+   `js/journey/dayCard.js`.
+2. ~~Convert **recon** onto it, including the deadline fix and the
+   pace/rations move to carried settings.~~ Done.
+3. ~~Re-sim.~~ Done — see section 6a.
+4. ~~Convert planning, permitting, silviculture, manager onto the same loop.~~
+   Done — all four run `runDaySituation`.
+5. **Still open.** The quiet-day card is recon-only. The other four modes get
+   the situation card but still fall back to their original action menus on
+   quiet days, so they have not had recon's menu-length cut. Planning's
+   `buildActionOptions` is the next-worst offender.
+6. **Still open.** Scrutiny is charged on every set-aside but its teeth were
+   never audited — worth confirming it actually bites before leaning on it as
+   the price of declining.
+7. **Still open.** Re-point the campaign wrapper and the debrief at what the
+   new day records.
 
 ## 8. Risks
 

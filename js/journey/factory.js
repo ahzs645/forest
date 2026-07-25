@@ -249,9 +249,11 @@ export function createSilvicultureJourney(options = {}) {
     // The planting season closes too. Without this, checkSilvicultureEndConditions
     // fell back to its 120-day "outside delivery window", which a 30-37 day
     // program never reached — so the deadline was decoration here as well.
-    // 36 clears the competent median (34 over 24 sim runs) and bites the tail
-    // that drifts to 37-38.
-    deadline: 36,
+    // Resized once the day's situation became the day: answering a moderate
+    // event now costs a program day that used to be free, which added six or
+    // seven days to a competent run. 42 clears the new median (35) with the
+    // same bite the old 36 had against the old economy.
+    deadline: 42,
 
     // Planting Program. Each cohort runs plant -> survival -> fill, so a block
     // is roughly three one-action days (js/journey/dayPlan.js); the program is
@@ -362,7 +364,10 @@ export function createPlanningJourney(options = {}) {
     // The cabinet window. Planning has many gates (data, analysis, FOM review,
     // stakeholder buy-in, ministerial confidence), so the term needs room to
     // clear them; 20 days was tight. Difficulty nudges this in ForestryTrailGame.
-    deadline: 28,
+    // Same resize as the other deployments: with the day's situation costing a
+    // day to answer, a competent planning file runs 21-27 days rather than
+    // 14-20, so the cabinet window has to hold that.
+    deadline: 34,
     actionsRemaining: ACTIONS_PER_DAY,
 
     // Protagonist state - YOU are the planner
@@ -442,13 +447,17 @@ export function createPlanningJourney(options = {}) {
       // of packed ones (js/journey/dayPlan.js), so the same $750-a-day overhead
       // is charged over roughly twice the calendar. Sized with
       // scripts/simulate-expeditions.mjs.
-      budget: 68000,
+      // Raised again with the event rate: a file now meets roughly a third
+      // more situations and every one it answers or declines draws on this
+      // same pool. Losses moved off the cabinet clock and onto money.
+      budget: 82000,
       // Standing burns a point a day and six a stakeholder session. Over a
       // season of one-action days (js/journey/dayPlan.js) that is roughly
       // twice the calendar the old pool was cut for, so the file lost the
       // cabinet before it lost the argument. Sized with
       // scripts/simulate-expeditions.mjs.
-      politicalCapital: 62,
+      // Same reason as the budget above.
+      politicalCapital: 74,
       dataCredits: 100,
       consultantDays: 30,
     },

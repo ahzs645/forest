@@ -23,6 +23,7 @@ import {
 } from '../journey/fieldMechanics.js';
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
+import { runDaySituation } from '../journey/daySituation.js';
 import { renderJourneyMap } from '../scene/areaMap.js';
 import {
   getCrossingContext,
@@ -452,50 +453,37 @@ async function runFieldDay(game) {
     // was missing — dealing with things properly is paid for in ground.
     if (pendingEvent) {
       const situation = pendingEvent;
-      const outcome = await handleEvent(game, situation, {
-        dayHeader: buildReconDayHeader(journey),
-        statusLine: buildReconStatusLine(journey),
-        context: buildReconContextLines(journey),
-        extraOptions: [{
-          label: 'Set it aside',
-          description: 'Not today. Take the shift back and spend it on your own work.',
-          tag: 'TRADEOFF',
-          value: 'walk_away',
-        }],
+      const outcome = await runDaySituation(game, situation, {
+        frame: {
+          dayHeader: buildReconDayHeader(journey),
+          statusLine: buildReconStatusLine(journey),
+          context: buildReconContextLines(journey),
+        },
+        setAsideDescription: 'Not today. Take the shift back and spend it on your own work.',
       });
-      if (game.gameOver) return;
+      if (outcome.gameOver) return;
 
       pendingEvent = null;
       checkpointReconShift(game, shiftState, pendingEvent);
 
-      if (outcome.resolved) {
-        // Whether answering it cost the shift depends on what it was. A good
-        // radio call or a small nuisance is dealt with over coffee and the
-        // crew still has a day; something moderate or worse IS the day.
-        // Without this split every situation cost a full shift, which is twice
-        // what events used to cost when they rode along on top of a travel
-        // day — and an eleven-block traverse cannot absorb that.
-        if (situationCostsTheShift(situation)) {
-          spendDay(journey);
-          shiftState.hasTraveled = hasTraveled;
-          checkpointReconShift(game, shiftState, pendingEvent);
-          ui.updateAllStatus(journey);
-          continue;
-        }
-        ui.write('Dealt with before the trucks were warm. The shift is still yours.', 'term-dim');
+      if (outcome.spendsDay) {
+        spendDay(journey);
+        shiftState.hasTraveled = hasTraveled;
+        checkpointReconShift(game, shiftState, pendingEvent);
         ui.updateAllStatus(journey);
-        settleDayPass(journey, freeChoices, ui);
         continue;
       }
 
-      // Set aside. The shift comes back to the player — the loop falls through
-      // to the quiet card below on the next pass — but the file remembers what
-      // you did not do. Deliberately NOT a forced drive-on: block work only
-      // happens on days the player owns, and if declining a situation always
-      // put the crew on the road, an eleven-block traverse could never be
-      // worked at all.
-      applyWalkAwayCost(ui, journey, situation);
-      logReconAction(journey, `Set aside: ${situation.title}`, 'Kept the shift for the crew\'s own work');
+      // Either it was small enough to handle over coffee, or it was set aside.
+      // Both leave the shift with the player, and the loop falls through to the
+      // quiet card on the next pass. Setting aside is deliberately NOT a forced
+      // drive-on: block work only happens on days the player owns, and if
+      // declining always put the crew on the road, an eleven-block traverse
+      // could never be worked at all.
+      if (outcome.setAside) {
+        logReconAction(journey, `Set aside: ${situation.title}`, 'Kept the shift for the crew\'s own work');
+      }
+      ui.updateAllStatus(journey);
       settleDayPass(journey, freeChoices, ui);
       continue;
     }
@@ -1101,45 +1089,6 @@ export function updateReconMissionStatus(ui, journey) {
  * ever takes. So it costs scrutiny (the file notices what you did not do) and
  * a little morale (the crew notices too), scaled by how bad the thing was.
  */
-/**
- * Whether answering this situation is the whole shift.
- *
- * Severities in the authored decks are minor / moderate / severe / positive
- * (js/data/fieldEvents.js). Only the middle two are a day's work.
- */
-function situationCostsTheShift(event) {
-  const severity = String(event?.severity || 'minor').toLowerCase();
-  return severity === 'moderate' || severity === 'severe' || severity === 'critical';
-}
-
-function applyWalkAwayCost(ui, journey, event) {
-  const severity = String(event?.severity || 'minor').toLowerCase();
-  const weight = severity === 'severe' || severity === 'critical'
-    ? 3
-    : severity === 'moderate'
-      ? 2
-      : 1;
-
-  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + weight);
-
-  // Morale only for things that actually mattered. A player triaging well sets
-  // a dozen-plus situations aside in a season, and charging the crew for every
-  // deferred radio call turned that into an attrition spiral rather than a
-  // judgement call.
-  const moraleHit = weight >= 2 ? weight : 0;
-  if (moraleHit > 0) {
-    for (const member of journey.crew) {
-      if (!member.isActive) continue;
-      member.morale = Math.max(0, member.morale - moraleHit);
-    }
-  }
-
-  ui.write('');
-  ui.writeWarning(moraleHit > 0
-    ? `You leave it. Scrutiny +${weight}, and the crew is quiet about it. Morale -${moraleHit}.`
-    : `You leave it for another day. Scrutiny +${weight}.`);
-}
-
 /**
  * Drive one leg of the traverse.
  *
