@@ -184,12 +184,13 @@ export function createReconJourney(options = {}) {
     // The access season closes. Recon used to ship without a deadline at all —
     // the mission pane printed "Days left" and nothing enforced it, so no day
     // ever competed with any other day (docs/day_as_situation.md section 3).
-    // Sized off scripts/simulate-expeditions.mjs: a competent full-length run
-    // lands in 27-38 shifts, so 32 clears the median and bites the long tail.
-    // Spelled out per scale because this object spread lands *after*
-    // createFieldJourney has already campaign-scaled baseJourney — a bare
-    // literal here would clobber the twenty-day campaign season.
-    deadline: campaignScale ? 20 : 32,
+    // Sized off scripts/simulate-expeditions.mjs. 32 was sized for a loop where
+    // the day's event rode along free on top of a travel day; now the situation
+    // IS the shift (docs/day_as_situation.md), so answering one costs a day and
+    // a season needs room for the triage. Spelled out per scale because this
+    // object spread lands *after* createFieldJourney has already campaign-scaled
+    // baseJourney — a bare literal here would clobber the campaign season.
+    deadline: campaignScale ? 24 : 40,
 
     // Season integration
     season: createSeasonState(roleId),

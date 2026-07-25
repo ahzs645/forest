@@ -446,6 +446,60 @@ async function runFieldDay(game) {
 
     updateReconMissionStatus(ui, journey);
 
+    // The day's situation, if the bush sent one. The event IS the shift: you
+    // answer it, or you decide it is not worth the day and drive on with it
+    // unanswered. That second option is the whole trade the old chore menu
+    // was missing — dealing with things properly is paid for in ground.
+    if (pendingEvent) {
+      const situation = pendingEvent;
+      const outcome = await handleEvent(game, situation, {
+        dayHeader: buildReconDayHeader(journey),
+        statusLine: buildReconStatusLine(journey),
+        context: buildReconContextLines(journey),
+        extraOptions: [{
+          label: 'Set it aside',
+          description: 'Not today. Take the shift back and spend it on your own work.',
+          tag: 'TRADEOFF',
+          value: 'walk_away',
+        }],
+      });
+      if (game.gameOver) return;
+
+      pendingEvent = null;
+      checkpointReconShift(game, shiftState, pendingEvent);
+
+      if (outcome.resolved) {
+        // Whether answering it cost the shift depends on what it was. A good
+        // radio call or a small nuisance is dealt with over coffee and the
+        // crew still has a day; something moderate or worse IS the day.
+        // Without this split every situation cost a full shift, which is twice
+        // what events used to cost when they rode along on top of a travel
+        // day — and an eleven-block traverse cannot absorb that.
+        if (situationCostsTheShift(situation)) {
+          spendDay(journey);
+          shiftState.hasTraveled = hasTraveled;
+          checkpointReconShift(game, shiftState, pendingEvent);
+          ui.updateAllStatus(journey);
+          continue;
+        }
+        ui.write('Dealt with before the trucks were warm. The shift is still yours.', 'term-dim');
+        ui.updateAllStatus(journey);
+        settleDayPass(journey, freeChoices, ui);
+        continue;
+      }
+
+      // Set aside. The shift comes back to the player — the loop falls through
+      // to the quiet card below on the next pass — but the file remembers what
+      // you did not do. Deliberately NOT a forced drive-on: block work only
+      // happens on days the player owns, and if declining a situation always
+      // put the crew on the road, an eleven-block traverse could never be
+      // worked at all.
+      applyWalkAwayCost(ui, journey, situation);
+      logReconAction(journey, `Set aside: ${situation.title}`, 'Kept the shift for the crew\'s own work');
+      settleDayPass(journey, freeChoices, ui);
+      continue;
+    }
+
     // A quiet shift: nothing on the radio, so the crew's day is the player's
     // to spend. This is where the old nine-item chore menu went — it is no
     // longer the default shape of a day, it is what you do with a gift.
@@ -608,87 +662,10 @@ async function runFieldDay(game) {
     }
 
     if (actionId === 'travel') {
-      // The pace is the standing order the player already set; the route is
-      // the one call worth making at the moment of leaving, because it is the
-      // only one that depends on what is actually ahead. It used to be asked
-      // *after* the player had already committed to an intensity.
-      const paceId = getReconPace(journey);
-      if (journey.routePlan?.day !== journey.day) {
-        await maybePromptRouteChoice(game, currentBlock);
-        checkpointReconShift(game, shiftState, pendingEvent);
-      }
-      applyReconTravelIntelPenalty(ui, journey, currentBlock, paceId);
-      // Travelling is the shift. Pace is what it costs the crew and the gear,
-      // not what it costs the clock.
-      spendDay(journey);
-      const progressBefore = journey.totalDistance > 0
-        ? journey.distanceTraveled / journey.totalDistance
-        : 0;
-      const blockIndexBefore = journey.currentBlockIndex;
-      const result = executeFieldAction(journey, paceId);
-      dayResolved = true;
-
-      const progressAfter = journey.totalDistance > 0
-        ? journey.distanceTraveled / journey.totalDistance
-        : progressBefore;
-      const stripCtx = {
-        weatherId: journey.weather?.id,
-        terrain: currentBlock?.terrain,
-        pace: paceId,
-        wildlife: pickTrailWildlife(journey, paceId),
-        seed: journey.day * 31 + journey.currentBlockIndex,
-      };
-
-      if (typeof ui.playTravelStrip === 'function') {
-        if (pendingEvent) {
-          // The day's event interrupts the traverse: the strip runs partway,
-          // trouble happens, and the crew moves on.
-          const midProgress = progressBefore + (progressAfter - progressBefore) * 0.45;
-          await ui.playTravelStrip({
-            ...stripCtx,
-            progressBefore,
-            progressAfter: midProgress,
-            frameCount: 8,
-          });
-          const interruptingEvent = pendingEvent;
-          pendingEvent = null;
-          checkpointReconShift(game, shiftState, pendingEvent);
-          await handleEvent(game, interruptingEvent);
-          if (game.gameOver) return;
-          await ui.playTravelStrip({
-            ...stripCtx,
-            progressBefore: midProgress,
-            progressAfter,
-            frameCount: 8,
-          });
-        } else {
-          await ui.playTravelStrip({ ...stripCtx, progressBefore, progressAfter });
-        }
-      } else if (pendingEvent) {
-        const interruptingEvent = pendingEvent;
-        pendingEvent = null;
-        checkpointReconShift(game, shiftState, pendingEvent);
-        await handleEvent(game, interruptingEvent);
-        if (game.gameOver) return;
-      }
-      ui.writeHeader('TRAVEL RESULTS');
-      writeFieldMessages(ui, result.messages);
+      const leg = await runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent });
+      if (leg.gameOver) return;
       hasTraveled = true;
-      shiftState.hasTraveled = true;
-      shiftState.dayResolved = true;
-
-      // Reaching a water crossing is a played decision, not terrain math.
-      if (journey.currentBlockIndex !== blockIndexBefore) {
-        const arrivedBlock = journey.blocks[journey.currentBlockIndex];
-        await runRiverCrossingBeat(game, arrivedBlock);
-        if (game.gameOver) return;
-        showTrailMarkers(ui, journey, arrivedBlock);
-      }
-
-      // A crossed progress milestone earns the crew a fire and a breather.
-      await celebrateNewMilestones(game);
-      ui.updateAllStatus(journey);
-      checkpointReconShift(game, shiftState, pendingEvent);
+      dayResolved = true;
       await acknowledgeActionResult(ui, 'Travel');
     } else if (actionId === 'set_tempo') {
       await handleSetTempo(ui, journey);
@@ -1116,6 +1093,119 @@ export function updateReconMissionStatus(ui, journey) {
   return status;
 }
 
+/**
+ * What it costs to drive away from something you did not deal with.
+ *
+ * Walking away has to be a real option or "the event is the day" just means
+ * the traverse stalls — but it cannot be free, or it is the only option anyone
+ * ever takes. So it costs scrutiny (the file notices what you did not do) and
+ * a little morale (the crew notices too), scaled by how bad the thing was.
+ */
+/**
+ * Whether answering this situation is the whole shift.
+ *
+ * Severities in the authored decks are minor / moderate / severe / positive
+ * (js/data/fieldEvents.js). Only the middle two are a day's work.
+ */
+function situationCostsTheShift(event) {
+  const severity = String(event?.severity || 'minor').toLowerCase();
+  return severity === 'moderate' || severity === 'severe' || severity === 'critical';
+}
+
+function applyWalkAwayCost(ui, journey, event) {
+  const severity = String(event?.severity || 'minor').toLowerCase();
+  const weight = severity === 'severe' || severity === 'critical'
+    ? 3
+    : severity === 'moderate'
+      ? 2
+      : 1;
+
+  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + weight);
+
+  // Morale only for things that actually mattered. A player triaging well sets
+  // a dozen-plus situations aside in a season, and charging the crew for every
+  // deferred radio call turned that into an attrition spiral rather than a
+  // judgement call.
+  const moraleHit = weight >= 2 ? weight : 0;
+  if (moraleHit > 0) {
+    for (const member of journey.crew) {
+      if (!member.isActive) continue;
+      member.morale = Math.max(0, member.morale - moraleHit);
+    }
+  }
+
+  ui.write('');
+  ui.writeWarning(moraleHit > 0
+    ? `You leave it. Scrutiny +${weight}, and the crew is quiet about it. Morale -${moraleHit}.`
+    : `You leave it for another day. Scrutiny +${weight}.`);
+}
+
+/**
+ * Drive one leg of the traverse.
+ *
+ * Extracted so both ways of spending a shift on the road reach the same code:
+ * choosing to move on from a quiet card, and walking away from a situation
+ * you decided not to deal with. The day's event no longer interrupts the
+ * strip partway through — the event has already been answered (or explicitly
+ * abandoned) by the time the trucks move, because the event IS the day now.
+ */
+async function runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent }) {
+  const { ui, journey } = game;
+
+  // The pace is the standing order the player already set; the route is the
+  // one call worth making at the moment of leaving, because it is the only one
+  // that depends on what is actually ahead. It used to be asked *after* the
+  // player had already committed to an intensity.
+  const paceId = getReconPace(journey);
+  if (journey.routePlan?.day !== journey.day) {
+    await maybePromptRouteChoice(game, currentBlock);
+    checkpointReconShift(game, shiftState, pendingEvent);
+  }
+  applyReconTravelIntelPenalty(ui, journey, currentBlock, paceId);
+
+  spendDay(journey);
+  const progressBefore = journey.totalDistance > 0
+    ? journey.distanceTraveled / journey.totalDistance
+    : 0;
+  const blockIndexBefore = journey.currentBlockIndex;
+  const result = executeFieldAction(journey, paceId);
+  const progressAfter = journey.totalDistance > 0
+    ? journey.distanceTraveled / journey.totalDistance
+    : progressBefore;
+
+  if (typeof ui.playTravelStrip === 'function') {
+    await ui.playTravelStrip({
+      weatherId: journey.weather?.id,
+      terrain: currentBlock?.terrain,
+      pace: paceId,
+      wildlife: pickTrailWildlife(journey, paceId),
+      seed: journey.day * 31 + journey.currentBlockIndex,
+      progressBefore,
+      progressAfter,
+    });
+  }
+
+  ui.writeHeader('TRAVEL RESULTS');
+  writeFieldMessages(ui, result.messages);
+  shiftState.hasTraveled = true;
+  shiftState.dayResolved = true;
+
+  // Reaching a water crossing is a played decision, not terrain math.
+  if (journey.currentBlockIndex !== blockIndexBefore) {
+    const arrivedBlock = journey.blocks[journey.currentBlockIndex];
+    await runRiverCrossingBeat(game, arrivedBlock);
+    if (game.gameOver) return { gameOver: true };
+    showTrailMarkers(ui, journey, arrivedBlock);
+  }
+
+  // A crossed progress milestone earns the crew a fire and a breather.
+  await celebrateNewMilestones(game);
+  if (game.gameOver) return { gameOver: true };
+  ui.updateAllStatus(journey);
+  checkpointReconShift(game, shiftState, pendingEvent);
+  return { gameOver: false };
+}
+
 /** Paces the player can carry. Ordered easiest-first for the tempo prompt. */
 const RECON_PACE_IDS = ['slow', 'normal', 'fast', 'grueling'];
 
@@ -1478,6 +1568,24 @@ async function maybeHandleFoodDecision(game) {
   }
 
   if ((journey.resources.food || 0) > FIELD_RESOURCES.food.warning) {
+    // Food came back. A standing order to stretch the meals has to lift by
+    // itself once it no longer applies, or short rations become a one-way door
+    // the player is never asked about again — which quietly starves a crew that
+    // is actually well supplied.
+    if (rations.mode === 'short') {
+      rations.mode = 'normal';
+      rations.shortRationStreak = 0;
+      ui.write('Food stores are healthy again. The crew goes back on full rations.');
+    }
+    return;
+  }
+
+  // Rations are a carried standing order now (Set the tempo), so this forced
+  // beat only needs to fire when the player has not already made the call.
+  // A crew already on short rations does not need to be asked again every
+  // single morning for the rest of the season — that was a dozen-plus prompts
+  // and acknowledgements per run saying nothing new.
+  if (rations.mode === 'short' && (journey.resources.food || 0) > FIELD_RESOURCES.food.critical) {
     return;
   }
 

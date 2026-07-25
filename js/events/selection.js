@@ -21,18 +21,33 @@ import { formatRadioReport } from './display.js';
 /**
  * Chance that an ordinary day carries an event at all.
  *
- * Event selection walks the whole applicable deck and rolls each entry on its
- * own, so with a pool this size something fired on very nearly every day.
- * That read as texture when a day held three or four actions. Against one
- * action a day (js/journey/dayPlan.js) it meant the day's event was as loud as
- * the day's decision, and the steady drip of event costs outran every budget
- * in scripts/simulate-expeditions.mjs. So the day gets rolled first, and only
- * then does the deck decide which event it is.
+ * This gate was 0.5 for a good reason: against one action a day
+ * (js/journey/dayPlan.js), an event that fired on nearly every day was as loud
+ * as the day's decision, and the steady drip of event costs outran every
+ * budget in scripts/simulate-expeditions.mjs.
+ *
+ * What changed is that the player can now decline. The day's situation is the
+ * day (docs/day_as_situation.md), and every situation the mode can walk away
+ * from carries an explicit "leave it and push on" that trades the cost for
+ * ground. An event is no longer a bill the player has no say in, so the rate
+ * can go back up and the ~500-entry authored library stops being something a
+ * run sees eleven of.
+ *
+ * Two things keep the higher rate affordable: the player can decline, and
+ * minor/positive situations are dealt with without costing the shift at all
+ * (situationCostsTheShift in js/modes/recon.js), so only moderate-and-worse
+ * actually competes with the day's work.
+ *
+ * 0.65 is measured, not chosen. Over 24 runs of scripts/simulate-expeditions.mjs
+ * a competent recon policy wins 17/24 here; at 0.8 it wins 5/16, because the
+ * traverse stops fitting inside the season. A run also needs quiet days for the
+ * loud ones to land, and a quiet day is a card too — it is where the player
+ * gets to choose their own work.
  *
  * Temptations keep their own lane below: they already have a multi-day
  * cooldown, and gating them twice would bury the shortcut library again.
  */
-const DAY_HAS_EVENT_CHANCE = 0.5;
+const DAY_HAS_EVENT_CHANCE = 0.65;
 
 /**
  * Whether today is an event day at all, before the deck picks which one.

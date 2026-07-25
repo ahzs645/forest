@@ -27,6 +27,12 @@ function formatRoleName(roleId) {
  * @param {string} [frame.dayHeader] - "SHIFT 6 - HIGHWAY CAMP"
  * @param {string} [frame.statusLine] - the day's drumbeat line
  * @param {string[]} [frame.context] - free background behind "More context"
+ * @param {Array} [frame.extraOptions] - mode-supplied ways out of the situation
+ *   that are not authored event options (recon's "leave it and keep moving").
+ *   Their values must not be numbers, which is how they are told apart from
+ *   the authored options' indices.
+ * @returns {Promise<{resolved: boolean, choice?: *}>} `resolved: false` means
+ *   the player took one of `extraOptions` and the caller owns what happens.
  */
 export async function handleEvent(game, event, frame = {}) {
   const { ui, journey } = game;
@@ -50,8 +56,10 @@ export async function handleEvent(game, event, frame = {}) {
   // player with zero choices if one somehow did.
   const usable = actionable.length ? actionable : entries;
 
+  const content = buildEventCardContent(formatted, event, usable);
   const card = {
-    ...buildEventCardContent(formatted, event, usable),
+    ...content,
+    options: [...content.options, ...(frame.extraOptions || [])],
     dayHeader: frame.dayHeader || null,
     statusLine: frame.statusLine || null,
     context: frame.context || [],
@@ -60,7 +68,15 @@ export async function handleEvent(game, event, frame = {}) {
     },
   };
 
-  const optionIndex = await presentDayCard(ui, card);
+  const picked = await presentDayCard(ui, card);
+
+  // Authored options resolve here; anything else is a mode-supplied way out
+  // and belongs to the caller, unresolved and with whatever that costs.
+  if (typeof picked !== 'number') {
+    return { resolved: false, choice: picked };
+  }
+
+  const optionIndex = picked;
   const selectedOption = event.options[optionIndex] || event.options[usable[0].index];
 
   const result = resolveEvent(journey, event, selectedOption);
@@ -85,4 +101,6 @@ export async function handleEvent(game, event, frame = {}) {
     description: 'Return to the shift after reviewing the result',
     value: 'continue'
   }]);
+
+  return { resolved: true };
 }

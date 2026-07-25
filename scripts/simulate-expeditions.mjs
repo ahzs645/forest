@@ -142,8 +142,19 @@ function reconPolicy(journey, options, prompt) {
       'rations', 'done', 'cancel', 'lean', 'skip', 'next', 'continue'
     ]);
     if (sub) return sub;
-    // An authored event card: options are numeric indices, so there is no
-    // vocabulary to match on. Take the first, which is the authored default.
+    // An authored event card. A competent crew lead does not deal with
+    // everything: when the season is running ahead of the file, they drive on
+    // and wear the scrutiny. Model that, or the policy spends every day of the
+    // run answering the radio and finishes three blocks out of eleven.
+    const walkAway = options.find((option) => option.value === 'walk_away');
+    if (walkAway) {
+      const deadline = journey.deadline || 32;
+      const seasonElapsed = (journey.day || 1) / deadline;
+      const totalBlocks = journey.blocks?.length || 1;
+      const packagesDone = (journey.blocksAssessed || 0) / totalBlocks;
+      if (packagesDone < seasonElapsed) return walkAway;
+    }
+    // Otherwise take the authored default.
     return options[0];
   }
 

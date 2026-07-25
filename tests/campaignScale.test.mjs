@@ -229,8 +229,8 @@ test('campaign scale: silviculture arithmetic is winnable within a season', () =
 test('recon and silviculture ship a real season deadline, full-length and campaign', () => {
   const recon = createJourney({ roleId: 'recce', areaId: 'fort-st-john-plateau' });
   const reconCampaign = createJourney({ roleId: 'recce', areaId: 'fort-st-john-plateau', scale: 'campaign' });
-  assert.equal(recon.deadline, 32, 'full-length recon runs to a 32-shift access season');
-  assert.equal(reconCampaign.deadline, 20, 'campaign recon shares the twenty-day season');
+  assert.equal(recon.deadline, 40, 'full-length recon runs to a 40-shift access season');
+  assert.equal(reconCampaign.deadline, 24, 'campaign recon gets a 24-shift season');
 
   const silv = createSilvicultureJourney({ roleId: 'silviculture', areaId: 'fort-st-john-plateau' });
   const silvCampaign = createSilvicultureJourney({
