@@ -9,6 +9,18 @@ import { syncBlocksFromDistance } from '../journey/blockNav.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
 import { buildEventReaction } from './reactions.js';
+/**
+ * Ceiling on how much ground a single day's trouble can cost a field crew.
+ * Event content still rates delays on the retired eight-hour scale; this
+ * turns that number into a share of the shift without ever zeroing it out.
+ */
+const MAX_TRAVEL_SETBACK = 0.75;
+
+/**
+ * Stress and energy a desk delay costs per hour it was authored at, on the
+ * same retired eight-hour scale.
+ */
+const DESK_DELAY_STRAIN = 2;
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
@@ -92,12 +104,18 @@ export function resolveEvent(journey, event, option) {
     messages.push('That call comes back on you.');
   }
 
+  // Content still rates a delay on the old eight-hour scale; a shift is one
+  // job now, so the same number reads as the share of the day's ground the
+  // trouble cost. A setback never takes the whole shift — the crew always
+  // makes some distance.
   const fieldTimeUsed = option.timeUsed ?? effects?.timeUsed;
   if (isFieldJourney(journey.journeyType) && typeof fieldTimeUsed === 'number') {
-    const hours = Math.max(0, Math.min(8, fieldTimeUsed));
-    journey.travelDelayHours = Math.min(8, (journey.travelDelayHours || 0) + hours);
-    if (hours > 0) {
-      messages.push(`Lost ${hours} hour${hours === 1 ? '' : 's'} dealing with the situation.`);
+    const setback = Math.max(0, Math.min(MAX_TRAVEL_SETBACK, fieldTimeUsed / 8));
+    journey.travelSetback = Math.min(MAX_TRAVEL_SETBACK, (journey.travelSetback || 0) + setback);
+    if (setback > 0) {
+      messages.push(setback >= 0.35
+        ? 'Sorting that out swallowed most of the shift. The crew makes little ground today.'
+        : 'Sorting that out cost the crew ground today.');
     }
   }
 
@@ -201,11 +219,21 @@ function applyEventEffects(journey, effects, messages) {
       journey.resources.politicalCapital = Math.max(0,
         Math.min(DESK_RESOURCES.politicalCapital.max, journey.resources.politicalCapital + effects.politicalCapital));
     }
-    if (typeof effects.timeUsed === 'number') {
-      journey.hoursRemaining = Math.max(0, journey.hoursRemaining - effects.timeUsed);
-      if (effects.timeUsed > 0) {
-        messages.push(`Time used: ${effects.timeUsed}h.`);
+    // A delay never costs the day's action. The desk pool rolls something on
+    // most days, so letting an event spend the day meant whole weeks where the
+    // player never reached their own menu — an event is what happens around
+    // the day's decision, not instead of it. The lost time lands as pressure.
+    if (typeof effects.timeUsed === 'number' && effects.timeUsed > 0) {
+      const strain = Math.max(1, Math.round(effects.timeUsed * DESK_DELAY_STRAIN));
+      if (journey.protagonist) {
+        journey.protagonist.stress = clampPercent((journey.protagonist.stress || 0) + strain);
+        journey.protagonist.energy = clampPercent((journey.protagonist.energy || 0) - strain);
+      } else if (typeof journey.resources?.energy === 'number') {
+        journey.resources.energy = clampPercent(journey.resources.energy - strain);
       }
+      messages.push(effects.timeUsed >= 4
+        ? 'That one ate the day around the edges. You get your work done late and tired.'
+        : 'The interruption cuts into the day you had planned.');
     }
   }
 

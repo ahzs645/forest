@@ -12,6 +12,17 @@ import { executeDeskDay, DESK_ACTIONS } from '../journey.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
+import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
+
+/**
+ * Files a desk moves in a day.
+ *
+ * The pipeline used to advance one permit per two-hour action, so a shift
+ * pushed three or four files. A day is one action now (js/journey/dayPlan.js),
+ * and at one file a day a fifteen-permit season needed sixty days against a
+ * thirty-day deadline. A day at the desk is a batch, not a single form.
+ */
+const DAILY_PERMIT_THROUGHPUT = 3;
 import { formatRoadAssetSummary, getPermittingRoadAssetContext } from '../data/roadAssetIntel.js';
 import {
   advanceProfessionalComplianceChain,
@@ -31,7 +42,6 @@ const PERMIT_REVISION_PROFILES = [
       timing: 2
     },
     clean: {
-      hours: 3,
       label: 'Clean up the crossing file',
       note: 'You rebuild the package with better drawings and hydrology notes.',
       scrutiny: -3,
@@ -39,7 +49,6 @@ const PERMIT_REVISION_PROFILES = [
       relationships: { agencies: 1 }
     },
     fast: {
-      hours: 2,
       label: 'Fast-track the crossing file',
       note: 'You resubmit quickly and lean on the existing package.',
       scrutiny: 4,
@@ -59,7 +68,6 @@ const PERMIT_REVISION_PROFILES = [
       timing: 1
     },
     clean: {
-      hours: 3,
       label: 'Rework the watershed package',
       note: 'You add a more defensible water-quality response and timing note.',
       scrutiny: -3,
@@ -67,7 +75,6 @@ const PERMIT_REVISION_PROFILES = [
       relationships: { ministry: 1, agencies: 1 }
     },
     fast: {
-      hours: 2,
       label: 'Push the watershed file',
       note: 'You keep the file moving, but the shorter response draws attention.',
       scrutiny: 4,
@@ -85,7 +92,6 @@ const PERMIT_REVISION_PROFILES = [
       publicReview: 4
     },
     clean: {
-      hours: 3,
       label: 'Tighten the consultation record',
       note: 'You rebuild the record trail and clean up the accommodation notes.',
       scrutiny: -3,
@@ -93,7 +99,6 @@ const PERMIT_REVISION_PROFILES = [
       relationships: { nations: 2, agencies: 1 }
     },
     fast: {
-      hours: 2,
       label: 'Resubmit consultation notes',
       note: 'You move quickly, but the lighter package leaves more heat behind.',
       scrutiny: 5,
@@ -111,7 +116,6 @@ const PERMIT_REVISION_PROFILES = [
       publicReview: 4
     },
     clean: {
-      hours: 3,
       label: 'Redraw the visual package',
       note: 'You tighten the map set and the file reads as more defensible.',
       scrutiny: -3,
@@ -119,7 +123,6 @@ const PERMIT_REVISION_PROFILES = [
       relationships: { ministry: 1 }
     },
     fast: {
-      hours: 2,
       label: 'Minimal visual edits',
       note: 'You keep the turnaround short, but the thinner package stays under a microscope.',
       scrutiny: 4,
@@ -139,7 +142,6 @@ const PERMIT_REVISION_PROFILES = [
       timing: 3
     },
     clean: {
-      hours: 3,
       label: 'Strengthen the access package',
       note: 'You tidy up the engineering notes and reduce the reviewer’s concerns.',
       scrutiny: -2,
@@ -147,7 +149,6 @@ const PERMIT_REVISION_PROFILES = [
       relationships: { agencies: 1 }
     },
     fast: {
-      hours: 2,
       label: 'Keep the access package moving',
       note: 'You push the file through with minimal edits and pay for it in attention.',
       scrutiny: 4,
@@ -167,7 +168,6 @@ const PERMIT_REVISION_PROFILES = [
       timing: 1
     },
     clean: {
-      hours: 3,
       label: 'Clean up the package',
       note: 'You chase down the missing pieces and make the submission more defensible.',
       scrutiny: -2,
@@ -175,7 +175,6 @@ const PERMIT_REVISION_PROFILES = [
       relationships: { ministry: 1, agencies: 1 }
     },
     fast: {
-      hours: 2,
       label: 'Submit the bare-minimum revision',
       note: 'You keep momentum, but the lean response adds heat to the file.',
       scrutiny: 3,
@@ -826,41 +825,53 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
       resolved: false,
       mode: selectedMode,
       ticket: null,
-      hoursUsed: 0,
       messages: ['No open deficiency file was available to respond to.']
     };
   }
 
   const response = ticket[selectedMode] || ticket.clean;
-  const hoursUsed = Math.max(0, response.hours || 0);
-  const availableHours = Number.isFinite(journey.hoursRemaining) ? journey.hoursRemaining : 0;
 
-  if (availableHours < hoursUsed) {
+  if (dayIsSpent(journey)) {
     return {
       resolved: false,
       mode: selectedMode,
       ticket,
-      hoursUsed: 0,
-      messages: ['Not enough hours remain to address that deficiency today.']
+      messages: ['The day is already spoken for. That deficiency waits until tomorrow.']
     };
   }
 
-  journey.hoursRemaining = availableHours - hoursUsed;
+  spendDay(journey);
+
+  // A day answering the reviewer clears the files that are open, not one form.
+  // Deficiencies land faster than a single-ticket day could ever answer them,
+  // so the queue would only ever grow (see DAILY_PERMIT_THROUGHPUT).
+  const alsoCleared = queue
+    .filter((candidate) => candidate !== ticket)
+    .slice(0, DAILY_PERMIT_THROUGHPUT - 1);
+  const cleared = [ticket, ...alsoCleared];
+
   applyProtagonistCost(journey, {
     energy: selectedMode === 'fast' ? 6 : 8,
     stress: selectedMode === 'fast' ? 7 : 4
   });
-  applyRevisionEffects(journey, response);
+  for (const entry of cleared) {
+    applyRevisionEffects(journey, entry[selectedMode] || entry.clean);
+  }
 
-  queue.splice(ticketIndex, 1);
+  for (const entry of cleared) {
+    const index = queue.indexOf(entry);
+    if (index !== -1) queue.splice(index, 1);
+  }
   if (journey.permits) {
-    journey.permits.needsRevision = Math.max(0, (journey.permits.needsRevision || 0) - 1);
-    journey.permits.submitted = (journey.permits.submitted || 0) + 1;
+    journey.permits.needsRevision = Math.max(0, (journey.permits.needsRevision || 0) - cleared.length);
+    journey.permits.submitted = (journey.permits.submitted || 0) + cleared.length;
   }
 
   const responseLabel = selectedMode === 'fast' ? 'Quick resubmission' : 'Clean response';
   const messages = [
-    `${responseLabel} filed for ${ticket.title}.`,
+    cleared.length > 1
+      ? `${responseLabel} filed for ${ticket.title} and ${cleared.length - 1} more open file${cleared.length > 2 ? 's' : ''}.`
+      : `${responseLabel} filed for ${ticket.title}.`,
     response.note
   ];
 
@@ -886,7 +897,7 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
     resolved: true,
     mode: selectedMode,
     ticket,
-    hoursUsed,
+    cleared: cleared.length,
     messages
   };
 }
@@ -924,8 +935,11 @@ export async function runPermittingDay(game) {
     if (game.gameOver) return;
   }
 
-  // Inner loop: multiple actions per day until hours run out
-  while (journey.hoursRemaining > 0) {
+  // One file gets the day. Look-ups leave it unspent and the loop comes back
+  // around to the real decision; the tally closes a day whose menu turns out
+  // to be nothing but look-ups.
+  const freeChoices = { count: 0 };
+  while (!dayIsSpent(journey)) {
     displayPermittingHeader(ui, journey);
 
     // Check protagonist energy
@@ -946,7 +960,7 @@ export async function runPermittingDay(game) {
     // shape recon uses, so the primary turn stays a clean set of decisions.
     let actionId = 'end_day';
     while (true) {
-      const action = await ui.promptChoice(`${journey.hoursRemaining} hours remaining:`, primary);
+      const action = await ui.promptChoice(dayPrompt(journey), primary);
       const chosen = action.value || 'end_day';
       if (chosen === 'support_menu') {
         const sub = await ui.promptChoice('Office & support:', [
@@ -984,7 +998,7 @@ export async function runPermittingDay(game) {
 
     // Update status panels
     ui.updateAllStatus(journey);
-
+    settleDayPass(journey, freeChoices, ui);
   }
 
   // End of day processing
@@ -1008,7 +1022,6 @@ function displayPermittingHeader(ui, journey) {
 
   const facts = [
     { label: 'Days left', value: `${daysRemaining}`, tone: daysRemaining <= 5 ? 'danger' : daysRemaining <= 10 ? 'warn' : undefined },
-    { label: 'Hours left', value: `${journey.hoursRemaining}h` },
     { label: 'Lane', value: guidance.lane },
     { label: 'Stage', value: laneAction.stageLabel }
   ];
@@ -1109,7 +1122,6 @@ function displayPermittingBriefing(ui, journey) {
  * @returns {Array} Action options
  */
 export function buildActionOptions(journey) {
-  const hoursLeft = journey.hoursRemaining || 8;
   const revisionQueue = ensurePermittingRevisionState(journey);
   const laneAction = getPermittingLaneAction(journey);
 
@@ -1126,7 +1138,7 @@ export function buildActionOptions(journey) {
   // registration is always urgent, and a climbing paperwork load becomes
   // urgent well before it reaches the "issue" threshold used elsewhere
   // (getPermittingProfessionalIssues flags it at 40+).
-  if (hoursLeft >= 2) {
+  {
     const professional = getPermittingProfessionalSnapshot(journey);
     const pieces = [];
     if (professional?.registrationStatus !== 'active') {
@@ -1143,7 +1155,7 @@ export function buildActionOptions(journey) {
     const laneDetail = `Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel}`;
     const prefix = adminUrgent ? 'Best move | ' : '';
     primary.push({
-      label: `${laneAction.actionLabel} (2h)`,
+      label: laneAction.actionLabel,
       description: pieces.length
         ? `${prefix}${laneDetail} | Clears: ${pieces.join(' | ')}`
         : `${prefix}${laneDetail}`,
@@ -1152,18 +1164,18 @@ export function buildActionOptions(journey) {
   }
 
   // Core pipeline throughput stays top-level so the main work is never buried.
-  if (journey.permits.backlog > 0 && hoursLeft >= 2) {
+  if (journey.permits.backlog > 0) {
     primary.push({
       label: 'Draft Permit Application',
-      description: '2h - Move a permit from the backlog into drafting',
+      description: 'Move a permit from the backlog into drafting',
       value: 'draft_permit'
     });
   }
 
-  if ((journey.permits.drafting || 0) > 0 && hoursLeft >= 2) {
+  if ((journey.permits.drafting || 0) > 0) {
     primary.push({
       label: 'Submit Permit',
-      description: '2h - Send a drafted permit into review',
+      description: 'Send a drafted permit into review',
       value: 'submit_permit'
     });
   }
@@ -1173,65 +1185,53 @@ export function buildActionOptions(journey) {
   const openRevisionTickets = revisionQueue.filter((ticket) => ticket && !ticket.resolved);
   openRevisionTickets.forEach((ticket, index) => {
     const bucket = index === 0 ? primary : support;
-    if (hoursLeft >= ticket.clean.hours) {
-      bucket.push({
-        label: `Clean response: ${ticket.title}`,
-        description: `${ticket.clean.hours}h - Fix the deficiency properly; lower scrutiny`,
-        value: `revise_permit:${ticket.id}:clean`
-      });
-    }
-    if (hoursLeft >= ticket.fast.hours) {
-      bucket.push({
-        label: `Fast-track: ${ticket.title}`,
-        description: `${ticket.fast.hours}h - Quicker resubmission, but more heat`,
-        value: `revise_permit:${ticket.id}:fast`
-      });
-    }
+    bucket.push({
+      label: `Clean response: ${ticket.title}`,
+      description: 'Fix the deficiency properly; lower scrutiny',
+      value: `revise_permit:${ticket.id}:clean`
+    });
+    bucket.push({
+      label: `Fast-track: ${ticket.title}`,
+      description: 'Quicker resubmission, but more heat',
+      value: `revise_permit:${ticket.id}:fast`
+    });
   });
 
-  if ((journey.permits.inReferral || 0) > 0 && hoursLeft >= 2) {
+  if ((journey.permits.inReferral || 0) > 0) {
     primary.push({
       label: 'Follow Up on Referrals',
-      description: '2h - Chase the other-agency sign-offs a permit is waiting on',
+      description: 'Chase the other-agency sign-offs a permit is waiting on',
       value: 'follow_up_referrals'
     });
   }
 
   // Process Permits is core throughput — it keeps submitted files moving.
-  if (DESK_ACTIONS.process_permits.hoursRequired <= hoursLeft) {
-    primary.push({
-      label: DESK_ACTIONS.process_permits.name,
-      description: `${DESK_ACTIONS.process_permits.hoursRequired}h - ${DESK_ACTIONS.process_permits.description}`,
-      value: 'process_permits'
-    });
-  }
+  primary.push({
+    label: DESK_ACTIONS.process_permits.name,
+    description: DESK_ACTIONS.process_permits.description,
+    value: 'process_permits'
+  });
 
   // Support actions: relationships, morale, crisis response, recovery.
-  if (DESK_ACTIONS.stakeholder_meeting.hoursRequired <= hoursLeft) {
-    support.push({
-      label: DESK_ACTIONS.stakeholder_meeting.name,
-      description: `${DESK_ACTIONS.stakeholder_meeting.hoursRequired}h - ${DESK_ACTIONS.stakeholder_meeting.description}`,
-      value: 'stakeholder_meeting'
-    });
-  }
-  if (DESK_ACTIONS.team_morale.hoursRequired <= hoursLeft) {
-    support.push({
-      label: DESK_ACTIONS.team_morale.name,
-      description: `${DESK_ACTIONS.team_morale.hoursRequired}h - ${DESK_ACTIONS.team_morale.description}`,
-      value: 'team_morale'
-    });
-  }
-  if (DESK_ACTIONS.crisis_management.hoursRequired <= hoursLeft) {
-    support.push({
-      label: DESK_ACTIONS.crisis_management.name,
-      description: `${DESK_ACTIONS.crisis_management.hoursRequired}h - ${DESK_ACTIONS.crisis_management.description}`,
-      value: 'crisis_management'
-    });
-  }
-  if (journey.protagonist && hoursLeft >= 1) {
+  support.push({
+    label: DESK_ACTIONS.stakeholder_meeting.name,
+    description: DESK_ACTIONS.stakeholder_meeting.description,
+    value: 'stakeholder_meeting'
+  });
+  support.push({
+    label: DESK_ACTIONS.team_morale.name,
+    description: DESK_ACTIONS.team_morale.description,
+    value: 'team_morale'
+  });
+  support.push({
+    label: DESK_ACTIONS.crisis_management.name,
+    description: DESK_ACTIONS.crisis_management.description,
+    value: 'crisis_management'
+  });
+  if (journey.protagonist) {
     support.push({
       label: 'Take a Break',
-      description: '1h - Reduce stress, recover energy',
+      description: 'Reduce stress, recover energy',
       value: 'rest'
     });
   }
@@ -1396,8 +1396,8 @@ async function processAction(game, actionId) {
 
     case 'draft_permit':
       if (journey.permits.backlog > 0) {
-        const drafted = shiftPermits('backlog', 'drafting', journey.permits, 1);
-        journey.hoursRemaining -= 2;
+        const drafted = shiftPermits('backlog', 'drafting', journey.permits, DAILY_PERMIT_THROUGHPUT);
+        spendDay(journey);
         applyProtagonistCost(journey, { energy: 8, stress: 5 });
         applyPermittingProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
         ui.write(`Permit application drafted and ready for submission${drafted > 1 ? 's' : ''}.`);
@@ -1406,8 +1406,8 @@ async function processAction(game, actionId) {
 
     case 'submit_permit':
       if ((journey.permits.drafting || 0) > 0) {
-        shiftPermits('drafting', 'submitted', journey.permits, 1);
-        journey.hoursRemaining -= 2;
+        shiftPermits('drafting', 'submitted', journey.permits, DAILY_PERMIT_THROUGHPUT);
+        spendDay(journey);
         applyProtagonistCost(journey, { energy: 5, stress: 3 });
 
         // Some permits go to referral, some to direct review
@@ -1472,7 +1472,7 @@ async function processAction(game, actionId) {
     case 'follow_up_referrals':
       const referrals = journey.permits.inReferral || 0;
       if (referrals > 0) {
-        journey.hoursRemaining -= 2;
+        spendDay(journey);
         applyProtagonistCost(journey, { energy: 6, stress: 4 });
 
         // Chance to advance referrals
@@ -1501,7 +1501,7 @@ async function processAction(game, actionId) {
       const chainId = getPermittingPaperworkChainId(journey);
       const chainProgress = progressPermittingPaperworkChain(journey, chainId, 1);
       const stage = chainProgress?.stage || 'renewal';
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       applyProtagonistCost(journey, { energy: 5, stress: 4 });
 
       const effect = getPaperworkChainStageEffect(chainId, stage);
@@ -1526,7 +1526,7 @@ async function processAction(game, actionId) {
         journey.protagonist.energy = Math.min(100, journey.protagonist.energy + 15);
         journey.protagonist.stress = Math.max(0, journey.protagonist.stress - 10);
       }
-      journey.hoursRemaining -= 1;
+      spendDay(journey);
       applyPermittingProfessionalWork(journey, { auditExposure: -1, competenceRisk: -1 });
       ui.write('You take a short break. Feeling a bit better.');
       return;
@@ -1639,7 +1639,7 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
 
   // Advance to next day
   journey.day++;
-    journey.hoursRemaining = 8;
+    startDay(journey);
     journey.currentPhase = getDeskPhase(journey);
 
     // Update status panels

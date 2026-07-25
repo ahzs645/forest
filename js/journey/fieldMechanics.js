@@ -755,8 +755,9 @@ function travelDistanceForDay(journey, paceId) {
   const routeMod = journey.routePlan?.distanceMultiplier ?? 1;
   const crewTravelMod = getCrewTravelModifier(journey);
 
-  const delayHours = Math.min(8, Math.max(0, journey.travelDelayHours || 0));
-  const timeModifier = Math.max(0, 1 - delayHours / 8);
+  // A day's trouble costs ground, not hours (js/events/resolution.js).
+  const setback = Math.min(0.75, Math.max(0, journey.travelSetback || 0));
+  const timeModifier = 1 - setback;
   const variance = 1 + (Math.random() * 2 - 1) * DAILY_TRAVEL_VARIANCE;
   const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance * timeModifier * routeMod * crewTravelMod;
   return Math.max(0, distance);
@@ -1024,7 +1025,7 @@ export function endFieldDay(journey) {
   }
   journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day, journey.season?.currentSeason);
   journey.temperature = getTemperature(journey.weather, getCurrentBlock(journey));
-  journey.travelDelayHours = 0;
+  journey.travelSetback = 0;
   journey.routePlan = null;
   if (journey.rationPlan) {
     journey.rationPlan.mode = 'normal';

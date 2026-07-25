@@ -122,10 +122,10 @@ test('campaign scale: recon trims blocks and scales per-run stockpile resources'
   assert.equal(scaled.resources.flaggingTape, Math.round(normal.resources.flaggingTape * 0.45));
 
   // Exact expected numbers from the current createFieldResources() defaults.
-  assert.equal(scaled.resources.budget, 900);
-  assert.equal(scaled.resources.fuel, 36);
-  assert.equal(scaled.resources.food, 16);
-  assert.equal(scaled.resources.firstAid, 3);
+  assert.equal(scaled.resources.budget, 1440);
+  assert.equal(scaled.resources.fuel, 59);
+  assert.equal(scaled.resources.food, 29);
+  assert.equal(scaled.resources.firstAid, 4);
   assert.equal(scaled.resources.gpsUnits, 2);
   assert.equal(scaled.resources.flaggingTape, 23);
 
@@ -159,18 +159,18 @@ test('campaign scale: silviculture sets season-sized targets, budget and contrac
   });
 
   // Full-length baseline, unaffected.
-  assert.equal(normal.planting.blocksToPlant, 15);
-  assert.equal(normal.planting.seedlingsAllocated, 250000);
-  assert.equal(normal.brushing.hectaresTarget, 500);
-  assert.equal(normal.surveys.freeGrowingTarget, 5);
+  assert.equal(normal.planting.blocksToPlant, 8);
+  assert.equal(normal.planting.seedlingsAllocated, 140000);
+  assert.equal(normal.brushing.hectaresTarget, 260);
+  assert.equal(normal.surveys.freeGrowingTarget, 3);
   assert.equal(normal.resources.budget, 120000);
   assert.equal(normal.resources.contractorCapacity, 320);
 
   // Campaign season targets from docs/unified_campaign.md section 3.
-  assert.equal(scaled.planting.blocksToPlant, 5);
-  assert.equal(scaled.planting.seedlingsAllocated, 80000);
-  assert.equal(scaled.resources.seedlings, 80000);
-  assert.equal(scaled.brushing.hectaresTarget, 150);
+  assert.equal(scaled.planting.blocksToPlant, 3);
+  assert.equal(scaled.planting.seedlingsAllocated, 55000);
+  assert.equal(scaled.resources.seedlings, 55000);
+  assert.equal(scaled.brushing.hectaresTarget, 100);
   assert.equal(scaled.surveys.freeGrowingTarget, 2);
   assert.equal(scaled.resources.budget, 45000);
   assert.equal(scaled.resources.contractorCapacity, Math.round(320 * 0.45));
@@ -187,26 +187,28 @@ test('campaign scale: silviculture sets season-sized targets, budget and contrac
   assert.equal(scaled.surveys.freeGrowingComplete, 0);
 });
 
-test('campaign scale: silviculture arithmetic is winnable within a season (9-14 plant/fill actions, ~8-12 days)', () => {
+test('campaign scale: silviculture arithmetic is winnable within a season', () => {
   // Mirrors js/modes/silviculture.js handlePlanting()'s formula:
   //   seedlingsToPlant = round(baseSeedlings * (avgProductivity/100) * plantingEff * crowdingFactor * (1 - zoneDrag))
   // baseSeedlings: 9500 (plant) / 7000 (fill); contractors start at 80-100%
   // productivity (avg ~85-90%); zoneDrag/crowding trims a further ~10-15%.
-  const seedlingsAllocated = 80000;
+  const seedlingsAllocated = 55000;
   const perPlantAction = Math.round(9500 * 0.85 * 1.0 * 1.0 * 0.9); // ~7267
   const actionsNeeded = Math.ceil(seedlingsAllocated / perPlantAction);
-  assert.ok(actionsNeeded >= 9 && actionsNeeded <= 14, `expected 9-14 plant/fill actions, got ${actionsNeeded}`);
+  assert.ok(actionsNeeded >= 6 && actionsNeeded <= 10, `expected 6-10 plant/fill actions, got ${actionsNeeded}`);
 
-  // Hours: plant costs 4h, fill 3h, out of a 10h silviculture day.
-  const hoursForPlanting = actionsNeeded * 4;
-  const daysForPlanting = Math.ceil(hoursForPlanting / 10);
-  assert.ok(daysForPlanting <= 6, `planting alone should fit comfortably inside the season, got ${daysForPlanting} days`);
+  // A day is one action now (js/journey/dayPlan.js), so planting actions map
+  // one-to-one onto days and the whole program has to fit the season beside
+  // brushing, surveys, and the days events take over.
+  assert.ok(actionsNeeded <= 12, `planting alone should fit inside the season, got ${actionsNeeded} days`);
 
   // Budget: $550/day overhead + $1700/plant action + brushing/survey passes,
-  // must clear the scaled budget even after the 0.8x hard multiplier.
-  const overheadDays = 12;
+  // must clear the scaled budget even after the 0.8x hard multiplier. The
+  // overhead runs the full measured season now, not a packed fortnight — see
+  // scripts/simulate-expeditions.mjs (campaign silviculture lands 12-19 days).
+  const overheadDays = 20;
   const plantCost = actionsNeeded * 1700;
-  const brushCost = 3 * 1400; // ~3 brushing actions to cover 150ha
+  const brushCost = 3 * 1400; // ~3 brushing actions to cover 100ha
   const surveyCost = 4 * 700; // a few survey attempts to land 2 free-growing calls
   const overheadCost = overheadDays * 550;
   const totalCost = plantCost + brushCost + surveyCost + overheadCost;
@@ -229,10 +231,10 @@ test('campaign scale: planning shortens the deadline and scales budget, leaves g
   const scaled = createPlanningJourney({ roleId: 'planner', areaId: 'fort-st-john-plateau', scale: 'campaign' });
 
   assert.equal(normal.deadline, 28);
-  assert.equal(scaled.deadline, 12);
+  assert.equal(scaled.deadline, 20);
 
-  assert.equal(scaled.resources.budget, Math.round(50000 * 0.5));
-  assert.equal(scaled.resources.budget, 25000);
+  assert.equal(scaled.resources.budget, Math.round(68000 * 0.68));
+  assert.equal(scaled.resources.budget, 46240);
 
   // Gate thresholds / plan phase state are untouched by campaign scale.
   assert.deepEqual(scaled.plan, normal.plan);
@@ -250,13 +252,13 @@ test('campaign scale: permitting tightens permit target and deadline, scales bud
   });
 
   assert.equal(normal.permits.target, 15);
-  assert.equal(scaled.permits.target, 5);
+  assert.equal(scaled.permits.target, 12);
 
   assert.equal(normal.deadline, 30);
-  assert.equal(scaled.deadline, 12);
+  assert.equal(scaled.deadline, 20);
 
-  assert.equal(scaled.resources.budget, Math.round(42000 * 0.5));
-  assert.equal(scaled.resources.budget, 21000);
+  assert.equal(scaled.resources.budget, Math.round(58000 * 0.68));
+  assert.equal(scaled.resources.budget, 39440);
 
   // Political capital/energy are percentage-style resources, untouched.
   assert.equal(scaled.resources.politicalCapital, normal.resources.politicalCapital);
@@ -286,11 +288,11 @@ test('unscaled createJourney remains behaviorally identical to before the campai
   const recon = createJourney({ roleId: 'recce', areaId: 'fort-st-john-plateau' });
   assert.equal(recon.journeyType, 'recon');
   assert.equal(recon.blocks.length, 12);
-  assert.equal(recon.resources.budget, 2000);
-  assert.equal(recon.resources.fuel, 80);
-  assert.equal(recon.resources.food, 35);
-  assert.equal(recon.resources.equipment, 85);
-  assert.equal(recon.resources.firstAid, 6);
+  assert.equal(recon.resources.budget, 3200);
+  assert.equal(recon.resources.fuel, 130);
+  assert.equal(recon.resources.food, 65);
+  assert.equal(recon.resources.equipment, 90);
+  assert.equal(recon.resources.firstAid, 8);
   assert.equal(recon.resources.gpsUnits, 5);
   assert.equal(recon.resources.flaggingTape, 50);
   assert.equal(recon.scrutiny, 28);
@@ -298,26 +300,26 @@ test('unscaled createJourney remains behaviorally identical to before the campai
   // Silviculture
   const silviculture = createJourney({ roleId: 'silviculture', areaId: 'fort-st-john-plateau' });
   assert.equal(silviculture.journeyType, 'silviculture');
-  assert.equal(silviculture.planting.blocksToPlant, 15);
-  assert.equal(silviculture.planting.seedlingsAllocated, 250000);
-  assert.equal(silviculture.brushing.hectaresTarget, 500);
-  assert.equal(silviculture.surveys.freeGrowingTarget, 5);
+  assert.equal(silviculture.planting.blocksToPlant, 8);
+  assert.equal(silviculture.planting.seedlingsAllocated, 140000);
+  assert.equal(silviculture.brushing.hectaresTarget, 260);
+  assert.equal(silviculture.surveys.freeGrowingTarget, 3);
   assert.equal(silviculture.resources.budget, 120000);
-  assert.equal(silviculture.resources.seedlings, 250000);
+  assert.equal(silviculture.resources.seedlings, 140000);
   assert.equal(silviculture.resources.contractorCapacity, 320);
 
   // Planning
   const planning = createJourney({ roleId: 'planner', areaId: 'fort-st-john-plateau' });
   assert.equal(planning.journeyType, 'planning');
   assert.equal(planning.deadline, 28);
-  assert.equal(planning.resources.budget, 50000);
+  assert.equal(planning.resources.budget, 68000);
 
   // Permitting
   const permitting = createJourney({ roleId: 'permitter', areaId: 'fort-st-john-plateau' });
   assert.equal(permitting.journeyType, 'permitting');
   assert.equal(permitting.permits.target, 15);
   assert.equal(permitting.deadline, 30);
-  assert.equal(permitting.resources.budget, 42000);
+  assert.equal(permitting.resources.budget, 58000);
 
   // Manager
   const manager = createJourney({ roleId: 'manager' });
@@ -329,7 +331,7 @@ test('unscaled createJourney remains behaviorally identical to before the campai
   const legacyField = createJourney({ areaId: 'fort-st-john-plateau' });
   assert.equal(legacyField.journeyType, 'field');
   assert.equal(legacyField.blocks.length, 12);
-  assert.equal(legacyField.resources.budget, 2000);
+  assert.equal(legacyField.resources.budget, 3200);
 });
 
 test('headless drive: a campaign-scale silviculture deployment is winnable inside a season', async () => {
@@ -371,8 +373,9 @@ test('headless drive: a campaign-scale silviculture deployment is winnable insid
     `expected most seeds to win the campaign-scale season, got: ${JSON.stringify(results)}`,
   );
   for (const win of wins) {
-    // Contract target is ~8-12 in-game days; give some RNG headroom the same
-    // way the full-length equivalent test does (target 25-45, asserts <=50).
-    assert.ok(win.day <= 18, `expected a win within a plausible season, got day ${win.day} (seed ${win.seed})`);
+    // A day is one action now (js/journey/dayPlan.js), so a campaign season
+    // runs ~12-19 days rather than ~8-12; the bound keeps the same RNG
+    // headroom over the range scripts/simulate-expeditions.mjs measures.
+    assert.ok(win.day <= 26, `expected a win within a plausible season, got day ${win.day} (seed ${win.seed})`);
   }
 });

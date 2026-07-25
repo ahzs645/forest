@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { executeDeskDay, getOperationalProgress, recordProgressMilestones } from '../js/journey.js';
+import { startDay } from '../js/journey/dayPlan.js';
 
 test('planning progress reflects all approval gates instead of confidence alone', () => {
   const planningJourney = {
@@ -62,7 +63,7 @@ test('progress milestones log once when a mode crosses a major threshold', () =>
 test('standard desk actions stay safe in protagonist-only permitting mode', () => {
   const permittingJourney = {
     journeyType: 'permitting',
-    hoursRemaining: 8,
+    actionsRemaining: 1,
     protagonist: {
       energy: 80,
       stress: 20
@@ -96,6 +97,9 @@ test('standard desk actions stay safe in protagonist-only permitting mode', () =
     assert.ok(meeting.messages.some((message) => message.includes('Met with ministry')));
     assert.ok(permittingJourney.relationships.ministry > 50);
 
+    // Each desk action is a day of its own now (js/journey/dayPlan.js), so the
+    // second one gets a fresh day rather than the same afternoon.
+    startDay(permittingJourney);
     const morale = executeDeskDay(permittingJourney, 'team_morale');
     assert.ok(morale.messages.some((message) => message.includes('recover')));
     assert.ok(permittingJourney.protagonist.energy > 60);

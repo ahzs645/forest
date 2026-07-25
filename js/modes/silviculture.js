@@ -13,6 +13,7 @@ import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
 import { addDiscoveryTags, getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { buildStandStrip } from '../scene/forest.js';
+import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
 
 // Contractor event templates (Phase 4.2)
 const CONTRACTOR_EVENTS = [
@@ -32,7 +33,7 @@ const CONTRACTOR_EVENTS = [
     title: 'Planting Quality Dispute',
     getText: (c) => `Spot-check reveals ${c.name} has been cutting corners on spacing.`,
     options: [
-      { label: 'Inspect & retrain (3h)', value: 'inspect', cost: 0, moraleGain: -5, prodGain: 10, hours: 3 },
+      { label: 'Inspect & retrain', value: 'inspect', cost: 0, moraleGain: -5, prodGain: 10 },
       { label: 'Let it slide', value: 'slide', cost: 0, moraleGain: 5, prodGain: 0 }
     ]
   },
@@ -42,7 +43,7 @@ const CONTRACTOR_EVENTS = [
     title: 'Contractor Crew Illness',
     getText: (c) => `Several workers from ${c.name} called in sick. Operations slowed.`,
     options: [
-      { label: 'Send medic (1h)', value: 'medic', cost: 500, moraleGain: 5, prodGain: 0, hours: 1 },
+      { label: 'Send medic', value: 'medic', cost: 500, moraleGain: 5, prodGain: 0 },
       { label: 'Push through', value: 'push', cost: 0, moraleGain: -10, prodGain: -10 }
     ]
   },
@@ -90,10 +91,7 @@ export async function runSilvicultureDay(game) {
   const vegetationPressure = getVegetationPressure(journey);
   const progressBeforeDay = getOperationalProgress(journey);
 
-  // Initialize hours for the day
-  if (!journey.hoursRemaining || journey.hoursRemaining <= 0) {
-    journey.hoursRemaining = 10;
-  }
+  startDay(journey);
 
   // Apply daily contractor productivity decay (Phase 4.2)
   for (const contractor of journey.contractors) {
@@ -168,19 +166,22 @@ export async function runSilvicultureDay(game) {
   const hasAdvancingAction = dayOpeningOptions.some((option) => advancingActionValues.has(option.value));
   silvicultureState.zombieDays = hasAdvancingAction ? 0 : (silvicultureState.zombieDays || 0) + 1;
 
-  // Multi-action loop
-  while (journey.hoursRemaining > 0) {
+  // One program decision gets the day. The binder is free to read and leaves
+  // the day unspent, so the loop returns to the real call; the tally closes a
+  // day whose menu turns out to be nothing but look-ups and blocked steps.
+  const freeChoices = { count: 0 };
+  while (!dayIsSpent(journey)) {
     resolveActionableSilviculturePhase(journey, silvicultureState);
     displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, zoneProfile);
 
-    // Build action options based on season and hours
     const actionOptions = buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultureState, zoneProfile);
 
-    const action = await ui.promptChoice(`${journey.hoursRemaining}h remaining:`, actionOptions);
+    const action = await ui.promptChoice(dayPrompt(journey), actionOptions);
 
     ui.write('');
 
     if (action.value === 'end') {
+      spendDay(journey);
       break;
     }
 
@@ -188,7 +189,7 @@ export async function runSilvicultureDay(game) {
     await processAction(game, action.value, currentSeason, seasonMods, silvicultureState, zoneProfile);
 
     ui.updateAllStatus(journey);
-
+    settleDayPass(journey, freeChoices, ui);
   }
 
   // End of day processing
@@ -237,8 +238,6 @@ export async function runSilvicultureDay(game) {
     journey.gameOverReason = 'The program can no longer reach its targets - the season is called.';
   }
 
-  // Reset hours for next day
-  journey.hoursRemaining = 0;
 
   ui.updateAllStatus(journey);
 
@@ -284,7 +283,6 @@ function displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, z
   if (seasonInfo) {
     facts.push({ label: 'Season', value: `${seasonInfo.name} \u00b7 Y${seasonInfo.year}` });
   }
-  facts.push({ label: 'Hours left', value: `${journey.hoursRemaining}h` });
   facts.push({ label: 'Brushing', value: `${brushPct}%` });
   facts.push({ label: 'Roster', value: roster.summary });
 
@@ -351,11 +349,12 @@ function displaySilvicultureBriefing(ui, journey, silvicultureState, zoneProfile
 }
 
 /**
- * Build available actions based on season and hours
+ * Build the day's available actions. Every one of them is a full day of
+ * program work now (see js/journey/dayPlan.js), so the gates are seasonal and
+ * sequential, never time-based.
  */
 function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultureState, zoneProfile) {
   const actionOptions = [];
-  const hoursLeft = journey.hoursRemaining;
   const sequencePhase = silvicultureState.phase;
   const roster = getSilvicultureContractorRoster(journey, zoneProfile);
   const { plantRatio, brushRatio } = getSilvicultureRatios(journey);
@@ -370,15 +369,14 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
       plantingEff > 0 &&
       journey.resources.seedlings > 0 &&
       journey.resources.contractorCapacity > 0 &&
-      journey.planting.blocksPlanted < journey.planting.blocksToPlant &&
-      hoursLeft >= 4) {
+      journey.planting.blocksPlanted < journey.planting.blocksToPlant) {
     const seasonNote = plantingEff >= 1.2 ? ' (peak season!)' : plantingEff < 1.0 ? ' (reduced efficiency)' : '';
     actionOptions.push({
-      label: `Plant Block (4h)${seasonNote}`,
+      label: `Plant Block${seasonNote}`,
       description: `Send contractors to establish the next block (${getSilvicultureTaskSummary(journey, zoneProfile, 'plant')})`,
       value: 'plant'
     });
-  } else if (plantingEff <= 0 && hoursLeft >= 4) {
+  } else if (plantingEff <= 0) {
     // Show disabled option so player knows why. Deliberately does NOT start
     // with "Plant Block" - this option is a no-op (no hours spent), and a
     // greedy "pick whatever starts with Plant Block" strategy (a real
@@ -391,8 +389,7 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
     });
   } else if (!plantingOpen &&
       plantingEff > 0 &&
-      journey.planting.blocksPlanted < journey.planting.blocksToPlant &&
-      hoursLeft >= 4) {
+      journey.planting.blocksPlanted < journey.planting.blocksToPlant) {
     // The phase machine is invisible otherwise: without this, planting can
     // vanish from the menu for a few actions while the current cohort's
     // stand-tending work finishes, with no clue why. Name the step that
@@ -407,9 +404,9 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   }
 
   // Survival check - should follow planting before fill/brush work
-  if (survivalOpen && hoursLeft >= 2 && journey.planting.blocksPlanted > 0) {
+  if (survivalOpen && journey.planting.blocksPlanted > 0) {
     actionOptions.push({
-      label: `Survival Check (2h)`,
+      label: 'Survival Check',
       description: `Assess planted blocks before fill work (${getSilvicultureTaskSummary(journey, zoneProfile, 'inspect')})`,
       value: 'inspect'
     });
@@ -418,12 +415,11 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   // Fill planting - only meaningful after a survival check or when pressure is high
   if (journey.resources.seedlings > 0 &&
       journey.resources.contractorCapacity > 0 &&
-      journey.planting.blocksPlanted > 0 &&
-      hoursLeft >= 3) {
+      journey.planting.blocksPlanted > 0) {
     const fillReady = fillOpen && journey.planting.seedlingsPlanted < journey.planting.seedlingsAllocated;
     if (fillReady) {
       actionOptions.push({
-        label: 'Fill Planting (3h)',
+        label: 'Fill Planting',
         description: `Top up mortality gaps before brush control (${getSilvicultureTaskSummary(journey, zoneProfile, 'fill')})`,
         value: 'fill'
       });
@@ -434,11 +430,10 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   const brushingEff = seasonMods?.brushingEfficiency ?? 1.0;
   if (journey.resources.contractorCapacity > 0 &&
       journey.brushing.hectaresComplete < journey.brushing.hectaresTarget &&
-      hoursLeft >= 3 &&
       currentSeason !== 'winter') {
     const seasonNote = brushingEff >= 1.2 ? ' (peak season!)' : '';
     actionOptions.push({
-      label: `Brush Treatment (3h)${seasonNote}`,
+      label: `Brush Treatment${seasonNote}`,
       description: `Protect planted ground and prepare the stand for survey (${getSilvicultureTaskSummary(journey, zoneProfile, 'brush')})`,
       value: 'herbicide'
     });
@@ -447,12 +442,11 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   // Survey - best in fall, not in winter
   const surveyEff = seasonMods?.surveyEfficiency ?? 1.0;
   if (currentSeason !== 'winter' &&
-      journey.surveys.freeGrowingComplete < journey.surveys.freeGrowingTarget &&
-      hoursLeft >= 3) {
+      journey.surveys.freeGrowingComplete < journey.surveys.freeGrowingTarget) {
     const seasonNote = surveyEff >= 1.2 ? ' (peak season!)' : '';
     if (surveyReady) {
       actionOptions.push({
-        label: `Survey Free-Growing (3h)${seasonNote}`,
+        label: `Survey Free-Growing${seasonNote}`,
         description: `Check planting survival after the stand has been tended (${getSilvicultureTaskSummary(journey, zoneProfile, 'survey')})`,
         value: 'survey'
       });
@@ -465,27 +459,27 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
     }
   }
 
-  if (roster.rotatableCount > 0 && hoursLeft >= 1) {
+  if (roster.rotatableCount > 0) {
     actionOptions.push({
-      label: 'Contractor Rotation (1h)',
+      label: 'Contractor Rotation',
       description: `Deploy rested contractors or stand down tired ones (${roster.rotationSummary})`,
       value: 'rotation'
     });
   }
 
   // Contractor meeting - choose specific contractor (Phase 4.2)
-  if (hoursLeft >= 2) {
+  {
     actionOptions.push({
-      label: 'Contractor Meeting (2h)',
+      label: 'Contractor Meeting',
       description: 'Meet with a specific contractor',
       value: 'meeting'
     });
   }
 
   // Team briefing
-  if (journey.crew && journey.crew.length > 0 && hoursLeft >= 1) {
+  if (journey.crew && journey.crew.length > 0) {
     actionOptions.push({
-      label: 'Team Briefing (1h)',
+      label: 'Team Briefing',
       description: 'Boost crew morale',
       value: 'team_briefing'
     });
@@ -498,8 +492,8 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   });
 
   actionOptions.push({
-    label: 'End Day',
-    description: 'Wrap up and rest',
+    label: 'Ride the Program',
+    description: 'No new commitments today — let the crews work and the seedlings settle',
     value: 'end'
   });
 
@@ -515,7 +509,7 @@ async function processAction(game, actionId, currentSeason, seasonMods, silvicul
   switch (actionId) {
     case 'plant':
       if (await handlePlanting(game, seasonMods, 'plant', silvicultureState, zoneProfile)) {
-        journey.hoursRemaining -= 4;
+        spendDay(journey);
       }
       break;
 
@@ -529,13 +523,13 @@ async function processAction(game, actionId, currentSeason, seasonMods, silvicul
 
     case 'herbicide':
       if (await handleHerbicide(game, seasonMods, silvicultureState, zoneProfile)) {
-        journey.hoursRemaining -= 3;
+        spendDay(journey);
       }
       break;
 
     case 'survey':
       if (await handleSurvey(game, seasonMods, silvicultureState, zoneProfile)) {
-        journey.hoursRemaining -= 3;
+        spendDay(journey);
       }
       break;
 
@@ -545,19 +539,19 @@ async function processAction(game, actionId, currentSeason, seasonMods, silvicul
 
     case 'inspect':
       if (await handleSurvivalCheck(game, seasonMods, silvicultureState, zoneProfile)) {
-        journey.hoursRemaining -= 2;
+        spendDay(journey);
       }
       break;
 
     case 'fill':
       if (await handlePlanting(game, seasonMods, 'fill', silvicultureState, zoneProfile)) {
-        journey.hoursRemaining -= 3;
+        spendDay(journey);
       }
       break;
 
     case 'meeting':
       await handleContractorMeeting(game);
-      journey.hoursRemaining -= 2;
+      spendDay(journey);
       break;
 
     case 'briefing':
@@ -567,12 +561,12 @@ async function processAction(game, actionId, currentSeason, seasonMods, silvicul
 
     case 'team_briefing':
       handleTeamBriefing(game);
-      journey.hoursRemaining -= 1;
+      spendDay(journey);
       break;
 
     case 'rotation':
       if (await handleContractorRotation(game, silvicultureState, zoneProfile)) {
-        journey.hoursRemaining -= 1;
+        spendDay(journey);
       }
       break;
 
@@ -970,10 +964,6 @@ async function handleContractorEvent(game, cEvent, contractor) {
     contractor.morale = Math.max(0, Math.min(100, contractor.morale + selected.moraleGain));
     contractor.productivity = Math.max(20, Math.min(100, contractor.productivity + selected.prodGain));
     contractorState.fatigue = Math.max(0, contractorState.fatigue - 1);
-
-    if (selected.hours) {
-      journey.hoursRemaining = Math.max(0, journey.hoursRemaining - selected.hours);
-    }
 
     if (selected.moraleGain > 0) {
       ui.writePositive(`${contractor.name} morale improved.`);

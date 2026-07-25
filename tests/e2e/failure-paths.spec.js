@@ -84,6 +84,14 @@ async function autoPlayToEnd(page, modeName, strategy, maxSteps = 420) {
       return { ended: true, steps: step, terminalText };
     }
 
+    // A free-text prompt (the epitaph a fallen crew member gets) puts no
+    // buttons on screen. Answer it and carry on rather than timing out.
+    if (await page.locator('#input-wrapper:not([hidden]) #text-input').count()) {
+      await page.locator('#text-input').fill('They loved this country');
+      await page.locator('#submit-btn').click();
+      continue;
+    }
+
     await page.waitForSelector('#choices button', { timeout: 15000 });
     const buttons = page.locator('#choices button');
     const labels = await buttons.evaluateAll((nodes) =>
@@ -162,21 +170,21 @@ function pickCollapseChoice(labels, terminalText, modeName) {
     if (labels.some((label) => label.includes('Emphasize Timber Supply'))) {
       return findFirstMatching(labels, ['Emphasize Timber Supply', 'Emphasize Community', 'Emphasize Biodiversity', 'Balanced Approach']);
     }
-    return findFirstMatching(labels, ['Timber Assessment', 'Check Email', 'Network', 'Take a Break', 'End Day', 'Gather Data', 'Run Analysis', 'Stakeholder Session', 'Prepare Submission', 'Values Workshop']);
+    return findFirstMatching(labels, ['Timber Assessment', 'Clear the Inbox', 'Network', 'Take a Break', 'Hold the Line', 'Gather Data', 'Run Analysis', 'Stakeholder Session', 'Prepare Submission', 'Values Workshop']);
   }
 
   if (modeName === 'permitter') {
-    return findFirstMatching(labels, ['Handle Crisis', 'Stakeholder Meeting', 'Team Building', 'Take a Break', 'End Day Early', 'Process Permits']);
+    return findFirstMatching(labels, ['Handle Crisis', 'Stakeholder Meeting', 'Team Building', 'Take a Break', 'Quiet Day', 'Process Permits']);
   }
 
   if (modeName === 'recce') {
-    const priorities = ['Ground-Truth Access', 'Values Sweep', 'Cautious Recon', 'Rest & End Shift', 'Standard Recon', 'Maintenance', 'Scout Ahead'];
+    const priorities = ['Ground-Truth Access', 'Values Sweep', 'Cautious Recon', 'Stand Down', 'Standard Recon', 'Maintenance', 'Scout Ahead'];
     const matchIndex = labels.findIndex((label) => priorities.some((priority) => label.includes(priority)));
     return matchIndex === -1 ? labels.length - 1 : matchIndex;
   }
 
   if (modeName === 'silviculture') {
-    return findFirstMatching(labels, ['Brush Treatment', 'Contractor Meeting', 'Team Briefing', 'Survival Check', 'End Day', 'Survey Free-Growing', 'Plant Block']);
+    return findFirstMatching(labels, ['Brush Treatment', 'Contractor Meeting', 'Team Briefing', 'Survival Check', 'Hold the Line', 'Survey Free-Growing', 'Plant Block']);
   }
 
   return 0;

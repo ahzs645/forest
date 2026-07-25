@@ -14,6 +14,7 @@ import {
 import { getPlanningCadenceDays } from "../data/planningBlocks.js";
 import { createSeasonState } from "../season.js";
 import { createProfessionalComplianceState } from "../engine.js";
+import { ACTIONS_PER_DAY } from './dayPlan.js';
 
 /**
  * Campaign-scale tuning (see docs/unified_campaign.md, section 3).
@@ -26,7 +27,11 @@ import { createProfessionalComplianceState } from "../engine.js";
  */
 const CAMPAIGN_RECON_BLOCK_COUNT = 6;
 const CAMPAIGN_STOCKPILE_SCALE = 0.45; // per-run field stockpiles (fuel/food/budget/...)
-const CAMPAIGN_BUDGET_SCALE = 0.5; // desk-role (planning/permitting) budgets
+// Campaign deployments run about two thirds of a full-length file's days now
+// that a day is one action (js/journey/dayPlan.js), so halving the desk budget
+// left nothing for the extra calendar. Sized with
+// scripts/simulate-expeditions.mjs.
+const CAMPAIGN_BUDGET_SCALE = 0.68; // desk-role (planning/permitting) budgets
 // Resources that read as a condition/percentage (0-100) rather than a
 // depletable per-run stockpile - campaign scaling leaves these alone.
 const CAMPAIGN_PERCENT_RESOURCE_KEYS = new Set(["equipment"]);
@@ -82,11 +87,11 @@ function applyCampaignScale(journey, journeyType) {
       return journey;
     }
     case "silviculture": {
-      journey.planting.blocksToPlant = 5;
-      journey.planting.seedlingsAllocated = 80000;
-      journey.brushing.hectaresTarget = 150;
+      journey.planting.blocksToPlant = 3;
+      journey.planting.seedlingsAllocated = 55000;
+      journey.brushing.hectaresTarget = 100;
       journey.surveys.freeGrowingTarget = 2;
-      journey.resources.seedlings = 80000;
+      journey.resources.seedlings = 55000;
       journey.resources.budget = 45000;
       journey.resources.contractorCapacity = Math.round(
         journey.resources.contractorCapacity * CAMPAIGN_STOCKPILE_SCALE,
@@ -94,13 +99,21 @@ function applyCampaignScale(journey, journeyType) {
       return journey;
     }
     case "planning": {
-      journey.deadline = 12;
+      // A one-action day (js/journey/dayPlan.js) means the file moves one
+      // track at a time, and a twelve-day window could not clear data,
+      // analysis, buy-in and confidence before the cabinet closed. Twenty days
+      // still sits inside the campaign's thirty-day season. Sized with
+      // scripts/simulate-expeditions.mjs.
+      journey.deadline = 20;
       journey.resources.budget = Math.round(journey.resources.budget * CAMPAIGN_BUDGET_SCALE);
       return journey;
     }
     case "permitting": {
-      journey.permits.target = 5;
-      journey.deadline = 12;
+      // A desk day clears a batch of files (DAILY_PERMIT_THROUGHPUT), so five
+      // permits fell in four days — no season in that. Twelve permits over
+      // twenty days is the same shape as the full-length file, condensed.
+      journey.permits.target = 12;
+      journey.deadline = 20;
       journey.resources.budget = Math.round(journey.resources.budget * CAMPAIGN_BUDGET_SCALE);
       return journey;
     }
@@ -217,24 +230,28 @@ export function createSilvicultureJourney(options = {}) {
     scrutiny: 12,
     day: 1,
 
-    // Planting Program
+    // Planting Program. Each cohort runs plant -> survival -> fill, so a block
+    // is roughly three one-action days (js/journey/dayPlan.js); the program is
+    // sized so the whole sequence lands inside a season rather than the ~65
+    // days the old fifteen-block target needed. See
+    // scripts/simulate-expeditions.mjs.
     planting: {
-      seedlingsAllocated: 250000,
+      seedlingsAllocated: 140000,
       seedlingsPlanted: 0,
       survivalRate: 85,
-      blocksToPlant: 15,
+      blocksToPlant: 8,
       blocksPlanted: 0,
     },
 
     // Brushing/Herbicide
     brushing: {
-      hectaresTarget: 500,
+      hectaresTarget: 260,
       hectaresComplete: 0,
     },
 
     // Surveys
     surveys: {
-      freeGrowingTarget: 5,
+      freeGrowingTarget: 3,
       freeGrowingComplete: 0,
       regenerationSurveys: 0,
     },
@@ -245,7 +262,7 @@ export function createSilvicultureJourney(options = {}) {
     // Resources
     resources: {
       budget: 120000,
-      seedlings: 250000,
+      seedlings: 140000,
       contractorCapacity: 320,
       equipment: 100,
       nurseryCredit: 50,
@@ -323,7 +340,7 @@ export function createPlanningJourney(options = {}) {
     // stakeholder buy-in, ministerial confidence), so the term needs room to
     // clear them; 20 days was tight. Difficulty nudges this in ForestryTrailGame.
     deadline: 28,
-    hoursRemaining: 8,
+    actionsRemaining: ACTIONS_PER_DAY,
 
     // Protagonist state - YOU are the planner
     protagonist: {
@@ -398,8 +415,17 @@ export function createPlanningJourney(options = {}) {
 
     // Resources (no crew-related)
     resources: {
-      budget: 50000,
-      politicalCapital: 40,
+      // Deployments now run a season of one-action days rather than a fortnight
+      // of packed ones (js/journey/dayPlan.js), so the same $750-a-day overhead
+      // is charged over roughly twice the calendar. Sized with
+      // scripts/simulate-expeditions.mjs.
+      budget: 68000,
+      // Standing burns a point a day and six a stakeholder session. Over a
+      // season of one-action days (js/journey/dayPlan.js) that is roughly
+      // twice the calendar the old pool was cut for, so the file lost the
+      // cabinet before it lost the argument. Sized with
+      // scripts/simulate-expeditions.mjs.
+      politicalCapital: 62,
       dataCredits: 100,
       consultantDays: 30,
     },
@@ -448,7 +474,7 @@ export function createPermittingJourney(options = {}) {
     scrutiny: 38,
     day: 1,
     deadline: 30,
-    hoursRemaining: 8,
+    actionsRemaining: ACTIONS_PER_DAY,
     currentPhase: "planning",
 
     // Protagonist state - YOU are the permitter
@@ -498,8 +524,12 @@ export function createPermittingJourney(options = {}) {
 
     // Resources (no crew-related)
     resources: createDeskResources({
-      budget: 42000,
-      politicalCapital: 46,
+      // Same reasoning as the planning file: a longer calendar at the same
+      // daily overhead. See scripts/simulate-expeditions.mjs.
+      budget: 58000,
+      // Same reasoning as the planning file: a longer calendar at the same
+      // daily drain. See scripts/simulate-expeditions.mjs.
+      politicalCapital: 66,
       energy: 100,
     }),
 
@@ -554,7 +584,7 @@ export function createFieldJourney(options = {}) {
     pace: "normal",
     weather: getRandomWeather(blocks[0], 1, createSeasonState(roleId)?.currentSeason),
     temperature: "cool",
-    travelDelayHours: 0,
+    travelSetback: 0,
     routePlan: null,
     rationPlan: {
       mode: "normal",
@@ -650,7 +680,7 @@ export function createDeskJourney(options = {}) {
     discoveryTags: [],
 
     // Daily time tracking
-    hoursRemaining: 8,
+    actionsRemaining: ACTIONS_PER_DAY,
 
     // State flags
     isComplete: false,

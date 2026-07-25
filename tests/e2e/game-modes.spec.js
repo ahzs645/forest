@@ -114,6 +114,14 @@ async function autoPlayToEnd(page, strategyName, maxSteps = 900) {
       return { ended: true, steps: step, terminalText };
     }
 
+    // A free-text prompt (the epitaph a fallen crew member gets) puts no
+    // buttons on screen. Answer it and carry on rather than timing out.
+    if (await page.locator('#input-wrapper:not([hidden]) #text-input').count()) {
+      await page.locator('#text-input').fill('They loved this country');
+      await page.locator('#submit-btn').click();
+      continue;
+    }
+
     await page.waitForSelector('#choices button', { timeout: 15000 });
     const buttons = page.locator('#choices button');
     const labels = await buttons.evaluateAll((nodes) =>
@@ -176,7 +184,7 @@ function pickChoice(labels, terminalText, strategyName) {
       'Stakeholder Meeting',
       'Team Building',
       'Take a Break',
-      'End Day Early'
+      'Quiet Day'
     ],
     silviculture: [
       'Plant Block',
@@ -192,7 +200,7 @@ function pickChoice(labels, terminalText, strategyName) {
       'Send medic',
       'Grant rest day',
       'Pay retention',
-      'End Day'
+      'Hold the Line'
     ],
     // Manager runs a 100-day term: favour budget-disciplined, no-cost choices so
     // the treasury survives to the deadline and the term reaches a clean end.
@@ -271,18 +279,18 @@ function pickReconChoice(labels, terminalText) {
   }
 
   if (food <= 12) {
-    return findFirstMatching(labels, ['Resupply', 'Retrieve Cached Rations', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Resupply', 'Retrieve Cached Rations', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Stand Down']);
   }
 
   if (fuel <= 25 || equipment <= 35) {
-    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Retrieve Cached Rations', 'Scout Ahead', 'Triage', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Resupply', 'Maintenance', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Retrieve Cached Rations', 'Scout Ahead', 'Triage', 'Stand Down']);
   }
 
   if (injuredCount >= 2 && meds > 0) {
-    return findFirstMatching(labels, ['Triage', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Retrieve Cached Rations', 'Rest & End Shift']);
+    return findFirstMatching(labels, ['Triage', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Retrieve Cached Rations', 'Stand Down']);
   }
 
-  return findFirstMatching(labels, ['Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Retrieve Cached Rations', 'Triage', 'Rest & End Shift']);
+  return findFirstMatching(labels, ['Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Resupply', 'Scout Ahead', 'Maintenance', 'Retrieve Cached Rations', 'Triage', 'Stand Down']);
 }
 
 function getRecommendedActionLabel(terminalText) {
@@ -323,26 +331,26 @@ function getPlanningPriorities(terminalText) {
 
   if (phase === 'Data Gathering') {
     return valuesBlocked
-      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Gather Data', 'Network', 'Check Email', 'Take a Break', 'End Day']
-      : ['Gather Data', 'Network', 'Check Email', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'End Day'];
+      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Gather Data', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
+      : ['Gather Data', 'Network', 'Clear the Inbox', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'Hold the Line'];
   }
 
   if (phase === 'Analysis') {
     return valuesBlocked
-      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Run Analysis', 'Network', 'Check Email', 'Take a Break', 'End Day']
-      : ['Run Analysis', 'Network', 'Check Email', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'End Day'];
+      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Run Analysis', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
+      : ['Run Analysis', 'Network', 'Clear the Inbox', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'Hold the Line'];
   }
 
   if (phase === 'Stakeholder Review') {
     return valuesBlocked
-      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Stakeholder Session', 'Network', 'Check Email', 'Take a Break', 'End Day']
-      : ['Stakeholder Session', 'Balanced Approach', 'Emphasize First Nations', 'Values Workshop', 'Network', 'Check Email', 'Take a Break', 'End Day'];
+      ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Stakeholder Session', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
+      : ['Stakeholder Session', 'Balanced Approach', 'Emphasize First Nations', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
   }
 
   if (phase === 'Ministerial Approval') {
     return valuesBlocked
-      ? ['Values Workshop', 'Timber Assessment', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Prepare Submission', 'Network', 'Check Email', 'Take a Break', 'End Day']
-      : ['Prepare Submission', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Values Workshop', 'Network', 'Check Email', 'Take a Break', 'End Day'];
+      ? ['Values Workshop', 'Timber Assessment', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Prepare Submission', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
+      : ['Prepare Submission', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
   }
 
   return [
@@ -361,9 +369,9 @@ function getPlanningPriorities(terminalText) {
     'Emphasize Biodiversity',
     'Values Workshop',
     'Network',
-    'Check Email',
+    'Clear the Inbox',
     'Take a Break',
-    'End Day'
+    'Hold the Line'
   ];
 }
 

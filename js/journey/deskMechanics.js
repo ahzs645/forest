@@ -15,6 +15,10 @@ import {
   applyProfessionalComplianceShift,
   ensureProfessionalComplianceState,
 } from '../engine.js';
+import { startDay, spendDay, dayIsSpent } from './dayPlan.js';
+
+/** Files a desk day clears; mirrors DAILY_PERMIT_THROUGHPUT in the mode. */
+const DESK_DAY_PERMIT_BATCH = 3;
 
 function applyDeskEffort(journey, { energy = 0, stress = 0 }) {
   if (journey.protagonist) {
@@ -69,27 +73,33 @@ export function executeDeskDay(journey, actionId, actionParams = {}) {
  */
 function processPermitWork(journey) {
   const messages = [];
-  const hoursUsed = 2;
   const professional = ensureProfessionalComplianceState(journey);
 
-  if (journey.hoursRemaining < hoursUsed) {
-    messages.push('Not enough time remaining today.');
+  if (dayIsSpent(journey)) {
+    messages.push('The day is already committed elsewhere.');
     return { journey, messages };
   }
 
-  journey.hoursRemaining -= hoursUsed;
+  spendDay(journey);
   applyDeskEffort(journey, { energy: 10, stress: 4 });
 
-  // Move permits through pipeline
+  // Move permits through the pipeline. A desk day clears a batch of files,
+  // not a single form (see DAILY_PERMIT_THROUGHPUT in js/modes/permitting.js).
   if (journey.permits.submitted > 0) {
-    journey.permits.submitted--;
-    journey.permits.inReview++;
-    messages.push('Submitted a permit package for review.');
+    const moved = Math.min(journey.permits.submitted, DESK_DAY_PERMIT_BATCH);
+    journey.permits.submitted -= moved;
+    journey.permits.inReview += moved;
+    messages.push(moved > 1
+      ? `Submitted ${moved} permit packages for review.`
+      : 'Submitted a permit package for review.');
     applyProfessionalComplianceShift(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
   } else if (journey.permits.backlog > 0) {
-    journey.permits.backlog--;
-    journey.permits.submitted++;
-    messages.push('Prepared a new permit package for submission.');
+    const moved = Math.min(journey.permits.backlog, DESK_DAY_PERMIT_BATCH);
+    journey.permits.backlog -= moved;
+    journey.permits.submitted += moved;
+    messages.push(moved > 1
+      ? `Prepared ${moved} new permit packages for submission.`
+      : 'Prepared a new permit package for submission.');
     applyProfessionalComplianceShift(journey, { cpdHours: 1, paperworkLoad: 2, auditExposure: 1 });
   }
 
@@ -138,14 +148,13 @@ function processPermitWork(journey) {
  */
 function holdStakeholderMeeting(journey, stakeholder = 'ministry') {
   const messages = [];
-  const hoursUsed = 3;
 
-  if (journey.hoursRemaining < hoursUsed) {
-    messages.push('Not enough time for a meeting today.');
+  if (dayIsSpent(journey)) {
+    messages.push('The day is already committed elsewhere.');
     return { journey, messages };
   }
 
-  journey.hoursRemaining -= hoursUsed;
+  spendDay(journey);
   applyDeskEffort(journey, { energy: 15, stress: 6 });
   journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
   applyProfessionalComplianceShift(journey, { cpdHours: 1, paperworkLoad: -1, auditExposure: -1 });
@@ -197,7 +206,7 @@ function holdStakeholderMeeting(journey, stakeholder = 'ministry') {
 function handleCrisis(journey, crisis = {}) {
   const messages = [];
 
-  journey.hoursRemaining = 0; // Crises consume the day
+  spendDay(journey); // A crisis is what the day turned out to be
   applyDeskEffort(journey, { energy: 30, stress: 14 });
 
   messages.push('Spent the day managing the crisis.');
@@ -220,14 +229,13 @@ function handleCrisis(journey, crisis = {}) {
  */
 function boostTeamMorale(journey) {
   const messages = [];
-  const hoursUsed = 2;
 
-  if (journey.hoursRemaining < hoursUsed) {
-    messages.push('Not enough time for team building.');
+  if (dayIsSpent(journey)) {
+    messages.push('The day is already committed elsewhere.');
     return { journey, messages };
   }
 
-  journey.hoursRemaining -= hoursUsed;
+  spendDay(journey);
   journey.resources.budget = Math.max(0, journey.resources.budget - 100);
 
   if (journey.crew?.length) {
@@ -256,10 +264,8 @@ function endDeskDay(journey) {
     ? Object.values(journey.stakeholders).reduce((sum, s) => sum + s.meetings, 0)
     : 0;
 
-  const consumption = calculateDeskConsumption({
-    overtime: 8 - journey.hoursRemaining > 8 ? 8 - journey.hoursRemaining - 8 : 0,
-    meetings
-  });
+  // Overtime was the leftover of an hour budget; a one-action day has none.
+  const consumption = calculateDeskConsumption({ meetings });
 
   const result = applyConsumption(journey.resources, consumption, DESK_RESOURCES);
   journey.resources = result.resources;
@@ -268,7 +274,7 @@ function endDeskDay(journey) {
   journey.resources = applyDeskRegen(journey.resources);
 
   // Reset daily values
-  journey.hoursRemaining = 8;
+  startDay(journey);
   journey.day++;
 
   // Check deadline

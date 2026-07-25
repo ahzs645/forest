@@ -137,11 +137,14 @@ export const DESK_RESOURCES = {
  */
 export function createFieldResources(options = {}) {
   return {
-    budget: options.budget ?? 2000,
-    fuel: options.fuel ?? 80,
-    food: options.food ?? 35,
-    equipment: options.equipment ?? 85,
-    firstAid: options.firstAid ?? 6
+    // Sized against scripts/simulate-expeditions.mjs: one action a day means a
+    // traverse runs a season's worth of days, and the old stores were cut for
+    // a run half that long — crews starved before they finished the packages.
+    budget: options.budget ?? 3200,
+    fuel: options.fuel ?? 130,
+    food: options.food ?? 65,
+    equipment: options.equipment ?? 90,
+    firstAid: options.firstAid ?? 8
   };
 }
 
