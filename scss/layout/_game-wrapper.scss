@@ -9,7 +9,13 @@
   min-height: 100dvh;
   max-width: 100vw;
 
+  // On a phone the game screen is the whole viewport and only its panes
+  // scroll. Without a ceiling here the wrapper grows to whatever the tallest
+  // pane wants and the document starts scrolling behind the fixed chrome.
   @include mobile-down {
     flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
   }
 }

@@ -11,6 +11,14 @@
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
+  // `height` alone is not a ceiling: as a flex item this pane keeps the
+  // default min-height:auto, so a tall option menu grew the pane (and the
+  // page behind it) instead of making the log give up its space. Then the
+  // menu's own "more below" marker could end up under the fold, and reaching
+  // the last option took a page scroll on top of a list scroll.
+  max-height: 100vh;
+  max-height: 100dvh;
+  min-height: 0;
   max-width: 100%;
   overflow: hidden;
 }
