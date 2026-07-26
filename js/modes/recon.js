@@ -24,7 +24,12 @@ import {
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
 import { runDaySituation } from '../journey/daySituation.js';
-import { getCondemnedCrossingPenalty } from '../events/consequences.js';
+import {
+  getCondemnedCrossingPenalty,
+  getMachineDownPenalty,
+  getCampBearDrain,
+  isBlockEnjoined
+} from '../events/consequences.js';
 import { renderJourneyMap } from '../scene/areaMap.js';
 import {
   getCrossingContext,
@@ -187,6 +192,13 @@ function maybeFinalizeReconAssessment(ui, journey, block) {
 
   const intel = getReconBlockIntel(journey, block);
   if (intel.assessmentComplete) {
+    return false;
+  }
+
+  // A block under injunction or stop-work cannot be signed off, however much
+  // groundwork is already done (js/events/consequences.js). The player has to
+  // re-plan the season around ground they can no longer touch.
+  if (isBlockEnjoined(journey, block)) {
     return false;
   }
 
@@ -743,6 +755,17 @@ async function runFieldDay(game) {
   // verification) get their camp beat here rather than mid-travel.
   await celebrateNewMilestones(game);
 
+  // A fed bear keeps coming back. Charged at the end of every shift until the
+  // crew does something about it (js/events/consequences.js).
+  const bear = getCampBearDrain(journey);
+  if (bear.note) {
+    journey.resources.food = Math.max(0, journey.resources.food + bear.food);
+    for (const member of journey.crew) {
+      if (member.isActive) member.morale = Math.max(0, member.morale + bear.morale);
+    }
+    ui.writeWarning(`${bear.note} Food ${bear.food}, morale ${bear.morale}.`);
+  }
+
   // Anyone lost today gets their marker before the day closes.
   await maybeMemorializeFallen(game);
 
@@ -1121,6 +1144,16 @@ async function runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent 
     journey.resources.fuel = Math.max(0, journey.resources.fuel - condemned.fuel);
     journey.resources.equipment = Math.max(0, journey.resources.equipment - condemned.equipment);
     ui.writeWarning(`${condemned.note} Fuel -${condemned.fuel}, equipment -${condemned.equipment}.`);
+  }
+
+  // Losing the machine for the season is paid on every leg after it, not once.
+  const machine = getMachineDownPenalty(journey);
+  if (machine.note) {
+    journey.travelSetback = Math.min(0.75, (journey.travelSetback || 0) + (1 - machine.paceFactor));
+    for (const member of journey.crew) {
+      if (member.isActive) member.health = Math.max(0, member.health + machine.crewHealth);
+    }
+    ui.writeWarning(machine.note);
   }
 
   spendDay(journey);

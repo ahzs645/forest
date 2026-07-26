@@ -93,6 +93,14 @@ export function matchesOddsCondition(when, journey) {
     case 'priorShortcuts':
       return Number.isFinite(threshold)
         && (journey.temptationMemory?.seenActIds?.length || 0) >= threshold;
+    case 'hasFlag':
+      // Consequence flags left by earlier bad bands (js/events/consequences.js).
+      // This is what closes the loop: a failure does not just cost something
+      // once, it changes the odds on everything the player gambles afterwards.
+      // A soured local network really does make the next dealing with locals
+      // worse, rather than being a line of prose about it.
+      return Array.isArray(journey.consequenceFlags)
+        && journey.consequenceFlags.includes(String(when).split(':')[1]);
     case 'accessGroundTruthed': {
       const block = journey.blocks?.[journey.currentBlockIndex];
       const intel = block?.id ? journey.reconIntel?.byBlock?.[block.id] : null;

@@ -551,6 +551,9 @@
       "from": "good",
       "to": "bad"
      }
+    ],
+    "failureFlags": [
+     "camp_bear"
     ]
    },
    {
@@ -586,6 +589,9 @@
       "from": "good",
       "to": "bad"
      }
+    ],
+    "failureFlags": [
+     "camp_bear"
     ]
    },
    {
@@ -2118,6 +2124,12 @@
       "move": 0.08,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    },
@@ -2152,6 +2164,12 @@
      {
       "when": "difficulty:hard",
       "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }
@@ -2200,7 +2218,16 @@
       "move": 0.1,
       "from": "bad",
       "to": "good"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
+    ],
+    "failureFlags": [
+     "locals_soured"
     ]
    },
    {
@@ -2234,6 +2261,12 @@
      {
       "when": "difficulty:hard",
       "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }
@@ -3028,6 +3061,12 @@
       "move": 0.08,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    },
@@ -3676,6 +3715,9 @@
       "from": "good",
       "to": "partial"
      }
+    ],
+    "failureFlags": [
+     "machine_down"
     ]
    },
    {
@@ -4031,7 +4073,17 @@
       "move": 0.08,
       "from": "bad",
       "to": "good"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
+    ],
+    "failureFlags": [
+     "block_enjoined",
+     "locals_soured"
     ]
    },
    {
@@ -4356,6 +4408,9 @@
       "from": "good",
       "to": "bad"
      }
+    ],
+    "failureFlags": [
+     "block_enjoined"
     ]
    },
    {
@@ -4478,6 +4533,9 @@
       "from": "bad",
       "to": "good"
      }
+    ],
+    "failureFlags": [
+     "locals_soured"
     ]
    },
    {
@@ -4697,6 +4755,10 @@
       "from": "good",
       "to": "bad"
      }
+    ],
+    "failureFlags": [
+     "block_enjoined",
+     "locals_soured"
     ]
    }
   ]
@@ -4896,6 +4958,12 @@
       "move": 0.1,
       "from": "bad",
       "to": "good"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    }
@@ -5010,6 +5078,12 @@
      {
       "when": "pace:grueling",
       "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }

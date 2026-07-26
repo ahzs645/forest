@@ -48,6 +48,12 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ],
     "failureSchedulesEvent": "audit_followup",
@@ -93,6 +99,12 @@
       "move": 0.1,
       "from": "good",
       "to": "partial"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    }
@@ -146,6 +158,12 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    },
@@ -181,6 +199,12 @@
      {
       "when": "difficulty:hard",
       "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }
@@ -236,6 +260,12 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    },
@@ -270,6 +300,12 @@
      {
       "when": "difficulty:hard",
       "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }
@@ -585,6 +621,12 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    },
@@ -635,7 +677,16 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
+    ],
+    "failureFlags": [
+     "reviewer_watching"
     ]
    }
   ],
@@ -859,6 +910,9 @@
       "from": "good",
       "to": "bad"
      }
+    ],
+    "failureFlags": [
+     "reviewer_watching"
     ]
    },
    {
@@ -1120,6 +1174,12 @@
      {
       "when": "scrutinyAbove:55",
       "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }
@@ -1620,6 +1680,12 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    }
@@ -1793,6 +1859,12 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    }
@@ -1840,6 +1912,12 @@
      {
       "when": "difficulty:hard",
       "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }
@@ -1891,6 +1969,12 @@
      {
       "when": "difficulty:hard",
       "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }
@@ -1970,6 +2054,12 @@
      {
       "when": "difficulty:hard",
       "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }
@@ -2297,7 +2387,13 @@
      }
     ],
     "failureSchedulesEvent": "whistleblower_media_leak",
-    "schedulesEvent": "whistleblower_media_leak"
+    "schedulesEvent": "whistleblower_media_leak",
+    "failureFlags": [
+     "reviewer_watching"
+    ],
+    "partialFlags": [
+     "reviewer_watching"
+    ]
    },
    {
     "label": "Forward to compliance division",
@@ -2442,6 +2538,12 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    }
@@ -2490,6 +2592,12 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    },
@@ -2534,6 +2642,12 @@
       "move": 0.1,
       "from": "good",
       "to": "partial"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    },
@@ -3446,6 +3560,12 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    }
@@ -3683,6 +3803,12 @@
       "move": 0.1,
       "from": "good",
       "to": "partial"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    },
@@ -4322,6 +4448,12 @@
       "move": 0.1,
       "from": "good",
       "to": "partial"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      }
     ]
    },
@@ -4356,6 +4488,12 @@
      {
       "when": "difficulty:hard",
       "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:reviewer_watching",
+      "move": 0.12,
       "from": "good",
       "to": "bad"
      }
