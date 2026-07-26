@@ -92,7 +92,29 @@ function makeUi(journey, policy, tally) {
     async promptChoice(prompt, options = []) {
       if (!options.length) return { value: undefined };
       if (options.length === 1) return options[0];
-      const chosen = policy(journey, options, String(prompt || '')) || options[0];
+      const picked = policy(journey, options, String(prompt || ''));
+      // A policy that returns nothing has gone blind — usually because an
+      // option value was renamed underneath it. The old fallback to options[0]
+      // hid that completely: renaming walk_away to set_aside silently took
+      // recon from 17/24 to 5/24 and looked like a balance regression rather
+      // than a broken policy. Count it so the harness can report it.
+      // Only a NAMED menu counts. Authored event cards carry numeric option
+      // indices that no policy has vocabulary for by design, so counting those
+      // buries the signal under expected misses.
+      // The day card appends a free "More context" option whose value is a
+      // Symbol sentinel (js/journey/dayCard.js). Ignoring it matters: testing
+      // every option for a string value excluded every card from the metric
+      // and left only dynamic sub-prompts, which reported planning as 100%
+      // blind when its real menus were being handled fine.
+      const named = options.filter((option) => typeof option?.value !== 'symbol');
+      const namedMenu = named.length > 0 && named.every((option) => typeof option.value === 'string');
+      if (!picked && namedMenu) {
+        tally.__fellThrough = (tally.__fellThrough || 0) + 1;
+      }
+      if (namedMenu) {
+        tally.__namedDecisions = (tally.__namedDecisions || 0) + 1;
+      }
+      const chosen = picked || options[0];
       tally[chosen.value] = (tally[chosen.value] || 0) + 1;
       return chosen;
     }
@@ -120,6 +142,28 @@ function maybeSetAside(journey, options, progress) {
   const elapsed = (journey.day || 1) / deadline;
   return progress < elapsed ? setAside : null;
 }
+
+/**
+ * The option values each policy steers by.
+ *
+ * Every policy here picks options by `value` string, so renaming one in a mode
+ * silently blinds the policy: it stops recognising the decision and takes
+ * whatever is first on the list instead. That reads as a balance regression -
+ * renaming walk_away to set_aside moved recon from 17/24 to 5/24 and looked
+ * like the content had got harder.
+ *
+ * Counting fall-through does not catch it, because these policies end in an
+ * explicit `options[0]` rather than returning null. So the vocabulary is
+ * declared here and tests/policyVocabulary.test.mjs drives each mode for real
+ * and asserts every value below still appears in the menus. Rename an option
+ * and that test names it immediately.
+ */
+export const POLICY_VOCABULARY = {
+  recon: ['set_aside', 'set_tempo', 'travel', 'ground_truth', 'camp_menu', 'end_shift'],
+  planning: ['set_aside', 'desk_menu', 'end', 'professional_admin'],
+  permitting: ['set_aside', 'end_day'],
+  silviculture: ['set_aside', 'end'],
+};
 
 // ── Role policies ───────────────────────────────────────────────────────────
 
@@ -409,10 +453,36 @@ async function main() {
       if (reasons.length) console.log(`${' '.repeat(26)} losses: ${reasons.join(' | ')}`);
     }
 
+    // A blind policy reads as a balance regression, so say it out loud. Every
+    // decision the policy failed to recognise was answered by taking the first
+    // option on the list, which is not a competent player and not a measurement
+    // of anything.
+    const blind = results.reduce((sum, result) => sum + (result.tally.__fellThrough || 0), 0);
+    const decisions = results.reduce((sum, result) => sum + (result.tally.__namedDecisions || 0), 0);
+    const blindRate = decisions > 0 ? blind / decisions : 0;
+    if (blind > 0) {
+      const pct = (blindRate * 100).toFixed(1);
+      console.log(`${' '.repeat(26)} POLICY BLIND on ${blind}/${decisions} decisions (${pct}%) — option values likely renamed underneath it`);
+      // Reported, not enforced. Some fall-through is legitimate: block-selection
+      // and triage sub-prompts carry dynamic values (block ids, contractor ids)
+      // that no fixed vocabulary can cover, and taking the first option there is
+      // a reasonable default rather than a bug. The hard guard against a
+      // renamed option is tests/policyVocabulary.test.mjs, which drives the real
+      // modes and names the missing value.
+    }
+
     if (winRate < args.minWinRate) failed = true;
   }
 
   if (failed) process.exitCode = 1;
 }
 
-main();
+// Only run when invoked as a script. tests/policyVocabulary.test.mjs imports
+// POLICY_VOCABULARY from here, and an unguarded main() meant importing a
+// constant silently ran every simulation and set a failing exit code.
+const invokedDirectly = process.argv[1]
+  && import.meta.url.endsWith(process.argv[1].split('/').pop());
+if (invokedDirectly) {
+  main();
+}
+

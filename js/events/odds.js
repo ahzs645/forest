@@ -23,6 +23,22 @@
 export const OUTCOME_BANDS = ['good', 'partial', 'bad'];
 
 /**
+ * Every predicate `matchesOddsCondition` implements.
+ *
+ * Exported so scripts/lint-events.mjs can check authored content against the
+ * engine rather than against a restated copy of this list — a `when` string the
+ * switch below does not handle returns false forever, which reads in the deck
+ * as an odds shift that simply never fires. tests/gradedOutcomes.test.mjs
+ * exercises every name here, so adding one without implementing it fails.
+ */
+export const ODDS_PREDICATE_NAMES = [
+  'weather', 'season', 'pace', 'difficulty', 'terrain', 'crewHasRole',
+  'scrutinyAbove', 'scrutinyBelow', 'equipmentBelow', 'avgMoraleBelow',
+  'avgMoraleAbove', 'relationshipsAbove', 'shortRationStreak', 'priorShortcuts',
+  'hasFlag', 'accessGroundTruthed',
+];
+
+/**
  * Read a numeric threshold off a `when` string like "scrutinyAbove:55".
  * @returns {number} NaN when the predicate carries no argument
  */

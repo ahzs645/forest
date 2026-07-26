@@ -14,6 +14,8 @@
 import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import STATUS_EFFECTS from '../js/data/json/shared/statusEffects.json' with { type: 'json' };
+import { ODDS_PREDICATE_NAMES, OUTCOME_BANDS } from '../js/events/odds.js';
+import { CONSEQUENCE_FLAGS } from '../js/events/consequences.js';
 
 const VALID_ROLES = new Set(['planner', 'permitter', 'recce', 'silviculture', 'manager']);
 const VALID_JOURNEY_TYPES = new Set(['field', 'recon', 'silviculture', 'desk', 'planning', 'permitting', 'manager']);
@@ -26,6 +28,15 @@ const VALID_OPTION_KEYS = new Set([
   'riskRejection', 'timeUsed', 'schedulesEvent', 'scheduledDelay', 'requiresRole',
   'gameOver', 'gameOverReason', 'hiddenOutcome', 'chanceSuccess', 'failureOutcome',
   'failureEffects',
+  // Graded outcome bands (js/events/odds.js).
+  'chancePartial', 'partialOutcome', 'partialEffects', 'oddsModifiers',
+  'partialCrewEffect', 'failureCrewEffect',
+  // Consequence flags (js/events/consequences.js).
+  'flags', 'partialFlags', 'failureFlags',
+  // Band-conditional scheduling.
+  'goodSchedulesEvent', 'partialSchedulesEvent', 'failureSchedulesEvent',
+  // Flavour tone consumed by js/events/reactions.js.
+  'reactionTone',
 ]);
 const VALID_EFFECT_KEYS = new Set([
   'budget', 'fuel', 'food', 'equipment', 'firstAid', 'politicalCapital',
@@ -37,6 +48,12 @@ const VALID_CREW_EFFECT_KEYS = new Set([
   'lose_member', 'leave', 'riskWorsen',
 ]);
 const VALID_STATUS_IDS = new Set(Object.keys(STATUS_EFFECTS));
+
+// Read from the engine rather than restated here, so an odds predicate or a
+// consequence flag can never be authored into content without the code that
+// consumes it existing first.
+const ODDS_PREDICATES = new Set(ODDS_PREDICATE_NAMES);
+const BANDS = new Set(OUTCOME_BANDS);
 
 const ALL = [
   ...FIELD_EVENTS.map((e) => ({ pool: 'field', event: e })),
@@ -234,9 +251,106 @@ for (const { pool, event } of ALL) {
   }
 }
 
-if (errors.length) {
-  console.error(`Event content lint FAILED (${errors.length} issue${errors.length > 1 ? 's' : ''}):`);
-  for (const err of errors) console.error(`  - ${err}`);
-  process.exit(1);
+// ── Graded outcome bands ────────────────────────────────────────────────────
+// Every one of these guards a way an option can look authored and be inert.
+
+const producedFlags = new Set();
+const consumedFlags = new Set();
+
+for (const { pool, event } of ALL) {
+  for (const [index, option] of (event.options || []).entries()) {
+    const where = `${pool}:${event.id} option ${index + 1}`;
+
+    const hasBands = typeof option.chanceSuccess === 'number';
+    if (hasBands && !option.failureOutcome) {
+      errors.push(`${where}: chanceSuccess with no failureOutcome — the bad band silently reuses the success text`);
+    }
+    if (typeof option.chancePartial === 'number') {
+      if (!hasBands) {
+        errors.push(`${where}: chancePartial with no chanceSuccess — never rolled`);
+      }
+      if (!option.partialOutcome) {
+        errors.push(`${where}: chancePartial with no partialOutcome — the middle band falls through to failure text`);
+      }
+      const total = (option.chanceSuccess || 0) + option.chancePartial;
+      if (total > 1) {
+        errors.push(`${where}: chanceSuccess+chancePartial = ${total.toFixed(2)} exceeds 1`);
+      }
+    }
+    for (const key of ['partialOutcome', 'partialEffects', 'failureEffects']) {
+      if (option[key] && !hasBands) {
+        errors.push(`${where}: ${key} with no chanceSuccess — authored and unreachable`);
+      }
+    }
+
+    for (const modifier of option.oddsModifiers || []) {
+      const predicate = String(modifier.when || '').split(':')[0];
+      if (!ODDS_PREDICATES.has(predicate)) {
+        errors.push(`${where}: oddsModifier predicate "${modifier.when}" is not implemented by matchesOddsCondition`);
+      }
+      if (!BANDS.has(modifier.from) || !BANDS.has(modifier.to)) {
+        errors.push(`${where}: oddsModifier from/to must be good|partial|bad`);
+      }
+      if (modifier.from === 'partial' && typeof option.chancePartial !== 'number') {
+        errors.push(`${where}: oddsModifier moves from an empty partial band`);
+      }
+      if (!(Number(modifier.move) > 0)) {
+        errors.push(`${where}: oddsModifier move must be positive`);
+      }
+      if (String(modifier.when || '').startsWith('hasFlag:')) {
+        consumedFlags.add(String(modifier.when).split(':')[1]);
+      }
+    }
+
+    for (const key of ['flags', 'partialFlags', 'failureFlags']) {
+      for (const flag of option[key] || []) {
+        producedFlags.add(flag);
+        if (!(flag in CONSEQUENCE_FLAGS)) {
+          errors.push(`${where}: consequence flag "${flag}" has no consumer registered in CONSEQUENCE_FLAGS`);
+        }
+      }
+    }
+
+    // The desk deck is shared with the seasonal TUI, whose adaptOperationalEvent
+    // reads `schedulesEvent` and knows nothing about bands. Moving a follow-up
+    // onto a band without leaving the unconditional field deletes it from the
+    // other game — which is exactly how it broke once.
+    if (option.failureSchedulesEvent && !option.schedulesEvent) {
+      errors.push(`${where}: failureSchedulesEvent with no schedulesEvent — the seasonal adapter loses this follow-up entirely`);
+    }
+  }
+}
+
+// A flag nobody reads, or a reader for a flag nobody sets, is dead content in
+// both directions. camp_bear shipped briefly with a consumer and no producer.
+for (const flag of consumedFlags) {
+  if (!producedFlags.has(flag)) {
+    errors.push(`odds: hasFlag:${flag} is read by an option but no band ever sets it`);
+  }
+}
+for (const flag of Object.keys(CONSEQUENCE_FLAGS)) {
+  if (!producedFlags.has(flag)) {
+    errors.push(`consequences: flag "${flag}" is registered with a consumer but no option produces it`);
+  }
+}
+
+/**
+ * The collected issues, so a test can gate on this rather than trusting that
+ * someone remembered to run the script. This lint was CI-only for its whole
+ * life, which is how 155 authored options carrying fields it rejected sat on
+ * the branch for several commits without anyone noticing.
+ * @returns {string[]}
+ */
+export function lintEvents() {
+  return errors;
+}
+
+const invokedDirectly = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop());
+if (invokedDirectly) {
+  if (errors.length) {
+    console.error(`Event content lint FAILED (${errors.length} issue${errors.length > 1 ? 's' : ''}):`);
+    for (const err of errors) console.error(`  - ${err}`);
+    process.exit(1);
+  }
 }
 console.log(`Event content lint passed: ${ALL.length} events, ${allIds.size} unique ids.`);
