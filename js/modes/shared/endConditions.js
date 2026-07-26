@@ -47,6 +47,15 @@ export function checkReconEndConditions(journey) {
     return { gameOver: true, reason: 'Recon package stalled on the final block with no mobility left' };
   }
 
+  // The access season closes. Checked last so a package finished on the final
+  // day still wins above — but a traverse that runs past the window loses,
+  // the same way every other mode's deadline works. Recon shipped without
+  // this branch while the mission pane advertised "Days left", which is why
+  // no recon day ever competed with any other day.
+  if (Number.isFinite(journey.deadline) && journey.day > journey.deadline) {
+    return { gameOver: true, reason: 'The access season closed with blocks still unassessed' };
+  }
+
   return null;
 }
 

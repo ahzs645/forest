@@ -149,6 +149,62 @@ test('recon mode fails on the final block when mobility is gone and open package
   });
 });
 
+test('recon loses when the access season closes with blocks still open', () => {
+  const reconJourney = {
+    journeyType: 'recon',
+    crew: [{ isActive: true }],
+    blocks: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    currentBlockIndex: 1,
+    blocksAssessed: 2,
+    day: 33,
+    deadline: 32,
+    totalDistance: 40,
+    distanceTraveled: 22,
+    resources: { fuel: 30, food: 20, equipment: 70 }
+  };
+
+  assert.deepEqual(checkEndConditions(reconJourney), {
+    gameOver: true,
+    reason: 'The access season closed with blocks still unassessed'
+  });
+});
+
+test('recon still wins on a package finished on the final day of the season', () => {
+  const reconJourney = {
+    journeyType: 'recon',
+    crew: [{ isActive: true }],
+    blocks: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    currentBlockIndex: 2,
+    blocksAssessed: 3,
+    day: 32,
+    deadline: 32,
+    totalDistance: 40,
+    distanceTraveled: 40,
+    resources: { fuel: 2, food: 1, equipment: 15 }
+  };
+
+  assert.deepEqual(checkEndConditions(reconJourney), {
+    victory: true,
+    reason: 'Expedition completed!'
+  });
+});
+
+test('recon without a deadline still runs (the branch is opt-in on journey.deadline)', () => {
+  const reconJourney = {
+    journeyType: 'recon',
+    crew: [{ isActive: true }],
+    blocks: [{ id: 'a' }, { id: 'b' }],
+    currentBlockIndex: 0,
+    blocksAssessed: 0,
+    day: 400,
+    totalDistance: 40,
+    distanceTraveled: 5,
+    resources: { fuel: 30, food: 20, equipment: 70 }
+  };
+
+  assert.equal(checkEndConditions(reconJourney), null);
+});
+
 test('a stalled silviculture program closes after the outside delivery window', () => {
   const result = checkEndConditions({
     journeyType: 'silviculture',

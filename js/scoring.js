@@ -68,10 +68,35 @@ export function calculateScore(journey, victory) {
   // components that summed to ~94).
   const baseScore = Math.round(weighted);
   const victoryBonus = victory ? Math.min(10, 100 - baseScore) : 0;
-  const totalScore = baseScore + victoryBonus;
+  const scrutinyPenalty = scoreScrutinyPenalty(journey);
+  const totalScore = Math.max(0, baseScore + victoryBonus - scrutinyPenalty);
   const grade = getLetterGrade(totalScore);
 
-  return { totalScore, grade, components, victory, baseScore, victoryBonus };
+  return { totalScore, grade, components, victory, baseScore, victoryBonus, scrutinyPenalty };
+}
+
+/**
+ * What a run's accumulated scrutiny costs it at the end.
+ *
+ * Scrutiny is charged everywhere — moving without ground-truthing access,
+ * closing a package from the notebook, and now declining the day's situation
+ * (js/journey/daySituation.js) — but nothing in this file used to read it, so
+ * a standalone expedition could finish with a file nobody would defend and
+ * still score an A. It had partial teeth elsewhere (event frequency in
+ * js/events/selection.js:239, a survey roll in js/modes/silviculture.js:795,
+ * the campaign's season compliance in js/game/campaign.js:188) but never
+ * touched the grade the player is actually shown.
+ *
+ * Reported separately rather than folded into the weights, so the displayed
+ * breakdown still reconciles and the player can see exactly what the file cost
+ * them. Below 30 is the normal working range and is free.
+ * @param {Object} journey
+ * @returns {number} 0-15
+ */
+export function scoreScrutinyPenalty(journey) {
+  const scrutiny = Number(journey?.scrutiny ?? journey?.heat ?? 0);
+  if (!Number.isFinite(scrutiny) || scrutiny <= 30) return 0;
+  return Math.min(15, Math.round((scrutiny - 30) / 4.5));
 }
 
 export function getLetterGrade(score) {
@@ -330,6 +355,10 @@ export function formatScoreDisplay(scoreResult) {
 
   if (scoreResult.victoryBonus > 0) {
     lines.push(`  ${'Completed'.padEnd(14)} +${scoreResult.victoryBonus} bonus for finishing the expedition`);
+  }
+
+  if (scoreResult.scrutinyPenalty > 0) {
+    lines.push(`  ${'Scrutiny'.padEnd(14)} -${scoreResult.scrutinyPenalty} for what the file carries`);
   }
 
   return lines;

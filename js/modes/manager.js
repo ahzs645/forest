@@ -7,7 +7,8 @@
  */
 
 import { checkForEvent } from "../events.js";
-import { handleEvent } from "./shared/handleEvent.js";
+import { runDaySituation } from '../journey/daySituation.js';
+import { formatStatusLine } from '../journey/dayCard.js';
 import { buildBoardChartFrames } from "../scene/textmode/scenes.js";
 import { getOperationalProgress, recordProgressMilestones } from "../journey.js";
 
@@ -48,9 +49,20 @@ export async function runManagerDay(game) {
   // The opening month is event-free so the executive loop reads cleanly first.
   const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
-    displayManagerHeader(ui, journey);
-    await handleEvent(game, event);
-    if (game.gameOver) return;
+    const monthsLeft = Math.max(0, (journey.deadline || 0) - journey.day);
+    const outcome = await runDaySituation(game, event, {
+      frame: {
+        dayHeader: `MONTH ${journey.day}/${journey.deadline} - EXECUTIVE`,
+        statusLine: formatStatusLine([
+          `$${Math.round((journey.resources.budget || 0) / 1000)}k on hand`,
+          `${monthsLeft} month${monthsLeft === 1 ? '' : 's'} left in the term`,
+        ]),
+      },
+      setAsideDescription: 'Delegate it. Keep the month for the business.',
+    });
+    if (outcome.gameOver) return;
+    // Manager months have no dayPlan action budget - the board period runs
+    // regardless - so a situation costs its effects, not the month.
   }
 
   await endOfManagerDay(game, progressBeforeDay);

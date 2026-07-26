@@ -21,18 +21,33 @@ import { formatRadioReport } from './display.js';
 /**
  * Chance that an ordinary day carries an event at all.
  *
- * Event selection walks the whole applicable deck and rolls each entry on its
- * own, so with a pool this size something fired on very nearly every day.
- * That read as texture when a day held three or four actions. Against one
- * action a day (js/journey/dayPlan.js) it meant the day's event was as loud as
- * the day's decision, and the steady drip of event costs outran every budget
- * in scripts/simulate-expeditions.mjs. So the day gets rolled first, and only
- * then does the deck decide which event it is.
+ * This gate was 0.5 for a good reason: against one action a day
+ * (js/journey/dayPlan.js), an event that fired on nearly every day was as loud
+ * as the day's decision, and the steady drip of event costs outran every
+ * budget in scripts/simulate-expeditions.mjs.
+ *
+ * What changed is that the player can now decline. The day's situation is the
+ * day (docs/day_as_situation.md), and every situation the mode can walk away
+ * from carries an explicit "leave it and push on" that trades the cost for
+ * ground. An event is no longer a bill the player has no say in, so the rate
+ * can go back up and the ~500-entry authored library stops being something a
+ * run sees eleven of.
+ *
+ * Two things keep the higher rate affordable: the player can decline, and
+ * minor/positive situations are dealt with without costing the shift at all
+ * (situationCostsTheShift in js/modes/recon.js), so only moderate-and-worse
+ * actually competes with the day's work.
+ *
+ * 0.65 is measured, not chosen. Over 24 runs of scripts/simulate-expeditions.mjs
+ * a competent recon policy wins 17/24 here; at 0.8 it wins 5/16, because the
+ * traverse stops fitting inside the season. A run also needs quiet days for the
+ * loud ones to land, and a quiet day is a card too — it is where the player
+ * gets to choose their own work.
  *
  * Temptations keep their own lane below: they already have a multi-day
  * cooldown, and gating them twice would bury the shortcut library again.
  */
-const DAY_HAS_EVENT_CHANCE = 0.5;
+const DAY_HAS_EVENT_CHANCE = 0.65;
 
 /**
  * Whether today is an event day at all, before the deck picks which one.
@@ -387,6 +402,68 @@ function getTemptationProfileForAct(act) {
 // rather than a nag.
 const TEMPTATION_COOLDOWN_DAYS = 4;
 
+/**
+ * The shortcut, as an actual gamble.
+ *
+ * This option was labelled "(high risk)" and carried no roll at all: every
+ * shortcut in the 208-act library paid out, every time, at exactly its
+ * advertised price. The only thing that could go wrong was an unrelated injury
+ * side-roll. Crime paid at list price.
+ *
+ * Three bands, because "nobody noticed", "someone noticed" and "it became a
+ * file with your name on it" are genuinely different futures rather than three
+ * sizes of the same one:
+ *
+ *   clean   - the money, and it stays buried
+ *   noticed - the money, but it leaves a mark that draws attention afterwards
+ *   caught  - no money at all, and the file follows you
+ *
+ * The odds move on things the player controls, which is the point: a clean
+ * record and standing with people genuinely buy cover, and a run that has
+ * already been cutting corners stops getting the benefit of the doubt. That
+ * last one matters most — `seenActIds` already tracked prior shortcuts purely
+ * to avoid showing the same act twice. Now it is also the thing that hangs you.
+ */
+function buildShortcutOption({ act, gain, isDesk, profile, takeOutcome, takeEffects, takeRiskInjury }) {
+  const shown = Math.min(gain, isDesk ? gain : 1200);
+  const caughtEffects = isDesk
+    ? { compliance: -14, politicalCapital: -10, scrutiny: 22, reputation: -8 }
+    : { compliance: -12, crew_morale: -8, scrutiny: 20, reputation: -6 };
+  const noticedEffects = { ...takeEffects, scrutiny: Number(takeEffects.scrutiny || 0) + 8 };
+
+  return {
+    label: 'Take the shortcut',
+    // Clean band.
+    outcome: `${takeOutcome} Avoided costs leave $${shown.toLocaleString()} available in the budget, and nobody asks.`,
+    effects: takeEffects,
+    // Noticed band: the money still lands, but so does the attention.
+    partialOutcome: `${takeOutcome} The money is real. So is the fact that somebody wrote down what they saw.`,
+    partialEffects: noticedEffects,
+    // Caught band: the gain never arrives. That is the whole deterrent — a
+    // shortcut whose worst case still pays is not a gamble, it is a discount.
+    failureOutcome: act?.consequence
+      ? `It does not hold. ${String(act.consequence)}`
+      : 'It does not hold. The file lands on a desk that asks questions, and your name is on every page of it.',
+    failureEffects: caughtEffects,
+    chanceSuccess: 0.5,
+    chancePartial: 0.3,
+    oddsModifiers: [
+      // A dirty file gets less benefit of the doubt.
+      { when: 'scrutinyAbove:55', move: 0.15, from: 'good', to: 'bad' },
+      { when: 'scrutinyBelow:20', move: 0.10, from: 'bad', to: 'good' },
+      // People look the other way for someone they rate (desk lane).
+      { when: 'relationshipsAbove:70', move: 0.10, from: 'bad', to: 'good' },
+      // Doing it repeatedly is how people get caught.
+      { when: 'priorShortcuts:2', move: 0.10, from: 'good', to: 'partial' },
+      { when: 'priorShortcuts:4', move: 0.15, from: 'good', to: 'bad' },
+      { when: 'difficulty:hard', move: 0.10, from: 'good', to: 'bad' },
+      { when: 'difficulty:easy', move: 0.10, from: 'bad', to: 'good' },
+    ],
+    riskInjury: takeRiskInjury,
+    reactionTone: 'compromised'
+  };
+}
+
 function maybeCreateTemptationEvent(journey) {
   if (!Array.isArray(ILLEGAL_ACTS) || ILLEGAL_ACTS.length === 0) {
     return null;
@@ -458,13 +535,7 @@ function maybeCreateTemptationEvent(journey) {
         outcome: 'You walk away. It keeps the run boring, but safe.',
         effects: refuseEffects
       },
-      {
-        label: 'Take the shortcut (high risk)',
-        outcome: `${takeOutcome} Avoided costs leave $${Math.min(gain, isDesk ? gain : 1200).toLocaleString()} available in the budget.`,
-        effects: takeEffects,
-        riskInjury: takeRiskInjury,
-        reactionTone: 'compromised'
-      },
+      buildShortcutOption({ act, gain, isDesk, profile, takeOutcome, takeEffects, takeRiskInjury }),
       {
         label: 'Document and report',
         outcome: 'You put it in writing. It takes time, but strengthens your position.',

@@ -39,6 +39,21 @@ function makeSensibleUi(journey, actionCounts) {
       if (!options || options.length === 0) return { value: undefined };
       if (options.length === 1) return options[0];
 
+      // A day can now open with an authored situation that costs the day to
+      // answer, plus an explicit way to decline it (js/journey/daySituation.js).
+      // A sensible player does not answer everything: when the program is
+      // behind the calendar they wear the scrutiny and keep the day for the
+      // planting. Without this the "sensible" run spends its season on the
+      // radio and lands outside any plausible window.
+      const setAside = options.find((o) => o.value === 'set_aside');
+      if (setAside) {
+        const deadline = journey.deadline || 42;
+        const elapsed = (journey.day || 1) / deadline;
+        const planted = (journey.planting?.blocksPlanted || 0)
+          / (journey.planting?.blocksToPlant || 1);
+        if (planted < elapsed) return setAside;
+      }
+
       if (options.some((o) => o.value === 'end')) {
         const anyReadyToDeploy = (journey.contractors || []).some((c) => {
           const s = c.silvicultureState;

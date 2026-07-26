@@ -17,10 +17,37 @@
    },
    {
     "label": "Use the spare and continue",
-    "outcome": "Quick swap and you're moving again. Hope there are no more surprises.",
+    "outcome": "The spare goes on in ten minutes and holds. You're moving again before the coffee gets cold.",
     "effects": {
      "equipment": -3
-    }
+    },
+    "failureOutcome": "An hour down the same sharp-rock road the spare lets go too. Now there are no spares at all — you crawl the rest of the route in low gear, and tomorrow starts with a tire run to town instead of work.",
+    "failureEffects": {
+     "equipment": -8,
+     "progress": -6,
+     "fuel": -4
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Wait for help",
@@ -42,19 +69,80 @@
   "options": [
    {
     "label": "Field repair with spare parts",
-    "outcome": "Your mechanic works through the problem. Fixed, but parts are depleted.",
+    "outcome": "Your mechanic chases it to a cracked fuel line and a plugged filter. Fixed by dark, but the spares box is a lot lighter.",
     "effects": {
      "equipment": -15
     },
-    "requiresRole": "mechanic"
+    "requiresRole": "mechanic",
+    "partialOutcome": "It runs, but it should not have to. The fix is a patch on something that lives deeper in the block, and everybody agrees not to say the word rebuild out loud.",
+    "partialEffects": {
+     "equipment": -20,
+     "progress": -4
+    },
+    "failureOutcome": "It is not a fuel line, it is a spun bearing, and no box of belts fixes that. The skidder is dead where it sits — the parts you burned trying are gone, and the tow you were avoiding is now the only call left to make.",
+    "failureEffects": {
+     "equipment": -22,
+     "budget": -500,
+     "progress": -6,
+     "crew_morale": -4
+    },
+    "chanceSuccess": 0.5,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     },
+     {
+      "when": "season:winter",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Limp to the next block slowly",
-    "outcome": "Running on half power, you make it to a spot where proper repairs are possible.",
+    "outcome": "Running on half power, you nurse it in. The machine reaches somewhere a proper repair is actually possible.",
     "effects": {
      "equipment": -20,
      "progress": -8
-    }
+    },
+    "failureOutcome": "Halfway there the temperature needle buries itself and the engine seizes with a sound nobody forgets. Now it is a dead machine blocking a bush road, and the tow that was five hundred dollars from camp costs a lot more from here.",
+    "failureEffects": {
+     "equipment": -28,
+     "progress": -10,
+     "budget": -700
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Call for tow truck ($500)",
@@ -83,19 +171,67 @@
    },
    {
     "label": "Send runner for parts",
-    "outcome": "Someone drives to town. Lost time but the good saw runs again.",
+    "outcome": "Someone burns the afternoon driving to town. The dealer has the bar and chain in stock, and the good saw runs again by morning.",
     "effects": {
      "fuel": -10,
      "equipment": -8
-    }
+    },
+    "failureOutcome": "The runner comes back at dusk with a chocolate bar and no parts — the dealer stopped stocking that bar two seasons ago. It is the slow backup saw until a proper order comes up from Kamloops, and production is capped until it does.",
+    "failureEffects": {
+     "fuel": -10,
+     "progress": -5,
+     "crew_morale": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Try to straighten the bar",
-    "outcome": "With patience and a hammer, it's serviceable. Probably.",
+    "outcome": "With a vise block, a straightedge, and patience, the bar comes back true enough to cut. It will finish the season if nobody pinches it again.",
     "effects": {
      "equipment": -10
     },
-    "riskInjury": 0.15
+    "riskInjury": 0.15,
+    "failureOutcome": "The third hammer blow finds the stress point and the bar cracks clean through the rail. The good saw is a paperweight until a new bar arrives, and the backup becomes the whole show.",
+    "failureEffects": {
+     "equipment": -15,
+     "budget": -200,
+     "progress": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "roles": [
@@ -117,11 +253,45 @@
   "options": [
    {
     "label": "Winch it out with the skidder",
-    "outcome": "Slow work, but eventually free. Equipment takes a beating.",
+    "outcome": "The skidder anchors to a stump and the winch does the rest, slow and ugly. The truck comes free with the fenders full of muskeg.",
     "effects": {
      "equipment": -12,
      "fuel": -5
-    }
+    },
+    "failureOutcome": "Ten metres out the skidder finds the same soft ground and settles in beside the truck. Two machines down to the axles and nothing left in camp big enough to pull either one — it is shovels and brush now, or waiting on drier weather.",
+    "failureEffects": {
+     "equipment": -15,
+     "fuel": -8,
+     "progress": -10,
+     "crew_morale": -6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "terrain:muskeg",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Dig and lay brush road",
@@ -158,11 +328,38 @@
    },
    {
     "label": "Push through to the next block",
-    "outcome": "You race the storm. Most make it, but conditions are dangerous.",
+    "outcome": "You beat the worst of it over the ridge with lightning walking the far side of the valley. Nobody says it was a good idea, but it worked.",
     "effects": {
      "crew_morale": -10
     },
-    "riskInjury": 0.2
+    "riskInjury": 0.2,
+    "failureOutcome": "A snag lets go across the road with the trucks strung out over a kilometre and no way to turn around. One man takes a limb across the shoulder clearing it, and you end up sheltering anyway — in the open, in the worst of it, in the worst possible spot.",
+    "failureEffects": {
+     "crew_health": -8,
+     "crew_morale": -14,
+     "progress": -6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Set up emergency camp",
@@ -193,12 +390,55 @@
    },
    {
     "label": "Risk crossing now before it gets worse",
-    "outcome": "A gamble. The trucks make it across, barely.",
+    "outcome": "The trucks take it in convoy with the water shoving at the doors. Everyone makes the far bank, engines screaming, hearts going.",
     "effects": {
      "crew_morale": -15,
      "equipment": -10
     },
-    "riskInjury": 0.25
+    "riskInjury": 0.25,
+    "partialOutcome": "The second truck loses the line mid-channel and hangs up on the downstream boulders. The winch gets it to the far bank before the water wins, but everything in the box rode the creek to get there.",
+    "partialEffects": {
+     "crew_morale": -15,
+     "equipment": -14,
+     "fuel": -5,
+     "crew_health": -5,
+     "progress": -3
+    },
+    "failureOutcome": "The lead truck loses its footing and slews sideways into the current, taking water over the hood before anyone can react. You drag everybody out on a rope and watch it settle. You are still on the wrong side, minus one engine, and the water is still coming up.",
+    "failureEffects": {
+     "equipment": -25,
+     "crew_morale": -18,
+     "crew_health": -8,
+     "progress": -12
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:storm",
+      "move": 0.2,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Camp on this side overnight",
@@ -227,11 +467,41 @@
    },
    {
     "label": "Bundle up and wait it out",
-    "outcome": "Everyone huddles in camp. A few frostbite scares but manageable.",
+    "outcome": "Everyone doubles up in the warmest tents and nobody does anything heroic. A few white patches on cheeks, but it stays at scares.",
     "effects": {
      "crew_health": -8,
      "crew_morale": -10
-    }
+    },
+    "failureOutcome": "By morning one of the fallers can't feel two fingers, and by noon they're the wrong colour. He's bandaged, useless for saw work, and you're short a set of hands with the cold snap still parked overhead.",
+    "failureEffects": {
+     "crew_health": -12,
+     "crew_morale": -14,
+     "firstAid": -2
+    },
+    "failureCrewEffect": {
+     "injury": "frostbite"
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "shortRationStreak:2",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:winter",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Light a big warming fire",
@@ -252,17 +522,77 @@
   "options": [
    {
     "label": "Make noise and back away slowly",
-    "outcome": "The bear eventually wanders off. Some food is ruined.",
+    "outcome": "Pots, air horns, and slow steps backward. The bear takes one more mouthful on principle and ambles into the bush. Some food is ruined.",
     "effects": {
      "food": -8
-    }
+    },
+    "failureOutcome": "The noise means nothing to a bear that has already found the calories. She works the cache methodically while you stand there banging pots, and what she doesn't eat she ruins. Worse, she's learned exactly where dinner lives — this camp has a bear problem now.",
+    "failureEffects": {
+     "food": -15,
+     "crew_morale": -6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "season:fall",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ],
+    "failureFlags": [
+     "camp_bear"
+    ]
    },
    {
     "label": "Use bear spray",
-    "outcome": "Direct hit. The bear runs. Everyone's shaken but safe.",
+    "outcome": "Direct hit at eight metres. The bear leaves at speed. Everyone's shaken but safe.",
     "effects": {
      "crew_morale": -5
-    }
+    },
+    "failureOutcome": "The wind swings just as the can goes off and the cloud comes back over your own people. Two of them spend the day blind and retching in the creek while the bear, unbothered, finishes what's left of the cache.",
+    "failureEffects": {
+     "crew_health": -6,
+     "crew_morale": -8,
+     "food": -10,
+     "firstAid": -1
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "weather:storm",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ],
+    "failureFlags": [
+     "camp_bear"
+    ]
    },
    {
     "label": "Fire a warning shot",
@@ -283,11 +613,38 @@
   "options": [
    {
     "label": "Post bear watch and continue",
-    "outcome": "Work continues with nervous glances. Productivity suffers.",
+    "outcome": "The watch stands on the high stump with the air horn and the day goes by in nervous glances. She never shows. Productivity suffers anyway.",
     "effects": {
      "progress": -5,
      "crew_morale": -8
-    }
+    },
+    "failureOutcome": "Mid-afternoon the watch's horn goes and she is there, close, ears back. The pull-out is fast and ugly — tools left where they dropped. The block is off-limits until wildlife officers walk it, and the crew has made it clear they're in no hurry to go back.",
+    "failureEffects": {
+     "progress": -12,
+     "crew_morale": -14,
+     "fuel": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "season:fall",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Relocate operations for the day",
@@ -325,10 +682,37 @@
    },
    {
     "label": "Honk and inch forward",
-    "outcome": "The moose charges the truck! Minor dents but everyone's okay.",
+    "outcome": "He charges, bounces off the bull bar, and stomps into the willows to think about it. Minor dents; everyone's okay.",
     "effects": {
      "equipment": -5
-    }
+    },
+    "failureOutcome": "He comes off his front feet and puts both hooves through the grille. Coolant sprays across the road and the gauge climbs before you've backed off fifty metres. The truck is done moving until the radiator is, and he stands over his victory for another half hour.",
+    "failureEffects": {
+     "equipment": -12,
+     "progress": -6,
+     "timeUsed": 3
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "season:fall",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Find an alternate route",
@@ -363,11 +747,39 @@
    },
    {
     "label": "Try to pass slowly",
-    "outcome": "The herd scatters. You save time but feel bad about it.",
+    "outcome": "You idle through the gaps and the herd flows around the truck. Saved an hour; nobody feels great about it.",
     "effects": {
      "crew_morale": -5,
      "compliance": -3
-    }
+    },
+    "failureOutcome": "The herd breaks the wrong way and pours down the ditch line in a panic — right past a wildlife officer's parked truck at the junction. Caribou are a listed species and he was writing before you'd stopped. The complaint lands on the district desk with your plate number on it.",
+    "failureEffects": {
+     "compliance": -8,
+     "relationships": -6,
+     "scrutiny": 8,
+     "crew_morale": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -381,13 +793,44 @@
   "options": [
    {
     "label": "Apply first aid and continue",
-    "outcome": "Bandaged up and back to light duty. They'll be sore for days.",
+    "outcome": "Taped, laced tight, back on light duty. Sore for days, but it's a sprain and it behaves like one.",
     "effects": {
      "firstAid": -1
     },
     "crewEffect": {
      "injury": "sprained_ankle"
-    }
+    },
+    "failureOutcome": "By supper the ankle is the size of a grapefruit and the wrong colour, and they can't put any weight on it. It was never a sprain. A truck goes out at first light, and the crew does the math on your medical judgment.",
+    "failureEffects": {
+     "firstAid": -1,
+     "progress": -6,
+     "fuel": -8,
+     "crew_morale": -8
+    },
+    "failureCrewEffect": {
+     "evacuate": true
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Send them out for medical care",
@@ -402,11 +845,41 @@
    },
    {
     "label": "Have them rest in camp",
-    "outcome": "They stay behind to heal. Might be fine tomorrow.",
+    "outcome": "Two days of camp rest, elevation, and cold creek water. By the second morning they're walking it off.",
     "effects": {},
     "crewEffect": {
      "rest": 2
-    }
+    },
+    "failureOutcome": "Overnight it balloons until the boot won't go on. You send them out in the morning anyway — a day later than you should have, and the X-ray will say exactly that.",
+    "failureEffects": {
+     "progress": -5,
+     "fuel": -8,
+     "crew_morale": -4
+    },
+    "failureCrewEffect": {
+     "evacuate": true
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "shortRationStreak:2",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -431,12 +904,44 @@
    },
    {
     "label": "Push through anyway",
-    "outcome": "Everyone works but productivity tanks. Some near-miss incidents.",
+    "outcome": "Everyone works, sort of. Production limps, tempers are short, and the outhouse sees heavy traffic — but the day ends with everyone upright.",
     "effects": {
      "progress": -3,
      "crew_morale": -12
     },
-    "riskInjury": 0.15
+    "riskInjury": 0.15,
+    "failureOutcome": "Mid-morning one of the sick ones goes down on the landing, two metres from the running processor. He's concussed where he hit the deck. Work stops, and the near-miss writeup asks in plain language why sick men were working equipment.",
+    "failureEffects": {
+     "progress": -8,
+     "crew_morale": -14,
+     "firstAid": -1,
+     "compliance": -4,
+     "scrutiny": 5
+    },
+    "failureCrewEffect": {
+     "injury": "concussion"
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Dispose of suspect food",
@@ -468,7 +973,7 @@
    },
    {
     "label": "Apply first aid and drive to hospital",
-    "outcome": "Bleeding is controlled, but the long road ride costs time and worries everyone.",
+    "outcome": "Pressure bandage, elevation, and three hours of washboard road. The bleeding stays controlled the whole way and the ER takes it from there.",
     "effects": {
      "crew_morale": -6,
      "fuel": -8,
@@ -476,11 +981,40 @@
     },
     "crewEffect": {
      "evacuate": true
-    }
+    },
+    "failureOutcome": "An hour out the bandage soaks through and he goes grey and quiet. The ER stabilizes him, but the damage done on that road is the kind that ends seasons. Everyone in camp knows a helicopter would have had him there in forty minutes, and the incident review will ask why it wasn't called.",
+    "failureEffects": {
+     "crew_morale": -16,
+     "fuel": -8,
+     "compliance": -6,
+     "scrutiny": 8,
+     "timeUsed": 2
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:rain",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Treat on site and keep crews working",
-    "outcome": "The wound is bandaged, but shock and infection risk rise. The crew is visibly shaken.",
+    "outcome": "The bandage holds and he rides out the day in the crummy, white-faced. It was the cheap choice and everyone knows it, but it didn't get worse.",
     "effects": {
      "crew_morale": -18,
      "firstAid": -4,
@@ -488,7 +1022,47 @@
     },
     "crewEffect": {
      "injury": "severe_laceration"
-    }
+    },
+    "partialOutcome": "By the third day the wound is hot, swollen, and weeping through the dressing. You send him to town on the supply run — a planned evacuation instead of an emergency, which is the most that can be said for it. You lost the worker anyway.",
+    "partialEffects": {
+     "crew_morale": -18,
+     "firstAid": -5,
+     "progress": -2,
+     "fuel": -8
+    },
+    "failureOutcome": "Three days on, the leg is septic and he's running a fever of thirty-nine and change in a camp four hours from pavement. The helicopter you didn't call the first time comes anyway, on worse terms, with worse odds. WorkSafe opens a file on why a severe laceration was treated with a bandage and a shift schedule.",
+    "failureEffects": {
+     "crew_morale": -20,
+     "firstAid": -5,
+     "compliance": -10,
+     "scrutiny": 12,
+     "progress": -6
+    },
+    "failureCrewEffect": {
+     "evacuate": true
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.35,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "shortRationStreak:2",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:rain",
+      "move": 0.08,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    }
   ]
  },
@@ -519,11 +1093,52 @@
    },
    {
     "label": "Try to ford the creek",
-    "outcome": "A risky crossing. The truck makes it but scrapes bottom badly.",
+    "outcome": "You pick the widest, shallowest braid and take it slow. The truck grinds over the cobble, scrapes bottom twice, and climbs the far bank streaming water.",
     "effects": {
-     "equipment": -15
+     "equipment": -12
     },
-    "riskInjury": 0.15
+    "riskInjury": 0.15,
+    "partialOutcome": "Mid-channel the front end drops into a slot between boulders and hangs there, driveline grinding. Winching it the rest of the way takes two hours, and the undercarriage keeps some parts of the creek as souvenirs.",
+    "partialEffects": {
+     "equipment": -18,
+     "progress": -4,
+     "fuel": -4
+    },
+    "failureOutcome": "The bed of the ford is washout spoil, not creek bottom, and it swallows the front wheel whole. Water comes over the intake before the winch line is even hooked. The engine is drowned, the washout is still there, and you are building the bypass anyway — now with one less truck to do it.",
+    "failureEffects": {
+     "equipment": -25,
+     "progress": -10,
+     "crew_morale": -8,
+     "fuel": -5
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    }
   ]
  },
@@ -537,10 +1152,49 @@
   "options": [
    {
     "label": "Test it on foot first",
-    "outcome": "You walk across. It holds. Trucks go one at a time, very slowly.",
+    "outcome": "You walk it, bouncing on the stringers at the mid-span. It talks back but it does not move. Trucks go one at a time, very slowly, and everyone watches.",
     "effects": {
      "timeUsed": 1
-    }
+    },
+    "partialOutcome": "Underfoot it is fine. Under nine tonnes it is not — a stringer splits on the first truck and the deck sags four inches. You get across. Nothing loaded is coming back this way.",
+    "partialEffects": {
+     "timeUsed": 1,
+     "progress": -4
+    },
+    "failureOutcome": "It holds you and lets go under the truck. The rear duals drop through the deck onto the cribbing and stop there, which is the only luck in it. The rest of the day is spent getting the box out, and the crossing is finished.",
+    "failureEffects": {
+     "equipment": -18,
+     "fuel": -6,
+     "progress": -8
+    },
+    "chanceSuccess": 0.55,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "equipmentBelow:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:spring",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:faller",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     }
+    ],
+    "partialFlags": [
+     "bridge_condemned"
+    ],
+    "failureFlags": [
+     "bridge_condemned"
+    ]
    },
    {
     "label": "Reinforce with fresh logs",
@@ -568,19 +1222,81 @@
   "options": [
    {
     "label": "Clear it with equipment",
-    "outcome": "The skidder pushes debris aside. Hard on the machine.",
+    "outcome": "The skidder works blade-first through the debris while everyone else watches the slope above. By late afternoon there's a lane.",
     "effects": {
      "equipment": -12,
      "fuel": -8
-    }
+    },
+    "failureOutcome": "The operator never hears the second pulse over the engine — the first anyone knows is mud coming over the blade and up the door. He climbs out the far side unhurt; the skidder stays, buried to the cab. Now you make the call to the geotech you were trying to avoid, and add a machine recovery to the file.",
+    "failureEffects": {
+     "equipment": -25,
+     "fuel": -8,
+     "progress": -12,
+     "crew_morale": -8
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:storm",
+      "move": 0.2,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:spring",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Hand-clear a path",
-    "outcome": "Everyone grabs tools. Exhausting but it works.",
+    "outcome": "Everyone grabs a saw or a shovel. It's brutal work, but by dark there's a path wide enough for the trucks.",
     "effects": {
      "crew_health": -8,
      "crew_morale": -5
-    }
+    },
+    "failureOutcome": "The slope gives a second time with six people in the cut. Everyone comes out, limping and swearing, but two shovels and a saw are somewhere under the new material. Nobody argues about the next step anymore — you pull back, and the road stays closed until someone qualified says otherwise.",
+    "failureEffects": {
+     "crew_health": -12,
+     "crew_morale": -12,
+     "equipment": -8,
+     "progress": -12
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "season:spring",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Turn back and report",
@@ -636,11 +1352,38 @@
   "options": [
    {
     "label": "Go back and search",
-    "outcome": "Found most of it scattered along the road. Lost time and fuel.",
+    "outcome": "Twenty minutes back down the road, there it is — burst open in the ditch but mostly salvageable. Lost time and fuel, nothing worse.",
     "effects": {
      "progress": -3,
      "fuel": -5
-    }
+    },
+    "failureOutcome": "You find where it went over — a rock bluff the road bends around. The box is forty metres down, burst, contents strewn through the alder and soaked. You drive back with the fuel burned, the hours gone, and the write-off intact, and the shortfall moves the next resupply run up a week.",
+    "failureEffects": {
+     "budget": -750,
+     "fuel": -5,
+     "progress": -4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:rain",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Write it off and continue",
@@ -693,18 +1436,71 @@
   "options": [
    {
     "label": "Scavenge fuel and parts",
-    "outcome": "A few jerry cans of diesel and some spare belts. Score!",
+    "outcome": "A few jerry cans of diesel that smell right, and a box of belts in the right sizes. The bush provides.",
     "effects": {
      "fuel": 15,
      "equipment": 5
-    }
+    },
+    "failureOutcome": "The cans sat through too many freeze-thaws and nobody checked with a clear jar. By mid-morning the skidder's filters are plugged with rust and water, and the machine is down while somebody drains and bleeds the whole system. The free fuel cost more than town prices.",
+    "failureEffects": {
+     "equipment": -10,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Grab the food supplies",
-    "outcome": "Canned goods and dried rations. Still good!",
+    "outcome": "Canned goods and dried rations, labels faded but seals intact. Still good.",
     "effects": {
      "food": 12
-    }
+    },
+    "failureOutcome": "Dinner tastes fine. Breakfast doesn't happen — half the camp is at the outhouse or in their bags, and the tins get a proper look in daylight: bulged lids, rust through the seams. The haul goes in a pit, and the day runs short-handed.",
+    "failureEffects": {
+     "crew_health": -8,
+     "progress": -6,
+     "crew_morale": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "shortRationStreak:2",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Take the first aid kit",
@@ -822,21 +1618,89 @@
    },
    {
     "label": "Lay brush and corduroy the approach",
-    "outcome": "The crew spends the shift reinforcing the crossing. It holds, but everyone feels the extra work.",
+    "outcome": "The crew spends the shift laying brush and corduroy. The mat takes the weight and spreads it — the crossing holds, and everyone feels the day in their backs.",
     "effects": {
      "progress": -2,
      "crew_morale": -4,
      "equipment": -3
-    }
+    },
+    "failureOutcome": "The mat under the corduroy is worse than the probe said. Under the first loaded pass the whole approach pumps, floats, and blows out sideways — the truck backs off a crossing that no longer exists. The shift is spent, the crossing is closed, and from tomorrow everything goes the long way.",
+    "failureEffects": {
+     "progress": -8,
+     "crew_morale": -8,
+     "equipment": -6,
+     "fuel": -4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:spring",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Test it with one light pickup",
-    "outcome": "The pickup squeaks through, but the shoulders slump and the crossing is worse by evening.",
+    "outcome": "The pickup idles across with a man walking ahead reading the mat. It flexes, it weeps a little brown water, and it holds. Light traffic only, but the crossing is a crossing.",
     "effects": {
+     "progress": 2,
+     "equipment": -2
+    },
+    "riskInjury": 0.1,
+    "partialOutcome": "The pickup squeaks through, but its wake follows it — the shoulders slump and brown water stands in the ruts by evening. It's a light-vehicle crossing now, and only just.",
+    "partialEffects": {
      "progress": 2,
      "equipment": -8
     },
-    "riskInjury": 0.1
+    "failureOutcome": "Ten metres out the mat quits. The front end drops through to the frame and brown water comes up over the running boards. Recovering a truck off pumping peat takes the day, wrecks what was left of the approach, and settles the question — this crossing is done, and the block reroutes around it.",
+    "failureEffects": {
+     "equipment": -15,
+     "progress": -8,
+     "fuel": -5,
+     "crew_morale": -6
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.35,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:spring",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     }
+    ]
    }
   ]
  },
@@ -871,20 +1735,92 @@
    },
    {
     "label": "Restrict loads and post a spotter",
-    "outcome": "The crossing survives the day, but everyone knows it is now on borrowed time.",
+    "outcome": "Half loads, one truck at a time, a spotter on the outlet watching for fresh scour. The crossing survives the day — on borrowed time, and everyone knows it.",
     "effects": {
      "progress": -2,
      "crew_morale": -3
-    }
+    },
+    "failureOutcome": "It lets go under a half load anyway — the outlet undercuts and a slug of road fill goes into the channel where the salmon are holding. The spotter's radio call is the first line of a fisheries file that has your traffic log stapled to it. The crossing is closed, and not by you.",
+    "failureEffects": {
+     "compliance": -10,
+     "scrutiny": 10,
+     "progress": -6,
+     "relationships": -4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:fall",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Keep moving and note it for later",
-    "outcome": "You buy a few production hours, but the crew knows this crossing just became a liability.",
+    "outcome": "The pipe holds one more day and you bank the production hours. The note goes in the file for later, where it sits with all the other laters.",
     "effects": {
      "progress": 4,
      "equipment": -5,
      "crew_morale": -5
-    }
+    },
+    "partialOutcome": "The crossing holds. What you didn't see was the hatchery crew downstream, and the photos of the perched outlet — with your loaded truck on top — are on a district desk by Friday. Nobody calls. A file just opens.",
+    "partialEffects": {
+     "progress": 4,
+     "equipment": -5,
+     "crew_morale": -5,
+     "scrutiny": 8,
+     "relationships": -4
+    },
+    "failureOutcome": "Mid-haul the culvert lets go completely. The road drops a metre, the truck barely stops in time, and a brown plume rolls through the pool where the spawners were holding. This one isn't a note for later — it's an investigation, and the crossing is gone.",
+    "failureEffects": {
+     "compliance": -14,
+     "scrutiny": 15,
+     "progress": -8,
+     "equipment": -8,
+     "relationships": -6
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:storm",
+      "move": 0.2,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.08,
+      "from": "partial",
+      "to": "good"
+     }
+    ]
    }
   ]
  },
@@ -925,12 +1861,44 @@
    },
    {
     "label": "Push full production",
-    "outcome": "The numbers look better by supper, but the crew is drained and the call feels harder to defend.",
+    "outcome": "The numbers look better by supper. The crew is hoarse and drained, and the call gets harder to defend every hour, but it holds.",
     "effects": {
      "progress": 5,
      "crew_morale": -8
     },
-    "riskInjury": 0.12
+    "riskInjury": 0.12,
+    "failureOutcome": "Mid-afternoon a faller goes down on the hill, hands on knees and then all the way down, coughing like a man twice his age. The stand-down order comes over the radio while you're still getting him to the truck. You shut down anyway — later, with an injury on the books and nothing to show for the difference.",
+    "failureEffects": {
+     "progress": -4,
+     "crew_morale": -12,
+     "crew_health": -8,
+     "compliance": -6,
+     "scrutiny": 8
+    },
+    "failureCrewEffect": {
+     "illness": "smoke_inhalation"
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -1025,25 +1993,85 @@
    },
    {
     "label": "Negotiate — offer a bonus and lighter duties",
-    "outcome": "You promise extra pay and shorter shifts. He thinks it over...",
+    "outcome": "He thinks about it for a long minute and puts his gloves back on. Word gets around camp that you sorted it out instead of letting him walk.",
     "effects": {
      "budget": -400,
-     "crew_morale": -3
+     "crew_morale": 4
     },
-    "chanceSuccess": 0.6,
-    "failureOutcome": "He takes the money but quits anyway two days later. Waste of cash.",
+    "chanceSuccess": 0.45,
+    "failureOutcome": "He takes the money, works two more days, and is gone with the Thursday supply run. You are down a set of hands and out the bonus.",
     "failureEffects": {
      "budget": -400,
      "crew_morale": -8
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "partialOutcome": "He stays, and he is careful to let everyone know exactly what it took. By supper two others have found reasons to mention how tired they are.",
+    "partialEffects": {
+     "budget": -400,
+     "crew_morale": -2
+    },
+    "failureCrewEffect": {
+     "lose_member": true
+    },
+    "chancePartial": 0.35,
+    "oddsModifiers": [
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.2,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "shortRationStreak:3",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleAbove:70",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     }
+    ],
+    "partialFlags": [
+     "crew_precedent_set"
+    ]
    },
    {
     "label": "Ignore it — he'll cool off",
-    "outcome": "You shrug it off. But the rest of the crew noticed you didn't care. Tension rises.",
+    "outcome": "By morning his gloves are on and nothing more is said. But the crew noticed you didn't care enough to ask, and the tension doesn't leave with the mood.",
     "effects": {
      "crew_morale": -12
-    }
+    },
+    "failureOutcome": "His bunk is empty at dawn and his truck is gone through the gate. The crew ate breakfast watching you not notice, and now they're doing his work short-handed for a boss who shrugged.",
+    "failureEffects": {
+     "crew_morale": -14
+    },
+    "failureCrewEffect": {
+     "lose_member": true
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.2,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "shortRationStreak:3",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleAbove:70",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1067,20 +2095,85 @@
    },
    {
     "label": "Ignore it — not your problem",
-    "outcome": "You keep working. But if someone finds out you saw it and said nothing...",
+    "outcome": "You keep working. The stumps grey out, the tire tracks wash away, and nobody ever asks what you saw.",
     "effects": {},
     "hiddenOutcome": true,
-    "riskCompliance": 0.3
+    "riskCompliance": 0.3,
+    "failureOutcome": "Six weeks later a natural resource officer walks your block with photos of the stumps and your crew's tire tracks beside them. You work two hundred metres from a theft site and saw nothing — that goes in the file, worded exactly that way, and the file follows you for the rest of the season.",
+    "failureEffects": {
+     "compliance": -12,
+     "scrutiny": 12,
+     "relationships": -5
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Investigate quietly on your own",
-    "outcome": "You poke around after hours. Fresh tire tracks lead to an unmarked road.",
+    "outcome": "You go in on foot after dark and get what you came for — plate numbers, a photo of the skidder's brand plate, the gate coordinates. Nobody sees you. Whatever happens next, you have proof.",
     "effects": {
-     "crew_morale": -3
+     "crew_morale": -3,
+     "data": 4
     },
     "hiddenOutcome": true,
     "schedulesEvent": "unauthorized_logging_followup",
-    "scheduledDelay": 3
+    "scheduledDelay": 3,
+    "failureOutcome": "Headlights swing across the landing while you're still beside their skidder, and you leave through the slash at a dead run. No photos, no plates — but they got a good look at you. When the visit comes, it'll be them holding the cards.",
+    "failureEffects": {
+     "crew_morale": -8
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "weather:fog",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1095,18 +2188,89 @@
   "options": [
    {
     "label": "Stand your ground and tell them to leave",
-    "outcome": "Tense standoff. They leave with threats but don't come back. Your crew is rattled.",
+    "outcome": "You meet them in the middle of camp with the whole crew drifting in behind you. There's a lot of talk, none of it kind, and then they leave. They don't come back.",
     "effects": {
      "crew_morale": -10
-    }
+    },
+    "failureOutcome": "They leave without a word, which should have been the warning. In the morning three tires are flat with clean knife cuts and the fuel tank's water trap is full of something that isn't diesel. The machines stay parked while you sort it out, and you call the conservation officers you could have called yesterday — now as the victim, not the witness.",
+    "failureEffects": {
+     "crew_morale": -14,
+     "equipment": -15,
+     "fuel": -8,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "avgMoraleAbove:70",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:faller",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ],
+    "failureFlags": [
+     "locals_soured"
+    ]
    },
    {
     "label": "Offer to look the other way",
-    "outcome": "They leave you alone but you've compromised your integrity. Compliance risk if it comes out.",
+    "outcome": "They nod, and that's the whole transaction. Their operation and yours ignore each other for the rest of the season, and nobody ever asks you what you knew.",
     "effects": {
      "compliance": -15
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "Months later a compliance sweep rolls up their operation, and they hand over your name before the coffee's poured — the licensee next door who agreed to look away. Every inspection you get for the rest of the season starts from that sentence.",
+    "failureEffects": {
+     "compliance": -20,
+     "scrutiny": 15,
+     "relationships": -8,
+     "reputation": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Call the authorities immediately",
@@ -1173,7 +2337,7 @@
    },
    {
     "label": "Let them do light duty",
-    "outcome": "They handle small tasks around camp. It helps a little, and they do not seem to get worse—yet.",
+    "outcome": "They sort chokers and file chains by the fire, moving slow but staying warm. Not much use today, but they hold steady and are on their feet by morning.",
     "effects": {
      "progress": -4
     },
@@ -1181,11 +2345,45 @@
     "crewEffect": {
      "illness": "flu",
      "riskWorsen": 0.35
-    }
+    },
+    "failureOutcome": "By mid-afternoon they are flat on their back in the cook tent, and by dark two more are running fevers. The flu is in camp now, and light duty is what everyone will be doing for a while.",
+    "failureEffects": {
+     "progress": -8,
+     "crew_health": -10,
+     "crew_morale": -5,
+     "firstAid": -1
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:freezing",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "shortRationStreak:2",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Medicate and push through",
-    "outcome": "You use the first-aid kit to manage the symptoms. They work at half speed, but the illness may worsen.",
+    "outcome": "Ibuprofen and cold pills out of the kit. They work at half speed, say nothing at lunch, and make it to the whistle without going down.",
     "effects": {
      "firstAid": -1,
      "progress": -2
@@ -1194,7 +2392,41 @@
     "crewEffect": {
      "illness": "exhaustion",
      "riskWorsen": 0.5
-    }
+    },
+    "failureOutcome": "An hour after lunch they go down between the rows, soaked through and shaking hard. This is not a flu you walk off, and the conversation now is about the drive to town, not tomorrow's shift.",
+    "failureEffects": {
+     "firstAid": -2,
+     "progress": -8,
+     "crew_health": -8,
+     "crew_morale": -8
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:freezing",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "shortRationStreak:2",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1256,21 +2488,76 @@
    },
    {
     "label": "Be cooperative but let them lead",
-    "outcome": "You answer questions honestly. They find what they find.",
+    "outcome": "You answer what they ask and nothing more. They find a frayed lanyard and a dated extinguisher, note both without drama, and are gone by two.",
     "effects": {
      "progress": -2,
      "compliance": 2
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "They find the thing you did not know about — the guard missing off the landing saw. A partial stop-work goes on the landing until it is corrected and signed off, and a follow-up visit lands on the calendar.",
+    "failureEffects": {
+     "progress": -6,
+     "compliance": -8,
+     "scrutiny": 8
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "equipmentBelow:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Distract them with coffee and stories",
-    "outcome": "You keep the crews working while you pour coffee and spin stories. Inspectors have seen this before — they dig deeper.",
+    "outcome": "He takes the coffee, tells a better story than yours, and gives the site a light once-over between refills. The crews never stop working.",
     "effects": {
      "progress": -1,
-     "compliance": -5
+     "compliance": -3
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "He sets the cup down half-finished and starts opening tool boxes. By the end of it you have citations on three items, a lecture about wasting his time, and your operation flagged for an unannounced re-visit.",
+    "failureEffects": {
+     "progress": -4,
+     "compliance": -8,
+     "scrutiny": 10,
+     "relationships": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:40",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1325,11 +2612,38 @@
   "options": [
    {
     "label": "Light extra fires and make noise",
-    "outcome": "The wolves linger but keep distance. An uneasy night. They're gone by morning.",
+    "outcome": "The wolves linger on the ridge but keep their distance. An uneasy night of banging pots and feeding fires. They are gone by morning.",
     "effects": {
      "crew_morale": -8,
      "food": -3
-    }
+    },
+    "failureOutcome": "The noise holds their eyes on the ridge while two of them work the cache behind camp. By morning half the meat is gone and the crew has done the math — until the pack moves on, nobody works spread out.",
+    "failureEffects": {
+     "crew_morale": -10,
+     "food": -10,
+     "progress": -3
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "season:winter",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Move camp to a more open area",
@@ -1341,11 +2655,39 @@
    },
    {
     "label": "Carry on — wolves don't attack people",
-    "outcome": "You're right, mostly. But the crew doesn't sleep well for days.",
+    "outcome": "You're right, mostly. They shadow the camp for two days and lose interest. The crew doesn't sleep well the whole time.",
     "effects": {
      "crew_morale": -12,
      "crew_health": -5
-    }
+    },
+    "failureOutcome": "A wolf takes a cooler off the tailgate at noon, twenty feet from the bucker. Habituated is the word the wildlife office uses. Nobody works alone after that and nobody works at dusk, and the pace shows it.",
+    "failureEffects": {
+     "crew_morale": -14,
+     "crew_health": -5,
+     "food": -6,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "season:winter",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "shortRationStreak:2",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1360,14 +2702,42 @@
   "options": [
    {
     "label": "Push hard now to get ahead of it",
-    "outcome": "The crew works double-time. Exhausting but you bank some progress before the storm.",
+    "outcome": "The crew works double-time and hates it. But the decking is ahead of schedule when the first gusts arrive, and that is money in the bank.",
     "effects": {
      "progress": 6,
      "crew_health": -8,
      "crew_morale": -5
     },
     "schedulesEvent": "major_storm_hits",
-    "scheduledDelay": 2
+    "scheduledDelay": 2,
+    "failureOutcome": "Double-time is when corners get cut. The skidder throws a track on a slope it had no business on, and it is still sitting there when the front rolls in. You meet the storm tired, behind, and down a machine.",
+    "failureEffects": {
+     "progress": -2,
+     "crew_health": -8,
+     "crew_morale": -8,
+     "equipment": -12
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "equipmentBelow:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Prepare camp for the storm",
@@ -1402,21 +2772,84 @@
   "options": [
    {
     "label": "Hunker down and ride it out",
-    "outcome": "A long, wet, miserable day. But everything holds together. Barely.",
+    "outcome": "A long, wet, miserable day of cards and coffee while the tarps snap. But everything holds together. Barely.",
     "effects": {
      "progress": -10,
      "crew_morale": -8,
      "food": -5
-    }
+    },
+    "failureOutcome": "Around midnight a cottonwood lets go and comes down across the frame tent — nobody under it, which is the only luck going. The generator and a wall tent are wrecked, and the first dry day goes to rebuilding camp instead of working.",
+    "failureEffects": {
+     "progress": -14,
+     "equipment": -15,
+     "crew_morale": -12,
+     "food": -5
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:faller",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:fall",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Evacuate to the main road",
-    "outcome": "A harrowing drive through the storm. Everyone makes it out but the camp is left behind.",
+    "outcome": "A white-knuckle drive with the wipers losing. Everyone makes it to the main road, and camp is on its own until this blows through.",
     "effects": {
      "progress": -15,
      "fuel": -10,
      "equipment": -5
-    }
+    },
+    "failureOutcome": "The crummy slides off the shoulder where the ditch has taken the road, halfway between camp and the highway. You spend the night in the cabs listening to it blow, and tomorrow belongs to the recovery, not the job.",
+    "failureEffects": {
+     "progress": -18,
+     "fuel": -10,
+     "equipment": -15,
+     "crew_health": -6,
+     "crew_morale": -10
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "terrain:muskeg",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Use the downtime for equipment maintenance",
@@ -1484,12 +2917,46 @@
    },
    {
     "label": "Cross carefully and note it for later",
-    "outcome": "You ford it gently and mark it on the map. Should have reported it first, but you saved time.",
+    "outcome": "You pick a wide cobble bar, ford it gently, and mark it on the map. Should have reported it first, and you know it, but the day keeps moving.",
     "effects": {
      "progress": -2,
      "compliance": -8
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "The bank cuts loose under the second truck and a plume of silt runs a hundred metres down through the spawning beds. A creek that is not on your map is on somebody's — a compliance officer is out within the week with photographs. It is a formal file now, with your name in it.",
+    "failureEffects": {
+     "progress": -4,
+     "compliance": -15,
+     "scrutiny": 15,
+     "relationships": -5
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "weather:heavy_rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:fall",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Investigate the watershed",
@@ -1562,12 +3029,46 @@
    },
    {
     "label": "Salvage the supplies",
-    "outcome": "Kerosene, rope, a hand axe, and some canned goods that are somehow still sealed. Lucky find.",
+    "outcome": "Kerosene, rope, a hand axe, and canned goods that are somehow still sealed. The cook inspects every tin and keeps most of them. Lucky find.",
     "effects": {
      "fuel": 5,
      "food": 6,
      "equipment": 3
-    }
+    },
+    "failureOutcome": "Sealed is not the same as sound. By three in the morning half the camp is outside the tents being sick, the cook worst of all. First aid gets everyone through it; the next day of production does not happen.",
+    "failureEffects": {
+     "crew_health": -10,
+     "firstAid": -2,
+     "progress": -8,
+     "crew_morale": -5
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "shortRationStreak:2",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Leave it undisturbed — could be heritage",
@@ -1597,19 +3098,78 @@
    },
    {
     "label": "Mediate — split the pot and move on",
-    "outcome": "A fair-enough solution. Nobody's happy but nobody's fighting.",
+    "outcome": "A fair-enough solution. Nobody's happy but nobody's fighting, and by breakfast it is mostly a story.",
     "effects": {
      "crew_morale": -3
-    }
+    },
+    "failureOutcome": "The man who was winning takes the split as robbery with a referee. He does not swing, he just stops talking — and now they work opposite ends of the block, and you plan every day around keeping them there.",
+    "failureEffects": {
+     "crew_morale": -8,
+     "progress": -3
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "avgMoraleAbove:70",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "shortRationStreak:2",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Let them sort it out themselves",
-    "outcome": "They scuffle. One gets a black eye. But somehow, they respect each other more after.",
+    "outcome": "They scuffle behind the fuel shed. One gets a black eye, the pot gets settled, and somehow they respect each other more after.",
     "effects": {
      "crew_morale": 3
     },
     "hiddenOutcome": true,
-    "riskInjury": 0.2
+    "riskInjury": 0.2,
+    "partialOutcome": "Nobody swings. The winner pockets the pot, the loser goes to his tent, and the thing sits there festering. They will not buck on the same strip now, and you are building each day's plan around it.",
+    "partialEffects": {
+     "crew_morale": -6,
+     "progress": -2
+    },
+    "failureOutcome": "It goes to the ground and somebody's hand finds a stump. Broken, splinted, done working — and by morning the loser is asking to be on the next supply run out. You are down a working pair of hands either way.",
+    "failureEffects": {
+     "crew_morale": -8,
+     "firstAid": -1,
+     "progress": -5
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.35,
+    "oddsModifiers": [
+     {
+      "when": "avgMoraleAbove:70",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "shortRationStreak:3",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1632,24 +3192,72 @@
    },
    {
     "label": "Try to fix it with what you have",
-    "outcome": "Your most tech-savvy crew member tinkers for hours. Might work, might not.",
+    "outcome": "A cracked solder joint on the power board. Your handiest man reflows it with a screwdriver blade heated on the stove, and district comes back scratchy but readable.",
     "effects": {
      "progress": -3
     },
     "hiddenOutcome": true,
     "chanceSuccess": 0.4,
-    "failureOutcome": "Hours of tinkering. The radio stays dead, and its parts are spread across a tarp.",
+    "failureOutcome": "Hours of tinkering and the radio stays dead, its parts spread across a tarp in an order only he understands. The town run happens anyway — a day later and a day poorer.",
     "failureEffects": {
-     "progress": -5
-    }
+     "progress": -6,
+     "fuel": -12
+    },
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:storm",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Work without radio — check in when you can",
-    "outcome": "Risky to be out of contact, but you keep production moving.",
+    "outcome": "Nothing happens that needed a radio. You borrow the neighbouring crew's set twice for check-ins, and the replacement can wait for the regular supply run.",
     "effects": {
      "compliance": -8
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "District has been calling for two days about a fire-weather shutdown you never heard. Silence reads as dodging — a white truck shows up unannounced with a formal warning in it, and the file it starts stays open.",
+    "failureEffects": {
+     "compliance": -12,
+     "scrutiny": 12,
+     "progress": -4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:40",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "season:summer",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1664,12 +3272,40 @@
   "options": [
    {
     "label": "Drain and filter what you can",
-    "outcome": "Tedious work. You save about half the fuel. Equipment runs rough for a day.",
+    "outcome": "Tedious work with a chamois and a funnel. You save about half the fuel, and the equipment runs rough for a day before clearing its throat.",
     "effects": {
      "fuel": -15,
      "equipment": -8,
      "progress": -4
-    }
+    },
+    "failureOutcome": "The water is through every can, not just the barrel. You save a quarter of it, the skidder's injectors are already scored from the morning's running, and the fresh-fuel order goes in anyway — with a machine limping until it comes.",
+    "failureEffects": {
+     "fuel": -25,
+     "equipment": -14,
+     "progress": -6,
+     "budget": -300
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:heavy_rain",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "equipmentBelow:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Dump it all and order fresh fuel",
@@ -1682,13 +3318,41 @@
    },
    {
     "label": "Use it anyway — it's mostly diesel",
-    "outcome": "The equipment runs, barely. Something is going to break sooner rather than later.",
+    "outcome": "The equipment runs, barely, on what you tell yourself is mostly diesel. Something is going to break sooner rather than later.",
     "effects": {
      "fuel": -5
     },
     "hiddenOutcome": true,
     "schedulesEvent": "engine_trouble",
-    "scheduledDelay": 2
+    "scheduledDelay": 2,
+    "failureOutcome": "The injection pump seizes with the skidder halfway up the main trail, and a dead machine there is a roadblock, not a breakdown. Parts are days out, and everything walks around it until they come.",
+    "failureEffects": {
+     "fuel": -5,
+     "equipment": -18,
+     "progress": -8,
+     "budget": -400
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:freezing",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1703,11 +3367,39 @@
   "options": [
    {
     "label": "Confront the foreman directly",
-    "outcome": "A heated but productive conversation. Boundaries are clarified. Uneasy truce.",
+    "outcome": "A heated but productive conversation over the hood of his pickup. Boundaries get re-flagged while you both watch. Uneasy truce.",
     "effects": {
      "crew_morale": 3,
      "relationships": -5
-    }
+    },
+    "failureOutcome": "He is not interested in a conversation, and the shouting carries. By the weekend there is a written complaint about your operation on the district's desk, and their flagging line is ten metres further over than it was.",
+    "failureEffects": {
+     "crew_morale": -3,
+     "relationships": -8,
+     "scrutiny": 8,
+     "progress": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "avgMoraleAbove:70",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Report the encroachment officially",
@@ -1720,13 +3412,41 @@
    },
    {
     "label": "Challenge them to a production race",
-    "outcome": "The crews push hard to outperform each other. Dangerous but motivating.",
+    "outcome": "Both crews push hard to bury each other, and yours wins by a truckload. Dangerous, loud, and the best week of morale all season.",
     "effects": {
      "progress": 5,
      "crew_morale": 8,
      "crew_health": -5
     },
-    "riskInjury": 0.15
+    "riskInjury": 0.15,
+    "failureOutcome": "Racing does not leave time to look up. Your second-best faller drops a stem across a marked reserve and takes a limb across the shin on the way clear. He is limping, the ribbon is on the ground, and you lose the race anyway — their foreman makes sure the whole valley hears.",
+    "failureEffects": {
+     "progress": -3,
+     "crew_morale": -10,
+     "crew_health": -8,
+     "compliance": -4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:faller",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1752,12 +3472,40 @@
    },
    {
     "label": "Ask him to stay until the shift ends",
-    "outcome": "He stays but his mind is elsewhere. Dangerous distraction. The crew is uncomfortable.",
+    "outcome": "He stays and works like a machine because thinking is worse. The crew gives him room and nobody says anything to you about it. He is on the road by dark.",
     "effects": {
      "crew_morale": -10
     },
     "riskInjury": 0.15,
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "His mind is on the highway and his saw is not. The kickback takes him across the thigh — the chaps eat most of it, first aid takes the rest. You drive him out that evening anyway, and the crew watches you load his gear without a word on your behalf.",
+    "failureEffects": {
+     "crew_morale": -15,
+     "crew_health": -5,
+     "firstAid": -2,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "avgMoraleAbove:70",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Drive him to town yourself",
@@ -1799,12 +3547,46 @@
    },
    {
     "label": "Work around it as close as regulations allow",
-    "outcome": "You cut right up to the legal minimum distance. Efficient but the eagles are stressed.",
+    "outcome": "You cut to the legal minimum and not a metre closer. The adults scream at the saws all week, but they keep bringing fish to the nest.",
     "effects": {
      "progress": -3,
      "compliance": 3
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "Three days of saws at the minimum distance and the adults stop coming back. Abandonment of an active nest is a Wildlife Act incident whether you were legal or not. Work stops for the assessment, and the file follows the licence, not the block.",
+    "failureEffects": {
+     "progress": -10,
+     "compliance": -12,
+     "scrutiny": 12,
+     "relationships": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "season:spring",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1819,11 +3601,38 @@
   "options": [
    {
     "label": "Search the area thoroughly",
-    "outcome": "You find one saw tossed in the brush — dropped by whoever took it. The rest is gone.",
+    "outcome": "You find one saw tossed in the brush a hundred metres out — dropped by somebody moving fast. The rest is gone, but one back is one back.",
     "effects": {
      "progress": -4,
      "equipment": -10
-    }
+    },
+    "failureOutcome": "Half a day of grid-walking turns up nothing of yours — then all of it, tarped and staged by the old landing for pickup. Whoever it is, they are coming back for the load. Camp security is now the evening's plan, not sleep.",
+    "failureEffects": {
+     "progress": -6,
+     "equipment": -10,
+     "crew_morale": -5
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:heavy_rain",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Report theft to RCMP",
@@ -1855,13 +3664,61 @@
   "options": [
    {
     "label": "Push hard now — run equipment day and night",
-    "outcome": "You work around the clock while the ground still holds. Exhausting but productive.",
+    "outcome": "You run iron around the clock while the frost holds the road together. Exhausting, hard on the machines, and worth every hour of it.",
     "effects": {
      "progress": 10,
      "crew_health": -10,
      "crew_morale": -8,
      "equipment": -10
-    }
+    },
+    "partialOutcome": "On the second night the buncher goes in to the belly pan on a stretch that held all day. Six hours of digging and matting gets it out, and that is the end of it — the road will not take iron again until it dries.",
+    "partialEffects": {
+     "progress": 4,
+     "crew_health": -10,
+     "crew_morale": -8,
+     "equipment": -14,
+     "fuel": -6
+    },
+    "failureOutcome": "A loaded skidder punches through the road base where the frost went out from underneath, and it sits down to the frame. The machine is buried, the road is destroyed behind it, and the district's repair order arrives before the tow does. Heavy equipment is done for the season, and everything now comes in on foot or waits.",
+    "failureEffects": {
+     "progress": -10,
+     "equipment": -20,
+     "crew_morale": -10,
+     "compliance": -8,
+     "scrutiny": 10,
+     "budget": -800
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "weather:freezing",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:heavy_rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ],
+    "failureFlags": [
+     "machine_down"
+    ]
    },
    {
     "label": "Switch to lighter operations only",
@@ -1893,11 +3750,39 @@
   "options": [
    {
     "label": "Fill up all the water containers",
-    "outcome": "Fresh, cold water for the whole camp. Everyone's in better spirits.",
+    "outcome": "Fresh, cold water for the whole camp, and the coffee finally tastes like something. Everyone's in better spirits.",
     "effects": {
      "crew_morale": 8,
      "crew_health": 5
-    }
+    },
+    "failureOutcome": "A week on, three of the crew can't hold food down, and the clinic in town says giardia over the radio. First aid goes fast, production goes slow, and every drop in camp gets boiled from here to the end of the trip.",
+    "failureEffects": {
+     "crew_health": -12,
+     "crew_morale": -8,
+     "firstAid": -2,
+     "progress": -6
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:medic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "season:summer",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "terrain:muskeg",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Test it first, use it if clean",
@@ -1977,11 +3862,31 @@
    },
    {
     "label": "Ignore it and go back to sleep",
-    "outcome": "Some crew members sleep well, others don't close their eyes until dawn.",
+    "outcome": "Whatever it was, it moved on. Some of the crew sleep fine; the rest don't close their eyes until the sky goes grey.",
     "effects": {
      "crew_morale": -5
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "It was a bear, and it found what it was smelling for. The cache is torn open at dawn — bags dragged into the brush, a cooler cracked like an egg. A fed bear comes back, and tonight's problem is now every night's problem until it is dealt with.",
+    "failureEffects": {
+     "crew_morale": -8,
+     "food": -10
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "season:fall",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1999,10 +3904,60 @@
   "options": [
    {
     "label": "Probe on foot, then drive across",
-    "outcome": "You wade in waist-deep to test the bottom. Solid gravel. The trucks cross safely.",
+    "outcome": "You wade in waist-deep, feeling for the bottom with a peavey. Solid gravel the whole way. The trucks cross one at a time and nobody says much about how cold you are.",
     "effects": {
      "crew_health": -3
-    }
+    },
+    "partialOutcome": "Halfway across, the lead truck finds the soft spot you missed. It settles to the axle and stays there. Two hours on the winch and everything in the boxes is wet.",
+    "partialEffects": {
+     "crew_health": -5,
+     "equipment": -8,
+     "fuel": -4,
+     "crew_morale": -4
+    },
+    "failureOutcome": "The bottom is not gravel, it is rounded cobble over silt, and it moves. The truck slews downstream and takes water through the intake before you get a line on it. You are back on the near bank with a drowned engine and a creek that is still rising.",
+    "failureEffects": {
+     "equipment": -22,
+     "crew_health": -8,
+     "crew_morale": -10
+    },
+    "chanceSuccess": 0.55,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:storm",
+      "move": 0.25,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ],
+    "failureFlags": [
+     "blocks_crossing"
+    ]
    },
    {
     "label": "Wait for the water to drop",
@@ -2013,12 +3968,47 @@
    },
    {
     "label": "Build a temporary crossing",
-    "outcome": "Logs and gravel create a rough bridge. Holds for one truck at a time.",
+    "outcome": "Logs, gravel, and two hours of swearing make a rough crib crossing. It holds for one truck at a time, and you leave it better than you found the ford.",
     "effects": {
      "progress": -3,
      "fuel": -3,
      "equipment": -5
-    }
+    },
+    "failureOutcome": "The crib shifts under the second truck and the whole works racks sideways into the current. The truck sits in the creek to the box floor, everything soft in it is soaked, and what is left of your bridge is downstream. Nobody is crossing here now.",
+    "failureEffects": {
+     "progress": -8,
+     "fuel": -5,
+     "equipment": -15,
+     "crew_health": -4,
+     "crew_morale": -8
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "weather:heavy_rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:storm",
+      "move": 0.2,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:faller",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.08,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    }
   ],
   "roles": [
@@ -2046,11 +4036,55 @@
    },
    {
     "label": "Acknowledge and promise to investigate later",
-    "outcome": "She's skeptical but accepts your word. The relationship is strained.",
+    "outcome": "She's skeptical but accepts your word, and nothing your saws touch this week proves her right. The relationship is strained, and you still owe the walk.",
     "effects": {
      "relationships": -5
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "Wednesday a faller puts down a cedar with old bark-strip scars nobody flagged, because nobody looked. A culturally modified tree on the ground is a Heritage Conservation Act violation, not a misunderstanding. Stop-work goes on the block, the district opens an investigation, and the elder does not come back to talk.",
+    "failureEffects": {
+     "relationships": -15,
+     "compliance": -12,
+     "scrutiny": 15,
+     "progress": -10
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.08,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ],
+    "failureFlags": [
+     "block_enjoined",
+     "locals_soured"
+    ]
    },
    {
     "label": "Offer to hire her as a cultural monitor",
@@ -2121,12 +4155,45 @@
    },
    {
     "label": "Try to patch the line in the field",
-    "outcome": "A temporary fix with hose clamps. It holds, barely. The machine runs at reduced pressure.",
+    "outcome": "Hose clamps and a length of spare line. It holds at reduced pressure and the loader finishes the shift, slowly, with somebody watching the coupling the whole time.",
     "effects": {
      "equipment": -15
     },
     "hiddenOutcome": true,
-    "riskInjury": 0.1
+    "riskInjury": 0.1,
+    "partialOutcome": "The patch holds until the middle of the next shift, then lets go again in a worse place. You end up making the mechanic call you were trying to avoid, and cleaning up a second spill to go with the first.",
+    "partialEffects": {
+     "equipment": -22,
+     "budget": -800,
+     "progress": -6,
+     "compliance": -4
+    },
+    "failureOutcome": "The clamp lets go while the line is still charged and catches the man working next to it across the forearm. Hot fluid at pressure does not care about a glove. The machine is down anyway and now so is he.",
+    "failureEffects": {
+     "equipment": -20,
+     "compliance": -8,
+     "scrutiny": 10,
+     "crew_morale": -8
+    },
+    "failureCrewEffect": {
+     "injury": "burn"
+    },
+    "chanceSuccess": 0.5,
+    "chancePartial": 0.32,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.12,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Shut everything down and call for a mechanic",
@@ -2199,12 +4266,39 @@
    },
    {
     "label": "Fall carefully with extra spotters",
-    "outcome": "Slow and tense but productive. One close call that makes everyone sweat.",
+    "outcome": "Slow, tense work — every stem called, every landing confirmed by voice. One close call that makes everyone sweat, but the wood keeps moving.",
     "effects": {
      "progress": -1,
      "crew_morale": -5
     },
-    "riskInjury": 0.2
+    "riskInjury": 0.2,
+    "failureOutcome": "A fir walks off its stump in the white and comes down where the spotter was not. It misses the man and finds the crummy's hood. Falling is done for the day, and the crew makes it plain they will not fall in fog again this trip.",
+    "failureEffects": {
+     "progress": -4,
+     "equipment": -12,
+     "crew_morale": -10
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "crewHasRole:faller",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -2268,10 +4362,56 @@
    },
    {
     "label": "Use your best judgment and continue",
-    "outcome": "You eyeball it based on terrain features. Could be right. Could be very wrong.",
-    "effects": {},
+    "outcome": "You read it off the draw and the ridge and back yourself. When the real survey catches up weeks later you were inside a few metres the whole way. Nobody ever finds out you guessed.",
+    "effects": {
+     "data": 3
+    },
     "hiddenOutcome": true,
-    "riskCompliance": 0.4
+    "riskCompliance": 0.4,
+    "partialOutcome": "You are off, but you are off on your own side. The block edge wanders where it should run straight, and the shape of it is going to be somebody's question at the next audit.",
+    "partialEffects": {
+     "progress": -4,
+     "compliance": -4,
+     "scrutiny": 6
+    },
+    "failureOutcome": "You were very wrong. The line you eyeballed put fallers forty metres into the neighbouring licence, and the stumps do not move. Stop-work goes on the block while two companies' lawyers work out whose mistake it was.",
+    "failureEffects": {
+     "compliance": -14,
+     "scrutiny": 18,
+     "budget": -1500,
+     "progress": -10
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.35,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:fog",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ],
+    "failureFlags": [
+     "block_enjoined"
+    ]
    },
    {
     "label": "Call the office for clarification",
@@ -2297,11 +4437,39 @@
   "options": [
    {
     "label": "Talk him through fixing it safely",
-    "outcome": "Patient coaching. He learns, the tree comes down safely. Takes an hour but builds his skills.",
+    "outcome": "You stand at his shoulder and talk him through it — escape route first, then the wedges, then the cut. The stem comes down clean and he stands a little taller after. Takes an hour.",
     "effects": {
      "progress": -2,
      "crew_morale": 5
-    }
+    },
+    "failureOutcome": "Halfway through the lesson the hung stem lets go on its own schedule. It grazes his shoulder going down — a bruise and a torn sleeve, pure luck at that. He hands you the saw, done falling for the trip, and the crew is asking quietly why the kid was under it at all.",
+    "failureEffects": {
+     "progress": -3,
+     "crew_morale": -8,
+     "crew_health": -4,
+     "firstAid": -1
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:faller",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "avgMoraleBelow:40",
+      "move": 0.08,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Fix it yourself and send him to the truck",
@@ -2337,7 +4505,38 @@
     "outcome": "A spare chain, two files, a peavey, and some wedges. The tarp is still waterproof. Great find.",
     "effects": {
      "equipment": 8
-    }
+    },
+    "failureOutcome": "Three days on, a trapper walks into camp with your tire tracks memorized. The gear goes back plus a case of food to settle it, and his account of company crews travels the valley ahead of you.",
+    "failureEffects": {
+     "food": -5,
+     "relationships": -5,
+     "reputation": -2,
+     "crew_morale": -2
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "season:winter",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:spotter",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ],
+    "failureFlags": [
+     "locals_soured"
+    ]
    },
    {
     "label": "Try to find the original owner",
@@ -2345,7 +4544,34 @@
     "effects": {
      "relationships": 4,
      "timeUsed": 1
-    }
+    },
+    "failureOutcome": "Two camps and a radio relay later, nobody claims it. The toolbox rides in the truck bed, still not yours, and the day is spent.",
+    "failureEffects": {
+     "timeUsed": 1,
+     "fuel": -2,
+     "crew_morale": -2
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "weather:storm",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Leave it — could be someone's active cache",
@@ -2404,7 +4630,34 @@
     "effects": {
      "reputation": 10,
      "budget": -1500
-    }
+    },
+    "failureOutcome": "The outfit folds before Labour Day — two cancelled bookings and a van that was never paid for. The boardwalk grays half-built, and every coffee-row skeptic in the district now has their example of what protection pays.",
+    "failureEffects": {
+     "budget": -1500,
+     "reputation": -4,
+     "relationships": -2
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "season:spring",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "season:fall",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Decline politely",
@@ -2429,7 +4682,41 @@
     "effects": {
      "reputation": 5,
      "crew_morale": 3
-    }
+    },
+    "partialOutcome": "The moderates sign the tailgate map; the hardliners walk into the trees without a word. Within the week there are fresh spikes chalked on the haul road and someone glassing the block from the ridge.",
+    "partialEffects": {
+     "reputation": 3,
+     "progress": -3,
+     "scrutiny": 5
+    },
+    "failureOutcome": "Two days of talk end with the mediator packing up mid-sentence. The blockade is wider than it was Monday, a camera crew is due Thursday, and clearing it or conceding the grove are both uglier choices now.",
+    "failureEffects": {
+     "progress": -8,
+     "crew_morale": -4,
+     "timeUsed": 1
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "weather:rain",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Call law enforcement to clear the blockade",
@@ -2439,7 +4726,40 @@
      "budget": -2000,
      "compliance": -8,
      "progress": 8
-    }
+    },
+    "failureOutcome": "An officer drags a grey-haired birdwatcher across the cattle guard on camera and the clip runs nationally by morning. A judge signs an interim injunction before the weekend — the grove is off-limits until the hearing, and your name is in the affidavit.",
+    "failureEffects": {
+     "reputation": -20,
+     "budget": -3000,
+     "compliance": -12,
+     "scrutiny": 15,
+     "progress": -6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ],
+    "failureFlags": [
+     "block_enjoined",
+     "locals_soured"
+    ]
    }
   ]
  },
@@ -2605,7 +4925,47 @@
     "effects": {
      "equipment": -4,
      "crew_morale": -1
-    }
+    },
+    "failureOutcome": "The dreaded kilometre is worse than advertised. The lead truck drops to the frame in a rut and a leaf spring lets go coming out; half a day on the winch and you make camp late with the toolbox open.",
+    "failureEffects": {
+     "equipment": -12,
+     "fuel": -4,
+     "progress": -4,
+     "crew_morale": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "weather:rain",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "accessGroundTruthed",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -2693,7 +5053,41 @@
      "food": 15,
      "fuel": 10,
      "timeUsed": 1
-    }
+    },
+    "failureOutcome": "You pull the cover and the smell tells you first — windings, fried, no field fix. The hour is gone, the payment was contingent, and his clients fly into a dark camp with your name attached to the story.",
+    "failureEffects": {
+     "equipment": -2,
+     "timeUsed": 1,
+     "relationships": -3,
+     "crew_morale": -2
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "crewHasRole:mechanic",
+      "move": 0.2,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "equipmentBelow:40",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "pace:grueling",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "hasFlag:locals_soured",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Buy smoked meat ($120)",

@@ -46,6 +46,21 @@ function makeSensibleUi(journey) {
       if (!options || options.length === 0) return { value: undefined };
       if (options.length === 1) return options[0];
 
+      // A day can now open with an authored situation that costs the day to
+      // answer, plus an explicit way to decline it (js/journey/daySituation.js).
+      // A sensible player does not answer everything: when the program is
+      // behind the calendar they wear the scrutiny and keep the day for the
+      // planting. Without this the "sensible" run spends its season on the
+      // radio and lands outside any plausible window.
+      const setAside = options.find((o) => o.value === 'set_aside');
+      if (setAside) {
+        const deadline = journey.deadline || 42;
+        const elapsed = (journey.day || 1) / deadline;
+        const planted = (journey.planting?.blocksPlanted || 0)
+          / (journey.planting?.blocksToPlant || 1);
+        if (planted < elapsed) return setAside;
+      }
+
       if (options.some((o) => o.value === 'end')) {
         const anyReadyToDeploy = (journey.contractors || []).some((c) => {
           const s = c.silvicultureState;
@@ -226,15 +241,31 @@ test('campaign scale: silviculture arithmetic is winnable within a season', () =
   assert.ok(capacityNeeded <= hardCapacity, `estimated capacity use ${capacityNeeded} should fit hard-mode capacity ${hardCapacity}`);
 });
 
+test('recon and silviculture ship a real season deadline, full-length and campaign', () => {
+  const recon = createJourney({ roleId: 'recce', areaId: 'fort-st-john-plateau' });
+  const reconCampaign = createJourney({ roleId: 'recce', areaId: 'fort-st-john-plateau', scale: 'campaign' });
+  assert.equal(recon.deadline, 40, 'full-length recon runs to a 40-shift access season');
+  assert.equal(reconCampaign.deadline, 24, 'campaign recon gets a 24-shift season');
+
+  const silv = createSilvicultureJourney({ roleId: 'silviculture', areaId: 'fort-st-john-plateau' });
+  const silvCampaign = createSilvicultureJourney({
+    roleId: 'silviculture',
+    areaId: 'fort-st-john-plateau',
+    scale: 'campaign'
+  });
+  assert.equal(silv.deadline, 42, 'full-length silviculture runs to a 42-day planting season');
+  assert.equal(silvCampaign.deadline, 20, 'campaign silviculture shares the twenty-day season');
+});
+
 test('campaign scale: planning shortens the deadline and scales budget, leaves gate thresholds alone', () => {
   const normal = createPlanningJourney({ roleId: 'planner', areaId: 'fort-st-john-plateau' });
   const scaled = createPlanningJourney({ roleId: 'planner', areaId: 'fort-st-john-plateau', scale: 'campaign' });
 
-  assert.equal(normal.deadline, 28);
+  assert.equal(normal.deadline, 34);
   assert.equal(scaled.deadline, 20);
 
-  assert.equal(scaled.resources.budget, Math.round(68000 * 0.68));
-  assert.equal(scaled.resources.budget, 46240);
+  assert.equal(scaled.resources.budget, Math.round(82000 * 0.68));
+  assert.equal(scaled.resources.budget, 55760);
 
   // Gate thresholds / plan phase state are untouched by campaign scale.
   assert.deepEqual(scaled.plan, normal.plan);
@@ -311,8 +342,8 @@ test('unscaled createJourney remains behaviorally identical to before the campai
   // Planning
   const planning = createJourney({ roleId: 'planner', areaId: 'fort-st-john-plateau' });
   assert.equal(planning.journeyType, 'planning');
-  assert.equal(planning.deadline, 28);
-  assert.equal(planning.resources.budget, 68000);
+  assert.equal(planning.deadline, 34);
+  assert.equal(planning.resources.budget, 82000);
 
   // Permitting
   const permitting = createJourney({ roleId: 'permitter', areaId: 'fort-st-john-plateau' });

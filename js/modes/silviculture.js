@@ -5,7 +5,8 @@
  */
 
 import { checkForEvent } from '../events.js';
-import { handleEvent } from './shared/handleEvent.js';
+import { runDaySituation } from '../journey/daySituation.js';
+import { formatStatusLine } from '../journey/dayCard.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
 import { crewHasRole } from '../crew.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
@@ -146,9 +147,24 @@ export async function runSilvicultureDay(game) {
   // legible before disruptions begin.
   const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
-    displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, zoneProfile);
-    await handleEvent(game, event);
-    if (game.gameOver) return;
+    const daysLeft = Number.isFinite(journey.deadline)
+      ? Math.max(0, journey.deadline - journey.day)
+      : null;
+    const outcome = await runDaySituation(game, event, {
+      frame: {
+        dayHeader: Number.isFinite(journey.deadline)
+          ? `DAY ${journey.day} of ${journey.deadline} - SILVICULTURE`
+          : `DAY ${journey.day} - SILVICULTURE`,
+        statusLine: formatStatusLine([
+          `${journey.planting?.blocksPlanted || 0}/${journey.planting?.blocksToPlant || 0} blocks planted`,
+          daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
+          `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
+        ]),
+      },
+      setAsideDescription: 'Not today. Keep the day for the program.',
+    });
+    if (outcome.gameOver) return;
+    if (outcome.spendsDay) spendDay(journey);
   }
 
   // Get seasonal modifiers (season doesn't change mid-day)
