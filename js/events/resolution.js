@@ -141,10 +141,24 @@ export function resolveEvent(journey, event, option) {
     messages.push(`Permits approved: ${journey.permits.approved}/${journey.permits.target}`);
   }
 
-  if (option.schedulesEvent) {
+  // A consequence on a timer has to belong to the band that earned it. An
+  // unconditional schedulesEvent contradicts any good band that says the thing
+  // stayed buried - the player is told they got away with it and the follow-up
+  // fires anyway. Band-specific scheduling wins; the unconditional form still
+  // works for options that always carry a follow-up.
+  // The desk deck is shared with the seasonal TUI (adaptOperationalEvent),
+  // which knows nothing about bands and reads `schedulesEvent` directly. So the
+  // unconditional field stays for seasonal, and band scheduling supersedes it
+  // here rather than replacing it — otherwise moving a timer onto the bad band
+  // silently deletes the follow-up from the other game.
+  const hasBandScheduling = Boolean(
+    option.failureSchedulesEvent || option.partialSchedulesEvent || option.goodSchedulesEvent
+  );
+  const scheduled = hasBandScheduling ? resolved.schedulesEvent : option.schedulesEvent;
+  if (scheduled) {
     if (!journey.scheduledEvents) journey.scheduledEvents = [];
     journey.scheduledEvents.push({
-      eventId: option.schedulesEvent,
+      eventId: scheduled,
       triggerDay: journey.day + (option.scheduledDelay || 3)
     });
     messages.push('This may have consequences later...');

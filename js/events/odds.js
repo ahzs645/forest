@@ -175,6 +175,7 @@ export function resolveOutcomeBand(option, journey, rng = Math.random) {
       effects: option.partialEffects || option.failureEffects || option.effects,
       crewEffect: option.partialCrewEffect || null,
       flags: option.partialFlags || [],
+      schedulesEvent: option.partialSchedulesEvent || null,
       odds,
     };
   }
@@ -186,6 +187,7 @@ export function resolveOutcomeBand(option, journey, rng = Math.random) {
       effects: option.failureEffects || option.effects,
       crewEffect: option.failureCrewEffect || null,
       flags: option.failureFlags || [],
+      schedulesEvent: option.failureSchedulesEvent || null,
       odds,
     };
   }
@@ -196,6 +198,7 @@ export function resolveOutcomeBand(option, journey, rng = Math.random) {
     effects: option.effects,
     crewEffect: null,
     flags: option.flags || [],
+    schedulesEvent: option.goodSchedulesEvent || null,
     odds,
   };
 }

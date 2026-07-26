@@ -18,19 +18,83 @@
    },
    {
     "label": "Ask to reschedule",
-    "outcome": "They agree to come back next week. You have time to prepare... or worry.",
+    "outcome": "They confer in the parking lot and agree to come back next week. You have time to prepare, or to worry.",
     "effects": {
      "politicalCapital": -5
     },
+    "failureOutcome": "They decline, politely, and set up in your boardroom anyway. The audit proceeds today with a note already made that the licensee asked them to leave.",
+    "failureEffects": {
+     "politicalCapital": -8,
+     "compliance": -5,
+     "timeUsed": 6,
+     "scrutiny": 4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ],
+    "failureSchedulesEvent": "audit_followup",
     "schedulesEvent": "audit_followup"
    },
    {
     "label": "Delegate to your team",
-    "outcome": "Karen handles it. She finds a few gaps but smooths them over.",
+    "outcome": "Karen handles it. She finds a few gaps before they do and smooths them over.",
     "effects": {
      "timeUsed": 2,
      "crew_morale": -5
-    }
+    },
+    "partialOutcome": "Karen gets through the day, but the auditors note the manager was unavailable. One of the gaps becomes a written observation instead of a conversation.",
+    "partialEffects": {
+     "timeUsed": 2,
+     "compliance": -3,
+     "politicalCapital": -3
+    },
+    "failureOutcome": "Karen fumbles a question about referral sign-off and the room goes quiet. The gaps become a formal finding, and a follow-up visit is scheduled with the tone already set.",
+    "failureEffects": {
+     "timeUsed": 3,
+     "compliance": -8,
+     "politicalCapital": -6,
+     "scrutiny": 4
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    }
   ]
  },
@@ -53,19 +117,74 @@
    },
    {
     "label": "Ask for more time (again)",
-    "outcome": "They note the pattern. You buy a little time, but credibility drops.",
+    "outcome": "They grant a short extension and note the pattern. You buy a little time at the cost of some credibility.",
     "effects": {
      "politicalCapital": -8
-    }
+    },
+    "failureOutcome": "Refused. Findings are issued on the spot, with the delay pattern cited in them, and you are now remediating under a formal order instead of a conversation.",
+    "failureEffects": {
+     "compliance": -8,
+     "politicalCapital": -10,
+     "scrutiny": 5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Throw the team under the bus",
-    "outcome": "It deflects blame short term. Internally, morale and trust take a hit.",
+    "outcome": "The deflection lands, for now. The auditors write up a staffing issue, and the office hears exactly how it was framed.",
     "effects": {
      "timeUsed": 2,
-     "crew_morale": -10,
-     "politicalCapital": -4
-    }
+     "politicalCapital": -4,
+     "crew_morale": -10
+    },
+    "failureOutcome": "They interview the team directly and the stories do not line up with yours. The finding stands, the office knows what you tried, and the auditors now treat everything you say as management spin.",
+    "failureEffects": {
+     "timeUsed": 3,
+     "compliance": -6,
+     "politicalCapital": -8,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -87,19 +206,74 @@
    },
    {
     "label": "Request reconsideration",
-    "outcome": "You push back respectfully. Some findings reduced but relationships strain.",
+    "outcome": "You push back respectfully with documentation. Some findings are reduced, though the relationship cools a degree.",
     "effects": {
      "politicalCapital": -8,
      "compliance": 5
-    }
+    },
+    "failureOutcome": "The findings are upheld in full and your file gains a note about a combative response. The next audit will open from that note, and you still owe the remediation.",
+    "failureEffects": {
+     "politicalCapital": -10,
+     "compliance": -3,
+     "scrutiny": 5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Blame the previous administration",
-    "outcome": "Classic move. It works politically but colleagues notice.",
+    "outcome": "Classic move. It works politically, and colleagues quietly file it away.",
     "effects": {
      "compliance": 3,
      "relationships": -10
-    }
+    },
+    "failureOutcome": "Someone produces a memo with your signature on the referral process in question. The deflection becomes its own story, and you remediate the findings anyway with your credibility spent.",
+    "failureEffects": {
+     "relationships": -12,
+     "politicalCapital": -8,
+     "compliance": -3,
+     "scrutiny": 5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -122,11 +296,39 @@
    },
    {
     "label": "Explain the regulatory constraints",
-    "outcome": "You walk through the rules. They understand but feel dismissed.",
+    "outcome": "You walk through the rules. They understand the framework but feel dismissed by it.",
     "effects": {
      "timeUsed": 1,
      "relationships": -5
-    }
+    },
+    "failureOutcome": "They hear a lecture, not an answer, and end the call early. By Friday the Nation has taken Block 7 over your head to the district, and the file pauses while the ministry asks you to explain the same rules to them.",
+    "failureEffects": {
+     "timeUsed": 1,
+     "relationships": -10,
+     "politicalCapital": -8,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Offer to halt operations pending review",
@@ -149,12 +351,48 @@
   "options": [
    {
     "label": "Schedule a town hall meeting",
-    "outcome": "You set up an evening session. Good turnout, reasonable discussion.",
+    "outcome": "You set up an evening session. Good turnout, reasonable discussion, and the petition organizers leave with your phone number instead of a grievance.",
     "effects": {
      "timeUsed": 4,
      "budget": -500,
      "relationships": 8
-    }
+    },
+    "partialOutcome": "The room is thin and the questions are sharp. You hold the line but commit to a written follow-up on two points you could not answer, and the petition stays open.",
+    "partialEffects": {
+     "timeUsed": 4,
+     "budget": -500,
+     "relationships": 3
+    },
+    "failureOutcome": "The meeting turns hostile twenty minutes in, with a reporter taking notes in the back row. The petition becomes an organized campaign with a mailing list, and your next haul schedule will be written with them in mind.",
+    "failureEffects": {
+     "timeUsed": 4,
+     "budget": -500,
+     "relationships": -6,
+     "reputation": -5,
+     "scrutiny": 4
+    },
+    "chanceSuccess": 0.5,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Send a written response",
@@ -184,12 +422,48 @@
   "options": [
    {
     "label": "Give a full interview",
-    "outcome": "You spend an hour explaining the complexities. Story is balanced.",
+    "outcome": "You spend an hour explaining the complexities. The story runs balanced, and the reporter keeps your number for next time.",
     "effects": {
      "timeUsed": 3,
      "relationships": 5,
      "politicalCapital": -5
-    }
+    },
+    "partialOutcome": "The story is mostly fair but leads with your one clumsy quote. You spend the next morning on calls making sure the ministry read past the headline.",
+    "partialEffects": {
+     "timeUsed": 4,
+     "politicalCapital": -5,
+     "reputation": -2
+    },
+    "failureOutcome": "An hour of tape becomes a skeptical piece with your two worst sentences in it. The ministry calls before you have read it, and the next story about this sale will start from the frame this one set.",
+    "failureEffects": {
+     "timeUsed": 3,
+     "relationships": -5,
+     "politicalCapital": -8,
+     "reputation": -6,
+     "scrutiny": 5
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Provide a written statement only",
@@ -233,11 +507,32 @@
    },
    {
     "label": "Escalate to management",
-    "outcome": "You make noise. IT prioritizes your fix. Still lost half a day.",
+    "outcome": "You make noise. IT reprioritizes your fix and the system is back by mid-afternoon, half a day gone.",
     "effects": {
      "timeUsed": 4,
      "politicalCapital": -3
-    }
+    },
+    "failureOutcome": "The noise gets you a ticket number and nothing else. The day is lost anyway, the team switches to paper at 3 p.m., and management remembers who called twice about a database.",
+    "failureEffects": {
+     "timeUsed": 8,
+     "politicalCapital": -6,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -259,19 +554,89 @@
    },
    {
     "label": "Request extension from ministry",
-    "outcome": "They grant it but note the delay in your file.",
+    "outcome": "They grant two weeks and note the delay in your file. The rebuild happens on a survivable schedule.",
     "effects": {
      "compliance": -5,
      "politicalCapital": -3
-    }
+    },
+    "failureOutcome": "Refused — the deadline stands. You submit what you have with no time to check it, review flags the stale layers, and the resubmission now happens on the reviewer's schedule instead of yours.",
+    "failureEffects": {
+     "compliance": -8,
+     "politicalCapital": -5,
+     "progress": -8,
+     "scrutiny": 4
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Submit with old data and notes",
-    "outcome": "It might pass review. It might not.",
+    "outcome": "The package clears review with the vintage of the spatial data noted and nothing more said. You got away with it, and the file says so quietly.",
     "effects": {
-     "compliance": -8
+     "compliance": -4
     },
-    "riskRejection": 0.3
+    "riskRejection": 0.3,
+    "partialOutcome": "It goes through, conditionally. The reviewer flags the data vintage and requires corrected spatial within thirty days, and your submissions now get opened carefully instead of stamped.",
+    "partialEffects": {
+     "compliance": -6,
+     "timeUsed": 4,
+     "scrutiny": 4
+    },
+    "failureOutcome": "Rejected outright, with the stale data called out by name. You are rebuilding from field notes anyway — now with a compliance mark attached and a reviewer who reads everything your office sends.",
+    "failureEffects": {
+     "compliance": -10,
+     "progress": -10,
+     "timeUsed": 6,
+     "politicalCapital": -4,
+     "scrutiny": 6
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "roles": [
@@ -297,19 +662,68 @@
    },
    {
     "label": "Fight for restoration",
-    "outcome": "You make the case upstairs. Partial restoration granted.",
+    "outcome": "You make the case upstairs with numbers and a straight face. Partial restoration is granted, at a price in favours.",
     "effects": {
      "budget": -4000,
      "politicalCapital": -10
-    }
+    },
+    "failureOutcome": "Nothing comes back. The full cut stands, the favours are spent, and you are now revising the same work plan you refused to trim two weeks ago — remembered upstairs as the manager who fought it.",
+    "failureEffects": {
+     "budget": -8000,
+     "politicalCapital": -12,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Find alternative funding",
-    "outcome": "You scramble for grants and partnerships. Stressful but effective.",
+    "outcome": "You scramble for grants and partner contributions. Most of the gap gets covered, stressfully.",
     "effects": {
-     "crew_morale": -10,
-     "budget": -2000
-    }
+     "budget": -2000,
+     "timeUsed": 3,
+     "crew_morale": -10
+    },
+    "failureOutcome": "Weeks of applications and calls land nothing. The shortfall comes out of the work plan after all, a month later than if you had just cut it, and the backlog grew while you wrote proposals.",
+    "failureEffects": {
+     "budget": -6000,
+     "progress": -8,
+     "timeUsed": 4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -331,19 +745,75 @@
    },
    {
     "label": "Request grandfathering",
-    "outcome": "Existing permits exempted. New ones still need the extra work.",
+    "outcome": "Existing permits are exempted. New files still need the extra documentation, but the backlog stays manageable.",
     "effects": {
      "politicalCapital": -5,
      "compliance": 3
-    }
+    },
+    "failureOutcome": "Refused — and the request itself flags your existing permits for a closer read under the new rules. You are now re-documenting files that were closed, on the district's timeline.",
+    "failureEffects": {
+     "politicalCapital": -6,
+     "compliance": -5,
+     "scrutiny": 5,
+     "timeUsed": 3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Join industry pushback",
-    "outcome": "You sign onto the letter. Implementation delayed.",
+    "outcome": "You sign onto the letter. Implementation is delayed a quarter, which is all anyone really wanted.",
     "effects": {
      "politicalCapital": -8,
      "relationships": -5
-    }
+    },
+    "failureOutcome": "The pushback fails and the signatory list circulates at the district. The rules land on schedule, your files start moving slower than everyone else's, and you get to comply anyway — late.",
+    "failureEffects": {
+     "politicalCapital": -10,
+     "relationships": -8,
+     "progress": -6,
+     "scrutiny": 3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    }
   ]
  },
@@ -357,11 +827,39 @@
   "options": [
    {
     "label": "Rush pending items through",
-    "outcome": "You push hard to get things approved before the change.",
+    "outcome": "Your contact signs off on the pending items in her last two weeks. Approvals in hand before the desk changes.",
     "effects": {
      "progress": 8,
      "politicalCapital": -5
-    }
+    },
+    "failureOutcome": "The rush is visible from across the office. Two files bounce for haste, the outgoing contact stops returning calls, and the replacement inherits a sticky note about your district — you resubmit to someone you have already annoyed.",
+    "failureEffects": {
+     "progress": -5,
+     "politicalCapital": -8,
+     "compliance": -4,
+     "scrutiny": 3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Prepare a transition briefing",
@@ -390,11 +888,32 @@
   "options": [
    {
     "label": "Mediate directly",
-    "outcome": "You sit them down together. Issues aired, partial resolution.",
+    "outcome": "You sit them down together. Issues get aired, a working truce holds, and the break room is usable again.",
     "effects": {
      "timeUsed": 2,
      "crew_morale": -5
-    }
+    },
+    "failureOutcome": "The session blows up inside ten minutes. One of them requests a transfer by email that afternoon, the office starts picking sides, and HR is now involved on their terms instead of yours.",
+    "failureEffects": {
+     "timeUsed": 2,
+     "progress": -6,
+     "politicalCapital": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Assign them to separate projects",
@@ -423,11 +942,38 @@
   "options": [
    {
     "label": "Counter-offer with raise",
-    "outcome": "They stay. Budget takes a hit but continuity preserved.",
+    "outcome": "They think it over the weekend and stay. Continuity preserved, budget dented.",
     "effects": {
      "budget": -5000,
      "crew_morale": 5
-    }
+    },
+    "partialOutcome": "They stay, and the team now knows exactly what a resignation letter is worth. Two more calendar invites titled career discussion appear within the month.",
+    "partialEffects": {
+     "budget": -5000,
+     "progress": -3
+    },
+    "failureOutcome": "Your counter becomes their leverage at the other shop, and they leave anyway with a better title. The handover is two distracted weeks, and fifteen years of file knowledge walks out the door.",
+    "failureEffects": {
+     "progress": -8,
+     "data": -5,
+     "politicalCapital": -3
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Wish them well and plan transition",
@@ -441,13 +987,35 @@
    },
    {
     "label": "Guilt trip about timing",
-    "outcome": "They stay an extra month but relations sour. Then they're gone.",
+    "outcome": "They stay an extra month out of guilt and hand over properly. They also tell everyone in the office exactly why they are really leaving.",
     "effects": {
+     "data": 3,
      "crew_morale": -15
     },
     "crewEffect": {
      "lose_member": true
-    }
+    },
+    "failureOutcome": "They walk that Friday, offended, with no handover at all. The story of the conversation spreads through the office ahead of you, and their files are a locked drawer nobody has the key to.",
+    "failureEffects": {
+     "progress": -8,
+     "data": -5,
+     "politicalCapital": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -468,11 +1036,32 @@
    },
    {
     "label": "Push back deadlines",
-    "outcome": "You notify stakeholders of delays. Understanding varies.",
+    "outcome": "You notify stakeholders of the delays. Most grumble and accept — everyone's office has a flu week eventually.",
     "effects": {
      "progress": -5,
      "relationships": -3
-    }
+    },
+    "failureOutcome": "One partner does not accept, because their referral window does not care about your flu week. The window closes, the relationship takes the real hit, and next week you are drafting an expedite request to recover ground you gave away by email.",
+    "failureEffects": {
+     "progress": -8,
+     "relationships": -8,
+     "politicalCapital": -3
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Bring in temps",
@@ -507,12 +1096,34 @@
    },
    {
     "label": "Use momentum to push others",
-    "outcome": "You leverage the goodwill to accelerate other applications.",
+    "outcome": "You leverage the goodwill while it is warm. Two other applications move up the pile.",
     "effects": {
      "permits_approved": 1,
      "progress": 5,
      "politicalCapital": 3
-    }
+    },
+    "failureOutcome": "You lean a call too hard and the contact bristles. The fast-track was a favour, not a precedent — your next file settles to the bottom of the pile, and you go back to waiting like everyone else.",
+    "failureEffects": {
+     "permits_approved": 1,
+     "progress": -4,
+     "politicalCapital": -4,
+     "relationships": -4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Document what worked",
@@ -546,11 +1157,32 @@
    },
    {
     "label": "Accept with conditions",
-    "outcome": "You set boundaries on scope. Partnership starts carefully.",
+    "outcome": "You set boundaries on scope and the Nation accepts them. The partnership starts carefully, on paper both sides can live with.",
     "effects": {
      "relationships": 8,
      "politicalCapital": -3
-    }
+    },
+    "failureOutcome": "The conditions read as distrust, and the offer is quietly withdrawn at the next council meeting. Consultation returns to the formal minimum — slower, colder, and now every referral goes through a Nation that remembers offering more.",
+    "failureEffects": {
+     "relationships": -8,
+     "politicalCapital": -3,
+     "reputation": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Defer pending capacity review",
@@ -589,21 +1221,86 @@
    },
    {
     "label": "Send formal notification letters only (minimal compliance)",
-    "outcome": "Letters go out and the legal box is ticked. Several Nations note that a letter is not consultation.",
+    "outcome": "Letters go out and the legal box is ticked. Several Nations note, in writing, that a letter is not consultation.",
     "effects": {
      "relationships": -3,
      "reputation": -3,
      "budget": -2000
-    }
+    },
+    "partialOutcome": "One Nation writes back asking for the meeting the letter should have offered. You schedule it under a cloud, and the minimal-compliance approach is now part of the meeting's agenda.",
+    "partialEffects": {
+     "relationships": -6,
+     "reputation": -4,
+     "budget": -3500,
+     "timeUsed": 3
+    },
+    "failureOutcome": "A Nation formally challenges the adequacy of consultation, and the referral stalls under review. Every future file with that Nation now starts from documented distrust, and the harvest plan waits on a process you no longer control.",
+    "failureEffects": {
+     "relationships": -12,
+     "reputation": -8,
+     "budget": -2000,
+     "progress": -12,
+     "scrutiny": 5
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.15,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Delay consultations (risk deteriorating relationships)",
-    "outcome": "The file goes quiet. Word gets around that consultation is being put off, and trust erodes.",
+    "outcome": "The file goes quiet. Word gets around that consultation is being put off, and trust erodes a little more each week you do not call.",
     "effects": {
      "relationships": -15,
      "reputation": -10,
      "budget": 0
-    }
+    },
+    "failureOutcome": "A Nation forces the issue with a formal complaint to the district. The harvest plan freezes until consultation happens on their timeline, in their community, with your delay as the first item discussed.",
+    "failureEffects": {
+     "relationships": -18,
+     "reputation": -12,
+     "progress": -15,
+     "politicalCapital": -6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -634,21 +1331,92 @@
    },
    {
     "label": "Add stronger erosion controls and keep moving",
-    "outcome": "The file stays alive, but only because the mitigation notes become much sharper.",
+    "outcome": "The sharpened mitigation notes satisfy the intake owner, barely. The file stays alive and the water stays out of the news.",
     "effects": {
      "budget": -2000,
      "compliance": 4,
      "progress": 2
-    }
+    },
+    "failureOutcome": "The intake owner is not convinced by paper and escalates to the district. The file pauses anyway — now with the optics of having been pushed through — and the mitigation plan gets co-written after all, from a weaker seat.",
+    "failureEffects": {
+     "budget": -2000,
+     "progress": -8,
+     "relationships": -6,
+     "scrutiny": 4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:spring",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Argue the risk is overstated",
-    "outcome": "You protect the schedule for now, but confidence in the file drops immediately.",
+    "outcome": "Your read of the drainage holds up and the schedule survives. Confidence in the file drops anyway, because arguing about drinking water always costs something.",
     "effects": {
      "progress": 4,
      "relationships": -7,
      "compliance": -5
-    }
+    },
+    "partialOutcome": "The district splits the difference: you keep moving under an attached monitoring condition. Someone now checks your sediment numbers monthly, and they did not pick the someone from your list.",
+    "partialEffects": {
+     "progress": 2,
+     "relationships": -7,
+     "compliance": -3,
+     "scrutiny": 4
+    },
+    "failureOutcome": "A hydrologist's rebuttal lands on the district's desk a week later and the file pauses on the spot. You are now the licensee who argued with the drinking-water file, and the mitigation plan you avoided gets written for you.",
+    "failureEffects": {
+     "progress": -10,
+     "relationships": -10,
+     "compliance": -8,
+     "scrutiny": 6,
+     "politicalCapital": -5
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "season:spring",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -678,21 +1446,77 @@
    },
    {
     "label": "Request a monitored operating window",
-    "outcome": "A narrow access opportunity stays alive under tighter conditions and much closer scrutiny.",
+    "outcome": "The biologists grant a narrow window under tighter conditions and much closer watch. The calendar survives, on their terms.",
     "effects": {
      "progress": 1,
      "compliance": 3,
      "relationships": 1
-    }
+    },
+    "failureOutcome": "Refused — and the request itself marks you as pushing on caribou. The window closes entirely, and you re-sequence to alternate ground anyway, three weeks later than if you had started the day the direction landed.",
+    "failureEffects": {
+     "progress": -6,
+     "relationships": -4,
+     "politicalCapital": -5,
+     "scrutiny": 3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:winter",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Push back on the revision",
-    "outcome": "You preserve the short-term schedule and spend political capital doing it.",
+    "outcome": "The district holds the line publicly but quietly lets your existing schedule stand. You keep the quarter and spend the capital.",
     "effects": {
      "progress": 4,
      "politicalCapital": -6,
      "relationships": -5
-    }
+    },
+    "failureOutcome": "The pushback fails, in writing, and the direction comes back tighter than the draft. The capital is simply gone, the window is smaller than if you had said nothing, and the re-sequencing starts today.",
+    "failureEffects": {
+     "progress": -6,
+     "politicalCapital": -10,
+     "relationships": -7,
+     "scrutiny": 3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -719,20 +1543,85 @@
    },
    {
     "label": "Revise maps and referral notes internally",
-    "outcome": "You shore up the package enough to keep it moving, though everyone knows the margin got thinner.",
+    "outcome": "The in-house patch holds. The package keeps moving, though everyone who touched it knows how thin the margin got.",
     "effects": {
      "timeUsed": 4,
      "compliance": 3,
      "progress": 1
-    }
+    },
+    "failureOutcome": "The archaeology branch spots the thin margin on the first pass and bounces the file with questions about who signed off. The specialist gets hired anyway — after the bounce, with your name now attached to the question.",
+    "failureEffects": {
+     "timeUsed": 4,
+     "compliance": -6,
+     "progress": -6,
+     "scrutiny": 5,
+     "politicalCapital": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Submit and hope the issue stays minor",
-    "outcome": "The file leaves the office on time, but not in the condition you would normally defend.",
+    "outcome": "The file leaves the office on time and clears screening without a second look. Nobody ever asks about the overview you did not strengthen.",
     "effects": {
      "progress": 5,
      "compliance": -6
-    }
+    },
+    "partialOutcome": "The reviewer asks for a supplementary overview before adjudication. The file waits while you produce, under deadline, exactly the work you skipped — and the request is on the record.",
+    "partialEffects": {
+     "progress": -2,
+     "compliance": -6,
+     "timeUsed": 4,
+     "scrutiny": 3
+    },
+    "failureOutcome": "Bounced, with a professional-reliance question attached to the referral response. The file and your name both go on a list, and everything you submit this year gets the long read.",
+    "failureEffects": {
+     "progress": -8,
+     "compliance": -10,
+     "scrutiny": 7,
+     "politicalCapital": -5
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -762,21 +1651,76 @@
    },
    {
     "label": "Add screening and phased harvesting notes",
-    "outcome": "You keep most of the schedule and give reviewers something more thoughtful to look at.",
+    "outcome": "The reviewer accepts the notes as a serious answer. You keep most of the schedule and the sightline file closes quietly.",
     "effects": {
      "budget": -1500,
      "progress": 1,
      "compliance": 2
-    }
+    },
+    "failureOutcome": "Unpersuaded — the redraft is ordered anyway. You have now paid for the notes and the redesign, and the reviewer's memo suggests starting the reshape before the next referral cycle.",
+    "failureEffects": {
+     "budget": -1500,
+     "progress": -6,
+     "politicalCapital": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Defend the original shape",
-    "outcome": "You save time in the office and spend credibility doing it.",
+    "outcome": "The reviewer files their concern and lets the layout stand. You save the office time and spend credibility doing it.",
     "effects": {
      "progress": 3,
      "relationships": -6,
      "politicalCapital": -4
-    }
+    },
+    "failureOutcome": "The reviewer escalates and the redesign is ordered with a community-interface note attached to your file. You reshape the opening anyway — later, under direction, with the town watching.",
+    "failureEffects": {
+     "progress": -6,
+     "relationships": -8,
+     "politicalCapital": -6,
+     "scrutiny": 4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -809,12 +1753,48 @@
    },
    {
     "label": "Send the minimum and move on",
-    "outcome": "You protect today's schedule at the cost of a rougher conversation later.",
+    "outcome": "The regulator accepts the thin file without comment. Today's schedule survives, and the declaration goes in a drawer for another cycle.",
     "effects": {
      "timeUsed": 1,
      "compliance": -6,
      "politicalCapital": -4
-    }
+    },
+    "partialOutcome": "Accepted with comments: a professional development plan is now due in sixty days, and your name is flagged for the next audit cycle. The minimum bought you a deadline.",
+    "partialEffects": {
+     "timeUsed": 2,
+     "compliance": -6,
+     "scrutiny": 4
+    },
+    "failureOutcome": "The declaration is ruled insufficient and a formal competence review opens. It hangs over every file you sign this run, and clearing it means producing — under review — the record you declined to produce today.",
+    "failureEffects": {
+     "timeUsed": 3,
+     "compliance": -10,
+     "politicalCapital": -8,
+     "scrutiny": 8,
+     "reputation": -4
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ]
  },
@@ -837,21 +1817,84 @@
    },
    {
     "label": "Negotiate a user agreement first",
-    "outcome": "You spend the day calling other industrial users and leave with a calmer road politics file.",
+    "outcome": "A day of calls to the other industrial users lands a workable split. You bring the district a calmer road politics file than they asked for.",
     "effects": {
      "timeUsed": 4,
      "relationships": 4,
      "compliance": 4
-    }
+    },
+    "failureOutcome": "One user stalls on cost-sharing and will not sign. The day is burned, the district is still waiting, and you end up formalizing the maintenance split yourself anyway — a week later, with the file marked as sitting.",
+    "failureEffects": {
+     "timeUsed": 4,
+     "progress": -5,
+     "relationships": -3
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Push traffic while the paperwork catches up",
-    "outcome": "The trucks keep moving. The district's mood does not.",
+    "outcome": "The paperwork catches up before anyone drives the road with a clipboard. The trucks never stopped, and the file closes as if it was always in order.",
     "effects": {
      "progress": 4,
      "compliance": -7,
      "politicalCapital": -5
-    }
+    },
+    "partialOutcome": "A district tech logs your traffic on an unpermitted segment and a warning letter follows. The permit gets processed with conditions attached, and your hauling is now something the district watches.",
+    "partialEffects": {
+     "progress": 2,
+     "compliance": -8,
+     "politicalCapital": -6,
+     "scrutiny": 5
+    },
+    "failureOutcome": "A stop-work order lands on the road and hauling halts mid-week. A compliance file opens with your name on the cover, and nothing moves until the permit — now unhurried — is issued.",
+    "failureEffects": {
+     "progress": -10,
+     "compliance": -12,
+     "politicalCapital": -8,
+     "scrutiny": 8
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "roles": [
@@ -887,12 +1930,50 @@
    },
    {
     "label": "Use the sites quietly and hope nobody notices",
-    "outcome": "It feels efficient right until the occupancy question shows up in writing.",
+    "outcome": "The season ends before anyone flies over with a question. The camp comes out in October and the occupancy question never gets asked.",
     "effects": {
      "progress": 3,
      "compliance": -8,
      "relationships": -3
-    }
+    },
+    "partialOutcome": "An overflight photo of the helipad reaches the district. A retroactive application is ordered and filed at the back of the queue, and the support sites operate under sufferance while it waits.",
+    "partialEffects": {
+     "progress": 0,
+     "compliance": -8,
+     "relationships": -3,
+     "timeUsed": 4,
+     "scrutiny": 5
+    },
+    "failureOutcome": "An unauthorized occupancy finding shuts the camp and helipad down mid-season. Crews demobilize while the permit bundle gets built anyway — under a compliance file, at demob prices.",
+    "failureEffects": {
+     "progress": -12,
+     "compliance": -12,
+     "relationships": -5,
+     "scrutiny": 8,
+     "budget": -3000
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "roles": [
@@ -919,13 +2000,49 @@
    },
    {
     "label": "Give a detailed on-the-record statement",
-    "outcome": "You explain the science, the setback distances, the monitoring plan. The journalist uses two sentences out of context. But some readers notice the nuance.",
+    "outcome": "You explain the science, the setbacks, the monitoring plan. The journalist keeps two careful sentences, and readers who look past the headline find the nuance.",
     "effects": {
      "timeUsed": 3,
      "relationships": 5,
      "politicalCapital": -3,
      "compliance": 5
-    }
+    },
+    "partialOutcome": "The piece runs with your quotes out of context, but the underlying numbers hold. You spend a day on follow-up letters and calls, and it ends roughly a wash.",
+    "partialEffects": {
+     "timeUsed": 4,
+     "politicalCapital": -4,
+     "reputation": -2
+    },
+    "failureOutcome": "Your own quotes anchor a harder piece than silence would have earned. The ministry calls first thing, and the follow-up story is already being reported with you cast as the defensive licensee.",
+    "failureEffects": {
+     "timeUsed": 3,
+     "relationships": -6,
+     "politicalCapital": -8,
+     "reputation": -6,
+     "scrutiny": 5
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Redirect to PR department",
@@ -948,22 +2065,71 @@
   "options": [
    {
     "label": "Fight it with data and lobbying",
-    "outcome": "You spend days building a counter-case and calling in favors. You keep most of your budget, but your political capital reserves are drained.",
+    "outcome": "Days of counter-cases and called-in favours keep most of your budget intact. The reserves of goodwill upstairs are what you spent instead.",
     "effects": {
      "timeUsed": 6,
      "budget": -1000,
      "politicalCapital": -12,
      "progress": -3
-    }
+    },
+    "failureOutcome": "The executive sides with Wildfire anyway. The line item transfers, the favours are spent for nothing, and you replan the monitoring season around a hole — remembered as the manager who fought and lost.",
+    "failureEffects": {
+     "timeUsed": 6,
+     "budget": -9000,
+     "politicalCapital": -15,
+     "progress": -8
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Propose a compromise split",
-    "outcome": "You offer 30% of the disputed line item. Both sides save face. Your team grumbles about doing more with less.",
+    "outcome": "You offer 30% of the disputed line and both sides save face. The team does more with less and says so at every staff meeting.",
     "effects": {
      "budget": -4500,
-     "crew_morale": -5,
-     "politicalCapital": 3
-    }
+     "politicalCapital": 3,
+     "crew_morale": -5
+    },
+    "failureOutcome": "Wildfire pockets the 30% as an opening bid and comes back for the rest with momentum. You are now fighting the fight you tried to buy your way out of, from a weaker position and minus the down payment.",
+    "failureEffects": {
+     "budget": -4500,
+     "politicalCapital": -6,
+     "progress": -4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Concede gracefully",
@@ -988,13 +2154,35 @@
   "options": [
    {
     "label": "Host a farewell event",
-    "outcome": "You organize a proper send-off with speeches and gifts. She's moved. Before she leaves, she shares her private notes on every sensitive file. Invaluable.",
+    "outcome": "A proper send-off with speeches and gifts. She is moved — and before she leaves, her private notes on every sensitive file land on your desk.",
     "effects": {
      "budget": -2000,
      "timeUsed": 4,
      "relationships": 12,
      "compliance": 5
-    }
+    },
+    "failureOutcome": "A lovely evening, warm speeches, and a firm handshake at the door. The notes were never hers to hand over, she decides, and fifteen years of unwritten rules retire with her — her replacement calls you with questions you cannot answer either.",
+    "failureEffects": {
+     "budget": -2000,
+     "timeUsed": 4,
+     "relationships": 5,
+     "compliance": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Send a card and a gift",
@@ -1025,23 +2213,90 @@
   "options": [
    {
     "label": "Investigate thoroughly in-house",
-    "outcome": "You pull the files, visit the sites, interview the contractor. Two of the three allegations check out. You report the findings honestly. It costs you time and a contractor relationship, but your integrity is on the record.",
+    "outcome": "You pull files, walk the blocks, interview the contractor. Two of three allegations check out, you report honestly, and your integrity is on the record at the cost of a relationship.",
     "effects": {
      "timeUsed": 8,
      "budget": -3000,
      "compliance": 15,
      "relationships": -5,
      "politicalCapital": 8
-    }
+    },
+    "failureOutcome": "All three allegations check out, and worse, the pattern extends to a fourth block. The contractor is terminated mid-season, the region's replanting capacity goes with them, and your honest report now comes with a scramble to re-tender the work.",
+    "failureEffects": {
+     "timeUsed": 8,
+     "budget": -6000,
+     "compliance": 12,
+     "relationships": -10,
+     "politicalCapital": 5,
+     "progress": -10
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Quietly bury it",
-    "outcome": "You file the letter and hope it goes away. For three months, it does. Then the whistleblower goes to the media.",
+    "outcome": "You file the letter where letters go to be forgotten, and nothing follows. The blocks stay signed off, the contractor keeps planting, and only you know the drawer it lives in.",
     "effects": {
-     "compliance": -15,
-     "politicalCapital": -5
+     "compliance": -10,
+     "scrutiny": 2
     },
     "hiddenOutcome": true,
+    "partialOutcome": "The whistleblower writes again — this time to your director, registered mail. You investigate after all, with the first letter's date sitting in the file, and every finding now doubles as evidence of the delay.",
+    "partialEffects": {
+     "compliance": -12,
+     "politicalCapital": -6,
+     "timeUsed": 6,
+     "scrutiny": 5
+    },
+    "failureOutcome": "Three months of quiet, then the allegations run in a provincial paper with a line about when your office first knew. The ministry's first question is not about the contractor, and the story you now manage is the burial, not the planting.",
+    "failureEffects": {
+     "compliance": -15,
+     "politicalCapital": -8,
+     "scrutiny": 8,
+     "reputation": -5
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ],
+    "failureSchedulesEvent": "whistleblower_media_leak",
     "schedulesEvent": "whistleblower_media_leak"
    },
    {
@@ -1077,12 +2332,41 @@
    },
    {
     "label": "Claim the letter was under review",
-    "outcome": "A half-truth. Some people buy it. The journalist doesn't. A follow-up story questions your office's processes.",
+    "outcome": "The half-truth holds. Most readers accept it, the journalist cannot prove otherwise, and the story cycles out without a follow-up.",
     "effects": {
-     "compliance": -8,
-     "relationships": -8,
-     "politicalCapital": -10
-    }
+     "compliance": -6,
+     "relationships": -5,
+     "politicalCapital": -8
+    },
+    "failureOutcome": "The journalist publishes the timeline, and the second story is about your office lying rather than the contractor cheating. The ministry stops returning calls, and you now answer for the cover story as well as the delay.",
+    "failureEffects": {
+     "compliance": -12,
+     "relationships": -12,
+     "politicalCapital": -15,
+     "reputation": -8,
+     "scrutiny": 6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Resign from the file",
@@ -1127,11 +2411,39 @@
    },
    {
     "label": "Request a postponement",
-    "outcome": "You cite operational pressures. They push it back two weeks. But you're now flagged as uncooperative.",
+    "outcome": "You cite operational pressures and they push it back two weeks. You are flagged as reluctant, but you have the time you asked for.",
     "effects": {
      "politicalCapital": -8,
      "compliance": -3
-    }
+    },
+    "failureOutcome": "Refused — the audit proceeds in three days as scheduled, and you spent one of them arguing about the date. The opening meeting begins with your postponement request on the table.",
+    "failureEffects": {
+     "politicalCapital": -10,
+     "compliance": -5,
+     "timeUsed": 2,
+     "scrutiny": 4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1146,21 +2458,84 @@
   "options": [
    {
     "label": "Full transparency -- open the files",
-    "outcome": "You give them unrestricted access. They find a few minor issues but commend your openness. Final report is fair.",
+    "outcome": "Unrestricted access turns up a few minor issues and a commendation for openness. The final report is fair, and it reads like it.",
     "effects": {
      "timeUsed": 8,
      "compliance": 12,
      "politicalCapital": 5
-    }
+    },
+    "failureOutcome": "In the open drawers they find a real gap — a referral closed without the sign-off it needed. The written finding is softened by your openness, but you now owe a remediation plan in thirty days and the gap has a name.",
+    "failureEffects": {
+     "timeUsed": 8,
+     "compliance": -5,
+     "politicalCapital": 2,
+     "scrutiny": 4
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Guided tour -- show them what's ready",
-    "outcome": "You steer them through the strong files first. They notice the steering. Some pointed questions follow.",
+    "outcome": "The strong files set the tone and the two days run out before the weak drawers come up. The report is clean, and only you know how the route was drawn.",
     "effects": {
      "timeUsed": 6,
-     "compliance": 3,
-     "politicalCapital": -3
-    }
+     "compliance": 3
+    },
+    "partialOutcome": "They notice the steering by the second morning. Pointed questions follow, and the report notes that access was 'facilitated' — a word that will be read carefully upstairs.",
+    "partialEffects": {
+     "timeUsed": 6,
+     "compliance": -2,
+     "politicalCapital": -3,
+     "scrutiny": 3
+    },
+    "failureOutcome": "The steering is read as concealment and written up as a systemic finding. The next audit will be unannounced, and the drawers you steered them past are now the first thing anyone opens.",
+    "failureEffects": {
+     "timeUsed": 6,
+     "compliance": -8,
+     "politicalCapital": -6,
+     "scrutiny": 6
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.35,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Assign your weakest team member as liaison",
@@ -1203,11 +2578,31 @@
    },
    {
     "label": "Continue business as usual",
-    "outcome": "You proceed with existing agreements. The new Chief hears about this through staff and feels disrespected.",
+    "outcome": "Operations proceed under the existing agreements while the new Council settles in. Nobody calls, which you choose to read as consent.",
     "effects": {
-     "relationships": -10,
-     "politicalCapital": -5
-    }
+     "relationships": -4
+    },
+    "failureOutcome": "The new Chief hears about the continuing operations from staff, not from you. Existing agreements are reopened for renegotiation, and your first meeting is now about why you never asked for one.",
+    "failureEffects": {
+     "relationships": -12,
+     "politicalCapital": -8,
+     "progress": -8
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1231,21 +2626,71 @@
    },
    {
     "label": "Present your existing plans and ask for their input",
-    "outcome": "You show your work. They feel consulted but not heard. The tone is professional but cool.",
+    "outcome": "You show your work and they engage with it. The tone is professional but cool — consulted is not the same as heard, and everyone in the room knows it.",
     "effects": {
      "timeUsed": 3,
      "relationships": 3
-    }
+    },
+    "failureOutcome": "Finished plans read as consultation theatre, and the meeting sours in the first half hour. A formal co-management demand lands the following week, and your plans are now the opening exhibit in that discussion.",
+    "failureEffects": {
+     "timeUsed": 3,
+     "relationships": -8,
+     "politicalCapital": -5,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Set firm boundaries on what's negotiable",
-    "outcome": "You're honest about constraints. They respect the candor but push back hard on two items. The meeting ends tense.",
+    "outcome": "You are honest about constraints and the Chief respects the candor. The meeting ends tense but with a real baseline neither side has to walk back.",
     "effects": {
      "timeUsed": 2,
      "relationships": -5,
      "politicalCapital": -3,
      "compliance": 3
-    }
+    },
+    "failureOutcome": "The boundaries read as bad faith on day one. Council takes the two contested items over your head to the ministry, and you spend next month defending positions you set in a first meeting.",
+    "failureEffects": {
+     "timeUsed": 2,
+     "relationships": -10,
+     "politicalCapital": -8,
+     "progress": -6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1260,24 +2705,91 @@
   "options": [
    {
     "label": "Issue a detailed public rebuttal",
-    "outcome": "You publish a point-by-point response with maps and data. Forestry professionals applaud. The general public finds it defensive.",
+    "outcome": "The point-by-point response, with maps and data, holds. Professionals applaud, the public shrugs, and the story loses its legs.",
     "effects": {
      "timeUsed": 6,
      "relationships": -3,
      "politicalCapital": -5,
      "compliance": 5
-    }
+    },
+    "failureOutcome": "The rebuttal becomes the story: a second news cycle about the defensive licensee and their eleven-page response. You are now managing coverage of your reaction, and the original piece reads better every day.",
+    "failureEffects": {
+     "timeUsed": 6,
+     "relationships": -8,
+     "politicalCapital": -8,
+     "reputation": -6,
+     "scrutiny": 4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Invite the journalist to a site tour",
-    "outcome": "Bold move. They accept. The follow-up piece is more balanced. Your team is nervous the whole time.",
+    "outcome": "Bold move. They walk the ground, ask hard questions, and the follow-up piece is notably more balanced than the first.",
     "effects": {
      "timeUsed": 4,
      "budget": -500,
      "relationships": 8,
      "crew_morale": -3
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "partialOutcome": "The follow-up is mostly fair, but the photo is a rutted skid trail with a careful caption. You spend a week answering letters about a picture instead of a practice.",
+    "partialEffects": {
+     "timeUsed": 5,
+     "budget": -500,
+     "relationships": 3,
+     "reputation": -2
+    },
+    "failureOutcome": "They find something on the tour you did not know was there to find. The second story is worse than the first and this time it has photos, and your own invitation is the first line of it.",
+    "failureEffects": {
+     "timeUsed": 4,
+     "budget": -500,
+     "relationships": -6,
+     "reputation": -8,
+     "compliance": -4,
+     "scrutiny": 6
+    },
+    "chanceSuccess": 0.45,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Let it blow over",
@@ -1408,23 +2920,88 @@
   "options": [
    {
     "label": "Report immediately and notify affected parties",
-    "outcome": "You file the breach report within the hour and call every affected First Nation. It turns out the laptop was encrypted. The panic was unnecessary, but your response earns respect.",
+    "outcome": "You file the breach report within the hour and call every affected Nation. The laptop turns out to be encrypted — the panic was unnecessary, and the speed of your call is what everyone remembers.",
     "effects": {
      "timeUsed": 6,
      "relationships": 8,
      "compliance": 10,
      "politicalCapital": 3
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "The laptop was not encrypted. It is a real breach: formal notifications, consultation records in the wind, and months of rebuilding trust with Nations whose information your truck lost — though nobody can fault the reporting.",
+    "failureEffects": {
+     "timeUsed": 8,
+     "compliance": 5,
+     "relationships": -8,
+     "politicalCapital": -5,
+     "scrutiny": 6
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Investigate quietly before reporting",
-    "outcome": "You check the encryption status first. It's encrypted -- no breach. But you delayed the mandatory report by four hours. Someone notices.",
+    "outcome": "IT confirms the encryption inside the hour and the report goes in clean. Nobody ever asks about the gap in the timestamps.",
     "effects": {
      "timeUsed": 3,
+     "compliance": -3
+    },
+    "partialOutcome": "Encrypted — no breach. But the four-hour gap between discovery and report gets its own line in the incident file, and mandatory reporting is not graded on outcomes.",
+    "partialEffects": {
+     "timeUsed": 3,
      "compliance": -8,
-     "politicalCapital": -5
-    }
+     "politicalCapital": -5,
+     "scrutiny": 3
+    },
+    "failureOutcome": "Not encrypted, and you sat on it for four hours. The delayed report becomes its own compliance file alongside the breach, and every notification call now starts with an apology for the timing.",
+    "failureEffects": {
+     "timeUsed": 6,
+     "compliance": -12,
+     "politicalCapital": -8,
+     "relationships": -8,
+     "scrutiny": 7
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "partial"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Have IT wipe the laptop remotely",
@@ -1457,21 +3034,66 @@
    },
    {
     "label": "Negotiate a compromise",
-    "outcome": "After two tense meetings, you agree to pay half. Both sides feel they gave up too much. The contractor will think twice before doing extras without written approval.",
+    "outcome": "Two tense meetings end at half. Both sides feel they gave up too much, which is roughly what a fair settlement feels like.",
     "effects": {
      "timeUsed": 4,
      "budget": -9000,
      "relationships": -3
-    }
+    },
+    "failureOutcome": "Talks collapse on the second meeting and they lawyer up mid-season. Nothing gets planted while it is in dispute, and you are now managing a legal file and an idle silviculture program at the same time.",
+    "failureEffects": {
+     "timeUsed": 6,
+     "budget": -3000,
+     "relationships": -10,
+     "progress": -12
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Reject the overage and cite the contract",
-    "outcome": "You send a firm letter. The contractor is furious. They finish current obligations but won't bid on your next contract. Finding a replacement in this region won't be easy.",
+    "outcome": "You send a firm letter. The contractor is furious but finishes current obligations — and will never again do extras on a handshake, which was rather the point.",
     "effects": {
      "relationships": -12,
      "politicalCapital": 3,
      "compliance": 5
-    }
+    },
+    "failureOutcome": "They walk off current obligations and file a claim for the full amount. The season's silviculture is suddenly uncrewed in a region with a short contractor list, and your firm letter is now exhibit A.",
+    "failureEffects": {
+     "relationships": -15,
+     "compliance": 5,
+     "progress": -15,
+     "budget": -5000,
+     "timeUsed": 4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1486,22 +3108,66 @@
   "options": [
    {
     "label": "Preemptively shut down operations and evacuate",
-    "outcome": "You pull everyone out a day before the order comes. Costs production but everyone is safe. The fire turns and misses the block entirely. Was it the right call? Yes. Will people question it? Also yes.",
+    "outcome": "You pull everyone out a day before the order comes. The fire turns and misses the block — the call was right, and people will still question it at budget time.",
     "effects": {
      "progress": -15,
-     "crew_morale": 5,
      "budget": -3000,
-     "politicalCapital": -3
+     "politicalCapital": -3,
+     "crew_morale": 5
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "The fire takes the block two days later: roads, culverts, and standing timber. The evacuation call is fully vindicated, and you now replan the season around burned ground instead of harvest schedules.",
+    "failureEffects": {
+     "progress": -20,
+     "budget": -8000,
+     "politicalCapital": 3
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "season:summer",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Continue with enhanced monitoring",
-    "outcome": "You keep working but double the fire watch. The wind shifts favorably. No evacuation needed. You got lucky and you know it.",
+    "outcome": "You double the fire watch and keep working. The wind holds, the evacuation never comes, and you got away with betting a crew on a forecast.",
     "effects": {
      "progress": 3,
      "crew_morale": -8
-    }
+    },
+    "failureOutcome": "The wind shifts mid-shift and the evacuation is a scramble, with equipment abandoned behind the fire line. Everyone gets out, WorkSafe wants the decision log, and the crew remembers exactly who kept them on the block.",
+    "failureEffects": {
+     "progress": -15,
+     "budget": -10000,
+     "politicalCapital": -6,
+     "compliance": -5,
+     "scrutiny": 5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "season:summer",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Request official guidance from the ministry",
@@ -1574,23 +3240,81 @@
    },
    {
     "label": "Push back with a legal interpretation",
-    "outcome": "Your reading of the legislation supports your position. Theirs supports theirs. It escalates to the ADM level. You spend weeks in meetings instead of doing work.",
+    "outcome": "The ADM backs your reading of the legislation. The file stays yours, jurisdiction is settled in writing, and the weeks of meetings were the price of the precedent.",
     "effects": {
      "timeUsed": 8,
      "politicalCapital": -10,
      "progress": -5,
      "compliance": 3
-    }
+    },
+    "partialOutcome": "The ADM splits the difference: you keep this file, and a joint-review protocol applies to everything after it. You won the battle and standardized the war.",
+    "partialEffects": {
+     "timeUsed": 8,
+     "politicalCapital": -10,
+     "progress": -8,
+     "compliance": 3
+    },
+    "failureOutcome": "The ADM sides with the assessment office. The file transfers anyway after weeks of meetings, and your branch wears the fight it started — the next jurisdictional grey area will not be given the benefit of the doubt.",
+    "failureEffects": {
+     "timeUsed": 8,
+     "politicalCapital": -14,
+     "progress": -12,
+     "relationships": -5
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Propose joint processing",
-    "outcome": "A creative solution. Both offices contribute. It takes longer than either would alone but creates a precedent for collaboration. Or a precedent for confusion.",
+    "outcome": "Both offices contribute and the file lands, slower than either process alone but with a precedent for collaboration attached. The Deputy Minister's office notices the absence of a fight.",
     "effects": {
      "timeUsed": 4,
      "relationships": 5,
      "progress": -8,
      "politicalCapital": 3
-    }
+    },
+    "failureOutcome": "The other office plays at half speed and the file enters dual-office limbo, slower than either process and owned by neither. Both sides blame you for the precedent, and you end up asking the ADM to untangle what you proposed.",
+    "failureEffects": {
+     "timeUsed": 6,
+     "relationships": -4,
+     "progress": -14,
+     "politicalCapital": -4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "roles": [
@@ -1619,12 +3343,34 @@
    },
    {
     "label": "Accept informally with verbal assurances",
-    "outcome": "She shares some information. It's helpful but incomplete -- she's holding back without a formal agreement. You adjust plans slightly.",
+    "outcome": "She shares some of what she knows — helpful but incomplete, because informality has limits she understands better than you do. You adjust the plan where you can.",
     "effects": {
      "timeUsed": 2,
      "relationships": 5,
      "compliance": 3
-    }
+    },
+    "failureOutcome": "Something she shared informally surfaces in a referral document six weeks later. The Nation sees a broken assurance, consultation turns adversarial, and the formal agreement you skipped gets negotiated anyway — from distrust.",
+    "failureEffects": {
+     "relationships": -12,
+     "politicalCapital": -6,
+     "compliance": -5,
+     "scrutiny": 3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Decline -- regulatory process doesn't require it",
@@ -1668,11 +3414,40 @@
    },
    {
     "label": "Submit digital-only and request accommodation",
-    "outcome": "You ask the ministry if they'll accept digital maps. They will, reluctantly. It sets a precedent they're not thrilled about.",
+    "outcome": "The ministry accepts digital maps, reluctantly, and notes the precedent they did not want to set. The permits go in on time.",
     "effects": {
      "compliance": -3,
      "politicalCapital": -5
-    }
+    },
+    "failureOutcome": "Refused — hard copies or nothing. You are now four days from deadline with no plotter, paying the print shop rush rate anyway, and the permits go in late with the delay marked in your file.",
+    "failureEffects": {
+     "compliance": -8,
+     "politicalCapital": -6,
+     "progress": -6,
+     "budget": -800,
+     "timeUsed": 4
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.12,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:55",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1699,21 +3474,79 @@
    },
    {
     "label": "Confront the contractor directly",
-    "outcome": "You raise it privately. The contractor fires the crew member immediately. No official record. The problem is solved but nothing is documented.",
+    "outcome": "You raise it privately and the contractor fires the crew member the same day. Solved, appreciated, and documented nowhere.",
     "effects": {
      "timeUsed": 2,
      "relationships": 3,
      "compliance": -5
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "The contractor denies everything and closes ranks, and the activity continues. When COS eventually gets its own tip, the file shows your office knew first and went nowhere official — and now you answer for the gap.",
+    "failureEffects": {
+     "timeUsed": 2,
+     "relationships": -5,
+     "compliance": -12,
+     "politicalCapital": -5,
+     "scrutiny": 5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Increase site monitoring but take no direct action",
-    "outcome": "You add patrols. The activity stops. You'll never know if the tip was accurate. The note-leaver expected more.",
+    "outcome": "You add patrols and the activity stops. You will never know if the tip was accurate, and the note-leaver clearly expected more.",
     "effects": {
      "budget": -1000,
      "compliance": 2
-    }
+    },
+    "failureOutcome": "The poaching continues until a kill site is found by hikers, and it is public within the week. The paper trail shows you were tipped and did nothing formal, and COS now conducts its investigation through your office rather than with it.",
+    "failureEffects": {
+     "budget": -1000,
+     "compliance": -10,
+     "reputation": -6,
+     "politicalCapital": -5,
+     "scrutiny": 5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "season:fall",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1746,13 +3579,36 @@
    },
    {
     "label": "Stand firm and end the conversation",
-    "outcome": "You tell him you'd do the same thing again. He storms out. His bid on your next contract will be 30% higher, if he bids at all.",
+    "outcome": "You tell him you would do the same thing again. He storms out, and his next bid arrives 30% higher — but it arrives.",
     "effects": {
      "relationships": -10,
      "politicalCapital": 5,
      "compliance": 8,
      "budget": -3000
-    }
+    },
+    "failureOutcome": "He is done — no bid next season, and he says so to every operator he drinks with. The regional contractor pool just got smaller, and your next tender comes back with one envelope in it.",
+    "failureEffects": {
+     "relationships": -14,
+     "politicalCapital": 5,
+     "compliance": 8,
+     "budget": -8000,
+     "progress": -6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -1767,21 +3623,68 @@
   "options": [
    {
     "label": "Drop everything and write the application",
-    "outcome": "You and your best writer spend three days on a strong submission. It's funded. $45,000 in new money for riparian work. Regular work falls behind.",
+    "outcome": "You and your best writer spend three days on a strong submission, and it is funded — $45,000 in new money for riparian work. The regular files waited and it was worth it.",
     "effects": {
      "timeUsed": 6,
      "budget": 45000,
      "progress": -8,
      "crew_morale": 8
     },
-    "hiddenOutcome": true
+    "hiddenOutcome": true,
+    "failureOutcome": "A strong submission, reviewed and not funded — the panel liked another district's watershed more. Three days are gone, the backlog grew, and the riparian project goes back on the someday list you took it from.",
+    "failureEffects": {
+     "timeUsed": 6,
+     "progress": -12
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Submit a quick application with existing materials",
-    "outcome": "You cobble together something from old project descriptions. It's technically complete but uninspiring. Reviewed but not funded.",
+    "outcome": "Against the odds, the panel funds a scaled version — $12,000 for the highest-priority reach. Sometimes lightning strikes a two-hour application.",
     "effects": {
+     "timeUsed": 2,
+     "budget": 12000
+    },
+    "partialOutcome": "Reviewed and declined with a polite form letter, as cobbled applications usually are. Two hours gone, nothing more.",
+    "partialEffects": {
      "timeUsed": 2
-    }
+    },
+    "failureOutcome": "Declined — and the program officer remembers the district that submitted recycled boilerplate. Next intake, your applications start from a deficit you wrote yourself.",
+    "failureEffects": {
+     "timeUsed": 2,
+     "reputation": -2,
+     "politicalCapital": -2
+    },
+    "chanceSuccess": 0.35,
+    "chancePartial": 0.4,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Pass -- can't afford the time right now",
@@ -1810,11 +3713,32 @@
    },
    {
     "label": "Allow remote work for the week",
-    "outcome": "Everyone works from home. Productivity varies wildly. Some people thrive. Others are unreachable by Wednesday.",
+    "outcome": "Everyone works from home and, on balance, it works. The referral queue moves, and the team remembers being trusted.",
     "effects": {
      "progress": -3,
      "crew_morale": 8
-    }
+    },
+    "failureOutcome": "Half the office is unreachable by Wednesday, and a referral misses its response window during the week nobody was there. You spend the following Monday apologizing to a partner agency about your HVAC.",
+    "failureEffects": {
+     "progress": -8,
+     "relationships": -4,
+     "compliance": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Buy portable AC units and power through",
@@ -1847,14 +3771,49 @@
    },
    {
     "label": "Apply for an exception permit",
-    "outcome": "The legislation allows exceptions in limited circumstances. Your application takes two months. It's denied. You've lost the season.",
+    "outcome": "Two months later the exception is granted with conditions: a reduced footprint under monitoring. Rare, defensible, and on the record as done properly.",
     "effects": {
+     "timeUsed": 8,
+     "progress": -8,
+     "compliance": 3,
+     "politicalCapital": -3
+    },
+    "hiddenOutcome": true,
+    "partialOutcome": "The decision comes back 'insufficient information — resubmission invited.' A month is gone, the nest is still there, and you now face the same halt-or-apply choice with less season left to spend on it.",
+    "partialEffects": {
+     "timeUsed": 8,
+     "progress": -12,
+     "politicalCapital": -5
+    },
+    "failureOutcome": "Denied after two months of waiting. The season is gone, and you spent it holding a contractor on standby instead of redesigning the block — which is where you now start, in the fall.",
+    "failureEffects": {
      "timeUsed": 8,
      "progress": -20,
      "politicalCapital": -8,
      "compliance": -5
     },
-    "hiddenOutcome": true
+    "chanceSuccess": 0.35,
+    "chancePartial": 0.3,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "partial"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Verify the identification before acting",
@@ -1881,13 +3840,34 @@
   "options": [
    {
     "label": "Present it to senior management with the intern",
-    "outcome": "You bring the intern to the director's meeting. She's nervous but impressive. The savings are real. Your district looks innovative. The intern gets a job offer.",
+    "outcome": "She is nervous and impressive in the same ten minutes. The savings are real, the district looks innovative, and she leaves the room with a job offer.",
     "effects": {
-     "crew_morale": 10,
      "politicalCapital": 8,
      "budget": 5000,
-     "timeUsed": 3
-    }
+     "timeUsed": 3,
+     "crew_morale": 10
+    },
+    "failureOutcome": "She freezes on the second question and the methodology gets picked apart live. The savings are shelved pending revalidation, and you re-pitch the same numbers next budget season without the shine.",
+    "failureEffects": {
+     "timeUsed": 3,
+     "politicalCapital": -6,
+     "reputation": -3
+    },
+    "chanceSuccess": 0.65,
+    "oddsModifiers": [
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Present it yourself and credit the intern",
@@ -1929,13 +3909,43 @@
    },
    {
     "label": "Send a formal letter of apology with a restoration offer",
-    "outcome": "The letter is well-written. The community acknowledges it. But a letter is paper, not presence. The relationship remains strained.",
+    "outcome": "The letter is well written and the restoration offer is real. The community acknowledges it — paper is not presence, but the file stays workable.",
     "effects": {
      "timeUsed": 2,
      "budget": -3000,
      "relationships": -3,
      "compliance": 3
-    }
+    },
+    "failureOutcome": "A letter, for a ceremonial site, reads as distance — and the community says so publicly. Consultation on your other files chills, and you end up making the three-hour drive anyway, weeks later, to a much colder room.",
+    "failureEffects": {
+     "timeUsed": 2,
+     "budget": -3000,
+     "relationships": -10,
+     "reputation": -6,
+     "politicalCapital": -5,
+     "progress": -5
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Point out the site wasn't mapped and offer to map it now",
@@ -1970,11 +3980,37 @@
    },
    {
     "label": "Send topline numbers with caveats in bold",
-    "outcome": "He reads the toplines and skips the bold. One number gets repeated on the back nine without its footnote. You spend Friday walking it back.",
+    "outcome": "The chair reads the bold print, repeats nothing he should not, and the golf goes fine. Finance keeps its evenings and you bank a small favour.",
     "effects": {
-     "politicalCapital": -4,
-     "scrutiny": 3
-    }
+     "politicalCapital": 2
+    },
+    "failureOutcome": "A bare number circulates among the investors without its footnote, and by Friday it has compounded. You spend the day walking it back caller by caller, and the audited pack will now be read against the version from the back nine.",
+    "failureEffects": {
+     "politicalCapital": -6,
+     "scrutiny": 4,
+     "timeUsed": 2
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Suggest the numbers wait for the audited pack",
@@ -2005,7 +4041,35 @@
      "budget": -4000,
      "relationships": 6,
      "politicalCapital": 4
-    }
+    },
+    "failureOutcome": "In the open books they find their own story — a cost line you had explanations for but no appetite to defend in public. The follow-up letter quotes your numbers back at the board, and the next quarter's pack gets built to answer it.",
+    "failureEffects": {
+     "budget": -4000,
+     "politicalCapital": -6,
+     "scrutiny": 5,
+     "reputation": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.08,
+      "from": "bad",
+      "to": "good"
+     }
+    ]
    },
    {
     "label": "Have legal draft a courteous nothing",
@@ -2017,12 +4081,38 @@
    },
    {
     "label": "Rebut with your own benchmarking",
-    "outcome": "Your numbers are decent and your tone is not. The exchange ends in a stalemate the trade press finds delicious.",
+    "outcome": "Your numbers are decent enough to hold, and the fund moves on to a softer target. The exchange costs some polish and nothing structural.",
     "effects": {
-     "reputation": -3,
-     "compliance": 2,
-     "scrutiny": 2
-    }
+     "reputation": -2,
+     "compliance": 2
+    },
+    "failureOutcome": "The fund escalates to a public campaign with the board cc'd, and the stalemate becomes a governance story in the trade press. You are now preparing AGM materials around a fight your covering letter started.",
+    "failureEffects": {
+     "reputation": -6,
+     "politicalCapital": -8,
+     "scrutiny": 6
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
@@ -2043,9 +4133,30 @@
     "outcome": "Forty minutes standing over the divisional map produces a schedule both sides claim they suggested. Peace, of a kind.",
     "effects": {
      "relationships": 4,
-     "crew_morale": 4,
-     "progress": 3
-    }
+     "progress": 3,
+     "crew_morale": 4
+    },
+    "failureOutcome": "The standoff hardens with an audience, and one of them files a formal grievance about the meeting itself. The planting window slips while HR mediates, and the schedule you needed gets written by a facilitator.",
+    "failureEffects": {
+     "progress": -8,
+     "politicalCapital": -4,
+     "timeUsed": 3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Side with woodlands -- the wood pays the bills",
@@ -2080,19 +4191,63 @@
   "options": [
    {
     "label": "Counter with money and a longer leash",
-    "outcome": "The retention package stings, but the CEO stays -- and now knows exactly what staying is worth.",
+    "outcome": "The retention package stings, but the CEO stays — and now knows exactly what staying is worth.",
     "effects": {
      "budget": -20000,
      "politicalCapital": 3
-    }
+    },
+    "failureOutcome": "Your counter becomes their floor in Alberta, and they leave anyway with a better number than the steakhouse offered. You have published what the job is worth, and the search firm quotes you your own figure.",
+    "failureEffects": {
+     "budget": -5000,
+     "politicalCapital": -6,
+     "progress": -8,
+     "reputation": -3
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:60",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Appeal to the work, not the wallet",
-    "outcome": "You talk tenure, stewardship, and finishing what was started. It lands -- this time. The steakhouse will still be there next quarter.",
+    "outcome": "You talk tenure, stewardship, and finishing what was started. It lands — this time — and the steakhouse will still be there next quarter.",
     "effects": {
      "relationships": 4,
      "politicalCapital": 2
-    }
+    },
+    "failureOutcome": "The dinners were further along than you knew, and the resignation letter arrives inside the month. The succession scramble is cold and public, and the board asks why there was no retention offer on the table.",
+    "failureEffects": {
+     "politicalCapital": -6,
+     "progress": -10,
+     "budget": -10000,
+     "reputation": -2
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "relationshipsAbove:65",
+      "move": 0.15,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    },
    {
     "label": "Quietly start shortlisting successors",
@@ -2128,20 +4283,83 @@
    },
    {
     "label": "Tidy what the auditor will actually see",
-    "outcome": "The route is spotless; the rest stays as it was. One minor non-conformity surfaces in a place you didn't expect them to look -- because the auditor has read this play before.",
+    "outcome": "She walks the spotless route, reads the clean files, and closes out with a remark about good housekeeping. The rest of the operation stays as it was, unexamined.",
     "effects": {
+     "budget": -2000,
+     "compliance": 2
+    },
+    "partialOutcome": "One minor non-conformity surfaces in a place you did not expect her to look — because she has read this play before. The finding is small; the note about where she found it is not.",
+    "partialEffects": {
      "budget": -2000,
      "compliance": -2,
      "scrutiny": 4
-    }
+    },
+    "failureOutcome": "She recognizes the staging and writes up the staging itself: a major non-conformity for management-system integrity. Certification is suspended pending re-audit, and the quarter now belongs to proving the system is real.",
+    "failureEffects": {
+     "budget": -2000,
+     "compliance": -10,
+     "scrutiny": 8,
+     "reputation": -6,
+     "progress": -6
+    },
+    "chanceSuccess": 0.4,
+    "chancePartial": 0.35,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.15,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "partial"
+     }
+    ]
    },
    {
     "label": "Trust the system you already run",
-    "outcome": "Bold. The audit lands one minor and one observation. Your certification survives, and your operations forester ages a year in a week.",
+    "outcome": "The audit lands one minor and one observation. Your certification survives, and your operations forester ages a year in a week.",
     "effects": {
      "compliance": 2,
      "crew_morale": -3
-    }
+    },
+    "failureOutcome": "The system has a hole nobody knew about, and once she finds it the findings compound. Recertification becomes the quarter's project, with a corrective-action plan due before the next surveillance visit.",
+    "failureEffects": {
+     "compliance": -8,
+     "scrutiny": 6,
+     "budget": -6000,
+     "progress": -8
+    },
+    "chanceSuccess": 0.6,
+    "oddsModifiers": [
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.1,
+      "from": "bad",
+      "to": "good"
+     },
+     {
+      "when": "scrutinyAbove:50",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
+     },
+     {
+      "when": "difficulty:hard",
+      "move": 0.1,
+      "from": "good",
+      "to": "bad"
+     }
+    ]
    }
   ],
   "expeditionOnly": true
