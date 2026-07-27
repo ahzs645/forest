@@ -6,7 +6,7 @@
 
 import { checkForEvent } from '../events.js';
 import { runDaySituation } from '../journey/daySituation.js';
-import { formatStatusLine } from '../journey/dayCard.js';
+import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
 import { crewHasRole } from '../crew.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
@@ -15,6 +15,7 @@ import { addDiscoveryTags, getDiscoveryTagNotes, getJourneyDiscoveryTags } from 
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { buildStandStrip } from '../scene/forest.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
+import { checkSilvicultureEndConditions } from './shared/endConditions.js';
 
 // Contractor event templates (Phase 4.2)
 const CONTRACTOR_EVENTS = [
@@ -147,19 +148,10 @@ export async function runSilvicultureDay(game) {
   // legible before disruptions begin.
   const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
-    const daysLeft = Number.isFinite(journey.deadline)
-      ? Math.max(0, journey.deadline - journey.day)
-      : null;
     const outcome = await runDaySituation(game, event, {
       frame: {
-        dayHeader: Number.isFinite(journey.deadline)
-          ? `DAY ${journey.day} of ${journey.deadline} - SILVICULTURE`
-          : `DAY ${journey.day} - SILVICULTURE`,
-        statusLine: formatStatusLine([
-          `${journey.planting?.blocksPlanted || 0}/${journey.planting?.blocksToPlant || 0} blocks planted`,
-          daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
-          `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
-        ]),
+        dayHeader: buildSilvicultureDayHeader(journey),
+        statusLine: buildSilvicultureStatusLine(journey),
       },
       setAsideDescription: 'Not today. Keep the day for the program.',
     });
@@ -182,27 +174,38 @@ export async function runSilvicultureDay(game) {
   const hasAdvancingAction = dayOpeningOptions.some((option) => advancingActionValues.has(option.value));
   silvicultureState.zombieDays = hasAdvancingAction ? 0 : (silvicultureState.zombieDays || 0) + 1;
 
-  // One program decision gets the day. The binder is free to read and leaves
-  // the day unspent, so the loop returns to the real call; the tally closes a
-  // day whose menu turns out to be nothing but look-ups and blocked steps.
+  // One program decision gets the day, and it opens as a card like every
+  // other mode's quiet day: the morning check-ins, then the call. The binder
+  // and the card's free context leave the day unspent, so the loop returns to
+  // the real decision; the tally closes a day whose menu turns out to be
+  // nothing but look-ups and blocked steps.
   const freeChoices = { count: 0 };
   while (!dayIsSpent(journey)) {
     resolveActionableSilviculturePhase(journey, silvicultureState);
-    displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, zoneProfile);
 
     const actionOptions = buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultureState, zoneProfile);
 
-    const action = await ui.promptChoice(dayPrompt(journey), actionOptions);
+    const actionId = await presentDayCard(ui, {
+      dayHeader: buildSilvicultureDayHeader(journey),
+      statusLine: buildSilvicultureStatusLine(journey),
+      label: 'MORNING CHECK-INS',
+      title: buildSilvicultureQuietTitle(journey, seasonInfo),
+      body: buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState),
+      context: buildSilvicultureContextLines(journey, seasonInfo, silvicultureState, zoneProfile),
+      prompt: dayPrompt(journey),
+      options: actionOptions,
+      onRender: () => { updateSilvicultureMissionStatus(ui, journey, seasonInfo, zoneProfile); },
+    });
 
     ui.write('');
 
-    if (action.value === 'end') {
+    if (actionId === 'end') {
       spendDay(journey);
       break;
     }
 
     // Process action
-    await processAction(game, action.value, currentSeason, seasonMods, silvicultureState, zoneProfile);
+    await processAction(game, actionId, currentSeason, seasonMods, silvicultureState, zoneProfile);
 
     ui.updateAllStatus(journey);
     settleDayPass(journey, freeChoices, ui);
@@ -231,17 +234,15 @@ export async function runSilvicultureDay(game) {
     }
   }
 
-  // Check victory conditions
-  if (journey.planting.blocksPlanted >= journey.planting.blocksToPlant &&
-      journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget) {
+  // Targets come from the shared module, so the day and the end-of-run check
+  // agree on what finishing means. Everything that ends the program badly is
+  // the shared check's call alone: the day used to run its own budget test,
+  // which settled the run before the shared contractor-capacity and
+  // delivery-window branches were ever consulted.
+  const endResult = checkSilvicultureEndConditions(journey);
+  if (endResult?.victory) {
     journey.isComplete = true;
-    journey.endReason = 'Regeneration targets achieved!';
-  }
-
-  // Check game over
-  if (journey.resources.budget <= 0) {
-    journey.isGameOver = true;
-    journey.gameOverReason = 'Budget exhausted';
+    journey.endReason = endResult.reason;
   }
 
   // Zombie tail: several days running with nothing left that can move the
@@ -273,21 +274,102 @@ export async function runSilvicultureDay(game) {
 }
 
 /**
- * Display compact silviculture header (Phase 6.2)
+ * The day card's header line and drumbeat, shared between the quiet card and
+ * the situation frame so the day reads the same whichever way it opens.
  */
-function displaySilvicultureHeader(ui, journey, seasonInfo, silvicultureState, zoneProfile) {
-  ui.clear();
-  ui.writeHeader(`DAY ${journey.day} - SILVICULTURE OPERATIONS`);
+function buildSilvicultureDayHeader(journey) {
+  return Number.isFinite(journey.deadline)
+    ? `DAY ${journey.day} of ${journey.deadline} - SILVICULTURE`
+    : `DAY ${journey.day} - SILVICULTURE`;
+}
 
-  // The stand at a glance: one glyph per program block, growing as the
-  // crew plants (^) and proves free-growing (♠).
-  const standStrip = buildStandStrip(journey);
-  if (standStrip) {
-    ui.write(standStrip, 'term-dim');
+function buildSilvicultureStatusLine(journey) {
+  const daysLeft = Number.isFinite(journey.deadline)
+    ? Math.max(0, journey.deadline - journey.day)
+    : null;
+  return formatStatusLine([
+    `${journey.planting?.blocksPlanted || 0}/${journey.planting?.blocksToPlant || 0} blocks planted`,
+    daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
+    `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
+  ]);
+}
+
+/**
+ * A quiet program day still needs to read like a morning, not like a form.
+ * The title and body come off the actual state so two check-in mornings at
+ * different points in the season do not open with identical text.
+ */
+function buildSilvicultureQuietTitle(journey, seasonInfo) {
+  const activeContractors = (journey.contractors || []).filter((c) => c.isActive);
+  if (seasonInfo?.id === 'winter') return 'FROZEN GROUND';
+  if (activeContractors.length === 0) return 'NOBODY ON THE GROUND';
+  if (activeContractors.some((c) => c.morale < 40)) return 'A SHORT-TEMPERED CHECK-IN';
+  if (getVegetationPressure(journey) > 0.25) return 'BRUSH COMING UP FAST';
+  if ((journey.resources.budget || 0) < 8000) return 'THIN IN THE ACCOUNT';
+  return 'ALL CREWS ACCOUNTED FOR';
+}
+
+function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState) {
+  const activeContractors = (journey.contractors || []).filter((c) => c.isActive);
+  const unhappy = activeContractors.find((c) => c.morale < 40);
+  const parts = [];
+
+  if (seasonInfo?.id === 'winter') {
+    parts.push('The ground is frozen through and nothing plants until spring. What moves today is the roster and the paperwork.');
+  } else if (activeContractors.length === 0) {
+    parts.push('Check-in time comes and goes with nobody deployed. The program does not move until a crew is on it.');
+  } else if (unhappy) {
+    parts.push(`${unhappy.name} keeps the morning call short and lets you hear it. Nothing that needs an answer yet.`);
+  } else {
+    parts.push('The contractors call in one by one and none of them has a problem for you. Whatever today is, it is yours to decide.');
   }
 
-  // Status renders in the mission dashboard pane; budget/seedlings/capacity
-  // live in the supplies pane already.
+  if (seasonInfo?.id !== 'winter') {
+    parts.push(`The cohort's next step is ${formatSilviculturePhase(silvicultureState.phase).toLowerCase()}.`);
+  }
+  if (Number.isFinite(journey.deadline)) {
+    const daysLeft = Math.max(0, journey.deadline - journey.day);
+    if (daysLeft <= 5) {
+      parts.push(`The season closes in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.`);
+    }
+  }
+  return parts.join(' ');
+}
+
+/**
+ * Reference material, free and behind "More context": the stand strip, the
+ * program sequence, and the pressures on the ground. The full binder is still
+ * its own menu entry; this is the glance, not the file.
+ */
+function buildSilvicultureContextLines(journey, seasonInfo, silvicultureState, zoneProfile) {
+  const lines = [];
+  const standStrip = buildStandStrip(journey);
+  if (standStrip) lines.push(standStrip);
+
+  lines.push(`Sequence: ${formatSilviculturePhase(silvicultureState.phase)} | ${zoneProfile.summary}`);
+  const roster = getSilvicultureContractorRoster(journey, zoneProfile);
+  lines.push(`Roster: ${roster.summary}`);
+
+  const brushPct = Math.round(safeRatio(journey.brushing.hectaresComplete, journey.brushing.hectaresTarget) * 100);
+  lines.push(`Brushing: ${brushPct}% | Surveys: ${Math.min(journey.surveys.freeGrowingComplete, journey.surveys.freeGrowingTarget)}/${journey.surveys.freeGrowingTarget} free-growing`);
+
+  const scrutinyPressure = getScrutinyPressure(journey);
+  if (scrutinyPressure > 0) {
+    lines.push(`${getScrutinyLabel(journey)}: ${scrutinyPressure}`);
+  }
+  const areaSituation = getAreaSituationSummary(journey);
+  if (areaSituation) lines.push(`Area: ${areaSituation}`);
+  const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'silviculture', 2);
+  if (discoveryNotes.length > 0) lines.push(`Carry-forward: ${discoveryNotes.join(' | ')}`);
+
+  return lines.filter(Boolean);
+}
+
+/**
+ * Keep the mission dashboard pane current on every card render;
+ * budget/seedlings/capacity live in the supplies pane already.
+ */
+function updateSilvicultureMissionStatus(ui, journey, seasonInfo, zoneProfile) {
   const plantPct = Math.round(Math.min(1, journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
   const brushPct = Math.round(Math.min(1, journey.brushing.hectaresComplete / journey.brushing.hectaresTarget) * 100);
   const surveyPct = Math.round(Math.min(1, journey.surveys.freeGrowingComplete / journey.surveys.freeGrowingTarget) * 100);

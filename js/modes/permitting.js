@@ -6,7 +6,7 @@
 
 import { checkForEvent } from '../events.js';
 import { runDaySituation } from '../journey/daySituation.js';
-import { formatStatusLine } from '../journey/dayCard.js';
+import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { buildOfficeWindowFrames, buildStampFrames } from '../scene/textmode/scenes.js';
 import { calculateDeskConsumption, applyConsumption, applyDeskRegen, getFormattedResourceStatus, DESK_RESOURCES } from '../resources.js';
 import { executeDeskDay, DESK_ACTIONS } from '../journey.js';
@@ -930,15 +930,10 @@ export async function runPermittingDay(game) {
   // the player sees the normal permitting loop before any exception arrives.
   const event = journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
-    const daysLeft = Math.max(0, journey.deadline - journey.day);
     const outcome = await runDaySituation(game, event, {
       frame: {
-        dayHeader: `DAY ${journey.day} of ${journey.deadline} - ${(journey.currentPhase || 'PERMITTING').toUpperCase()}`,
-        statusLine: formatStatusLine([
-          `${journey.permits?.approved || 0}/${journey.permits?.target || 0} approved`,
-          `${journey.permits?.backlog || 0} in the backlog`,
-          `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
-        ]),
+        dayHeader: buildPermittingDayHeader(journey),
+        statusLine: buildPermittingStatusLine(journey),
       },
       setAsideDescription: 'Not today. Keep the day for the queue.',
     });
@@ -946,13 +941,13 @@ export async function runPermittingDay(game) {
     if (outcome.spendsDay) spendDay(journey);
   }
 
-  // One file gets the day. Look-ups leave it unspent and the loop comes back
-  // around to the real decision; the tally closes a day whose menu turns out
-  // to be nothing but look-ups.
+  // One file gets the day, and it opens as a card like every other mode's
+  // quiet day: the desk as you find it, then the call. Look-ups and the
+  // card's free context leave the day unspent and the loop comes back around
+  // to the real decision; the tally closes a day whose menu turns out to be
+  // nothing but look-ups.
   const freeChoices = { count: 0 };
   while (!dayIsSpent(journey)) {
-    displayPermittingHeader(ui, journey);
-
     // Check protagonist energy
     if (journey.protagonist && journey.protagonist.energy <= 0) {
       ui.writeWarning('You are exhausted. Taking the rest of the day to recover.');
@@ -967,27 +962,26 @@ export async function runPermittingDay(game) {
 
     const { primary, support } = buildActionOptions(journey);
 
-    // Resolve the menu, drilling into the support submenu when chosen — the same
-    // shape recon uses, so the primary turn stays a clean set of decisions.
-    let actionId = 'end_day';
-    while (true) {
-      const action = await ui.promptChoice(dayPrompt(journey), primary);
-      const chosen = action.value || 'end_day';
-      if (chosen === 'support_menu') {
-        const sub = await ui.promptChoice('Office & support:', [
-          ...support,
-          { label: 'Back', description: 'Return to the main menu', value: 'support_back' }
-        ]);
-        const subChoice = sub.value || 'support_back';
-        if (subChoice === 'support_back') {
-          displayPermittingHeader(ui, journey);
-          continue;
-        }
-        actionId = subChoice;
-        break;
-      }
-      actionId = chosen;
-      break;
+    let actionId = await presentDayCard(ui, {
+      dayHeader: buildPermittingDayHeader(journey),
+      statusLine: buildPermittingStatusLine(journey),
+      label: 'THE MORNING QUEUE',
+      title: buildPermittingQuietTitle(journey),
+      body: buildPermittingQuietBody(journey),
+      context: buildPermittingContextLines(journey),
+      prompt: dayPrompt(journey),
+      options: primary,
+      onRender: () => { updatePermittingMissionStatus(ui, journey); },
+    }) || 'end_day';
+
+    if (actionId === 'support_menu') {
+      const sub = await ui.promptChoice('Office & support:', [
+        ...support,
+        { label: 'Back', description: 'Return to the main menu', value: 'support_back' }
+      ]);
+      // Backing out is a free look-up, not a spent day; settleDayPass below
+      // counts it against FREE_LOOKUPS_PER_DAY so the loop cannot spin.
+      actionId = sub.value === 'support_back' ? 'noop' : (sub.value || 'noop');
     }
 
     // End day early
@@ -995,6 +989,11 @@ export async function runPermittingDay(game) {
       ui.write('');
       ui.write('You call it a day and head home to rest.');
       break;
+    }
+
+    if (actionId === 'noop') {
+      if (settleDayPass(journey, freeChoices, ui)) break;
+      continue;
     }
 
     // Execute the action
@@ -1017,17 +1016,96 @@ export async function runPermittingDay(game) {
 }
 
 /**
- * Display compact permitting header (Phase 6.2)
+ * The day card's header line and drumbeat, shared between the quiet card and
+ * the situation frame so the day reads the same whichever way it opens. The
+ * header names the mode, not the internal season phase — `currentPhase` says
+ * 'planning' for the opening third of a permitting season, which reads like a
+ * different job entirely.
  */
-function displayPermittingHeader(ui, journey) {
+function buildPermittingDayHeader(journey) {
+  return `DAY ${journey.day} of ${journey.deadline} - PERMITTING`;
+}
+
+function buildPermittingStatusLine(journey) {
+  const daysLeft = Math.max(0, journey.deadline - journey.day);
+  return formatStatusLine([
+    `${journey.permits?.approved || 0}/${journey.permits?.target || 0} approved`,
+    `${journey.permits?.backlog || 0} in the backlog`,
+    `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
+  ]);
+}
+
+/**
+ * A quiet desk day still needs to read like a morning, not like a form. The
+ * title and body come off the actual pipeline so two mornings at different
+ * points in the season do not open with identical text.
+ */
+function buildPermittingQuietTitle(journey) {
+  const permits = journey.permits || {};
+  const daysLeft = Math.max(0, journey.deadline - journey.day);
+  if ((permits.needsRevision || 0) > 0) return 'RED INK IN THE INBOX';
+  if ((permits.inReferral || 0) > 0) return 'WAITING ON OTHER DESKS';
+  if (daysLeft <= 5) return 'THE CALENDAR LEANS IN';
+  if ((permits.backlog || 0) === 0 && (permits.drafting || 0) === 0) return 'A CLEAR COUNTER';
+  return 'THE QUEUE, FIRST THING';
+}
+
+function buildPermittingQuietBody(journey) {
+  const permits = journey.permits || {};
+  const daysLeft = Math.max(0, journey.deadline - journey.day);
+  const parts = ['The phone holds off through the first coffee. The day belongs to whichever file you pull first.'];
+
+  const revisions = permits.needsRevision || 0;
+  const referrals = permits.inReferral || 0;
+  const backlog = permits.backlog || 0;
+  if (revisions > 0) {
+    parts.push(`${revisions} file${revisions === 1 ? ' sits' : 's sit'} on the corner of the desk with deficiencies flagged.`);
+  } else if (referrals > 0) {
+    parts.push(`${referrals} file${referrals === 1 ? ' is' : 's are'} out with other agencies, waiting on sign-off.`);
+  } else if (backlog > 0) {
+    parts.push(`${backlog} application${backlog === 1 ? '' : 's'} deep in the backlog.`);
+  }
+  if (daysLeft <= 5) {
+    parts.push(`The deadline lands in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.`);
+  }
+  return parts.join(' ');
+}
+
+/**
+ * Reference material, free and behind "More context": the pipeline at a
+ * glance, the lane, and the pressures on the file. The full review is still
+ * its own menu entry; this is the glance, not the file.
+ */
+function buildPermittingContextLines(journey) {
+  const permits = journey.permits || {};
+  const guidance = buildPermittingActionGuidance(journey);
+  const laneAction = getPermittingLaneAction(journey);
+  const lines = [
+    `Pipeline: backlog ${permits.backlog || 0} | drafting ${permits.drafting || 0} | submitted ${permits.submitted || 0} | referral ${permits.inReferral || 0} | review ${permits.inReview || 0}`,
+    `Lane: ${guidance.lane} | Stage: ${laneAction.stageLabel}`,
+  ];
+  if (guidance.headline) lines.push(`Next best move: ${guidance.headline}`);
+  lines.push(`Scrutiny: ${Math.round(journey.scrutiny || 0)}%`);
+  if (journey.relationships) {
+    lines.push(`Relationships: ministry ${journey.relationships.ministry}% | nations ${journey.relationships.nations}% | agencies ${journey.relationships.agencies}%`);
+  }
+  const areaSituation = getAreaSituationSummary(journey);
+  if (areaSituation) lines.push(`Area: ${areaSituation}`);
+  const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'permitter', 2);
+  if (discoveryNotes.length > 0) lines.push(`Carry-forward: ${discoveryNotes.join(' | ')}`);
+  return lines.filter(Boolean);
+}
+
+/**
+ * Keep the mission dashboard pane current on every card render; energy/stress
+ * live in the protagonist pane and budget/political capital in the supplies
+ * pane.
+ */
+function updatePermittingMissionStatus(ui, journey) {
   const daysRemaining = Math.max(0, journey.deadline - journey.day);
   const guidance = buildPermittingActionGuidance(journey);
   const laneAction = getPermittingLaneAction(journey);
-  ui.clear();
-  ui.writeHeader(`DAY ${journey.day} of ${journey.deadline} - PERMITTING`);
 
-  // Status renders in the mission dashboard pane; energy/stress live in the
-  // protagonist pane and budget/political capital in the supplies pane.
   const permits = journey.permits;
   const permitProgress = Math.round((permits.approved / permits.target) * 100);
 

@@ -97,32 +97,56 @@ export const InputMixin = {
       // options there is no number key, so the badge is dropped rather than
       // promising a shortcut that does not exist.
       const shortcutKey = index < 9 ? String(index + 1) : index === 9 ? '0' : null;
-      const prefix = shortcutKey ? `[${shortcutKey}] ` : '';
+
+      // Risk-tag chip (parsed from the " [SAFE]"-style suffix some modes
+      // append to labels; shown as a chip instead of inline noise).
+      const TAG_RE = /\s*\[(SAFE|RISKY|TRADEOFF)\]\s*/;
+      let labelText = String(option.label ?? '');
+      const tagMatch = labelText.match(TAG_RE);
+      const tag = tagMatch ? tagMatch[1] : null;
+      if (tag) labelText = labelText.replace(TAG_RE, ' ').replace(/\s{2,}/g, ' ').trim();
 
       if (isModern) {
         // Modern card layout with header and checkbox
-        btn.innerHTML = `
-          <div class="card-header">
-            ${shortcutKey ? `<span class="card-kbd-badge">KEY [${shortcutKey}]</span>` : '<span class="card-kbd-badge card-kbd-badge--none"></span>'}
-            <span class="card-checkbox">&#10003;</span>
-          </div>
-          <div class="card-content">
-            <span class="card-label">${option.label}</span>
-            ${option.hint || option.description
-              ? `<span class="card-hint">${option.hint || option.description}</span>`
-              : ''}
-          </div>
-        `;
+        const header = document.createElement('div');
+        header.className = 'card-header';
+
+        const badge = document.createElement('span');
+        badge.className = shortcutKey ? 'card-kbd-badge' : 'card-kbd-badge card-kbd-badge--none';
+        if (shortcutKey) badge.textContent = `KEY [${shortcutKey}]`;
+        header.appendChild(badge);
+
+        if (tag) {
+          const chip = document.createElement('span');
+          chip.className = `choice-tag tag-${tag.toLowerCase()}`;
+          chip.textContent = tag;
+          header.appendChild(chip);
+        }
+
+        const checkbox = document.createElement('span');
+        checkbox.className = 'card-checkbox';
+        checkbox.textContent = '✓';
+        header.appendChild(checkbox);
+        btn.appendChild(header);
+
+        const content = document.createElement('div');
+        content.className = 'card-content';
+
+        const label = document.createElement('span');
+        label.className = 'card-label';
+        label.textContent = labelText;
+        content.appendChild(label);
+
+        if (option.hint || option.description) {
+          const hint = document.createElement('span');
+          hint.className = 'card-hint';
+          hint.textContent = option.hint || option.description;
+          content.appendChild(hint);
+        }
+        btn.appendChild(content);
       } else {
         // Classic mode: TUI option card — key badge, label, effects hint,
-        // risk-tag chip (parsed from the " [SAFE]"-style suffix some modes
-        // append to labels; shown as a chip instead of inline noise).
-        const TAG_RE = /\s*\[(SAFE|RISKY|TRADEOFF)\]\s*/;
-        let labelText = String(option.label ?? '');
-        const tagMatch = labelText.match(TAG_RE);
-        const tag = tagMatch ? tagMatch[1] : null;
-        if (tag) labelText = labelText.replace(TAG_RE, ' ').replace(/\s{2,}/g, ' ').trim();
-
+        // risk-tag chip.
         const key = document.createElement('span');
         key.className = 'choice-key';
         key.textContent = shortcutKey || '·';

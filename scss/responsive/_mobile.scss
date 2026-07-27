@@ -73,11 +73,21 @@
   }
 
   .status-label {
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .status-value {
     font-size: var(--font-size-xs);
+  }
+
+  // A flex item refuses to shrink below its own text, so a long objective ran
+  // straight past the strip's clip edge and the ellipsis never got a chance.
+  .strip-objective {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .terminal {
@@ -93,14 +103,18 @@
 
   // A phone can't afford a fixed 300px menu box: a ten-option shift menu
   // overflowed it silently, leaving the last options invisible with no
-  // scrollbar to hint at them. Let the menu claim up to two thirds of the
-  // screen and take the space from the log, which is scrollable anyway.
+  // scrollbar to hint at them. Let the menu take its space from the log —
+  // but only half the screen. At two thirds the log was down to four lines
+  // of a fifteen-line event, which is a letterbox, not a narrative.
+  // The area is also the bottom-most thing on screen, so it carries the
+  // home-indicator inset; without it the last choice sits under the bar.
   .action-area {
     display: flex;
     flex-direction: column;
     flex-shrink: 1;
     min-height: 0;
-    max-height: 66dvh;
+    max-height: 50dvh;
+    padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
   }
 
   .choices {
@@ -109,20 +123,10 @@
     flex: 0 1 auto;
   }
 
+  // Eight lines of log, or 40% of the viewport on a landscape phone that
+  // hasn't got eight lines to give.
   .terminal-window {
-    min-height: 5.5rem;
-  }
-
-  // Whatever still doesn't fit gets an explicit marker, so a cut-off menu
-  // never reads as the whole menu.
-  .action-area.has-more-choices::after {
-    content: '▼ more below';
-    display: block;
-    padding-top: 2px;
-    font-size: var(--font-size-xs);
-    color: var(--accent);
-    text-align: center;
-    flex-shrink: 0;
+    min-height: min(11rem, 40dvh);
   }
 
   .close-btn {
@@ -151,12 +155,37 @@
     display: none;
   }
 
+  // "INPUT: KEYBOARD_MOUSE" is a boot-screen readout for a machine that has
+  // neither.
+  .terminal-footer > span:first-child {
+    display: none;
+  }
+
+  // Every control a thumb can hit clears 44px. A media query adds no
+  // specificity of its own, so any component rule that sets its own
+  // min-height has to leave it alone rather than be beaten here.
   .landing-btn,
   .choice-btn,
   .header-btn,
   .init-ghost,
-  .init-ghost-sm {
+  .init-ghost-sm,
+  .init-primary,
+  .submit-btn,
+  .modal-btn,
+  .footer-btn,
+  button.chip {
     min-height: 44px;
+  }
+
+  // The ones that are inline text boxes need their glyphs centred once
+  // they're taller than their type.
+  .submit-btn,
+  .modal-btn,
+  .footer-btn,
+  button.chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   // iOS zooms the whole page when focusing an input rendered below 16px —

@@ -28,6 +28,12 @@ jobs:
       - name: Lint game content
         run: npm run lint:events --if-present
 
+      - name: Lint seasonal content
+        run: npm run lint:seasonal --if-present
+
+      - name: Lint JavaScript
+        run: npm run lint:js --if-present
+
       - name: Build
         run: npm run build
 

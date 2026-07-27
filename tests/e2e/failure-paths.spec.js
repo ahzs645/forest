@@ -98,7 +98,7 @@ async function autoPlayToEnd(page, modeName, strategy, maxSteps = 420) {
       nodes.map((node) => node.innerText.replace(/\s+/g, ' ').trim())
     );
 
-    if (labels.length === 1 && labels[0].includes('New Expedition')) {
+    if (labels.length === 1 && labels[0].includes('Return to District Office')) {
       return {
         ended: true,
         steps: step,

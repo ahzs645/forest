@@ -130,7 +130,7 @@ export const ModalMixin = {
    * @param {Object} options - Modal options
    */
   showModal(options) {
-    const { title, content, actions = [] } = options;
+    const { title, content, actions = [], dismissible = true } = options;
 
     if (this.modalTitle) {
       this.modalTitle.textContent = title || '';
@@ -165,6 +165,9 @@ export const ModalMixin = {
         this.modalActions.appendChild(btn);
       }
     }
+
+    this._modalOnClose = null;
+    this._modalDismissible = dismissible;
 
     if (this.modal) {
       this.modal.hidden = false;
@@ -243,22 +246,21 @@ export const ModalMixin = {
       buildContent: (container) => {
         container.innerHTML = `
           <p><strong>BC FORESTRY TRAIL</strong></p>
-          <p>Guide forestry decisions across British Columbia's varied operating regions.</p>
+          <p>Three ways to run a district:</p>
+          <p><strong>Campaign</strong> — one year, four seasons, four hats. Each season briefs, deploys, and reviews; five meters carry the whole year.</p>
+          <p><strong>Expedition</strong> — a single deployment: recon traverse, silviculture program, planning file, or permitting push.</p>
+          <p><strong>Seasonal Strategy</strong> — the year as cards. Four seasons of calls, no boots on the ground.</p>
+          <br>
+          <p><strong>The day:</strong></p>
+          <p>A day is one substantive action — the leg you drive, the survey you run, the file you push — plus whatever finds you. Reading your own maps and notes is free.</p>
+          <p>When a situation lands, deal with it or set it aside. Setting it aside keeps the day for the work, but the file notices: scrutiny climbs, and the debrief prices everything the file carries.</p>
           <br>
           <p><strong>Controls:</strong></p>
-          <p>[1-9] - Select options</p>
-          <p>[S] - Toggle status panel</p>
-          <p>[L] - View journey log</p>
-          <p>[P] - Open professional/compliance intel</p>
-          <p>[ESC] - Close panels</p>
-          <br>
-          <p><strong>Field Roles:</strong></p>
-          <p>Survey forest blocks during 8-9 hour shifts. Keep radio contact while managing fuel, food, and equipment.</p>
-          <br>
-          <p><strong>Desk Roles:</strong></p>
-          <p>Process permits against a deadline. Manage budget and stakeholders.</p>
-          <br>
-          <p><strong>Keep your crew healthy and reach your goal!</strong></p>
+          <p>[1-9] - Pick an option ([0] for a tenth)</p>
+          <p>[↑]/[↓] or [J]/[K] - Move through options, [ENTER] confirms</p>
+          <p>[S] - Status panel &nbsp; [G] - Glossary &nbsp; [L] - Journey log</p>
+          <p>[P] - Compliance intel &nbsp; [?] - This screen</p>
+          <p>[R] or [ESC] - Leave the run / close panels</p>
         `;
       },
       actions: [{ label: 'Got it!', primary: true, onSelect: () => this.closeModal() }]

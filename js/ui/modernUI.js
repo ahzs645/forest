@@ -1,6 +1,6 @@
 /**
  * Modern UI Module
- * Handles modern mode UI updates (header badges, metrics sidebar, stat cards)
+ * Handles modern mode UI updates (stats row, metrics sidebar, stat cards)
  */
 
 import { displayMode } from '../displayMode.js';
@@ -12,34 +12,13 @@ import { getOperationalProgress } from '../journey.js';
  */
 export const ModernUIMixin = {
   /**
-   * Update modern mode UI elements (header badges, metrics sidebar, stat cards)
+   * Update modern mode UI elements (stats row, metrics sidebar, stat cards)
    * @param {Object} journey - Journey state
    * @param {boolean} isProtagonistMode - Whether in protagonist mode
    */
   _updateModernUI(journey, isProtagonistMode) {
     const progress = this._calculateProgress(journey);
     const isFieldType = journey.journeyType === 'field' || journey.journeyType === 'recon';
-
-    // Header context badges
-    if (this.badgeSeasonValue) {
-      const seasonName = journey.season?.currentSeason || journey.season?.name || 'UNKNOWN';
-      this.badgeSeasonValue.textContent = seasonName.toUpperCase();
-    }
-
-    if (this.badgeRoleValue) {
-      const roleLabels = {
-        planner: 'PLANNER',
-        permitter: 'PERMITTER',
-        recce: 'RECCE',
-        silviculture: 'SILVIC'
-      };
-      this.badgeRoleValue.textContent = roleLabels[journey.role] || journey.role?.toUpperCase() || 'OPERATOR';
-    }
-
-    if (this.badgeZoneValue) {
-      const zoneName = journey.area?.name || journey.zone || 'UNKNOWN';
-      this.badgeZoneValue.textContent = zoneName.toUpperCase();
-    }
 
     // Stats row (year / funds / eco-health / zone) — live data, not the static
     // placeholders that used to ship in the markup.
@@ -51,7 +30,10 @@ export const ModernUIMixin = {
       this.modernFundsValue.textContent = `$${budget.toLocaleString()}`;
     }
     if (this.modernZoneValue) {
-      this.modernZoneValue.textContent = journey.area?.becZone || journey.area?.name || journey.zone || '—';
+      // becZone reads "SBSmc2 – Sub-Boreal Spruce moist cold"; the card is a
+      // one-line slot, so it gets the subzone code and leaves the prose out.
+      const becZone = journey.area?.becZone?.split('–')[0].trim();
+      this.modernZoneValue.textContent = becZone || journey.area?.name || journey.zone || '—';
     }
     // Eco-health maps to whatever the mode tracks: forest health, then
     // biodiversity, falling back to a neutral dash when neither applies.
@@ -83,6 +65,7 @@ export const ModernUIMixin = {
         this.metricEnergyFill.classList.toggle('critical', energy < 25);
       }
 
+      if (this.metricStressLabel) this.metricStressLabel.textContent = 'STRESS';
       if (this.metricStressValue) this.metricStressValue.textContent = `${stress}%`;
       if (this.metricStressFill) this.metricStressFill.style.width = `${stress}%`;
     } else if (journey.crew) {
@@ -95,11 +78,13 @@ export const ModernUIMixin = {
         this.metricEnergyFill.classList.toggle('critical', morale < 25);
       }
 
-      // Calculate stress from injuries
+      // A crew has no stress meter; the same slot reports how much of it is
+      // laid up instead.
       const injuredCount = journey.crew.filter(c => c.status === 'injured').length;
-      const stressPercent = journey.crew.length > 0 ? Math.round((injuredCount / journey.crew.length) * 100) : 0;
-      if (this.metricStressValue) this.metricStressValue.textContent = `${stressPercent}%`;
-      if (this.metricStressFill) this.metricStressFill.style.width = `${stressPercent}%`;
+      const injuredPercent = journey.crew.length > 0 ? Math.round((injuredCount / journey.crew.length) * 100) : 0;
+      if (this.metricStressLabel) this.metricStressLabel.textContent = 'INJURED';
+      if (this.metricStressValue) this.metricStressValue.textContent = `${injuredPercent}%`;
+      if (this.metricStressFill) this.metricStressFill.style.width = `${injuredPercent}%`;
     }
 
     // Budget (from resources)
@@ -181,6 +166,14 @@ export const ModernUIMixin = {
     // The grid renderer projects the DOM, so it toggles on top of classic
     if (mode === 'grid') this.gridView?.enable();
     else this.gridView?.disable();
+
+    // The status pass skips the modern chrome while it is hidden, so fill it
+    // in on the way back rather than showing last-mode numbers until the
+    // next turn.
+    if (mode === 'modern' && this._currentJourney) {
+      const journey = this._currentJourney;
+      this._updateModernUI(journey, Boolean(journey.protagonist) && !journey.crew?.length);
+    }
 
     // Re-render current choices if any are displayed
     if (this._currentOptions && this._choiceHandler) {

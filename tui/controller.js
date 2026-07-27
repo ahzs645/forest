@@ -99,6 +99,33 @@ function createSessionRng(rngOrSeed) {
   return makeRng(rngOrSeed);
 }
 
+// Read the parked seasonal autosave without a controller (the landing
+// screen's LOAD DATA listing). Same validation as loadSeasonalSave below.
+export function peekSeasonalSave(storage, saveKey = DEFAULT_SAVE_KEY) {
+  const store = resolveStorage(storage);
+  if (!store) return null;
+  let raw;
+  try {
+    raw = store.getItem(saveKey);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  let save;
+  try {
+    save = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!save || save.version !== SAVE_VERSION || !save.state?.role || !save.state?.metrics) {
+    return null;
+  }
+  // A finished (or over-run) save has nothing left to resume.
+  const total = Number(save.state.totalRounds || SEASONS.length);
+  if (Number(save.round) >= total) return null;
+  return save;
+}
+
 function createViewState() {
   return {
     mode: "setup-name",
@@ -531,26 +558,7 @@ export class TuiGameController {
 
   loadSeasonalSave() {
     if (!this.storage) return null;
-    let raw;
-    try {
-      raw = this.storage.getItem(this.saveKey);
-    } catch {
-      return null;
-    }
-    if (!raw) return null;
-    let save;
-    try {
-      save = JSON.parse(raw);
-    } catch {
-      return null;
-    }
-    if (!save || save.version !== SAVE_VERSION || !save.state?.role || !save.state?.metrics) {
-      return null;
-    }
-    // A finished (or over-run) save has nothing left to resume.
-    const total = Number(save.state.totalRounds || SEASONS.length);
-    if (Number(save.round) >= total) return null;
-    return save;
+    return peekSeasonalSave(this.storage, this.saveKey);
   }
 
   clearSeasonalSave() {
@@ -835,6 +843,7 @@ export class TuiGameController {
             trendLines: summary.legacy?.trendLines,
             projection: summary.projection,
             achievements: summary.achievements,
+            restartIndex: 0,
             notice,
           },
           ["Play Again", "Quit"],

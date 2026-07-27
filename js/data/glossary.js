@@ -55,6 +55,11 @@ export const GLOSSARY_TERMS = [
       "The volume of timber that can legally be harvested from a defined area each year, determined by the Chief Forester.",
   },
   {
+    term: "Scrutiny",
+    description:
+      "How hard the district is looking at your file. Setting situations aside, closing block packages from the notebook, and moving without ground-truthing access all raise it; careful, verified fieldwork slowly works it back down. Below 30 is normal working range and free — the final debrief prices anything above that, up to -15 points.",
+  },
+  {
     term: "Stumpage",
     description:
       "Fees paid to the provincial government for the right to harvest timber from Crown land.",

@@ -49,6 +49,9 @@
     font-size: var(--font-size-xs);
     white-space: nowrap;
     overflow: hidden;
+    // One line, and it keeps it: squeezed between the log and a tall option
+    // menu the strip was getting sliced through the middle of its own text.
+    flex-shrink: 0;
 
     &[hidden] {
       display: none;

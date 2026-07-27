@@ -132,9 +132,6 @@ export class TerminalUI {
     // Modern mode header elements
     this.modernHeader = document.getElementById('modern-header');
     this.modernSettingsBtn = document.getElementById('modern-settings-btn');
-    this.badgeSeasonValue = document.getElementById('badge-season-value');
-    this.badgeRoleValue = document.getElementById('badge-role-value');
-    this.badgeZoneValue = document.getElementById('badge-zone-value');
 
     // Modern mode metrics sidebar elements
     this.metricsSidebar = document.getElementById('metrics-sidebar');
@@ -144,6 +141,9 @@ export class TerminalUI {
     this.metricEnergyFill = document.getElementById('metric-energy-fill');
     this.metricStressValue = document.getElementById('metric-stress-value');
     this.metricStressFill = document.getElementById('metric-stress-fill');
+    // The markup ships no id on the metric labels, and this one has to change
+    // wording depending on whether it is tracking a person or a crew.
+    this.metricStressLabel = this.metricStressFill?.closest('.metric-item')?.querySelector('.metric-label') || null;
     this.metricBudgetValue = document.getElementById('metric-budget-value');
     this.metricBudgetFill = document.getElementById('metric-budget-fill');
     this.metricsExtra = document.getElementById('metrics-extra');
@@ -337,12 +337,28 @@ export class TerminalUI {
         this.showProfessionalComplianceIntel();
       }
 
+      // ? for help, as the header advertises
+      if (canUseGameplayShortcuts && !this.isModalOpen() && e.key === '?' && !this._isInputFocused()) {
+        e.preventDefault();
+        this.showHelp();
+      }
+
+      // R for restart — same context-aware prompt as the header button
+      if (canUseGameplayShortcuts && !this.isModalOpen() && e.key === 'r' && !this._isInputFocused()) {
+        e.preventDefault();
+        if (this._onRestart) this._onRestart();
+      }
+
       // Escape to close panel or modal. Consume the event so later Escape
       // handlers (the game's restart prompt) don't fire on the same press.
+      // Non-dismissible modals hold a promise open — swallow the press
+      // instead of closing them out from under it.
       if (e.key === 'Escape') {
         if (!this.modal?.hidden) {
           e.preventDefault();
-          this.closeModal();
+          if (this._modalDismissible) {
+            this.closeModal();
+          }
         } else if (this._isPanelOpen) {
           e.preventDefault();
           this.closeStatusPanel();
@@ -431,7 +447,9 @@ export class TerminalUI {
     this.updateRadioFromJourney(journey);
 
     // Update modern mode UI elements
-    this._updateModernUI(journey, isProtagonistMode);
+    if (displayMode.isModern()) {
+      this._updateModernUI(journey, isProtagonistMode);
+    }
   }
 
   /**
@@ -518,6 +536,21 @@ export class TerminalUI {
   }
 
   // ============ Utility ============
+
+  /**
+   * Resolve the pending choice prompt programmatically, as if the player had
+   * clicked an option (used by modal actions that stand in for the list, like
+   * the seasonal exit). Returns false when no choice is pending.
+   * @param {Object} option - { label, value } handed to the waiting caller
+   */
+  resolveActiveChoice(option) {
+    const handler = this._choiceHandler;
+    if (!handler) return false;
+    this.write(`> ${option.label}`, 'term-dim');
+    this._hideChoices();
+    handler(option);
+    return true;
+  }
 
   /**
    * Prepare UI for a new game

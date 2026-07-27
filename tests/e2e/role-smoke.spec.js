@@ -18,7 +18,6 @@ async function startRole(page, roleIndex, areaIndex, difficultyLabel = 'Greenhor
   await page.locator('.area-item').nth(areaIndex).click();
   await page.click('#area-continue-btn');
   await page.locator('#choices button').filter({ hasText: difficultyLabel }).click();
-  await page.locator('#choices button').filter({ hasText: 'Begin Journey' }).click();
 }
 
 async function resolveUntil(page, predicate, maxSteps = 3) {

@@ -31,7 +31,7 @@ import {
   ensureProfessionalComplianceState,
   getProfessionalComplianceSnapshot,
 } from '../engine.js';
-import { isPlanningApprovalReady } from './shared/endConditions.js';
+import { checkPlanningEndConditions, isPlanningApprovalReady } from './shared/endConditions.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
@@ -1763,18 +1763,12 @@ async function advanceToNextDay(game) {
 function checkGameOver(game) {
   const journey = game.journey;
 
-  if (journey.resources.budget <= 0) {
+  // Thresholds and reason strings live in the shared module. This used to be a
+  // copy that had drifted — it never closed the file when the cabinet window
+  // ran out, so a doomed plan kept billing days forever.
+  const result = checkPlanningEndConditions(journey);
+  if (result?.gameOver) {
     journey.isGameOver = true;
-    journey.gameOverReason = 'Budget exhausted';
-  }
-
-  if (journey.resources.politicalCapital <= 0) {
-    journey.isGameOver = true;
-    journey.gameOverReason = 'Lost political support';
-  }
-
-  if (journey.protagonist && journey.protagonist.stress >= 100) {
-    journey.isGameOver = true;
-    journey.gameOverReason = 'Burnout - you need to step back from this project';
+    journey.gameOverReason = result.reason;
   }
 }

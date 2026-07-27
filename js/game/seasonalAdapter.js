@@ -242,6 +242,10 @@ export async function promptSummaryCard(ui, contentData = {}, options = [], game
  * @param {{companyName: string, roleIndex: number, areaIndex: number}} [options.preset]
  *   - skip the controller's setup cards (used by the campaign)
  * @param {string} [options.saveKey] - override the controller autosave slot
+ * @param {Function} [options.onExitAvailable] - receives an exit function the
+ *   host can call (the Escape modal's "Save & return"); it unblocks the
+ *   pending card and unwinds the run, leaving the boundary autosave on file.
+ *   Returns false when the run cannot unwind cleanly (no card pending).
  * @returns {Promise<{state: Object, summary: Object, quit: boolean}>}
  */
 // The expedition status bar and stat cards show journey data the seasonal
@@ -278,11 +282,25 @@ export async function runSeasonalGame(ui, options = {}) {
 
 async function runSeasonalGameInner(ui, options = {}) {
   const seed = options.seed ?? Math.floor(Math.random() * 0x100000000);
+  let exitRequested = false;
   const controller = new TuiGameController({
     rng: makeRng(seed),
     ...(options.saveKey ? { saveKey: options.saveKey } : {}),
-    onExit: () => {},
+    onExit: () => { exitRequested = true; },
   });
+
+  if (typeof options.onExitAvailable === 'function') {
+    options.onExitAvailable(() => {
+      // The season-boundary autosave is already parked; unblocking the
+      // pending card lets the loop below notice and hand the hub back.
+      const unblocked = ui.resolveActiveChoice?.({
+        label: 'Return to district office',
+        value: 'seasonal-exit',
+      });
+      if (unblocked) exitRequested = true;
+      return Boolean(unblocked);
+    });
+  }
 
   if (options.preset) {
     controller.setInputText(options.preset.companyName || 'The Timber Wolves');
@@ -293,6 +311,9 @@ async function runSeasonalGameInner(ui, options = {}) {
 
   let guard = 0;
   while (guard++ < 2000) {
+    if (exitRequested) {
+      return { state: controller.gs, summary: null, quit: true };
+    }
     const view = controller.getState();
     const { mode, contentData } = view;
 
@@ -301,7 +322,7 @@ async function runSeasonalGameInner(ui, options = {}) {
       ui.writeHeader('SEASONAL STRATEGY');
       ui.write('Four seasons, five meters, one operating area. Decisions echo.');
       ui.write('');
-      const name = await ui.promptText('Company name:', 'e.g. Northern Canopy Ltd.');
+      const name = await ui.promptText('Crew handle:', 'The Timber Wolves');
       controller.setInputText(name || 'The Timber Wolves');
       controller.submitCurrent();
       continue;
@@ -312,8 +333,7 @@ async function runSeasonalGameInner(ui, options = {}) {
       const optionLabels = view.options || [];
       if (optionLabels.length) {
         const index = await promptSummaryCard(ui, contentData, optionLabels, view.gameState);
-        const label = String(optionLabels[index] || '').toLowerCase();
-        if (label.includes('again')) {
+        if (index === contentData.restartIndex) {
           controller.selectOption(index);
           continue;
         }
@@ -329,6 +349,9 @@ async function runSeasonalGameInner(ui, options = {}) {
     }
 
     const index = await promptSeasonalCard(ui, contentData, optionLabels, view.gameState);
+    if (exitRequested) {
+      return { state: controller.gs, summary: null, quit: true };
+    }
     controller.selectOption(index);
   }
 

@@ -36,7 +36,6 @@ test('a started expedition is offered for resume after a reload', async ({ page 
   await page.locator('.area-item').nth(0).click();
   await page.click('#area-continue-btn');
   await page.locator('#choices button').filter({ hasText: 'Journeyman' }).click();
-  await page.locator('#choices button').filter({ hasText: 'Begin Journey' }).click();
 
   // The run is persisted at the start of the journey; a reload should detect it.
   await page.reload();

@@ -17,6 +17,19 @@
   overflow-y: auto;
 }
 
+// Whatever doesn't fit gets an explicit marker, so a cut-off menu never reads
+// as the whole menu. The list is capped on every screen, not just phones, so
+// the marker belongs with the list rather than in a breakpoint.
+.action-area.has-more-choices::after {
+  content: '▼ more below';
+  display: block;
+  padding-top: 2px;
+  font-size: var(--font-size-xs);
+  color: var(--accent);
+  text-align: center;
+  flex-shrink: 0;
+}
+
 // Classic mode: flat TUI menu rows — no boxes. A > cursor plus an
 // inverse-video selection bar marks the focused row, like a real terminal
 // menu; risk tags render as colored ‹SAFE›-style text, not chips.
