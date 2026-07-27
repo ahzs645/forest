@@ -116,8 +116,8 @@ test('a long option menu stays inside the viewport and reachable by list scroll 
     const labels = await page.locator('#choices button').evaluateAll((nodes) =>
       nodes.map((node) => node.innerText.replace(/\s+/g, ' ').trim()));
 
-    sawShiftMenu = labels.some((label) => label.includes('Camp & Support'))
-      && labels.some((label) => label.includes('Stand Down'));
+    sawShiftMenu = labels.some((label) => label.includes('Camp & crew'))
+      && labels.some((label) => label.includes('Set the tempo'));
 
     const layout = await page.evaluate(() => {
       const list = document.querySelector('#choices');
