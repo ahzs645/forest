@@ -9,8 +9,18 @@
   }
 }
 
+// A phone held sideways is 844x390: too wide for a width-only breakpoint to
+// catch, too short for the desktop layout, which stacks a 1408px column into
+// a 390px viewport and leaves the log one line tall. Shortness is mobile too.
 @mixin mobile-down {
-  @media (max-width: 700px) {
+  @media (max-width: 700px), (max-height: 500px) {
+    @content;
+  }
+}
+
+// Landscape phones: room across, none to spare down the page.
+@mixin short-down {
+  @media (max-height: 500px) {
     @content;
   }
 }
@@ -27,8 +37,9 @@
   }
 }
 
+// The exact complement of mobile-down, so the two never fire together.
 @mixin mobile-up {
-  @media (min-width: 701px) {
+  @media (min-width: 701px) and (min-height: 501px) {
     @content;
   }
 }

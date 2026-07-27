@@ -14,6 +14,7 @@ import { progressBar } from '../ascii.js';
 
 const SIDEBAR_W = 34;
 const MIN_COLS_FOR_SIDEBAR = 96;
+const DRAG_SLOP = 6;
 
 function wrap(text, width) {
   const out = [];
@@ -44,6 +45,14 @@ export class GridView {
     this._scrollOffset = 0;
     this._observers = [];
     this._logLineCount = 0;
+    this._drag = null;
+    this._suppressClick = false;
+    this._raf = 0;
+
+    // Touch devices get tap chips instead of key hints, roomier option rows
+    // and drag-to-scroll on the log.
+    this._touch = (navigator.maxTouchPoints || 0) > 0
+      || window.matchMedia?.('(pointer: coarse)').matches === true;
 
     if (!this.canvas) return;
     this.renderer = new TextmodeRenderer(this.canvas);
@@ -55,6 +64,9 @@ export class GridView {
     this._onFocus = () => { this._dirty = true; };
     this._onClick = (e) => this._handleClick(e);
     this._onWheel = (e) => this._handleWheel(e);
+    this._onTouchStart = (e) => this._handleTouchStart(e);
+    this._onTouchMove = (e) => this._handleTouchMove(e);
+    this._onTouchEnd = () => this._handleTouchEnd();
   }
 
   enable() {
@@ -69,6 +81,10 @@ export class GridView {
     document.addEventListener('focusout', this._onFocus);
     this.canvas.addEventListener('click', this._onClick);
     this.canvas.addEventListener('wheel', this._onWheel, { passive: false });
+    this.canvas.addEventListener('touchstart', this._onTouchStart, { passive: true });
+    this.canvas.addEventListener('touchmove', this._onTouchMove, { passive: false });
+    this.canvas.addEventListener('touchend', this._onTouchEnd);
+    this.canvas.addEventListener('touchcancel', this._onTouchEnd);
 
     const observer = new MutationObserver(() => { this._dirty = true; });
     observer.observe(document.querySelector('.game-wrapper'), {
@@ -96,11 +112,18 @@ export class GridView {
     this.enabled = false;
     this.canvas.hidden = true;
     clearInterval(this._timer);
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this._raf = 0;
+    this._drag = null;
     window.removeEventListener('resize', this._onResize);
     document.removeEventListener('focusin', this._onFocus);
     document.removeEventListener('focusout', this._onFocus);
     this.canvas.removeEventListener('click', this._onClick);
     this.canvas.removeEventListener('wheel', this._onWheel);
+    this.canvas.removeEventListener('touchstart', this._onTouchStart);
+    this.canvas.removeEventListener('touchmove', this._onTouchMove);
+    this.canvas.removeEventListener('touchend', this._onTouchEnd);
+    this.canvas.removeEventListener('touchcancel', this._onTouchEnd);
     this.ui.textInput?.removeEventListener('input', this._onFocus);
     for (const observer of this._observers) observer.disconnect();
     this._observers = [];
@@ -109,6 +132,12 @@ export class GridView {
   // ── input routing ──────────────────────────────────
 
   _handleClick(e) {
+    // A finger that just dragged the log ends with a synthetic click; drop it
+    // so scrolling never picks an option.
+    if (this._suppressClick) {
+      this._suppressClick = false;
+      return;
+    }
     const { col, row } = this.renderer.cellAt(e.offsetX, e.offsetY);
     for (const region of this._regions) {
       if (row >= region.y && row < region.y + region.h && col >= region.x && col < region.x + region.w) {
@@ -124,9 +153,60 @@ export class GridView {
     const g = this._logGeom;
     if (col < g.x || col >= g.x + g.w || row < g.y || row >= g.y + g.h) return;
     e.preventDefault();
-    const max = Math.max(0, g.totalLines - g.h);
-    this._scrollOffset = Math.max(0, Math.min(max, this._scrollOffset + (e.deltaY > 0 ? -3 : 3)));
+    this._scrollLog(this._scrollOffset + (e.deltaY > 0 ? -3 : 3));
+  }
+
+  _handleTouchStart(e) {
+    this._suppressClick = false;
+    this._drag = null;
+    if (e.touches.length !== 1) return;
+    const p = this._point(e.touches[0]);
+    const g = this._logGeom;
+    if (!g) return;
+    const inLog = p.col >= g.boxX && p.col < g.boxX + g.boxW
+      && p.row >= g.boxY && p.row < g.boxY + g.boxH;
+    if (inLog) this._drag = { y: p.y, offset: this._scrollOffset, moved: false };
+  }
+
+  _handleTouchMove(e) {
+    if (!this._drag || e.touches.length !== 1) return;
+    const dy = this._point(e.touches[0]).y - this._drag.y;
+    if (!this._drag.moved && Math.abs(dy) < DRAG_SLOP) return;
+    this._drag.moved = true;
+    e.preventDefault();
+    // Finger down pulls older lines into view, the way a paper log would move.
+    this._scrollLog(this._drag.offset + Math.round(dy / this.renderer.cellH));
+  }
+
+  _handleTouchEnd() {
+    if (this._drag?.moved) this._suppressClick = true;
+    this._drag = null;
+  }
+
+  _point(touch) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    return { x, y, ...this.renderer.cellAt(x, y) };
+  }
+
+  _scrollLog(offset) {
+    const g = this._logGeom;
+    if (!g) return;
+    const next = Math.max(0, Math.min(Math.max(0, g.totalLines - g.h), offset));
+    if (next === this._scrollOffset) return;
+    this._scrollOffset = next;
+    this._scheduleDraw();
+  }
+
+  /** Repaint on the next frame — the 120ms heartbeat is too slow to drag against. */
+  _scheduleDraw() {
     this._dirty = true;
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => {
+      this._raf = 0;
+      if (this._dirty && this.enabled) this._draw();
+    });
   }
 
   // ── painting ───────────────────────────────────────
@@ -154,6 +234,7 @@ export class GridView {
   _draw() {
     this._dirty = false;
     this._regions = [];
+    this._logGeom = null;
     const t = this.renderer;
     const C = this._colors();
     t.clear();
@@ -169,17 +250,17 @@ export class GridView {
     this._drawStatusStrip(t, C, cols);
 
     const top = 2;
-    const bottom = rows - 1; // footer row
+    const bottom = rows - (this._touch ? 2 : 1); // footer row (tap chips need a spacer)
 
     // Narrow screens: [S] opens the status view as a full grid overlay
     // (there is no sidebar to project it into).
     if (!hasSidebar && this.ui._isPanelOpen) {
       t.drawBox(0, top, cols, bottom - top, C.borderStrong, 'STATUS REPORT');
       this._drawSidebar(t, C, 1, top + 1, cols - 2, bottom - top - 2);
-      const close = '[S] close';
+      const close = this._touch ? '[close]' : '[S] close';
       t.drawText(close, cols - close.length - 3, top, C.warn);
       this._regions.push({
-        x: 0, y: top, w: cols, h: 1,
+        x: 0, y: top, w: cols, h: this._touch ? 2 : 1,
         action: () => this.ui.closeStatusPanel()
       });
       this._drawFooter(t, C, rows - 1, cols);
@@ -191,8 +272,11 @@ export class GridView {
     const optionRows = this._optionEntries();
     const inputVisible = this.ui.inputWrapper && !this.ui.inputWrapper.hidden;
     let optH = 0;
-    if (optionRows.length) optH = Math.min(optionRows.length + 2, Math.max(5, Math.floor(rows * 0.45)));
-    else if (inputVisible) optH = 3;
+    if (optionRows.length) {
+      const cap = Math.max(5, Math.floor(rows * 0.45));
+      const spaced = optionRows.length * 2 + 1;
+      optH = Math.min(this._touch && spaced <= cap ? spaced : optionRows.length + 2, cap);
+    } else if (inputVisible) optH = 3;
 
     const logH = bottom - top - optH - (hasSidebar ? 0 : (this.ui._missionStatus ? 1 : 0));
 
@@ -212,22 +296,36 @@ export class GridView {
     t.flush(C.canvas);
   }
 
+  _actionButtons() {
+    return Array.from(document.querySelectorAll('.header-actions .header-btn')).map((btn) => ({
+      key: btn.querySelector('.header-btn-key')?.textContent.trim() || '',
+      label: btn.querySelector('.header-btn-label')?.textContent.trim() || btn.textContent.trim(),
+      click: () => btn.click()
+    }));
+  }
+
   _drawHeader(t, C, cols) {
     const title = cols >= 84 ? '▲ BC FORESTRY TRAIL' : '▲ BCFT';
     t.drawText(title, 1, 0, C.bright);
 
-    // Hotkeys lay out right-to-left; whatever would collide with the title
-    // is dropped rather than smeared over it.
-    const buttons = Array.from(document.querySelectorAll('.header-actions .header-btn'))
-      .map((btn) => ({ label: btn.textContent.trim(), click: () => btn.click() }))
-      .reverse();
-    let x = cols - 1;
-    for (const btn of buttons) {
-      x -= btn.label.length;
-      if (x <= title.length + 3) break;
+    // Hotkeys sit right-aligned in header order, and the tail (Restart, Help…)
+    // is what drops on a narrow row — Status and Glossary are the last to go.
+    const fitted = [];
+    const room = cols - 3 - title.length;
+    let used = 0;
+    for (const btn of this._actionButtons()) {
+      const label = `${btn.key}${btn.label}`;
+      const width = label.length + (fitted.length ? 2 : 0);
+      if (used + width > room) break;
+      used += width;
+      fitted.push({ label, click: btn.click });
+    }
+
+    let x = cols - 1 - used;
+    for (const btn of fitted) {
       t.drawText(btn.label, x, 0, C.muted);
       this._regions.push({ x, y: 0, w: btn.label.length, h: 1, action: btn.click });
-      x -= 2;
+      x += btn.label.length + 2;
     }
   }
 
@@ -428,7 +526,10 @@ export class GridView {
       this._logLineCount = lines.length;
       this._scrollOffset = 0;
     }
-    this._logGeom = { x: innerX, y: y + 1, w: innerW, h: innerH, totalLines: lines.length };
+    this._logGeom = {
+      x: innerX, y: y + 1, w: innerW, h: innerH, totalLines: lines.length,
+      boxX: x, boxY: y, boxW: w, boxH: h
+    };
 
     const start = Math.max(0, lines.length - innerH - this._scrollOffset);
     const visible = lines.slice(start, start + innerH);
@@ -455,11 +556,16 @@ export class GridView {
     t.drawBox(x, y, w, h, C.borderStrong, 'RESPOND');
     const innerX = x + 2;
     const innerW = w - 4;
-    const visible = entries.slice(0, h - 2);
+    // Touch gets a blank row between options so each tap target is two cells
+    // tall — unless the menu is long enough that spacing would hide entries.
+    const inner = h - 2;
+    let step = this._touch ? 2 : 1;
+    if (step > 1 && Math.floor((inner + 1) / 2) < entries.length) step = 1;
+    const visible = entries.slice(0, Math.floor((inner + step - 1) / step));
     const focusIndex = entries.findIndex((e) => e.focused);
 
     visible.forEach((entry, r) => {
-      const rowY = y + 1 + r;
+      const rowY = y + 1 + r * step;
       const tagText = entry.tag ? ` ‹${entry.tag}›` : '';
       let text = `${entry.key ? `${entry.key} ` : '  '}${entry.label}`;
       if (entry.hint) text += ` · ${entry.hint}`;
@@ -477,11 +583,12 @@ export class GridView {
           t.drawText(tagText, x + w - 2 - tagText.length, rowY, tone);
         }
       }
-      this._regions.push({ x: x + 1, y: rowY, w: w - 2, h: 1, action: entry.click });
+      this._regions.push({ x: x + 1, y: rowY, w: w - 2, h: step, action: entry.click });
     });
 
     if (entries.length > visible.length) {
-      t.drawText(`… ${entries.length - visible.length} more (number keys work)`, innerX, y + h - 1, C.warn);
+      const more = `… ${entries.length - visible.length} more`;
+      t.drawText(this._touch ? more : `${more} (number keys work)`, innerX, y + h - 1, C.warn);
     }
     // Keep the focused-but-clipped case honest
     if (focusIndex >= visible.length && focusIndex !== -1) {
@@ -512,7 +619,23 @@ export class GridView {
   }
 
   _drawFooter(t, C, y, cols) {
-    const hint = '↑↓ select · Enter confirm · 1–9 jump · S status · G glossary · ? help';
-    t.drawText(hint.slice(0, cols - 2), 1, y, C.dim);
+    if (!this._touch) {
+      const hint = '↑↓ select · Enter confirm · 1–9 jump · S status · G glossary · ? help';
+      t.drawText(hint.slice(0, cols - 2), 1, y, C.dim);
+      return;
+    }
+
+    // Tap row: the only route to Status and Glossary on a narrow grid, so it
+    // is drawn last and claims the spacer row above it for a fatter target.
+    let x = 1;
+    for (const btn of this._actionButtons()) {
+      const width = btn.label.length + 2;
+      if (x + width > cols - 1) break;
+      t.drawText('[', x, y, C.dim);
+      t.drawText(btn.label, x + 1, y, C.text);
+      t.drawText(']', x + width - 1, y, C.dim);
+      this._regions.push({ x, y: y - 1, w: width, h: 2, action: btn.click });
+      x += width + 1;
+    }
   }
 }

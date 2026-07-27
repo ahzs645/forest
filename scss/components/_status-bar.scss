@@ -1,6 +1,7 @@
 // =============================================
 // Status Bar Component
 // =============================================
+@use '../abstracts' as *;
 
 .status-area {
   flex-shrink: 0;
@@ -66,7 +67,7 @@
   }
 
   // Not enough columns for bars on a phone — numbers only
-  @media (max-width: 700px) {
+  @include mobile-down {
     display: none;
   }
 }

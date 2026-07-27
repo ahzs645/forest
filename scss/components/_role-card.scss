@@ -153,9 +153,11 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 
+  // One line hid two thirds of every description while a third of the phone
+  // sat empty — you were picking a career off a truncated sentence.
   @include mobile-down {
-    font-size: 10px;
-    -webkit-line-clamp: 1;
+    font-size: 11px;
+    -webkit-line-clamp: 3;
   }
 }
 

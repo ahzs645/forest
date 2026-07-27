@@ -1,6 +1,7 @@
 // =============================================
 // Modal Component
 // =============================================
+@use '../abstracts' as *;
 
 .modal {
   position: fixed;
@@ -15,23 +16,40 @@
   &[hidden] {
     display: none !important;
   }
+
+  // Full-bleed on a phone, minus the notch and the home indicator. A centred
+  // box with margins wastes width the glossary needs.
+  @include mobile-down {
+    align-items: stretch;
+    padding: calc(var(--space-sm) + env(safe-area-inset-top, 0px)) var(--space-sm)
+      calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 // Dialog box, midnight-commander style: crisp frame, inverse-video title bar
 .modal-box {
   width: 100%;
   max-width: 500px;
-  max-height: 90vh;
+  // vh counts the strip under iOS Safari's toolbar, so a 90vh dialog put its
+  // buttons behind the chrome. dvh measures what's actually on screen.
+  max-height: 90dvh;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
+
+  @include mobile-down {
+    max-height: 100%;
+    margin: auto;
+    box-shadow: none;
+  }
 }
 
 .modal-header {
   padding: var(--space-xs) var(--space-md);
   background: var(--accent);
+  flex-shrink: 0;
 }
 
 .modal-title {
@@ -48,6 +66,10 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+
+  @include mobile-down {
+    padding: var(--space-sm);
+  }
 }
 
 .modal-actions {
@@ -56,6 +78,11 @@
   gap: var(--space-sm);
   padding: var(--space-md);
   border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+
+  @include mobile-down {
+    padding: var(--space-xs) var(--space-sm);
+  }
 }
 
 // [ Button ] — brackets appear via pseudo-elements, TUI dialog style
@@ -101,8 +128,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  max-height: 55vh;
+  max-height: 55dvh;
   overflow: auto;
+
+  // The body already scrolls and is already bounded by the dialog; a second
+  // cap inside it just makes a shorter window with two scrollbars.
+  @include mobile-down {
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 .modal-glossary-term {

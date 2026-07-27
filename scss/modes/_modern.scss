@@ -73,6 +73,7 @@ body[data-display-mode="modern"] {
   display: flex;
   align-items: center;
   gap: var(--space-md);
+  min-width: 0;
 }
 
 .modern-logo-icon {
@@ -84,6 +85,7 @@ body[data-display-mode="modern"] {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .modern-title {
@@ -136,6 +138,7 @@ body[data-display-mode="modern"] {
   font-size: var(--font-size-lg);
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 
   &:hover {
     border-color: var(--accent);
@@ -364,6 +367,7 @@ body[data-display-mode="modern"] .terminal {
   padding-bottom: var(--space-md);
   margin-bottom: var(--space-md);
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .decision-icon {
@@ -383,12 +387,28 @@ body[data-display-mode="modern"] .terminal {
   }
 }
 
+// The wrapper grid gives this pane exactly one viewport and no more, so a
+// long menu has to take its space from the log rather than push the footer
+// off the bottom — but the log keeps a floor, or the narrative becomes a
+// letterbox.
+body[data-display-mode="modern"] .terminal-window {
+  min-height: min(12rem, 30dvh);
+}
+
 body[data-display-mode="modern"] .action-area {
-  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
+  min-height: 0;
   margin: 0 var(--space-md) var(--space-md);
   padding: var(--space-md);
   background: rgba(0, 10, 5, 0.6);
   border: 1px solid var(--border-color);
+}
+
+body[data-display-mode="modern"] .choices {
+  min-height: 0;
+  max-height: none;
 }
 
 // Modern decision cards - horizontal layout
@@ -490,6 +510,7 @@ body[data-display-mode="modern"] .choices--modern {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
+  flex-shrink: 0;
   margin-top: var(--space-md);
   padding-top: var(--space-md);
   border-top: 1px solid var(--border-color);
@@ -596,8 +617,11 @@ body[data-display-mode="modern"] .game-wrapper {
     "stats stats"
     "sidebar main"
     "footer footer";
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto 1fr auto;
+  // minmax(0, 1fr) rather than 1fr: the stat cards carry min-widths, and an
+  // auto-min track lets their min-content total push the whole grid wider
+  // than the viewport.
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
@@ -623,6 +647,12 @@ body[data-display-mode="modern"] .game-screen {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  // Classic mode makes this pane the whole viewport. Here it is one cell of
+  // a grid that already owns the viewport, and a 100dvh cell would shove the
+  // footer past the fold and squeeze the stat row to nothing.
+  height: auto;
+  max-height: none;
 }
 
 body[data-display-mode="modern"] .footer-hotkeys {
@@ -650,8 +680,8 @@ body[data-display-mode="modern"] .footer-hotkeys {
       "stats"
       "main"
       "footer";
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto 1fr auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
   }
 
   body[data-display-mode="modern"] .metrics-sidebar {
@@ -660,36 +690,66 @@ body[data-display-mode="modern"] .footer-hotkeys {
 
   .modern-header {
     padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
   }
 
   .modern-title {
     font-size: var(--font-size-base);
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .modern-subtitle {
     display: none;
   }
 
-  .modern-stats-row {
+  // No room for the online badge next to the title on a phone; the footer
+  // indicator already carries the same signal.
+  body[data-display-mode="modern"] .system-status-badge {
+    display: none;
+  }
+
+  // Four cards side by side leaves each one too narrow to read its own
+  // label. Two up on a portrait phone, still four across in landscape.
+  body[data-display-mode="modern"] .modern-stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     padding: var(--space-sm);
     gap: var(--space-sm);
-    overflow-x: auto;
-    flex-wrap: nowrap;
   }
 
   .modern-stat-card {
-    min-width: 100px;
+    min-width: 0;
     padding: var(--space-sm);
 
     .stat-card-value {
       font-size: var(--font-size-base);
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    // The percentage carries it at this size, and dropping the bar keeps
+    // both rows of cards the same height.
+    .stat-card-bar {
+      display: none;
     }
   }
 
-  .footer-left {
-    gap: var(--space-sm);
+  .footer-hotkeys {
+    padding: var(--space-xs) var(--space-sm);
   }
 
+  .footer-left {
+    gap: var(--space-xs);
+  }
+
+  // Nothing to press a hotkey with on a touch screen — the label is the
+  // whole button here.
+  .footer-key,
   .footer-status {
     display: none;
   }
@@ -699,6 +759,7 @@ body[data-display-mode="modern"] .footer-hotkeys {
 
     .decision-card {
       max-width: none;
+      min-width: 0;
     }
   }
 }

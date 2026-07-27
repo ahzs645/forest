@@ -78,10 +78,32 @@
     justify-content: space-between;
     gap: 0;
   }
+
+  // Sideways, the phone has width to spare — six buttons spread across 844px
+  // read as six unrelated widgets instead of one action row.
+  @include short-down {
+    justify-content: flex-end;
+    gap: var(--space-xs);
+  }
+}
+
+// On a phone the hotkey is the useless half: there's no [S] to press, and
+// [S] [G] [L] [P] [?] [R] is a row of six identical grey boxes. Drop the
+// brackets, keep the word, shrink it — six labels at 10px still clear 360px.
+.header-btn-key {
+  @include mobile-down {
+    display: none;
+  }
 }
 
 .header-btn-label {
   @include mobile-down {
-    display: none;
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  @include xs-down {
+    font-size: 9px;
   }
 }
