@@ -51,12 +51,11 @@ Everything after this pushes to an auto-deploying main.
       dependency + `play:blessed` script — cli-game.js is its only consumer).
 - [ ] Delete the ~11 fully-merged remote branches (verified via `git branch -r --merged`);
       shrinks the live-branch surface from 20 to ~5.
-- [ ] Fix `README.md`: it lists FOUR roles (manager missing), describes the seasonal
-      game's mechanics as if they were the expedition game, and documents a deprecated
-      cli.mjs loop. Add a **frontend status matrix**: expedition DOM = primary,
-      browser TUI = primary, @opentui = experimental seasonal-only (frozen),
-      blessed = removed, headless cli.mjs = balance tooling (to be rebuilt on
-      TuiGameController).
+- [ ] Fix `README.md`: it lists FOUR roles (manager missing) and describes the seasonal
+      game's mechanics as if they were the expedition game. Add a **frontend status
+      matrix**: expedition DOM = primary, browser TUI = primary, @opentui =
+      experimental seasonal-only (frozen), blessed = removed, headless
+      `sim:expeditions` = balance tooling.
 - [ ] Remove the dead `@opentui` manualChunks rule in `vite.config.js` (never matches).
 
 ## Phase 1 — Branch harvest (strict order; before local edits to the same files)
@@ -178,7 +177,7 @@ deep assertions after.
       skipping cooldowns, context matching, temptations, reporters). Add manager to
       the journey-type constants and tag/author 10–15 manager events.
 - [ ] Add manager to `ROLE_RUNS` in the e2e specs and to
-      `scripts/monte-carlo-playtest.mjs` (currently excluded from both).
+      `scripts/simulate-expeditions.mjs` (currently excluded from both).
 
 ## Phase 5 — Mobile & platform hardening
 
@@ -218,8 +217,8 @@ deep assertions after.
 
 ## Phase 6 — Balance, pacing, onboarding (last; measure first)
 
-- [ ] Rebuild `cli.mjs` (or fold into monte-carlo) on the real game loop, covering
-      **all five roles** — then tune one knob at a time: desk-header compression
+- [ ] Extend `sim:expeditions` to cover **all five roles**, then tune one knob at a
+      time: desk-header compression
       (planning/permitting print 20–30 line headers before every action — reading
       load is their real pacing problem), resource scarcity curves, event frequency.
 - [ ] **Onboarding**: first-run detection + a guided first day per role (Oregon

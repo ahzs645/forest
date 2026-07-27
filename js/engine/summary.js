@@ -2,6 +2,7 @@ import { formatMetricName } from "./shared.js";
 import { getRoleDisplayName } from "./seasonalContract.js";
 import { buildRoleLens, computeManagementStyle } from "./insights.js";
 import { scoreRun } from "./scoring.js";
+import { formatMetricDelta } from "./effects.js";
 
 export function buildSummary(state) {
   const { metrics, role, area } = state;
@@ -159,11 +160,4 @@ function futureOutlook(metrics, trends, area) {
     pieces.push("Trajectory is stable. Consider experimenting with innovation pilots next year.");
   }
   return pieces;
-}
-
-function formatMetricDelta(delta = {}) {
-  const pieces = Object.entries(delta)
-    .filter(([, value]) => value !== undefined && value !== 0)
-    .map(([key, value]) => `${formatMetricName(key)} ${value > 0 ? "+" : ""}${value}`);
-  return pieces.join(", ");
 }

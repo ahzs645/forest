@@ -4,7 +4,6 @@
  */
 
 import { progressBar, box, PROGRESS } from '../ascii.js';
-import { displayMode } from '../displayMode.js';
 import { getCrewDisplayInfo, getActiveCrewCount, getAverageMorale } from '../crew.js';
 import { FIELD_RESOURCES, DESK_RESOURCES, getResourcePercentage } from '../resources.js';
 import { getOperationalProgress } from '../journey.js';

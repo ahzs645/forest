@@ -66,13 +66,6 @@ export class DisplayModeManager {
   }
 
   /**
-   * Toggle between classic and modern mode
-   */
-  toggle() {
-    this.setMode(this._mode === 'classic' ? 'modern' : 'classic');
-  }
-
-  /**
    * Check if current mode is modern
    * @returns {boolean}
    */
