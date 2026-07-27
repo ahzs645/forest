@@ -76,6 +76,9 @@ export class ForestryTrailGame {
     this.gameOver = false;
     this.victory = false;
     this._restartConfirmOpen = false;
+    this._campaignActive = false;
+    this._seasonalActive = false;
+    this._seasonalExitFn = null;
 
     this.ui.onRestartRequest(() => this._promptRestart());
     this.ui.onLogRequest(() => this._showLog());
@@ -98,6 +101,10 @@ export class ForestryTrailGame {
 
   /** Persist the current decision checkpoint, including an in-progress shift. */
   checkpoint() {
+    // Campaign deployments are saved by the campaign (bcft.campaign.v1);
+    // writing the expedition slot here would shadow the year with a phantom
+    // standalone run.
+    if (this._campaignActive) return;
     saveActiveRun(this.journey);
   }
 
@@ -115,6 +122,19 @@ export class ForestryTrailGame {
 
   _promptRestart() {
     if (this._restartConfirmOpen) return;
+    // On the landing hub and through setup there is nothing to abandon —
+    // Escape stays inert instead of offering to delete a save the player
+    // never entered.
+    if (this.ui._isLandingVisible?.() || this.ui._isInitOverlayVisible?.()) return;
+    if (this._campaignActive) {
+      this._promptCampaignExit();
+      return;
+    }
+    if (this._seasonalActive) {
+      this._promptSeasonalExit();
+      return;
+    }
+    if (!this.journey) return;
     this._restartConfirmOpen = true;
 
     this.ui.openModal({
@@ -123,13 +143,13 @@ export class ForestryTrailGame {
       onClose: () => { this._restartConfirmOpen = false; },
       buildContent: (container) => {
         const msg = document.createElement('p');
-        msg.textContent = 'Starting over abandons your current crew and returns to role selection.';
+        msg.textContent = 'Abandoning deletes this expedition save and returns you to the district office.';
         msg.style.marginTop = '0';
         container.appendChild(msg);
       },
       actions: [
         {
-          label: 'Abandon',
+          label: 'Abandon (delete save)',
           primary: true,
           onSelect: () => {
             this.ui.closeModal();
@@ -140,7 +160,79 @@ export class ForestryTrailGame {
           }
         },
         {
-          label: 'Continue',
+          label: 'Keep Playing',
+          onSelect: () => { this.ui.closeModal(); }
+        }
+      ]
+    });
+  }
+
+  /**
+   * Campaign quit: the year is already parked in its own save at each day
+   * boundary, so leaving never deletes anything — reload back to the hub.
+   * @private
+   */
+  _promptCampaignExit() {
+    this._restartConfirmOpen = true;
+    this.ui.openModal({
+      title: 'Return to District Office?',
+      dismissible: true,
+      onClose: () => { this._restartConfirmOpen = false; },
+      buildContent: (container) => {
+        const msg = document.createElement('p');
+        msg.textContent = 'The campaign year saves at the start of each deployment day and stays on file. '
+          + 'Resuming replays the current day from its morning.';
+        msg.style.marginTop = '0';
+        container.appendChild(msg);
+      },
+      actions: [
+        {
+          label: 'Save & return to district office',
+          primary: true,
+          onSelect: () => {
+            this.ui.closeModal();
+            window.location.reload();
+          }
+        },
+        {
+          label: 'Keep Playing',
+          onSelect: () => { this.ui.closeModal(); }
+        }
+      ]
+    });
+  }
+
+  /**
+   * Seasonal quit: the controller autosaves at every season boundary; the
+   * adapter unwinds cleanly back to the hub with the run kept on file.
+   * @private
+   */
+  _promptSeasonalExit() {
+    this._restartConfirmOpen = true;
+    this.ui.openModal({
+      title: 'Return to District Office?',
+      dismissible: true,
+      onClose: () => { this._restartConfirmOpen = false; },
+      buildContent: (container) => {
+        const msg = document.createElement('p');
+        msg.textContent = 'The seasonal run autosaves at each season boundary and stays on file — '
+          + 'resume it from SEASONAL or LOAD DATA. Resuming replays the current season from its start.';
+        msg.style.marginTop = '0';
+        container.appendChild(msg);
+      },
+      actions: [
+        {
+          label: 'Save & return to district office',
+          primary: true,
+          onSelect: () => {
+            this.ui.closeModal();
+            if (!this._seasonalExitFn?.()) {
+              window.location.reload();
+            }
+          }
+        },
+        {
+          label: 'Keep Playing',
           onSelect: () => { this.ui.closeModal(); }
         }
       ]
@@ -161,7 +253,7 @@ export class ForestryTrailGame {
       window.history.replaceState(null, '', window.location.pathname);
       const { runSeasonalGame } = await import('./seasonalAdapter.js');
       this.ui._hideLandingScreen?.();
-      await runSeasonalGame(this.ui);
+      await this._runSeasonal(runSeasonalGame);
       this.start();
       return;
     }
@@ -174,11 +266,15 @@ export class ForestryTrailGame {
       this.journey = savedRun;
       this.ui.updateAllStatus(savedRun);
       const resume = await this._promptResume(savedRun);
-      if (resume) {
+      if (resume === 'resume') {
         await this._resumeSavedRun(savedRun);
         return;
       }
-      clearActiveRun();
+      if (resume === 'fresh') {
+        clearActiveRun();
+      }
+      // 'later' keeps the save on file; either way the hub owns the screen now.
+      this.journey = null;
     }
 
     const init = await new Promise((resolve) => {
@@ -205,7 +301,7 @@ export class ForestryTrailGame {
     // year ends (or the player quits out), fall back to the landing screen.
     if (init?.action === 'seasonal') {
       const { runSeasonalGame } = await import('./seasonalAdapter.js');
-      await runSeasonalGame(this.ui);
+      await this._runSeasonal(runSeasonalGame);
       this.start();
       return;
     }
@@ -221,6 +317,28 @@ export class ForestryTrailGame {
     const crewName = init?.crewName || 'The Timber Wolves';
     const role = init?.role || FORESTER_ROLES[0];
     const area = init?.area || OPERATING_AREAS[0];
+
+    // Only one expedition fits on file. If a parked run is still saved (the
+    // player chose "Not now" at boot), starting a new one would silently
+    // overwrite it — ask first, exactly as the landing screen promises.
+    const parkedRun = loadActiveRun();
+    if (parkedRun) {
+      this.ui.clear();
+      this.ui.writeHeader('SAVED EXPEDITION ON FILE');
+      this.ui.write(`${parkedRun.companyName || 'Your crew'} — ${parkedRun.role?.name || 'Forester'}, `
+        + `${parkedRun.area?.name || 'the operating area'}, day ${parkedRun.day}.`);
+      this.ui.write('Only one expedition can be on file at a time.', 'term-dim');
+      this.ui.write('');
+      const keep = await this.ui.promptChoice('Starting a new expedition abandons the saved one.', [
+        { label: 'Resume the saved expedition', value: 'resume' },
+        { label: 'Start new (abandons the save)', value: 'new' }
+      ]);
+      if (keep.value === 'resume') {
+        await this._resumeSavedRun(parkedRun);
+        return;
+      }
+      clearActiveRun();
+    }
 
     // Difficulty selection
     this.ui.clear();
@@ -276,10 +394,27 @@ export class ForestryTrailGame {
 
     showJourneyIntro(this.ui, this.journey);
 
-    await this.ui.promptChoice('Ready to move out?', [{ label: 'Begin Journey', value: 'start' }]);
-
     saveActiveRun(this.journey);
     await this._mainLoop();
+  }
+
+  /**
+   * Run a seasonal year with the quit flow wired: while the adapter owns the
+   * screen, Escape offers "Save & return to district office" and unwinds
+   * through the exit hook the adapter registers here.
+   * @private
+   */
+  async _runSeasonal(runSeasonalGame) {
+    this._seasonalActive = true;
+    this._seasonalExitFn = null;
+    try {
+      await runSeasonalGame(this.ui, {
+        onExitAvailable: (fn) => { this._seasonalExitFn = fn; }
+      });
+    } finally {
+      this._seasonalActive = false;
+      this._seasonalExitFn = null;
+    }
   }
 
   /**
@@ -300,14 +435,22 @@ export class ForestryTrailGame {
   }
 
   /**
-   * Offer to resume a saved expedition. Resolves true to resume.
+   * Offer to resume a saved expedition. Resolves 'resume', 'later' (keep the
+   * save, go to the hub — also what Escape means here), or 'fresh' (delete).
    * @private
    */
   _promptResume(savedRun) {
     return new Promise((resolve) => {
+      let settled = false;
+      const settle = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
       this.ui.openModal({
         title: 'Expedition in Progress',
-        dismissible: false,
+        dismissible: true,
+        onClose: () => settle('later'),
         buildContent: (container) => {
           const msg = document.createElement('p');
           const roleName = savedRun.role?.name || 'Forester';
@@ -321,11 +464,15 @@ export class ForestryTrailGame {
           {
             label: 'Resume Expedition',
             primary: true,
-            onSelect: () => { this.ui.closeModal(); resolve(true); }
+            onSelect: () => { settle('resume'); this.ui.closeModal(); }
           },
           {
-            label: 'Start Fresh',
-            onSelect: () => { this.ui.closeModal(); resolve(false); }
+            label: 'Not Now (keep it saved)',
+            onSelect: () => { settle('later'); this.ui.closeModal(); }
+          },
+          {
+            label: 'Start Fresh (abandons this expedition)',
+            onSelect: () => { settle('fresh'); this.ui.closeModal(); }
           }
         ]
       });
@@ -424,7 +571,7 @@ export class ForestryTrailGame {
     // resume, no service record — and looked like the game "forgot" the win.
     clearActiveRun();
 
-    await this.ui.promptChoice('', [{ label: 'New Expedition', value: 'restart' }]);
+    await this.ui.promptChoice('', [{ label: 'Return to District Office', value: 'restart' }]);
     this.start();
   }
 

@@ -140,28 +140,11 @@ export const InitFlowMixin = {
       window.location.assign('./tui.html?mode=crisis-command');
     });
 
-    // Load Data button — resumes the auto-saved expedition if one exists.
-    // Runs persist after resolved decisions, so this is the same run the
-    // resume prompt offers after a refresh; there is no separate save slot.
+    // Load Data button — the one place to continue anything: it lists every
+    // save that actually exists (expedition, campaign, seasonal) and routes
+    // each to its own resume path.
     this.loadGameBtn?.addEventListener('click', () => {
-      const savedRun = loadActiveRun();
-      if (savedRun) {
-        this._hideLandingScreen();
-        if (this._resolveLanding) {
-          const resolve = this._resolveLanding;
-          this._resolveLanding = null;
-          resolve({ action: 'load', journey: savedRun });
-        }
-        return;
-      }
-
-      this.showModal({
-        title: 'LOAD DATA',
-        content: 'No saved expedition found. Runs save automatically after '
-          + 'resolved decisions — reload the page anytime to pick one back up, and '
-          + 'you will be asked before anything is overwritten.',
-        actions: [{ label: 'OK', primary: true }]
-      });
+      this._showLoadDataModal();
     });
 
     // Help button on landing
@@ -205,7 +188,108 @@ export const InitFlowMixin = {
       } else if (e.key === 'h' || e.key === 'H') {
         e.preventDefault();
         this.helpLandingBtn?.click();
+      } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        this.complianceIntelLandingBtn?.click();
       }
+    });
+  },
+
+  /**
+   * LOAD DATA: list every save on file — expedition, campaign, seasonal —
+   * with a line of context each, and route the pick to its resume path.
+   * @private
+   */
+  async _showLoadDataModal() {
+    const [{ loadCampaign, CAMPAIGN_SEASONS }, { peekSeasonalSave }] = await Promise.all([
+      import('../game/campaign.js'),
+      import('../../tui/controller.js'),
+    ]);
+
+    const expedition = loadActiveRun();
+    const campaign = loadCampaign();
+    const seasonal = peekSeasonalSave();
+
+    if (!expedition && !campaign && !seasonal) {
+      this.showModal({
+        title: 'LOAD DATA',
+        content: 'No saved games found. Expeditions, campaigns, and seasonal '
+          + 'runs save automatically as you play — return here anytime to pick '
+          + 'one back up, and you will be asked before anything is overwritten.',
+        actions: [{ label: 'OK', primary: true }]
+      });
+      return;
+    }
+
+    const routeTo = (payload) => {
+      this.closeModal();
+      this._hideLandingScreen();
+      if (this._resolveLanding) {
+        const resolve = this._resolveLanding;
+        this._resolveLanding = null;
+        resolve(payload);
+      }
+    };
+
+    const entries = [];
+    if (expedition) {
+      entries.push({
+        label: 'Resume Expedition',
+        detail: `${expedition.companyName || 'Your crew'} — ${expedition.role?.name || 'Forester'}, `
+          + `${expedition.area?.name || 'the operating area'}, day ${expedition.day}`
+          + `${expedition.activeReconShift ? ' (mid-shift)' : ''}`,
+        onSelect: () => routeTo({ action: 'load', journey: expedition }),
+      });
+    }
+    if (campaign) {
+      const seasonLabel = CAMPAIGN_SEASONS[campaign.seasonIndex]?.label || 'In progress';
+      entries.push({
+        label: 'Resume Campaign',
+        detail: `${campaign.crewName || 'Your crew'} — ${seasonLabel} `
+          + `(season ${Math.min(campaign.seasonIndex + 1, CAMPAIGN_SEASONS.length)} of ${CAMPAIGN_SEASONS.length}), `
+          + `${campaign.areaName || 'the district'}`,
+        onSelect: () => routeTo({ action: 'campaign' }),
+      });
+    }
+    if (seasonal) {
+      entries.push({
+        label: 'Resume Seasonal Run',
+        detail: `${seasonal.companyName || 'Your company'} — ${seasonal.roleName || 'Forester'}, `
+          + `${seasonal.areaName || 'the operating area'}, before season ${Number(seasonal.round) + 1} of 4`,
+        onSelect: () => routeTo({ action: 'seasonal' }),
+      });
+    }
+
+    this.openModal({
+      title: 'LOAD DATA',
+      dismissible: true,
+      buildContent: (container) => {
+        for (const entry of entries) {
+          const row = document.createElement('div');
+          row.style.marginBottom = '10px';
+
+          const title = document.createElement('div');
+          title.textContent = entry.label;
+          title.style.fontWeight = '700';
+
+          const detail = document.createElement('div');
+          detail.textContent = entry.detail;
+          detail.className = 'term-dim';
+          detail.style.marginTop = '2px';
+
+          row.appendChild(title);
+          row.appendChild(detail);
+          container.appendChild(row);
+        }
+      },
+      actions: [
+        ...entries.map((entry, index) => ({
+          label: entry.label,
+          primary: index === 0,
+          onSelect: entry.onSelect,
+        })),
+        { label: 'Cancel', onSelect: () => this.closeModal() },
+      ]
     });
   },
 

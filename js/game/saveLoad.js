@@ -33,6 +33,9 @@ export function loadActiveRun() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.version !== 1 || !parsed.journey?.journeyType) return null;
+    // A campaign deployment belongs to bcft.campaign.v1 — never offer one as
+    // a standalone expedition (covers stale saves from older builds).
+    if (parsed.journey.campaignStartMetrics) return null;
     return parsed.journey;
   } catch {
     return null;

@@ -18,6 +18,7 @@ import { runReconDay } from '../modes/recon.js';
 import { runSilvicultureDay } from '../modes/silviculture.js';
 import { runPlanningDay } from '../modes/planning.js';
 import { runPermittingDay } from '../modes/permitting.js';
+import { runManagerDay } from '../modes/manager.js';
 import { createInitialState } from '../engine/state.js';
 import { applyEffects, applyRoundConsequences, applyOptionOutcome, formatMetricDelta } from '../engine/effects.js';
 import { describeConsequences } from '../engine/insights.js';
@@ -32,7 +33,7 @@ const CAMPAIGN_SAVE_KEY = 'bcft.campaign.v1';
 
 // One year, four hats. Each season names the expedition role that plays it
 // and the seasonal-engine role that frames it (they share ids).
-const CAMPAIGN_SEASONS = [
+export const CAMPAIGN_SEASONS = [
   {
     id: 'spring',
     label: 'Spring',
@@ -249,11 +250,15 @@ async function promptContinue(ui, label = 'Continue') {
  * existing mode day-runners work unchanged.
  */
 export async function runCampaign(game) {
+  // While the campaign owns the journey slot, game.checkpoint() must not
+  // write the expedition autosave — the year lives in bcft.campaign.v1.
+  game._campaignActive = true;
   try {
     await runCampaignInner(game);
   } finally {
     // Never leak hidden expedition chrome or the campaign banner back to the
     // hub or a quick mode.
+    game._campaignActive = false;
     setExpeditionChromeHidden(false);
     game.ui.campaignBanner = null;
     game.journey = null;
@@ -451,13 +456,20 @@ async function runCampaignSeason(game, campaign, season) {
       // clear the screen, and this banner is re-written by every clear().
       const m = campaign.yearMetrics;
       ui.campaignBanner = `CAMPAIGN · ${season.label} ${campaign.seasonIndex + 1}/4 · Year: `
-        + `Prog ${Math.round(m.progress)} · Forest ${Math.round(m.forestHealth)} · Rel ${Math.round(m.relationships)} `
-        + `· Comp ${Math.round(m.compliance)} · Budget ${Math.round(m.budget)}`;
+        + `Progress ${Math.round(m.progress)} · Forest ${Math.round(m.forestHealth)} · Relations ${Math.round(m.relationships)} `
+        + `· Compliance ${Math.round(m.compliance)} · Budget ${Math.round(m.budget)}`;
       ui.updateAllStatus(journey);
 
       const scheduledEvent = checkScheduledEvents(journey);
       if (scheduledEvent) {
         await game._handleEvent(scheduledEvent);
+        // An event that ends the run closes the deployment here, the way the
+        // expedition loop breaks on it. Without this the season played on
+        // past its own ending.
+        if (game.gameOver) {
+          endResult = { gameOver: true, reason: journey.endReason || 'Operations halted' };
+          break;
+        }
       }
 
       switch (journey.journeyType) {
@@ -465,6 +477,7 @@ async function runCampaignSeason(game, campaign, season) {
         case 'planning': await runPlanningDay(game); break;
         case 'permitting':
         case 'desk': await runPermittingDay(game); break;
+        case 'manager': await runManagerDay(game); break;
         case 'recon':
         case 'field':
         default: await runReconDay(game); break;

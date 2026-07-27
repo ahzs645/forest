@@ -1053,12 +1053,18 @@ export function updateReconMissionStatus(ui, journey) {
   const packagesDone = Math.min(totalBlocks, journey.blocksAssessed || 0);
   const completionPct = totalBlocks > 0 ? Math.round((packagesDone / totalBlocks) * 100) : 0;
   const packagesRemaining = Math.max(0, totalBlocks - packagesDone);
+  const scrutiny = Math.round(Math.max(0, Number(journey.scrutiny ?? journey.heat ?? 0)));
   const facts = [
     { label: 'Weather', value: journey.weather?.name || 'Clear' },
     { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
     { label: 'Days left', value: Number.isFinite(journey.deadline) ? `${Math.max(0, journey.deadline - journey.day)}` : '—' },
     { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km` },
-    { label: 'Reached', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` }
+    { label: 'Reached', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` },
+    {
+      label: 'Scrutiny',
+      value: `${scrutiny}%`,
+      tone: scrutiny > 60 ? 'danger' : scrutiny > 30 ? 'warn' : undefined
+    }
   ];
   const checklist = [];
 
