@@ -1,7 +1,10 @@
 export const SEASONS = ["Spring Planning", "Summer Field", "Fall Integration", "Winter Review"];
 export const ISSUE_REPEAT_COOLDOWN_ROUNDS = 2;
 export const EVENT_REPEAT_COOLDOWN_ROUNDS = 2;
-export const TEMPTATION_REPEAT_COOLDOWN_ROUNDS = 2;
+// One round, not two: with only three eligible seasons a year (round 1 never
+// tempts), a two-round cooldown capped the whole 208-act temptation deck at
+// one appearance per year and most years saw none.
+export const TEMPTATION_REPEAT_COOLDOWN_ROUNDS = 1;
 export const BUDGET_ATTRITION_THRESHOLD = 25;
 export const RELATIONSHIP_TRUST_THRESHOLD = 35;
 export const COMPLIANCE_AUDIT_THRESHOLD = 40;
@@ -97,13 +100,16 @@ export const AUDIT_TEMPTATION_TAGS = new Set([
 
 export const COMMUNITY_TEMPTATION_TAGS = new Set(["cultural", "community", "labour", "media"]);
 
+// Temptation chances are tuned so a typical year meets roughly one shortcut
+// offer (P(none) ≈ 0.25–0.3 before pressure bonuses) instead of the old
+// ~0.07 per season, which left the temptation deck effectively unplayed.
 export const ROLE_TEMPTATION_PROFILES = {
   planner: {
     flavor: "Bureaucratic shortcut",
     chance: {
-      base: 0.07,
-      lateSeasonBonus: 0.03,
-      cap: 0.24,
+      base: 0.26,
+      lateSeasonBonus: 0.12,
+      cap: 0.5,
       pressure: {
         budget: { threshold: 34, bonus: 0.04 },
         progress: { threshold: 42, bonus: 0.04 },
@@ -135,9 +141,9 @@ export const ROLE_TEMPTATION_PROFILES = {
   permitter: {
     flavor: "Bureaucratic shortcut",
     chance: {
-      base: 0.075,
-      lateSeasonBonus: 0.03,
-      cap: 0.26,
+      base: 0.28,
+      lateSeasonBonus: 0.12,
+      cap: 0.52,
       pressure: {
         budget: { threshold: 35, bonus: 0.05 },
         progress: { threshold: 42, bonus: 0.04 },
@@ -169,9 +175,9 @@ export const ROLE_TEMPTATION_PROFILES = {
   recce: {
     flavor: "Field desperation",
     chance: {
-      base: 0.085,
-      lateSeasonBonus: 0.04,
-      cap: 0.28,
+      base: 0.3,
+      lateSeasonBonus: 0.14,
+      cap: 0.55,
       pressure: {
         budget: { threshold: 35, bonus: 0.05 },
         progress: { threshold: 40, bonus: 0.04 },
@@ -203,9 +209,9 @@ export const ROLE_TEMPTATION_PROFILES = {
   silviculture: {
     flavor: "Field desperation",
     chance: {
-      base: 0.09,
-      lateSeasonBonus: 0.04,
-      cap: 0.3,
+      base: 0.32,
+      lateSeasonBonus: 0.14,
+      cap: 0.58,
       pressure: {
         budget: { threshold: 34, bonus: 0.05 },
         progress: { threshold: 38, bonus: 0.04 },

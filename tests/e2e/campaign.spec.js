@@ -1,10 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-// Campaign smoke: setup → spring briefing → condensed recon deployment →
-// spring review → summer briefing. A full year runs ~7 minutes of clicking,
-// so CI proves the season pipeline (briefing → deployment → bridge → review →
-// next season) rather than all four seasons.
-test('campaign plays through a full season into the next briefing', async ({ page }) => {
+// Exercise every deployment and the year-end handoff. A spring-only smoke
+// cannot catch a stalled planning season or a broken final debrief.
+test('campaign plays all four seasons through the year-end review', async ({ page }) => {
+  test.setTimeout(240000);
   const runtimeErrors = [];
   page.on('pageerror', (error) => runtimeErrors.push(error.message));
   page.on('console', (message) => {
@@ -32,10 +31,10 @@ test('campaign plays through a full season into the next briefing', async ({ pag
     /Field Notebook|Ground-Truth|Values Sweep/i,
     /Standard Recon|Stay Mainline/i,
   ];
-  let sawSpringReview = false;
-  let sawSummerBriefing = false;
+  const reviews = new Set();
+  let sawYearEnd = false;
 
-  for (let step = 0; step < 700 && !sawSummerBriefing; step++) {
+  for (let step = 0; step < 1600 && !sawYearEnd; step++) {
     await page.waitForTimeout(100);
 
     if (await page.locator('#input-wrapper').isVisible().catch(() => false)) {
@@ -45,9 +44,11 @@ test('campaign plays through a full season into the next briefing', async ({ pag
     }
 
     const body = await page.locator('body').innerText();
-    if (/SPRING REVIEW/.test(body)) sawSpringReview = true;
-    if (sawSpringReview && /Summer: Silviculture Program/i.test(body)) {
-      sawSummerBriefing = true;
+    for (const season of ['SPRING', 'SUMMER', 'FALL', 'WINTER']) {
+      if (body.includes(`${season} REVIEW`)) reviews.add(season);
+    }
+    if (/YEAR IN REVIEW/.test(body)) {
+      sawYearEnd = true;
       break;
     }
 
@@ -66,6 +67,8 @@ test('campaign plays through a full season into the next briefing', async ({ pag
   }
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
-  expect(sawSpringReview, 'spring review never rendered').toBeTruthy();
-  expect(sawSummerBriefing, 'summer briefing never rendered').toBeTruthy();
+  expect([...reviews], 'every deployment should reach its season review').toEqual(['SPRING', 'SUMMER', 'FALL', 'WINTER']);
+  expect(sawYearEnd, 'year-end review never rendered').toBeTruthy();
+  await page.locator('#choices button').filter({ hasText: 'Return to the district office' }).click();
+  await expect(page.locator('#campaign-btn')).toBeVisible();
 });

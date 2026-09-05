@@ -12,6 +12,7 @@ import {
 } from '../js/journey/factory.js';
 import { AREA_BLOCKS } from '../js/data/blocks.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
+import { simulateRun } from '../scripts/simulate-expeditions.mjs';
 
 // Deterministic PRNG so the headless drive below never flakes on Math.random().
 function seededRandomFactory(seed) {
@@ -262,16 +263,30 @@ test('campaign scale: planning shortens the deadline and scales budget, leaves g
   const scaled = createPlanningJourney({ roleId: 'planner', areaId: 'fort-st-john-plateau', scale: 'campaign' });
 
   assert.equal(normal.deadline, 34);
-  assert.equal(scaled.deadline, 20);
+  assert.equal(scaled.deadline, 26);
 
-  assert.equal(scaled.resources.budget, Math.round(82000 * 0.68));
-  assert.equal(scaled.resources.budget, 55760);
+  assert.equal(scaled.resources.budget, Math.round(82000 * 0.85));
+  assert.equal(scaled.resources.budget, 69700);
 
   // Gate thresholds / plan phase state are untouched by campaign scale.
   assert.deepEqual(scaled.plan, normal.plan);
   assert.equal(scaled.resources.politicalCapital, normal.resources.politicalCapital);
   assert.equal(scaled.resources.dataCredits, normal.resources.dataCredits);
   assert.equal(scaled.resources.consultantDays, normal.resources.consultantDays);
+});
+
+test('campaign planning can finish a real file within its funded season', async () => {
+  const results = [];
+  for (let index = 0; index < 12; index += 1) {
+    results.push(await simulateRun('planning', 1000 + index * 37, 'campaign'));
+  }
+  assert.ok(results.filter((result) => result.won).length >= 4,
+    `competent planning files should be deliverable: ${JSON.stringify(results.map(({ seed, days, reason }) => ({ seed, days, reason })))}`);
+  for (const result of results) {
+    assert.ok(!result.reason?.startsWith('error:'), result.reason);
+    assert.ok(result.days <= result.deadline);
+    assert.equal(result.tally.__fellThrough || 0, 0, 'the policy must recognise the actual menus');
+  }
 });
 
 test('campaign scale: permitting tightens permit target and deadline, scales budget', () => {

@@ -106,11 +106,13 @@ function applyCampaignScale(journey, journeyType) {
     case "planning": {
       // A one-action day (js/journey/dayPlan.js) means the file moves one
       // track at a time, and a twelve-day window could not clear data,
-      // analysis, buy-in and confidence before the cabinet closed. Twenty days
-      // still sits inside the campaign's thirty-day season. Sized with
-      // scripts/simulate-expeditions.mjs.
-      journey.deadline = 20;
-      journey.resources.budget = Math.round(journey.resources.budget * CAMPAIGN_BUDGET_SCALE);
+      // analysis, buy-in and confidence before the cabinet closed. The event
+      // days introduced afterward pushed competent files past twenty days;
+      // allow recovery inside the campaign's thirty-day season.
+      journey.deadline = 26;
+      // The shorter deployment still pays for the same approval gates and
+      // authored event costs. Fund those fixed costs as well as daily upkeep.
+      journey.resources.budget = Math.round(journey.resources.budget * 0.85);
       return journey;
     }
     case "permitting": {

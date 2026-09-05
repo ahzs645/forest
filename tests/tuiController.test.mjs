@@ -69,7 +69,9 @@ test('planner assignment selection updates the dashboard metrics in the controll
   assert.equal(state.gameState.metrics.progress, 50);
   assert.equal(state.gameState.metrics.relationships, 52);
   assert.equal(state.gameState.metrics.compliance, 53);
-  assert.match(state.contentData.notice.heading, /^Decision Logged:/);
+  // Acknowledgements are typed now: a round-1 assignment reads as the season
+  // plan taking shape rather than a generic "Decision Logged" stamp.
+  assert.match(state.contentData.notice.heading, /^Season plan set:/);
   assert.match(state.contentData.notice.body, /Compliance \+3/);
   assert.match(state.contentData.notice.body, /Relationships \+2/);
 });
@@ -155,7 +157,9 @@ test('first playable seasonal card exposes the contract fields and neutral promp
   assert.ok(state.contentData.context?.operation);
   assert.ok(state.contentData.context?.objective);
   assert.ok(state.contentData.context?.stakes);
-  assert.match(state.contentData.decisionPrompt || '', /^How do you want to respond\?$/i);
+  // The ask varies by card type and season now; a spring assignment frames the
+  // decision as setting the season up.
+  assert.match(state.contentData.decisionPrompt || '', /^How do you set the season up\?$/i);
   assert.equal(state.contentData.optionHeading, 'Choose your response');
   assert.equal(state.art, null);
   assert.ok(state.options.length > 1);
@@ -822,4 +826,33 @@ test('planning readiness carries forward area-level road intel without blocking 
   assert.equal(readiness.roadContext.source, 'area');
   assert.ok(readiness.fom.roadEngineeringReadiness < 100);
   assert.match(readiness.fom.roadNote, /carry-forward access intel/i);
+});
+
+test('a season never plays two cards of the same kind back to back', () => {
+  // The deeper season draws a second event or a second contested call, and the
+  // shortcut offer that would sit between them does not always draw. Two cards
+  // under the same label in a row read as the game repeating itself, which is
+  // the opposite of what the extra depth is for.
+  for (const seed of [20260411, 4242, 909, 13, 77771]) {
+    const controller = new TuiGameController({ seed, storage: null, onExit: () => {} });
+    const types = [];
+    let guard = 0;
+
+    advanceFromSetupToFirstPlannerTask(controller);
+
+    while (guard < 200) {
+      guard += 1;
+      const content = controller.getState().contentData;
+      if (content?.type === 'summary') break;
+      if (['assignment', 'task', 'event', 'issue', 'temptation'].includes(content?.type)) {
+        types.push(content.type);
+      }
+      controller.selectOption(0);
+    }
+
+    for (let i = 1; i < types.length; i += 1) {
+      assert.notEqual(`${types[i]}@${i}`, `${types[i - 1]}@${i}`,
+        `seed ${seed}: ${types[i]} played twice in a row at index ${i} (${types.join(', ')})`);
+    }
+  }
 });

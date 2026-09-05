@@ -151,3 +151,31 @@ test('spring breakup hauling issues keep a viable defer-or-stand-down response',
     'expected a defer-or-stand-down response for peatland breakup hauling risk',
   );
 });
+
+test('season-locked issues never surface outside the season their copy describes', () => {
+  const locked = ISSUE_LIBRARY.filter((issue) => issue.seasonLock);
+  assert.ok(locked.length > 0, 'some cards opt into the hard season gate');
+
+  for (const issue of locked) {
+    assert.ok(Array.isArray(issue.seasonBias) && issue.seasonBias.length,
+      `${issue.id} declares the seasons it belongs to`);
+  }
+
+  const iceRoad = ISSUE_LIBRARY.find((issue) => issue.id === 'ice-road-window');
+  assert.ok(iceRoad, 'the mid-winter ice-bridge card is still in the library');
+
+  // Spring: the winter-only card must not be drawable at all.
+  const springDraws = new Set();
+  for (let i = 0; i < 400; i += 1) {
+    const springState = createSeasonalState('recce', 1, 'fort-st-john-plateau');
+    let seed = i + 1;
+    const rng = () => {
+      seed = (1664525 * seed + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+    const card = drawIssue(springState, rng);
+    if (card?.id) springDraws.add(card.id);
+  }
+  assert.equal(springDraws.has('ice-road-window'), false,
+    'a mid-winter crisis does not open the spring season');
+});

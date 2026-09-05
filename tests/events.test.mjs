@@ -32,6 +32,22 @@ test('radio event copy uses one concise reporter lead', () => {
   assert.doesNotMatch(formatted.description, /radios in:.*radios in:/i);
 });
 
+test('option hints disclose run-ending and evacuation choices without hiding graded odds', () => {
+  const formatted = formatEventForDisplay({
+    title: 'A difficult call',
+    options: [
+      { label: 'Walk away', gameOver: true, hiddenOutcome: true },
+      { label: 'Send them to town', crewEffect: { evacuate_sick: true } },
+      { label: 'Attempt recovery', hiddenOutcome: true, chanceSuccess: 0.5, chancePartial: 0.3 },
+      { label: 'Wait', effects: {} }
+    ]
+  }, 'recon');
+  assert.match(formatted.options[0].hint, /ends the run/i);
+  assert.match(formatted.options[1].hint, /evacuates/i);
+  assert.match(formatted.options[2].hint, /50% clean, 20% badly wrong/);
+  assert.equal(formatted.options[3].hint, 'No direct cost');
+});
+
 test('event outcomes wait for acknowledgement before play resumes', async () => {
   const writes = [];
   const prompts = [];

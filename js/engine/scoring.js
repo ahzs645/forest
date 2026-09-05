@@ -96,13 +96,17 @@ export function deriveTier(metrics = {}) {
   const stewardshipStrong =
     metrics.compliance >= 80 && metrics.relationships >= 68 && metrics.forestHealth >= 50 && metrics.progress >= 30;
   const nothingCollapsed = Object.values(metrics).every((value) => Number(value) >= 40);
-  const stewardshipExcellence = metrics.compliance >= 85 && metrics.relationships >= 70;
+  // Excellence gates were re-raised when the seasonal year deepened from ~12
+  // to ~17 decision cards: optimizer play banks proportionally more compliance
+  // and relationships across the longer year, and the old gates let ~1 in 3
+  // greedy runs finish Outstanding. These keep it near the top sixth.
+  const stewardshipExcellence = metrics.compliance >= 88 && metrics.relationships >= 72;
   const ecologicalExcellence =
-    metrics.forestHealth >= 64 && metrics.compliance >= 72 && metrics.relationships >= 62;
+    metrics.forestHealth >= 67 && metrics.compliance >= 75 && metrics.relationships >= 65;
 
   if (
-    averages >= 62
-    && metrics.progress >= 42
+    averages >= 64
+    && metrics.progress >= 45
     && nothingCollapsed
     && (stewardshipExcellence || ecologicalExcellence)
   ) {

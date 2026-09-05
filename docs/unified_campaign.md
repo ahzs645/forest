@@ -97,18 +97,24 @@ start of the saved day or at the next season briefing.
 `createJourney({ ..., scale: 'campaign' })` shrinks each mode to a season-
 sized deployment. A day is one substantive action
 ([`js/journey/dayPlan.js`](../js/journey/dayPlan.js)), so a deployment is
-~12–20 days of play rather than the ~8–12 it was when a day held three or four
+~11–26 days of play rather than the ~8–12 it was when a day held three or four
 actions. The numbers below are measured, not estimated — re-check them with
 `npm run sim:expeditions -- --scale campaign`:
 
-- recon: ~6 blocks (subset of area blocks), traverse trimmed to match — lands
-  in 13–21 days
+- recon: ~6 blocks (subset of area blocks), traverse trimmed to match, deadline
+  24 — successful sampled runs finish in 16–24 days
 - silviculture: 3 blocks / ~55k seedlings / brush 100 ha / 2 surveys,
-  budget + overhead scaled to match (~$45k, same daily overhead) — 12–19 days
-- planning: deadline 20 (from 28), gate thresholds unchanged — 14–18 days
-- permitting: 12 permits / deadline 20 (from 15/30) — 10–16 days
-- per-run field stockpiles scaled ~0.45×; desk budgets ~0.68×, because the
-  same daily overhead is now charged over a longer calendar
+  budget + overhead scaled to match (~$45k, same daily overhead) — 11–20 days
+- planning: deadline 26 (from 34), budget $69,700 (0.85×), gate thresholds
+  unchanged — successful sampled runs finish in 20–24 days. The previous
+  20-day/$55,760 combination failed all 12 baseline policy runs after the
+  event/day-flow changes; planning still pays the fixed approval-gate costs.
+- permitting: 12 permits / deadline 20 (from 15/30) — 14–20 days
+- per-run field stockpiles scaled ~0.45×; permitting budget ~0.68×.
+
+These ranges come from 24 seeds per mode in Fraser Plateau, normal difficulty;
+they describe successful runs rather than guaranteeing success. See
+[`branch-playability-audit.md`](branch-playability-audit.md) for outcomes.
 
 Difficulty multipliers apply after scale, unchanged.
 

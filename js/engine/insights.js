@@ -40,6 +40,10 @@ const CONSEQUENCE_INFO = {
     title: "Operational dividend",
     cause: "Strong compliance and relationships meant less rework and firefighting, freeing up budget.",
   },
+  "delivery-dividend": {
+    title: "Delivery dividend",
+    cause: "Reviewers trusted the file, so referrals and reviews came back clean and the schedule got room back.",
+  },
   "comeback-window": {
     title: "Comeback window",
     cause: "The file was still salvageable, so targeted effort steadied your weakest meter.",

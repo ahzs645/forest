@@ -150,6 +150,8 @@ function formatOddsHint(option) {
  * Generate a hint about an option's effects
  */
 function getOptionHint(option, journeyType) {
+  // A run-ending choice must say so even when the authored outcome is hidden.
+  if (option.gameOver) return 'Ends the run';
   // Options flagged hiddenOutcome keep their effects close to the chest — but
   // an authored gamble still names its odds. Previously this returned before
   // the chanceSuccess line below could ever run, and since both options in the
@@ -160,7 +162,6 @@ function getOptionHint(option, journeyType) {
   }
 
   const hints = [];
-  const isField = isFieldJourney(journeyType);
 
   if (option.effects) {
     if (option.effects.fuel !== undefined) {
@@ -253,6 +254,9 @@ function getOptionHint(option, journeyType) {
     } else if (crewEffect.injury) {
       hints.push('injures someone');
     }
+    if (crewEffect.evacuate || crewEffect.evacuate_sick) {
+      hints.push('evacuates a crew member');
+    }
   }
   if (option.schedulesEvent) hints.push('this comes back');
   // riskRejection is an alias, not a second mechanic: resolution.js:108 reads
@@ -272,7 +276,7 @@ function getOptionHint(option, journeyType) {
     hints.push(value > 0 ? `+${value} reputation` : `${value} reputation`);
   }
 
-  return hints.length > 0 ? hints.join(', ') : 'Safe choice';
+  return hints.length > 0 ? hints.join(', ') : 'No direct cost';
 }
 
 /**

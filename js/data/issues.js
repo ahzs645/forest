@@ -175,6 +175,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce", "planner"],
     areaTags: ["winter-road", "bwbs", "peace-region"],
     seasonBias: ["Winter Review"],
+    seasonLock: true,
     options: [
       {
         label: "Accelerate hauling with double shifts",
@@ -378,6 +379,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce", "silviculture", "planner"],
     areaTags: ["remote-camps", "winter-road"],
     seasonBias: ["Fall Integration", "Winter Review"],
+    seasonLock: true,
     options: [
       {
         label: "Mandate rest, fly in medical support",
@@ -682,6 +684,7 @@ export const ISSUE_LIBRARY = [
     roles: ["planner"],
     areaTags: ["winter-road", "remote-camps", "northern-bc"],
     seasonBias: ["Fall Integration"],
+    seasonLock: true,
     description:
       "Roadbuilding, harvesting, and silviculture teams have each optimized different blocks for freeze-up, and only one winter sequence can actually fit the access window.",
     options: [
@@ -711,6 +714,7 @@ export const ISSUE_LIBRARY = [
     roles: ["planner"],
     areaTags: ["winter-road", "northern-bc"],
     seasonBias: ["Winter Review"],
+    seasonLock: true,
     preconditions: {
       operationStages: ["reforecast"],
       seasons: ["winter"],
@@ -750,6 +754,7 @@ export const ISSUE_LIBRARY = [
     roles: ["permitter"],
     areaTags: ["bwbs", "peace-region", "peatland", "gas-interface", "northern-bc"],
     seasonBias: ["Spring Planning"],
+    seasonLock: true,
     baseWeight: 2,
     description:
       "District review sends your access package back with redlines across the Exhibit A, clearing estimate, and deactivation notes just as breakup approaches.",
@@ -869,6 +874,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce"],
     areaTags: ["steep", "remote-camps", "northern-bc"],
     seasonBias: ["Spring Planning"],
+    seasonLock: true,
     description:
       "Breakup reactivates a ravine crossing you flagged in winter, and the traverse line you sold as workable no longer lands on stable ground.",
     options: [

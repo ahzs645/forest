@@ -370,6 +370,31 @@ function applyRoundRecoveries(state, round, consequences) {
     consequences.push("operational-dividend");
   }
 
+  // Delivery dividend: the schedule counterpart to the operational dividend.
+  // A season carries five-plus decision cards and the careful answer on most
+  // of them costs schedule time; without a counterweight a disciplined desk
+  // year ground progress to the floor while compliance sat in the 90s. A file
+  // reviewers trust genuinely does move faster — referrals come back clean,
+  // permits don't bounce — so a clean, well-trusted program earns some of
+  // that time back each season. Same opening-season exemption as the other
+  // recoveries: dividends respond to a track record, not to week one.
+  // Sized so it keeps a careful year deliverable without powering the sprint
+  // to Outstanding: it only tops progress up toward 50, never past it.
+  if (round >= 2 && metrics.compliance >= 70 && metrics.relationships >= 60 && metrics.progress < 50) {
+    applyEffects(
+      state,
+      { progress: 6 },
+      {
+        type: "recovery",
+        id: "delivery-dividend",
+        title: "Delivery dividend from a trusted file",
+        option: "Clean referrals and reviews gave the schedule room back",
+        round,
+      },
+    );
+    consequences.push("delivery-dividend");
+  }
+
   // Field-discipline rebound ("repair compliance later"): a crew that is still
   // delivering real work on the ground can be pulled off the line to catch up
   // documentation and clean the file, clawing back some compliance at the cost

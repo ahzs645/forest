@@ -243,7 +243,12 @@ function reconPolicy(journey, options, prompt) {
   ]);
 }
 
-function planningPolicy(journey, options) {
+function planningPolicy(journey, options, prompt) {
+  // These menus have dynamic block ids, not action names. Deliberately select
+  // the first candidate instead of reporting an unrecognised action.
+  if (prompt === 'Select active block focus:' || prompt === 'Constraint triage:') {
+    return options[0];
+  }
   const plan = journey.plan || {};
   const gates = (Math.min(1, (plan.dataCompleteness || 0) / 80)
     + Math.min(1, (plan.analysisQuality || 0) / 80)
@@ -327,6 +332,9 @@ function silviculturePolicy(journey, options, prompt) {
     }
     return best;
   }
+  if (prompt === 'How do you respond?') {
+    return pick(options, ['medic', 'inspect', 'rest', 'pay']) || options[0];
+  }
 
   const canDeploy = (journey.contractors || []).some((contractor) => {
     const state = contractor.silvicultureState;
@@ -369,7 +377,7 @@ function summarizeState(journey) {
   return '';
 }
 
-async function simulateRun(roleName, seed, scale) {
+export async function simulateRun(roleName, seed, scale) {
   const role = ROLES[roleName];
   return withSeed(seed, async () => {
     const journey = role.create({ areaId: DEFAULT_AREA, roleId: role.roleId, scale });
@@ -485,4 +493,3 @@ const invokedDirectly = process.argv[1]
 if (invokedDirectly) {
   main();
 }
-

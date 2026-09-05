@@ -59,6 +59,7 @@ export async function handleEvent(game, event, frame = {}) {
   const content = buildEventCardContent(formatted, event, usable);
   const card = {
     ...content,
+    label: journey.journeyType === 'manager' && event.reporter ? 'OPS ESCALATION' : content.label,
     options: [...content.options, ...(frame.extraOptions || [])],
     dayHeader: frame.dayHeader || null,
     statusLine: frame.statusLine || null,

@@ -20,6 +20,7 @@ import {
 } from '../js/data/planningBlocks.js';
 import { FORESTER_ROLES } from '../js/data/roles.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
+import { normalizeSeasonalCard } from '../js/engine/seasonalContract.js';
 
 function makeUi() {
   const lines = [];
@@ -39,6 +40,20 @@ function makePlanningJourney() {
   const area = OPERATING_AREAS.find((candidate) => candidate.id === 'fraser-plateau');
   return createPlanningJourney({ roleId: 'planner', areaId: area.id, area });
 }
+
+test('seasonal stakes tolerate dollar costs that round to zero metric points', () => {
+  const card = normalizeSeasonalCard({
+    id: 'small-invoice',
+    title: 'Small invoice',
+    options: [{ label: 'Pay', effects: { budget: -100 } }],
+  }, {
+    role: FORESTER_ROLES.find((role) => role.id === 'planner'),
+    area: OPERATING_AREAS[0], round: 1,
+    metrics: { budget: 50 },
+  }, 'issue');
+  assert.equal(typeof card.context.stakes, 'string');
+  assert.ok(card.context.stakes.length > 0);
+});
 
 test('seasonal context renders structured operation, objective, and stakes instead of object coercion', () => {
   const lines = collectDetailLines({

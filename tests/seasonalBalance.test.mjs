@@ -63,6 +63,10 @@ function playSeason(roleId, areaId, strategy, seed) {
       const issue = drawIssue(state, rng);
       if (issue) cards.push(['issue', issue]);
     } else {
+      // Mirrors the controller's season shape (see tui/controller.js
+      // startRound): assignment, event, issue, temptation, then a second
+      // event (rounds 1–2) or second issue (rounds 3–4) — so this sweep
+      // exercises the pacing players actually get.
       const assignment = drawSeasonalAssignment(state, context, rng);
       if (assignment) {
         recordAssignmentSelection(state, assignment);
@@ -72,11 +76,25 @@ function playSeason(roleId, areaId, strategy, seed) {
       const event = drawSeasonalEvent(state, rng);
       if (event) cards.push(['event', event]);
 
+      const issue = drawIssue(state, rng);
+      if (issue) cards.push(['issue', issue]);
+
       const temptation = drawSeasonalTemptation(state, rng);
       if (temptation) cards.push(['temptation', temptation]);
 
-      const issue = drawIssue(state, rng);
-      if (issue) cards.push(['issue', issue]);
+      if (round <= 2) {
+        const secondEvent = drawSeasonalEvent(state, rng, {
+          advancePending: false,
+          excludeIds: event ? [event.id] : [],
+        });
+        if (secondEvent) cards.push(['event', secondEvent]);
+      } else {
+        const secondIssue = drawIssue(state, rng, {
+          advancePending: false,
+          excludeIds: issue ? [issue.id] : [],
+        });
+        if (secondIssue) cards.push(['issue', secondIssue]);
+      }
     }
 
     for (const [type, card] of cards) {
