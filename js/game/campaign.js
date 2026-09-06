@@ -46,7 +46,7 @@ export const CAMPAIGN_SEASONS = [
     label: 'Summer',
     roleId: 'silviculture',
     title: 'Silviculture Program',
-    situation: 'Planting windows are open. Put trees in the ground the spring recon said would carry them.',
+    situation: 'Hot, dry summer ground makes fresh planting inefficient, but brushing and survival checks are live. Put trees in where you must, then keep the stand moving.',
   },
   {
     id: 'fall',
@@ -152,6 +152,33 @@ function getObjectiveCompletion(journey) {
     }
     default:
       return 0;
+  }
+}
+
+function getObjectiveDetail(journey) {
+  switch (journey.journeyType) {
+    case 'recon':
+    case 'field': {
+      const achieved = journey.blocksAssessed || 0;
+      const target = journey.blocks?.length || 0;
+      return `${achieved}/${target} block packages finalized`;
+    }
+    case 'silviculture': {
+      const p = journey.planting || {};
+      const s = journey.surveys || {};
+      return `${p.blocksPlanted || 0}/${p.blocksToPlant || 0} blocks planted, ${s.freeGrowingComplete || 0}/${s.freeGrowingTarget || 0} free-growing surveys`;
+    }
+    case 'planning': {
+      const plan = journey.plan || {};
+      return `data ${Math.round(plan.dataCompleteness || 0)}/80, analysis ${Math.round(plan.analysisQuality || 0)}/80, buy-in ${Math.round(plan.stakeholderBuyIn || 0)}/75, confidence ${Math.round(plan.ministerialConfidence || 0)}/80`;
+    }
+    case 'permitting':
+    case 'desk': {
+      const permits = journey.permits || {};
+      return `${permits.approved || 0}/${permits.target || 0} permits approved`;
+    }
+    default:
+      return `${Math.round(getObjectiveCompletion(journey) * 100)}% complete`;
   }
 }
 
@@ -504,6 +531,7 @@ async function runCampaignSeason(game, campaign, season) {
   ui.campaignBanner = null;
   setExpeditionChromeHidden(true);
   const bridge = computeSeasonBridge(journey, endResult, journey.campaignStartBudget);
+  const objectiveDetail = getObjectiveDetail(journey);
   if (stance && Object.keys(stance.yearEffects).length) {
     bridge.causes.push(`Briefing stance "${stance.label}" → ${formatMetricDelta(stance.yearEffects)}`);
   }
@@ -569,8 +597,8 @@ async function runCampaignSeason(game, campaign, season) {
   ui.write('');
   ui.writeHeader(`${season.label.toUpperCase()} REVIEW`);
   ui.write(endResult.victory
-    ? `${season.title} delivered. ${endResult.reason || ''}`
-    : `${season.title} fell short. ${endResult.reason || ''}`);
+    ? `${season.title} delivered: ${objectiveDetail}. ${endResult.reason || ''}`
+    : `${season.title} fell short: ${objectiveDetail}. ${endResult.reason || ''}`);
   ui.write('');
   ui.writeDivider('WHAT IT DID TO THE YEAR');
   for (const cause of bridge.causes) ui.write(`• ${cause}`);
@@ -594,6 +622,7 @@ async function runCampaignSeason(game, campaign, season) {
     title: season.title,
     victory: endResult.victory === true,
     reason: endResult.reason || '',
+    detail: objectiveDetail,
     completion: Math.round(bridge.completion * 100),
     deltas: bridge.deltas,
     metricsAfter: { ...campaign.yearMetrics },
@@ -622,7 +651,7 @@ async function showYearEnd(ui, campaign) {
     body: `${wins}/${CAMPAIGN_SEASONS.length} deployments delivered. ${tierBody}`,
     scoreReasons: [],
     seasonSummaries: campaign.seasonLog.map((s) =>
-      `• ${s.season} ${s.title}: ${s.victory ? 'delivered' : 'fell short'} at ${s.completion}% — ${formatMetricDelta(s.deltas) || 'no metric movement'}`),
+      `• ${s.season} ${s.title}: ${s.victory ? 'delivered' : 'fell short'} at ${s.completion}% (${s.detail || 'counts unavailable'}) — ${formatMetricDelta(s.deltas) || 'no metric movement'}`),
     trendLines: Object.entries(metrics).map(([key, value]) => `${formatMetricName(key)}: ${Math.round(value)}`),
   };
 

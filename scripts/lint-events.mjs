@@ -28,6 +28,8 @@ const VALID_OPTION_KEYS = new Set([
   'riskRejection', 'timeUsed', 'schedulesEvent', 'scheduledDelay', 'requiresRole',
   'gameOver', 'gameOverReason', 'hiddenOutcome', 'chanceSuccess', 'failureOutcome',
   'failureEffects',
+  // Shared day-situation time policy (js/events/timePolicy.js).
+  'spendsDay', 'usesDay', 'timeCost', 'dayCost',
   // Graded outcome bands (js/events/odds.js).
   'chancePartial', 'partialOutcome', 'partialEffects', 'oddsModifiers',
   'partialCrewEffect', 'failureCrewEffect',
@@ -42,6 +44,8 @@ const VALID_EFFECT_KEYS = new Set([
   'budget', 'fuel', 'food', 'equipment', 'firstAid', 'politicalCapital',
   'timeUsed', 'progress', 'crew_health', 'crew_morale', 'compliance',
   'relationships', 'scrutiny', 'reputation', 'permits_approved', 'data',
+  // Field progress can explicitly mean turning back rather than incidental delay.
+  'progressMode',
 ]);
 const VALID_CREW_EFFECT_KEYS = new Set([
   'injury', 'illness', 'count', 'evacuate', 'evacuate_sick', 'rest',

@@ -536,6 +536,7 @@
    {
     "label": "Send everyone home early",
     "outcome": "Nothing can be done without the system. Team appreciates the break.",
+    "spendsDay": true,
     "effects": {
      "timeUsed": 8,
      "crew_morale": 10
@@ -582,9 +583,9 @@
   "options": [
    {
     "label": "Rebuild from field notes",
-    "outcome": "Painful work but you reconstruct the data. Lost two days.",
+    "outcome": "Painful work, but you reconstruct the data. The file loses the day to technical recovery.",
+    "spendsDay": true,
     "effects": {
-     "progress": -10,
      "timeUsed": 8
     }
    },
@@ -599,7 +600,7 @@
     "failureEffects": {
      "compliance": -8,
      "politicalCapital": -5,
-     "progress": -8,
+     "data": -8,
      "scrutiny": 4
     },
     "chanceSuccess": 0.65,
@@ -646,7 +647,7 @@
     "failureOutcome": "Rejected outright, with the stale data called out by name. You are rebuilding from field notes anyway — now with a compliance mark attached and a reviewer who reads everything your office sends.",
     "failureEffects": {
      "compliance": -10,
-     "progress": -10,
+     "data": -10,
      "timeUsed": 6,
      "politicalCapital": -4,
      "scrutiny": 6

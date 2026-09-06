@@ -1126,6 +1126,7 @@
    {
     "label": "Build a bypass",
     "outcome": "With shovels and chainsaws, you cut a rough detour. Takes all day.",
+    "spendsDay": true,
     "effects": {
      "progress": -8,
      "equipment": -10,
@@ -1134,7 +1135,8 @@
    },
    {
     "label": "Report and wait for road crew",
-    "outcome": "A proper crew will fix it in 2 days. You're stuck here.",
+    "outcome": "You spend the shift coordinating a road crew and waiting for a temporary crossing. The road reopens by closeout, with slow travel through the repair next shift.",
+    "spendsDay": true,
     "effects": {
      "progress": -15,
      "compliance": 5
@@ -1272,6 +1274,7 @@
    {
     "label": "Clear it with equipment",
     "outcome": "The skidder works blade-first through the debris while everyone else watches the slope above. By late afternoon there's a lane.",
+    "spendsDay": true,
     "effects": {
      "equipment": -12,
      "fuel": -8
@@ -1314,6 +1317,7 @@
    {
     "label": "Hand-clear a path",
     "outcome": "Everyone grabs a saw or a shovel. It's brutal work, but by dark there's a path wide enough for the trucks.",
+    "spendsDay": true,
     "effects": {
      "crew_health": -8,
      "crew_morale": -5
@@ -1352,6 +1356,7 @@
     "outcome": "Safety first. The office will coordinate geotechnical review.",
     "effects": {
      "progress": -12,
+     "progressMode": "turn_back",
      "compliance": 8
     }
    }
@@ -4653,15 +4658,15 @@
  },
  {
   "id": "campfire_storytelling",
-  "title": "Campfire Stories",
+  "title": "Breakfast Stories",
   "type": "morale",
   "severity": "positive",
   "probability": 0.1,
-  "description": "After a long day, someone starts telling stories around the fire. One by one, the whole crew joins in. Laughter echoes through the trees.",
+  "description": "Over breakfast, someone starts telling stories from past jobs. One by one, the whole crew joins in. Laughter carries across camp before the shift begins.",
   "options": [
    {
     "label": "Join in and share your own story",
-    "outcome": "You tell the one about the time you got lost for three days. Everyone howls. Best night of the season.",
+    "outcome": "You tell the one about the time you got lost for three days. Everyone howls. The crew starts the shift in good spirits.",
     "effects": {
      "crew_morale": 12
     }
@@ -4674,7 +4679,7 @@
     }
    },
    {
-    "label": "Remind everyone about the early start tomorrow",
+    "label": "Remind everyone the shift is starting",
     "outcome": "The mood deflates instantly. Professional but joyless.",
     "effects": {
      "crew_morale": -5,

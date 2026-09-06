@@ -1,5 +1,38 @@
 import { test, expect } from '@playwright/test';
 
+test.describe('touch grid choices', () => {
+  test.use({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
+
+  test('last campaign area is reachable through touch pages with usable targets', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bcForestry_displayMode', 'grid'));
+    await page.goto('/');
+    await page.locator('#campaign-btn').tap();
+    await expect(page.locator('#grid-canvas')).toBeVisible();
+    const target = await page.locator('#choices .choice-label').last().innerText();
+    let chosen = false;
+    for (let turn = 0; turn < 12 && !chosen; turn++) {
+      await expect.poll(() => page.evaluate(() => window.__forestGame.ui.gridView._regions.filter((region) => region.type === 'option').length)).toBeGreaterThan(0);
+      const next = await page.evaluate((label) => {
+        const grid = window.__forestGame.ui.gridView;
+        const region = grid._regions.find((entry) => entry.type === 'option' && entry.label === label)
+          || grid._regions.find((entry) => entry.type === 'option-page' && entry.label === '[Next]');
+        if (!region) return null;
+        return { label: region.label, height: region.h * grid.renderer.cellH,
+          x: (region.x + region.w / 2) * grid.renderer.cellW,
+          y: (region.y + region.h / 2) * grid.renderer.cellH,
+          start: grid._optionStart };
+      }, target);
+      expect(next, 'the last area or a next page must be tappable').not.toBeNull();
+      expect(next.height).toBeGreaterThanOrEqual(44);
+      await page.touchscreen.tap(next.x, next.y);
+      chosen = next.label === target;
+      if (!chosen) await expect.poll(() => page.evaluate(() => window.__forestGame.ui.gridView._optionStart)).toBeGreaterThan(next.start);
+    }
+    expect(chosen).toBe(true);
+    await expect(page.locator('#choices')).toContainText('Journeyman');
+  });
+});
+
 // The ASCII grid renderer projects the DOM game screen onto a canvas; the
 // hidden DOM keeps receiving input. This smoke run plays the campaign a few
 // steps with keyboard only and confirms the projection stays alive and the

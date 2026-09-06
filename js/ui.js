@@ -300,6 +300,7 @@ export class TerminalUI {
 
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => {
+      if (this.isModalOpen() && e.key === 'Tab') this._trapModalFocus(e);
       const canUseGameplayShortcuts = this._canUseGameplayShortcuts();
 
       // Number keys for choices (works in both classic and modern mode).
@@ -389,7 +390,8 @@ export class TerminalUI {
    * @private
    */
   _canUseGameplayShortcuts() {
-    return !this._isLandingVisible() && !this._isInitOverlayVisible();
+    return !this._isLandingVisible() && !this._isInitOverlayVisible()
+      && !this.isModalOpen() && !this._isInputFocused();
   }
 
   // ============ Full Status Update ============

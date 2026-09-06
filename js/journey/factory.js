@@ -619,6 +619,8 @@ export function createFieldJourney(options = {}) {
     weather: getRandomWeather(blocks[0], 1, createSeasonState(roleId)?.currentSeason),
     temperature: "cool",
     travelSetback: 0,
+    pendingTravelSetback: 0,
+    routeConstraints: [],
     routePlan: null,
     rationPlan: {
       mode: "normal",

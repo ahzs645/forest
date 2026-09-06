@@ -45,7 +45,7 @@ test('option hints disclose run-ending and evacuation choices without hiding gra
   assert.match(formatted.options[0].hint, /ends the run/i);
   assert.match(formatted.options[1].hint, /evacuates/i);
   assert.match(formatted.options[2].hint, /50% clean, 20% badly wrong/);
-  assert.equal(formatted.options[3].hint, 'No direct cost');
+  assert.equal(formatted.options[3].hint, 'brief response; work continues');
 });
 
 test('event outcomes wait for acknowledgement before play resumes', async () => {
@@ -115,6 +115,10 @@ test('illegal-act temptations have a priority draw from day two with a cooldown'
     assert.notEqual(coolingDown?.type, 'temptation');
 
     journey.day = 6;
+    const stillCoolingDown = checkForEvent(journey);
+    assert.notEqual(stillCoolingDown?.type, 'temptation');
+
+    journey.day = 8;
     const nextEligible = checkForEvent(journey);
     assert.equal(nextEligible?.type, 'temptation');
   } finally {
@@ -122,9 +126,9 @@ test('illegal-act temptations have a priority draw from day two with a cooldown'
   }
 });
 
-test('field temptation chance accepts a draw above the old twelve-percent rate', () => {
+test('field temptation chance accepts a draw inside the reduced pacing rate', () => {
   const originalRandom = Math.random;
-  Math.random = () => 0.17;
+  Math.random = () => 0.09;
 
   try {
     const journey = createJourney({
@@ -183,7 +187,7 @@ test('a heavy field delay never takes the whole shift', () => {
   assert.equal(journey.travelSetback, 0.75, 'the crew always makes some ground');
 });
 
-test('temptation lane guarantees an offer after three eligible misses', () => {
+test('temptation lane guarantees an offer after five eligible misses', () => {
   const originalRandom = Math.random;
   Math.random = () => 0.99;
   try {
@@ -192,11 +196,11 @@ test('temptation lane guarantees an offer after three eligible misses', () => {
       areaId: 'fort-st-john-plateau',
       crew: []
     });
-    for (const day of [2, 3, 4]) {
+    for (const day of [2, 3, 4, 5, 6]) {
       journey.day = day;
       checkForEvent(journey);
     }
-    journey.day = 5;
+    journey.day = 7;
     assert.equal(checkForEvent(journey)?.type, 'temptation');
   } finally {
     Math.random = originalRandom;

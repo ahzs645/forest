@@ -238,8 +238,9 @@ function reconPolicy(journey, options, prompt) {
   // the free options (set_tempo, consult_map, briefing) — a policy that did
   // would spin the day against FREE_LOOKUPS_PER_DAY instead of simulating.
   return pick(options, [
-    'ground_truth', 'values_sweep', 'travel', 'field_notebook',
-    'end_shift', 'next', 'continue'
+    'ground_truth', 'values_sweep', 'clear_route_constraint', 'detour_route_constraint',
+    'travel', 'field_notebook',
+    'end_shift', 'next', 'continue', 'camp_menu'
   ]);
 }
 

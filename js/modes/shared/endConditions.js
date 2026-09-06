@@ -142,7 +142,7 @@ export function checkPlanningEndConditions(journey) {
 export function checkManagerEndConditions(journey) {
   // Victory: Completed all terms (e.g., 100 days)
   if (journey.day > journey.deadline) {
-    if (journey.resources.budget > 0 && (journey.metrics.reputation || 50) > 40) {
+    if (journey.resources.budget > 0 && (journey.metrics.reputation ?? 50) > 40) {
       return { victory: true, reason: 'Successfully led the company through the term!' };
     } else {
       return { gameOver: true, reason: 'Term ended with poor performance' };
@@ -155,7 +155,7 @@ export function checkManagerEndConditions(journey) {
   }
 
   // Game over: Poor reputation
-  if ((journey.metrics.reputation || 50) <= 0) {
+  if ((journey.metrics.reputation ?? 50) <= 0) {
     return { gameOver: true, reason: 'Lost all public and board trust' };
   }
 

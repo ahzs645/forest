@@ -43,6 +43,7 @@ export class GridView {
     this._dirty = true;
     this._regions = [];
     this._scrollOffset = 0;
+    this._optionStart = 0;
     this._observers = [];
     this._logLineCount = 0;
     this._drag = null;
@@ -273,9 +274,9 @@ export class GridView {
     const inputVisible = this.ui.inputWrapper && !this.ui.inputWrapper.hidden;
     let optH = 0;
     if (optionRows.length) {
-      const cap = Math.max(5, Math.floor(rows * 0.45));
-      const spaced = optionRows.length * 2 + 1;
-      optH = Math.min(this._touch && spaced <= cap ? spaced : optionRows.length + 2, cap);
+      const step = this._touch ? Math.ceil(44 / this.renderer.cellH) : 1;
+      const cap = Math.max(2 + step * 2, Math.floor(rows * 0.45));
+      optH = Math.min(optionRows.length * step + 2, cap);
     } else if (inputVisible) optH = 3;
 
     const logH = bottom - top - optH - (hasSidebar ? 0 : (this.ui._missionStatus ? 1 : 0));
@@ -542,6 +543,7 @@ export class GridView {
 
   _optionEntries() {
     return Array.from(this.ui.choices?.querySelectorAll('button') || []).map((btn) => ({
+      element: btn,
       key: btn.querySelector('.choice-key')?.textContent.trim() || '',
       label: btn.querySelector('.choice-label')?.textContent.trim()
         || btn.textContent.replace(/\s+/g, ' ').trim(),
@@ -556,13 +558,25 @@ export class GridView {
     t.drawBox(x, y, w, h, C.borderStrong, 'RESPOND');
     const innerX = x + 2;
     const innerW = w - 4;
-    // Touch gets a blank row between options so each tap target is two cells
-    // tall — unless the menu is long enough that spacing would hide entries.
+    // Keep touch targets large even when there are many choices. Paging owns
+    // its own hit area; a clipped menu must never require a physical keyboard.
     const inner = h - 2;
-    let step = this._touch ? 2 : 1;
-    if (step > 1 && Math.floor((inner + 1) / 2) < entries.length) step = 1;
-    const visible = entries.slice(0, Math.floor((inner + step - 1) / step));
+    const step = this._touch ? Math.ceil(44 / this.renderer.cellH) : 1;
+    const paged = entries.length * step > inner;
+    const capacity = Math.max(1, Math.floor((inner - (paged ? step : 0)) / step));
     const focusIndex = entries.findIndex((e) => e.focused);
+    const focusElement = entries[focusIndex]?.element;
+    if (this._optionMenu !== entries[0]?.element) {
+      this._optionMenu = entries[0]?.element;
+      this._optionStart = 0;
+    }
+    if (focusIndex >= 0 && focusElement !== this._optionFocus
+      && (focusIndex < this._optionStart || focusIndex >= this._optionStart + capacity)) {
+      this._optionStart = Math.floor(focusIndex / capacity) * capacity;
+    }
+    this._optionFocus = focusElement;
+    this._optionStart = Math.min(this._optionStart, Math.floor((entries.length - 1) / capacity) * capacity);
+    const visible = entries.slice(this._optionStart, this._optionStart + capacity);
 
     visible.forEach((entry, r) => {
       const rowY = y + 1 + r * step;
@@ -583,16 +597,20 @@ export class GridView {
           t.drawText(tagText, x + w - 2 - tagText.length, rowY, tone);
         }
       }
-      this._regions.push({ x: x + 1, y: rowY, w: w - 2, h: step, action: entry.click });
+      this._regions.push({ x: x + 1, y: rowY, w: w - 2, h: step, label: entry.label, type: 'option', action: entry.click });
     });
 
-    if (entries.length > visible.length) {
-      const more = `… ${entries.length - visible.length} more`;
-      t.drawText(this._touch ? more : `${more} (number keys work)`, innerX, y + h - 1, C.warn);
-    }
-    // Keep the focused-but-clipped case honest
-    if (focusIndex >= visible.length && focusIndex !== -1) {
-      t.drawText('▼', x + w - 3, y + h - 1, C.accent);
+    if (paged) {
+      const pagerY = y + h - 1 - step;
+      const half = Math.floor((w - 2) / 2);
+      const addPage = (direction, label, col) => {
+        t.drawText(label, col + 1, pagerY, C.warn);
+        this._regions.push({ x: col, y: pagerY, w: half, h: step, type: 'option-page', label,
+          action: () => { this._optionStart += direction * capacity; this._scheduleDraw(); } });
+      };
+      if (this._optionStart > 0) addPage(-1, '[Previous]', x + 1);
+      if (this._optionStart + capacity < entries.length) addPage(1, '[Next]', x + 1 + half);
+      t.drawText(`${this._optionStart + 1}-${this._optionStart + visible.length}/${entries.length}`, innerX, y + h - 1, C.dim);
     }
   }
 

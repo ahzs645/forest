@@ -13,6 +13,9 @@
   flex-direction: column;
   flex-shrink: 0;
   order: -1;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 
   @include mobile-down {
     position: fixed;
@@ -51,7 +54,9 @@
 
 .panel-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-md);
 }
 

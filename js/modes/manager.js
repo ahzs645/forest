@@ -57,6 +57,7 @@ export async function runManagerDay(game) {
           `$${Math.round((journey.resources.budget || 0) / 1000)}k on hand`,
           `${monthsLeft} month${monthsLeft === 1 ? '' : 's'} left in the term`,
         ]),
+        onRender: () => updateManagerMissionStatus(ui, journey),
       },
       setAsideDescription: 'Delegate it. Keep the month for the business.',
     });
@@ -141,11 +142,15 @@ async function runExecutiveOnboarding(game) {
 function displayManagerHeader(ui, journey) {
   ui.clear();
   ui.writeHeader(`MANAGER - MONTH ${journey.day}/${journey.deadline}`);
+  ui.updateAllStatus(journey);
+  updateManagerMissionStatus(ui, journey);
+}
 
+function updateManagerMissionStatus(ui, journey) {
   // Status renders in the mission dashboard pane; budget/political capital
   // live in the supplies pane and the crew pane covers the executive team.
   const budgetOk = journey.resources.budget > 0;
-  const repOk = (journey.metrics.reputation || 50) > 40;
+  const repOk = (journey.metrics.reputation ?? 50) > 40;
 
   const facts = [
     { label: 'Reputation', value: `${Math.round(journey.metrics.reputation)}%`, tone: repOk ? undefined : 'danger' },
@@ -628,5 +633,3 @@ function bumpCrewMorale(journey, delta) {
 function recordDecision(journey, beat, choice) {
   journey.decisions.push({ day: journey.day, type: "strategic", beat, choice });
 }
-
-

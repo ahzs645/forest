@@ -294,7 +294,7 @@ function applyEventEffects(journey, effects, messages) {
 
   // Progress effects
   if (typeof effects.progress === 'number' && effects.progress !== 0) {
-    applyProgressEffects(journey, effects.progress, messages);
+    applyProgressEffects(journey, effects.progress, messages, effects);
   }
 
   // Crew-wide effects
@@ -335,6 +335,7 @@ function applyEventEffects(journey, effects, messages) {
   // Survey/intel data (recce discoveries; feeds planning data when present)
   if (typeof effects.data === 'number' && effects.data !== 0) {
     let banked = false;
+    let planningData = false;
     if (typeof journey.qualitySurveys === 'number') {
       journey.qualitySurveys += Math.max(1, Math.round(effects.data / 5));
       banked = true;
@@ -342,9 +343,13 @@ function applyEventEffects(journey, effects, messages) {
     if (journey.plan && typeof journey.plan.dataCompleteness === 'number') {
       journey.plan.dataCompleteness = clampPercent(journey.plan.dataCompleteness + effects.data);
       banked = true;
+      planningData = true;
     }
     if (banked) {
-      messages.push(`Survey data logged (+${effects.data}).`);
+      const sign = effects.data > 0 ? '+' : '';
+      messages.push(planningData
+        ? `Data readiness ${effects.data > 0 ? 'improved' : 'slipped'} (${sign}${effects.data}%).`
+        : `Survey data logged (${sign}${effects.data}).`);
     }
   }
 
@@ -425,7 +430,7 @@ function applyDiscoveryTagEffects(journey, event, option) {
   return [`Carry-forward intel: ${tags.map((tag) => tag.label).join(', ')}.`];
 }
 
-function applyProgressEffects(journey, progressPoints, messages) {
+function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
   switch (journey.journeyType) {
     case 'planning':
       applyPlanningProgress(journey, progressPoints, messages);
@@ -439,8 +444,14 @@ function applyProgressEffects(journey, progressPoints, messages) {
     case 'field':
     case 'recon':
       if (typeof journey.distanceTraveled === 'number') {
-        journey.distanceTraveled = Math.max(0, journey.distanceTraveled + progressPoints);
-        syncBlocksFromDistance(journey);
+        if (progressPoints < 0 && effects.progressMode !== 'turn_back') {
+          const setback = Math.min(MAX_TRAVEL_SETBACK, Math.abs(progressPoints) / 16);
+          journey.travelSetback = Math.min(MAX_TRAVEL_SETBACK, (journey.travelSetback || 0) + setback);
+          messages.push(`Travel delay queued; no ground is lost (${Math.abs(progressPoints)} km-equivalent setback).`);
+        } else {
+          journey.distanceTraveled = Math.max(0, journey.distanceTraveled + progressPoints);
+          syncBlocksFromDistance(journey);
+        }
       }
       return;
 

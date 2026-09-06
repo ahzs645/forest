@@ -261,7 +261,16 @@ function getPermittingPaperworkChainId(journey) {
   return 'registration';
 }
 
-function formatPermittingStageLabel(stage) {
+function formatPermittingStageLabel(stage, chainId = null) {
+  const roadLabels = {
+    screen: 'Road screen',
+    map: 'Road map exhibits',
+    submit: 'Road submission',
+    maintenance: 'Maintenance conditions'
+  };
+  if (chainId === 'roadPermit' && roadLabels[stage]) {
+    return roadLabels[stage];
+  }
   return String(stage || 'review')
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -271,7 +280,7 @@ function formatPermittingStageLabel(stage) {
 function getPermittingLaneAction(journey) {
   const chainId = getPermittingPaperworkChainId(journey);
   const professional = getPermittingProfessionalSnapshot(journey);
-  const chain = professional?.chains?.[chainId] || null;
+  const chain = professional?.[`${chainId}Chain`] || null;
   const stepIndex = chain
     ? Math.min(chain.stepIndex, Math.max(0, chain.steps.length - 1))
     : 0;
@@ -295,7 +304,7 @@ function getPermittingLaneAction(journey) {
     laneLabel: laneMap[chainId] || 'Professional file',
     actionLabel: labelMap[chainId] || 'Compliance Admin',
     stage,
-    stageLabel: formatPermittingStageLabel(stage),
+    stageLabel: formatPermittingStageLabel(stage, chainId),
     stageIndex: chain ? Math.min(chain.stepIndex + 1, chain.steps.length) : 1,
     stageCount: chain?.steps?.length || 1
   };
@@ -561,7 +570,7 @@ function buildPermittingActionGuidance(journey) {
   if (revisionQueue.length > 0) {
     const ticket = revisionQueue[0];
     lane = 'Revision queue';
-    headline = `Clean response: ${ticket.title} to keep scrutiny from stacking on the file.`;
+    headline = `Clean response: ${ticket.fileLabel || ticket.id} (${ticket.title}) to keep scrutiny from stacking on the file.`;
     pushPermittingGuideStep(steps, ticket.summary);
     pushPermittingGuideStep(steps, 'Use the clean response first unless you need a desperate fast resubmission.');
     return { lane, headline, steps };
@@ -656,6 +665,13 @@ function ensurePermitRevisionBaseState(journey) {
 
 export function ensurePermittingRevisionState(journey) {
   const queue = ensurePermitRevisionBaseState(journey);
+  for (const [index, ticket] of queue.entries()) {
+    if (ticket && !ticket.fileLabel) {
+      const sequence = getRevisionTicketSequence(ticket, index + 1);
+      ticket.sequence = sequence;
+      ticket.fileLabel = formatRevisionFileLabel(ticket.profileId || 'package', sequence);
+    }
+  }
   const missingTickets = Math.max(0, (journey.permits.needsRevision || 0) - journey.permits.revisionQueue.length);
   for (let i = 0; i < missingTickets; i++) {
     const profile = pickRevisionProfile(journey, journey.permits.revisionQueue.length + i);
@@ -663,6 +679,8 @@ export function ensurePermittingRevisionState(journey) {
     journey.permits.revisionSeq = nextSeq;
     journey.permits.revisionQueue.push({
       id: `revision-${journey.day || 0}-${nextSeq}-${profile.id}`,
+      sequence: nextSeq,
+      fileLabel: formatRevisionFileLabel(profile.id, nextSeq),
       profileId: profile.id,
       title: profile.title,
       summary: profile.summary,
@@ -736,6 +754,28 @@ function pickRevisionProfile(journey, index = 0) {
   return profiles[index % profiles.length];
 }
 
+function formatRevisionFileLabel(profileId, sequence) {
+  const prefix = {
+    'fish-passage': 'FP',
+    'community-watershed': 'CW',
+    consultation: 'CN',
+    'visual-quality': 'VQ',
+    'access-engineering': 'AE',
+    'package-completeness': 'PKG'
+  }[profileId] || 'REV';
+  const seq = Math.max(1, Number(sequence) || 1);
+  return `${prefix}-${String(seq).padStart(3, '0')}`;
+}
+
+function getRevisionTicketSequence(ticket, fallback = 1) {
+  if (Number.isFinite(Number(ticket?.sequence)) && Number(ticket.sequence) > 0) {
+    return Math.floor(Number(ticket.sequence));
+  }
+  const match = String(ticket?.id || '').match(/^revision-\d+-(\d+)-/);
+  if (match) return Math.max(1, Number(match[1]) || fallback);
+  return Math.max(1, Number(fallback) || 1);
+}
+
 /**
  * Seed revision tickets for newly returned permits.
  * @param {Object} journey - Journey state
@@ -760,6 +800,8 @@ function pushRevisionTicket(journey, index, source = {}) {
   journey.permits.revisionSeq = nextSeq;
   const ticket = {
     id: `revision-${journey.day || 0}-${nextSeq}-${profile.id}`,
+    sequence: nextSeq,
+    fileLabel: formatRevisionFileLabel(profile.id, nextSeq),
     profileId: profile.id,
     title: profile.title,
     summary: profile.summary,
@@ -871,8 +913,8 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
   const responseLabel = selectedMode === 'fast' ? 'Quick resubmission' : 'Clean response';
   const messages = [
     cleared.length > 1
-      ? `${responseLabel} filed for ${ticket.title} and ${cleared.length - 1} more open file${cleared.length > 2 ? 's' : ''}.`
-      : `${responseLabel} filed for ${ticket.title}.`,
+      ? `${responseLabel} filed for ${ticket.fileLabel || ticket.id} (${ticket.title}) and ${cleared.length - 1} more open file${cleared.length > 2 ? 's' : ''}.`
+      : `${responseLabel} filed for ${ticket.fileLabel || ticket.id} (${ticket.title}).`,
     response.note
   ];
 
@@ -934,6 +976,7 @@ export async function runPermittingDay(game) {
       frame: {
         dayHeader: buildPermittingDayHeader(journey),
         statusLine: buildPermittingStatusLine(journey),
+        onRender: () => updatePermittingMissionStatus(ui, journey),
       },
       setAsideDescription: 'Not today. Keep the day for the queue.',
     });
@@ -1171,7 +1214,7 @@ function displayPermittingBriefing(ui, journey) {
   if (revisionQueue.length > 0) {
     ui.write(`  Open Deficiencies: ${revisionQueue.length}`);
     for (const ticket of revisionQueue.slice(0, 2)) {
-      ui.write(`    - ${ticket.title}: ${ticket.summary}`);
+      ui.write(`    - ${ticket.fileLabel || ticket.id} (${ticket.title}): ${ticket.summary}`);
     }
   }
   const areaSituation = getAreaSituationSummary(journey);
@@ -1213,6 +1256,7 @@ function displayPermittingBriefing(ui, journey) {
 export function buildActionOptions(journey) {
   const revisionQueue = ensurePermittingRevisionState(journey);
   const laneAction = getPermittingLaneAction(journey);
+  const openRevisionTickets = revisionQueue.filter((ticket) => ticket && !ticket.resolved);
 
   // The turn is split so it reads as a decision, not an audit:
   //   primary  = the best move + core pipeline throughput (kept ≤6)
@@ -1239,8 +1283,10 @@ export function buildActionOptions(journey) {
     if (professional?.paperworkLoad > 0) {
       pieces.push(`paperwork ${professional.paperworkLoad} (filing backlog slowing the desk)`);
     }
-    const adminUrgent = (professional?.paperworkLoad || 0) >= PAPERWORK_ADMIN_URGENT_THRESHOLD
-      || professional?.registrationStatus !== 'active';
+    const adminUrgent = openRevisionTickets.length === 0 && (
+      (professional?.paperworkLoad || 0) >= PAPERWORK_ADMIN_URGENT_THRESHOLD
+      || professional?.registrationStatus !== 'active'
+    );
     const laneDetail = `Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel}`;
     const prefix = adminUrgent ? 'Best move | ' : '';
     primary.push({
@@ -1271,17 +1317,16 @@ export function buildActionOptions(journey) {
 
   // First open deficiency gets a top-level pair; extras drop into the submenu so
   // the primary menu does not balloon when several files come back at once.
-  const openRevisionTickets = revisionQueue.filter((ticket) => ticket && !ticket.resolved);
   openRevisionTickets.forEach((ticket, index) => {
     const bucket = index === 0 ? primary : support;
     bucket.push({
-      label: `Clean response: ${ticket.title}`,
-      description: 'Fix the deficiency properly; lower scrutiny',
+      label: `Clean response: ${ticket.fileLabel || ticket.id}`,
+      description: `Best move when a deficiency is open | ${ticket.title}: ${ticket.summary}`,
       value: `revise_permit:${ticket.id}:clean`
     });
     bucket.push({
-      label: `Fast-track: ${ticket.title}`,
-      description: 'Quicker resubmission, but more heat',
+      label: `Fast-track: ${ticket.fileLabel || ticket.id}`,
+      description: `${ticket.title}: quicker resubmission, but more heat`,
       value: `revise_permit:${ticket.id}:fast`
     });
   });

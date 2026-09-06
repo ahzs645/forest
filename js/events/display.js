@@ -4,6 +4,7 @@
  */
 
 import { isFieldJourney } from './constants.js';
+import { formatOptionTimeCost } from './timePolicy.js';
 
 /**
  * Give field events one consistent radio lead without making the reporter's
@@ -35,7 +36,7 @@ export function formatEventForDisplay(event, journeyType = 'field') {
     options: event.options.map((opt, index) => ({
       index: index + 1,
       label: opt.label,
-      hint: getOptionHint(opt, journeyType),
+      hint: getOptionHint(opt, journeyType, event),
       tag: deriveOptionRiskTag(opt)
     }))
   };
@@ -149,19 +150,21 @@ function formatOddsHint(option) {
 /**
  * Generate a hint about an option's effects
  */
-function getOptionHint(option, journeyType) {
+function getOptionHint(option, journeyType, event = null) {
+  const timeHint = formatOptionTimeCost(event, option, journeyType);
   // A run-ending choice must say so even when the authored outcome is hidden.
-  if (option.gameOver) return 'Ends the run';
+  if (option.gameOver) return ['Ends the run', timeHint].filter(Boolean).join(', ');
   // Options flagged hiddenOutcome keep their effects close to the chest — but
   // an authored gamble still names its odds. Previously this returned before
   // the chanceSuccess line below could ever run, and since both options in the
   // whole corpus carrying chanceSuccess are also hiddenOutcome, the "% success
   // odds" hint was unreachable: the game rolled a number it could not show.
   if (option.hiddenOutcome) {
-    return formatOddsHint(option) || 'Outcome uncertain';
+    return [formatOddsHint(option) || 'Outcome uncertain', timeHint].filter(Boolean).join(', ');
   }
 
   const hints = [];
+  if (timeHint) hints.push(timeHint);
 
   if (option.effects) {
     if (option.effects.fuel !== undefined) {
@@ -206,10 +209,15 @@ function getOptionHint(option, journeyType) {
       hints.push(option.effects.data > 0 ? `+${option.effects.data} data` : `${option.effects.data} data`);
     }
     if (option.effects.progress !== undefined && option.effects.progress !== 0) {
-      const unit = journeyType === 'field' || journeyType === 'recon' ? ' km traverse' : ' progress';
-      hints.push(option.effects.progress > 0
-        ? `+${option.effects.progress}${unit}`
-        : `${option.effects.progress}${unit}`);
+      const field = journeyType === 'field' || journeyType === 'recon';
+      if (field && option.effects.progress < 0 && option.effects.progressMode !== 'turn_back') {
+        hints.push('slower next travel leg');
+      } else {
+        const unit = field ? ' km traverse' : ' progress';
+        hints.push(option.effects.progress > 0
+          ? `+${option.effects.progress}${unit}`
+          : `${option.effects.progress}${unit}`);
+      }
     }
     if (option.effects.permits_approved !== undefined) {
       const amount = option.effects.permits_approved;

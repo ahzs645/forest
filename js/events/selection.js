@@ -553,7 +553,7 @@ function getTemptationProfileForAct(act) {
 
 // Minimum days between shortcut offers, so a higher draw rate reads as texture
 // rather than a nag.
-const TEMPTATION_COOLDOWN_DAYS = 4;
+const TEMPTATION_COOLDOWN_DAYS = 6;
 
 /**
  * The shortcut, as an actual gamble.
@@ -632,9 +632,9 @@ function maybeCreateTemptationEvent(journey) {
   const memory = journey.temptationMemory || (journey.temptationMemory = { lastDay: 0, seenActIds: [], missedEligibleDays: 0 });
   if (day <= 1 || (memory.lastDay > 0 && day - memory.lastDay < TEMPTATION_COOLDOWN_DAYS)) return null;
 
-  const baseChance = isDesk ? 0.15 : 0.18;
-  const chance = Math.min(0.3, baseChance * getDifficultyEventModifier(journey));
-  const guaranteeAfterMisses = 3;
+  const baseChance = isDesk ? 0.08 : 0.1;
+  const chance = Math.min(0.22, baseChance * getDifficultyEventModifier(journey));
+  const guaranteeAfterMisses = 5;
   if (Math.random() > chance && Number(memory.missedEligibleDays || 0) < guaranteeAfterMisses) {
     memory.missedEligibleDays = Number(memory.missedEligibleDays || 0) + 1;
     return null;

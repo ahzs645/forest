@@ -12,6 +12,7 @@ import {
   getCurrentSegmentLength,
   getDistanceIntoCurrentSegment
 } from './blockNav.js';
+import { ensureRouteConstraints, getActiveRouteConstraint } from './routeConstraints.js';
 import { getOperationalProgress, recordProgressMilestones } from './progress.js';
 import {
   applyRandomInjury,
@@ -783,10 +784,11 @@ export function calculateTravelDistance(journey, paceId) {
   const segmentLength = getCurrentSegmentLength(journey.blocks, journey.currentBlockIndex);
   const distanceIntoSegment = getDistanceIntoCurrentSegment(journey);
   const remaining = Math.max(0, segmentLength - distanceIntoSegment);
-  const reachesBlock = distance >= remaining && remaining > 0;
+  const clampedDistance = remaining > 0 ? Math.min(distance, remaining) : 0;
+  const reachesBlock = clampedDistance >= remaining && remaining > 0;
 
   return {
-    distance: Math.round(distance * 10) / 10,
+    distance: Math.min(remaining, Math.round(clampedDistance * 10) / 10),
     reachesBlock: Boolean(reachesBlock),
     blockName: reachesBlock ? nextBlock.name : null,
     terrain: terrain.name,
@@ -802,6 +804,7 @@ export function calculateTravelDistance(journey, paceId) {
  */
 export function executeFieldAction(journey, paceId) {
   const messages = [];
+  ensureRouteConstraints(journey);
   let effectivePaceId = paceId;
   let pace = PACE_OPTIONS[paceId] || PACE_OPTIONS.normal;
 
@@ -815,6 +818,11 @@ export function executeFieldAction(journey, paceId) {
 
   // Block travel if fuel or equipment is depleted
   if (pace.distanceMultiplier > 0) {
+    const constraint = getActiveRouteConstraint(journey);
+    if (constraint) {
+      messages.push(`${constraint.title} still blocks travel to ${constraint.toBlockName}. Clear it or mark a detour first.`);
+      return { journey, messages, blocked: true };
+    }
     if (journey.resources.fuel <= 0) {
       messages.push('No fuel left. The crew stays in camp.');
       effectivePaceId = 'camp_work';
@@ -835,11 +843,12 @@ export function executeFieldAction(journey, paceId) {
 
   if (travelInfo.distance > 0) {
     messages.push(`Covered ${travelInfo.distance} km of traverse at ${pace.name} pace.`);
+    journey.travelSetback = 0;
   } else {
     if (effectivePaceId === 'resting') {
       messages.push('The crew stood down and recovered this shift.');
     } else {
-      messages.push('The crew stayed in camp for the shift.');
+      messages.push('The shift ends without a travel leg.');
     }
   }
 
@@ -1025,7 +1034,8 @@ export function endFieldDay(journey) {
   }
   journey.weather = getRandomWeather(getCurrentBlock(journey), journey.day, journey.season?.currentSeason);
   journey.temperature = getTemperature(journey.weather, getCurrentBlock(journey));
-  journey.travelSetback = 0;
+  journey.travelSetback = Math.min(0.75, Math.max(0, journey.travelSetback || 0) + Math.max(0, journey.pendingTravelSetback || 0));
+  journey.pendingTravelSetback = 0;
   journey.routePlan = null;
   if (journey.rationPlan) {
     journey.rationPlan.mode = 'normal';

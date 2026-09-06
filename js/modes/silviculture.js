@@ -152,6 +152,7 @@ export async function runSilvicultureDay(game) {
       frame: {
         dayHeader: buildSilvicultureDayHeader(journey),
         statusLine: buildSilvicultureStatusLine(journey),
+        onRender: () => updateSilvicultureMissionStatus(ui, journey, seasonInfo, zoneProfile),
       },
       setAsideDescription: 'Not today. Keep the day for the program.',
     });
@@ -301,7 +302,12 @@ function buildSilvicultureStatusLine(journey) {
  */
 function buildSilvicultureQuietTitle(journey, seasonInfo) {
   const activeContractors = (journey.contractors || []).filter((c) => c.isActive);
+  const readyContractors = (journey.contractors || []).filter((c) => {
+    const state = ensureSilvicultureContractorState(c, journey, getSilvicultureZoneProfile(journey));
+    return !c.isActive && state.status === 'ready';
+  });
   if (seasonInfo?.id === 'winter') return 'FROZEN GROUND';
+  if (activeContractors.length === 0 && readyContractors.length > 0) return 'CREWS READY TO DEPLOY';
   if (activeContractors.length === 0) return 'NOBODY ON THE GROUND';
   if (activeContractors.some((c) => c.morale < 40)) return 'A SHORT-TEMPERED CHECK-IN';
   if (getVegetationPressure(journey) > 0.25) return 'BRUSH COMING UP FAST';
@@ -317,7 +323,13 @@ function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState) {
   if (seasonInfo?.id === 'winter') {
     parts.push('The ground is frozen through and nothing plants until spring. What moves today is the roster and the paperwork.');
   } else if (activeContractors.length === 0) {
-    parts.push('Check-in time comes and goes with nobody deployed. The program does not move until a crew is on it.');
+    const readyCount = (journey.contractors || []).filter((c) => {
+      const state = ensureSilvicultureContractorState(c, journey, getSilvicultureZoneProfile(journey));
+      return !c.isActive && state.status === 'ready';
+    }).length;
+    parts.push(readyCount > 0
+      ? `${readyCount} rested contractor${readyCount === 1 ? ' is' : 's are'} ready. Picking a field task will deploy the best fit automatically.`
+      : 'Check-in time comes and goes with nobody deployed or ready. Rotate a contractor back before the program can move.');
   } else if (unhappy) {
     parts.push(`${unhappy.name} keeps the morning call short and lets you hear it. Nothing that needs an answer yet.`);
   } else {
@@ -682,7 +694,7 @@ async function handlePlanting(game, seasonMods, stage = 'plant', silvicultureSta
   const vegetationPressure = getVegetationPressure(journey);
   const activeState = silvicultureState || ensureSilvicultureState(journey);
   const pressure = zoneProfile || getSilvicultureZoneProfile(journey, activeState);
-  const taskContractors = getSilvicultureTaskContractors(journey, pressure, stage);
+  const taskContractors = getSilvicultureTaskContractors(journey, pressure, stage, true, ui);
 
   if (stage !== 'fill' && journey.planting.blocksPlanted >= journey.planting.blocksToPlant) {
     ui.write('All planting blocks are already complete. Shift effort elsewhere.');
@@ -692,6 +704,10 @@ async function handlePlanting(game, seasonMods, stage = 'plant', silvicultureSta
   const activeContractors = taskContractors.length > 0
     ? taskContractors
     : journey.contractors.filter(c => c.isActive && (c.specialty === 'planting' || (stage === 'fill' && c.specialty === 'brushing')));
+  if (activeContractors.length === 0) {
+    ui.writeWarning('No contractor is available for this task. Rotate a ready crew onto the program first.');
+    return false;
+  }
   const avgProductivity = activeContractors.length > 0
     ? activeContractors.reduce((sum, c) => {
       const profile = getSilvicultureContractorFit(c, pressure, stage);
@@ -784,10 +800,14 @@ async function handleHerbicide(game, seasonMods, silvicultureState = null, zoneP
   const vegetationPressure = getVegetationPressure(journey);
   const activeState = silvicultureState || ensureSilvicultureState(journey);
   const pressure = zoneProfile || getSilvicultureZoneProfile(journey, activeState);
-  const activeContractors = getSilvicultureTaskContractors(journey, pressure, 'brush');
+  const activeContractors = getSilvicultureTaskContractors(journey, pressure, 'brush', true, ui);
 
   if (journey.brushing.hectaresComplete >= journey.brushing.hectaresTarget) {
     ui.write('Competing vegetation target already treated. Save the spray budget.');
+    return false;
+  }
+  if (activeContractors.length === 0) {
+    ui.writeWarning('No contractor is available for brush treatment. Rotate a ready crew onto the program first.');
     return false;
   }
 
@@ -843,7 +863,7 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
   const activeState = silvicultureState || ensureSilvicultureState(journey);
   const pressure = zoneProfile || getSilvicultureZoneProfile(journey, activeState);
   const scrutinyPressure = getScrutinyPressure(journey);
-  const activeContractors = getSilvicultureTaskContractors(journey, pressure, 'survey');
+  const activeContractors = getSilvicultureTaskContractors(journey, pressure, 'survey', true, ui);
   const rushedSurvey = activeState.phase !== 'survey' || brushRatio < Math.max(0.2, plantRatio - 0.08);
 
   if (journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget) {
@@ -851,12 +871,17 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
     return false;
   }
 
-  journey.surveys.regenerationSurveys++;
-  journey.resources.budget -= 700;
-
   const hasSurveyor = journey.crew
     ? (crewHasRole(journey.crew, 'surveyor') || crewHasRole(journey.crew, 'spotter'))
     : false;
+  if (activeContractors.length === 0 && !hasSurveyor) {
+    ui.writeWarning('No survey crew is available. Rotate a survey-capable contractor or use the team only when a surveyor/spotter is present.');
+    return false;
+  }
+
+  journey.surveys.regenerationSurveys++;
+  journey.resources.budget -= 700;
+
   const contractorSurveySupport = activeContractors.some((contractor) => {
     const specialty = String(contractor?.specialty || '').toLowerCase();
     return specialty === 'survey' || specialty === 'surveyor' || specialty === 'spotter';
@@ -892,7 +917,8 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
       ui.write('Fall conditions provided ideal assessment conditions.');
     }
   } else {
-    ui.write('Survey complete - more monitoring needed.');
+    ui.write('Survey complete - the stand is not defensible as free-growing yet.');
+    ui.write(`This visit had a ${Math.round(successChance * 100)}% chance of a conclusive assessment. Address the conditions below, then survey again with a rested specialist.`);
     addDiscoveryTags(journey, ['regen_gap'], {
       source: 'silviculture:survey',
       severity: rushedSurvey ? 3 : 2,
@@ -902,8 +928,14 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
       ui.writeWarning('Rushed stand-tending is making the free-growing call harder to defend.');
       adjustScrutiny(journey, 1);
     }
+    if (brushRatio < Math.max(0.35, plantRatio - 0.05)) {
+      ui.writeWarning('Brush treatment is behind planted ground; close that gap before the next survey.');
+    }
     if (vegetationPressure > 0.15) {
       ui.writeWarning('Brush competition is making free-growing declarations harder to land.');
+    }
+    if (!contractorSurveySupport) {
+      ui.writeWarning('A dedicated survey contractor improves the next attempt.');
     }
     if (pressure.surveyPressure > 0.05) {
       ui.writeWarning(pressure.summary);
@@ -937,7 +969,14 @@ async function handleSurvivalCheck(game, seasonMods, silvicultureState = null, z
   const activeState = silvicultureState || ensureSilvicultureState(journey);
   const pressure = zoneProfile || getSilvicultureZoneProfile(journey, activeState);
   const plantingEff = seasonMods?.plantingEfficiency ?? 1.0;
-  const activeContractors = getSilvicultureTaskContractors(journey, pressure, 'inspect');
+  const activeContractors = getSilvicultureTaskContractors(journey, pressure, 'inspect', true, ui);
+  const hasInspector = journey.crew
+    ? (crewHasRole(journey.crew, 'surveyor') || crewHasRole(journey.crew, 'spotter'))
+    : false;
+  if (activeContractors.length === 0 && !hasInspector) {
+    ui.writeWarning('No inspection crew is available. Rotate a contractor or bring a survey-capable team member before spending the day.');
+    return false;
+  }
   const baseSurvival = 70 + Math.floor(Math.random() * 25);
   const zoneDrag = Math.round((pressure.survivalPenalty + pressure.accessPressure * 0.35 + pressure.fillPressure * 0.25) * 100);
   const contractorLift = activeContractors.length > 0
@@ -1346,18 +1385,18 @@ function adjustScrutiny(journey, delta) {
 
 function getSilvicultureTaskSummary(journey, zoneProfile, task) {
   const contractors = getSilvicultureTaskContractors(journey, zoneProfile, task, false);
-  const readyCount = journey.contractors.filter(c => {
+  const ready = journey.contractors.filter(c => {
     const state = ensureSilvicultureContractorState(c, journey, zoneProfile);
-    return !c.isActive && state.status === 'ready';
-  }).length;
+    return !c.isActive && state.status === 'ready' && matchesSilvicultureTask(c, task);
+  }).sort((a, b) => getSilvicultureContractorFit(b, zoneProfile, task) - getSilvicultureContractorFit(a, zoneProfile, task));
+  const readyCount = ready.length;
   const recoveringCount = journey.contractors.filter(c => {
     const state = ensureSilvicultureContractorState(c, journey, zoneProfile);
     return state.status === 'recovering' || state.cooldownDays > 0;
   }).length;
-  const bestFit = contractors[0];
-  const fitText = bestFit
-    ? `${bestFit.name.split(' ')[0]} fit ${Math.round(getSilvicultureContractorFit(bestFit, zoneProfile, task) * 100)}%`
-    : 'no deployed specialist';
+  const fitText = contractors.length
+    ? contractors.map((contractor) => `${contractor.isActive ? 'deployed' : 'will deploy'} ${contractor.name} (${Math.round(getSilvicultureContractorFit(contractor, zoneProfile, task) * 100)}% fit)`).join('; ')
+    : 'no available contractor';
   return `${fitText} | ready ${readyCount} | recovering ${recoveringCount}`;
 }
 
@@ -1394,7 +1433,7 @@ function getSilvicultureContractorRoster(journey, zoneProfile) {
   return { lines, summary, rotationSummary, rotatableCount: deployed.length + ready.length };
 }
 
-function getSilvicultureTaskContractors(journey, zoneProfile, task, deployMissing = true) {
+function getSilvicultureTaskContractors(journey, zoneProfile, task, deployMissing = true, ui = null) {
   const contractors = Array.isArray(journey?.contractors) ? journey.contractors : [];
   const taskTraits = CONTRACTOR_TASK_TRAITS[task] || [];
   const eligible = [];
@@ -1426,19 +1465,23 @@ function getSilvicultureTaskContractors(journey, zoneProfile, task, deployMissin
   }
 
   const autoDeployPool = ready.length > 0 ? ready : fallback;
-  if (deployMissing && eligible.length === 0 && autoDeployPool.length > 0) {
-    const chosen = [...autoDeployPool]
+  const selected = eligible.length > 0
+    ? eligible.sort((a, b) => b.fit - a.fit)
+    : [...autoDeployPool]
       .sort((a, b) => b.fit - a.fit)
       .slice(0, Math.max(1, Math.min(2, taskTraits.length > 0 ? 2 : 1)));
-    for (const entry of chosen) {
-      deploySilvicultureContractor(entry.contractor, zoneProfile, task);
+  if (deployMissing) {
+    for (const entry of selected) {
+      if (!entry.contractor.isActive) {
+        deploySilvicultureContractor(entry.contractor, zoneProfile, task);
+        ui?.writePositive?.(`${entry.contractor.name} deployed for this task.`);
+      }
     }
-    return chosen.map(entry => entry.contractor);
+    if (selected.length > 0) {
+      ui?.write?.(`Working crew: ${selected.map((entry) => entry.contractor.name).join(', ')}.`);
+    }
   }
-
-  return eligible
-    .sort((a, b) => b.fit - a.fit)
-    .map(entry => entry.contractor);
+  return selected.map(entry => entry.contractor);
 }
 
 function matchesSilvicultureTask(contractor, task) {

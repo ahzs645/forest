@@ -12,6 +12,7 @@
 import { formatEventForDisplay, resolveEvent } from '../../events.js';
 import { crewHasRole } from '../../crew.js';
 import { presentDayCard, buildEventCardContent } from '../../journey/dayCard.js';
+import { optionSpendsDay } from '../../events/timePolicy.js';
 
 function formatRoleName(roleId) {
   if (!roleId) return 'specialist';
@@ -65,6 +66,8 @@ export async function handleEvent(game, event, frame = {}) {
     statusLine: frame.statusLine || null,
     context: frame.context || [],
     onRender: () => {
+      ui.updateAllStatus?.(journey);
+      frame.onRender?.();
       if (typeof ui.playEventVignette === 'function') ui.playEventVignette(event);
     },
   };
@@ -79,9 +82,14 @@ export async function handleEvent(game, event, frame = {}) {
 
   const optionIndex = picked;
   const selectedOption = event.options[optionIndex] || event.options[usable[0].index];
+  const spendsDay = optionSpendsDay(event, selectedOption, journey.journeyType);
 
   const result = resolveEvent(journey, event, selectedOption);
-  game.checkpoint?.();
+  // The outcome acknowledgement is still inside the current decision. Saving
+  // its effects here would replay them on reload (or repeat a manager's
+  // strategic spending). The runner saves after finishing the decision or day.
+  ui.updateAllStatus?.(journey);
+  frame.onRender?.();
 
   ui.write('');
   ui.writeHeader('OUTCOME');
@@ -99,9 +107,11 @@ export async function handleEvent(game, event, frame = {}) {
   // the very consequence that makes this decision meaningful.
   await ui.promptChoice('', [{
     label: 'Acknowledge outcome and continue',
-    description: 'Return to the shift after reviewing the result',
+    description: spendsDay
+      ? 'Close the outcome and move to day closeout'
+      : 'Return to the day after reviewing the result',
     value: 'continue'
   }]);
 
-  return { resolved: true };
+  return { resolved: true, option: selectedOption, spendsDay };
 }

@@ -870,15 +870,19 @@ export default function App() {
   );
   useEffect(() => {
     if (!crisisRequested.current) return;
-    if (state.mode === "resume") {
+    // StrictMode may replay the effect before React publishes a new snapshot.
+    // Read the controller's current stage so a second pass cannot submit the
+    // first seasonal role using stale setup-name state.
+    const current = controller.getState();
+    if (current.mode === "resume") {
       // Crisis deep-link takes priority over a parked seasonal run: discard the
       // resume prompt (Start a new run) and continue into the crisis flow.
-      selectOption(state.options.length - 1);
-    } else if (state.mode === "setup-name") {
+      selectOption(current.options.length - 1);
+    } else if (current.mode === "setup-name") {
       controller.handleKey({ name: "return" });
-    } else if (state.mode === "setup-role" && state.options.length) {
+    } else if (current.mode === "setup-role" && current.options.length) {
       crisisRequested.current = false;
-      selectOption(state.options.length - 1);
+      selectOption(current.options.length - 1);
     }
   }, [state.mode, state.options.length, controller, selectOption]);
 

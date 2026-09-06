@@ -17,6 +17,11 @@
  */
 
 import { handleEvent } from '../modes/shared/handleEvent.js';
+import { optionSpendsDay } from '../events/timePolicy.js';
+import {
+  addRouteConstraintFromEvent,
+  isRouteObstructionEvent
+} from './routeConstraints.js';
 
 /**
  * Whether answering this situation is the whole day.
@@ -93,12 +98,19 @@ export function applySetAsideCost(ui, journey, event) {
 export async function runDaySituation(game, event, options = {}) {
   const { ui, journey } = game;
   const frame = options.frame || {};
+  ui.updateAllStatus?.(journey);
+  frame.onRender?.();
+  const obstruction = ['recon', 'field'].includes(journey.journeyType)
+    && isRouteObstructionEvent(event);
+  const travelSetbackBefore = Number(journey.travelSetback || 0);
 
   const outcome = await handleEvent(game, event, {
     ...frame,
     extraOptions: [{
       label: options.setAsideLabel || 'Set it aside',
-      description: options.setAsideDescription
+      description: obstruction
+        ? 'Defer the call. The route stays blocked until you clear it or mark a detour.'
+        : options.setAsideDescription
         || 'Not today. Take the day back and spend it on your own work.',
       tag: 'TRADEOFF',
       value: 'set_aside',
@@ -111,12 +123,37 @@ export async function runDaySituation(game, event, options = {}) {
 
   if (!outcome.resolved) {
     applySetAsideCost(ui, journey, event);
+    if (obstruction) {
+      const constraint = addRouteConstraintFromEvent(journey, event);
+      if (constraint) {
+        ui.writeWarning(`${constraint.title} remains active between ${constraint.fromBlockName} and ${constraint.toBlockName}. Clear it or mark a detour before travelling that leg.`);
+      }
+    }
+    journey.recentSituationContext = {
+      day: journey.day,
+      title: event?.title || 'the situation',
+      setAside: true,
+    };
+    ui.updateAllStatus?.(journey);
+    frame.onRender?.();
     return { setAside: true, spendsDay: false, gameOver: false };
   }
 
-  const spendsDay = situationCostsTheDay(event);
+  const spendsDay = optionSpendsDay(event, outcome.option, journey.journeyType);
+  if (spendsDay && Number(journey.travelSetback || 0) > travelSetbackBefore) {
+    const setbackDelta = Number(journey.travelSetback || 0) - travelSetbackBefore;
+    journey.travelSetback = travelSetbackBefore;
+    journey.pendingTravelSetback = Math.min(0.75, (journey.pendingTravelSetback || 0) + setbackDelta);
+  }
   if (!spendsDay) {
     ui.write('Handled without losing the day.', 'term-dim');
   }
+  journey.recentSituationContext = {
+    day: journey.day,
+    title: event?.title || 'the situation',
+    setAside: false,
+  };
+  ui.updateAllStatus?.(journey);
+  frame.onRender?.();
   return { setAside: false, spendsDay, gameOver: false };
 }

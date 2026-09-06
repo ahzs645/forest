@@ -763,3 +763,32 @@ body[data-display-mode="modern"] .footer-hotkeys {
     }
   }
 }
+
+// On a short screen the header, meters and footer cannot share one viewport
+// with a readable story and decision cards. Let the frame scroll vertically
+// instead of compressing the choice list to zero height.
+@media (max-height: 650px) {
+  body[data-display-mode="modern"] .game-wrapper {
+    grid-template-rows: auto auto auto auto;
+    overflow-y: auto;
+  }
+
+  body[data-display-mode="modern"] .game-screen {
+    min-height: 32rem;
+    overflow: visible;
+  }
+
+  body[data-display-mode="modern"] .terminal-window {
+    flex: none;
+    height: 12rem;
+  }
+
+  body[data-display-mode="modern"] .action-area {
+    flex: none;
+    max-height: none;
+  }
+
+  body[data-display-mode="modern"] .choices {
+    max-height: 22rem;
+  }
+}

@@ -38,6 +38,7 @@ import {
   fordCrossing
 } from '../journey/riverCrossing.js';
 import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journey/blockNav.js';
+import { getActiveRouteConstraint, resolveRouteConstraint } from '../journey/routeConstraints.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { PACE_OPTIONS } from '../journey/constants.js';
 import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
@@ -47,6 +48,7 @@ import { buildNightCampFrames } from '../scene/textmode/scenes.js';
 import { FIELD_RESOURCES } from '../resources.js';
 import {
   addDiscoveryTags,
+  getDiscoveryTagDefinition,
   getDiscoveryTagNotes,
   inferDiscoveryTagsFromAccess
 } from '../data/discoveryTags.js';
@@ -310,10 +312,12 @@ function checkpointReconShift(game, shift, pendingEvent) {
   game.checkpoint?.();
 }
 
-async function acknowledgeActionResult(ui, label = 'Action') {
+async function acknowledgeActionResult(ui, label = 'Action', closesShift = false) {
   await ui.promptChoice('', [{
     label: 'Acknowledge results and continue',
-    description: `${label} is complete; return to the shift`,
+    description: closesShift
+      ? `${label} is complete; review the shift closeout`
+      : `${label} is complete; return to the shift`,
     value: 'continue'
   }]);
 }
@@ -457,6 +461,7 @@ async function runFieldDay(game) {
     const canTravel = !hasTraveled && hasNextBlock && journey.resources.fuel > 0 && journey.resources.equipment > 0;
     const blockIntel = getReconBlockIntel(journey, currentBlock);
     const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
+    const routeConstraint = getActiveRouteConstraint(journey);
 
     updateReconMissionStatus(ui, journey);
 
@@ -471,6 +476,7 @@ async function runFieldDay(game) {
           dayHeader: buildReconDayHeader(journey),
           statusLine: buildReconStatusLine(journey),
           context: buildReconContextLines(journey),
+          onRender: () => updateReconMissionStatus(ui, journey),
         },
         setAsideDescription: 'Not today. Take the shift back and spend it on your own work.',
       });
@@ -536,7 +542,22 @@ async function runFieldDay(game) {
       });
     }
 
-    if (canTravel) {
+    if (routeConstraint) {
+      options.push({
+        label: 'Clear route obstruction',
+        description: `${routeConstraint.title} blocks ${routeConstraint.toBlockName} - uses this shift`,
+        tag: 'SAFE',
+        value: 'clear_route_constraint'
+      });
+      options.push({
+        label: 'Mark a detour',
+        description: `Bypass ${routeConstraint.title.toLowerCase()} with extra fuel and rougher travel - uses this shift`,
+        tag: 'TRADEOFF',
+        value: 'detour_route_constraint'
+      });
+    }
+
+    if (canTravel && !routeConstraint) {
       const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
       options.push({
         label: `Move on to ${nextBlock?.name || 'the next block'}`,
@@ -667,7 +688,7 @@ async function runFieldDay(game) {
       if (leg.gameOver) return;
       hasTraveled = true;
       dayResolved = true;
-      await acknowledgeActionResult(ui, 'Travel');
+      await acknowledgeActionResult(ui, 'Travel', true);
     } else if (actionId === 'set_tempo') {
       await handleSetTempo(ui, journey);
     } else if (actionId === 'ground_truth') {
@@ -702,6 +723,23 @@ async function runFieldDay(game) {
       spendDay(journey);
       handleScoutAhead(ui, journey);
       logReconAction(journey, 'Scouted the next block');
+    } else if (actionId === 'clear_route_constraint' || actionId === 'detour_route_constraint') {
+      const constraint = getActiveRouteConstraint(journey);
+      if (!constraint) {
+        ui.write('No route obstruction is active on the next leg.');
+      } else {
+        spendDay(journey);
+        const result = resolveRouteConstraint(
+          journey,
+          constraint.id,
+          actionId === 'detour_route_constraint' ? 'detour' : 'clear'
+        );
+        for (const message of result.messages) {
+          if (actionId === 'detour_route_constraint') ui.writeWarning(message);
+          else ui.write(message);
+        }
+        logReconAction(journey, result.messages[0] || 'Resolved route obstruction');
+      }
     }
 
     ui.updateAllStatus(journey);
@@ -718,10 +756,12 @@ async function runFieldDay(game) {
       maintain: 'Maintenance',
       triage: 'Triage',
       resupply: 'Resupply',
-      scout: 'Scouting'
+      scout: 'Scouting',
+      clear_route_constraint: 'Route clearing',
+      detour_route_constraint: 'Route detour'
     };
     if (acknowledgedActions[actionId]) {
-      await acknowledgeActionResult(ui, acknowledgedActions[actionId]);
+      await acknowledgeActionResult(ui, acknowledgedActions[actionId], dayIsSpent(journey));
     }
 
     settleDayPass(journey, freeChoices, ui);
@@ -989,7 +1029,7 @@ async function celebrateNewMilestones(game) {
 async function runMilestoneCamp(game, threshold) {
   const { ui, journey } = game;
   ui.write('');
-  ui.writeHeader(`TRAIL CAMP — ${threshold}% OF THE JOB DONE`);
+  ui.writeHeader(`TRAIL BREAK — ${threshold}% OF THE JOB DONE`);
   if (typeof ui.playScene === 'function') {
     await ui.playScene(buildCampfireFrames({ frames: 14, seed: threshold + journey.day * 3 }), {
       delay: 160,
@@ -1014,16 +1054,16 @@ async function runMilestoneCamp(game, threshold) {
   if (voice) ui.write(voice);
 
   const canSplurge = (journey.resources.food || 0) > FIELD_RESOURCES.food.warning;
-  const choice = await ui.promptChoice('The fire burns down:', [
+  const choice = await ui.promptChoice('The tailgate talk winds down:', [
     {
       label: 'Keep it lean',
-      description: 'Bank the supplies; back at it at first light',
+      description: 'Bank the supplies; back to the shift',
       value: 'lean',
     },
     canSplurge
       ? {
         label: 'Break out the good coffee (-3 food)',
-        description: 'A morale night — the crew has earned it',
+        description: 'A morale break - the crew has earned it',
         value: 'splurge',
       }
       : {
@@ -1040,7 +1080,7 @@ async function runMilestoneCamp(game, threshold) {
     }
     ui.writePositive('Real coffee, a dry log to sit on, and the job visibly shrinking. Morale climbs.');
   } else {
-    ui.write('The crew turns in early. The trail will still be there tomorrow.');
+    ui.write('The crew banks the supplies and gets back to the shift.');
   }
   ui.updateAllStatus(journey);
 }
@@ -1085,6 +1125,13 @@ export function updateReconMissionStatus(ui, journey) {
   }
 
   const alerts = [];
+  const routeConstraint = getActiveRouteConstraint(journey);
+  if (routeConstraint) {
+    alerts.push({
+      level: 'danger',
+      text: `${routeConstraint.title} blocks ${routeConstraint.toBlockName}; clear it or mark a detour before travelling.`
+    });
+  }
   const currentAccessVerdict = getDisplayedAccessVerdict(journey, currentBlock);
   if (currentAccessVerdict.id === 'no_go' || currentAccessVerdict.id === 'heli_only') {
     alerts.push({ level: 'danger', text: formatAccessVerdict(currentAccessVerdict) });
@@ -1281,6 +1328,7 @@ function maybeSpeakCrew(ui, journey) {
  * different points in the season do not open with identical text.
  */
 function buildQuietShiftTitle(journey) {
+  if (journey.recentSituationContext?.day === journey.day) return 'AFTER THE CALL';
   const weather = normalizeReconToken(journey.weather?.id);
   if (weather === 'rain' || weather === 'drizzle') return 'A WET START';
   if (weather === 'snow' || weather === 'heavy_snow') return 'SNOW ON THE TRUCKS';
@@ -1296,7 +1344,12 @@ function buildQuietShiftBody(journey) {
   const openHere = currentBlock ? !getReconBlockIntel(journey, currentBlock).assessmentComplete : false;
   const daysLeft = Number.isFinite(journey.deadline) ? Math.max(0, journey.deadline - journey.day) : null;
 
-  const parts = ['The radio stays quiet through breakfast. Whatever today is, it is yours to decide.'];
+  const recent = journey.recentSituationContext?.day === journey.day
+    ? journey.recentSituationContext
+    : null;
+  const parts = [recent
+    ? `${recent.setAside ? 'You left' : 'You handled'} ${recent.title}. The rest of the shift is still yours to decide.`
+    : 'The radio stays quiet through breakfast. Whatever today is, it is yours to decide.'];
   if (openHere) {
     parts.push(`${currentBlock.name} is still open in the file.`);
   }
@@ -1772,7 +1825,8 @@ function handleValuesSweep(ui, journey, block) {
   for (const note of sweep.notes) {
     ui.write(note.charAt(0).toUpperCase() + note.slice(1) + '.');
   }
-  ui.writePositive(`Logged: ${sweep.tags.join(', ')}`);
+  const labels = sweep.tags.map((tagId) => getDiscoveryTagDefinition(tagId)?.label || tagId);
+  ui.writePositive(`Logged: ${labels.join(', ')}`);
   journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - Math.min(2, sweep.tags.length));
   maybeFinalizeReconAssessment(ui, journey, block);
 }
@@ -1959,6 +2013,8 @@ export async function handleResupply(game, block) {
     journey.resources.budget = Math.max(0, money - offer.cost);
     offer.apply();
     ui.writePositive(`Purchased ${offer.label}.`);
+    ui.updateAllStatus(journey);
+    updateReconMissionStatus(ui, journey);
   }
 
   ui.write('');
@@ -2077,9 +2133,3 @@ function retrieveCachedRations(ui, journey) {
   ui.writePositive(`Recovered ${foodRecovered} person-days of sealed field rations.`);
   ui.write(`Fuel used reaching the cache: ${fuelUsed}. Food now ${Math.round(journey.resources.food)} person-days.`);
 }
-
-
-
-
-
-

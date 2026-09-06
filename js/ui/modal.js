@@ -130,6 +130,7 @@ export const ModalMixin = {
    * @param {Object} options - Modal options
    */
   showModal(options) {
+    if (!this.isModalOpen()) this._modalReturnFocus = document.activeElement;
     const { title, content, actions = [], dismissible = true } = options;
 
     if (this.modalTitle) {
@@ -171,6 +172,7 @@ export const ModalMixin = {
 
     if (this.modal) {
       this.modal.hidden = false;
+      this._focusModal();
     }
   },
 
@@ -179,6 +181,7 @@ export const ModalMixin = {
    * @param {Object} options - Modal options
    */
   openModal(options) {
+    if (!this.isModalOpen()) this._modalReturnFocus = document.activeElement;
     const { title, dismissible = false, buildContent, actions = [], onClose } = options;
 
     if (this.modalTitle) {
@@ -212,6 +215,7 @@ export const ModalMixin = {
 
     if (this.modal) {
       this.modal.hidden = false;
+      this._focusModal();
     }
   },
 
@@ -219,12 +223,42 @@ export const ModalMixin = {
    * Close the modal
    */
   closeModal() {
+    const returnFocus = this._modalReturnFocus;
+    this._modalReturnFocus = null;
     if (this.modal) {
       this.modal.hidden = true;
     }
     if (this._modalOnClose) {
-      this._modalOnClose();
+      const onClose = this._modalOnClose;
       this._modalOnClose = null;
+      onClose();
+    }
+    if (!this.isModalOpen() && returnFocus?.isConnected) returnFocus.focus();
+  },
+
+  _modalFocusableElements() {
+    return [...(this.modal?.querySelectorAll('button, input, select, textarea, a[href], [tabindex]') || [])]
+      .filter((element) => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length > 0);
+  },
+
+  _focusModal() {
+    const target = this._modalFocusableElements()[0] || this.modal?.querySelector('[role="dialog"]');
+    if (target) {
+      if (!target.hasAttribute('tabindex') && target.matches('[role="dialog"]')) target.tabIndex = -1;
+      target.focus();
+    }
+  },
+
+  _trapModalFocus(event) {
+    const elements = this._modalFocusableElements();
+    const first = elements[0];
+    const last = elements.at(-1);
+    if (!first) {
+      event.preventDefault();
+      this._focusModal();
+    } else if (!this.modal.contains(document.activeElement) || (event.shiftKey ? document.activeElement === first : document.activeElement === last)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
     }
   },
 

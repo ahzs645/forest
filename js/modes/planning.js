@@ -428,6 +428,10 @@ function pushPlanningGuideStep(steps, text) {
   steps.push(text);
 }
 
+function getSubmissionConfidenceGain(readiness) {
+  return readiness?.waterContext?.gate === 'clear' ? 18 : 14;
+}
+
 function buildPlanningActionGuidance(journey, seasonInfo = null) {
   const readiness = getPlanningSubmissionReadiness(journey, seasonInfo);
   const deficits = getValuesGateDeficits(journey);
@@ -524,10 +528,18 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
     pushPlanningGuideStep(steps, 'Clear registration, CPD, and paperwork drag before you spend ministerial time.');
   }
 
-  if (!deficits.length && fom?.status === 'approved' && professionalIssues.length === 0 && journey.plan.ministerialConfidence < 80) {
+  if (!deficits.length && fom?.status === 'approved' && professionalIssues.length === 0 && readiness.ready && journey.plan.ministerialConfidence < 80) {
+    const directGain = getSubmissionConfidenceGain(readiness);
+    const directConfidence = Math.min(100, (journey.plan.ministerialConfidence || 0) + directGain);
+    if (directConfidence >= 80) {
+      lane = 'Submission package';
+      headline = `Prepare Submission can carry confidence to ${directConfidence}% now; Ministerial Outreach is cheaper but slower.`;
+      pushPlanningGuideStep(steps, `Submission costs more energy and budget, but it is the fastest path before another event reopens the file.`);
+      return { lane, headline, steps };
+    }
     lane = 'Ministerial brief';
     headline = 'Ministerial Outreach to close the confidence gap before submission.';
-    pushPlanningGuideStep(steps, 'Recover confidence to 80% before you burn six hours on the final package.');
+    pushPlanningGuideStep(steps, `Prepare Submission would add ${directGain} confidence but still leave the package short; outreach is the cleaner bridge.`);
   }
 
   if (!deficits.length && readiness.ready && journey.plan.ministerialConfidence >= 80) {
@@ -660,6 +672,7 @@ export async function runPlanningDay(game) {
           `confidence ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
           `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
         ]),
+        onRender: () => updatePlanningMissionStatus(ui, journey, seasonInfo),
       },
       setAsideDescription: 'Not today. Keep the day for the file.',
     });
@@ -814,8 +827,16 @@ export function updatePlanningMissionStatus(ui, journey, seasonInfo = null) {
   const alerts = [];
   if (plan.phase === 'ministerial_approval') {
     const gap = Math.max(0, 80 - plan.ministerialConfidence);
+    const readiness = getPlanningSubmissionReadiness(journey, seasonInfo);
+    const directGain = getSubmissionConfidenceGain(readiness);
+    const directSubmissionWorks = readiness.ready && gap > 0 && directGain >= gap;
     alerts.push(gap > 0
-      ? { level: 'warn', text: `Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Use Ministerial Outreach before submission.` }
+      ? {
+          level: 'warn',
+          text: directSubmissionWorks
+            ? `Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Prepare Submission can close it now; Outreach is cheaper but slower.`
+            : `Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Use Ministerial Outreach before submission.`
+        }
       : { level: 'ok', text: 'Approval threshold reached. A full submission can carry the plan across the line.' });
   }
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
@@ -1383,7 +1404,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
           ui.writeWarning(`Submission blocked: ${[...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons].join(' | ')}.`);
           break;
         }
-        const confidenceGain = submissionReadiness.waterContext.gate === 'clear' ? 18 : 14;
+        const confidenceGain = getSubmissionConfidenceGain(submissionReadiness);
         journey.plan.ministerialConfidence = Math.min(100, journey.plan.ministerialConfidence + confidenceGain);
       }
       spendDay(journey);
