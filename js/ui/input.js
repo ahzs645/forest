@@ -155,7 +155,13 @@ export const InputMixin = {
       const tag = tagMatch ? tagMatch[1] : null;
       if (tag) labelText = labelText.replace(TAG_RE, ' ').replace(/\s{2,}/g, ' ').trim();
 
-      if (isModern) {
+      if (option.presentation === 'continue' && options.length === 1) {
+        btn.classList.add('choice-continue');
+        const label = document.createElement('span');
+        label.className = isModern ? 'card-label' : 'choice-label';
+        label.textContent = labelText;
+        btn.appendChild(label);
+      } else if (isModern) {
         // Modern card layout with header and checkbox
         const header = document.createElement('div');
         header.className = 'card-header';
@@ -231,6 +237,7 @@ export const InputMixin = {
         this.write(`> ${option.label}`, 'term-dim');
         // Matching action animation on the field radio (chainsaw, boots, ...)
         this.playRadioAction?.(option.label);
+        this.trailView?.playAction(option.label);
         this._hideChoices();
         if (handler) {
           handler(option);

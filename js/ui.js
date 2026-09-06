@@ -27,6 +27,7 @@ import {
   attachFrame
 } from './ui/index.js';
 import { GridView } from './gridview/gridView.js';
+import { TrailView } from './ui/trailView.js';
 
 /**
  * TerminalUI Class
@@ -35,6 +36,7 @@ import { GridView } from './gridview/gridView.js';
 export class TerminalUI {
   constructor() {
     this._initDOMReferences();
+    this.trailView = this.terminal ? new TrailView(this.terminal) : null;
     this._initState();
     this._initEventListeners();
     this._initLandingScreen();
@@ -448,6 +450,7 @@ export class TerminalUI {
 
     // Field radio ambience follows the journey (weather / desk)
     this.updateRadioFromJourney(journey);
+    this.trailView?.update(journey, this._calculateProgress(journey));
 
     // Update modern mode UI elements
     if (displayMode.isModern()) {
@@ -559,6 +562,7 @@ export class TerminalUI {
    * Prepare UI for a new game
    */
   prepareForNewGame() {
+    this.trailView?.stop();
     this.clear();
     this._hideChoices();
     this._hideInput();

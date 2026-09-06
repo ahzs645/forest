@@ -225,23 +225,23 @@ function getReconValueSweepProfile(block, journey) {
 
   if ([...features].some((feature) => RECON_WATER_FEATURES.has(feature)) || [...hazards].some((hazard) => hazard === 'river_crossing' || hazard === 'flood' || hazard === 'washout')) {
     tags.add('watershed_watch');
-    notes.push('crossings, riparian ground, or drinking-water values need cleaner notes');
+    notes.push('locate streams and riparian areas, and flag water concerns for layout');
   }
   if ([...features].some((feature) => RECON_CULTURAL_FEATURES.has(feature)) || [...hazards].some((hazard) => hazard === 'cultural_protocol')) {
     tags.add('cultural_hold');
-    notes.push('cultural or archaeology indicators are active on the ground');
+    notes.push('record cultural indicators without disturbance and refer them for follow-up with the affected Nation and specialists');
   }
   if ([...features].some((feature) => RECON_VISIBILITY_FEATURES.has(feature)) || [...hazards].some((hazard) => hazard === 'traffic' || hazard === 'visual_constraint')) {
     tags.add('community_visibility');
-    notes.push('the block sits where community or recreation eyes will stay on it');
+    notes.push('record recreation use and visible slopes for the planning team');
   }
   if ([...hazards].some((hazard) => RECON_ACCESS_HAZARDS.has(hazard))) {
     tags.add('access_rehab');
-    notes.push('access rehab is likely to come back as a live issue');
+    notes.push('flag road repairs that need assessment before development');
   }
   if (normalizeReconToken(journey?.weather?.id) === 'storm') {
-    tags.add('smoke_pressure');
-    notes.push('the field window is unstable enough to distort clean coverage');
+    tags.add('access_rehab');
+    notes.push('record storm damage and drainage concerns before the next access review');
   }
 
   return {
@@ -269,8 +269,8 @@ function getDisplayedAccessVerdict(journey, block) {
   if (block && !getReconBlockIntel(journey, block).accessGroundTruthed) {
     return {
       id: 'unverified',
-      label: 'Unverified',
-      summary: 'Ground-truth the crossing, road condition, and approach before relying on this route.'
+      label: 'Not checked yet',
+      summary: 'Choose Work the block to inspect the road and crossing approaches. The map alone does not confirm access.'
     };
   }
   const recorded = block?.id ? journey.accessVerdicts?.[block.id] : null;
@@ -312,12 +312,10 @@ function checkpointReconShift(game, shift, pendingEvent) {
   game.checkpoint?.();
 }
 
-async function acknowledgeActionResult(ui, label = 'Action', closesShift = false) {
+async function acknowledgeActionResult(ui) {
   await ui.promptChoice('', [{
-    label: 'Acknowledge results and continue',
-    description: closesShift
-      ? `${label} is complete; review the shift closeout`
-      : `${label} is complete; return to the shift`,
+    label: 'Continue',
+    presentation: 'continue',
     value: 'continue'
   }]);
 }
@@ -447,7 +445,7 @@ async function runFieldDay(game) {
     updateReconMissionStatus(ui, journey);
     logReconAction(journey, 'Ration decision', `Food remaining: ${Math.round(journey.resources.food || 0)} person-days`);
     checkpointReconShift(game, shiftState, pendingEvent);
-    await acknowledgeActionResult(ui, 'Ration decision');
+    await acknowledgeActionResult(ui);
   }
 
   // One job a shift. Free look-ups (map, briefing) leave the shift unspent,
@@ -529,15 +527,13 @@ async function runFieldDay(game) {
     if (blockWorkPending === 'access') {
       options.push({
         label: 'Work the block',
-        description: 'Access is unverified — drive the spur, walk the crossings, log what the road actually is',
-        tag: 'SAFE',
+        description: 'Check the road and crossing approaches; record hazards without entering unsafe ground. Uses this shift.',
         value: 'ground_truth'
       });
     } else if (blockWorkPending === 'values') {
       options.push({
         label: 'Work the block',
-        description: `Values still to sweep — ${valuesSweep.notes[0]}`,
-        tag: 'SAFE',
+        description: `Check sensitive sites — ${valuesSweep.notes[0]}. Uses this shift.`,
         value: 'values_sweep'
       });
     }
@@ -567,12 +563,11 @@ async function runFieldDay(game) {
     }
 
     const notebookTargets = getReconNotebookTargets(journey);
-    if (notebookTargets.length > 0) {
+    if (notebookTargets.length > 0 && (journey.resources.fuel || 0) >= 4) {
       const nextPackage = notebookTargets[0];
       options.push({
-        label: 'Catch up the notebook',
-        description: `Close ${nextPackage.block.name} from notes and GPS marks — +2 scrutiny`,
-        tag: 'RISKY',
+        label: 'Follow up missed fieldwork',
+        description: `Return to ${nextPackage.block.name} for one missing check, then rejoin camp — uses this shift and 4 fuel`,
         value: 'field_notebook'
       });
     }
@@ -669,6 +664,7 @@ async function runFieldDay(game) {
       dayResolved = true;
       if (typeof ui.playScene === 'function') {
         await ui.playScene(buildNightCampFrames({ seed: journey.day * 5 + 1 }), {
+          ambient: 'camp',
           delay: 170,
           loops: 2,
         });
@@ -688,7 +684,7 @@ async function runFieldDay(game) {
       if (leg.gameOver) return;
       hasTraveled = true;
       dayResolved = true;
-      await acknowledgeActionResult(ui, 'Travel', true);
+      await acknowledgeActionResult(ui);
     } else if (actionId === 'set_tempo') {
       await handleSetTempo(ui, journey);
     } else if (actionId === 'ground_truth') {
@@ -700,9 +696,10 @@ async function runFieldDay(game) {
       handleValuesSweep(ui, journey, currentBlock);
       logReconAction(journey, 'Completed values sweep', currentBlock?.name || 'Current block');
     } else if (actionId === 'field_notebook') {
-      spendDay(journey);
-      handleFieldNotebook(ui, journey);
-      logReconAction(journey, 'Updated field notebook');
+      if (handleFieldNotebook(ui, journey)) {
+        spendDay(journey);
+        logReconAction(journey, 'Followed up missed fieldwork');
+      }
     } else if (actionId === 'food_cache') {
       spendDay(journey);
       retrieveCachedRations(ui, journey);
@@ -751,7 +748,7 @@ async function runFieldDay(game) {
     const acknowledgedActions = {
       ground_truth: 'Ground-truth access',
       values_sweep: 'Values sweep',
-      field_notebook: 'Field notebook',
+      field_notebook: 'Return field visit',
       food_cache: 'Cached-ration retrieval',
       maintain: 'Maintenance',
       triage: 'Triage',
@@ -761,7 +758,7 @@ async function runFieldDay(game) {
       detour_route_constraint: 'Route detour'
     };
     if (acknowledgedActions[actionId]) {
-      await acknowledgeActionResult(ui, acknowledgedActions[actionId], dayIsSpent(journey));
+      await acknowledgeActionResult(ui);
     }
 
     settleDayPass(journey, freeChoices, ui);
@@ -791,8 +788,7 @@ async function runFieldDay(game) {
     checkpointReconShift(game, shiftState, pendingEvent);
   }
 
-  // Milestones crossed by desk-side progress (notebook write-ups, package
-  // verification) get their camp beat here rather than mid-travel.
+  // Milestones crossed by field inspections or package verification get their camp beat here rather than mid-travel.
   await celebrateNewMilestones(game);
 
   // A fed bear keeps coming back. Charged at the end of every shift until the
@@ -1032,6 +1028,7 @@ async function runMilestoneCamp(game, threshold) {
   ui.writeHeader(`TRAIL BREAK — ${threshold}% OF THE JOB DONE`);
   if (typeof ui.playScene === 'function') {
     await ui.playScene(buildCampfireFrames({ frames: 14, seed: threshold + journey.day * 3 }), {
+      ambient: 'camp',
       delay: 160,
       loops: 2,
     });
@@ -1745,7 +1742,7 @@ function applyReconTravelIntelPenalty(ui, journey, currentBlock, actionId) {
   if (!blockIntel.valuesSwept && valuesSweep.needed) {
     const scrutinyGain = Math.min(3, Math.max(1, valuesSweep.tags.length));
     journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + scrutinyGain);
-    ui.writeWarning(`You left ${valuesSweep.notes.slice(0, 2).join(' and ')} unverified. Scrutiny +${scrutinyGain}.`);
+    ui.writeWarning(`Sensitive-site checks remain unfinished: ${valuesSweep.notes.slice(0, 2).join('; ')}. Scrutiny +${scrutinyGain}.`);
   }
 }
 
@@ -1790,7 +1787,7 @@ function handleGroundTruthAccess(ui, journey, block) {
   }
 
   journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
-  ui.write('You log the access condition before the crew commits more distance.');
+  ui.write('Road check recorded. This is a field observation, not authorization to build a road or use a damaged crossing.');
   maybeFinalizeReconAssessment(ui, journey, block);
 }
 
@@ -1831,43 +1828,38 @@ function handleValuesSweep(ui, journey, block) {
   maybeFinalizeReconAssessment(ui, journey, block);
 }
 
-// Notebook write-ups only work for ground the crew has actually reached: you
-// can catch up paperwork from real notes, but you cannot paper-truth a block
-// you never drove to. (Unrestricted, the notebook let a run "win" from camp at
-// 48% of the traverse — it dominated actually travelling.)
+// Keep the saved action value for compatibility, but require real fieldwork.
+// A follow-up returns to an earlier visited block and back to camp; it never
+// awards traverse progress or completes both inspections in one shift.
 function getReconNotebookTargets(journey) {
   const blocks = Array.isArray(journey?.blocks) ? journey.blocks : [];
   const currentIndex = Number(journey?.currentBlockIndex || 0);
   return getReconOpenPackages(journey).filter(({ block }) => {
     const index = blocks.indexOf(block);
-    return index > -1 && index <= currentIndex;
+    return index > -1 && index < currentIndex && !isBlockEnjoined(journey, block);
   });
 }
 
 function handleFieldNotebook(ui, journey) {
   const target = getReconNotebookTargets(journey)[0];
   if (!target) {
-    const remaining = getReconOpenPackages(journey).length;
-    ui.write(remaining > 0
-      ? 'No visited blocks left to write up — the remaining packages need you on the ground.'
-      : 'No open recon packages remain in the notebook.');
-    return;
+    ui.write('No earlier blocks need a field follow-up. Use Work the block for checks at your current location.');
+    return false;
+  }
+  if ((journey.resources.fuel || 0) < 4) {
+    ui.writeWarning('The return field visit needs 4 fuel. Resupply before sending the crew.');
+    return false;
   }
 
+  journey.resources.fuel -= 4;
+  ui.writeHeader('RETURN FIELD VISIT');
+  ui.write(`The crew revisits ${target.block.name}, then returns to camp. Fuel used: 4.`);
   if (!target.intel.accessGroundTruthed) {
-    target.intel.accessGroundTruthed = true;
-    target.intel.lastAccessDay = journey.day;
+    handleGroundTruthAccess(ui, journey, target.block);
+  } else {
+    handleValuesSweep(ui, journey, target.block);
   }
-  if (target.sweep.needed && !target.intel.valuesSwept) {
-    target.intel.valuesSwept = true;
-    target.intel.lastValuesDay = journey.day;
-  }
-
-  ui.write(`Notebook catch-up closes ${target.block.name}: ${target.missing.join(', ')}.`);
-  maybeFinalizeReconAssessment(ui, journey, target.block);
-  // Paper-heavy files draw attention: closing from notes costs more scrutiny
-  // than doing the work on the ground.
-  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + 2);
+  return true;
 }
 
 /**

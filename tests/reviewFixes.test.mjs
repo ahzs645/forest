@@ -366,12 +366,13 @@ test('silviculture cannot manufacture planting output when no workforce is avail
   });
   journey.crew = [];
   const dayBefore = journey.day;
-  const warnings = [];
+  const offered = [];
   const ui = {
     write() {}, writeHeader() {}, writePositive() {}, writeDanger() {},
-    writeWarning(text) { warnings.push(String(text || '')); },
+    writeWarning() {},
     clear() {}, updateAllStatus() {}, playEventVignette() {},
     async promptChoice(_prompt, options) {
+      offered.push(...options.map((option) => option.value));
       return options.find((option) => option.value === 'plant') || options.find((option) => option.value === 'end') || options[0];
     }
   };
@@ -379,10 +380,10 @@ test('silviculture cannot manufacture planting output when no workforce is avail
   await withRandomAsync(0.99, () => runSilvicultureDay({ ui, journey, gameOver: false }));
   assert.equal(journey.planting.seedlingsPlanted, 0);
   assert.equal(journey.day, dayBefore + 1);
-  assert.ok(warnings.some((message) => /no contractor is available/i.test(message)));
+  assert.equal(offered.includes('plant'), false, 'unavailable fieldwork must not be offered');
 });
 
-test('silviculture survey rejects no-workforce attempts without charging the file', async () => {
+test('silviculture hides surveys without a workforce and does not charge for them', async () => {
   const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
   journey.contractors.forEach((contractor) => {
     contractor.isActive = false;
@@ -397,12 +398,13 @@ test('silviculture survey rejects no-workforce attempts without charging the fil
   const budgetBefore = journey.resources.budget;
   const surveyAttemptsBefore = journey.surveys.regenerationSurveys;
   let actionPrompts = 0;
-  const warnings = [];
+  const offered = [];
   const ui = {
     write() {}, writeHeader() {}, writePositive() {}, writeDanger() {},
-    writeWarning(text) { warnings.push(String(text || '')); },
+    writeWarning() {},
     clear() {}, updateAllStatus() {}, playEventVignette() {},
     async promptChoice(_prompt, options) {
+      offered.push(...options.map((option) => option.value));
       if ((options || []).some((option) => option.value === 'survey')) {
         actionPrompts++;
         if (actionPrompts === 1) return options.find((option) => option.value === 'survey');
@@ -414,10 +416,10 @@ test('silviculture survey rejects no-workforce attempts without charging the fil
 
   await withRandomAsync(0.99, () => runSilvicultureDay({ ui, journey, gameOver: false }));
   assert.equal(journey.day, dayBefore + 1);
-  assert.equal(actionPrompts, 2, 'the invalid survey should return to the menu instead of spending the day');
+  assert.equal(actionPrompts, 0, 'an unavailable survey must not be offered');
   assert.equal(journey.resources.budget, budgetBefore - 550, 'only daily overhead should land after ending the day');
   assert.equal(journey.surveys.regenerationSurveys, surveyAttemptsBefore);
-  assert.ok(warnings.some((message) => /no survey crew is available/i.test(message)));
+  assert.equal(offered.includes('survey'), false);
 });
 
 test('planning mission guidance recommends direct submission when it can close approval faster', () => {

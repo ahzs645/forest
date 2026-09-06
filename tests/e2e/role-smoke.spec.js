@@ -103,10 +103,10 @@ test('recce smoke exposes role-specific ground-truth actions', async ({ page }) 
   );
   const workTheBlock = page.locator('#choices button').filter({ hasText: 'Work the block' });
   await expect(workTheBlock).toBeVisible();
-  await expect(workTheBlock).toContainText('Access is unverified');
+  await expect(workTheBlock).toContainText('Check the road and crossing approaches');
   await workTheBlock.click();
-  await expect(page.locator('#choices button').filter({ hasText: 'Acknowledge results and continue' })).toBeVisible();
-  await page.locator('#choices button').filter({ hasText: 'Acknowledge results and continue' }).click();
+  await expect(page.locator('#choices button').filter({ hasText: 'Continue' })).toBeVisible();
+  await page.locator('#choices button').filter({ hasText: 'Continue' }).click();
   // Ground-truthing a block is the shift (js/journey/dayPlan.js), so the day
   // closes out on it rather than returning to the menu for another action.
   await expect(page.locator('#choices button').filter({ hasText: /Begin Shift \d+/ })).toBeVisible();

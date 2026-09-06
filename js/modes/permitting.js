@@ -960,7 +960,7 @@ export async function runPermittingDay(game) {
       weatherId: journey.weather?.id,
       season: journey.season?.currentSeason,
       seed: journey.day,
-    }), { delay: 140, holdLastFrame: false });
+    }), { delay: 140, holdLastFrame: false, ambient: 'work' });
   }
 
   const daysRemaining = journey.deadline - journey.day;

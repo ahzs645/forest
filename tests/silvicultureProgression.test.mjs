@@ -225,3 +225,36 @@ test('contractor rotation offers a "Never mind" cancel and never force-stands-do
     assert.ok(journey.contractors.every((c) => c.isActive), 'cancelling the confirmation must leave every contractor deployed');
   });
 });
+
+test('recovering contractors cannot be assigned fieldwork; rest makes work available again', async () => {
+  await withSeededRandom(12345, async () => {
+    const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
+    for (const contractor of journey.contractors) {
+      contractor.isActive = false;
+      contractor.silvicultureState = { status: 'recovering', cooldownDays: 2 };
+    }
+    for (const member of journey.crew || []) member.role = 'driver';
+    let sawRest = false;
+    let sawAvailablePlanting = false;
+    let checkedFirstMenu = false;
+    const ui = makeSensibleUi(journey, {});
+    ui.promptChoice = async (_prompt, options = []) => {
+      if (options.some((o) => o.value === 'end')) {
+        if (!checkedFirstMenu) {
+          assert.equal(options.some((o) => ['plant', 'fill', 'herbicide', 'inspect', 'survey'].includes(o.value)), false);
+          assert.ok(options.some((o) => o.label === 'Rest crews and plan tomorrow'));
+          checkedFirstMenu = true;
+          sawRest = true;
+        } else {
+          sawAvailablePlanting ||= options.some((o) => o.value === 'plant');
+        }
+        return options.find((o) => o.value === 'end');
+      }
+      return options.find((o) => o.value === 'set_aside') || options[0];
+    };
+    const game = { journey, ui, gameOver: false };
+    for (let i = 0; i < 4 && !sawAvailablePlanting; i++) await runSilvicultureDay(game);
+    assert.ok(sawRest);
+    assert.ok(sawAvailablePlanting, 'field tasks should return after recovery');
+  });
+});

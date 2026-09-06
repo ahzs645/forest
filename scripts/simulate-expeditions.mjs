@@ -39,6 +39,7 @@ function parseArgs(argv) {
     else if (flag === '--scale') args.scale = argv[++i];
     else if (flag === '--role') args.role = argv[++i];
     else if (flag === '--verbose') args.verbose = true;
+    else if (flag === '--transcript') args.transcript = true;
     else if (flag === '--min-win-rate') args.minWinRate = Number(argv[++i]);
   }
   return args;
@@ -80,11 +81,12 @@ function pick(options, wanted) {
  * supply-preserving option so a run fails on balance rather than on the
  * driver doing something a player never would.
  */
-function makeUi(journey, policy, tally) {
+function makeUi(journey, policy, tally, trace = null) {
   const noop = () => {};
+  const write = (...parts) => trace?.(parts.filter((part) => typeof part === 'string').join(' '));
   return {
-    write: noop, writeHeader: noop, writeWarning: noop, writePositive: noop,
-    writeDanger: noop, writeBox: noop, writeDivider: noop, clear: noop,
+    write, writeHeader: write, writeWarning: write, writePositive: write,
+    writeDanger: write, writeBox: write, writeDivider: noop, clear: noop,
     updateAllStatus: noop, playEventVignette: noop, playScene: noop,
     playTravelStrip: noop, playRadioAction: noop, setMissionStatus: noop,
     clearMissionStatus: noop, writeSuccess: noop,
@@ -115,6 +117,7 @@ function makeUi(journey, policy, tally) {
         tally.__namedDecisions = (tally.__namedDecisions || 0) + 1;
       }
       const chosen = picked || options[0];
+      trace?.(`[Day ${journey.day}] ${prompt} -> ${chosen.label}${chosen.description ? ` | ${chosen.description}` : ''}`);
       tally[chosen.value] = (tally[chosen.value] || 0) + 1;
       return chosen;
     }
@@ -378,13 +381,13 @@ function summarizeState(journey) {
   return '';
 }
 
-export async function simulateRun(roleName, seed, scale) {
+export async function simulateRun(roleName, seed, scale, trace = null) {
   const role = ROLES[roleName];
   return withSeed(seed, async () => {
     const journey = role.create({ areaId: DEFAULT_AREA, roleId: role.roleId, scale });
     const tally = {};
     const game = {
-      ui: makeUi(journey, role.policy, tally),
+      ui: makeUi(journey, role.policy, tally, trace),
       journey,
       gameOver: false,
       checkpoint() {}
@@ -432,7 +435,7 @@ async function main() {
     }
     const results = [];
     for (let i = 0; i < args.runs; i += 1) {
-      results.push(await simulateRun(roleName, 1000 + i * 37, args.scale));
+      results.push(await simulateRun(roleName, 1000 + i * 37, args.scale, args.transcript ? console.log : null));
     }
 
     const wins = results.filter((result) => result.won);

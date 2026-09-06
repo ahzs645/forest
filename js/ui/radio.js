@@ -69,6 +69,10 @@ export const RadioMixin = {
    * updateAllStatus, so the radio follows weather and mode changes.
    */
   updateRadioFromJourney(journey) {
+    if (this.trailView) {
+      this.stopRadio();
+      return;
+    }
     if (!this.radioPanel || !journey) return;
     const deck = (journey.journeyType === 'field' || journey.journeyType === 'recon')
       ? weatherDeck(journey.weather?.name)
@@ -84,6 +88,7 @@ export const RadioMixin = {
    * ambient scene. No-op when the label matches nothing.
    */
   playRadioAction(label) {
+    if (this.trailView) return;
     if (!this.radioPanel) return;
     const deck = actionDeck(label);
     if (!deck?.frames?.length) return;

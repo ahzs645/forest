@@ -134,7 +134,7 @@ test('recon mission status exposes only unverified access until fieldwork record
   const ui = makeUi();
 
   const initial = updateReconMissionStatus(ui, journey);
-  assert.ok(initial.alerts.some((alert) => /Unverified/.test(alert.text)));
+  assert.ok(initial.alerts.some((alert) => /Not checked yet/.test(alert.text)));
   assert.equal(initial.alerts.some((alert) => /Passable now/.test(alert.text)), false);
   assert.ok(initial.checklist.some((item) => item.label === 'access ground-truthed' && !item.done));
 

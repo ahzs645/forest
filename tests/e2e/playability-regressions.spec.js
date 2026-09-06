@@ -57,7 +57,7 @@ test('a deferred washout survives autosave and can be cleared without moving the
     distance: window.__forestGame.journey.distanceTraveled,
     active: window.__forestGame.journey.routeConstraints.filter((entry) => entry.status === 'active').length,
   }))).toEqual({ distance: before.distance, active: 0 });
-  await page.locator('#choices button').filter({ hasText: 'Acknowledge results and continue' }).click();
+  await page.locator('#choices button').filter({ hasText: 'Continue' }).click();
   await expect(page.locator('#choices button').filter({ hasText: `Begin Shift ${before.day + 1}` })).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });

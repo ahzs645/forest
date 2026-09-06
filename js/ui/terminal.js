@@ -164,6 +164,12 @@ export const TerminalMixin = {
    */
   playTravelStrip(ctx) {
     if (!this.terminal) return Promise.resolve();
+    // Trail View already shows the journey. Hiding that view is also a
+    // request to hide travel art, not to spawn the old strip in the log.
+    if (this.trailView?.state) {
+      this.trailView.playAction('Travel');
+      return Promise.resolve();
+    }
     return playFrames(this.terminal, buildTravelFrames(ctx), {
       delay: 150,
       loops: 1,
@@ -181,6 +187,10 @@ export const TerminalMixin = {
    */
   playScene(frames, opts = {}) {
     if (!this.terminal || !frames?.length) return Promise.resolve();
+    if (opts.ambient && this.trailView?.state) {
+      this.trailView.playAction(opts.ambient);
+      return Promise.resolve({ skipped: false, frameIndex: frames.length - 1 });
+    }
     return playFrames(this.terminal, frames, {
       delay: 130,
       loops: 1,

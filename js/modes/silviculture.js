@@ -329,7 +329,7 @@ function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState) {
     }).length;
     parts.push(readyCount > 0
       ? `${readyCount} rested contractor${readyCount === 1 ? ' is' : 's are'} ready. Picking a field task will deploy the best fit automatically.`
-      : 'Check-in time comes and goes with nobody deployed or ready. Rotate a contractor back before the program can move.');
+      : 'The contractors are recovering. Give them a rest day or use your own survey team for a task it can handle.');
   } else if (unhappy) {
     parts.push(`${unhappy.name} keeps the morning call short and lets you hear it. Nothing that needs an answer yet.`);
   } else {
@@ -337,7 +337,7 @@ function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState) {
   }
 
   if (seasonInfo?.id !== 'winter') {
-    parts.push(`The cohort's next step is ${formatSilviculturePhase(silvicultureState.phase).toLowerCase()}.`);
+    parts.push(`The program's next task is ${formatSilviculturePhase(silvicultureState.phase).toLowerCase()}.`);
   }
   if (Number.isFinite(journey.deadline)) {
     const daysLeft = Math.max(0, journey.deadline - journey.day);
@@ -358,6 +358,7 @@ function buildSilvicultureContextLines(journey, seasonInfo, silvicultureState, z
   const standStrip = buildStandStrip(journey);
   if (standStrip) lines.push(standStrip);
 
+  lines.push('This program covers new planting and older regenerating stands. Free-growing surveys assess older stands against site-specific stocking standards; new seedlings do not become free-growing this season.');
   lines.push(`Sequence: ${formatSilviculturePhase(silvicultureState.phase)} | ${zoneProfile.summary}`);
   const roster = getSilvicultureContractorRoster(journey, zoneProfile);
   lines.push(`Roster: ${roster.summary}`);
@@ -417,7 +418,7 @@ function updateSilvicultureMissionStatus(ui, journey, seasonInfo, zoneProfile) {
   }
 
   ui.setMissionStatus?.({
-    objective: 'Hit the regeneration targets \u2014 plant the block program and clear free-growing surveys.',
+    objective: 'Plant the new blocks and assess older stands for free-growing status.',
     meter: { label: 'Planting', value: plantPct, text: `${plantPct}%` },
     facts,
     checklist,
@@ -557,7 +558,7 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
     if (surveyReady) {
       actionOptions.push({
         label: `Survey Free-Growing${seasonNote}`,
-        description: `Check planting survival after the stand has been tended (${getSilvicultureTaskSummary(journey, zoneProfile, 'survey')})`,
+        description: `Assess older regeneration against stocking standards, including health, height and competition (${getSilvicultureTaskSummary(journey, zoneProfile, 'survey')})`,
         value: 'survey'
       });
     } else {
@@ -602,12 +603,21 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   });
 
   actionOptions.push({
-    label: 'Ride the Program',
-    description: 'No new commitments today — let the crews work and the seedlings settle',
+    label: roster.rotatableCount === 0 ? 'Rest crews and plan tomorrow' : 'Ride the Program',
+    description: roster.rotatableCount === 0
+      ? 'Use this day for recovery; rested contractors become available again'
+      : 'No new commitments today — let the crews work and the seedlings settle',
     value: 'end'
   });
 
-  return actionOptions;
+  const fieldTasks = { plant: 'plant', fill: 'fill', herbicide: 'brush', inspect: 'inspect', survey: 'survey' };
+  const hasSurveyTeam = crewHasRole(journey.crew || [], 'surveyor') || crewHasRole(journey.crew || [], 'spotter');
+  return actionOptions.filter((option) => {
+    const task = fieldTasks[option.value];
+    if (!task) return true;
+    if ((task === 'inspect' || task === 'survey') && hasSurveyTeam) return true;
+    return getSilvicultureTaskContractors(journey, zoneProfile, task, false).length > 0;
+  });
 }
 
 /**
@@ -839,7 +849,7 @@ async function handleHerbicide(game, seasonMods, silvicultureState = null, zoneP
     ui.writeWarning(pressure.summary);
   }
   if (brushingEff >= 1.2) {
-    ui.writePositive('Summer heat improved herbicide effectiveness!');
+    ui.writePositive('The seasonal treatment window improved brush-control productivity.');
   }
   if (vegetationPressure > 0.15) {
     ui.writePositive('Brush control reopened planted ground and improved your survey outlook.');
@@ -908,7 +918,7 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
       journey.surveys.freeGrowingTarget,
       journey.surveys.freeGrowingComplete + surveyGain
     );
-    ui.writePositive(`Survey complete - ${surveyGain > 1 ? `${surveyGain} blocks` : 'block'} declared free-growing!`);
+    ui.writePositive(`Survey complete - ${surveyGain > 1 ? `${surveyGain} older stands meet` : 'an older stand meets'} the free-growing assessment criteria.`);
     if (rushedSurvey) {
       ui.writeWarning('The survey passes, but the rushed stand-tending sequence leaves extra scrutiny on the file.');
       adjustScrutiny(journey, 1);
@@ -917,7 +927,7 @@ async function handleSurvey(game, seasonMods, silvicultureState = null, zoneProf
       ui.write('Fall conditions provided ideal assessment conditions.');
     }
   } else {
-    ui.write('Survey complete - the stand is not defensible as free-growing yet.');
+    ui.write('Survey inconclusive - the measurements do not yet support a free-growing finding.');
     ui.write(`This visit had a ${Math.round(successChance * 100)}% chance of a conclusive assessment. Address the conditions below, then survey again with a rested specialist.`);
     addDiscoveryTags(journey, ['regen_gap'], {
       source: 'silviculture:survey',
@@ -1396,7 +1406,10 @@ function getSilvicultureTaskSummary(journey, zoneProfile, task) {
   }).length;
   const fitText = contractors.length
     ? contractors.map((contractor) => `${contractor.isActive ? 'deployed' : 'will deploy'} ${contractor.name} (${Math.round(getSilvicultureContractorFit(contractor, zoneProfile, task) * 100)}% fit)`).join('; ')
-    : 'no available contractor';
+    : (task === 'inspect' || task === 'survey')
+      && (crewHasRole(journey.crew || [], 'surveyor') || crewHasRole(journey.crew || [], 'spotter'))
+      ? 'your survey team'
+      : 'no available contractor';
   return `${fitText} | ready ${readyCount} | recovering ${recoveringCount}`;
 }
 

@@ -643,7 +643,7 @@ export async function runPlanningDay(game) {
       weatherId: journey.weather?.id,
       season: journey.season?.currentSeason,
       seed: journey.day,
-    }), { delay: 140, holdLastFrame: false });
+    }), { delay: 140, holdLastFrame: false, ambient: 'work' });
   }
 
   startDay(journey);
@@ -758,8 +758,8 @@ export async function runPlanningDay(game) {
       const receipt = buildPlanningActionReceipt(actionBefore, journey);
       if (receipt) ui.write(`State change: ${receipt}`, 'term-dim');
       await ui.promptChoice('', [{
-        label: 'Acknowledge results and continue',
-        description: `${action.label || 'Action'} is complete; return to the planning day`,
+        label: 'Continue',
+        presentation: 'continue',
         value: 'continue'
       }]);
     }
@@ -1073,7 +1073,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (valuesOk) {
       actionOptions.push({
         label: 'Stakeholder Session',
-        description: 'Lane: consultation file | Host consultation and bank buy-in',
+        description: 'Consultation file: hear concerns, record responses and agree follow-up actions',
         value: 'stakeholder'
       });
     } else {

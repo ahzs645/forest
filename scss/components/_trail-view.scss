@@ -1,0 +1,61 @@
+// A compact, persistent diorama. The field log and choices retain their own
+// scroll areas; short phones start with the picture folded away.
+.trail-view {
+  flex: 0 0 clamp(180px, 27dvh, 250px);
+  min-height: 140px;
+  max-height: 65%;
+  display: flex;
+  flex-direction: column;
+  margin: 6px 10px 0;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: #12242c;
+  color: #d3dfcc;
+
+  &[hidden] { display: none; }
+  &.is-collapsed { flex: 0 0 44px; min-height: 44px; }
+  button {
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 0;
+    border-left: 1px solid #36504f;
+    background: transparent;
+    color: #d3dfcc;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    &:hover { background: #27423f; }
+    &:focus-visible { outline: 2px solid #edc977; outline-offset: -3px; }
+  }
+}
+.trail-view-bar { display: flex; flex: 0 0 44px; align-items: stretch; border-bottom: 1px solid #36504f; }
+.trail-view-heading { flex: 1; min-width: 0; padding: 5px 10px; display: flex; flex-direction: column; justify-content: center; }
+.trail-view-kicker { font-size: 9px; letter-spacing: 2px; color: #9cbbac; }
+.trail-view-title { font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.trail-picture {
+  min-height: 0; flex: 1; display: flex; flex-direction: column;
+  &[hidden] { display: none; }
+  canvas { display: block; width: 100%; flex: 1; min-height: 0; height: 150px; }
+}
+.trail-caption { flex: 0 0 20px; padding: 0 10px; font-size: 10px; color: #bdcec5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trail-progress { flex: 0 0 3px; background: #28423e; span { display: block; height: 3px; background: #c5d899; } }
+.terminal { min-height: 0; }
+@media (max-width: 600px) {
+  .trail-view { margin: 3px 6px 0; flex-basis: 190px; max-height: 65%; }
+  .trail-view-title { font-size: 10px; }
+}
+@media (max-height: 600px) {
+  // Explicitly opening the picture on a short screen gives it room to read.
+  // The frame scrolls to the decisions; folding it restores the compact UI.
+  .game-screen:has(.trail-view:not(.is-collapsed):not([hidden])) { overflow-y: auto; }
+  .terminal-window:has(.trail-view:not(.is-collapsed):not([hidden])) {
+    flex: none;
+    height: 320px;
+    min-height: 320px;
+  }
+  .game-screen:has(.trail-view:not(.is-collapsed):not([hidden])) .action-area { flex-shrink: 0; }
+  .trail-view { max-height: 65%; min-height: 140px; }
+}

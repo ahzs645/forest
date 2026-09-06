@@ -11,6 +11,7 @@
 
 import { TextmodeRenderer } from './renderer.js';
 import { progressBar } from '../ascii.js';
+import { renderTrailFrame } from '../scene/trailView.js';
 
 const SIDEBAR_W = 34;
 const MIN_COLS_FOR_SIDEBAR = 96;
@@ -103,7 +104,7 @@ export class GridView {
     // blink and any animation the observer misses.
     this._timer = setInterval(() => {
       const inputVisible = this.ui.inputWrapper && !this.ui.inputWrapper.hidden;
-      if (this._dirty || inputVisible) this._draw();
+      if (this._dirty || inputVisible || this.ui.trailView?.timer) this._draw();
     }, 120);
     this._draw();
   }
@@ -285,7 +286,28 @@ export class GridView {
     if (!hasSidebar && this.ui._missionStatus) this._drawMissionStrip(t, C, 0, top, cols);
 
     const logY = top + (!hasSidebar && this.ui._missionStatus ? 1 : 0);
-    this._drawLog(t, C, mainX, logY, mainW, logH);
+    // Keep a readable log and full-size choice targets on short grids. Larger
+    // grids project the same live diorama as the DOM, with semantic cell tones.
+    const trail = this.ui.trailView;
+    const sceneH = trail?.state && !trail.collapsed && mainW >= 48 && logH >= 26 ? 16 : 0;
+    if (sceneH) {
+      t.drawBox(mainX, logY, mainW, sceneH, C.borderStrong, `TRAIL VIEW · ${trail.state.title}`);
+      const frame = renderTrailFrame(trail.state, trail.tick, { cols: Math.min(120, mainW - 4), rows: 14, action: trail.action });
+      const offset = mainX + Math.floor((mainW - frame.cells[0].length) / 2);
+      for (let y = 0; y < frame.cells.length; y++) {
+        for (let x = 0; x < frame.cells[y].length; x++) {
+          const cell = frame.cells[y][x];
+          const color = cell.tone === 'danger' ? C.warn : ['crew', 'truck', 'paper', 'seedling'].includes(cell.tone) ? C.bright : C.accent;
+          if (cell.ch !== ' ') t.drawText(cell.ch, offset + x, logY + 1 + y, color);
+        }
+      }
+      const label = trail.paused ? '[Play]' : '[Pause]';
+      t.drawText(label, mainX + mainW - label.length - 2, logY, C.warn);
+      this._regions.push({ x: mainX + mainW - label.length - 3, y: logY, w: label.length + 2,
+        h: this._touch ? Math.ceil(44 / this.renderer.cellH) : 1,
+        type: 'trail-motion', action: () => trail.motion.click() });
+    }
+    this._drawLog(t, C, mainX, logY + sceneH, mainW, logH - sceneH);
 
     if (optionRows.length) {
       this._drawOptions(t, C, mainX, bottom - optH, mainW, optH, optionRows);

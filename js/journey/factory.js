@@ -658,11 +658,12 @@ export function createFieldJourney(options = {}) {
 }
 
 function scaleBlocksForShifts(blocks = []) {
-  return blocks.map((block) => {
+  return blocks.map((block, index) => {
     const scaled = Math.round(block.distance * FIELD_DISTANCE_SCALE * 10) / 10;
     return {
       ...block,
-      distance: Math.max(0.5, scaled),
+      // The crew starts at the first camp; there is no inbound leg to travel.
+      distance: index === 0 ? 0 : Math.max(0.5, scaled),
     };
   });
 }

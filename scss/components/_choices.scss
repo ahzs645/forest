@@ -39,6 +39,18 @@
   gap: 1px;
 }
 
+// Acknowledging a result is one action, not another numbered decision card.
+.choices .choice-continue {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  min-width: 120px;
+  min-height: 44px;
+  padding: 8px 18px;
+
+  &::before { display: none; }
+}
+
 .choice-btn {
   display: grid;
   grid-template-columns: 2ch 2ch 1fr auto;

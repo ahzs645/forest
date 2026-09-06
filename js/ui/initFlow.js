@@ -320,6 +320,7 @@ export const InitFlowMixin = {
     // A mission belongs to a run; back on the landing hub there isn't one.
     this.clearMissionStatus?.();
     this.stopRadio?.();
+    this.trailView?.stop();
     this._startLandingScene();
   },
 

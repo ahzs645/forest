@@ -78,7 +78,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1440, height: 900
       await expectContained(page, '#terminal-window');
       await choices.first().focus();
       await page.keyboard.press('Enter');
-      await expect(page.locator('#choices')).toContainText('Acknowledge results and continue');
+      await expect(page.locator('#choices')).toContainText('Continue');
       await page.keyboard.press('Enter');
       await expect(page.locator('#choices')).toContainText('Begin Shift 2');
       await page.keyboard.press('Enter');
@@ -114,7 +114,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1440, height: 900
       await expect(page.locator('#modal')).toBeHidden();
       await expect(page.locator('#choices button').first()).toBeFocused();
       await page.keyboard.press('Enter');
-      await expect(page.locator('#choices')).toContainText('Acknowledge results and continue');
+      await expect(page.locator('#choices')).toContainText('Continue');
     });
 
     test('campaign entry and seasonal strategy entry work at this desktop size', async ({ page }, testInfo) => {
