@@ -32,8 +32,8 @@ const PLANNING_TRIAGE_PROFILES = {
     },
   },
   community: {
-    label: "Community and consultation first",
-    description: "Favor the blocks with less public and First Nations friction. Better trust and fewer surprises, but less aggressive timber selection.",
+    label: "Engagement-led sequencing",
+    description: "Lead with the blocks where engagement with the Nations is furthest along and the heritage screen is clean. Slower on volume, defensible on the record.",
     scrutinyDelta: -2,
     weights: {
       technicalComplexity: -0.2,
@@ -146,7 +146,7 @@ function buildFallbackPlanningSnapshot(areaId, area = null) {
     },
     dominantConstraint: {
       key: "community",
-      label: "Community / consultation",
+      label: "Heritage / engagement",
       severity: 24,
       count: 2,
     },
@@ -202,6 +202,76 @@ function getAreaConstraintPreference(area) {
   return null;
 }
 
+const WATER_GATE_LABELS = { clear: "CLEAR", watch: "WINDOW", hold: "HOLD" };
+
+/**
+ * Display label for a water gate: CLEAR / WINDOW / HOLD. The internal gate
+ * ids ('clear' | 'watch' | 'hold') are persisted on the FOM tracker, so only
+ * the label changes here.
+ */
+export function formatWaterGateLabel(gate) {
+  return WATER_GATE_LABELS[gate] || String(gate || "clear").toUpperCase();
+}
+
+/**
+ * Heritage/referral load: how much engagement and heritage work a block
+ * brings to the file. Built from what the snapshot carries (the Nation
+ * sensitivity metric, riparian ground as an AOA-potential proxy, whether the
+ * licence has an agreement with more than one Nation in the area) and a
+ * deterministic CMT/heritage screen where the snapshot is silent — never
+ * from reserve proximity, which says nothing about a Nation's territory.
+ *
+ * @returns {{score: number, className: 'light'|'moderate'|'heavy', label: string, notes: string[]}}
+ */
+export function getPlanningBlockHeritageLoad(block, area = null) {
+  const metrics = block?.metrics || {};
+  const indicators = block?.indicators || {};
+  const notes = [];
+  let score = clamp(Number(metrics.firstNationsSensitivity || 0), 0, 100);
+
+  const riparian = Boolean(indicators.ogmaNearby || indicators.whaNoHarvestNearby || indicators.speciesAtRiskNearby);
+  if (riparian) {
+    score += 10;
+    notes.push("AOA potential high on riparian ground");
+  } else {
+    notes.push("AOA potential low");
+  }
+
+  // Known CMT / heritage sites: the snapshot does not carry the RAAD layer,
+  // so screen deterministically off the block identity.
+  let hash = 0;
+  for (const char of String(block?.id || block?.label || "")) {
+    hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+  }
+  const heritageScreen = hash % 3;
+  if (heritageScreen === 2) {
+    score += 16;
+    notes.push("CMT/heritage sites recorded within 1 km");
+  } else if (heritageScreen === 1) {
+    score += 8;
+    notes.push("heritage screen flags one recorded site nearby");
+  } else {
+    notes.push("heritage screen clean");
+  }
+
+  const partners = Array.isArray(area?.indigenousPartners) ? area.indigenousPartners : [];
+  if (partners.length >= 2) {
+    score -= 10;
+    notes.push(`agreement in place with ${partners[0]}`);
+  } else if (partners.length === 1) {
+    notes.push(`engagement with ${partners[0]} ongoing`);
+  }
+
+  score = clamp(Math.round(score), 0, 100);
+  const className = score >= 60 ? "heavy" : score >= 30 ? "moderate" : "light";
+  return {
+    score,
+    className,
+    label: `Heritage/referral ${score}`,
+    notes,
+  };
+}
+
 function getBlockConstraintSignals(block, area = null) {
   const areaTags = getAreaTags(area);
   const signals = [];
@@ -211,7 +281,8 @@ function getBlockConstraintSignals(block, area = null) {
   const fn = Number(block?.metrics?.firstNationsSensitivity || 0);
   const indicators = block?.indicators || {};
   const indicatorWaterLoad = Number(Boolean(indicators.ogmaNearby) || Boolean(indicators.whaNoHarvestNearby) || Boolean(indicators.speciesAtRiskNearby));
-  const indicatorCommunityLoad = Number(Boolean(indicators.firstNationsReserveNearby));
+  const heritage = getPlanningBlockHeritageLoad(block, area);
+  const indicatorCommunityLoad = heritage.className === "heavy" ? 1 : 0;
 
   const accessAreaBoost = areaTags.has("steep") || areaTags.has("remote-camps") || areaTags.has("winter-road") || areaTags.has("glacial") ? 8 : 0;
   const waterAreaBoost = areaTags.has("karst") || areaTags.has("salmon") || areaTags.has("watershed") || areaTags.has("wetland") || areaTags.has("community-water") ? 10 : 0;
@@ -238,9 +309,9 @@ function getBlockConstraintSignals(block, area = null) {
   if (fn >= 18 || indicatorCommunityLoad > 0 || communityAreaBoost > 0) {
     signals.push({
       key: "community",
-      label: "Community / consultation",
-      severity: fn + (indicatorCommunityLoad * 10) + communityAreaBoost,
-      note: fn >= 18 ? "consultation load is part of the block story" : "area context suggests consultation or public-interface friction",
+      label: "Heritage / engagement",
+      severity: heritage.score + communityAreaBoost,
+      note: fn >= 18 ? "heritage and referral load is part of the block story" : "area context suggests engagement or public-interface friction",
     });
   }
 
@@ -285,10 +356,10 @@ export function getPlanningBlockWaterContext(block, area = null, seasonInfo = nu
       : "water timing";
 
   const note = gate === "hold"
-    ? `${hydrologyLabel} needs a working-around-water review before submission.`
+    ? `${hydrologyLabel} — in-stream work window applies (WSA s.11); works in and about a stream review needed before submission.`
     : gate === "watch"
-      ? `${hydrologyLabel} is sensitive enough to keep the timing window visible.`
-      : `${hydrologyLabel} is not currently forcing a timing hold.`;
+      ? `${hydrologyLabel} — in-stream work window applies (WSA s.11); keep the timing window on the map.`
+      : `${hydrologyLabel} — no in-stream timing constraint on this block.`;
 
   const readiness = clamp(100 - (timingPressure * 12) - (watershedPressure ? 4 : 0), 20, 100);
   const reviewDays = gate === "hold" ? 3 : gate === "watch" ? 2 : 1;
@@ -299,6 +370,7 @@ export function getPlanningBlockWaterContext(block, area = null, seasonInfo = nu
     sensitive: timingPressure > 0,
     timingPressure,
     gate,
+    gateLabel: formatWaterGateLabel(gate),
     note,
     hydrologyLabel,
     plannedSeason,
@@ -339,7 +411,8 @@ function scorePlanningBlockForTriage(block, triageKey, area = null, seasonInfo =
   }
 
   if (triageKey === "community") {
-    if (indicators.firstNationsReserveNearby) score -= 8;
+    const heritage = getPlanningBlockHeritageLoad(block, area);
+    score -= heritage.score * 0.3;
     if (areaTags.has("community-interface") || areaTags.has("visuals")) score -= 2;
   }
 
@@ -366,7 +439,7 @@ function getTriageEvidenceValue(block, triageKey, area = null, seasonInfo = null
     return Math.round(Number(metrics.biodiversitySensitivity || 0) + water.timingPressure * 5);
   }
   if (triageKey === "community") {
-    return Math.round(Number(metrics.firstNationsSensitivity || 0) + (block?.indicators?.firstNationsReserveNearby ? 25 : 0));
+    return getPlanningBlockHeritageLoad(block, area).score;
   }
   return Math.round(Number(metrics.timberOpportunity || 0));
 }
@@ -401,16 +474,16 @@ export function formatPlanningBlockTriageEvidence(block, triageKey, candidates =
   }
   if (triageKey === "water") {
     const water = getPlanningBlockWaterContext(block, area, seasonInfo);
-    return `Water evidence: ecology sensitivity ${Math.round(Number(metrics.biodiversitySensitivity || 0))}/100 · hydrology ${water.gate.toUpperCase()} · fit rank ${rank}/${count}`;
+    return `Water evidence: habitat sensitivity ${Math.round(Number(metrics.biodiversitySensitivity || 0))}/100 · water gate ${water.gateLabel} · fit rank ${rank}/${count}`;
   }
   if (triageKey === "community") {
-    const reserve = block?.indicators?.firstNationsReserveNearby ? "yes" : "no";
-    return `Consultation evidence: FN sensitivity ${Math.round(Number(metrics.firstNationsSensitivity || 0))}/100 · reserve nearby ${reserve} · fit rank ${rank}/${count}`;
+    const heritage = getPlanningBlockHeritageLoad(block, area);
+    return `Engagement evidence: heritage/referral load ${heritage.score}/100 (${heritage.className}) · ${heritage.notes[0] || "no heritage notes"} · fit rank ${rank}/${count}`;
   }
   if (triageKey === "timber") {
     return `Timber evidence: opportunity ${Math.round(Number(metrics.timberOpportunity || 0))}/100 · fit rank ${rank}/${count} (higher opportunity is better)`;
   }
-  return "Balanced evidence: compare timber, ecology, consultation, and engineering together.";
+  return "Balanced evidence: compare timber, habitat, heritage/referral load, and engineering together.";
 }
 
 function getTriageOptions(recommendedKey) {
@@ -497,7 +570,7 @@ export function formatPlanningBlockPromptDescription(block, area = null, seasonI
 
   const timber = Math.round(block?.metrics?.timberOpportunity || 0);
   const eco = Math.round(block?.metrics?.biodiversitySensitivity || 0);
-  const fn = Math.round(block?.metrics?.firstNationsSensitivity || 0);
+  const heritage = getPlanningBlockHeritageLoad(block, area);
   const blockArea = Number(block.areaHa || 0).toFixed(1);
   const species = formatSpecies(block);
   const timing = block.plannedHarvestYear || block.approveYear;
@@ -509,10 +582,10 @@ export function formatPlanningBlockPromptDescription(block, area = null, seasonI
     formatDistrictName(block.adminDistrict),
     species ? `Species ${species}` : "",
     `Timber ${timber}`,
-    `Eco ${eco}`,
-    `FN ${fn}`,
+    `Habitat ${eco}`,
+    heritage.label,
     constraints ? `Constraints ${constraints}` : "",
-    waterContext.sensitive ? `Water ${waterContext.gate.toUpperCase()} - ${waterContext.note}` : "",
+    waterContext.sensitive ? `Water ${waterContext.gateLabel}: ${waterContext.note}` : "",
     timing ? `Target ${timing}` : "",
   ]
     .filter(Boolean)
@@ -543,6 +616,9 @@ export function getPlanningAreaSnapshot(areaId, area = null, options = {}) {
       if (block?.indicators?.whaNoHarvestNearby) counts.whaNoHarvestNearby += 1;
       if (block?.indicators?.speciesAtRiskNearby) counts.speciesAtRiskNearby += 1;
       if (block?.indicators?.firstNationsReserveNearby) counts.firstNationsReserveNearby += 1;
+      const heritage = getPlanningBlockHeritageLoad(block, resolvedArea);
+      if (heritage.className === "heavy") counts.heritageHeavy += 1;
+      if (heritage.className !== "light") counts.heritageReferral += 1;
       return counts;
     },
     {
@@ -550,6 +626,8 @@ export function getPlanningAreaSnapshot(areaId, area = null, options = {}) {
       whaNoHarvestNearby: 0,
       speciesAtRiskNearby: 0,
       firstNationsReserveNearby: 0,
+      heritageHeavy: 0,
+      heritageReferral: 0,
     },
   );
 
@@ -654,7 +732,7 @@ export function summarizePlanningBlock(block, area = null, triageKey = null, sea
   const blockArea = Number(block.areaHa || 0).toFixed(1);
   const timber = Math.round(block?.metrics?.timberOpportunity || 0);
   const eco = Math.round(block?.metrics?.biodiversitySensitivity || 0);
-  const fn = Math.round(block?.metrics?.firstNationsSensitivity || 0);
+  const heritage = getPlanningBlockHeritageLoad(block, area);
   const constraints = summarizePlanningBlockConstraints(block, area);
   const triageLabel = triageKey ? getPlanningTriageLabel(triageKey) : "";
   const waterContext = getPlanningBlockWaterContext(block, area, seasonInfo);
@@ -662,10 +740,10 @@ export function summarizePlanningBlock(block, area = null, triageKey = null, sea
     `${formatPlanningBlockLabel(block)} (${blockArea} ha)`,
     formatDistrictName(block.adminDistrict),
     `Timber ${timber}`,
-    `Eco ${eco}`,
-    `FN ${fn}`,
+    `Habitat ${eco}`,
+    heritage.label,
     constraints ? `Constraints ${constraints}` : "",
-    waterContext.sensitive ? `Water ${waterContext.gate.toUpperCase()}` : "",
+    waterContext.sensitive ? `Water ${waterContext.gateLabel}` : "",
     triageLabel ? `Triage ${triageLabel}` : "",
   ]
     .filter(Boolean)

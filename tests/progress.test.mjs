@@ -94,7 +94,7 @@ test('standard desk actions stay safe in protagonist-only permitting mode', () =
 
   try {
     const meeting = executeDeskDay(permittingJourney, 'stakeholder_meeting');
-    assert.ok(meeting.messages.some((message) => message.includes('Met with ministry')));
+    assert.ok(meeting.messages.some((message) => message.includes('Met with the district office')));
     assert.ok(permittingJourney.relationships.ministry > 50);
 
     // Each desk action is a day of its own now (js/journey/dayPlan.js), so the

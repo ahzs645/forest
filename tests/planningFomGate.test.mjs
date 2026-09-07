@@ -5,8 +5,11 @@ import { createPlanningJourney } from '../js/journey/factory.js';
 import {
   runPlanningDay,
   syncFomStateFromActiveBlock,
-  processAction
+  processAction,
+  getPlanningSubmissionReadiness,
+  getOutreachReadinessCap
 } from '../js/modes/planning.js';
+import { startDay } from '../js/journey/dayPlan.js';
 import { getPlanningAreaBlockPool } from '../js/data/planningBlocks.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 
@@ -72,7 +75,7 @@ test('the public-review countdown surfaces in the day header once the FOM is pub
     await runPlanningDay(game);
 
     assert.ok(
-      ui.lines.some((line) => /Public Review Window: 30 calendar days remaining/.test(line)),
+      ui.lines.some((line) => /FOM comment period: 30 calendar days remaining/.test(line)),
       `expected the day header to surface the review countdown, lines were: ${JSON.stringify(ui.lines.slice(0, 15))}`
     );
   });
@@ -103,7 +106,7 @@ test('FOM review state persists across a block-focus switch instead of resetting
   assert.equal(secondSync.activeBlockId, pool[1].id, 'the descriptive active-block id still updates');
 });
 
-test('an already-approved FOM is not reset back to draft when the block focus changes', () => {
+test('a closed FOM comment period is not reset back to draft when the block focus changes', () => {
   const journey = makeJourneyWithArea();
   const pool = getPlanningAreaBlockPool(journey.areaId);
   assert.ok(pool.length >= 2);
@@ -111,39 +114,72 @@ test('an already-approved FOM is not reset back to draft when the block focus ch
   journey.blockPlanning.activeBlock = pool[0];
   journey.blockPlanning.activeBlockId = pool[0].id;
   const firstSync = syncFomStateFromActiveBlock(journey, null);
-  firstSync.status = 'approved';
+  firstSync.status = 'closed';
   firstSync.approvedDay = 12;
 
   journey.blockPlanning.activeBlock = pool[1];
   journey.blockPlanning.activeBlockId = pool[1].id;
   const secondSync = syncFomStateFromActiveBlock(journey, null);
 
-  assert.equal(secondSync.status, 'approved', 'an approved FOM must not be rewound to draft by a focus switch');
+  assert.equal(secondSync.status, 'closed', 'a closed comment period must not be rewound to draft by a focus switch');
   assert.equal(secondSync.approvedDay, 12);
 });
 
-test('Ministerial Outreach can actually close the 80% confidence gate it is recommended for', async () => {
+test("older saves that recorded the FOM as 'approved' load as a closed comment period", () => {
+  const journey = makeJourneyWithArea();
+  const pool = getPlanningAreaBlockPool(journey.areaId);
+  journey.blockPlanning.activeBlock = pool[0];
+  journey.blockPlanning.activeBlockId = pool[0].id;
+  journey.blockPlanning.fom.status = 'approved';
+  journey.blockPlanning.fom.activeBlockId = pool[0].id;
+
+  const fom = syncFomStateFromActiveBlock(journey, null);
+  assert.equal(fom.status, 'closed');
+});
+
+test('the District Pre-Submission Meeting tops out short of the decision gate; only Prepare Submission crosses it, and only with the FOM closed', async () => {
   await withSeededRandom(777, async () => {
     const journey = makeJourneyWithArea();
+    const pool = getPlanningAreaBlockPool(journey.areaId);
+    journey.blockPlanning.activeBlock = pool[0];
+    journey.blockPlanning.activeBlockId = pool[0].id;
     journey.plan.phase = 'ministerial_approval';
-    journey.plan.ministerialConfidence = 60;
-    journey.hoursRemaining = 8;
+    journey.plan.dataCompleteness = 85;
+    journey.plan.analysisQuality = 85;
+    journey.plan.stakeholderBuyIn = 80;
+    journey.plan.ministerialConfidence = 30;
     journey.resources.budget = 100000;
     journey.resources.politicalCapital = 100;
+    journey.professional.registrationStatus = 'active';
 
     const ui = makeCaptureUi();
     const game = { ui, journey, gameOver: false };
 
-    // Repeatedly use the outreach action, same as the "Next Best Move"
-    // guidance recommends, until it stops being useful or the gate closes.
-    for (let i = 0; i < 10 && journey.plan.ministerialConfidence < 80; i++) {
-      journey.hoursRemaining = 8;
+    for (let i = 0; i < 10; i++) {
+      startDay(journey);
       await processAction(game, 'outreach', null);
     }
+    const readiness = getPlanningSubmissionReadiness(journey, null);
+    const cap = getOutreachReadinessCap(readiness);
+    assert.ok(cap < 80, `the meeting cap must sit below the decision gate, got ${cap}`);
+    assert.equal(journey.plan.ministerialConfidence, cap, 'meetings stop at the cap');
 
-    assert.ok(
-      journey.plan.ministerialConfidence >= 80,
-      `Ministerial Outreach should be able to reach the 80% gate, stalled at ${journey.plan.ministerialConfidence}%`
-    );
+    // The FOM is still a draft: the submission is blocked and the file is not won.
+    startDay(journey);
+    await processAction(game, 'submit', null);
+    assert.equal(journey.isComplete, false, 'no decision without a closed FOM comment period');
+    assert.equal(journey.plan.ministerialConfidence, cap);
+    assert.ok(ui.lines.some((line) => /Submission blocked: .*FOM draft/.test(line)));
+
+    // Close the comment period; the submission carries the file across.
+    journey.blockPlanning.fom.status = 'closed';
+    journey.blockPlanning.fom.commentLoad = 0;
+    journey.blockPlanning.fom.reviewDaysRemaining = 0;
+    journey.blockPlanning.fom.hydrologyReadiness = 100;
+    startDay(journey);
+    await processAction(game, 'submit', null);
+    assert.ok(journey.plan.ministerialConfidence >= 80, `submission should cross the gate, at ${journey.plan.ministerialConfidence}%`);
+    assert.equal(journey.isComplete, true);
+    assert.match(journey.endReason, /approved by the District Manager/);
   });
 });

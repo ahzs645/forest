@@ -48,8 +48,12 @@ function makeCaptureUi() {
     playEventVignette() {},
     async promptChoice(prompt, choices) {
       if (!choices || choices.length === 0) return { value: undefined };
-      const endIdx = choices.findIndex((c) => c.value === 'end');
-      if (endIdx !== -1) return choices[endIdx];
+      // Work the file the way a player would, so the phases actually turn
+      // over; fall back to closing the day, then to the first option.
+      for (const wanted of ['set_aside', 'gather_data', 'analyze', 'stakeholder', 'end']) {
+        const found = choices.find((c) => c.value === wanted);
+        if (found) return found;
+      }
       return choices[0];
     }
   };
@@ -62,10 +66,17 @@ test('Cutblock Priority Decision card never repeats a paragraph', async () => {
     const ui = makeCaptureUi();
     const game = { ui, journey, gameOver: false };
 
-    await runPlanningDay(game);
+    // The card opens the analysis, not the run: the inventory has to be in
+    // before there is anything to triage against.
+    let guard = 0;
+    while (!ui.lines.some((line) => line.includes('CUTBLOCK PRIORITY DECISION')) && guard < 14) {
+      await runPlanningDay(game);
+      guard += 1;
+    }
 
     const cardStart = ui.lines.findIndex((line) => line.includes('CUTBLOCK PRIORITY DECISION'));
-    assert.ok(cardStart !== -1, 'expected the card to fire on day 1');
+    assert.ok(cardStart !== -1, 'expected the card to fire once the analysis opened');
+    assert.equal(journey.plan.phase === 'data_gathering', false, 'the card must not fire before the inventory is in');
 
     // The area's zoneSummary is a full descriptive sentence/paragraph. The
     // bug rendered it once on its own line and again as the leading clause
@@ -81,13 +92,12 @@ test('Cutblock Priority Decision card never repeats a paragraph', async () => {
   });
 });
 
-test('Cutblock Priority Decision fires at most twice in a campaign-length planning run', async () => {
+test('Cutblock Priority Decision fires exactly once in a campaign-length planning run and locks a lead block set', async () => {
   await withSeededRandom(9001, async () => {
     const area = OPERATING_AREAS.find((candidate) => candidate.id === 'fraser-plateau');
     const journey = createPlanningJourney({ roleId: 'planner', areaId: 'fraser-plateau', area, scale: 'campaign' });
-    // Campaign scale runs a 26-day window with a 3-day selection cadence, so
-    // the cadence alone would put this card on screen eight or nine times with
-    // identical wording; MAX_BLOCK_SELECTIONS_PER_RUN is what holds it down.
+    // The triage runs once, at the start of the analysis; only an authored
+    // event (effects.blockSelection) can reopen it.
     assert.equal(journey.deadline, 26);
     const ui = makeCaptureUi();
     const game = { ui, journey, gameOver: false };
@@ -99,7 +109,10 @@ test('Cutblock Priority Decision fires at most twice in a campaign-length planni
     }
 
     const fireCount = ui.headers.filter((header) => header === 'CUTBLOCK PRIORITY DECISION').length;
-    assert.ok(fireCount <= 2, `expected the card to fire at most twice, fired ${fireCount} times`);
-    assert.ok(fireCount >= 1, 'expected the card to fire at least once');
+    assert.equal(fireCount, 1, `expected the card to fire exactly once, fired ${fireCount} times`);
+    assert.ok(journey.blockPlanning.leadBlocks.length >= 2 && journey.blockPlanning.leadBlocks.length <= 3,
+      `expected a lead block set of 2-3 blocks, got ${journey.blockPlanning.leadBlocks.length}`);
+    assert.equal(journey.blockPlanning.leadBlocks[0].id, journey.blockPlanning.activeBlock.id, 'the chosen block leads the set');
+    assert.ok(ui.lines.some((line) => line.startsWith('Lead block set for the first FOM:')));
   });
 });

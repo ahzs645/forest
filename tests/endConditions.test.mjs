@@ -41,7 +41,7 @@ test('planning mode does not declare victory on confidence alone before the full
   assert.equal(checkEndConditions(planningJourney), null);
 });
 
-test('planning mode wins once every ministerial approval milestone is actually complete', () => {
+test('planning mode wins once every District Manager gate is actually complete, FOM comment period included', () => {
   const planningJourney = {
     journeyType: 'planning',
     crew: [],
@@ -53,14 +53,43 @@ test('planning mode wins once every ministerial approval milestone is actually c
       stakeholderBuyIn: 78,
       ministerialConfidence: 82
     },
+    blockPlanning: { fom: { status: 'closed' } },
     resources: { budget: 41000, politicalCapital: 25 }
   };
 
   assert.equal(isPlanningApprovalReady(planningJourney), true);
   assert.deepEqual(checkEndConditions(planningJourney), {
     victory: true,
-    reason: 'Landscape plan approved by Ministry!'
+    reason: 'FSP and Forest Operations Map approved by the District Manager.'
   });
+});
+
+test('planning mode cannot win while the FOM has not finished its public comment period', () => {
+  const base = {
+    journeyType: 'planning',
+    crew: [],
+    day: 10,
+    deadline: 34,
+    protagonist: { stress: 22 },
+    plan: {
+      phase: 'ministerial_approval',
+      dataCompleteness: 85,
+      analysisQuality: 84,
+      stakeholderBuyIn: 78,
+      ministerialConfidence: 82
+    },
+    resources: { budget: 41000, politicalCapital: 25 }
+  };
+
+  for (const status of ['draft', 'public_review', 'revision_required']) {
+    const journey = { ...base, blockPlanning: { fom: { status } } };
+    assert.equal(isPlanningApprovalReady(journey), false, `FOM ${status} must not be decidable`);
+    assert.equal(checkEndConditions(journey), null);
+  }
+  // No FOM tracker at all is not a loophole either.
+  assert.equal(isPlanningApprovalReady(base), false);
+  // Saves that recorded the closed period as 'approved' still count.
+  assert.equal(isPlanningApprovalReady({ ...base, blockPlanning: { fom: { status: 'approved' } } }), true);
 });
 
 test('permitting mode does not auto-fail when using protagonist without crew', () => {

@@ -82,29 +82,27 @@ export function showJourneyIntro(ui, journey) {
     }
 
     case 'planning':
-      ui.write(`Mission: Achieve ministerial approval for a landscape-level forest plan within ${journey.deadline} days.`);
-      ui.write('Progress through phases: Data Gathering → Analysis → Stakeholder Review → Ministerial Approval');
-      ui.write('Balance values: biodiversity, timber supply, community needs, First Nations interests.');
-      ui.write('Final submission now depends on Forest Operations Map review and water-timing readiness.');
+      ui.write(`Mission: Get the operating area's Forest Stewardship Plan and first Forest Operations Map approved by the District Manager within ${journey.deadline} days.`);
+      ui.write('Phases: Inventory & Data → Analysis & Draft Plan → Engagement & Public Review → District Manager Decision');
+      ui.write('Balance values: habitat, timber supply, community needs, First Nations interests.');
+      ui.write('The FOM must run its 30-day public comment period before the file can go to the District Manager; the water gate and the road file have to be clear too.');
       ui.write('');
-      ui.write('Current phase: Data Gathering');
-      ui.write(`  Cutblocks to plan: ${journey.cutblocks.proposed}`);
+      ui.write('Current phase: Inventory & Data');
       ui.write('');
       ui.write('Starting resources:');
       ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
-      ui.write(`  Political Capital: ${journey.resources.politicalCapital}`);
-      ui.write(`  Data Credits: ${journey.resources.dataCredits}`);
-      ui.write(`  Consultant Days: ${journey.resources.consultantDays}`);
+      ui.write(`  District goodwill: ${journey.resources.politicalCapital}`);
+      ui.write(`  Inventory budget: ${Math.round((journey.resources.dataCredits || 0) / 10)} LiDAR/VRI pulls`);
       break;
 
     case 'permitting':
-      ui.write(`Mission: Complete ${journey.permits.target} permit approvals within ${journey.deadline} days.`);
-      ui.write('Manage the permit pipeline: drafting → referral → review → approval.');
-      ui.write('Build stakeholder relationships to smooth the approval process.');
-      ui.write('Public-review, hydrology, and timing pressure now change how hard the file is to move.');
+      ui.write(`Mission: Get ${journey.permits.target} permits issued by the District Manager within ${journey.deadline} days.`);
+      ui.write('Work the queue: drafting → submission → referral clock → district decision → issued.');
+      ui.write('Cutting and road permits go out on a 30-day First Nations referral; a file that touches a stream carries a 45-day WSA s.11 notification window; a deficiency letter stops its clock until you answer it.');
+      ui.write('Working relationships with the district, the Nation, and the agencies are what move a clock early.');
       ui.write('');
-      ui.write('Permit pipeline:');
-      ui.write(`  Target: ${journey.permits.target} approvals`);
+      ui.write('Permit queue:');
+      ui.write(`  Target: ${journey.permits.target} permits issued`);
       ui.write(`  In backlog: ${journey.permits.backlog}`);
       ui.write(`  Submitted: ${journey.permits.submitted}`);
       ui.write(`  In review: ${journey.permits.inReview}`);

@@ -627,8 +627,8 @@ test('planning water context holds community watershed blocks and blocks submiss
 
   const readiness = getPlanningSubmissionReadiness(journey, season);
   assert.equal(readiness.ready, false);
-  assert.match(readiness.reasons.join(' | '), /FOM is draft/i);
-  assert.match(readiness.reasons.join(' | '), /working-around-water/i);
+  assert.match(readiness.reasons.join(' | '), /FOM draft/i);
+  assert.match(readiness.reasons.join(' | '), /works in and about a stream/i);
 });
 
 test('planning readiness blocks direct severe road observations with road-engineering reasons', () => {

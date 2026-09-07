@@ -43,8 +43,8 @@ deployments are sized against it with `npm run sim:expeditions`.
 
 **Five roles, five distinct journeys:**
 
-- **Strategic Planner** — phase-gated landscape planning against the District Manager's decision deadline.
-- **Permitting Specialist** — a permit pipeline sim: drafting → referral → review → approval.
+- **Strategic Planner** — phase-gated FSP and Forest Operations Map planning against the District Manager's decision deadline.
+- **Permitting Specialist** — a permit pipeline sim: drafting → submission → referral clock → district decision → issued.
 - **Recon Crew Lead** — block-to-block layout and recon traverse with pace, rations, camps, and crew welfare.
 - **Silviculture Supervisor** — contractor management across planting, brushing, and surveys.
 - **General Manager** — woodlands mode: hire a woods manager, chase SFI/FSC certification, hold cut control and the books.

@@ -49,8 +49,12 @@ function getProfessionalRoleBaseline(roleId, areaOrId = null) {
   let baseline;
   switch (roleId) {
     case "permitter":
+      // CPD is logged on the professional file only, and the target is the
+      // season's share of the FPBC year (roughly 8 of ~32 hours), so a
+      // competent desk clears it with one admin day rather than by doing
+      // the job.
       baseline = {
-        cpdTarget: 32,
+        cpdTarget: 8,
         competenceRisk: 20,
         paperworkLoad: 10,
         auditExposure: 10,
@@ -58,7 +62,7 @@ function getProfessionalRoleBaseline(roleId, areaOrId = null) {
       break;
     case "planner":
       baseline = {
-        cpdTarget: 30,
+        cpdTarget: 8,
         competenceRisk: 18,
         paperworkLoad: 8,
         auditExposure: 8,

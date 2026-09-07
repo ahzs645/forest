@@ -4,6 +4,7 @@
  */
 
 import { isFieldJourney, isDeskJourney } from './constants.js';
+import { PLANNING_PRE_SUBMISSION_CAP } from '../journey/constants.js';
 import { applyRandomInjury, applyStatusEffect } from '../crew.js';
 import { syncBlocksFromDistance } from '../journey/blockNav.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
@@ -296,6 +297,9 @@ function applyEventEffects(journey, effects, messages) {
   if (typeof effects.progress === 'number' && effects.progress !== 0) {
     applyProgressEffects(journey, effects.progress, messages, effects);
   }
+  if (journey.journeyType === 'planning') {
+    applyPlanningMetricEffects(journey, effects, messages);
+  }
 
   // Crew-wide effects
   if (effects.crew_health) {
@@ -433,7 +437,7 @@ function applyDiscoveryTagEffects(journey, event, option) {
 function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
   switch (journey.journeyType) {
     case 'planning':
-      applyPlanningProgress(journey, progressPoints, messages);
+      applyPlanningProgress(journey, progressPoints, messages, effects);
       return;
 
     case 'permitting':
@@ -486,12 +490,51 @@ function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
   }
 }
 
-function applyPlanningProgress(journey, progressPoints, messages) {
+/** Explicit planning-file effect keys a desk event can carry. */
+const PLANNING_METRIC_KEYS = {
+  analysis: { metric: 'analysisQuality', label: 'Analysis quality' },
+  buyIn: { metric: 'stakeholderBuyIn', label: 'Stakeholder buy-in' },
+};
+
+function hasExplicitPlanningKey(effects = {}) {
+  return ['data', 'analysis', 'buyIn'].some((key) => typeof effects?.[key] === 'number' && effects[key] !== 0);
+}
+
+/**
+ * Explicit planning-file effects: `data` lands on data completeness (handled
+ * with the survey-data key above), `analysis` on the draft plan, `buyIn` on
+ * the engagement record. `blockSelection: true` reopens the cutblock
+ * priority decision. None of these moves the District Manager's readiness
+ * or advances a phase — only the planner's own work does that.
+ */
+function applyPlanningMetricEffects(journey, effects, messages) {
   if (!journey.plan) return;
+  for (const [key, { metric, label }] of Object.entries(PLANNING_METRIC_KEYS)) {
+    const delta = effects?.[key];
+    if (typeof delta !== 'number' || delta === 0) continue;
+    journey.plan[metric] = clampPercent((journey.plan[metric] || 0) + delta);
+    messages.push(`${label} ${delta > 0 ? 'improved' : 'slipped'} (${delta > 0 ? '+' : ''}${delta}%).`);
+  }
+  if (effects?.blockSelection === true && journey.blockPlanning) {
+    journey.blockPlanning.pendingSelection = true;
+    messages.push('The lead block set is back on the table; the cutblock priority decision reopens tomorrow.');
+  }
+}
+
+/**
+ * Generic progress on a planning file lands on the metric of the phase the
+ * file is in. It is the fallback for decks that do not say which track
+ * moved; an option that carries an explicit data/analysis/buyIn key has said
+ * so, and the generic amount is not applied on top.
+ */
+function applyPlanningProgress(journey, progressPoints, messages, effects = {}) {
+  if (!journey.plan) return;
+  if (hasExplicitPlanningKey(effects)) return;
 
   const amount = Math.max(3, Math.round(Math.abs(progressPoints) * 1.5));
   let metricKey = 'dataCompleteness';
   let metricLabel = 'Data readiness';
+  let ceiling = 100;
 
   switch (journey.plan.phase) {
     case 'analysis':
@@ -503,18 +546,27 @@ function applyPlanningProgress(journey, progressPoints, messages) {
       metricLabel = 'Stakeholder buy-in';
       break;
     case 'ministerial_approval':
+      // A good week at the district can lift readiness, but never past the
+      // point where only Prepare Submission crosses the decision gate.
       metricKey = 'ministerialConfidence';
-      metricLabel = 'Ministerial confidence';
+      metricLabel = 'DM readiness';
+      ceiling = PLANNING_PRE_SUBMISSION_CAP;
       break;
     default:
       break;
   }
 
   const signedAmount = progressPoints > 0 ? amount : -amount;
-  journey.plan[metricKey] = clampPercent((journey.plan[metricKey] || 0) + signedAmount);
+  const current = journey.plan[metricKey] || 0;
+  const next = signedAmount > 0
+    ? Math.max(current, Math.min(ceiling, current + signedAmount))
+    : clampPercent(current + signedAmount);
+  journey.plan[metricKey] = next;
 
-  const direction = progressPoints > 0 ? 'improved' : 'slipped';
-  messages.push(`${metricLabel} ${direction} (${signedAmount > 0 ? '+' : ''}${signedAmount}%).`);
+  const applied = Math.round(next - current);
+  if (applied === 0) return;
+  const direction = applied > 0 ? 'improved' : 'slipped';
+  messages.push(`${metricLabel} ${direction} (${applied > 0 ? '+' : ''}${applied}%).`);
   advancePlanningPhaseIfReady(journey, messages);
 }
 
@@ -525,18 +577,19 @@ function applyComplianceEffects(journey, delta, messages) {
     return;
   }
 
-  if (isDeskJourney(journey.journeyType) && typeof journey.resources?.politicalCapital === 'number') {
-    journey.resources.politicalCapital = clampPercent(journey.resources.politicalCapital + delta);
-  }
-
-  if (journey.journeyType === 'planning' && journey.plan) {
-    journey.plan.ministerialConfidence = clampPercent(journey.plan.ministerialConfidence + delta);
+  if (journey.journeyType === 'planning') {
+    // On a planning file, compliance is the planner's own standing: it moves
+    // scrutiny (applyScrutinyEffects) and reputation, never the District
+    // Manager's readiness and never the district's goodwill.
     if (journey.protagonist) {
       journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + Math.ceil(delta / 2));
     }
-    messages.push(`Ministerial confidence ${delta > 0 ? 'rose' : 'fell'} (${delta > 0 ? '+' : ''}${delta}%).`);
-    advancePlanningPhaseIfReady(journey, messages);
+    messages.push(`Professional standing ${delta > 0 ? 'improved' : 'slipped'} (${delta > 0 ? '+' : ''}${delta}).`);
     return;
+  }
+
+  if (isDeskJourney(journey.journeyType) && typeof journey.resources?.politicalCapital === 'number') {
+    journey.resources.politicalCapital = clampPercent(journey.resources.politicalCapital + delta);
   }
 
   if (journey.journeyType === 'permitting' && journey.regulations) {
@@ -564,12 +617,11 @@ function applyRelationshipEffects(journey, delta, messages) {
     }
   }
 
-  if (journey.journeyType === 'planning' && journey.plan) {
-    journey.plan.stakeholderBuyIn = clampPercent(journey.plan.stakeholderBuyIn + delta);
-    if (journey.protagonist) {
-      journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + relationshipShift);
-    }
-    advancePlanningPhaseIfReady(journey, messages);
+  if (journey.journeyType === 'planning' && journey.protagonist) {
+    // Relationships land on the stakeholders' moods (above) and the planner's
+    // reputation. Buy-in is the engagement record, and only a Stakeholder
+    // Session or an explicit buyIn effect writes it.
+    journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + relationshipShift);
   }
 
   if (journey.journeyType === 'manager' && journey.metrics) {
@@ -579,30 +631,23 @@ function applyRelationshipEffects(journey, delta, messages) {
   messages.push(`Relationships ${delta > 0 ? 'improved' : 'frayed'} (${delta > 0 ? '+' : ''}${delta}).`);
 }
 
+/**
+ * The technical phases can close on the back of an event; the engagement
+ * phase closes only on a Stakeholder Session, and the District Manager's
+ * decision only on Prepare Submission (js/modes/planning.js).
+ */
 function advancePlanningPhaseIfReady(journey, messages) {
   if (!journey.plan) return;
 
   if (journey.plan.phase === 'data_gathering' && journey.plan.dataCompleteness >= 80) {
     journey.plan.phase = 'analysis';
-    messages.push('Data phase complete! Moving to Analysis.');
+    messages.push('Inventory complete. The analysis opens with the cutblock priority decision.');
     return;
   }
 
   if (journey.plan.phase === 'analysis' && journey.plan.analysisQuality >= 80) {
     journey.plan.phase = 'stakeholder_review';
-    messages.push('Analysis complete! Moving to Stakeholder Review.');
-    return;
-  }
-
-  if (journey.plan.phase === 'stakeholder_review' && journey.plan.stakeholderBuyIn >= 75) {
-    journey.plan.phase = 'ministerial_approval';
-    messages.push('Stakeholder review complete! Moving to Ministerial Approval.');
-    return;
-  }
-
-  if (journey.plan.phase === 'ministerial_approval' && journey.plan.ministerialConfidence >= 80) {
-    journey.isComplete = true;
-    journey.endReason = 'Landscape plan approved by Ministry!';
+    messages.push('Draft plan complete. Moving to Engagement & Public Review.');
   }
 }
 

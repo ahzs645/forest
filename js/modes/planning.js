@@ -1,7 +1,8 @@
 /**
  * Planning Mode Runner
- * Protagonist-based strategic planning for landscape-level forest plans
- * Multi-action days with values tradeoffs
+ * Protagonist-based strategic planning: the licensee's Forest Stewardship
+ * Plan replacement and the first Forest Operations Map for the operating
+ * area, decided by the District Manager. One-action days with values tradeoffs.
  */
 
 import { checkForEvent } from '../events.js';
@@ -11,6 +12,7 @@ import { buildOfficeWindowFrames } from '../scene/textmode/scenes.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay } from '../season.js';
 import {
   buildPlanningConstraintTriage,
+  formatWaterGateLabel,
   getPlanningAreaBlockPool,
   getPlanningTriageLabel,
   getPlanningTriageScrutinyDelta,
@@ -21,6 +23,7 @@ import {
   formatPlanningBlockPromptDescription,
   formatPlanningBlockTriageEvidence,
 } from '../data/planningBlocks.js';
+import { PLANNING_DECISION_GATE } from '../journey/constants.js';
 import {
   formatRoadAssetSummary,
   getPlanningRoadAssetContext,
@@ -43,11 +46,21 @@ import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../jou
  * These used to be the yield of a three or four hour block, taken two or three
  * times a day. A day is one action now (js/journey/dayPlan.js), so each track
  * moves by a day's worth instead — otherwise the file cannot reach its gates
- * inside the cabinet window. Sized with scripts/simulate-expeditions.mjs.
+ * before the current FSP expires. Sized with scripts/simulate-expeditions.mjs.
  */
 const DAY_OF_DATA = 18;
 const DAY_OF_ANALYSIS = 26;
 const DAY_OF_CONSULTATION = 18;
+/** What a day walking the draft with the District Manager is worth in readiness. */
+const DAY_OF_DISTRICT_MEETING = 14;
+/** A session with a clean engagement record also reassures the district. */
+const SESSION_READINESS_LIFT = 3;
+/**
+ * What the planning team costs a day. The FOM comment period and the
+ * pre-submission meetings put a competent file at 21-25 days, so the daily
+ * burn is sized for that calendar (scripts/simulate-expeditions.mjs).
+ */
+const PLANNING_DAILY_BURN = 600;
 
 // The professional reference carried by the game specifies a 30-calendar-day
 // comment period. A planning "day" is a compressed turn, so the statutory
@@ -57,18 +70,46 @@ export const FOM_CALENDAR_DAYS_PER_PLANNING_DAY = 15;
 export const FOM_MIN_DATA_COMPLETENESS = 30;
 export const FOM_MIN_ANALYSIS_QUALITY = 15;
 const FOM_PUBLIC_REVIEW_COMMENT_LIMIT = 0;
-// The Cutblock Priority Decision card re-triages the area and reprints the
-// same zone framing every time it fires. On a short (campaign-scale) run the
-// 3-day cadence can put it on screen 4 times with identical wording, so cap
-// it to a couple of appearances per run instead of letting the day-based
-// cadence reschedule indefinitely.
-const MAX_BLOCK_SELECTIONS_PER_RUN = 2;
+/** How many blocks the first FOM leads with. */
+export const LEAD_BLOCK_SET_SIZE = 3;
+// Internal phase keys are persisted in saves (journey.plan.phase), so only
+// the labels carry the District Manager framing.
 const PLANNING_PHASE_NAMES = {
-  data_gathering: 'Data Gathering',
-  analysis: 'Analysis',
-  stakeholder_review: 'Stakeholder Review',
-  ministerial_approval: 'Ministerial Approval'
+  data_gathering: 'Inventory & Data',
+  analysis: 'Analysis & Draft Plan',
+  stakeholder_review: 'Engagement & Public Review',
+  ministerial_approval: 'District Manager Decision'
 };
+/** Water gate ids in order of how hard they hold the file. */
+const WATER_GATE_RANK = { clear: 0, watch: 1, hold: 2 };
+/**
+ * A HOLD on the water gate is the works in and about a stream (WSA s.11)
+ * review: hydrology readiness climbs with every FOM day spent on it, and at
+ * this level the HOLD becomes a WINDOW — the in-stream work window is on
+ * the map and the notification is filed.
+ */
+export const WSA_REVIEW_READINESS = 60;
+const WSA_REVIEW_PROGRESS_PER_DAY = 20;
+
+export function getEffectiveWaterGate(fom, waterContext) {
+  const rawGate = waterContext?.gate || 'clear';
+  if (rawGate === 'hold' && (fom?.hydrologyReadiness || 0) >= WSA_REVIEW_READINESS) return 'watch';
+  return rawGate;
+}
+
+function describeEffectiveWaterNote(fom, waterContext) {
+  const gate = getEffectiveWaterGate(fom, waterContext);
+  if (waterContext?.gate === 'hold' && gate === 'watch') {
+    return `${waterContext.hydrologyLabel} — works in and about a stream review done; in-stream work window on the map and WSA s.11 notification filed.`;
+  }
+  return waterContext?.note || 'No water gate evaluated yet.';
+}
+
+function progressWaterGateReview(fom, waterContext, baseGain) {
+  const gain = waterContext?.gate === 'hold' ? WSA_REVIEW_PROGRESS_PER_DAY : baseGain;
+  fom.hydrologyReadiness = Math.min(100, Math.max(fom.hydrologyReadiness || 0, waterContext?.readiness || 0) + gain);
+  return gain;
+}
 
 function ensurePlanningProfessionalState(journey) {
   return ensureProfessionalComplianceState(journey);
@@ -81,9 +122,18 @@ function getPlanningProfessionalSnapshot(journey) {
 function describePlanningProfessionalSnapshot(snapshot) {
   if (!snapshot) return 'Registration n/a | CPD n/a | Paperwork n/a | Audit n/a';
   const burden = snapshot.areaBurdenLabel ? ` | ${snapshot.areaBurdenLabel}` : '';
-  return `Registration: ${snapshot.registrationStatus} | CPD: ${snapshot.cpdHours}/${snapshot.cpdTarget}h | Paperwork: ${snapshot.paperworkLoad} | Audit: ${snapshot.auditExposure}${burden}`;
+  const filing = snapshot.paperworkLoad >= PAPERWORK_FLAG_THRESHOLD ? 'high — the next audit will find it' : 'manageable';
+  return `Registration: ${snapshot.registrationStatus} | CPD logged this season: ${snapshot.cpdHours}/${snapshot.cpdTarget}h | Filing backlog: ${filing} | Audit exposure: ${snapshot.auditExposure}${burden}`;
 }
 
+/** Paperwork load at which the filing backlog is worth a flag on the card. */
+const PAPERWORK_FLAG_THRESHOLD = 20;
+
+/**
+ * What on the professional file stops the submission. Only registration
+ * gates the file — a CPD shortfall or audit exposure shows up as scrutiny
+ * and in the odds of an FPBC audit, not as a reason the DM cannot decide.
+ */
 function getPlanningProfessionalIssues(journey) {
   const snapshot = getPlanningProfessionalSnapshot(journey);
   if (!snapshot) return [];
@@ -91,18 +141,6 @@ function getPlanningProfessionalIssues(journey) {
   const reasons = [];
   if (!snapshot.registrationActive) {
     reasons.push(`registration is ${snapshot.registrationStatus}`);
-  }
-  if (snapshot.cpdGap > 0) {
-    reasons.push(`CPD gap ${snapshot.cpdGap}h`);
-  }
-  if (snapshot.competenceRisk >= 35) {
-    reasons.push(`competence risk ${snapshot.competenceRisk}%`);
-  }
-  if (snapshot.paperworkLoad >= 55) {
-    reasons.push(`paperwork load ${snapshot.paperworkLoad}`);
-  }
-  if (snapshot.auditExposure >= 35) {
-    reasons.push(`audit exposure ${snapshot.auditExposure}`);
   }
   return reasons;
 }
@@ -169,6 +207,11 @@ function ensurePlanningFomState(journey) {
   if (!fom.status) {
     fom.status = 'draft';
   }
+  // Older saves recorded the end of the comment period as 'approved'. A FOM
+  // is published for comment, not approved; the period closes.
+  if (fom.status === 'approved') {
+    fom.status = 'closed';
+  }
   if (!Number.isFinite(fom.reviewDaysRemaining)) {
     fom.reviewDaysRemaining = 0;
   }
@@ -212,11 +255,11 @@ function describeReviewState(fom) {
   if (!fom) return 'Draft';
   switch (fom.status) {
     case 'public_review':
-      return `Public review ${Math.max(0, fom.reviewDaysRemaining)} calendar days left`;
+      return `Comment period: ${Math.max(0, fom.reviewDaysRemaining)} calendar days left`;
     case 'revision_required':
-      return 'Revision required';
-    case 'approved':
-      return 'Approved';
+      return 'Comments need a response';
+    case 'closed':
+      return 'Comment period closed';
     default:
       return 'Draft';
   }
@@ -224,7 +267,7 @@ function describeReviewState(fom) {
 
 export function getFomPublicationGaps(journey) {
   const gaps = [];
-  if (!journey?.blockPlanning?.activeBlock) gaps.push('select an active block');
+  if (!journey?.blockPlanning?.activeBlock) gaps.push('lock the lead block set');
   const data = Math.round(Number(journey?.plan?.dataCompleteness || 0));
   const analysis = Math.round(Number(journey?.plan?.analysisQuality || 0));
   if (data < FOM_MIN_DATA_COMPLETENESS) gaps.push(`data ${data}%/${FOM_MIN_DATA_COMPLETENESS}%`);
@@ -236,13 +279,60 @@ function getPlanningPhaseLabel(phase) {
   return PLANNING_PHASE_NAMES[phase] || phase;
 }
 
+/**
+ * The blocks the first FOM leads with. Saves from before the lead set carry
+ * only an active block, which is a set of one.
+ */
+export function getPlanningLeadBlocks(journey) {
+  const state = journey?.blockPlanning;
+  if (!state) return [];
+  if (Array.isArray(state.leadBlocks) && state.leadBlocks.length) return state.leadBlocks;
+  return state.activeBlock ? [state.activeBlock] : [];
+}
+
+export function formatPlanningLeadBlocks(journey) {
+  const blocks = getPlanningLeadBlocks(journey);
+  if (!blocks.length) return '';
+  return blocks.map((block) => formatPlanningBlockLabel(block).replace(/^Cutblock /, '')).join(', ');
+}
+
+/**
+ * The water gate for the file is the worst gate in the lead set: one block
+ * with an in-stream work window holds the whole FOM.
+ */
+export function getPlanningLeadWaterContext(journey, seasonInfo = null) {
+  const blocks = getPlanningLeadBlocks(journey);
+  let worst = null;
+  for (const block of blocks) {
+    const context = getPlanningBlockWaterContext(block, journey.area, seasonInfo);
+    if (!worst
+      || WATER_GATE_RANK[context.gate] > WATER_GATE_RANK[worst.gate]
+      || (context.gate === worst.gate && context.timingPressure > worst.timingPressure)) {
+      worst = { ...context, block };
+    }
+  }
+  return worst || { ...getPlanningBlockWaterContext(null, journey.area, seasonInfo), block: null };
+}
+
+/** The road file for the FOM is the worst road context in the lead set. */
+export function getPlanningLeadRoadContext(journey) {
+  const blocks = getPlanningLeadBlocks(journey);
+  let worst = null;
+  for (const block of blocks) {
+    const context = getPlanningRoadAssetContext(journey, block);
+    const score = (context.blocker ? 1000 : 0) + (context.readinessPenalty || 0) + (context.engineeringPressure || 0);
+    if (!worst || score > worst.score) worst = { ...context, block, score };
+  }
+  return worst || { ...getPlanningRoadAssetContext(journey, null), block: null, score: 0 };
+}
+
 export function syncFomStateFromActiveBlock(journey, seasonInfo) {
   const blockPlanning = journey.blockPlanning;
   if (!blockPlanning?.activeBlock) return ensurePlanningFomState(journey);
 
   const fom = ensurePlanningFomState(journey);
-  const waterContext = getPlanningBlockWaterContext(blockPlanning.activeBlock, journey.area, seasonInfo);
-  const roadContext = getPlanningRoadAssetContext(journey, blockPlanning.activeBlock);
+  const waterContext = getPlanningLeadWaterContext(journey, seasonInfo);
+  const roadContext = getPlanningLeadRoadContext(journey);
   const activeBlockId = blockPlanning.activeBlock.id;
 
   // The FOM submission is plan-level, not per-block: Cutblock Priority
@@ -260,14 +350,19 @@ export function syncFomStateFromActiveBlock(journey, seasonInfo) {
     fom.publicReviewOpenedDay = null;
     fom.approvedDay = null;
     fom.revisionNotes = '';
+    // Hydrology readiness starts where the worst block in the set puts it
+    // and climbs only with FOM work (the WSA s.11 review), so it is seeded
+    // once rather than reset on every sync.
+    fom.hydrologyReadiness = waterContext.readiness;
   }
 
   fom.activeBlockId = activeBlockId;
-  fom.blockLabel = blockPlanning.activeSummary || blockPlanning.activeBlock.label || blockPlanning.activeBlock.id;
-  fom.waterGate = waterContext.gate;
-  fom.waterNote = waterContext.note;
+  fom.blockLabel = formatPlanningLeadBlocks(journey) || blockPlanning.activeSummary || blockPlanning.activeBlock.label || blockPlanning.activeBlock.id;
+  fom.hydrologyReadiness = Math.min(100, Math.max(fom.hydrologyReadiness || 0, waterContext.readiness));
+  fom.rawWaterGate = waterContext.gate;
+  fom.waterGate = getEffectiveWaterGate(fom, waterContext);
+  fom.waterNote = describeEffectiveWaterNote(fom, waterContext);
   fom.hydrologyLabel = waterContext.hydrologyLabel;
-  fom.hydrologyReadiness = waterContext.readiness;
   fom.reviewDaysTarget = Math.max(FOM_PUBLIC_REVIEW_MIN_DAYS, waterContext.reviewDays);
   fom.roadSource = roadContext.source;
   fom.roadSummary = formatRoadAssetSummary(roadContext);
@@ -297,7 +392,7 @@ function getFomActionLabel(fom, roadContext = null) {
       return `Update FOM Review${roadSuffix}`;
     case 'revision_required':
       return `Revise FOM${roadSuffix}`;
-    case 'approved':
+    case 'closed':
       return roadContext?.hasData ? 'Check FOM / Road Record' : 'Check FOM Record';
     default:
       return `Open FOM Review${roadSuffix}`;
@@ -310,13 +405,13 @@ function getFomActionDescription(fom, roadContext = null) {
     : '';
   switch (fom?.status) {
     case 'public_review':
-      return `Keep the Forest Operations Map current while the ${Math.max(0, fom.reviewDaysRemaining)}-calendar-day review clock runs; one planning day advances ${FOM_CALENDAR_DAYS_PER_PLANNING_DAY} calendar days.${roadTail}`;
+      return `Log and respond to comments while the ${Math.max(0, fom.reviewDaysRemaining)}-calendar-day comment period runs; one planning day advances ${FOM_CALENDAR_DAYS_PER_PLANNING_DAY} calendar days.${roadTail}`;
     case 'revision_required':
-      return `Address review comments, especially timing and water notes, then resubmit the map.${roadTail}`;
-    case 'approved':
-      return `Confirm the map record and keep the submission package aligned.${roadTail}`;
+      return `Respond to the comments, especially the in-stream work window (WSA s.11), then republish the map.${roadTail}`;
+    case 'closed':
+      return `Confirm the comment record and keep the submission package consistent with the map.${roadTail}`;
     default:
-      return `Publish the Forest Operations Map after baseline data and preliminary analysis are ready; opens the required 30-calendar-day review window.${roadTail}`;
+      return `Publish the Forest Operations Map for the lead block set once baseline data and preliminary analysis are ready; opens the required 30-calendar-day comment period.${roadTail}`;
   }
 }
 
@@ -328,14 +423,14 @@ function updatePlanningFomStatus(ui, fom, waterContext, roadContext, sourceLabel
   const roadClear = !roadContext?.blocker;
   const reviewClear = (fom.reviewDaysRemaining || 0) <= 0;
   const commentsClear = (fom.commentLoad || 0) <= FOM_PUBLIC_REVIEW_COMMENT_LIMIT;
-  const waterClear = waterContext?.gate !== 'hold';
+  const waterClear = getEffectiveWaterGate(fom, waterContext) !== 'hold';
 
   if (reviewClear && commentsClear && waterClear && roadClear) {
-    fom.status = 'approved';
+    fom.status = 'closed';
     fom.commentLoad = 0;
     fom.reviewDaysRemaining = 0;
     fom.approvedDay = Math.max(1, fom.lastUpdatedDay || 0);
-    ui.writePositive(`Forest Operations Map cleared public review after ${sourceLabel}.`);
+    ui.writePositive(`FOM comment period closed after ${sourceLabel}; comments logged and responses filed.`);
     return true;
   }
 
@@ -344,21 +439,22 @@ function updatePlanningFomStatus(ui, fom, waterContext, roadContext, sourceLabel
 
 export function getPlanningSubmissionReadiness(journey, seasonInfo = null) {
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
-  const waterContext = getPlanningBlockWaterContext(journey.blockPlanning?.activeBlock, journey.area, seasonInfo);
-  const roadContext = getPlanningRoadAssetContext(journey, journey.blockPlanning?.activeBlock || null);
+  const waterContext = getPlanningLeadWaterContext(journey, seasonInfo);
+  const roadContext = getPlanningLeadRoadContext(journey);
   const professional = getPlanningProfessionalSnapshot(journey);
   const reasons = [];
 
   if (!journey.blockPlanning?.activeBlock) {
-    reasons.push('no active block selected');
+    reasons.push('no lead block set locked');
   }
 
-  if (fom.status !== 'approved') {
-    reasons.push(`FOM is ${describeReviewState(fom).toLowerCase()}`);
+  if (fom.status !== 'closed') {
+    reasons.push(`FOM ${describeReviewState(fom).toLowerCase()}`);
   }
 
-  if (waterContext.gate === 'hold') {
-    reasons.push(waterContext.note);
+  const waterGate = getEffectiveWaterGate(fom, waterContext);
+  if (waterGate === 'hold') {
+    reasons.push(fom.waterNote || waterContext.note);
   }
 
   if (fom.commentLoad > FOM_PUBLIC_REVIEW_COMMENT_LIMIT) {
@@ -372,20 +468,12 @@ export function getPlanningSubmissionReadiness(journey, seasonInfo = null) {
   if (professional && !professional.registrationActive) {
     reasons.push(`registration is ${professional.registrationStatus}`);
   }
-  if (professional?.cpdGap > 0) {
-    reasons.push(`CPD gap ${professional.cpdGap}h`);
-  }
-  if (professional?.competenceRisk >= 35) {
-    reasons.push(`competence risk ${professional.competenceRisk}%`);
-  }
-  if (professional?.auditExposure >= 35) {
-    reasons.push(`audit exposure ${professional.auditExposure}`);
-  }
 
   return {
     ready: reasons.length === 0,
     reasons,
     waterContext,
+    waterGate,
     roadContext,
     fom,
     professional,
@@ -399,11 +487,11 @@ function getPlanningValueRecoveryHint(journey, deficits) {
     return null;
   }
 
-  if (primary.label === 'Timber' && (journey?.values?.biodiversity || 0) > 32) {
+  if (primary.label === 'Timber') {
     return {
-      actionLabel: 'Timber Assessment',
-      headline: `Timber Assessment to lift timber supply from ${primary.value}% before the next gate.`,
-      followUp: 'Use Values Workshop after the timber pass if biodiversity starts to slip.'
+      actionLabel: 'Timber Supply Analysis',
+      headline: `Timber Supply Analysis to lift timber supply from ${primary.value}% before the next gate.`,
+      followUp: 'It costs a day of analysis time; use Values Workshop if another value slips meanwhile.'
     };
   }
 
@@ -429,7 +517,17 @@ function pushPlanningGuideStep(steps, text) {
 }
 
 function getSubmissionConfidenceGain(readiness) {
-  return readiness?.waterContext?.gate === 'clear' ? 18 : 14;
+  const gate = readiness?.waterGate || readiness?.waterContext?.gate || 'clear';
+  return gate === 'clear' ? 18 : 14;
+}
+
+/**
+ * Where a pre-submission meeting tops out. Only Prepare Submission — the
+ * step that checks the FOM comment period, the water gate, the road file and
+ * registration — carries DM readiness across the decision gate.
+ */
+export function getOutreachReadinessCap(readiness) {
+  return PLANNING_DECISION_GATE - getSubmissionConfidenceGain(readiness);
 }
 
 function buildPlanningActionGuidance(journey, seasonInfo = null) {
@@ -442,26 +540,32 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
   let lane = 'Technical file';
   let headline = 'Gather Data to keep the planning file moving.';
 
-  if (!journey.blockPlanning?.activeBlock) {
-    lane = 'Block file';
-    headline = 'Choose an active block when the cutblock review opens so the rest of the file has somewhere to land.';
-    pushPlanningGuideStep(steps, 'Finish the cutblock review prompt and lock an active block before you worry about FOM or submission work.');
+  if (journey.plan.phase === 'data_gathering') {
+    lane = 'Technical file';
+    headline = 'Gather Data to reach 80% completeness and open the analysis.';
+    pushPlanningGuideStep(steps, 'Pull VRI, LiDAR and the district resource-value layers until the baseline is strong enough to draft against.');
+    pushPlanningGuideStep(steps, 'The lead block set is chosen when the analysis opens.');
     return { lane, headline, steps };
   }
 
-  switch (journey.plan.phase) {
-    case 'data_gathering':
-      lane = 'Technical file';
-      headline = 'Gather Data to reach 80% completeness and unlock analysis.';
-      pushPlanningGuideStep(steps, 'Gather Data until the baseline package is strong enough to hand off to analysis.');
-      pushPlanningGuideStep(steps, 'Use Compliance Admin if registration or paperwork pressure starts dragging the file.');
-      return { lane, headline, steps };
+  if (!journey.blockPlanning?.activeBlock) {
+    lane = 'Block file';
+    headline = 'Lock the lead block set when the cutblock priority decision opens so the FOM has somewhere to land.';
+    pushPlanningGuideStep(steps, 'Finish the cutblock priority decision before you worry about FOM or submission work.');
+    return { lane, headline, steps };
+  }
 
+  const fom = readiness.fom;
+  const fomOpen = fom?.status === 'draft' && getFomPublicationGaps(journey).length === 0;
+
+  switch (journey.plan.phase) {
     case 'analysis':
       lane = 'Technical file';
-      headline = 'Run Analysis to push the model package to 80% and open stakeholder review.';
+      headline = fomOpen
+        ? 'Open FOM Review now — the 30-day comment period runs while you finish the analysis.'
+        : 'Run Analysis to push the draft plan to 80% and open engagement.';
       pushPlanningGuideStep(steps, 'Run Analysis until the technical package clears the phase gate.');
-      pushPlanningGuideStep(steps, 'Use Values Workshop if the block choice dragged a core value under the review threshold.');
+      pushPlanningGuideStep(steps, 'Publish the FOM as soon as data and preliminary analysis allow; the comment period is the long pole.');
       return { lane, headline, steps };
 
     case 'stakeholder_review': {
@@ -469,15 +573,24 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
         const valueHint = getPlanningValueRecoveryHint(journey, deficits);
         lane = 'Values lane';
         headline = valueHint?.headline || 'Values Workshop to recover the blocked values.';
-        pushPlanningGuideStep(steps, valueHint?.followUp || 'Recover the weakest value before reopening the stakeholder lane.');
+        pushPlanningGuideStep(steps, valueHint?.followUp || 'Recover the weakest value before reopening the engagement lane.');
         pushPlanningGuideStep(steps, 'Stakeholder Session stays blocked until every value clears 25%.');
         return { lane, headline, steps };
       }
 
-      lane = 'Consultation lane';
-      headline = 'Stakeholder Session to push buy-in toward 75% and open ministerial approval.';
-      pushPlanningGuideStep(steps, 'Hold Stakeholder Session until buy-in clears the approval handoff.');
-      pushPlanningGuideStep(steps, 'Use Values Workshop if a session drags biodiversity, community, or First Nations values back down.');
+      if (fomOpen) {
+        lane = 'FOM / submission file';
+        headline = 'Open FOM Review to start the 30-day comment period; buy-in can build while it runs.';
+        pushPlanningGuideStep(steps, 'Nothing goes to the District Manager until the comment period has closed.');
+        return { lane, headline, steps };
+      }
+
+      lane = 'Engagement lane';
+      headline = 'Stakeholder Session to push buy-in toward 75% and bring the file to the District Manager.';
+      pushPlanningGuideStep(steps, 'Hold Stakeholder Session until buy-in clears the handoff.');
+      pushPlanningGuideStep(steps, fom?.status === 'public_review'
+        ? `Keep the FOM live: ${Math.max(0, fom.reviewDaysRemaining || 0)} calendar days and ${Math.max(0, fom.commentLoad || 0)} comment${(fom.commentLoad || 0) === 1 ? '' : 's'} to burn down.`
+        : 'Use Values Workshop if a session drags a value back down.');
       return { lane, headline, steps };
     }
 
@@ -500,52 +613,57 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
     return { lane, headline, steps };
   }
 
-  const fom = readiness.fom;
-  if (!deficits.length && fom?.status !== 'approved') {
+  if (!deficits.length && fom?.status !== 'closed') {
     lane = 'FOM / submission file';
     if (fom?.status === 'draft') {
-      headline = 'Open FOM Review to start the public-review clock on the active block.';
-      pushPlanningGuideStep(steps, 'Open FOM Review first; submission cannot move while the FOM is still a draft.');
+      headline = 'Open FOM Review to start the 30-day comment period on the lead block set.';
+      pushPlanningGuideStep(steps, 'Open FOM Review first; nothing goes to the District Manager while the FOM is still a draft.');
     } else if (fom?.status === 'public_review') {
-      headline = 'Update FOM Review until the review window and open comments clear.';
+      headline = 'Update FOM Review until the comment period and open comments clear.';
       pushPlanningGuideStep(steps, `Keep the FOM live until the ${Math.max(0, fom.reviewDaysRemaining || 0)} calendar days and comment load burn down; each planning day advances ${FOM_CALENDAR_DAYS_PER_PLANNING_DAY} calendar days.`);
     } else if (fom?.status === 'revision_required') {
-      headline = 'Revise FOM to close review comments and reopen the submission lane.';
-      pushPlanningGuideStep(steps, 'Stay in the FOM lane until revision notes and water comments are closed.');
+      headline = 'Revise FOM to respond to the comments and reopen the submission lane.';
+      pushPlanningGuideStep(steps, 'Stay in the FOM lane until the responses, especially on the in-stream work window, are filed.');
     }
-    if (readiness.waterContext?.gate === 'hold') {
-      pushPlanningGuideStep(steps, readiness.waterContext.note);
+    if (readiness.waterGate === 'hold') {
+      pushPlanningGuideStep(steps, `${readiness.fom?.waterNote || readiness.waterContext.note} FOM days on the map progress the review.`);
     }
     if (readiness.roadContext?.blocker) {
       pushPlanningGuideStep(steps, `Road blocker: ${readiness.roadContext.blockerReasons.join(' | ')}`);
     }
+    return { lane, headline, steps };
   }
 
-  if (!deficits.length && fom?.status === 'approved' && professionalIssues.length > 0) {
+  if (!deficits.length && professionalIssues.length > 0) {
     lane = 'Professional file';
     const adminLabel = professional?.registrationActive ? 'Compliance Admin' : 'Renew Registration';
-    headline = `${adminLabel} to clear ${professionalIssues[0]} before the package goes upstairs.`;
-    pushPlanningGuideStep(steps, 'Clear registration, CPD, and paperwork drag before you spend ministerial time.');
+    headline = `${adminLabel} to clear ${professionalIssues[0]} before the package goes to the District Manager.`;
+    pushPlanningGuideStep(steps, 'The DM will not accept a plan sealed by someone whose registration is not current.');
+    return { lane, headline, steps };
   }
 
-  if (!deficits.length && fom?.status === 'approved' && professionalIssues.length === 0 && readiness.ready && journey.plan.ministerialConfidence < 80) {
+  if (!deficits.length && !readiness.ready) {
+    lane = 'Submission package';
+    headline = `Clear the submission gate: ${readiness.reasons.join(' | ')}.`;
+    if (readiness.waterGate === 'hold') pushPlanningGuideStep(steps, readiness.fom?.waterNote || readiness.waterContext.note);
+    if (readiness.roadContext?.blocker) pushPlanningGuideStep(steps, `Road blocker: ${readiness.roadContext.blockerReasons.join(' | ')}`);
+    return { lane, headline, steps };
+  }
+
+  if (!deficits.length && readiness.ready) {
+    const readinessNow = Math.round(journey.plan.ministerialConfidence || 0);
     const directGain = getSubmissionConfidenceGain(readiness);
-    const directConfidence = Math.min(100, (journey.plan.ministerialConfidence || 0) + directGain);
-    if (directConfidence >= 80) {
+    const directConfidence = Math.min(100, readinessNow + directGain);
+    const cap = getOutreachReadinessCap(readiness);
+    if (directConfidence >= PLANNING_DECISION_GATE) {
       lane = 'Submission package';
-      headline = `Prepare Submission can carry confidence to ${directConfidence}% now; Ministerial Outreach is cheaper but slower.`;
-      pushPlanningGuideStep(steps, `Submission costs more energy and budget, but it is the fastest path before another event reopens the file.`);
+      headline = `Prepare Submission can carry DM readiness to ${directConfidence}% now — the FOM, water, road and registration gates are clean.`;
+      pushPlanningGuideStep(steps, 'Submission costs more energy and budget, but it is the step that puts the file on the District Manager\'s desk.');
       return { lane, headline, steps };
     }
-    lane = 'Ministerial brief';
-    headline = 'Ministerial Outreach to close the confidence gap before submission.';
-    pushPlanningGuideStep(steps, `Prepare Submission would add ${directGain} confidence but still leave the package short; outreach is the cleaner bridge.`);
-  }
-
-  if (!deficits.length && readiness.ready && journey.plan.ministerialConfidence >= 80) {
-    lane = 'Submission package';
-    headline = 'Prepare Submission while the FOM, values, and professional gates are clean.';
-    pushPlanningGuideStep(steps, 'Use the six-hour submission push before another event reopens the file.');
+    lane = 'District file';
+    headline = `District Pre-Submission Meeting to lift DM readiness toward ${cap}% (${readinessNow}% now); Prepare Submission carries the last ${directGain} points.`;
+    pushPlanningGuideStep(steps, 'Walk the District Manager and stewardship staff through the draft before you file it.');
   }
 
   if (!steps.length) {
@@ -592,7 +710,7 @@ export function buildPlanningActionReceipt(before, journey) {
     ['Data', 'data'],
     ['Analysis', 'analysis'],
     ['Buy-in', 'buyIn'],
-    ['Confidence', 'confidence'],
+    ['DM readiness', 'confidence'],
     ['Energy', 'energy'],
     ['Stress', 'stress'],
     ['Biodiversity', 'biodiversity'],
@@ -611,11 +729,13 @@ export function buildPlanningActionReceipt(before, journey) {
     parts.push(`Budget ${budgetDelta > 0 ? '+' : '-'}$${Math.abs(Math.round(budgetDelta)).toLocaleString()} → $${Math.round(after.budget).toLocaleString()}`);
   }
   const politicalDelta = after.political - before.political;
-  if (politicalDelta !== 0) parts.push(`Political capital ${signed(politicalDelta)} → ${Math.round(after.political)}`);
+  if (politicalDelta !== 0) parts.push(`District goodwill ${signed(politicalDelta)} → ${Math.round(after.political)}`);
   const cpdDelta = after.cpd - before.cpd;
   if (cpdDelta !== 0) parts.push(`CPD ${signed(cpdDelta)}h → ${Math.round(after.cpd)}h`);
-  const paperworkDelta = after.paperwork - before.paperwork;
-  if (paperworkDelta !== 0) parts.push(`Paperwork ${signed(paperworkDelta)} → ${Math.round(after.paperwork)}`);
+  // The filing backlog is a flag, not a meter: say so only when it crosses
+  // the line where an audit would find it, in either direction.
+  if (before.paperwork < PAPERWORK_FLAG_THRESHOLD && after.paperwork >= PAPERWORK_FLAG_THRESHOLD) parts.push('Filing backlog: high — the next audit will find it');
+  if (before.paperwork >= PAPERWORK_FLAG_THRESHOLD && after.paperwork < PAPERWORK_FLAG_THRESHOLD) parts.push('Filing backlog: back under control');
   if (after.phase !== before.phase) parts.push(`Phase ${getPlanningPhaseLabel(before.phase)} → ${getPlanningPhaseLabel(after.phase)}`);
   if (after.fomStatus !== before.fomStatus) parts.push(`FOM ${before.fomStatus.replaceAll('_', ' ')} → ${after.fomStatus.replaceAll('_', ' ')}`);
   if (after.fomDays !== before.fomDays) parts.push(`FOM clock ${Math.round(after.fomDays)} calendar days`);
@@ -669,7 +789,7 @@ export async function runPlanningDay(game) {
         statusLine: formatStatusLine([
           getPlanningPhaseLabel(journey.plan.phase),
           daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
-          `confidence ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
+          `DM readiness ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
           `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
         ]),
         onRender: () => updatePlanningMissionStatus(ui, journey, seasonInfo),
@@ -718,7 +838,7 @@ export async function runPlanningDay(game) {
       statusLine: formatStatusLine([
         getPlanningPhaseLabel(journey.plan.phase),
         daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
-        `confidence ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
+        `DM readiness ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
         `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
       ]),
       label: 'AT THE DESK',
@@ -769,8 +889,8 @@ export async function runPlanningDay(game) {
     }
 
     if (journey.isComplete) {
-      // 'submit' can clear ministerial approval with hours still on the
-      // clock. Once the plan is approved the expedition is over -- stop
+      // 'submit' can win the District Manager's decision with hours still on
+      // the clock. Once the plan is approved the expedition is over -- stop
       // offering more actions on a day that's already been won so the day
       // (and the end-of-run debrief) closes out immediately instead of
       // leaving the player to burn remaining hours on a finished file.
@@ -814,48 +934,40 @@ export function updatePlanningMissionStatus(ui, journey, seasonInfo = null) {
   }
   if (guidance.lane) facts.push({ label: 'Lane', value: guidance.lane });
 
+  const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
   const gates = [
     { label: 'Data', target: 80, current: Math.round(plan.dataCompleteness || 0) },
     { label: 'Analysis', target: 80, current: Math.round(plan.analysisQuality || 0) },
     { label: 'Buy-in', target: 75, current: Math.round(plan.stakeholderBuyIn || 0) },
-    { label: 'Confidence', target: 80, current: Math.round(plan.ministerialConfidence || 0) }
+    { label: 'DM readiness', target: PLANNING_DECISION_GATE, current: Math.round(plan.ministerialConfidence || 0) }
   ];
   const checklist = gates.map((gate) => ({
     label: `${gate.label} ${gate.current}% of ${gate.target}%`,
     done: gate.current >= gate.target
   }));
+  checklist.push({
+    label: `FOM ${describeReviewState(fom).toLowerCase()}`,
+    done: fom?.status === 'closed'
+  });
+  // The guidance headline is the one recommendation; the alerts only carry
+  // the clocks and blockers the headline cannot hold.
   const alerts = [];
-  if (plan.phase === 'ministerial_approval') {
-    const gap = Math.max(0, 80 - plan.ministerialConfidence);
-    const readiness = getPlanningSubmissionReadiness(journey, seasonInfo);
-    const directGain = getSubmissionConfidenceGain(readiness);
-    const directSubmissionWorks = readiness.ready && gap > 0 && directGain >= gap;
-    alerts.push(gap > 0
-      ? {
-          level: 'warn',
-          text: directSubmissionWorks
-            ? `Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Prepare Submission can close it now; Outreach is cheaper but slower.`
-            : `Approval gap: ${gap} confidence point${gap === 1 ? '' : 's'}. Use Ministerial Outreach before submission.`
-        }
-      : { level: 'ok', text: 'Approval threshold reached. A full submission can carry the plan across the line.' });
-  }
-  const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
   if (fom?.status === 'public_review') {
     const days = Math.max(0, fom.reviewDaysRemaining || 0);
     const comments = Math.max(0, fom.commentLoad || 0);
     alerts.push({
       level: days <= FOM_CALENDAR_DAYS_PER_PLANNING_DAY ? 'danger' : 'warn',
-      text: `Public Review Window: ${days} calendar days remaining | ${comments} open comment${comments === 1 ? '' : 's'} | ${FOM_CALENDAR_DAYS_PER_PLANNING_DAY} calendar days per planning day`
+      text: `FOM comment period: ${days} calendar days remaining | ${comments} open comment${comments === 1 ? '' : 's'} | ${FOM_CALENDAR_DAYS_PER_PLANNING_DAY} calendar days per planning day`
     });
   } else if (fom?.status === 'revision_required') {
-    alerts.push({ level: 'warn', text: 'FOM public review flagged revisions - address them before the window reopens.' });
+    alerts.push({ level: 'warn', text: 'FOM comments need a response before the map can be republished.' });
   }
   if (fom?.roadBlocker) alerts.push({ level: 'warn', text: `Road-engineering blocker: ${fom.roadBlockerReasons.join(' | ')}` });
 
   const objectiveDeadline = Number.isFinite(journey.deadline) ? ` by Day ${journey.deadline}` : '';
   const status = {
-    objective: `Win ministerial approval of the landscape plan${objectiveDeadline}.`,
-    meter: { label: 'Confidence', value: plan.ministerialConfidence, text: `${Math.round(plan.ministerialConfidence)}%` },
+    objective: `Get the FSP and first Forest Operations Map through the District Manager${objectiveDeadline}.`,
+    meter: { label: 'DM readiness', value: plan.ministerialConfidence, text: `${Math.round(plan.ministerialConfidence)}%` },
     facts,
     checklist,
     guidance: guidance.headline || null,
@@ -879,7 +991,7 @@ function displayPlanningHeader(ui, journey, seasonInfo) {
   if (fomAlert?.status === 'public_review') {
     const reviewDaysRemaining = Math.max(0, fomAlert.reviewDaysRemaining || 0);
     const commentLoad = Math.max(0, fomAlert.commentLoad || 0);
-    ui.write(`Public Review Window: ${reviewDaysRemaining} calendar days remaining | ${commentLoad} open comment${commentLoad === 1 ? '' : 's'} | ${FOM_CALENDAR_DAYS_PER_PLANNING_DAY} calendar days per planning day`);
+    ui.write(`FOM comment period: ${reviewDaysRemaining} calendar days remaining | ${commentLoad} open comment${commentLoad === 1 ? '' : 's'} | ${FOM_CALENDAR_DAYS_PER_PLANNING_DAY} calendar days per planning day`);
   }
   updatePlanningMissionStatus(ui, journey, seasonInfo);
 }
@@ -898,7 +1010,9 @@ function displayPlanningBriefing(ui, journey, seasonInfo) {
   if (guidance.steps.length > 0) {
     ui.write(`Follow-up: ${guidance.steps.join(' -> ')}`);
   }
-  ui.write(`Values: Bio ${journey.values.biodiversity}% | Timber ${journey.values.timberSupply}% | Community ${journey.values.communityNeeds}% | FN ${journey.values.firstNationsValues}%`);
+  ui.write(`Values: Habitat ${journey.values.biodiversity}% | Timber ${journey.values.timberSupply}% | Community ${journey.values.communityNeeds}% | First Nations ${journey.values.firstNationsValues}%`);
+  const moods = describeStakeholderMoods(journey);
+  if (moods) ui.write(`Stakeholder mood: ${moods}`);
   if (Number.isFinite(journey.scrutiny)) {
     const scrutiny = Math.round(journey.scrutiny);
     const scrutinyLevel = scrutiny > 70 ? 'HIGH' : scrutiny > 40 ? 'MODERATE' : 'LOW';
@@ -916,7 +1030,7 @@ function displayPlanningBriefing(ui, journey, seasonInfo) {
 
   const fom = syncFomStateFromActiveBlock(journey, seasonInfo);
   if (fom?.activeBlockId) {
-    ui.write(`FOM: ${describeReviewState(fom)} | Water Gate: ${fom.waterGate.toUpperCase()} | ${fom.hydrologyLabel}`);
+    ui.write(`FOM: ${describeReviewState(fom)} | Water Gate: ${formatWaterGateLabel(fom.waterGate)} | ${fom.hydrologyLabel}`);
     ui.write(`Hydrology Readiness: ${Math.round(fom.hydrologyReadiness)}% | ${fom.waterNote}`);
     ui.write(`Review Burndown: ${Math.max(0, fom.commentLoad || 0)} open comment${(fom.commentLoad || 0) === 1 ? '' : 's'} | ${Math.max(0, fom.reviewDaysRemaining || 0)} calendar days remaining | Road Readiness ${Math.round(fom.roadEngineeringReadiness || 0)}%`);
     if (fom.roadSummary) {
@@ -929,25 +1043,73 @@ function displayPlanningBriefing(ui, journey, seasonInfo) {
     const currentStage = chain.steps[Math.min(chain.stepIndex, chain.steps.length - 1)] || 'submission';
     ui.write(`FOM paperwork chain: ${currentStage}${chain.complete ? ' (complete)' : ''}`);
   }
-  if (journey.blockPlanning?.activeSummary) {
-    ui.write(`Active Block: ${journey.blockPlanning.activeSummary}`);
-    if (journey.blockPlanning.nextSelectionDay) {
-      ui.write(`Next block review: Day ${journey.blockPlanning.nextSelectionDay}`);
-    }
+  const leadBlocks = formatPlanningLeadBlocks(journey);
+  if (leadBlocks) {
+    ui.write(`Active blocks: ${leadBlocks}`);
   }
+  if (journey.blockPlanning?.activeSummary) {
+    ui.write(`Lead block: ${journey.blockPlanning.activeSummary}`);
+  }
+  if (Number.isFinite(journey.resources?.dataCredits)) {
+    ui.write(`Inventory budget: ${Math.max(0, Math.round(journey.resources.dataCredits / 10))} LiDAR/VRI pulls remaining`);
+  }
+}
+
+const STAKEHOLDER_MOOD_LABELS = {
+  ministry: 'district',
+  nations: 'the Nation',
+  community: 'community',
+  licensees: 'the mill',
+};
+
+/**
+ * Stakeholder moods are moved by events (a town hall, a partnership offer)
+ * and read by the Stakeholder Session, which lands harder or softer with
+ * the room. One line so the player can see the room.
+ */
+export function describeStakeholderMoods(journey) {
+  const stakeholders = journey?.stakeholders;
+  if (!stakeholders || typeof stakeholders !== 'object') return '';
+  return Object.entries(stakeholders)
+    .filter(([, value]) => Number.isFinite(value?.mood))
+    .map(([key, value]) => `${STAKEHOLDER_MOOD_LABELS[key] || key} ${Math.round(value.mood)}`)
+    .join(' | ');
+}
+
+/** Average stakeholder mood, or null when the journey carries none. */
+export function getStakeholderMoodAverage(journey) {
+  const moods = Object.values(journey?.stakeholders || {})
+    .map((value) => value?.mood)
+    .filter((mood) => Number.isFinite(mood));
+  if (!moods.length) return null;
+  return moods.reduce((sum, mood) => sum + mood, 0) / moods.length;
+}
+
+/**
+ * Whether the cutblock priority decision is due. It runs once, when the
+ * analysis opens and there is data to triage against; after that only an
+ * authored event (effects.blockSelection) reopens it.
+ */
+export function isBlockSelectionDue(journey) {
+  const plannerState = journey?.blockPlanning;
+  if (!plannerState) return false;
+  if (plannerState.pendingSelection) return true;
+  if (plannerState.activeBlock) return false;
+  return journey.plan?.phase !== 'data_gathering';
 }
 
 async function maybePromptForBlockSelection(game, seasonInfo) {
   const { ui, journey } = game;
   const plannerState = journey.blockPlanning;
-  if (!plannerState) return;
-  if (journey.plan?.phase === 'ministerial_approval' && plannerState.activeBlock) return;
-  if (journey.day < (plannerState.nextSelectionDay || 1)) return;
-  if ((plannerState.selectionCount || 0) >= MAX_BLOCK_SELECTIONS_PER_RUN) return;
+  if (!isBlockSelectionDue(journey)) return;
+  const reopened = Boolean(plannerState.pendingSelection && plannerState.activeBlock);
+  plannerState.pendingSelection = false;
 
   displayPlanningHeader(ui, journey, seasonInfo);
   ui.writeHeader('CUTBLOCK PRIORITY DECISION');
-  ui.write('Choose how to triage the area constraints before you lock the next block focus.');
+  ui.write(reopened
+    ? 'The file has reopened the block question. Re-triage the area constraints and pick the lead block set again.'
+    : `The inventory is in. Choose how to triage the area constraints, then lock the lead block set (${LEAD_BLOCK_SET_SIZE} blocks) the first Forest Operations Map will carry.`);
   ui.write('');
 
   const allBlocks = getPlanningAreaBlockPool(journey.areaId);
@@ -985,17 +1147,30 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
     };
   });
 
-  const selected = await ui.promptChoice('Select active block focus:', promptOptions);
+  const selected = await ui.promptChoice('Select the lead block:', promptOptions);
   const chosen = options.find((block) => block.id === selected.value) || options[0];
-  applySelectedBlockImpact(journey, chosen, triageChoice.value, seasonInfo);
+  const others = options.filter((block) => block.id !== chosen.id).slice(0, LEAD_BLOCK_SET_SIZE - 1);
+  applySelectedBlockImpact(journey, chosen, triageChoice.value, seasonInfo, others);
+  ui.write(`Lead block set for the first FOM: ${formatPlanningLeadBlocks(journey)}.`);
+  const water = getPlanningLeadWaterContext(journey, seasonInfo);
+  if (water.block) {
+    ui.write(`Water gate for the set: ${water.gateLabel} — ${water.note}`);
+  }
 }
 
-function applySelectedBlockImpact(journey, block, triageKey = null, seasonInfo = null) {
+/**
+ * Lock the lead block set. The chosen block leads (its value effects land on
+ * the file); the rest of the set rides along and the FOM's water and road
+ * context is the worst of the set.
+ */
+export function applySelectedBlockImpact(journey, block, triageKey = null, seasonInfo = null, others = []) {
   if (!journey.blockPlanning || !block) return;
 
   const state = journey.blockPlanning;
   state.activeBlockId = block.id;
   state.activeBlock = block;
+  state.leadBlocks = [block, ...others.filter((candidate) => candidate && candidate.id !== block.id)].slice(0, LEAD_BLOCK_SET_SIZE);
+  state.leadBlockIds = state.leadBlocks.map((candidate) => candidate.id);
   state.activeTriage = triageKey;
   state.activeTriageLabel = getPlanningTriageLabel(triageKey);
   const roadContext = getPlanningRoadAssetContext(journey, block);
@@ -1004,9 +1179,10 @@ function applySelectedBlockImpact(journey, block, triageKey = null, seasonInfo =
     : '';
   state.activeSummary = `${summarizePlanningBlock(block, journey.area, triageKey, seasonInfo)}${roadMatch}`;
   state.activeEventBias = block.eventBias || null;
-  state.history = Array.isArray(state.history) ? [...state.history, block.id].slice(-30) : [block.id];
+  state.history = Array.isArray(state.history) ? [...state.history, ...state.leadBlockIds].slice(-30) : [...state.leadBlockIds];
   state.selectionCount = (state.selectionCount || 0) + 1;
-  state.nextSelectionDay = journey.day + (state.cadenceDays || 3);
+  state.nextSelectionDay = null;
+  state.pendingSelection = false;
   syncFomStateFromActiveBlock(journey, seasonInfo);
 
   const effects = block.valueEffects || {};
@@ -1029,10 +1205,11 @@ function applyValuesConsequences(journey) {
     journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 2);
   }
   if (journey.values.timberSupply < 30) {
-    journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);
+    // The mill's planning lead stops returning calls.
+    journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 1);
   }
-  if (journey.values.firstNationsValues < 30 && journey.plan.phase === 'stakeholder_review') {
-    // Stalls stakeholder phase progress
+  if (journey.values.firstNationsValues < 30 && (journey.plan.phase === 'stakeholder_review' || journey.plan.phase === 'ministerial_approval')) {
+    // A Nation that is not engaged stalls both the engagement and the decision.
     journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 3);
   }
   if (journey.values.communityNeeds < 30 && journey.protagonist) {
@@ -1053,7 +1230,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   if (journey.plan.phase === 'data_gathering' && journey.resources.dataCredits > 0) {
     actionOptions.push({
       label: 'Gather Data',
-      description: 'Lane: technical file | Compile LiDAR, inventory, and baseline data',
+      description: "Lane: technical file | Pull VRI, LiDAR, and the district's resource-value layers",
       value: 'gather_data'
     });
   }
@@ -1061,7 +1238,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   if (journey.plan.phase === 'analysis') {
     actionOptions.push({
       label: 'Run Analysis',
-      description: 'Lane: technical file | Spatial analysis and modeling',
+      description: 'Lane: technical file | Spatial analysis, results and strategies, the draft FSP',
       value: 'analyze'
     });
   }
@@ -1073,7 +1250,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (valuesOk) {
       actionOptions.push({
         label: 'Stakeholder Session',
-        description: 'Consultation file: hear concerns, record responses and agree follow-up actions',
+        description: 'Engagement record: hear concerns, record responses and agree follow-up actions',
         value: 'stakeholder'
       });
     } else {
@@ -1108,7 +1285,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (valuesOk) {
       actionOptions.push({
         label: 'Stakeholder Session',
-        description: 'Lane: consultation recovery | Rebuild buy-in before the final package',
+        description: 'Lane: engagement recovery | Rebuild buy-in before the final package',
         value: 'stakeholder'
       });
     } else {
@@ -1129,7 +1306,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (valuesOk && submissionReadiness.ready && professionalIssues.length === 0 && approvalGaps.length === 0) {
       actionOptions.push({
         label: 'Prepare Submission',
-        description: 'Lane: submission package | Fastest approval push once the FOM, road, and professional gates are clear',
+        description: `Lane: submission package | Put the FSP and FOM on the District Manager's desk; +${getSubmissionConfidenceGain(submissionReadiness)} DM readiness`,
         value: 'submit'
       });
     } else {
@@ -1150,26 +1327,30 @@ function buildActionOptions(journey, seasonInfo = null) {
       pieces.push(`registration ${professional.registrationStatus} (your licence to sign off is not current)`);
     }
     if (professional?.cpdGap > 0) {
-      pieces.push(`CPD gap ${professional.cpdGap}h (professional training file is behind)`);
+      pieces.push(`CPD ${professional.cpdHours}/${professional.cpdTarget}h logged this season`);
     }
-    if (professional?.paperworkLoad > 0) {
-      pieces.push(`paperwork ${professional.paperworkLoad} (filing backlog slowing the file)`);
+    if ((professional?.paperworkLoad || 0) >= PAPERWORK_FLAG_THRESHOLD) {
+      pieces.push(`filing backlog high (the next audit will find it)`);
     }
     actionOptions.push({
       label,
       description: pieces.length
         ? `Lane: professional file | Clears: ${pieces.join(' | ')}`
-        : 'Lane: professional file | Renew registration, log CPD (continuing training), and clear paperwork pressure',
+        : 'Lane: professional file | Renew registration, log CPD, and clear the filing backlog',
       value: 'professional_admin'
     });
   }
 
-  if (journey.plan.phase === 'ministerial_approval' && journey.plan.ministerialConfidence < 80) {
-    actionOptions.push({
-      label: 'Ministerial Outreach',
-      description: 'Lane: ministerial brief | Brief decision-makers and recover confidence up to 80%',
-      value: 'outreach'
-    });
+  if (journey.plan.phase === 'ministerial_approval') {
+    const readiness = getPlanningSubmissionReadiness(journey, seasonInfo);
+    const cap = getOutreachReadinessCap(readiness);
+    if (journey.plan.ministerialConfidence < cap) {
+      actionOptions.push({
+        label: 'District Pre-Submission Meeting',
+        description: `Lane: district file | Walk the District Manager and stewardship staff through the draft; recover readiness up to ${cap}%`,
+        value: 'outreach'
+      });
+    }
   }
 
   if (journey.blockPlanning?.activeBlock) {
@@ -1177,7 +1358,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (publicationGaps.length > 0) {
       actionOptions.push({
         label: 'Open FOM Review (BLOCKED)',
-        description: `Needs: ${publicationGaps.join(' | ')}. Build a baseline file before publishing a public map.`,
+        description: `Needs: ${publicationGaps.join(' | ')}. Build a baseline file before publishing a map for public comment.`,
         value: 'fom_review_blocked'
       });
     } else {
@@ -1198,11 +1379,11 @@ function buildActionOptions(journey, seasonInfo = null) {
     });
   }
 
-  // Timber assessment (new - Phase 4.1)
+  // Timber supply analysis
   {
     actionOptions.push({
-      label: 'Timber Assessment',
-      description: 'Lane: timber file | Assess timber supply (+timber, -biodiversity)',
+      label: 'Timber Supply Analysis',
+      description: 'Lane: timber file | Timber supply analysis (+timber; costs a day of analysis time)',
       value: 'timber'
     });
   }
@@ -1219,7 +1400,7 @@ function buildActionOptions(journey, seasonInfo = null) {
 
   actionOptions.push({
     label: 'Hold the Line',
-    description: 'Keep the file ticking over and give the day back to the team',
+    description: 'Keep the file ticking over and give the day back to the office',
     value: 'end'
   });
 
@@ -1239,7 +1420,7 @@ function buildPlanningDeskOptions(journey) {
     },
     {
       label: 'Network',
-      description: 'Build political capital for the next gate',
+      description: 'Build district goodwill for the next gate',
       value: 'network'
     }
   ];
@@ -1263,13 +1444,21 @@ function buildPlanningContextLines(journey, seasonInfo) {
     `Data ${Math.round(plan.dataCompleteness || 0)}% of 80%`,
     `Analysis ${Math.round(plan.analysisQuality || 0)}% of 80%`,
     `Buy-in ${Math.round(plan.stakeholderBuyIn || 0)}% of 75%`,
-    `Confidence ${Math.round(plan.ministerialConfidence || 0)}% of 80%`,
+    `DM readiness ${Math.round(plan.ministerialConfidence || 0)}% of ${PLANNING_DECISION_GATE}%`,
   ];
+  const fom = journey.blockPlanning?.fom;
+  if (fom?.status) lines.push(`FOM: ${describeReviewState(fom)}`);
+  const leadBlocks = formatPlanningLeadBlocks(journey);
+  if (leadBlocks) lines.push(`Active blocks: ${leadBlocks}`);
   if (seasonInfo) lines.push(`Season: ${seasonInfo.name} - Year ${seasonInfo.year}`);
   const scrutiny = Number(journey.scrutiny ?? journey.heat ?? 0);
   if (Number.isFinite(scrutiny)) lines.push(`Scrutiny: ${Math.round(Math.max(0, scrutiny))}%`);
-  lines.push(`Political capital: ${Math.round(journey.resources.politicalCapital || 0)}`);
-  lines.push(`Data credits: ${Math.round(journey.resources.dataCredits || 0)}`);
+  lines.push(`District goodwill: ${Math.round(journey.resources.politicalCapital || 0)}`);
+  const moods = describeStakeholderMoods(journey);
+  if (moods) lines.push(`Stakeholder mood: ${moods}`);
+  if ((journey.professional?.paperworkLoad || 0) >= PAPERWORK_FLAG_THRESHOLD) {
+    lines.push('Filing backlog: high — the next audit will find it.');
+  }
   const notes = getDiscoveryTagNotes(journey, journey.roleId || 'planner', 2);
   if (notes.length > 0) lines.push(`Carry-forward: ${notes.join(' | ')}`);
   return lines.filter(Boolean);
@@ -1302,11 +1491,11 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 900);
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 10, stress: 6 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: recoveryRun ? 1 : 2, competenceRisk: -1, auditExposure: 1 });
-      ui.write(`Data gathering progressed. Completeness: ${journey.plan.dataCompleteness}%`);
+      applyPlanningProfessionalWork(journey, { paperworkLoad: recoveryRun ? 1 : 2, competenceRisk: -1, auditExposure: 1 });
+      ui.write(`Inventory pull filed. Data completeness: ${journey.plan.dataCompleteness}%`);
       if (!recoveryRun && journey.plan.dataCompleteness >= 80) {
         journey.plan.phase = 'analysis';
-        ui.writePositive('Data phase complete! Moving to Analysis.');
+        ui.writePositive('Inventory complete. The analysis opens tomorrow with the cutblock priority decision.');
       } else if (recoveryRun && journey.plan.dataCompleteness >= 80) {
         ui.writePositive('Technical recovery complete. The data file is back above the approval threshold.');
       }
@@ -1324,11 +1513,11 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 15, stress: 12 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 3, paperworkLoad: recoveryRun ? 1 : 2, competenceRisk: -1, auditExposure: 1 });
-      ui.write(`Analysis progressed. Quality: ${journey.plan.analysisQuality}%`);
+      applyPlanningProfessionalWork(journey, { paperworkLoad: recoveryRun ? 1 : 2, competenceRisk: -1, auditExposure: 1 });
+      ui.write(`Analysis progressed. Draft plan quality: ${journey.plan.analysisQuality}%`);
       if (!recoveryRun && journey.plan.analysisQuality >= 80) {
         journey.plan.phase = 'stakeholder_review';
-        ui.writePositive('Analysis complete! Moving to Stakeholder Review.');
+        ui.writePositive('Draft plan complete. Moving to Engagement & Public Review.');
       } else if (recoveryRun && journey.plan.analysisQuality >= 80) {
         ui.writePositive('Analysis recovery complete. The model package is back above the approval threshold.');
       }
@@ -1340,20 +1529,29 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + DAY_OF_CONSULTATION);
       if (discoveryIds.has('community_visibility') || discoveryIds.has('cultural_hold') || discoveryIds.has('watershed_watch')) {
         journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
-        ui.write('Concrete field findings gave the stakeholder session more weight (+2 buy-in).');
+        ui.write('Concrete field findings gave the session more weight (+2 buy-in).');
       }
-      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 6);
+      const mood = getStakeholderMoodAverage(journey);
+      if (mood !== null && mood >= 60) {
+        journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
+        ui.write('The room was already warm; the session landed well (+2 buy-in).');
+      } else if (mood !== null && mood <= 40) {
+        journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 2);
+        ui.write('The room came in sour; the session spent its first hour on old grievances (-2 buy-in).');
+      }
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 3);
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 20, stress: 16 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 2, paperworkLoad: recoveryRun ? 2 : 3, competenceRisk: -1, auditExposure: 2 });
+      applyPlanningProfessionalWork(journey, { paperworkLoad: recoveryRun ? 2 : 3, competenceRisk: -1, auditExposure: 2 });
       if (journey.protagonist) {
         journey.protagonist.reputation = Math.min(100, journey.protagonist.reputation + 3);
       }
-      ui.write(`Stakeholder buy-in improved to ${journey.plan.stakeholderBuyIn}%`);
+      journey.plan.ministerialConfidence = Math.min(100, (journey.plan.ministerialConfidence || 0) + SESSION_READINESS_LIFT);
+      ui.write(`Buy-in improved to ${journey.plan.stakeholderBuyIn}%. The district reads the engagement record too (DM readiness +${SESSION_READINESS_LIFT}).`);
       if (!recoveryRun && journey.plan.stakeholderBuyIn >= 75) {
         journey.plan.phase = 'ministerial_approval';
-        ui.writePositive('Stakeholder review complete! Moving to Ministerial Approval.');
+        ui.writePositive('Engagement record complete. The file goes to the District Manager next.');
       } else if (recoveryRun && journey.plan.stakeholderBuyIn >= 75) {
         ui.writePositive('Consultation recovery complete. Buy-in is back above the approval threshold.');
       }
@@ -1372,7 +1570,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
         : isFomBlocked ? 'FOM PUBLICATION BLOCKED' : 'STAKEHOLDER SESSION BLOCKED');
       if (isFomBlocked) {
         ui.writeWarning(`Cannot publish yet. Complete: ${getFomPublicationGaps(journey).join(' | ')}.`);
-        ui.write('A public map needs a defensible baseline data package and preliminary analysis before the 30-calendar-day notice period starts.');
+        ui.write('A map published for public comment needs a defensible baseline data package and preliminary analysis before the 30-calendar-day comment period starts.');
       } else if (valueDeficits.length > 0) {
         ui.writeWarning(`Cannot proceed. Recover these values first: ${formatValuesGateDeficits(valueDeficits)}.`);
       } else {
@@ -1411,15 +1609,15 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.budget = Math.max(0, journey.resources.budget - 2200);
       journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
       applyProtagonistCost(journey, { energy: 25, stress: 20 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 4, paperworkLoad: 3, competenceRisk: -2, auditExposure: 2 });
+      applyPlanningProfessionalWork(journey, { paperworkLoad: 3, competenceRisk: -2, auditExposure: 2 });
       progressPlanningPaperworkChain(journey, 'fom', 1);
-      ui.write(`Submission prepared. Confidence: ${journey.plan.ministerialConfidence}%`);
+      ui.write(`Submission filed with the district. DM readiness: ${journey.plan.ministerialConfidence}%`);
       if (isPlanningApprovalReady(journey)) {
         journey.isComplete = true;
-        journey.endReason = 'Landscape plan approved by Ministry!';
+        journey.endReason = 'FSP and Forest Operations Map approved by the District Manager.';
       } else {
-        const gap = Math.max(0, 80 - journey.plan.ministerialConfidence);
-        ui.write(`Still ${gap} point${gap === 1 ? '' : 's'} short of approval-ready confidence.`);
+        const gap = Math.max(0, PLANNING_DECISION_GATE - journey.plan.ministerialConfidence);
+        ui.write(`Still ${gap} point${gap === 1 ? '' : 's'} short — the District Manager wants another pre-submission meeting before deciding.`);
       }
       break;
 
@@ -1438,17 +1636,17 @@ export async function processAction(game, actionValue, seasonInfo = null) {
         ui.writeWarning(`Forest Operations Map publication blocked: ${publicationGaps.join(' | ')}.`);
         break;
       }
-      if (fom.status === 'approved') {
+      if (fom.status === 'closed') {
         spendDay(journey);
         applyProtagonistCost(journey, { energy: 3, stress: 2 });
-        ui.write('Forest Operations Map record checked. The approved review file stays in place.');
+        ui.write('Forest Operations Map record checked. The comment record and responses stay on file.');
         if (roadContext.hasData) {
           ui.write(roadContext.note);
         }
         break;
       }
 
-      const waterContext = getPlanningBlockWaterContext(activeBlock, journey.area, seasonInfo);
+      const waterContext = getPlanningLeadWaterContext(journey, seasonInfo);
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 6, stress: 5 });
       const chainProgress = progressPlanningPaperworkChain(journey, 'fom', 1);
@@ -1460,39 +1658,54 @@ export async function processAction(game, actionValue, seasonInfo = null) {
         fom.reviewDaysRemaining = FOM_PUBLIC_REVIEW_MIN_DAYS;
         fom.commentLoad = Math.max(fom.commentLoad || 0, waterContext.commentCount);
         fom.publicReviewOpenedDay = journey.day;
-        fom.hydrologyReadiness = waterContext.readiness;
-        fom.waterGate = waterContext.gate;
-        fom.waterNote = waterContext.note;
+        fom.hydrologyReadiness = Math.max(fom.hydrologyReadiness || 0, waterContext.readiness);
+        fom.waterGate = getEffectiveWaterGate(fom, waterContext);
+        fom.waterNote = describeEffectiveWaterNote(fom, waterContext);
         applyPlanningProfessionalWork(journey, { paperworkLoad: 2, auditExposure: 1 });
 
-        ui.write('Forest Operations Map posted for public review.');
+        ui.write(`Forest Operations Map published for public comment: ${formatPlanningLeadBlocks(journey)}.`);
+        if (fom.waterGate === 'hold') {
+          ui.write('The water gate is a HOLD: the works in and about a stream review runs alongside the comment period, one FOM day at a time.');
+        }
       } else if (previousStatus === 'public_review') {
         const commentBurn = roadContext.hasData || waterContext.commentCount > 0 ? 2 : 1;
         fom.commentLoad = Math.max(0, (fom.commentLoad || 0) - commentBurn);
-        fom.hydrologyReadiness = Math.min(100, Math.max(fom.hydrologyReadiness || 0, waterContext.readiness) + 8);
-        fom.waterGate = waterContext.gate;
-        fom.waterNote = waterContext.note;
-        applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: -3, competenceRisk: -1, auditExposure: -2 });
+        const gateBefore = getEffectiveWaterGate(fom, waterContext);
+        progressWaterGateReview(fom, waterContext, 8);
+        fom.waterGate = getEffectiveWaterGate(fom, waterContext);
+        fom.waterNote = describeEffectiveWaterNote(fom, waterContext);
+        applyPlanningProfessionalWork(journey, { paperworkLoad: -3, competenceRisk: -1, auditExposure: -2 });
 
-        ui.write(`FOM review updated. Closed ${commentBurn} comment${commentBurn === 1 ? '' : 's'}; the statutory clock advances only when the planning day ends.`);
+        ui.write(`FOM comment record updated. Responded to ${commentBurn} comment${commentBurn === 1 ? '' : 's'}; the comment period advances only when the planning day ends.`);
+        if (waterContext.gate === 'hold') {
+          ui.write(gateBefore === 'hold' && fom.waterGate !== 'hold'
+            ? 'Works in and about a stream review complete: the HOLD is now a WINDOW and the WSA s.11 notification is filed.'
+            : `Works in and about a stream review progressed: hydrology readiness ${Math.round(fom.hydrologyReadiness)}% of ${WSA_REVIEW_READINESS}%.`);
+        }
         updatePlanningFomStatus(ui, fom, waterContext, roadContext, 'review work');
       } else {
         const revisionBurn = roadContext.hasData ? 3 : 2;
         fom.status = 'public_review';
         fom.reviewDaysRemaining = FOM_PUBLIC_REVIEW_MIN_DAYS;
         fom.commentLoad = Math.max(0, Math.max(fom.commentLoad || 0, waterContext.commentCount) - revisionBurn);
-        fom.hydrologyReadiness = Math.min(100, Math.max(fom.hydrologyReadiness || 0, waterContext.readiness) + 14);
-        fom.waterGate = waterContext.gate;
-        fom.waterNote = waterContext.note;
-        applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: -4, competenceRisk: -2, auditExposure: -2 });
+        const gateBefore = getEffectiveWaterGate(fom, waterContext);
+        progressWaterGateReview(fom, waterContext, 14);
+        fom.waterGate = getEffectiveWaterGate(fom, waterContext);
+        fom.waterNote = describeEffectiveWaterNote(fom, waterContext);
+        applyPlanningProfessionalWork(journey, { paperworkLoad: -4, competenceRisk: -2, auditExposure: -2 });
 
-        ui.write(`FOM revisions rebuilt the file and reopened public review with ${Math.max(0, fom.commentLoad)} comment${(fom.commentLoad || 0) === 1 ? '' : 's'} left.`);
+        ui.write(`FOM responses filed and the map republished for comment with ${Math.max(0, fom.commentLoad)} comment${(fom.commentLoad || 0) === 1 ? '' : 's'} left.`);
+        if (waterContext.gate === 'hold') {
+          ui.write(gateBefore === 'hold' && fom.waterGate !== 'hold'
+            ? 'Works in and about a stream review complete: the HOLD is now a WINDOW and the WSA s.11 notification is filed.'
+            : `Works in and about a stream review progressed: hydrology readiness ${Math.round(fom.hydrologyReadiness)}% of ${WSA_REVIEW_READINESS}%.`);
+        }
       }
 
       if (chainProgress?.stage) {
-        ui.write(`Paperwork chain advanced to: ${chainProgress.stage}.`);
+        ui.write(`FOM record: ${chainProgress.stage} stage filed.`);
       }
-      ui.write(`Review window: ${Math.max(0, fom.reviewDaysRemaining)} calendar days (${FOM_CALENDAR_DAYS_PER_PLANNING_DAY} per planning day) | ${fom.waterNote}`);
+      ui.write(`Comment period: ${Math.max(0, fom.reviewDaysRemaining)} calendar days (${FOM_CALENDAR_DAYS_PER_PLANNING_DAY} per planning day) | ${fom.waterNote}`);
       if (roadContext.hasData) {
         ui.write(roadContext.note);
         if (roadContext.blocker) {
@@ -1504,23 +1717,24 @@ export async function processAction(game, actionValue, seasonInfo = null) {
 
     case 'outreach': {
       const previousConfidence = journey.plan.ministerialConfidence;
-      // The submission gate needs 80% (see the "Confidence 80%" approval gate
-      // and the 80-point gap checks elsewhere in this file) - capping this
-      // recommended action's gain at 78% meant the game could tell a player
-      // to use Ministerial Outreach to "close the confidence gap" while the
-      // action itself was structurally incapable of ever reaching the gate.
-      journey.plan.ministerialConfidence = Math.min(80, journey.plan.ministerialConfidence + 8);
+      // A pre-submission meeting tops out short of the decision gate: only
+      // Prepare Submission, which checks the FOM comment period, the water
+      // gate, the road file and registration, carries the file across.
+      const readiness = getPlanningSubmissionReadiness(journey, seasonInfo);
+      const cap = getOutreachReadinessCap(readiness);
+      journey.plan.ministerialConfidence = Math.max(previousConfidence, Math.min(cap, journey.plan.ministerialConfidence + DAY_OF_DISTRICT_MEETING));
       journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
       journey.resources.budget = Math.max(0, journey.resources.budget - 600);
-      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);
+      journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 1);
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 8, stress: 7 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, competenceRisk: -1, auditExposure: 1 });
+      applyPlanningProfessionalWork(journey, { paperworkLoad: 1, competenceRisk: -1, auditExposure: 1 });
 
       const gained = journey.plan.ministerialConfidence - previousConfidence;
-      const gap = Math.max(0, 80 - journey.plan.ministerialConfidence);
-      ui.write(`Briefings improved ministerial confidence by ${gained} points to ${journey.plan.ministerialConfidence}%.`);
-      ui.write(`You are ${gap} point${gap === 1 ? '' : 's'} short of the submission threshold.`);
+      ui.write(`The District Manager and stewardship staff walked the draft with you. DM readiness +${gained} → ${journey.plan.ministerialConfidence}%.`);
+      if (journey.plan.ministerialConfidence >= cap) {
+        ui.write(`That is as far as a meeting takes it. Prepare Submission carries the last ${getSubmissionConfidenceGain(readiness)} points${readiness.ready ? '' : ` once the gate is clear: ${readiness.reasons.join(' | ')}`}.`);
+      }
       break;
     }
 
@@ -1538,9 +1752,9 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 5, stress: 4 });
       if (didRenewal) {
-        ui.write('Registration renewal paperwork cleared and active status is restored.');
+        ui.write('FPBC registration renewal filed and active status is restored. CPD logged for the season.');
       } else {
-        ui.write('Compliance admin caught up CPD records and trimmed the paperwork load.');
+        ui.write('Compliance admin logged the season\'s CPD and trimmed the filing backlog.');
       }
       if (chainProgress?.stage) {
         ui.write(`Registration chain advanced to: ${chainProgress.stage}.`);
@@ -1565,12 +1779,14 @@ export async function processAction(game, actionValue, seasonInfo = null) {
           journey.values.biodiversity = Math.max(0, journey.values.biodiversity - 3);
           break;
         case 'community':
+          // Viewscape and access commitments cost volume, not the Nation.
           journey.values.communityNeeds = Math.min(100, journey.values.communityNeeds + 8);
-          journey.values.firstNationsValues = Math.max(0, journey.values.firstNationsValues - 3);
+          journey.values.timberSupply = Math.max(0, journey.values.timberSupply - 2);
           break;
         case 'fn':
+          // Heritage and referral commitments cost volume too.
           journey.values.firstNationsValues = Math.min(100, journey.values.firstNationsValues + 8);
-          journey.values.communityNeeds = Math.max(0, journey.values.communityNeeds - 3);
+          journey.values.timberSupply = Math.max(0, journey.values.timberSupply - 2);
           break;
         case 'balanced':
           journey.values.biodiversity = Math.min(100, journey.values.biodiversity + 3);
@@ -1584,19 +1800,18 @@ export async function processAction(game, actionValue, seasonInfo = null) {
 
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 10, stress: 5 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 1 });
+      applyPlanningProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 1 });
       ui.write('Values workshop completed. Balance updated.');
       break;
     }
 
     case 'timber':
-      // New timber assessment action (Phase 4.1)
-      journey.values.timberSupply = Math.min(100, journey.values.timberSupply + 15);
-      journey.values.biodiversity = Math.max(0, journey.values.biodiversity - 5);
+      // Timber supply analysis: a day of analysis time buys timber standing.
+      journey.values.timberSupply = Math.min(100, journey.values.timberSupply + 12);
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 10, stress: 5 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1, auditExposure: 1 });
-      ui.write(`Timber supply assessment completed. Timber: ${journey.values.timberSupply}%, Biodiversity: ${journey.values.biodiversity}%`);
+      applyPlanningProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 1 });
+      ui.write(`Timber supply analysis completed. Timber: ${journey.values.timberSupply}%. The day came out of the analysis calendar.`);
       break;
 
     case 'email': {
@@ -1609,10 +1824,10 @@ export async function processAction(game, actionValue, seasonInfo = null) {
         ui.write('Useful data attachment in an email. Data completeness +3%.');
       } else if (roll < 0.5) {
         journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 2);
-        ui.write('Supportive email from a stakeholder. Political capital +2.');
+        ui.write('Supportive email from the district stewardship officer. District goodwill +2.');
       } else if (roll < 0.7) {
         applyProtagonistCost(journey, { energy: 0, stress: 5 });
-        ui.write('Angry email from a licensee. Stress increased.');
+        ui.write("Angry email from the mill's planning lead. Stress increased.");
       } else {
         ui.write('Nothing urgent in the inbox.');
       }
@@ -1624,11 +1839,11 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 4);
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 8, stress: 3 });
-      applyPlanningProfessionalWork(journey, { cpdHours: 1, paperworkLoad: 1 });
+      applyPlanningProfessionalWork(journey, { paperworkLoad: 1 });
       if (journey.protagonist) {
         journey.protagonist.reputation = Math.min(100, journey.protagonist.reputation + 2);
       }
-      ui.write('Networking successful. Political capital increased.');
+      ui.write('Coffee with district staff and the Nation\'s referral coordinator. District goodwill +4.');
       break;
 
     case 'rest':
@@ -1664,8 +1879,8 @@ export function buildValuesWorkshopChoices() {
   const choices = [
     { label: 'Emphasize Biodiversity', description: '+8 bio, -3 timber', value: 'bio' },
     { label: 'Emphasize Timber Supply', description: '+8 timber, -3 bio', value: 'timber_v' },
-    { label: 'Emphasize Community', description: '+8 community, -3 FN values', value: 'community' },
-    { label: 'Emphasize First Nations', description: '+8 FN values, -3 community', value: 'fn' }
+    { label: 'Emphasize Community', description: '+8 community, -2 timber (viewscape and access commitments cost volume)', value: 'community' },
+    { label: 'Emphasize First Nations', description: '+8 First Nations values, -2 timber (heritage and referral commitments cost volume)', value: 'fn' }
   ];
 
   choices.push({
@@ -1705,10 +1920,9 @@ function formatValuesGateDeficits(deficits) {
 async function advanceToNextDay(game) {
   const { ui, journey } = game;
 
-  journey.resources.budget = Math.max(0, journey.resources.budget - 750);
-  if (journey.plan.phase !== 'ministerial_approval') {
-    journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 1);
-  }
+  // District goodwill moves only on district-facing actions and events; the
+  // daily cost of a planning file is money.
+  journey.resources.budget = Math.max(0, journey.resources.budget - PLANNING_DAILY_BURN);
 
   const daysRemainingBeforeAdvance = Number.isFinite(journey.deadline)
     ? journey.deadline - journey.day
@@ -1718,7 +1932,7 @@ async function advanceToNextDay(game) {
     if (journey.protagonist) {
       journey.protagonist.stress = Math.min(100, journey.protagonist.stress + 6);
     }
-    ui.writeWarning('The cabinet window is closing. Delays are starting to cost political support.');
+    ui.writeWarning('The current FSP expires soon. Every day without a replacement is a day the licence cannot apply for new cutting permits.');
   }
 
   const fom = journey.blockPlanning?.fom;
@@ -1729,16 +1943,16 @@ async function advanceToNextDay(game) {
     );
     if (fom.reviewDaysRemaining <= 0) {
       if (fom.commentLoad <= FOM_PUBLIC_REVIEW_COMMENT_LIMIT && fom.waterGate !== 'hold') {
-        fom.status = 'approved';
+        fom.status = 'closed';
         fom.commentLoad = 0;
         fom.approvedDay = journey.day + 1;
-        ui.writePositive('Forest Operations Map cleared public review.');
+        ui.writePositive('FOM comment period closed; comments logged and responses filed.');
       } else {
         fom.status = 'revision_required';
         fom.revisionNotes = fom.waterGate === 'hold'
-          ? 'Working-around-water timing comments still need a revision.'
-          : 'Public comments require one more revision pass.';
-        ui.writeWarning(`Forest Operations Map needs revisions: ${fom.revisionNotes}`);
+          ? 'Comments on the in-stream work window (WSA s.11) still need a response.'
+          : 'Public comments require one more response pass.';
+        ui.writeWarning(`Forest Operations Map comments need a response: ${fom.revisionNotes}`);
       }
     }
   }
@@ -1760,6 +1974,10 @@ async function advanceToNextDay(game) {
     if (cpdGap > 0) {
       professional.competenceRisk = Math.min(100, professional.competenceRisk + 1);
       professional.auditExposure = Math.min(100, professional.auditExposure + 1);
+      // A CPD record that is behind is what an FPBC audit finds first.
+      if (journey.day % 4 === 0) {
+        journey.scrutiny = clampValue((journey.scrutiny || 0) + 1);
+      }
     } else if (professional.competenceRisk > 0) {
       professional.competenceRisk = Math.max(0, professional.competenceRisk - 1);
     }
@@ -1778,15 +1996,15 @@ async function advanceToNextDay(game) {
     }
   }
 
-  ui.write(`Daily planning overhead: -$750${journey.plan.phase !== 'ministerial_approval' ? ', political capital -1' : ''}.`);
+  ui.write(`Planning team burn: -$${PLANNING_DAILY_BURN}.`);
 }
 
 function checkGameOver(game) {
   const journey = game.journey;
 
   // Thresholds and reason strings live in the shared module. This used to be a
-  // copy that had drifted — it never closed the file when the cabinet window
-  // ran out, so a doomed plan kept billing days forever.
+  // copy that had drifted — it never closed the file when the FSP expired, so
+  // a doomed plan kept billing days forever.
   const result = checkPlanningEndConditions(journey);
   if (result?.gameOver) {
     journey.isGameOver = true;

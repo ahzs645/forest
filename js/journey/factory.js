@@ -129,9 +129,10 @@ function applyCampaignScale(journey, journeyType) {
     case "planning": {
       // A one-action day (js/journey/dayPlan.js) means the file moves one
       // track at a time, and a twelve-day window could not clear data,
-      // analysis, buy-in and confidence before the cabinet closed. The event
-      // days introduced afterward pushed competent files past twenty days;
-      // allow recovery inside the campaign's thirty-day season.
+      // analysis, the FOM comment period, buy-in and DM readiness before the
+      // FSP expired. The event days introduced afterward pushed competent
+      // files past twenty days; allow recovery inside the campaign's
+      // thirty-day season.
       journey.deadline = 26;
       // The shorter deployment still pays for the same approval gates and
       // authored event costs. Fund those fixed costs as well as daily upkeep.
@@ -387,12 +388,12 @@ export function createPlanningJourney(options = {}) {
     season: createSeasonState(effectiveRoleId),
     scrutiny: 34,
     day: 1,
-    // The cabinet window. Planning has many gates (data, analysis, FOM review,
-    // stakeholder buy-in, ministerial confidence), so the term needs room to
-    // clear them; 20 days was tight. Difficulty nudges this in ForestryTrailGame.
-    // Same resize as the other deployments: with the day's situation costing a
-    // day to answer, a competent planning file runs 21-27 days rather than
-    // 14-20, so the cabinet window has to hold that.
+    // The day the current FSP expires. Planning has many gates (data,
+    // analysis, the FOM comment period, buy-in, the District Manager's
+    // readiness), so the term needs room to clear them; 20 days was tight.
+    // Difficulty nudges this in ForestryTrailGame. With the day's situation
+    // costing a day to answer, a competent planning file runs 21-27 days
+    // rather than 14-20, so the window has to hold that.
     deadline: 34,
     actionsRemaining: ACTIONS_PER_DAY,
 
@@ -408,7 +409,8 @@ export function createPlanningJourney(options = {}) {
       },
     },
 
-    // Plan development phases
+    // Plan development phases. `ministerialConfidence` is the persisted key
+    // for the District Manager's readiness to decide the file.
     plan: {
       phase: "data_gathering",
       phaseDaysRemaining: 20,
@@ -426,10 +428,15 @@ export function createPlanningJourney(options = {}) {
       firstNationsValues: 50,
     },
 
-    // Real-data block selection cadence and active impacts
+    // Real-data lead block set for the first FOM. The cutblock priority
+    // decision runs once, when the analysis opens; `cadenceDays` and
+    // `nextSelectionDay` are kept for saves that predate the lead set.
     blockPlanning: {
       cadenceDays,
-      nextSelectionDay: 1,
+      nextSelectionDay: null,
+      pendingSelection: false,
+      leadBlocks: [],
+      leadBlockIds: [],
       activeBlockId: null,
       activeBlock: null,
       activeSummary: null,
@@ -459,7 +466,8 @@ export function createPlanningJourney(options = {}) {
       inReview: 0,
     },
 
-    // Stakeholders
+    // Stakeholder moods: the district, the Nation, the community, the mill.
+    // Events move them; the Stakeholder Session reads the room.
     stakeholders: {
       ministry: { mood: 50, meetings: 0, lastContact: 0 },
       nations: { mood: 50, meetings: 0, lastContact: 0 },
@@ -475,15 +483,13 @@ export function createPlanningJourney(options = {}) {
       // scripts/simulate-expeditions.mjs.
       // Raised again with the event rate: a file now meets roughly a third
       // more situations and every one it answers or declines draws on this
-      // same pool. Losses moved off the cabinet clock and onto money.
+      // same pool. Losses moved off the FSP clock and onto money.
       budget: 82000,
-      // Standing burns a point a day and six a stakeholder session. Over a
-      // season of one-action days (js/journey/dayPlan.js) that is roughly
-      // twice the calendar the old pool was cut for, so the file lost the
-      // cabinet before it lost the argument. Sized with
-      // scripts/simulate-expeditions.mjs.
-      // Same reason as the budget above.
+      // District goodwill (persisted as politicalCapital). It moves only on
+      // district-facing actions and events — a stakeholder session, a
+      // pre-submission meeting, a complaint — never as a daily drain.
       politicalCapital: 74,
+      // Inventory budget: ten LiDAR/VRI pulls.
       dataCredits: 100,
       consultantDays: 30,
     },
@@ -547,7 +553,9 @@ export function createPermittingJourney(options = {}) {
       },
     },
 
-    // Enhanced permit pipeline
+    // The permit queue. Counters are the persisted summary; the named files
+    // behind them (types, lanes, referral clocks) are seeded on the first
+    // desk day by js/journey/permitPipeline.js.
     permits: {
       target: 15,
       backlog: 8,
@@ -558,6 +566,7 @@ export function createPermittingJourney(options = {}) {
       needsRevision: 0,
       approved: 0,
       rejected: 0,
+      files: [],
     },
 
     // Referral tracking
@@ -567,7 +576,8 @@ export function createPermittingJourney(options = {}) {
       completed: [],
     },
 
-    // Stakeholder relationships
+    // Working relationships: the district office (persisted as `ministry`),
+    // the Nation's referral coordinator, and the agencies (DFO / ENV).
     relationships: {
       ministry: 50,
       nations: 50,
