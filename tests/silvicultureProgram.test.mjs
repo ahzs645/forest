@@ -346,7 +346,7 @@ test('fill planting tops up last year\'s opening from the fill stock at the fill
     assert.equal(journey.planting.fillComplete, 1);
     assert.equal(seedlingsBefore - journey.resources.seedlings, opening.trees);
     assert.equal(journey.planting.seedlingsPlanted, 0, 'fill trees never count against this year\'s allocation');
-    assert.ok(ui.lines.some((line) => new RegExp(`Fill plant on ${opening.id} \\(${opening.year}, ${opening.ha} ha\\): ${opening.trees.toLocaleString()} trees into the gaps, ${opening.stockedSph} sph back above MSS 700`).test(line)));
+    assert.ok(ui.lines.some((line) => new RegExp(`Fill plant on ${opening.id} \\(${opening.year}, ${opening.ha} ha\\): ${opening.trees.toLocaleString()} trees into the gaps take the opening from ${opening.stockedSph} sph back above MSS 700`).test(line)));
     assert.ok(ui.lines.some((line) => new RegExp(`fill work at \\$${(planters.pricePerTree + 0.06).toFixed(2)}/tree`).test(line)));
     assert.ok(ui.lines.some((line) => /Last year's openings are back above minimum stocking/.test(line)));
   });
