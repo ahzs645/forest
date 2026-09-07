@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ISSUE_LIBRARY } from '../js/data/issues.js';
+import { CHAINED_ISSUES } from '../js/data/chainedIssues.js';
+import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
+import { makeRng } from '../js/engine/rng.js';
+import { PLACE_NAME_PATTERN } from '../scripts/lint-seasonal-content.mjs';
 import { createInitialState, drawIssue, scoreIssueSelection, SEASONS } from '../js/engine.js';
 import {
   matchesPreconditions,
@@ -63,7 +67,7 @@ test('issue scoring favors specialty-specific and season-aligned scenarios', () 
 
   const offSeasonClone = {
     ...exclusivePlanner,
-    seasonBias: ['Winter Review'],
+    seasonBias: ['Winter Operations'],
   };
 
   const exclusiveWeight = scoreIssueSelection(exclusivePlanner, state, context);
@@ -178,4 +182,83 @@ test('season-locked issues never surface outside the season their copy describes
   }
   assert.equal(springDraws.has('ice-road-window'), false,
     'a mid-winter crisis does not open the spring season');
+});
+
+// ── Region gating ───────────────────────────────────────────────────────────
+// Place-named cards used to leak across the province: a planner in the
+// Okanagan got "Smithers issues a turbidity advisory" because the near-universal
+// "northern-bc" tag counted as an area match. Cards that name a place now
+// declare `areaIds`, and the generic tags earn no relevance bonus.
+
+const AREA_PLACE_WORDS = {
+  'fort-st-john-plateau': [/Peace River/, /\bBWBS\b/, /Fort St\. John/],
+  'muskwa-foothills': [/Peace River/, /\bBWBS\b/, /Fort Nelson/],
+  'bulkley-valley': [/Smithers/, /Highway 16/, /Bulkley/, /\bSBS\b/],
+  'fraser-plateau': [/Lheidli/, /Prince George/, /\bSBS\b/],
+  'skeena-nass': [/Skeena/, /\bNass\b/, /Terrace/],
+  'tahltan-highland': [/Stikine/, /Tahltan/, /Dease/, /\bSWB\b/],
+  'vancouver-island-coast': [/Alberni/],
+  'kootenay-wetbelt': [/Kootenay/],
+  'okanagan-shuswap-drybelt': [/Okanagan/],
+};
+
+function namesForeignPlace(text, areaId) {
+  const match = String(text || '').match(PLACE_NAME_PATTERN);
+  if (!match) return null;
+  const allowed = AREA_PLACE_WORDS[areaId] || [];
+  return allowed.some((re) => re.test(match[0])) ? null : match[0];
+}
+
+test('areaIds is a hard gate: a Bulkley viewshed card never draws in the Okanagan', () => {
+  const viewshed = ISSUE_LIBRARY.find((issue) => issue.id === 'highway-16-viewshed-redesign');
+  assert.deepEqual(viewshed.areaIds, ['bulkley-valley']);
+
+  const okanagan = createSeasonalState('planner', 1, 'okanagan-shuswap-drybelt');
+  okanagan.pendingIssues = [{ id: 'highway-16-viewshed-redesign', delay: 0, force: true }];
+  assert.notEqual(drawIssue(okanagan, () => 0)?.id, 'highway-16-viewshed-redesign');
+
+  const bulkley = createSeasonalState('planner', 1, 'bulkley-valley');
+  bulkley.pendingIssues = [{ id: 'highway-16-viewshed-redesign', delay: 0, force: true }];
+  assert.equal(drawIssue(bulkley, () => 0)?.id, 'highway-16-viewshed-redesign');
+});
+
+test('generic province-wide tags earn no area relevance bonus', () => {
+  const state = createSeasonalState('planner', 1, 'okanagan-shuswap-drybelt');
+  const context = { tags: state.area.tags, season: 'Spring Planning' };
+  const base = { id: 'x', roles: ['planner'], options: [] };
+  const untagged = scoreIssueSelection({ ...base, areaTags: [] }, state, context);
+  const genericOnly = scoreIssueSelection({ ...base, areaTags: ['bc-wide'] }, state, context);
+  const realMatch = scoreIssueSelection({ ...base, areaTags: ['wildfire'] }, state, context);
+  assert.equal(genericOnly, untagged, '"bc-wide" must not outscore an untagged card');
+  assert.ok(realMatch > genericOnly, 'a real area tag still earns its bonus');
+});
+
+test('no role draws a card that names another region, across every area', () => {
+  const roles = ['planner', 'permitter', 'recce', 'silviculture'];
+  const leaks = [];
+  for (const area of OPERATING_AREAS) {
+    for (const roleId of roles) {
+      const rng = makeRng(7);
+      for (let round = 1; round <= 4; round += 1) {
+        for (let draw = 0; draw < 40; draw += 1) {
+          const state = createSeasonalState(roleId, round, area.id);
+          state.flags = { professionalAuditActive: true, regulatoryScrutiny: true, outdatedData: true };
+          const issue = drawIssue(state, rng);
+          if (!issue) continue;
+          const foreign = namesForeignPlace(`${issue.title} ${issue.description}`, area.id);
+          if (foreign) leaks.push(`${roleId} @ ${area.id}: "${issue.title}" names ${foreign}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual([...new Set(leaks)], []);
+});
+
+test('every place-named card in the libraries declares the areas it belongs to', () => {
+  for (const issue of [...ISSUE_LIBRARY, ...CHAINED_ISSUES]) {
+    const text = `${issue.title} ${issue.description}`;
+    if (PLACE_NAME_PATTERN.test(text)) {
+      assert.ok(Array.isArray(issue.areaIds) && issue.areaIds.length, `${issue.id} names a place without areaIds`);
+    }
+  }
 });

@@ -1,4 +1,4 @@
-export const SEASONS = ["Spring Planning", "Summer Field", "Fall Integration", "Winter Review"];
+export const SEASONS = ["Spring Planning", "Summer Field", "Fall Close-out", "Winter Operations"];
 export const ISSUE_REPEAT_COOLDOWN_ROUNDS = 2;
 export const EVENT_REPEAT_COOLDOWN_ROUNDS = 2;
 // One round, not two: with only three eligible seasons a year (round 1 never

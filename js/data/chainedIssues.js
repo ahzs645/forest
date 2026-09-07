@@ -12,7 +12,7 @@ export const CHAINED_ISSUES = [
     id: "ministry-data-audit",
     title: "Ministry Data Audit",
     description:
-      "The ministry noticed your landscape plan relies on last cycle's hydrology data. An auditor wants to review your spatial inputs.",
+      "The district's stewardship staff noticed your landscape plan relies on last cycle's hydrology data, and they want to review your spatial inputs before the FSP amendment moves.",
     roles: ["planner"],
     areaTags: [],
     requiresFlags: ["outdatedData"],
@@ -22,7 +22,7 @@ export const CHAINED_ISSUES = [
       {
         label: "Commission emergency updated LiDAR",
         outcome:
-          "Expensive, but the fresh data impresses the auditor and strengthens the plan.",
+          "Expensive, but the fresh data satisfies the stewardship officer and strengthens the plan.",
         effects: { progress: -3, compliance: 5, forestHealth: 3, budget: -5 },
         clearFlags: ["outdatedData"],
         setFlags: { dataAuditResolved: true },
@@ -30,13 +30,13 @@ export const CHAINED_ISSUES = [
       {
         label: "Defend the existing dataset in writing",
         outcome:
-          "Your memo is technically sound but the auditor marks the file for follow-up next year.",
+          "Your memo is technically sound but the stewardship officer marks the file for follow-up next year.",
         effects: { progress: 2, compliance: -4, relationships: -2 },
       },
       {
         label: "Blame the previous planner's handover notes",
         outcome:
-          "The auditor shrugs but your predecessor's friends on council are furious.",
+          "The stewardship officer shrugs but your predecessor's friends in the office are furious.",
         effects: { relationships: -6, compliance: 1, progress: 3 },
       },
     ],
@@ -46,7 +46,7 @@ export const CHAINED_ISSUES = [
     id: "permit-deficiency",
     title: "Permit Deficiency Notice",
     description:
-      "The ministry returns a batch of permits flagged as deficient. Rushed documentation has gaps.",
+      "The district returns a batch of cutting permit applications flagged as deficient. Rushed documentation has gaps.",
     roles: ["permitter"],
     areaTags: [],
     requiresFlags: ["rushJob"],
@@ -56,7 +56,7 @@ export const CHAINED_ISSUES = [
       {
         label: "Pull an all-nighter to fix the package",
         outcome:
-          "The revised package is bulletproof. Ministry approves within the week.",
+          "The revised package is bulletproof. The District Manager signs within the week.",
         effects: { progress: -4, compliance: 6, budget: -2 },
         clearFlags: ["rushJob"],
         setFlags: { deficiencyResolved: true },
@@ -116,7 +116,7 @@ export const CHAINED_ISSUES = [
     id: "regulatory-spotlight",
     title: "Regulatory Spotlight",
     description:
-      "As warned, regulators are watching closely. A compliance officer shows up unannounced to inspect the blocks you pushed through with enhanced mitigation.",
+      "As warned, C&E is watching closely. A natural resource officer shows up unannounced to inspect the blocks you pushed through with enhanced mitigation.",
     roles: ["planner"],
     areaTags: [],
     requiresFlags: ["regulatoryScrutiny"],
@@ -202,7 +202,7 @@ export const CHAINED_ISSUES = [
     id: "environmental-audit-fallout",
     title: "Environmental Audit Fallout",
     description:
-      "Environment ministry auditors have flagged irregularities in your ecological data. A field verification team is being dispatched.",
+      "District silviculture staff have flagged irregularities in your RESULTS declarations, and a C&E check survey of the free-growing blocks is being scheduled.",
     roles: ["planner", "silviculture"],
     areaTags: [],
     requiresAnyFlags: [
@@ -230,13 +230,13 @@ export const CHAINED_ISSUES = [
       {
         label: "Challenge the audit methodology",
         outcome:
-          "Your technical objections delay the process but the auditors double down.",
+          "Your technical objections delay the process but C&E doubles down.",
         effects: { compliance: -5, progress: 3, relationships: -3 },
       },
       {
         label: "Accept the findings and commit to remediation",
         outcome:
-          "The remediation plan is expensive but restores credibility with both regulators and communities.",
+          "The remediation plan is expensive but restores credibility with both the district and the communities.",
         effects: { progress: -6, forestHealth: 5, compliance: 4, relationships: 2 },
         clearFlags: [
           "environmentalAudit",
@@ -321,7 +321,7 @@ export const CHAINED_ISSUES = [
     id: "silviculture-audit-seedlot-traceback",
     title: "Silviculture Audit: Seedlot Traceback",
     description:
-      "Regional silviculture auditors want a block-by-block traceback of every seedlot used in last spring's planting, and your cutblock list has forty-some suspect lines.",
+      "The district stewardship officer wants a block-by-block seedlot traceback against RESULTS for last spring's planting, and your cutblock list has forty-some suspect lines.",
     roles: ["silviculture", "planner"],
     areaTags: ["reforestation", "community-forest"],
     requiresFlags: ["wrongSeedzonePlanted"],
@@ -331,7 +331,7 @@ export const CHAINED_ISSUES = [
       {
         label: "Run the full traceback, fund fill-planting where survival is failing",
         outcome:
-          "The traceback is exhausting and the fill-planting budget hurts, but the remediation plan satisfies the auditors and the chief forester's team.",
+          "The traceback is exhausting and the fill-planting budget hurts, but the remediation plan satisfies the stewardship officer and the Tree Seed Centre.",
         effects: { progress: -5, forestHealth: 6, compliance: 6, budget: -8 },
         clearFlags: ["wrongSeedzonePlanted"],
         setFlags: { seedlotTracebackResolved: true, silvicultureAudit: true },
@@ -339,7 +339,7 @@ export const CHAINED_ISSUES = [
       {
         label: "Submit a high-level summary and resist the block-by-block request",
         outcome:
-          "The auditors are unimpressed. The file moves up a level and the timeline gets formal.",
+          "The district is unimpressed. The file goes to C&E and the timeline gets formal.",
         effects: { progress: 1, compliance: -5, relationships: -2 },
       },
       {

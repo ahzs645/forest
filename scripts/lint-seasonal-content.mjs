@@ -28,6 +28,10 @@ import {
 } from "../js/engine/seasonalContract.js";
 
 const METRIC_KEYS = ["progress", "forestHealth", "relationships", "compliance"];
+// A card that names a place must say which operating areas it belongs to,
+// or it will be drawn in the wrong valley ("Smithers issues a turbidity
+// advisory" while the player is in the Okanagan).
+export const PLACE_NAME_PATTERN = /Smithers|Skeena|Stikine|Peace River|Highway 16|Lheidli|Tahltan|Dease|\bNass\b|\bSWB\b|\bBWBS\b|\bSBS\b|Okanagan|Kootenay|Alberni|Bulkley|Prince George|Fort St\. John|Fort Nelson|Terrace/;
 const MAX_METRIC_MAGNITUDE = 15; // budget is excluded (authored in raw dollars)
 const MIN_ROLE_ISSUES = 3;
 
@@ -45,6 +49,7 @@ export function lintSeasonalContent() {
 
   const allIssues = [...ISSUE_LIBRARY, ...CHAINED_ISSUES];
   const knownIssueIds = new Set(allIssues.map((issue) => issue?.id).filter(Boolean));
+  const knownAreaIds = new Set(OPERATING_AREAS.map((area) => area.id));
   const knownEventIds = new Set([...DESK_EVENTS, ...FIELD_EVENTS].map((event) => event?.id).filter(Boolean));
 
   // 1. Issue library schema + scheduled-issue id resolution + magnitudes.
@@ -57,6 +62,14 @@ export function lintSeasonalContent() {
     if (!issue?.title) err(where, "missing title");
     if (!issue?.description) err(where, "missing description");
     if (!Array.isArray(issue?.roles) || issue.roles.length === 0) err(where, "missing roles");
+    const placeText = [issue?.title, issue?.description].filter(Boolean).join(" ");
+    const hasAreaIds = Array.isArray(issue?.areaIds) && issue.areaIds.length > 0;
+    if (PLACE_NAME_PATTERN.test(placeText) && !hasAreaIds) {
+      err(where, `names a place (${placeText.match(PLACE_NAME_PATTERN)[0]}) without areaIds`);
+    }
+    for (const areaId of issue?.areaIds || []) {
+      if (!knownAreaIds.has(areaId)) err(where, `unknown areaId "${areaId}"`);
+    }
     const options = Array.isArray(issue?.options) ? issue.options : [];
     if (options.length < 2) err(where, `needs >= 2 options (has ${options.length})`);
     for (const [i, option] of options.entries()) {

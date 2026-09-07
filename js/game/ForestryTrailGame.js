@@ -353,10 +353,10 @@ export class ForestryTrailGame {
     const difficulty = difficultyChoice.value || 'normal';
 
     this.ui.clear();
-    this.ui.writeHeader('BC FORESTRY OPERATIONS SYSTEM');
+    this.ui.writeHeader('BC FORESTRY TRAIL');
     this.ui.write('System online. Deployment package confirmed.');
     this.ui.write('');
-    this.ui.write(`Crew Handle: ${crewName}`);
+    this.ui.write(`Crew: ${crewName}`);
     this.ui.write(`Role: ${role.name}`);
     this.ui.write(`Operating Area: ${area.name}`);
     this.ui.write(`BEC Zone: ${area.becZone}`);

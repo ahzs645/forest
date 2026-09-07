@@ -2,12 +2,12 @@ export const GLOSSARY_TERMS = [
   {
     term: "BEC Zone",
     description:
-      "Biogeoclimatic Ecosystem Classification zone describing regional climate, vegetation, and soils. Example: BWBSmw1 is Boreal White and Black Spruce moist warm subzone variant 1.",
+      "Biogeoclimatic Ecosystem Classification — BC's system for naming ecosystems by regional climate, then by subzone and variant. Written as zone + subzone (+ variant): SBSmc2 is Sub-Boreal Spruce, moist cold, variant 2; BWBSmw is Boreal White and Black Spruce, moist warm. The site series under each unit drive stocking standards and species choice.",
   },
   {
     term: "Hydrology Assessment",
     description:
-      "Review of surface and subsurface water movement to ensure roads and harvest plans maintain watershed function and protect downstream values.",
+      "A qualified professional's review of how water moves through a watershed and what roads and harvesting will do to peak flows, sediment, and channel stability — usually a watershed or hydrologic assessment tied to a community watershed or fisheries-sensitive stream.",
   },
   {
     term: "LiDAR",
@@ -22,12 +22,12 @@ export const GLOSSARY_TERMS = [
   {
     term: "Referral",
     description:
-      "Formal consultation package sent to Indigenous governments, stakeholders, and regulators for comment on a proposed activity.",
+      "The package a licensee sends to a First Nation (and, where relevant, other agencies or stakeholders) describing proposed blocks and roads and asking for comment. The Crown's duty to consult sits with the Province; the licensee's referral and engagement record is what the district reads to see whether that duty has been informed.",
   },
   {
     term: "Free Growing",
     description:
-      "Regeneration milestone in BC where planted or natural seedlings meet height and density targets, proving the stand is established.",
+      "The FRPA milestone where a regenerated stand is established: acceptable, well-spaced crop trees at or above the minimum stocking standard, of the required height, and free of brush competition. Confirmed by a free-growing survey and declared in RESULTS before the late free-growing date; the declaration closes the licensee's silviculture obligation on the block.",
   },
   {
     term: "Road Deactivation",
@@ -35,24 +35,24 @@ export const GLOSSARY_TERMS = [
       "Works that render a temporary or inactive road stable and environmentally secure by pulling culverts, installing water bars, and re-contouring.",
   },
   {
-    term: "Cultural Feature Inventory",
+    term: "Cultural Heritage Resource (CHR)",
     description:
-      "Field program led with Indigenous partners to identify culturally significant sites such as trails, cabins, or harvesting areas before work proceeds.",
+      "An object, site, or location of historical, cultural, or archaeological significance to BC or to a First Nation — trails, culturally modified trees (CMTs), cabins, harvesting areas, burial sites. Archaeological sites are protected under the Heritage Conservation Act whether or not they are recorded, and the FSP has to say how CHRs will be conserved.",
   },
   {
     term: "Wildfire Hazard Abatement",
     description:
-      "Reducing the buildup of flammable fuels near infrastructure or communities through treatments like pruning, spacing, or debris disposal.",
+      "The Wildfire Act obligation to assess and abate the fire hazard created by slash and debris from harvesting and road work within the required period. It is not FireSmart or fuel management for a community — it is the licensee's duty to deal with the fuel it created.",
   },
   {
     term: "Riparian Reserve",
     description:
-      "Protected buffer adjacent to streams, lakes, or wetlands that maintains shade, bank stability, and aquatic habitat.",
+      "Under the FPPR, streams are classed S1–S6 (fish-bearing S1–S4 by width; non-fish-bearing S5–S6). Each class sets a riparian management area (RMA) made of a riparian reserve zone (RRZ), where no harvesting occurs, and a riparian management zone (RMZ), where retention is managed. S5 and S6 streams carry no reserve zone.",
   },
   {
     term: "Annual Allowable Cut (AAC)",
     description:
-      "The volume of timber that can legally be harvested from a defined area each year, determined by the Chief Forester.",
+      "The volume the Chief Forester determines can be harvested from a timber supply area (TSA) or tree farm licence (TFL), reviewed through timber supply review at least every ten years and apportioned to licences by the Minister. Cut control tracks each licensee against its share.",
   },
   {
     term: "Scrutiny",
@@ -62,32 +62,32 @@ export const GLOSSARY_TERMS = [
   {
     term: "Stumpage",
     description:
-      "Fees paid to the provincial government for the right to harvest timber from Crown land.",
+      "The price the Crown charges for Crown timber, set through the appraisal system and paid per cubic metre scaled against the timber mark.",
   },
   {
     term: "Cutting Permit",
     description:
-      "Authorization from the Ministry of Forests to harvest timber from a specific area under specific conditions.",
+      "The permit issued by the District Manager under a licence that authorizes harvesting on specific blocks. The blocks must be consistent with the approved FSP (and any FOM published for them), and the CP carries the timber mark, term, and appraisal data.",
   },
   {
     term: "FREP",
     description:
-      "Forest and Range Evaluation Program - BC's monitoring program for forest and range practices effectiveness.",
+      "Forest and Range Evaluation Program — the Province's resource stewardship monitoring of FRPA outcomes (stand-level biodiversity, riparian, soils, visuals), done by government staff on a sample of blocks rather than by the licensee.",
   },
   {
     term: "First Nations Consultation",
     description:
-      "Legal requirement to engage with Indigenous communities whose traditional territories overlap with proposed forestry activities.",
+      "The Crown's constitutional duty to consult and, where appropriate, accommodate First Nations on decisions that may affect Aboriginal rights and title. The duty belongs to the Province; the licensee engages — referrals, information sharing, site visits — and its engagement record informs the decision-maker.",
   },
   {
     term: "Old Growth Management Area (OGMA)",
     description:
-      "Designated areas where old-growth forest attributes are maintained through harvest restrictions.",
+      "A spatially defined area established under a land-use order to retain old-forest attributes. Harvesting is generally excluded, and moving a boundary needs an approved rationale.",
   },
   {
     term: "Mountain Pine Beetle (MPB)",
     description:
-      "Bark beetle species that has caused massive mortality in BC's lodgepole pine forests since the 1990s.",
+      "Dendroctonus ponderosae. The 1999–2015 epidemic killed lodgepole pine across more than 18 million hectares of BC and drove the salvage programs, mid-term timber supply falldown, and beetle-recovery regeneration work the Interior is still living with.",
   },
   {
     term: "Salvage Logging",

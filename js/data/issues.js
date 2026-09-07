@@ -5,8 +5,9 @@ export const ISSUE_LIBRARY = [
     description:
       "A warm spell is softening peatland crossings along your mainline north of the Peace River, and loaded trucks are starting to break through.",
     roles: ["recce", "planner"],
+    areaIds: ["fort-st-john-plateau", "muskwa-foothills"],
     areaTags: ["peatland", "bwbs", "peace-region"],
-    seasonBias: ["Spring Planning", "Winter Review"],
+    seasonBias: ["Spring Planning", "Winter Operations"],
     options: [
       {
         label: "Corduroy the approaches and reduce axle loads",
@@ -32,7 +33,7 @@ export const ISSUE_LIBRARY = [
     id: "caribou-range-closure",
     title: "Caribou Maternal Pen Closure",
     description:
-      "The province issues an emergency access restriction around a caribou maternal pen overlapping your BWBS and SWB tenure.",
+      "The province issues an emergency access restriction around a caribou maternal pen that overlaps your operating area.",
     roles: ["planner", "permitter", "recce"],
     areaTags: ["caribou", "bwbs", "swb"],
     seasonBias: ["Summer Field"],
@@ -61,7 +62,7 @@ export const ISSUE_LIBRARY = [
     id: "cultural-burning-collab",
     title: "Cultural Burning Collaboration",
     description:
-      "Lheidli T'enneh firekeepers request support for a cultural burn on SBS interface blocks to reduce ladder fuels before summer.",
+      "The Nation's firekeepers ask for support on a cultural burn across the interface blocks to reduce ladder fuels before summer.",
     roles: ["planner", "silviculture"],
     areaTags: ["sbs", "community-interface", "wildfire"],
     seasonBias: ["Spring Planning"],
@@ -90,10 +91,10 @@ export const ISSUE_LIBRARY = [
     id: "salmon-crossing-washout",
     title: "Salmon Crossing Washout",
     description:
-      "An atmospheric river scours a fish-bearing creek along your Skeena access road, leaving gear stranded beyond the washout.",
+      "An atmospheric river scours a fish-bearing creek along your mainline access road, leaving gear stranded beyond the washout.",
     roles: ["recce", "permitter"],
     areaTags: ["cwh", "salmon", "steep"],
-    seasonBias: ["Fall Integration"],
+    seasonBias: ["Fall Close-out"],
     options: [
       {
         label: "Install a temporary Bailey bridge with habitat oversight",
@@ -119,7 +120,7 @@ export const ISSUE_LIBRARY = [
     id: "smoke-inversion",
     title: "Persistent Smoke Inversion",
     description:
-      "Wildfires to the south trap smoke over the SBS plateau, pushing particulate levels past safe work thresholds for a week.",
+      "Wildfires to the south trap smoke over your operating area, pushing particulate levels past safe work thresholds for a week.",
     roles: ["recce", "silviculture"],
     areaTags: ["wildfire", "sbs", "bwbs"],
     seasonBias: ["Summer Field"],
@@ -142,7 +143,7 @@ export const ISSUE_LIBRARY = [
     id: "spruce-budworm-front",
     title: "Spruce Budworm Expansion",
     description:
-      "Budworm egg masses appear across SBS regeneration blocks, threatening next year's survival counts.",
+      "Budworm egg masses appear across your spruce regeneration blocks, threatening next year's survival counts.",
     roles: ["silviculture"],
     areaTags: ["sbs", "bwbs", "beetle-recovery"],
     seasonBias: ["Summer Field"],
@@ -150,11 +151,11 @@ export const ISSUE_LIBRARY = [
       {
         label: "Deploy aerial BtK treatments on priority polygons",
         outcome:
-          "You charter aircraft for targeted spraying, stemming the outbreak with regulator support.",
+          "You charter aircraft for targeted Btk spraying under a pest management plan, and the district's forest health staff are onside.",
         effects: { progress: 2, forestHealth: 6, compliance: 4, relationships: 2, budget: -5 },
       },
       {
-        label: "Adjust stocking standards and species mix",
+        label: "Amend the prescriptions within the approved stocking standards",
         outcome:
           "You amend prescriptions to diversify species resilience, lowering immediate survival targets.",
         effects: { progress: -1, forestHealth: 4, compliance: 3, relationships: 2 },
@@ -162,7 +163,7 @@ export const ISSUE_LIBRARY = [
       {
         label: "Monitor and hope for natural predators",
         outcome:
-          "Monitoring costs stay low, yet defoliation expands and auditors flag the passive stance.",
+          "Monitoring costs stay low, yet defoliation expands and the district's forest health officer flags the passive stance.",
         effects: { progress: -3, forestHealth: 1, compliance: -2 },
       },
     ],
@@ -171,10 +172,10 @@ export const ISSUE_LIBRARY = [
     id: "ice-road-window",
     title: "Ice Road Window Collapsing",
     description:
-      "Mid-winter rain threatens to close the ice bridge supplying your BWBS camp for the rest of the season.",
+      "Mid-winter rain threatens to close the ice bridge supplying your winter camp for the rest of the season.",
     roles: ["recce", "planner"],
     areaTags: ["winter-road", "bwbs", "peace-region"],
-    seasonBias: ["Winter Review"],
+    seasonBias: ["Winter Operations"],
     seasonLock: true,
     options: [
       {
@@ -201,10 +202,10 @@ export const ISSUE_LIBRARY = [
     id: "karst-cave-discovery",
     title: "Karst Cave Discovery",
     description:
-      "A reconnaissance crew in the Skeena-Nass plateau uncovers a karst cave with cultural features in the planned cutblock.",
+      "A layout crew uncovers a karst cave with cultural features inside the planned cutblock.",
     roles: ["planner", "recce"],
     areaTags: ["karst", "cwh"],
-    seasonBias: ["Fall Integration"],
+    seasonBias: ["Fall Close-out"],
     options: [
       {
         label: "Commission karst and cultural inventories",
@@ -215,7 +216,7 @@ export const ISSUE_LIBRARY = [
       {
         label: "Flag a reserve and proceed with buffers",
         outcome:
-          "You set aside the cave feature with generous buffers. Regulators caution that monitoring must continue.",
+          "You set aside the cave feature with generous buffers. The district cautions that monitoring must continue.",
         effects: { progress: 3, forestHealth: 2, compliance: 3 },
       },
       {
@@ -230,10 +231,10 @@ export const ISSUE_LIBRARY = [
     id: "community-water-warning",
     title: "Community Water Turbidity Warning",
     description:
-      "Smithers issues a turbidity advisory downstream of your interface road maintenance work.",
+      "The downstream water purveyor issues a turbidity advisory below your interface road maintenance work, and the district wants to know what you are doing about it.",
     roles: ["planner", "permitter"],
     areaTags: ["community-water", "watershed", "visuals"],
-    seasonBias: ["Summer Field", "Fall Integration"],
+    seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
         label: "Install sediment socks and continuous monitoring",
@@ -250,7 +251,7 @@ export const ISSUE_LIBRARY = [
       {
         label: "Dispute the readings and continue",
         outcome:
-          "You question data quality and push ahead. Officials warn that enforcement is imminent.",
+          "You question data quality and push ahead. C&E warns that an inspection is imminent.",
         effects: { progress: 2, relationships: -5, compliance: -4 },
       },
     ],
@@ -259,8 +260,9 @@ export const ISSUE_LIBRARY = [
     id: "glacial-outburst-watch",
     title: "Glacial Outburst Watch",
     description:
-      "Hydrometric crews detect rising risk of a jökulhlaup on the Stikine headwaters below your SWB operations.",
+      "Hydrometric crews detect rising risk of a jökulhlaup — a glacial outburst flood — on the Stikine headwaters below your operations.",
     roles: ["planner", "recce", "silviculture"],
+    areaIds: ["tahltan-highland"],
     areaTags: ["swb", "glacial", "caribou"],
     seasonBias: ["Summer Field"],
     options: [
@@ -279,7 +281,7 @@ export const ISSUE_LIBRARY = [
       {
         label: "Accept the low probability and stay the course",
         outcome:
-          "Productivity remains high, yet emergency planners flag your risk tolerance.",
+          "Productivity remains high, yet the regional emergency program flags your risk tolerance.",
         effects: { progress: 4, relationships: -4, compliance: -5 },
       },
     ],
@@ -288,21 +290,21 @@ export const ISSUE_LIBRARY = [
     id: "seedling-logistics-crunch",
     title: "Seedling Logistics Crunch",
     description:
-      "A transport strike delays delivery of SWB seedlots destined for remote Tahltan blocks.",
+      "A transport strike delays delivery of the seedlots destined for your remote blocks, and the stock is sitting in a reefer instead of the ground.",
     roles: ["silviculture"],
     areaTags: ["remote-camps", "swb", "sbs"],
     seasonBias: ["Spring Planning"],
     options: [
       {
-        label: "Charter a cargo flight to the Dease strip",
+        label: "Charter a cargo flight to the nearest airstrip",
         outcome:
           "You secure a last-minute flight to move seedlings before thaw. Costs spike but survival targets stay on track.",
         effects: { progress: 2, relationships: 3, compliance: 4, budget: -6 },
       },
       {
-        label: "Swap to available SBS seedlots",
+        label: "Swap to an adjacent-zone seedlot under the seed-transfer rules",
         outcome:
-          "You revise stocking standards to use nearby SBS lots. Regulators accept the variance with conditions.",
+          "You document a seed-transfer variance under the Chief Forester's Standards for Seed Use and plant the nearest acceptable lot. The district accepts it with conditions.",
         effects: { progress: 1, forestHealth: 3, compliance: 5 },
       },
       {
@@ -320,7 +322,7 @@ export const ISSUE_LIBRARY = [
       "North American lumber prices tank overnight, forcing difficult decisions about volume commitments.",
     roles: ["planner", "permitter"],
     areaTags: ["market", "northern-bc"],
-    seasonBias: ["Winter Review"],
+    seasonBias: ["Winter Operations"],
     options: [
       {
         label: "Throttle harvest and preserve cash",
@@ -375,10 +377,10 @@ export const ISSUE_LIBRARY = [
     id: "crew-influenza-wave",
     title: "Influenza Wave Hits Remote Camp",
     description:
-      "Half your camp reports fever and fatigue just as winter road demob is scheduled.",
+      "Half your camp reports fever and fatigue just as freeze-up mobilization is scheduled.",
     roles: ["recce", "silviculture", "planner"],
     areaTags: ["remote-camps", "winter-road"],
-    seasonBias: ["Fall Integration", "Winter Review"],
+    seasonBias: ["Fall Close-out", "Winter Operations"],
     seasonLock: true,
     options: [
       {
@@ -433,17 +435,17 @@ export const ISSUE_LIBRARY = [
   },
   {
     id: "policy-funding-cut",
-    title: "Provincial Funding Cut",
+    title: "FESBC Grant Clawback",
     description:
-      "New fiscal directives slash stewardship funding mid-year, forcing reprioritization.",
+      "FESBC claws back part of your stewardship grant mid-year after a provincial budget update, and the funded fuel treatments and rehab work have to be reprioritized.",
     roles: ["planner", "permitter"],
     areaTags: ["policy", "northern-bc"],
-    seasonBias: ["Winter Review"],
+    seasonBias: ["Winter Operations"],
     options: [
       {
         label: "Re-sequence projects to match available funds",
         outcome:
-          "You defer lower-priority works and keep compliance-critical files advancing.",
+          "You defer the discretionary treatments and keep the obligation work advancing.",
         effects: { progress: -3, budget: 2, compliance: 3 },
       },
       {
@@ -476,15 +478,15 @@ export const ISSUE_LIBRARY = [
         effects: { progress: -2, compliance: 3, budget: -5 },
       },
       {
-        label: "Switch to ground-based total station surveys",
+        label: "Hand-traverse the P-line with clino, chain and GPS",
         outcome:
-          "Crews spend longer in the bush but produce reliable results.",
+          "Crews spend longer in the bush, but the road location is walked, not modelled.",
         effects: { progress: -3, compliance: 4, relationships: 1 },
       },
       {
         label: "Approximate designs from partial scans",
         outcome:
-          "You extrapolate alignments. Auditors warn that tolerances are razor thin.",
+          "You extrapolate alignments. Your road engineer warns that tolerances are razor thin.",
         effects: { progress: 2, compliance: -3, forestHealth: -1 },
       },
     ],
@@ -493,10 +495,10 @@ export const ISSUE_LIBRARY = [
     id: "labour-job-action",
     title: "Labour Job Action Threatened",
     description:
-      "Union stewards demand revised safety provisions or threaten a strategic slowdown before fall surge.",
+      "The union stewards on the road and log-haul crews demand revised safety provisions or threaten a slowdown before the fall push.",
     roles: ["recce", "silviculture", "planner"],
     areaTags: ["remote-camps", "northern-bc"],
-    seasonBias: ["Fall Integration"],
+    seasonBias: ["Fall Close-out"],
     options: [
       {
         label: "Co-develop a refreshed safety charter",
@@ -522,7 +524,7 @@ export const ISSUE_LIBRARY = [
     id: "pine-beetle-scouts",
     title: "Mountain Pine Beetle Scouts Detected",
     description:
-      "Beetles are surfacing on the fringe of your SBS salvage recovery units. Entomologists warn an outbreak could reignite.",
+      "Beetles are surfacing on the fringe of your salvage recovery units. The district's forest health staff warn an outbreak could reignite.",
     roles: ["planner", "recce", "silviculture"],
     areaTags: ["sbs", "beetle-recovery"],
     seasonBias: ["Spring Planning"],
@@ -591,10 +593,10 @@ export const ISSUE_LIBRARY = [
     id: "pine-beetle-regional",
     title: "Regional Beetle Spillover",
     description:
-      "Adjacent operations suffer outbreaks traced to your tenure, straining cross-license relationships.",
+      "The district's beetle-management unit shows the hottest spots sitting on your operating area, and neighbouring licensees want to know why sanitation waited.",
     roles: ["planner", "permitter"],
     areaTags: ["sbs", "beetle-recovery"],
-    seasonBias: ["Fall Integration"],
+    seasonBias: ["Fall Close-out"],
     requiresFlags: ["pineBeetleUnchecked"],
     options: [
       {
@@ -605,9 +607,9 @@ export const ISSUE_LIBRARY = [
         clearFlags: ["pineBeetleUnchecked"],
       },
       {
-        label: "Offer stumpage credits to impacted neighbours",
+        label: "Cost-share sanitation harvesting with the neighbouring licensees",
         outcome:
-          "Credits soften the blow but dent your financial outlook.",
+          "Sharing the sanitation bill softens the blow but dents your budget.",
         effects: { progress: -1, relationships: 3, budget: -4, compliance: 1 },
         clearFlags: ["pineBeetleUnchecked"],
       },
@@ -624,6 +626,7 @@ export const ISSUE_LIBRARY = [
     id: "highway-16-viewshed-redesign",
     title: "Highway 16 Viewshed Redesign",
     roles: ["planner"],
+    areaIds: ["bulkley-valley"],
     areaTags: ["sbs", "visuals", "community-interface"],
     seasonBias: ["Spring Planning"],
     description:
@@ -683,7 +686,7 @@ export const ISSUE_LIBRARY = [
     title: "Winter Block Sequencing Board",
     roles: ["planner"],
     areaTags: ["winter-road", "remote-camps", "northern-bc"],
-    seasonBias: ["Fall Integration"],
+    seasonBias: ["Fall Close-out"],
     seasonLock: true,
     description:
       "Roadbuilding, harvesting, and silviculture teams have each optimized different blocks for freeze-up, and only one winter sequence can actually fit the access window.",
@@ -713,7 +716,7 @@ export const ISSUE_LIBRARY = [
     title: "Annual Plan Reforecast",
     roles: ["planner"],
     areaTags: ["winter-road", "northern-bc"],
-    seasonBias: ["Winter Review"],
+    seasonBias: ["Winter Operations"],
     seasonLock: true,
     preconditions: {
       operationStages: ["reforecast"],
@@ -811,15 +814,15 @@ export const ISSUE_LIBRARY = [
   },
   {
     id: "overlap-map-affidavit",
-    title: "Overlap Map Affidavit",
+    title: "Tenure Overlap Memo",
     roles: ["permitter"],
     areaTags: ["winter-road", "gas-interface", "northern-bc"],
-    seasonBias: ["Fall Integration"],
+    seasonBias: ["Fall Close-out"],
     description:
       "Title review finds a tenure overlap on one of your late-season files, and the district now wants a signed overlap memo before the package can move.",
     options: [
       {
-        label: "Commission a clean overlap package and sworn map note",
+        label: "Commission a clean overlap package and an overlapping-tenure letter",
         outcome:
           "It burns time, but the file stops wobbling and the overlap risk is finally documented properly.",
         effects: { progress: -2, compliance: 6, budget: -1 },
@@ -843,7 +846,7 @@ export const ISSUE_LIBRARY = [
     title: "Road Closeout Record Mismatch",
     roles: ["permitter"],
     areaTags: ["winter-road", "remote-camps", "bwbs", "steep", "northern-bc"],
-    seasonBias: ["Winter Review"],
+    seasonBias: ["Winter Operations"],
     baseWeight: 2,
     description:
       "Demob notes say some spurs were deactivated, others are still under maintenance, and none of it lines up cleanly with the notices already on file.",
@@ -933,7 +936,7 @@ export const ISSUE_LIBRARY = [
     title: "Weather Window Collapse",
     roles: ["recce"],
     areaTags: ["remote-camps", "glacial", "northern-bc"],
-    seasonBias: ["Fall Integration"],
+    seasonBias: ["Fall Close-out"],
     description:
       "Fog, early snow, and short daylight keep collapsing the last workable access window for one unfinished ridge traverse.",
     options: [
@@ -962,7 +965,7 @@ export const ISSUE_LIBRARY = [
     title: "Whiteout Extraction Call",
     roles: ["recce"],
     areaTags: ["winter-road", "remote-camps", "northern-bc"],
-    seasonBias: ["Winter Review"],
+    seasonBias: ["Winter Operations"],
     description:
       "A whiteout closes both the road and aviation window with one field crew still beyond the camp line during your final winter push.",
     options: [
@@ -1006,7 +1009,7 @@ export const ISSUE_LIBRARY = [
         effects: { progress: -1, forestHealth: 4, compliance: 4, budget: -2 },
       },
       {
-        label: "Blend pine or larch onto warmer aspects",
+        label: "Blend pine or interior Douglas-fir onto warmer aspects",
         outcome:
           "The mix is less elegant but operationally workable, and the rationale holds if the field notes stay tight.",
         effects: { progress: 1, forestHealth: 3, compliance: 2, relationships: 1 },
@@ -1056,8 +1059,8 @@ export const ISSUE_LIBRARY = [
     id: "free-growing-catchup-plan",
     title: "Free-Growing Catch-Up Plan",
     roles: ["silviculture"],
-    areaTags: ["sbs", "beetle-recovery", "northern-bc"],
-    seasonBias: ["Fall Integration"],
+    areaTags: ["sbs", "bwbs", "beetle-recovery"],
+    seasonBias: ["Fall Close-out"],
     preconditions: {
       operationStages: ["survey"],
       standAgeClasses: ["survey-ready"],
@@ -1079,7 +1082,7 @@ export const ISSUE_LIBRARY = [
         effects: { progress: -1, forestHealth: 5, compliance: 4, budget: -3 },
       },
       {
-        label: "Rewrite targets around natural ingress",
+        label: "Re-survey counting acceptable natural ingress toward stocking",
         outcome:
           "You revise the survey rationale around natural ingress and mixed regeneration, but the record has to be explicit about what still needs follow-up.",
         effects: { progress: 1, forestHealth: 3, compliance: 2, relationships: 1 },
@@ -1096,8 +1099,8 @@ export const ISSUE_LIBRARY = [
     id: "snow-press-browse-signal",
     title: "Snow Press and Browse Signal",
     roles: ["silviculture"],
-    areaTags: ["bwbs", "sbs", "northern-bc"],
-    seasonBias: ["Winter Review"],
+    areaTags: ["bwbs", "sbs"],
+    seasonBias: ["Winter Operations"],
     preconditions: {
       operationStages: ["inspection"],
       standAgeClasses: ["carryover"],
@@ -1168,7 +1171,7 @@ export const ISSUE_LIBRARY = [
       "An independent audit reveals your old-growth retention is dipping toward provincial minimums.",
     roles: ["planner", "permitter"],
     areaTags: ["northern-bc", "forest-legacy"],
-    seasonBias: ["Winter Review"],
+    seasonBias: ["Winter Operations"],
     options: [
       {
         label: "Designate additional retention patches immediately",
@@ -1194,10 +1197,10 @@ export const ISSUE_LIBRARY = [
     id: "wildlife-collar-drop",
     title: "Caribou GPS Collar Drop",
     description:
-      "A collared caribou loses signal near your winter block, prompting concern about disturbance.",
+      "A collared caribou loses signal near your winter block, and the regional biologist reads it as a possible mortality signal.",
     roles: ["recce", "silviculture"],
     areaTags: ["caribou", "winter-road"],
-    seasonBias: ["Winter Review"],
+    seasonBias: ["Winter Operations"],
     options: [
       {
         label: "Suspend work and support a tracking flight",
@@ -1226,7 +1229,7 @@ export const ISSUE_LIBRARY = [
       "A long-time road builder files for bankruptcy, leaving projects mid-stream.",
     roles: ["planner", "recce"],
     areaTags: ["winter-road", "remote-camps", "northern-bc"],
-    seasonBias: ["Winter Review"],
+    seasonBias: ["Winter Operations"],
     options: [
       {
         label: "Absorb crews into company operations",
@@ -1252,7 +1255,7 @@ export const ISSUE_LIBRARY = [
     id: "remote-camp-flooding",
     title: "Remote Camp Flooding",
     description:
-      "Sudden snowmelt floods a remote BWBS camp, isolating staff and equipment.",
+      "Sudden snowmelt floods your remote camp, isolating staff and equipment.",
     roles: ["recce", "silviculture"],
     areaTags: ["remote-camps", "bwbs", "watershed"],
     seasonBias: ["Spring Planning", "Summer Field"],
@@ -1281,7 +1284,7 @@ export const ISSUE_LIBRARY = [
     id: "compliance-drone-sweep",
     title: "Compliance Drone Sweep",
     description:
-      "The ministry launches unannounced drone inspections over your harvest blocks.",
+      "Compliance and Enforcement starts flying unannounced drone inspections over your harvest blocks.",
     roles: ["planner", "permitter", "recce"],
     areaTags: ["technology", "northern-bc"],
     seasonBias: ["Summer Field"],
@@ -1313,7 +1316,7 @@ export const ISSUE_LIBRARY = [
       "Operating funds are exhausted. Finance offers an emergency loan that will dampen future budget gains.",
     roles: ["planner", "permitter", "recce", "silviculture"],
     areaTags: ["northern-bc"],
-    seasonBias: ["Fall Integration", "Winter Review"],
+    seasonBias: ["Fall Close-out", "Winter Operations"],
     requiresFlags: ["budgetEmergencyScheduled"],
     options: [
       {
@@ -1347,7 +1350,7 @@ export const ISSUE_LIBRARY = [
       "Your practice file has drawn enough scrutiny that FPBC asks for CPD records, your competence declaration, development plan, and work samples tied to your current practice areas.",
     roles: ["planner", "permitter", "recce", "silviculture"],
     areaTags: ["northern-bc"],
-    seasonBias: ["Winter Review", "Spring Planning"],
+    seasonBias: ["Winter Operations", "Spring Planning"],
     requiresAnyFlags: ["professionalAuditActive"],
     context: {
       operation: "You are answering a live professional practice audit tied to the work you have been doing this season.",
@@ -1383,7 +1386,7 @@ export const ISSUE_LIBRARY = [
       "The Forest Stewardship Plan review package draws a late wave of written comments on visual quality, water timing, and access assumptions, and the response record is due before the file can move.",
     roles: ["planner", "permitter"],
     areaTags: ["community-interface", "community-water", "watershed", "northern-bc"],
-    seasonBias: ["Spring Planning", "Fall Integration"],
+    seasonBias: ["Spring Planning", "Fall Close-out"],
     processHookIds: ["fsp-public-review"],
     options: [
       {
@@ -1413,7 +1416,7 @@ export const ISSUE_LIBRARY = [
       "District review catches a mismatch between the final Forest Operations Map and the cutting-permit package you were about to submit.",
     roles: ["planner", "permitter"],
     areaTags: ["northern-bc", "community-interface", "watershed", "karst"],
-    seasonBias: ["Spring Planning", "Fall Integration"],
+    seasonBias: ["Spring Planning", "Fall Close-out"],
     processHookIds: ["fom-notice-cycle", "cutting-permit-admin"],
     options: [
       {
@@ -1443,7 +1446,7 @@ export const ISSUE_LIBRARY = [
       "An archaeology overview flags overlap with the planned footprint, and what looked like a desktop-screening exercise is now turning into permit and specialist waiting time.",
     roles: ["planner", "permitter", "recce"],
     areaTags: ["karst", "glacial", "community-interface", "northern-bc"],
-    seasonBias: ["Spring Planning", "Summer Field", "Fall Integration"],
+    seasonBias: ["Spring Planning", "Summer Field", "Fall Close-out"],
     processHookIds: ["archaeology-screening-ladder"],
     options: [
       {
@@ -1473,7 +1476,7 @@ export const ISSUE_LIBRARY = [
       "A field revisit changes fish presence and channel-width assumptions on a stream you already used in layout and prescription work.",
     roles: ["planner", "permitter", "recce", "silviculture"],
     areaTags: ["community-water", "watershed", "salmon", "peatland", "northern-bc"],
-    seasonBias: ["Spring Planning", "Summer Field", "Fall Integration"],
+    seasonBias: ["Spring Planning", "Summer Field", "Fall Close-out"],
     processHookIds: ["riparian-classification", "fish-crossing-remediation"],
     options: [
       {
@@ -1503,7 +1506,7 @@ export const ISSUE_LIBRARY = [
       "District staff flag that your Forest Service Road access needs a cleaner road use permit and a clearer primary-user maintenance plan before hauling can keep rolling.",
     roles: ["planner", "permitter", "recce"],
     areaTags: ["winter-road", "remote-camps", "steep", "gas-interface", "northern-bc"],
-    seasonBias: ["Spring Planning", "Summer Field", "Fall Integration"],
+    seasonBias: ["Spring Planning", "Summer Field", "Fall Close-out"],
     processHookIds: ["road-use-permit", "road-notifications"],
     options: [
       {
@@ -1599,18 +1602,18 @@ export const ISSUE_LIBRARY = [
       "Your site plan sits over a Mule Deer Winter Range. Someone on the team is pretty sure there is a blanket GAR exemption from last year's salvage push. The harvest window closes in a week.",
     roles: ["planner", "permitter"],
     areaTags: ["wildlife", "salvage"],
-    seasonBias: ["Winter Review", "Spring Planning"],
+    seasonBias: ["Winter Operations", "Spring Planning"],
     options: [
       {
         label: "Sign on the remembered exemption and move the block forward",
         outcome:
-          "Trees fall inside the winter range. Six months later the compliance branch confirms the exemption lapsed and your name is on the site plan.",
+          "Trees fall inside the winter range. Six months later Compliance and Enforcement confirms the exemption lapsed and your name is on the site plan.",
         effects: { progress: 8, compliance: -8, forestHealth: -3, relationships: -3 },
         setFlags: { mdwrExposure: true },
       },
       {
         label: "Pause the file and file a fresh exemption request",
-        outcome: "The harvest window slips but the paperwork is clean when the auditor arrives.",
+        outcome: "The harvest window slips but the paperwork is clean when the C&E officer arrives.",
         effects: { progress: -5, compliance: 7, relationships: 2 },
       },
       {
@@ -1628,7 +1631,7 @@ export const ISSUE_LIBRARY = [
       "The fabricator is staging a reused Bailey span tomorrow. You have a pre-work inspection form in your bag and a contractor already moving trucks to the approach.",
     roles: ["permitter", "recce", "planner"],
     areaTags: ["bridges", "access"],
-    seasonBias: ["Summer Field", "Fall Integration"],
+    seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
         label: "Inspect girders, document condition, and hold hauling until the PEng agrees",
@@ -1639,7 +1642,7 @@ export const ISSUE_LIBRARY = [
       {
         label: "Sign the CAS now, mark 'N/A' on the damage questions, let trucks roll",
         outcome:
-          "Hauling starts on time. Three weeks later a Forest Practices Board auditor photographs the cracks and your name is on the form.",
+          "Hauling starts on time. Three weeks later a C&E officer on a road inspection photographs the cracks and your name is on the form.",
         effects: { progress: 9, compliance: -9, relationships: -4 },
         setFlags: { unsafeCrossing: true },
       },
@@ -1685,7 +1688,7 @@ export const ISSUE_LIBRARY = [
     id: "own-land-temptation",
     title: "Work on Your Own Shoreline",
     description:
-      "A regional district bylaw requires a Qualified Environmental Professional to assess the foreshore work on your private lake lot. You happen to be an RPF with riparian training.",
+      "A side-file from your consulting practice: A regional district bylaw requires a Qualified Environmental Professional to assess the foreshore work on your private lake lot. You happen to be an RPF with riparian training.",
     roles: ["planner", "silviculture", "recce"],
     areaTags: ["riparian", "conflict"],
     seasonBias: ["Summer Field"],
@@ -1714,7 +1717,7 @@ export const ISSUE_LIBRARY = [
     id: "municipal-bylaw-blind-spot",
     title: "Municipal Bylaw Blind Spot",
     description:
-      "Your client's private lot abuts a resort municipality's treed highway buffer, and the realtor now wants harvesting for a new driveway. The tree-cutting bylaw is not one you usually work with.",
+      "A side-file from your consulting practice: Your client's private lot abuts a resort municipality's treed highway buffer, and the realtor now wants harvesting for a new driveway. The tree-cutting bylaw is not one you usually work with.",
     roles: ["planner", "permitter"],
     areaTags: ["community-interface", "private-land", "municipal"],
     seasonBias: ["Spring Planning", "Summer Field"],
@@ -1745,7 +1748,7 @@ export const ISSUE_LIBRARY = [
       "Your contractor accidentally cut 0.03 ha inside a wildlife tree retention area that was also buffering a neighbour's domestic water intake, and nobody has told the water licensee yet.",
     roles: ["recce", "permitter"],
     areaTags: ["community-water", "watershed", "private-land"],
-    seasonBias: ["Summer Field", "Fall Integration"],
+    seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
         label: "Drive out to the neighbour today and walk them through what happened",
@@ -1753,8 +1756,8 @@ export const ISSUE_LIBRARY = [
         effects: { progress: -1, relationships: 5, compliance: 5 },
       },
       {
-        label: "Report the trespass to the Ministry and wait for them to notify the neighbour",
-        outcome: "The ministry logs it cleanly. The neighbour hears about it second-hand and takes longer to warm back up.",
+        label: "Report the trespass to the district and wait for them to notify the neighbour",
+        outcome: "The district logs it cleanly. The neighbour hears about it second-hand and takes longer to warm back up.",
         effects: { progress: 0, relationships: -1, compliance: 4 },
       },
       {
@@ -1773,7 +1776,7 @@ export const ISSUE_LIBRARY = [
       "A scaler in your yard emails that they feel pressured by your supervisor to downgrade loads beyond what the scaling manual supports, and has attached a week of examples.",
     roles: ["recce", "planner"],
     areaTags: ["yard", "northern-bc"],
-    seasonBias: ["Fall Integration", "Winter Review"],
+    seasonBias: ["Fall Close-out", "Winter Operations"],
     options: [
       {
         label: "Pull the supervisor off scaling and bring in an independent review",
@@ -1787,7 +1790,7 @@ export const ISSUE_LIBRARY = [
       },
       {
         label: "Tell the scaler the supervisor is just focused on cost control and to keep scaling their best",
-        outcome: "You lose the scaler's trust overnight, and a month later the ministry is asking about grading deduction patterns in your yard.",
+        outcome: "You lose the scaler's trust overnight, and a month later Revenue Branch's check scaler is asking about grading deduction patterns in your yard.",
         effects: { progress: 2, compliance: -6, relationships: -5 },
         setFlags: { scalingPressurePatternIgnored: true },
       },
@@ -1801,7 +1804,7 @@ export const ISSUE_LIBRARY = [
       "Your nursery confirms that the seedlings lined up for spring planting are from a seedlot one zone south of the cutblocks. Forty-some blocks are already in the order.",
     roles: ["silviculture", "planner"],
     areaTags: ["reforestation", "coast", "community-forest"],
-    seasonBias: ["Winter Review", "Spring Planning"],
+    seasonBias: ["Winter Operations", "Spring Planning"],
     options: [
       {
         label: "Cancel the order and delay planting to source the right seedlot",
@@ -1810,7 +1813,7 @@ export const ISSUE_LIBRARY = [
       },
       {
         label: "Swap seedlots only on the coastal-aspect blocks and plant the rest",
-        outcome: "The compromise thins the exposure but still leaves a chunk of ground with mismatched stock, and the silviculture auditor marks it.",
+        outcome: "The compromise thins the exposure but still leaves a chunk of ground with mismatched stock, and the district's check survey marks it.",
         effects: { progress: -1, forestHealth: 1, compliance: -2, budget: -2 },
       },
       {
@@ -1829,7 +1832,7 @@ export const ISSUE_LIBRARY = [
       "You need a crossing fast and the licensee's yard has a pre-fabricated temporary bridge that has been installed and pulled three times already. The inspection paperwork is patchy.",
     roles: ["recce", "permitter"],
     areaTags: ["steep", "winter-road", "salmon"],
-    seasonBias: ["Summer Field", "Fall Integration"],
+    seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
         label: "Commission a full structural re-inspection before selecting the unit",
@@ -1844,7 +1847,7 @@ export const ISSUE_LIBRARY = [
       },
       {
         label: "Rely on the yard's existing inspection forms and sign the Crossing Assurance Statement",
-        outcome: "Hauling starts, and an FPB auditor happens to catch a loaded truck crossing while a crack widens on video.",
+        outcome: "Hauling starts, and a C&E officer on a road inspection happens to catch a loaded truck crossing while a crack widens on video.",
         effects: { progress: 3, compliance: -8, forestHealth: -2, relationships: -3 },
         setFlags: { unsafeCrossing: true, crossingAssuranceSignedBlind: true },
       },
@@ -1855,10 +1858,10 @@ export const ISSUE_LIBRARY = [
     id: "cruise-design-grid-shortcut",
     title: "Cruise Design Grid Shortcut",
     description:
-      "Your cruise of four small expropriation parcels is behind schedule, and the Cruising Manual allows a 100 by 100 grid that waives the sampling error requirement. Two parcels look low volume from the road.",
+      "A side-file from your consulting practice: Your cruise of four small expropriation parcels is behind schedule, and the Cruising Manual allows a 100 by 100 grid that waives the sampling error requirement. Two parcels look low volume from the road.",
     roles: ["planner", "recce"],
     areaTags: ["private-land", "cruise", "northern-bc"],
-    seasonBias: ["Summer Field", "Fall Integration"],
+    seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
         label: "Tighten the grid, walk every parcel, and keep full field notes",
@@ -1883,10 +1886,10 @@ export const ISSUE_LIBRARY = [
     id: "elected-midproject",
     title: "Elected Mid-Project",
     description:
-      "You are the prescribing RPF on a fuel-management project for a small village, and last week you were elected to council. The prescription is not yet implemented.",
+      "A side-file from your consulting practice: You are the prescribing RPF on a fuel-management project for a small village, and last week you were elected to council. The prescription is not yet implemented.",
     roles: ["planner", "silviculture"],
     areaTags: ["community-interface", "wildfire", "municipal"],
-    seasonBias: ["Fall Integration", "Winter Review"],
+    seasonBias: ["Fall Close-out", "Winter Operations"],
     options: [
       {
         label: "Hand the RPF role to an independent colleague and recuse from council votes on the file",
@@ -1900,7 +1903,7 @@ export const ISSUE_LIBRARY = [
       },
       {
         label: "Keep both roles quietly and tell concerned residents you already know what the community wants",
-        outcome: "A neighbour complains to the professional regulator and to the ministry on the same week.",
+        outcome: "A neighbour complains to FPBC and to the village office in the same week.",
         effects: { progress: 2, compliance: -7, relationships: -6 },
         setFlags: { dualRoleConflict: true },
       },
@@ -1928,7 +1931,7 @@ export const ISSUE_LIBRARY = [
       },
       {
         label: "Blame the FSP referral clause wording and keep the audit internal",
-        outcome: "The Nation hears about it from a ministry compliance officer, and the trust damage is harder to undo than a direct admission would have been.",
+        outcome: "The Nation hears about it from a C&E natural resource officer, and the trust damage is harder to undo than a direct admission would have been.",
         effects: { progress: 2, compliance: -5, relationships: -7 },
         setFlags: { firstNationReferralHidden: true },
       },
@@ -1939,10 +1942,10 @@ export const ISSUE_LIBRARY = [
     id: "audit-laundry-list",
     title: "FPB Audit Laundry List",
     description:
-      "A Forest Practices Board audit of your community forest lands ten findings at once: vague road mapping, drifting OGMA boundaries, unclear contractor obligations, and six more items.",
+      "A side-file from your consulting practice: A Forest Practices Board audit of your community forest lands ten findings at once: vague road mapping, drifting OGMA boundaries, unclear contractor obligations, and six more items.",
     roles: ["planner", "permitter", "recce", "silviculture"],
     areaTags: ["community-forest", "audit"],
-    seasonBias: ["Winter Review", "Spring Planning"],
+    seasonBias: ["Winter Operations", "Spring Planning"],
     options: [
       {
         label: "Triage the ten findings and publish a public response plan",
@@ -1967,14 +1970,14 @@ export const ISSUE_LIBRARY = [
     id: "rely-on-client-salvage-numbers",
     title: "Rely on the Client's Salvage Numbers",
     description:
-      "Your small-scale salvage client has been logging Douglas-fir for thirty years and already has dead-and-down and green-attacked volume estimates ready for you. Your field day is booked elsewhere.",
+      "A side-file from your consulting practice: Your small-scale salvage client has been logging Douglas-fir for thirty years and already has dead-and-down and green-attacked volume estimates ready for you. Your field day is booked elsewhere.",
     roles: ["planner", "recce"],
     areaTags: ["salvage", "interior", "private-land"],
-    seasonBias: ["Summer Field", "Fall Integration"],
+    seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
         label: "Reschedule and walk the blocks yourself before the application",
-        outcome: "You miss the deadline by a week but the field notes line up with what the ministry checkers eventually find.",
+        outcome: "You miss the deadline by a week but the field notes line up with what the district's check cruise eventually finds.",
         effects: { progress: -3, compliance: 6, relationships: 2, budget: -2 },
       },
       {
@@ -1984,7 +1987,7 @@ export const ISSUE_LIBRARY = [
       },
       {
         label: "Sign the applications using the client's tally and move on",
-        outcome: "Three applications get suspended the next spring and your name appears on the ministry's list of SSS submitters to watch.",
+        outcome: "Three applications get suspended the next spring and your name lands on the district's list of small-scale salvage submitters to watch.",
         effects: { progress: 3, compliance: -7, relationships: -3 },
         setFlags: { salvageEstimatesUnchecked: true },
       },

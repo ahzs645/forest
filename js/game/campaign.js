@@ -31,22 +31,26 @@ import { promptSeasonalCard, promptSummaryCard, renderMetricStrip, setExpedition
 
 const CAMPAIGN_SAVE_KEY = 'bcft.campaign.v1';
 
-// One year, four hats. Each season names the expedition role that plays it
-// and the seasonal-engine role that frames it (they share ids).
+// One year, four hats, in the order the work actually happens on a licensee's
+// calendar: the spring plant goes in as soon as breakup ends, recon and layout
+// run through the open summer ground, the planning file is built in the fall
+// once the field notes are in, and the cutting and road permits are pushed
+// through the district over winter. Each season names the expedition role
+// that plays it and the seasonal-engine role that frames it (they share ids).
 export const CAMPAIGN_SEASONS = [
   {
     id: 'spring',
     label: 'Spring',
-    roleId: 'recce',
-    title: 'Recon Traverse',
-    situation: 'Breakup is over and the year starts on the ground: scout the blocks the whole program will stand on.',
+    roleId: 'silviculture',
+    title: 'Silviculture Program',
+    situation: 'Breakup is over and the reefers are full: get the spring plant in before the stock ages out.',
   },
   {
     id: 'summer',
     label: 'Summer',
-    roleId: 'silviculture',
-    title: 'Silviculture Program',
-    situation: 'Hot, dry summer ground makes fresh planting inefficient, but brushing and survival checks are live. Put trees in where you must, then keep the stand moving.',
+    roleId: 'recce',
+    title: 'Recon Traverse',
+    situation: 'Ground is open and fully visible: walk the blocks the whole program will stand on — layout, streams, cultural features.',
   },
   {
     id: 'fall',
@@ -60,39 +64,52 @@ export const CAMPAIGN_SEASONS = [
     label: 'Winter',
     roleId: 'permitter',
     title: 'Permitting Push',
-    situation: 'The plan means nothing until it clears the agencies. Shepherd the permits through before spring.',
+    situation: 'The plan means nothing until the District Manager signs the cutting and road permits. Shepherd them through before breakup.',
   },
 ];
 
+const isFieldSeason = (journeyType) => ['recon', 'field', 'silviculture'].includes(journeyType);
+
 // Season briefing stances: a small immediate posture on the year's meters,
-// plus one concrete perk for the deployment about to start.
+// plus one concrete perk for the deployment about to start. The perk (and its
+// preview) depends on whether the season is a field deployment or a desk
+// file — a permitting push has no fuel to top up and no first-aid kit to pack.
 const BRIEFING_STANCES = [
   {
     label: 'Run it careful',
-    preview: 'Compliance +3 · Progress -2 · Extra first-aid kit and +5 equipment',
+    preview: (journeyType) => (isFieldSeason(journeyType)
+      ? 'Compliance +3 · Progress -2 · Extra first-aid kit and +5 equipment'
+      : 'Compliance +3 · Progress -2 · Political capital +4 up front'),
     riskLevel: 'low',
     yearEffects: { compliance: 3, progress: -2 },
-    perkLine: 'The crew packs an extra first-aid kit and double-checks the gear.',
+    perkLine: (journeyType) => (isFieldSeason(journeyType)
+      ? 'The crew packs an extra first-aid kit and double-checks the gear.'
+      : 'You open the season with a few favours banked at the district office.'),
     applyPerk(journey) {
       const r = journey.resources || {};
       if (typeof r.firstAid === 'number') r.firstAid += 1;
       if (typeof r.equipment === 'number') r.equipment = Math.min(100, r.equipment + 5);
+      if (!isFieldSeason(journey.journeyType) && typeof r.politicalCapital === 'number') r.politicalCapital += 4;
     },
   },
   {
     label: 'Balance the season',
-    preview: 'No meter or supply modifier — judged entirely on the deployment',
+    preview: () => 'No meter or supply modifier — judged entirely on the deployment',
     riskLevel: 'medium',
     yearEffects: {},
-    perkLine: 'No shortcuts, no padding. The season is what you make of it.',
+    perkLine: () => 'No shortcuts, no padding. The season is what you make of it.',
     applyPerk() {},
   },
   {
     label: 'Push for delivery',
-    preview: 'Progress +3 · Compliance -2 · Fuel +15% and budget +8%',
+    preview: (journeyType) => (isFieldSeason(journeyType)
+      ? 'Progress +3 · Compliance -2 · Fuel +15% and budget +8%'
+      : 'Progress +3 · Compliance -2 · Budget +8%'),
     riskLevel: 'high',
     yearEffects: { progress: 3, compliance: -2 },
-    perkLine: 'Extra fuel and money up front — the district expects numbers for it.',
+    perkLine: (journeyType) => (isFieldSeason(journeyType)
+      ? 'Extra fuel and money up front — the woods manager expects numbers for it.'
+      : 'Extra money up front — the woods manager expects permits for it.'),
     applyPerk(journey) {
       const r = journey.resources || {};
       if (typeof r.fuel === 'number') r.fuel = Math.round(r.fuel * 1.15);
@@ -100,6 +117,11 @@ const BRIEFING_STANCES = [
     },
   },
 ];
+
+/** The deployment type a campaign season plays, from the role that plays it. */
+function getSeasonJourneyType(season) {
+  return FORESTER_ROLES.find((r) => r.id === season.roleId)?.journeyType || 'field';
+}
 
 function saveCampaign(state) {
   try {
@@ -264,6 +286,10 @@ function buildSeasonState(campaign, season) {
   gs.round = campaign.seasonIndex + 1;
   gs.totalRounds = CAMPAIGN_SEASONS.length;
   gs.discoveryTags = campaign.discoveryTags;
+  // The campaign shows one name per hat everywhere — briefing, metric strip,
+  // review — so the strategy layer's short label ("Field Technician") never
+  // contradicts the deployment's "Recon Crew Lead".
+  gs.roleDisplayName = FORESTER_ROLES.find((r) => r.id === season.roleId)?.name || gs.roleDisplayName;
   return gs;
 }
 
@@ -340,7 +366,7 @@ async function setupCampaign(ui) {
   ui.clear();
   ui.writeHeader('A YEAR IN THE DISTRICT');
   ui.write('One operating area. Four seasons. Four hats.');
-  ui.write('Spring recon, summer planting, a fall planning file, a winter permitting push — the same five meters carry through the whole year.');
+  ui.write('Spring planting, summer recon and layout, a fall planning file, a winter permitting push — the same five meters carry through the whole year.');
   ui.write('');
 
   const areaChoice = await ui.promptChoice('Operating area:', OPERATING_AREAS.map((area, index) => ({
@@ -356,7 +382,7 @@ async function setupCampaign(ui) {
     { label: 'Old Growth (Hard)', description: 'Fewer resources, more events.', value: 'hard' },
   ]);
 
-  const crewName = (await ui.promptText('Crew handle:', 'The Timber Wolves')) || 'The Timber Wolves';
+  const crewName = (await ui.promptText('Crew name:', 'The Timber Wolves')) || 'The Timber Wolves';
 
   const seed = Math.floor(Math.random() * 0x100000000);
   return {
@@ -411,13 +437,14 @@ async function runCampaignSeason(game, campaign, season) {
       );
     }
     setExpeditionChromeHidden(true);
+    const journeyType = getSeasonJourneyType(season);
     const stanceIndex = await promptSeasonalCard(ui, {
       cardLabel: `${season.label} · Season ${campaign.seasonIndex + 1} of 4`,
       title: `${season.label}: ${season.title}`,
       description: season.situation,
       context: `You take the ${FORESTER_ROLES.find((r) => r.id === season.roleId)?.name || season.roleId} seat this season. The deployment is condensed — a season's worth of work in a tight window — and what it does feeds the year's meters at the season review.`,
-      decisionPrompt: 'How do you brief the crew?',
-      optionDetails: BRIEFING_STANCES.map((s) => ({ preview: s.preview, riskLevel: s.riskLevel })),
+      decisionPrompt: isFieldSeason(journeyType) ? 'How do you brief the crew?' : 'How do you set the season up?',
+      optionDetails: BRIEFING_STANCES.map((s) => ({ preview: s.preview(journeyType), riskLevel: s.riskLevel })),
     }, BRIEFING_STANCES.map((s) => s.label), gsSeason);
 
     stance = BRIEFING_STANCES[stanceIndex];
@@ -466,7 +493,7 @@ async function runCampaignSeason(game, campaign, season) {
 
     ui.clear();
     ui.writeHeader(`DEPLOYMENT: ${season.title.toUpperCase()}`);
-    ui.write(stance.perkLine, 'term-dim');
+    ui.write(stance.perkLine(journey.journeyType), 'term-dim');
     ui.write('');
     await promptContinue(ui, 'Move out');
   }
@@ -639,7 +666,7 @@ async function showYearEnd(ui, campaign) {
   const wins = campaign.seasonLog.filter((s) => s.victory).length;
 
   const tierBody = {
-    outstanding: 'An exceptional year — the district will be measured against it.',
+    outstanding: 'An exceptional year — the rest of the district will be measured against it.',
     solid: 'A clearly good year. The program delivered and the file holds up.',
     mixed: 'Mixed outcomes. Some seasons carried the ones that stumbled.',
     stumbled: 'A hard year. The meters tell the story, and so will the review.',

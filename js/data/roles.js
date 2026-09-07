@@ -11,7 +11,7 @@ export const FORESTER_ROLES = [
         id: "landscape",
         title: "Landscape Assessment",
         prompt:
-          "A new five-year plan is due, and your FSP / Forest Operations Map story needs to survive public review. How will you analyze the landscape before setting cutblocks?",
+          "A new five-year plan is due: the FSP amendment goes out for its 60-day public review and the FOMs for their 30-day comment period, and both have to survive it. How will you analyze the landscape before setting cutblocks?",
         processHookIds: ["fsp-public-review", "fom-notice-cycle"],
         options: [
           {
@@ -30,7 +30,7 @@ export const FORESTER_ROLES = [
           {
             label: "Pilot climate-adaptive scenario modeling",
             outcome:
-              "You run adaptive models for fire and drought. Council is intrigued, yet the team needs coaching to interpret results.",
+              "You run adaptive models for fire and drought. The planning team is intrigued, yet they need coaching to interpret results.",
             effects: { progress: 3, forestHealth: 8, relationships: -1, compliance: 5, budget: -4 },
           },
         ],
@@ -43,7 +43,7 @@ export const FORESTER_ROLES = [
         processHookIds: ["fom-notice-cycle", "riparian-classification"],
         options: [
           {
-            label: "Negotiate minor boundary tweaks with regulators",
+            label: "Negotiate minor boundary tweaks with the district biologist and the Nation's referral staff",
             outcome:
               "You adjust block boundaries slightly. Compliance improves, though the milling schedule gets tighter.",
             effects: { progress: 4, relationships: 5, compliance: 6, forestHealth: -3 },
@@ -57,7 +57,7 @@ export const FORESTER_ROLES = [
           {
             label: "Document mitigation and proceed",
             outcome:
-              "You submit enhanced mitigation plans and continue. Regulators warn they will be watching closely.",
+              "You submit enhanced mitigation plans and continue. The district notes it will be watching closely.",
             effects: { progress: 7, compliance: 1, relationships: -3 },
             setFlags: { regulatoryScrutiny: true },
           },
@@ -98,7 +98,7 @@ export const FORESTER_ROLES = [
     seasonalName: "Permitting Specialist",
     journeyType: "desk",
     description:
-      "Coordinate northern referrals, ensure submissions reflect local values, and shepherd approvals across agencies.",
+      "Coordinate referrals, make sure submissions reflect local values, and shepherd cutting and road permits through the district.",
     tasks: [
       {
         id: "package",
@@ -108,9 +108,9 @@ export const FORESTER_ROLES = [
         processHookIds: ["cutting-permit-admin", "road-permit-package", "fom-notice-cycle"],
         options: [
           {
-            label: "Bundle permits to fast-track volume",
+            label: "Bundle the CPs and skip the attachment checks",
             outcome:
-              "You consolidate similar blocks to minimize paperwork. The ministry warns they expect pristine documentation.",
+              "You consolidate similar blocks into one thin package to save paperwork. The district's permit clerk warns it will be checked line by line.",
             effects: { progress: 8, compliance: 1, relationships: -3 },
             setFlags: { rushJob: true },
             scheduleIssues: { id: "permit-deficiency", delay: 1 },
@@ -133,7 +133,7 @@ export const FORESTER_ROLES = [
         id: "referrals",
         title: "Referral Follow-up",
         prompt:
-          "Half of your FOM, archaeology, and hydrology referral responses are overdue.",
+          "Half of your FOM comments, archaeology screens, and your hydrologist's assessment are overdue.",
         processHookIds: ["fom-notice-cycle", "archaeology-screening-ladder", "riparian-classification"],
         options: [
           {
@@ -143,9 +143,9 @@ export const FORESTER_ROLES = [
             effects: { progress: 1, relationships: 6, compliance: 4 },
           },
           {
-            label: "Escalate through ministry contacts",
+            label: "Escalate through the district office",
             outcome:
-              "Direct ministry outreach shakes loose responses quickly, though local Nations worry they were bypassed.",
+              "Leaning on the district shakes loose responses quickly, though the Nations worry they were bypassed.",
             effects: { progress: 6, compliance: 2, relationships: -3 },
           },
           {
@@ -164,22 +164,22 @@ export const FORESTER_ROLES = [
         processHookIds: ["cutting-permit-admin", "road-notifications"],
         options: [
           {
-            label: "Bring in a third-party professional immediately",
+            label: "Contract a peer-review RPF to second-check the backlog",
             outcome:
-              "An independent RPF signs off after a rapid review. It costs, yet regulators applaud the diligence.",
-            effects: { progress: 2, compliance: 8, relationships: 3, budget: -5 },
+              "An independent RPF reviews every file before it goes back out. It costs and it is slow, but the district can see the second signature.",
+            effects: { progress: 1, compliance: 6, relationships: 2, budget: -5 },
           },
           {
-            label: "Lobby for a grace period",
+            label: "Have your in-house RPF re-review and re-declare the backlog",
             outcome:
-              "You coordinate with industry peers to request delayed implementation. Some relief is granted but scrutiny increases.",
-            effects: { progress: 5, compliance: 3, relationships: -2 },
+              "Your own RPF works through the files, updates the rationales, and re-signs. It is the normal way to do it, and the record shows the work.",
+            effects: { progress: 4, compliance: 5, budget: -1 },
           },
           {
-            label: "Document internal competency and carry on",
+            label: "Let the files go out under last year's declarations",
             outcome:
-              "Your senior team self-certifies compliance. Files move, although auditors flag gaps for later review.",
-            effects: { progress: 7, compliance: -3, relationships: -2 },
+              "The packages move on stale sign-offs. If anyone pulls a file, the declaration no longer matches the rules it was signed under.",
+            effects: { progress: 7, compliance: -5 },
           },
         ],
       },
@@ -197,7 +197,7 @@ export const FORESTER_ROLES = [
         id: "access",
         title: "Road Recon",
         prompt:
-          "Spring melt damaged a key spur road, and the district wants to know whether this is still maintenance, a road use permit problem, or significant road work. How do you respond?",
+          "Breakup took out a key spur road, and the woods manager wants a call: routine maintenance under the road permit, a road use permit question, or significant road work that has to be notified to the district. How do you respond?",
         processHookIds: ["road-use-permit", "significant-road-work", "road-notifications"],
         options: [
           {
@@ -258,10 +258,10 @@ export const FORESTER_ROLES = [
             label: "Institute daily tailgate reviews with photos",
             outcome:
               "The crew walks slopes each morning and shares pictures. Morale rises and hazards drop.",
-            effects: { progress: -1, relationships: 5, compliance: 5, forestHealth: 1, budget: -2 },
+            effects: { progress: -1, relationships: 5, compliance: 5, budget: -2 },
           },
           {
-            label: "Bring in an external safety auditor",
+            label: "Bring in a SAFE Companies auditor",
             outcome:
               "A specialist shadows the crew. Findings improve practices but slow the schedule.",
             effects: { progress: -2, compliance: 7, relationships: 2, budget: -4 },
@@ -295,7 +295,7 @@ export const FORESTER_ROLES = [
             label: "Stagger crews by elevation band",
             outcome:
               "You re-phase the program so warmer aspects go first. Productivity holds steady.",
-            effects: { progress: 6, forestHealth: 5, relationships: 3, budget: -3, compliance: -1 },
+            effects: { progress: 6, forestHealth: 5, relationships: 3, budget: -3 },
           },
           {
             label: "Charter extra helicopters to stay on schedule",
@@ -304,10 +304,10 @@ export const FORESTER_ROLES = [
             effects: { progress: 8, forestHealth: 3, budget: -5 },
           },
           {
-            label: "Delay start until weather stabilizes",
+            label: "Hold crews until the high blocks clear",
             outcome:
-              "You wait out the snow. Seedlings stay healthy, yet production targets slip.",
-            effects: { progress: -3, forestHealth: 6, compliance: 2 },
+              "You hold crews until the high blocks clear. Stock sits longer in cold storage and the nursery starts asking about shelf life, but nobody plants into snow.",
+            effects: { progress: -3, forestHealth: 2, budget: -2 },
           },
         ],
       },
@@ -321,8 +321,8 @@ export const FORESTER_ROLES = [
           {
             label: "Switch to mixed species blends",
             outcome:
-              "You diversify with larch and spruce. It impresses regulators and may resist pests better.",
-            effects: { progress: 1, forestHealth: 8, compliance: 4, budget: -3 },
+              "You diversify with spruce and Douglas-fir where the site series allows, and use pine only where the beetle risk is acceptable. It fits the approved stocking standards and should spread the pest risk.",
+            effects: { progress: 1, forestHealth: 8, compliance: 2, budget: -3 },
           },
           {
             label: "Apply intensive site prep and replant",
@@ -342,13 +342,13 @@ export const FORESTER_ROLES = [
         id: "reporting",
         title: "Stand Monitoring",
         prompt:
-          "Regulator deadlines for FREP surveys and riparian follow-up land the same week as community tours.",
+          "RESULTS deadlines for regen-delay and free-growing declarations, plus the riparian follow-up walk, land the same week as the community tours.",
         processHookIds: ["riparian-classification", "special-use-permit"],
         options: [
           {
-            label: "Send technical crews early and host tours later",
+            label: "Get the survey crews out first and host the tours later",
             outcome:
-              "You finish compliance work first, then bring communities once data is in hand.",
+              "You get the survey crews out and the declarations into RESULTS first, then bring the communities out once the data is in hand.",
             effects: { progress: 5, compliance: 7, relationships: -2, budget: -3 },
           },
           {
@@ -360,7 +360,7 @@ export const FORESTER_ROLES = [
           {
             label: "Prioritize the community tour",
             outcome:
-              "You showcase healthy stands. Regulators grant an extension yet remind you about future deadlines.",
+              "You showcase healthy stands. The district grants an extension on the declarations but reminds you the late free-growing date does not move.",
             effects: { progress: 3, relationships: 6, compliance: -1, budget: -2 },
           },
         ],
@@ -374,7 +374,7 @@ export const FORESTER_ROLES = [
     seasonalEnabled: false,
     journeyType: "manager",
     description:
-      "Oversee both field operations and strategic desk initiatives, managing CEOs and certifications.",
+      "Run the woodlands operation: cut control against the AAC, appraisals and stumpage, contractor rates, SFI/FSC certification, and a SAFE Companies record that survives an audit.",
     tasks: [
       {
         id: "gm_init",

@@ -238,6 +238,107 @@ const DISCOVERY_FLAG_MAP = {
   regen_gap: { environmentalAudit: true },
 };
 
+// Paperwork chains are real processes with real stages; the generic "Patch
+// only the hot spots" template read as nonsense on an AOA card. Each stage
+// carries its own three labels (cautious / balanced / aggressive) and keeps
+// the professional template's effects and side effects.
+const CHAIN_STAGE_RESPONSES = {
+  "fom-notice-cycle": {
+    notice: [
+      { label: "Post the FOM notice now and file proof of posting", outcome: "The notice goes up on time with the posting record saved, so the comment clock and the proof of it both exist." },
+      { label: "Post the notice and tidy the comment log as it fills", outcome: "The notice is up and the log gets cleaned as comments arrive; a few early ones are filed loosely." },
+      { label: "Hold the notice until the map is final", outcome: "You wait for a perfect map. The comment period starts late and the permit sequence behind it slides." },
+    ],
+    response: [
+      { label: "Answer every comment in writing and reconcile the map", outcome: "Each comment gets a written response and the final map matches what was noticed. It takes the week." },
+      { label: "Answer the substantive comments and log the rest", outcome: "The comments that could change the map get real answers; the rest are logged with a line each." },
+      { label: "Send the map forward and answer comments later", outcome: "The map moves, but the response record is thin and the district will ask where it is." },
+    ],
+    submission: [
+      { label: "Cross-check every CP against the final FOM before it leaves", outcome: "Every block in the package matches the published map. Nothing comes back for consistency." },
+      { label: "Spot-check the blocks that changed since the notice", outcome: "The blocks that moved get checked; the ones you assume did not move are the risk." },
+      { label: "Send the CP package on the notice-stage map", outcome: "The package goes out against the old map, and any block that shifted is now a consistency problem." },
+    ],
+  },
+  "road-authority-chain": {
+    "road-permit": [
+      { label: "Build the full RP package with crossing designs attached", outcome: "The road permit application carries the crossing designs and the professional sign-offs. Slow, but it will not bounce." },
+      { label: "File the RP with the crossings flagged for follow-up", outcome: "The RP moves with the crossings noted as pending; the district accepts it with a follow-up condition." },
+      { label: "File a bare RP and sort the crossings when the trucks show up", outcome: "The permit moves fast and the first crossing becomes a problem the day the trucks arrive." },
+    ],
+    rup: [
+      { label: "Assign the road use permit and maintenance lead in writing", outcome: "The RUP is issued, the maintenance lead is named, and the primary user knows who is paying for what." },
+      { label: "Name a maintenance lead and leave the RUP with the primary user", outcome: "Maintenance is covered informally; the RUP question waits for the primary user to raise it." },
+      { label: "Haul on the primary user's road and settle the RUP later", outcome: "Trucks roll without a road use permit in place, and the first complaint goes straight to the district." },
+    ],
+    closeout: [
+      { label: "Close every road notice and the maintenance record", outcome: "The notices are closed and the maintenance record is complete; the file can be handed to anyone." },
+      { label: "Close the open notices and leave the record for winter", outcome: "The notices are closed; the maintenance record gets finished when the crews are in." },
+      { label: "Let the notices lapse and keep hauling", outcome: "Nothing is closed. The open notices are the first thing a C&E road inspection will ask about." },
+    ],
+  },
+  "archaeology-ladder": {
+    "desktop-screen": [
+      { label: "Run the AOA screen before layout starts", outcome: "The archaeological overview screen is done before anyone flags a line, so the high-potential ground is known up front." },
+      { label: "Screen the high-potential blocks first", outcome: "The blocks that look risky get screened first; the rest wait until the crew is nearby." },
+      { label: "Skip the screen and lay out on the old map", outcome: "Layout starts on last cycle's map. If a crew finds a CMT, the Heritage Conservation Act problem is already yours." },
+    ],
+    "field-review": [
+      { label: "Book the PFR walkover now", outcome: "A preliminary field reconnaissance is booked with the Nation's crew, and the layout waits for the results." },
+      { label: "Redesign the footprint off the high-potential ground", outcome: "You move the block and road off the flagged ground and document the avoidance." },
+      { label: "Treat the AOA as clearance and keep laying out", outcome: "The overview is not clearance. The crew keeps flagging through ground nobody has walked." },
+    ],
+    "aia-context": [
+      { label: "Commission the AIA and hold the block", outcome: "An archaeological impact assessment goes in under permit and the block waits for its findings." },
+      { label: "Redesign around the site and document the avoidance", outcome: "The site is buffered out of the block and the rationale is written down; the volume is smaller." },
+      { label: "Push the site alteration permit and keep the schedule", outcome: "You apply to alter the site so the schedule holds. The Nation notices the application before you tell them." },
+    ],
+  },
+  "support-site-occupancy": {
+    "footprint-triage": [
+      { label: "Map every camp, helipad and dump footprint now", outcome: "Each support site is mapped and matched to an authority, so nothing is occupying Crown land by assumption." },
+      { label: "Map the camp and helipad and defer the small sites", outcome: "The big footprints are covered; the small landings and fuel caches wait for the next pass." },
+      { label: "Assume the CP covers the camp and carry on", outcome: "The cutting permit does not cover a camp. The occupancy is unauthorized until someone notices." },
+    ],
+    "sup-package": [
+      { label: "Build the special-use permit package with the site plans", outcome: "The special-use permit application carries site plans and the rehab commitments. It goes in complete." },
+      { label: "File the special-use permit for the camp and leave the helipad", outcome: "The camp is covered; the helipad is still an open question if anyone asks." },
+      { label: "Occupy the site and file the special-use permit after", outcome: "The camp goes in first and the permit follows, which is the wrong order and the district knows it." },
+    ],
+    "occupancy-closeout": [
+      { label: "Close the occupancy record with rehab photos", outcome: "The sites are rehabilitated, photographed, and the occupancy record is closed." },
+      { label: "Close the camp record and leave the helipad", outcome: "The camp is closed out; the helipad stays open on paper until next season." },
+      { label: "Leave the sites open and demob", outcome: "The crew leaves and the sites stay open on the record, which is where a C&E inspection will find them." },
+    ],
+  },
+};
+
+// In-world fallback copy for areas whose planning-block snapshot has not been
+// generated yet. The data-layer placeholder must never reach the player.
+const AREA_FALLBACK_BLOCK_SUMMARIES = {
+  "vancouver-island-coast": "Candidate block on Douglas-fir/hemlock benches above the Alberni Inlet; windfirm edges, a fish-stream crossing and roadside visuals are still unresolved.",
+  "kootenay-wetbelt": "Candidate block on cedar–hemlock side slopes above a community watershed near Nelson; road prism stability and intake protection are still unresolved.",
+  "okanagan-shuswap-drybelt": "Candidate block on Douglas-fir/pine benches above Vernon; access, visuals and a water-sensitive draw are still unresolved.",
+};
+const PLACEHOLDER_BLOCK_SUMMARY = /fallback regional block sample/i;
+
+function describePlanningBlock(block, state) {
+  const summary = String(block?.summary || "");
+  if (summary && !PLACEHOLDER_BLOCK_SUMMARY.test(summary)) {
+    return summary;
+  }
+  const areaId = state?.area?.id || state?.areaId;
+  return AREA_FALLBACK_BLOCK_SUMMARIES[areaId]
+    || `Candidate block in the ${state?.area?.name || "operating area"} snapshot; access, values and timing windows are still unresolved.`;
+}
+
+function capitaliseSentence(text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) return "";
+  const capped = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return /[.!?]$/.test(capped) ? capped : `${capped}.`;
+}
+
 function familyTitle(roleId, family, fallback = null) {
   return ROLE_FAMILY_TITLES[roleId]?.[family] || fallback || SOURCE_LABELS[family] || "Seasonal Assignment";
 }
@@ -317,9 +418,11 @@ function buildAssignmentOptions(candidate) {
 
   const profile = ASSIGNMENT_RESPONSE_PROFILES[candidate.sourceFamily] || [];
   return profile.map((template) => {
+    const stageResponse = candidate.chainStageResponses?.find?.((entry, index) => index === profile.indexOf(template))
+      || null;
     const option = {
-      label: template.label,
-      outcome: template.outcome,
+      label: stageResponse?.label || template.label,
+      outcome: stageResponse?.outcome || template.outcome,
       effects: { ...template.effects },
       // Carry the authored stance forward so chosen decisions can feed the
       // management-style meter without re-deriving intent from the effects.
@@ -389,7 +492,7 @@ function buildBriefingCandidates(state, context) {
     sourceFamily: "briefing",
     sourceKey: `finding:${index}`,
     title: familyTitle(context.roleId, "briefing"),
-    description: sanitizeText(finding),
+    description: `Field intel: ${capitaliseSentence(sanitizeText(finding))}`,
     // The zone summary is standing area context — it now lives in the
     // Dashboard "Area" tab, so the per-turn card keeps just its finding.
     sourceLabel: SOURCE_LABELS.briefing,
@@ -492,7 +595,7 @@ function buildPlanningCandidates(state, context) {
     sourceKey: `block:${block.id}`,
     title: `${familyTitle(context.roleId, "planning")}: ${block.label}`,
     description: sanitizeText(
-      [block.summary, block.species ? `Species ${block.species}` : "", block.district].filter(Boolean).join(" • "),
+      [describePlanningBlock(block, state), block.species ? `Species ${block.species}` : "", block.district].filter(Boolean).join(" • "),
       `${block.label} is surfacing as one of the most material planning choices in the current snapshot.`,
     ),
     flavor: sanitizeText(snapshot.generatedOn ? `Snapshot generated ${snapshot.generatedOn}` : "Current planning snapshot"),
@@ -670,6 +773,7 @@ function buildProfessionalCandidates(state, context) {
         "An unfinished professional chain is now carrying into the active season and can trigger avoidable scrutiny.",
       ),
       paperworkChainId: progress.chain.id,
+      chainStageResponses: CHAIN_STAGE_RESPONSES[progress.chain.id]?.[progress.stage.id] || null,
       failureIssueId: findChainFailureIssueId(progress.chain),
       score: 30 + Number(progress.remainingStages || 0),
     }, state));

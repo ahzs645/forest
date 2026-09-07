@@ -143,7 +143,7 @@ function buildReasons(state, { metricScore, roleScore, riskPenalty }) {
 
   const fired = countConsequences(state);
   if (fired > 0) {
-    reasons.push(`${fired} delayed consequence${fired === 1 ? "" : "s"} fired.`);
+    reasons.push(`${fired} earlier call${fired === 1 ? "" : "s"} came back on you this year.`);
   }
   if (roleScore >= 70 && metricScore >= 60) {
     reasons.push("Balanced delivery against the role's mandate.");

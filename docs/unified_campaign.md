@@ -51,10 +51,10 @@ everything:
 
 | Season | Deployment (expedition engine, condensed) |
 |---|---|
-| Spring | Recon traverse — scout the year's blocks |
-| Summer | Silviculture program — plant what was scouted |
+| Spring | Silviculture program — get the spring plant in before the stock ages out |
+| Summer | Recon traverse — layout, streams and cultural features on open ground |
 | Fall   | Strategic planning file — turn field truth into a plan |
-| Winter | Permitting push — get the plan through the agencies |
+| Winter | Permitting push — get the cutting and road permits through the district |
 
 Season loop:
 1. **Season briefing** (seasonal adapter): the seasonal engine's assignment
@@ -84,8 +84,8 @@ cause ("Permits: 4/5 approved → Progress +9").
 
 **Carry-forward:** `discoveryTags` from each deployment persist on the
 campaign and seed the next deployment's journey (the factory already accepts
-them), so spring recon finds shape summer planting, and the planning file in
-fall names what the year actually did.
+them), so what the spring plant and the summer recon found shapes the fall
+planning file, and the winter permits carry the year's findings.
 
 **Save/resume:** `bcft.campaign.v1` = `{ season, yearMetrics, seasonLog,
 activeJourney }`, saved at day boundaries (reusing saveActiveRun's journey
