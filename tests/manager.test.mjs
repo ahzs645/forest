@@ -240,7 +240,7 @@ test('escalated events resolve against the treasury, not the crew wallet', () =>
 
 test('manager events resolve through resolveEvent with desk-style money effects at corporate scale', () => {
   const journey = createManagerJourney();
-  assert.equal(journey.resources.budget, 500000);
+  assert.equal(journey.resources.budget, 850000);
   // Starts below the 100 ceiling so the meter can move in both directions.
   assert.equal(journey.resources.politicalCapital, 65);
 
@@ -260,7 +260,7 @@ test('manager events resolve through resolveEvent with desk-style money effects 
   const result = resolveEvent(journey, event, option);
 
   // Budget must NOT clamp to the 100k desk ceiling (manager treasury is 500k)
-  assert.equal(journey.resources.budget, 495000);
+  assert.equal(journey.resources.budget, 845000);
   assert.equal(journey.resources.politicalCapital, 59);
   assert.equal(journey.metrics.compliance, 54);
   assert.equal(journey.metrics.relationships, 47);

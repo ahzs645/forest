@@ -73,15 +73,15 @@ export function checkSilvicultureEndConditions(journey) {
     return { gameOver: true, reason: 'All crew members lost' };
   }
 
-  // Victory: Met regeneration targets
+  // Victory: this year's blocks planted, this year's declarations in RESULTS
   if (journey.planting.blocksPlanted >= journey.planting.blocksToPlant &&
       journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget) {
-    return { victory: true, reason: 'Regeneration targets achieved!' };
+    return { victory: true, reason: 'Planting program delivered and this year\'s free-growing declarations submitted to RESULTS.' };
   }
 
   // Game over: Budget depleted
   if (journey.resources.budget <= 0) {
-    return { gameOver: true, reason: 'Budget exhausted - program cancelled' };
+    return { gameOver: true, reason: 'Budget exhausted - program cancelled, contractor invoices unpaid' };
   }
 
   // Game over: No contractor capacity and not enough planting done
@@ -140,18 +140,18 @@ export function checkPlanningEndConditions(journey) {
  * @returns {Object|null} End condition result or null
  */
 export function checkManagerEndConditions(journey) {
-  // Victory: Completed all terms (e.g., 100 days)
+  // Victory: the operating year is run with the books solvent and the board onside
   if (journey.day > journey.deadline) {
     if (journey.resources.budget > 0 && (journey.metrics.reputation ?? 50) > 40) {
-      return { victory: true, reason: 'Successfully led the company through the term!' };
+      return { victory: true, reason: 'The operating year is delivered with the books solvent and the board onside.' };
     } else {
       return { gameOver: true, reason: 'Term ended with poor performance' };
     }
   }
 
-  // Game over: Budget depleted
+  // Game over: treasury gone
   if (journey.resources.budget <= 0) {
-    return { gameOver: true, reason: 'Budget exhausted - operations halted' };
+    return { gameOver: true, reason: 'Budget exhausted - the bank calls the covenant and operations halt' };
   }
 
   // Game over: Poor reputation

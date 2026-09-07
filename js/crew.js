@@ -57,8 +57,10 @@ function pickRandom(arr) {
  * @param {Object} roleOverride - Optional specific role to assign
  * @returns {Object} Crew member object
  */
-export function generateCrewMember(journeyType, roleOverride = null) {
-  const roles = journeyType === 'field' ? FIELD_ROLES : DESK_ROLES;
+export function generateCrewMember(journeyType, roleOverride = null, rolePool = null) {
+  const roles = Array.isArray(rolePool) && rolePool.length
+    ? rolePool
+    : (journeyType === 'field' ? FIELD_ROLES : DESK_ROLES);
   const role = roleOverride || pickRandom(roles);
   const name = pickRandom(FIRST_NAMES);
 
@@ -84,6 +86,7 @@ export function generateCrewMember(journeyType, roleOverride = null) {
     maxHealth: 100,
     morale: Math.min(100, Math.max(30, role.baseMorale + moraleVariance)),
     traits,
+    ...(role.firstAidTicket ? { firstAidTicket: role.firstAidTicket } : {}),
     statusEffects: [], // Array of { effectId, daysRemaining }
     daysIncapacitated: 0,
     untreatedSeriousDays: 0,
@@ -98,21 +101,29 @@ export function generateCrewMember(journeyType, roleOverride = null) {
  * Generate a full crew
  * @param {number} count - Number of crew members
  * @param {string} journeyType - 'field' or 'desk'
+ * @param {Object} [options]
+ * @param {Object[]} [options.roles] - explicit role pool ({id, name, description,
+ *   skills, baseHealth, baseMorale, firstAidTicket?}) instead of the default
+ *   field/desk roster - a silviculture crew or an executive team
+ * @param {string[]} [options.essentialIds] - role ids that must appear, in order
  * @returns {Object[]} Array of crew members
  */
-export function generateCrew(count, journeyType) {
-  const roles = journeyType === 'field' ? FIELD_ROLES : DESK_ROLES;
+export function generateCrew(count, journeyType, options = {}) {
+  const roles = Array.isArray(options.roles) && options.roles.length
+    ? options.roles
+    : (journeyType === 'field' ? FIELD_ROLES : DESK_ROLES);
   const crew = [];
   const usedNames = new Set();
 
   // Ensure we have at least one of the essential roles
-  const essentialRoles = journeyType === 'field'
-    ? [roles.find(r => r.id === 'driver'), roles.find(r => r.id === 'medic')]
-    : [roles.find(r => r.id === 'analyst'), roles.find(r => r.id === 'coordinator')];
+  const essentialIds = Array.isArray(options.essentialIds)
+    ? options.essentialIds
+    : (journeyType === 'field' ? ['driver', 'medic'] : ['analyst', 'coordinator']);
+  const essentialRoles = essentialIds.map((id) => roles.find((r) => r.id === id));
 
   for (const role of essentialRoles) {
     if (role && crew.length < count) {
-      const member = generateCrewMember(journeyType, role);
+      const member = generateCrewMember(journeyType, role, roles);
       // Ensure unique name
       while (usedNames.has(member.name)) {
         member.name = pickRandom(FIRST_NAMES);
@@ -124,7 +135,7 @@ export function generateCrew(count, journeyType) {
 
   // Fill remaining slots with random roles
   while (crew.length < count) {
-    const member = generateCrewMember(journeyType);
+    const member = generateCrewMember(journeyType, null, roles);
     // Ensure unique name
     while (usedNames.has(member.name)) {
       member.name = pickRandom(FIRST_NAMES);

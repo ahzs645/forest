@@ -15,6 +15,29 @@ import { getPlanningCadenceDays } from "../data/planningBlocks.js";
 import { createSeasonState } from "../season.js";
 import { createProfessionalComplianceState } from "../engine.js";
 import { ACTIONS_PER_DAY } from './dayPlan.js';
+import {
+  buildSilvicultureProgram,
+  generateSilvicultureContractors,
+  getProgramFillTrees,
+} from "../data/silvicultureProgram.js";
+import { SILVICULTURE_CREW_ROLES, SILVICULTURE_ESSENTIAL_ROLE_IDS } from "../data/silvicultureCrewRoles.js";
+import { MANAGER_EXECUTIVE_ROLES, MANAGER_ESSENTIAL_ROLE_IDS } from "../data/managerRoles.js";
+import { OPERATING_AREAS } from "../data/operatingAreas.js";
+
+// Silviculture program budgets. Contractors are paid per tree planted and per
+// hectare treated at real interior rates (js/data/silvicultureProgram.js:
+// ~$0.32/tree, manual brushing ~$900/ha, glyphosate ~$350/ha, accredited
+// survey day rate $1,800), plus $550/day supervisor overhead. Sized with
+// scripts/simulate-expeditions.mjs so an all-manual release program still
+// lands on normal difficulty and glyphosate is the affordable route on hard.
+const SILVICULTURE_BUDGET = 380000;
+const SILVICULTURE_CAMPAIGN_BUDGET = 150000;
+
+// The operating year a General Manager runs. Volumes are m³, money is dollars,
+// prices are per m³ delivered to the mill.
+const MANAGER_TREASURY = 850000;
+const MANAGER_AAC = 240000;
+const MANAGER_MONTHLY_OVERHEAD = 290000;
 
 /**
  * Campaign-scale tuning (see docs/unified_campaign.md, section 3).
@@ -97,7 +120,7 @@ function applyCampaignScale(journey, journeyType) {
       journey.brushing.hectaresTarget = 100;
       journey.surveys.freeGrowingTarget = 2;
       journey.resources.seedlings = 55000;
-      journey.resources.budget = 45000;
+      journey.resources.budget = SILVICULTURE_CAMPAIGN_BUDGET;
       journey.resources.contractorCapacity = Math.round(
         journey.resources.contractorCapacity * CAMPAIGN_STOCKPILE_SCALE,
       );
@@ -224,9 +247,13 @@ export function createReconJourney(options = {}) {
  * Create silviculture journey (contractor management mode)
  */
 export function createSilvicultureJourney(options = {}) {
-  const { roleId, areaId, companyName, crewName, crew, role, area } = options;
-  const effectiveAreaId = areaId || area?.id;
+  const { roleId, areaId, companyName, crewName, crew, role } = options;
+  const effectiveAreaId = areaId || options.area?.id;
   const effectiveRoleId = roleId || role?.id || "silviculture";
+  // The program's block records, stocking standard and per-tree price all
+  // come off the area's BEC code, so resolve the area even when the caller
+  // only passed an id.
+  const area = options.area || OPERATING_AREAS.find((candidate) => candidate.id === effectiveAreaId) || null;
 
   const journey = {
     journeyType: "silviculture",
@@ -283,12 +310,13 @@ export function createSilvicultureJourney(options = {}) {
       regenerationSurveys: 0,
     },
 
-    // Contractors
-    contractors: generateContractors(3),
+    // Contractors: production planters paid per tree, a brushing outfit with
+    // saw crews and a PMP applicator, an accredited survey contractor.
+    contractors: generateSilvicultureContractors(area?.becCode),
 
     // Resources
     resources: {
-      budget: 120000,
+      budget: SILVICULTURE_BUDGET,
       seedlings: 140000,
       contractorCapacity: 320,
       equipment: 100,
@@ -296,8 +324,13 @@ export function createSilvicultureJourney(options = {}) {
     },
     discoveryTags: [],
 
-    // Party
-    crew: crew || generateCrew(4, "field"),
+    // Party: the licensee's own crew - a quality checker, an accredited
+    // surveyor, the OFA 3 attendant and the crummy driver. The contractors
+    // are the workforce; these people check it and sign for it.
+    crew: crew || generateCrew(4, "field", {
+      roles: SILVICULTURE_CREW_ROLES,
+      essentialIds: SILVICULTURE_ESSENTIAL_ROLE_IDS,
+    }),
 
     // State flags
     isComplete: false,
@@ -309,35 +342,26 @@ export function createSilvicultureJourney(options = {}) {
     decisions: [],
   };
 
-  return options.scale === "campaign" ? applyCampaignScale(journey, "silviculture") : journey;
+  if (options.scale === "campaign") {
+    applyCampaignScale(journey, "silviculture");
+  }
+  attachSilvicultureProgram(journey);
+  return journey;
 }
 
 /**
- * Generate contractor crews for silviculture
+ * Derive the per-vintage program (this year's blocks, last year's fill
+ * openings, the 2–5 year old release stands, the 8–15 year old free-growing
+ * candidates) from the journey's targets and area, and stock the reefer with
+ * the fill trees on top of this year's allocation.
  */
-function generateContractors(count) {
-  const names = [
-    "Mountain Pine Planters",
-    "Northern Regen Co",
-    "Boreal Silviculture",
-    "Timber Trail Crew",
-    "Alpine Reforestation",
-  ];
-  const contractors = [];
-
-  for (let i = 0; i < count; i++) {
-    contractors.push({
-      id: `contractor_${i + 1}`,
-      name: names[i] || `Contractor ${i + 1}`,
-      productivity: 80 + Math.floor(Math.random() * 20),
-      morale: 70 + Math.floor(Math.random() * 20),
-      crewSize: 8 + Math.floor(Math.random() * 8),
-      specialty: i === 0 ? "planting" : i === 1 ? "brushing" : "survey",
-      isActive: true,
-    });
-  }
-
-  return contractors;
+export function attachSilvicultureProgram(journey) {
+  journey.program = buildSilvicultureProgram(journey);
+  journey.resources.seedlings = journey.planting.seedlingsAllocated + getProgramFillTrees(journey.program);
+  journey.planting.fillTarget = journey.program.fill.length;
+  journey.planting.fillComplete = 0;
+  journey.planting.qualityAverage = null;
+  return journey;
 }
 
 /**
@@ -759,9 +783,11 @@ export function createManagerJourney(options = {}) {
     resources: {
       ...baseDesk,
       ...baseField,
-      // Must cover the mandatory month-1 CEO hire ($180-200k), an optional
-      // certification ($80-150k), and the monthly overhead across the term.
-      budget: 500000,
+      // Opening treasury. The year is run on a monthly ledger (js/modes/manager.js):
+      // delivered m³ × (log price − stumpage − logging/haul) less head-office
+      // overhead and certification costs. The cushion covers spring breakup,
+      // when deliveries fall to a third of plan and the overhead does not.
+      budget: MANAGER_TREASURY,
       // Below the 100-point ceiling so the meter can actually move both ways;
       // starting pinned at max made it read as dead UI for a whole term.
       politicalCapital: 65,
@@ -773,17 +799,40 @@ export function createManagerJourney(options = {}) {
     discoveryTags: [],
     flags: {},
     certifications: [],
+    // The operating posture the woodlands team runs the year on. Kept under
+    // the legacy `ceo` key because the debrief and reaction decks read the
+    // name and decision_making_style off it.
     ceo: null,
-    targetProfit: 100000,
+    // The operating year's ledger. AAC and cut control are annual; the plan
+    // spreads it across twelve months with a seasonal delivery curve.
+    ledger: {
+      aac: MANAGER_AAC,
+      monthlyPlan: Math.round(MANAGER_AAC / 12),
+      deliveredYtd: 0,
+      logPrice: 105,
+      stumpage: 27,
+      loggingHaul: 62,
+      overhead: MANAGER_MONTHLY_OVERHEAD,
+      startTreasury: MANAGER_TREASURY,
+      curtailmentFactor: 1,
+      bonusVolume: 0,
+      costShiftPerM3: 0,
+      months: [],
+      cutControl: null,
+    },
     // The term runs as 12 monthly board periods rather than 100 daily turns:
     // each period is one strategic decision plus its fallout, with quarterly
     // board reviews. ~16 meaningful decisions instead of a 100-turn grind.
     deadline: 12,
     history: [],
 
-    // The GM keeps a small executive crew: they gate requiresRole event
-    // options and act as field reporters for operational (field-pool) events.
-    crew: options.crew || generateCrew(5, "field"),
+    // The GM's executive team: CFO, Woodlands Manager, Chief Forester (RPF),
+    // Indigenous Relations Lead, HSE Manager. They act as reporters for the
+    // operational escalations that reach the GM's desk.
+    crew: options.crew || generateCrew(5, "field", {
+      roles: MANAGER_EXECUTIVE_ROLES,
+      essentialIds: MANAGER_ESSENTIAL_ROLE_IDS,
+    }),
 
     // State flags
     isComplete: false,

@@ -7,6 +7,7 @@ import { getCurrentSeasonInfo } from '../season.js';
 import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { getRoleProfessionalContext } from '../data/professionalPractice.js';
+import { getStockingStandard, describeStockingStandard } from '../data/stockingStandards.js';
 
 function formatScrutiny(scrutiny) {
   const value = Number(scrutiny || 0);
@@ -58,21 +59,27 @@ export function showJourneyIntro(ui, journey) {
       ui.write(`  GPS Units: ${journey.resources.gpsUnits || 5}`);
       break;
 
-    case 'silviculture':
-      ui.write(`Mission: Meet regeneration targets for the ${journey.planting.blocksToPlant} blocks in your program.`);
-      ui.write('Manage planting contractors, herbicide applications, and survival surveys.');
-      ui.write('Spring is critical for planting. Summer for brushing. Fall for assessments.');
+    case 'silviculture': {
+      const program = journey.program || {};
+      const standard = getStockingStandard(program.becCode || journey.area?.becCode);
+      const fillCount = Array.isArray(program.fill) ? program.fill.length : 0;
+      ui.write(`Mission: Deliver this year's planting program (${journey.planting.blocksToPlant} blocks, ${journey.planting.seedlingsAllocated.toLocaleString()} trees) and get this year's free-growing declarations into RESULTS.`);
+      ui.write('You run five vintages at once: this year\'s blocks (plant, then quality plots before the contractor is paid), last year\'s openings (fill where the survival survey fell below MSS), the 2-5 year old stands (release from brush), and the 8-15 year old openings (free-growing surveys against the site plan\'s stocking standard).');
+      ui.write('Contractors are paid per tree and per hectare; the crew checks the work and signs for it.');
       ui.write('');
       ui.write('Program targets:');
-      ui.write(`  Seedlings to plant: ${journey.planting.seedlingsAllocated.toLocaleString()}`);
-      ui.write(`  Brushing hectares: ${journey.brushing.hectaresTarget} ha`);
-      ui.write(`  Free-growing surveys: ${journey.surveys.freeGrowingTarget}`);
+      ui.write(`  This year's blocks: ${journey.planting.blocksToPlant} (${journey.planting.seedlingsAllocated.toLocaleString()} trees, ${standard.speciesMix}, ${standard.plantingSph.toLocaleString()} sph)`);
+      if (fillCount) ui.write(`  Fill plant: ${fillCount} of last year's openings`);
+      ui.write(`  Release treatment: ${journey.brushing.hectaresTarget} ha of 2-5 year old stands`);
+      ui.write(`  Free-growing declarations: ${journey.surveys.freeGrowingTarget}`);
+      ui.write(`  Stocking standard: ${describeStockingStandard(standard)}`);
       ui.write('');
       ui.write('Starting resources:');
-      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
-      ui.write(`  Seedling inventory: ${journey.resources.seedlings?.toLocaleString() || 0}`);
-      ui.write(`  Contractor capacity: ${journey.resources.contractorCapacity} days`);
+      ui.write(`  Program budget: $${journey.resources.budget?.toLocaleString() || 0} (supervisor overhead $550/day; contractor invoices on top)`);
+      ui.write(`  Seedling inventory: ${journey.resources.seedlings?.toLocaleString() || 0} (this year's allocation plus fill stock)`);
+      ui.write(`  Contractor capacity: ${journey.resources.contractorCapacity} crew-days`);
       break;
+    }
 
     case 'planning':
       ui.write(`Mission: Achieve ministerial approval for a landscape-level forest plan within ${journey.deadline} days.`);
@@ -120,16 +127,18 @@ export function showJourneyIntro(ui, journey) {
       ui.write(`  First Aid: ${journey.resources.firstAid} kits`);
       break;
 
-    case 'manager':
-      ui.write(`Mission: Lead the forestry operations to profitability and sustainability over ${journey.deadline} days.`);
-      ui.write('Manage field crew realities while advancing high-level office initiatives like certifications and hiring CEOs.');
-      ui.write('Balance your budget with reputation and compliance.');
+    case 'manager': {
+      const ledger = journey.ledger || {};
+      ui.write(`Mission: run the licensee's ${journey.deadline}-month operating year - deliver the cut, keep the books and the board onside.`);
+      ui.write('Set the year\'s operating plan with your woodlands team, then run the monthly ledger: delivered cubic metres against the AAC, log price less stumpage and logging/haul, head-office overhead, certification costs. The divisions escalate what they cannot settle; the board reviews you quarterly.');
       ui.write('');
-      ui.write('Strategic overview:');
-      ui.write(`  Initial Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
-      ui.write(`  Target Profit: $${journey.targetProfit?.toLocaleString() || 0}`);
-      ui.write(`  Deadline: ${journey.deadline} days`);
+      ui.write('Operating overview:');
+      ui.write(`  Opening treasury: $${journey.resources.budget?.toLocaleString() || 0}`);
+      if (ledger.aac) ui.write(`  AAC: ${ledger.aac.toLocaleString()} m³ (plan ${ledger.monthlyPlan.toLocaleString()} m³/month; cut control judged at year end)`);
+      if (ledger.logPrice) ui.write(`  Log price $${ledger.logPrice}/m³ - stumpage $${ledger.stumpage} - logging & haul $${ledger.loggingHaul}; overhead $${ledger.overhead.toLocaleString()}/month`);
+      ui.write(`  Operating year: ${journey.deadline} months`);
       break;
+    }
 
     case 'desk':
     default:

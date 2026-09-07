@@ -34,10 +34,10 @@ export const MILESTONE_COPY = {
     90: 'Final push. The extraction point is almost within sight.'
   },
   silviculture: {
-    25: 'The first wave of regeneration is taking hold across the program.',
-    50: 'Half the silviculture campaign is established. Momentum is finally visible.',
-    75: 'The season is bending your way. One more strong push could finish the contract cleanly.',
-    90: 'Final block pressure. Every contractor call and survey day matters now.'
+    25: 'First blocks in the ground and inspected; the year\'s program has a shape.',
+    50: 'Half the program delivered: blocks inspected, release moving through the older stands.',
+    75: 'The season is bending your way. Last blocks, last release openings, the surveyor booked.',
+    90: 'Last block and last declaration in sight.'
   },
   planning: {
     25: 'The planning wall has shape now. The expedition no longer feels theoretical.',

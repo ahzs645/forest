@@ -20,12 +20,14 @@ import {
   createReconJourney,
   createPlanningJourney,
   createPermittingJourney,
-  createSilvicultureJourney
+  createSilvicultureJourney,
+  createManagerJourney
 } from '../js/journey/factory.js';
 import { runReconDay } from '../js/modes/recon.js';
 import { runPlanningDay } from '../js/modes/planning.js';
 import { runPermittingDay } from '../js/modes/permitting.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
+import { runManagerDay } from '../js/modes/manager.js';
 import { checkEndConditions } from '../js/modes/shared/endConditions.js';
 
 const DEFAULT_AREA = 'fraser-plateau';
@@ -86,10 +88,10 @@ function makeUi(journey, policy, tally, trace = null) {
   const write = (...parts) => trace?.(parts.filter((part) => typeof part === 'string').join(' '));
   return {
     write, writeHeader: write, writeWarning: write, writePositive: write,
-    writeDanger: write, writeBox: write, writeDivider: noop, clear: noop,
+    writeDanger: write, writeBox: write, writeInfo: write, writeDivider: noop, clear: noop,
     updateAllStatus: noop, playEventVignette: noop, playScene: noop,
     playTravelStrip: noop, playRadioAction: noop, setMissionStatus: noop,
-    clearMissionStatus: noop, writeSuccess: noop,
+    clearMissionStatus: noop, writeSuccess: write,
     async promptText() { return 'They loved this country'; },
     async promptChoice(prompt, options = []) {
       if (!options.length) return { value: undefined };
@@ -165,7 +167,8 @@ export const POLICY_VOCABULARY = {
   recon: ['set_aside', 'set_tempo', 'travel', 'ground_truth', 'camp_menu', 'end_shift'],
   planning: ['set_aside', 'desk_menu', 'end', 'professional_admin'],
   permitting: ['set_aside', 'end_day'],
-  silviculture: ['set_aside', 'end'],
+  silviculture: ['set_aside', 'end', 'plant', 'inspect', 'brush', 'survey'],
+  manager: ['set_aside', 'hold', 'plan', 'desk', 'rehearse', 'transparent'],
 };
 
 // ── Role policies ───────────────────────────────────────────────────────────
@@ -324,7 +327,7 @@ function silviculturePolicy(journey, options, prompt) {
     return pick(options, ['cancel']) || options[0];
   }
   if (prompt === 'Adjust which contractor?') {
-    const ready = options.find((option) => option.description?.startsWith('ready'));
+    const ready = options.find((option) => /^(ready|available)/.test(option.description || ''));
     return ready || pick(options, ['cancel']) || options[options.length - 1];
   }
   if (prompt === 'Meet with which contractor?') {
@@ -337,24 +340,59 @@ function silviculturePolicy(journey, options, prompt) {
     return best;
   }
   if (prompt === 'How do you respond?') {
-    return pick(options, ['medic', 'inspect', 'rest', 'pay']) || options[0];
+    // Contractor calls: retrain on a quality dispute, inspect the camp on a
+    // sickness call, back a stand-down, pay a re-price rather than lose half
+    // the crew. Never sign plot cards you did not walk.
+    return pick(options, ['inspect', 'inspect_camp', 'rest', 'pay']) || options[0];
+  }
+  if (prompt.startsWith('Release treatment on ')) {
+    // Manual release when the budget carries it, glyphosate under the PMP
+    // when it does not - the call a supervisor makes with the ledger open.
+    const remainingHa = Math.max(0, (journey.brushing?.hectaresTarget || 0) - (journey.brushing?.hectaresComplete || 0));
+    const remainingTrees = Math.max(0, (journey.planting?.seedlingsAllocated || 0) - (journey.planting?.seedlingsPlanted || 0));
+    const daysLeft = Math.max(0, (journey.deadline || 42) - (journey.day || 1));
+    const restOfProgram = remainingTrees * 0.36 + daysLeft * 550 + 4 * 1800 + 15000;
+    const manualCost = remainingHa * 900;
+    const budget = journey.resources?.budget || 0;
+    const wanted = budget > manualCost + restOfProgram ? ['manual', 'glyphosate', 'sheep'] : ['glyphosate', 'manual', 'sheep'];
+    return pick(options, wanted) || options[0];
   }
 
   const canDeploy = (journey.contractors || []).some((contractor) => {
     const state = contractor.silvicultureState;
     return !contractor.isActive && state?.status !== 'recovering' && !(state?.cooldownDays > 0);
   });
-  const wanted = ['plant', 'inspect', 'fill', 'herbicide', 'survey'];
+  // Plots before the planters move on, then this year's blocks, then the
+  // surveyor onto any opening that is ready (the older stands read better
+  // before the brush gets ahead of the calendar), then fill and release.
+  const wanted = ['inspect', 'plant', 'survey', 'fill', 'brush'];
   if (canDeploy) wanted.push('rotation');
   wanted.push('meeting', 'team_briefing', 'end', 'next', 'continue');
   return pick(options, wanted);
+}
+
+/**
+ * A General Manager who runs a steady year: set the posture, hold the cash,
+ * demand plans rather than buy fixes, rehearse for the board and tell it the
+ * truth. Delegates situations only when the treasury is thin.
+ */
+function managerPolicy(journey, options) {
+  const treasury = journey.resources?.budget || 0;
+  const start = journey.ledger?.startTreasury || 850000;
+  const setAside = options.find((option) => option.value === 'set_aside');
+  if (setAside && treasury < start * 0.4) return setAside;
+  return pick(options, [
+    'steady', 'none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', 'next', 'continue'
+  ]);
 }
 
 const ROLES = {
   recon: { create: createReconJourney, run: runReconDay, policy: reconPolicy, roleId: 'recce' },
   planning: { create: createPlanningJourney, run: runPlanningDay, policy: planningPolicy, roleId: 'planner' },
   permitting: { create: createPermittingJourney, run: runPermittingDay, policy: permittingPolicy, roleId: 'permitter' },
-  silviculture: { create: createSilvicultureJourney, run: runSilvicultureDay, policy: silviculturePolicy, roleId: 'silviculture' }
+  silviculture: { create: createSilvicultureJourney, run: runSilvicultureDay, policy: silviculturePolicy, roleId: 'silviculture' },
+  // The manager runs an operating year, not a campaign season: no campaign scale.
+  manager: { create: createManagerJourney, run: runManagerDay, policy: managerPolicy, roleId: 'manager', fullLengthOnly: true }
 };
 
 /** A one-line read on how far a deployment actually got. */
@@ -372,6 +410,12 @@ function summarizeState(journey) {
     return `planted ${journey.planting.blocksPlanted}/${journey.planting.blocksToPlant}`
       + ` brush ${Math.round(journey.brushing.hectaresComplete)}/${journey.brushing.hectaresTarget}`
       + ` surveys ${journey.surveys.freeGrowingComplete}/${journey.surveys.freeGrowingTarget}`;
+  }
+  if (journey.ledger) {
+    const ledger = journey.ledger;
+    return `delivered ${Math.round(ledger.deliveredYtd).toLocaleString()}/${ledger.aac.toLocaleString()} m³`
+      + ` (${ledger.cutControl || 'year open'}) treasury $${Math.round(journey.resources?.budget || 0).toLocaleString()}`
+      + ` reputation ${Math.round(journey.metrics?.reputation ?? 50)} scrutiny ${Math.round(journey.scrutiny || 0)}`;
   }
   if (journey.blocks) {
     return `packages ${journey.blocksAssessed || 0}/${journey.blocks.length}`
@@ -424,7 +468,9 @@ export async function simulateRun(roleName, seed, scale, trace = null) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const roleNames = args.role ? [args.role] : Object.keys(ROLES);
+  const roleNames = args.role
+    ? [args.role]
+    : Object.keys(ROLES).filter((name) => !(args.scale === 'campaign' && ROLES[name].fullLengthOnly));
   let failed = false;
 
   for (const roleName of roleNames) {
@@ -432,6 +478,10 @@ async function main() {
       console.error(`unknown role: ${roleName}`);
       process.exitCode = 2;
       return;
+    }
+    if (args.scale === 'campaign' && ROLES[roleName].fullLengthOnly) {
+      console.log(`${roleName.padEnd(26)} skipped: runs an operating year, not a campaign season`);
+      continue;
     }
     const results = [];
     for (let i = 0; i < args.runs; i += 1) {
