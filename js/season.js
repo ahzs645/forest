@@ -39,7 +39,7 @@ export const SEASON_ORDER = ['spring', 'summer', 'fall', 'winter'];
 
 // Starting seasons by role (which season makes sense to start)
 export const ROLE_START_SEASONS = {
-  recce: 'summer',        // Recon starts in peak field season
+  recce: 'summer',        // Recon/layout starts in peak field season (campaign agrees: summer = recon)
   silviculture: 'spring', // Silviculture starts at planting
   planner: 'fall',        // Planning starts before fiscal year
   permitter: 'spring'     // Permitting starts with new fiscal year
@@ -49,14 +49,14 @@ export const ROLE_START_SEASONS = {
 export const SEASONAL_MODIFIERS = {
   recce: {
     spring: {
-      travelSpeed: 0.7,      // Snow melt, muddy roads
+      travelSpeed: 0.7,      // Breakup: soft roads, swollen crossings
       eventChance: 1.2,      // More hazards
-      description: 'Spring melt makes access challenging'
+      description: 'Breakup makes access slow and crossings high'
     },
     summer: {
       travelSpeed: 1.0,      // Normal operations
       eventChance: 1.0,
-      description: 'Peak survey season'
+      description: 'Peak layout season'
     },
     fall: {
       travelSpeed: 0.85,     // Early snow possible
@@ -64,7 +64,7 @@ export const SEASONAL_MODIFIERS = {
       description: 'Weather windows closing'
     },
     winter: {
-      travelSpeed: 0.5,      // Limited access
+      travelSpeed: 0.5,      // Frozen-ground access only
       eventChance: 0.5,      // Fewer events (less activity)
       description: 'Minimal field activity'
     }

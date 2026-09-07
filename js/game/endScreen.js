@@ -5,6 +5,7 @@
 
 import { getCrewDisplayInfo } from '../crew.js';
 import { getSurveyedBlockCount } from '../journey/progress.js';
+import { getPackagesFinalized, getPackageTarget } from '../journey/packages.js';
 import { getCurrentSeasonInfo } from '../season.js';
 import { calculateScore, formatScoreDisplay } from '../scoring.js';
 
@@ -54,12 +55,10 @@ export async function showEndScreen(ui, journey, victory) {
       const info = getCrewDisplayInfo(member);
       let fate;
       if (!member.isActive) {
-        if (member.isDead) {
-          fate = 'Lost to the wilderness. Their sacrifice will be remembered.';
-        } else if (member.hasQuit) {
+        if (member.hasQuit) {
           fate = 'Packed their bags and headed home early.';
         } else {
-          fate = 'Evacuated for medical care.';
+          fate = 'Evacuated. Off the crew for the season; WorkSafeBC file open.';
         }
       } else if (victory) {
         if (member.health > 80 && member.morale > 70) {
@@ -109,9 +108,11 @@ export function writeFinalStatistics(ui, journey) {
       const surveyedBlocks = getSurveyedBlockCount(journey);
       ui.write(`Traverse Covered: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km (${fieldProgressPct}%)`);
       ui.write(`Shifts Elapsed: ${daysUsed}`);
-      ui.write(`Blocks Surveyed: ${surveyedBlocks}/${journey.blocks.length}`);
-      if (journey.blocksAssessed !== undefined) {
-        ui.write(`Blocks Assessed: ${journey.blocksAssessed}`);
+      if (journey.journeyType === 'recon') {
+        ui.write(`Stops Reached: ${Math.min(journey.blocks.length, (journey.currentBlockIndex || 0) + 1)}/${journey.blocks.length}`);
+        ui.write(`Packages Finalized: ${getPackagesFinalized(journey)}/${getPackageTarget(journey)}`);
+      } else {
+        ui.write(`Blocks Surveyed: ${surveyedBlocks}/${journey.blocks.length}`);
       }
       break;
     }
@@ -174,7 +175,7 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
   switch (journey.journeyType) {
     case 'recon':
     case 'field': {
-      const blocksCount = journey.blocks?.length || 0;
+      const blocksCount = journey.journeyType === 'recon' ? getPackageTarget(journey) : (journey.blocks?.length || 0);
       const activeCrew = journey.crew.filter(m => m.isActive).length;
       // A recon win means every block package closed — not necessarily the
       // whole traverse driven (packages can be finalized from notes and GPS),
@@ -185,8 +186,8 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
         ? `${crewName} completed the ${journey.totalDistance} km traverse through ${areaName} as ${seasonName} settled in.`
         : `${crewName} closed out every block package in ${areaName} as ${seasonName} settled in.`;
       return `${opening} ` +
-        `${activeCrew} crew members finalized all ${blocksCount} blocks over ${daysUsed} shifts. ` +
-        `The reconnaissance data will guide forest operations in this area for years to come.`;
+        `${activeCrew} crew members finalized all ${blocksCount} block packages over ${daysUsed} shifts. ` +
+        `The layout and recon data go to the planning file and the cutting permit application.`;
     }
     case 'silviculture':
       return `After ${daysUsed} days, the silviculture program in ${areaName} is delivered: ` +

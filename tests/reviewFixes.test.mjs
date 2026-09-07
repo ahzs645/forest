@@ -267,7 +267,7 @@ test('travel stops at the named next destination and reports clamped distance', 
   const result = withRandom(0.5, () => executeFieldAction(journey, 'grueling'));
   assert.equal(journey.currentBlockIndex, 1);
   assert.equal(journey.distanceTraveled, 5);
-  assert.ok(result.messages.some((message) => /Covered 5 km/.test(message)));
+  assert.ok(result.messages.some((message) => /Walked 5 km of line and road location/.test(message)));
   assert.ok(result.messages.some((message) => /Arrived at Blackwater Road/.test(message)));
   assert.ok(!result.messages.some((message) => /Arrived at Old Burn Edge/.test(message)));
 });
@@ -291,7 +291,7 @@ test('incidental negative field progress creates delay without moving the crew b
   assert.equal(journey.currentBlockIndex, 1);
   assert.equal(journey.distanceTraveled, 5);
   assert.ok(journey.travelSetback > 0);
-  assert.ok(result.messages.some((message) => /Travel delay queued/i.test(message)));
+  assert.ok(result.messages.some((message) => /Tomorrow's leg will be slower/i.test(message)));
 });
 
 test('GIS data recovery does not route a technical setback into stakeholder buy-in', () => {

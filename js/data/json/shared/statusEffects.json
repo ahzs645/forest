@@ -1,12 +1,13 @@
 {
   "broken_leg": {
-    "name": "Broken Leg",
+    "name": "Fracture",
     "duration": 7,
     "healthDrain": 0,
     "moraleEffect": -5,
     "workCapacity": 0,
-    "description": "Cannot work. Requires rest.",
-    "canTravel": true
+    "description": "Fracture. ETV to hospital; off the crew.",
+    "canTravel": false,
+    "evacuate": true
   },
   "broken_arm": {
     "name": "Broken Arm",
@@ -14,7 +15,7 @@
     "healthDrain": 0,
     "moraleEffect": -3,
     "workCapacity": 0.3,
-    "description": "Limited work capacity.",
+    "description": "Splinted. Rides in the truck and does the paperwork until it is cleared.",
     "canTravel": true
   },
   "sprained_ankle": {
@@ -23,7 +24,7 @@
     "healthDrain": 0,
     "moraleEffect": -2,
     "workCapacity": 0.5,
-    "description": "Slowed movement.",
+    "description": "Taped and laced tight. Slow on the line.",
     "canTravel": true
   },
   "concussion": {
@@ -32,7 +33,7 @@
     "healthDrain": 2,
     "moraleEffect": -4,
     "workCapacity": 0,
-    "description": "Must rest. Health declining.",
+    "description": "Must rest. No line work until cleared.",
     "canTravel": true
   },
   "flu": {
@@ -65,12 +66,12 @@
     "canTravel": false
   },
   "dysentery": {
-    "name": "Dysentery",
+    "name": "Giardia",
     "duration": 4,
     "healthDrain": 4,
     "moraleEffect": -6,
     "workCapacity": 0,
-    "description": "Severe stomach illness. Needs rest and clean water.",
+    "description": "Beaver fever. Filter the water. Needs rest.",
     "canTravel": false
   },
   "hypothermia": {
@@ -79,7 +80,7 @@
     "healthDrain": 8,
     "moraleEffect": -6,
     "workCapacity": 0,
-    "description": "Dangerously cold. Needs warmth.",
+    "description": "Dangerously cold. Dry clothes, warm truck, watch them.",
     "canTravel": false
   },
   "exhaustion": {
@@ -123,8 +124,9 @@
     "duration": 6,
     "healthDrain": 1,
     "moraleEffect": -4,
-    "workCapacity": 0.2,
-    "description": "Deep saw cut; needs hospital care.",
-    "canTravel": true
+    "workCapacity": 0,
+    "description": "Deep cut. Pressure dressing, ETV to hospital; off the crew.",
+    "canTravel": false,
+    "evacuate": true
   }
 }

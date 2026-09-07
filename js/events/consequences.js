@@ -143,7 +143,8 @@ export function getCondemnedCrossingPenalty(journey) {
   if (condemned.length === 0) return { fuel: 0, equipment: 0, note: null };
 
   return {
-    fuel: 3 * condemned.length,
+    // Litres per leg per broken crossing.
+    fuel: 12 * condemned.length,
     equipment: 2 * condemned.length,
     note: condemned.length === 1
       ? 'The long way around the crossing you broke costs fuel and rubber.'

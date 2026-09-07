@@ -82,6 +82,10 @@ export function generateCrewMember(journeyType, roleOverride = null, rolePool = 
     name,
     role: role.id,
     roleName: role.name,
+    // Every field hand carries at least OFA 1; the attendant carries OFA 3
+    // and the ETV. Whether one is still on the crew gates the whole shift
+    // (hasActiveFirstAidAttendant).
+    firstAidTicket: role.firstAidTicket || (journeyType === 'field' ? 'OFA1' : null),
     health: Math.min(100, Math.max(50, role.baseHealth + healthVariance)),
     maxHealth: 100,
     morale: Math.min(100, Math.max(30, role.baseMorale + moraleVariance)),
@@ -92,13 +96,23 @@ export function generateCrewMember(journeyType, roleOverride = null, rolePool = 
     untreatedSeriousDays: 0,
     lastTreatedDay: null,
     isActive: true,
+    // Kept for saves and older readers; nobody dies on this crew any more.
+    // The worst outcome is an evacuation (status 'evacuated', evacuatedDay).
     isDead: false,
-    hasQuit: false
+    hasQuit: false,
+    status: 'active',
+    evacuatedDay: null
   };
 }
 
 /**
  * Generate a full crew
+ *
+ * The default pool for a field crew is the layout/recon crew in
+ * js/data/json/field/roles.json (driver-swamper and an OFA 3 attendant are
+ * always aboard). Other field programs pass their own table: silviculture
+ * hands in `options.roles` in the same shape and its own `essentialIds`, and
+ * this function never needs to know what a planting crew looks like.
  * @param {number} count - Number of crew members
  * @param {string} journeyType - 'field' or 'desk'
  * @param {Object} [options]
@@ -145,6 +159,49 @@ export function generateCrew(count, journeyType, options = {}) {
   }
 
   return crew;
+}
+
+/**
+ * Is a Level 3 first aid attendant still working?
+ *
+ * WorkSafeBC's first aid tables put a remote crew more than twenty minutes
+ * from hospital under an OFA 3 attendant with an ETV. Without one the crew
+ * can drive, camp and resupply, but nobody walks a line.
+ * @param {Object[]} crew
+ * @returns {boolean}
+ */
+export function hasActiveFirstAidAttendant(crew) {
+  return (crew || []).some((member) => member?.isActive
+    && (member.firstAidTicket === 'OFA3' || member.role === 'medic'));
+}
+
+/**
+ * Take a crew member off the crew for the season.
+ *
+ * The worst thing that happens to anyone on this crew is a medevac or an ETV
+ * run to town: they are gone for the season, WorkSafeBC is notified, and the
+ * shift stops. Nobody dies.
+ * @param {Object} member
+ * @param {Object} [options]
+ * @param {number|null} [options.day] - journey day of the evacuation
+ * @param {'injury'|'illness'} [options.reason]
+ * @param {string} [options.message] - explicit copy instead of the stock line
+ * @returns {{member: Object, message: string|null}}
+ */
+export function evacuateCrewMember(member, { day = null, reason = 'injury', message = null } = {}) {
+  if (!member) return { member, message: null };
+  if (!member.isActive && member.status === 'evacuated') {
+    return { member, message: null };
+  }
+  member.isActive = false;
+  member.isDead = false;
+  member.status = 'evacuated';
+  member.evacuatedDay = Number.isFinite(day) ? day : (member.evacuatedDay ?? null);
+  const pool = reason === 'illness'
+    ? DEPARTURE_MESSAGES.evacuated_illness
+    : DEPARTURE_MESSAGES.evacuated_injury;
+  const template = message || pickRandom(pool || []) || '{name} is evacuated for medical care.';
+  return { member, message: template.replace('{name}', member.name) };
 }
 
 /**
@@ -314,13 +371,28 @@ export function processDailyUpdate(member, conditions = {}) {
     member.morale = Math.max(0, member.morale - 2);
   }
 
-  // Check for death
+  // A fracture or a deep cut is an ETV run, not a week of rest in camp.
+  const evacuatingEffect = member.statusEffects.find((e) => STATUS_EFFECTS[e.effectId]?.evacuate);
+  if (evacuatingEffect) {
+    const def = STATUS_EFFECTS[evacuatingEffect.effectId];
+    const evac = evacuateCrewMember(member, {
+      day: conditions.currentDay ?? null,
+      reason: 'injury',
+      message: `{name}: ${def.description} WorkSafeBC is notified.`
+    });
+    if (evac.message) messages.push(evac.message);
+    return { member, messages };
+  }
+
+  // Nobody dies out here. Health at zero is a medevac and a season lost.
   if (member.health <= 0) {
-    member.isActive = false;
-    member.isDead = true;
-    const deathType = hasSeriousEffect ? 'death_illness' : 'death_injury';
-    const template = pickRandom(DEPARTURE_MESSAGES[deathType]);
-    messages.push(template.replace('{name}', member.name));
+    member.health = 0;
+    const evac = evacuateCrewMember(member, {
+      day: conditions.currentDay ?? null,
+      reason: hasSeriousEffect ? 'illness' : 'injury'
+    });
+    if (evac.message) messages.push(evac.message);
+    return { member, messages };
   }
 
   // Check for quitting (low morale)
@@ -627,22 +699,34 @@ export function getCrewComment(member, journey) {
   if (member.role === 'driver') {
     comments.push(
       "Roads are getting rough up ahead.",
-      'Transmission is holding — for now.'
+      'Transmission is holding — for now.',
+      'That road location wants to go on the other side of the draw.'
     );
   } else if (member.role === 'medic') {
     const injured = journey.crew?.filter(m => m.isActive && m.statusEffects?.length > 0).length || 0;
     if (injured > 0) {
       comments.push(
         `Got ${injured} crew needing attention.`,
-        'We should do triage when we get the chance.'
+        'We should do a proper check on them before the tailgate tomorrow.'
       );
     } else {
-      comments.push('Everyone looks healthy. Knock on wood.');
+      comments.push('Everyone looks healthy. Knock on wood.', 'ETV is stocked and the kit is checked.');
     }
   } else if (member.role === 'spotter') {
     comments.push(
-      'Terrain ahead looks manageable.',
-      'Keep your eyes open for wildlife.'
+      'Line runs clean to the next station.',
+      'Keep your eyes open for wildlife.',
+      'I flagged a wet spot on the north line you should look at.'
+    );
+  } else if (member.role === 'faller') {
+    comments.push(
+      'Boundary is hung to the creek. Ribbon is holding.',
+      'That corner needs a second look before it goes on the map.'
+    );
+  } else if (member.role === 'bucker') {
+    comments.push(
+      'Plots are averaging better than the typing said.',
+      'Lot of defect in the big spruce. Cruise will show it.'
     );
   } else if (member.role === 'mechanic') {
     if (journey.resources?.equipment !== undefined && journey.resources.equipment < 50) {
@@ -672,7 +756,7 @@ export function getCrewDisplayInfo(member) {
 
   let status = 'Good';
   if (!member.isActive) {
-    status = member.isDead ? 'Deceased' : 'Left';
+    status = member.hasQuit ? 'Left' : 'Evacuated';
   } else if (effects.length > 0) {
     status = effects[0].name;
   } else if (member.health < 30) {

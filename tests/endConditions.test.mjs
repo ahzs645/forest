@@ -117,7 +117,7 @@ test('recon mode ends when no active crew remain', () => {
   };
 
   const result = checkEndConditions(reconJourney);
-  assert.deepEqual(result, { gameOver: true, reason: 'All crew members lost' });
+  assert.deepEqual(result, { gameOver: true, reason: 'The crew is off the block: nobody left in the field to finish the season' });
 });
 
 test('recon mode victory uses fully surveyed block count for the final checkpoint', () => {
@@ -194,7 +194,7 @@ test('recon loses when the access season closes with blocks still open', () => {
 
   assert.deepEqual(checkEndConditions(reconJourney), {
     gameOver: true,
-    reason: 'The access season closed with blocks still unassessed'
+    reason: 'The layout deadline passed with blocks still unassessed — the cutting permit goes in without them'
   });
 });
 

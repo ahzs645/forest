@@ -130,20 +130,25 @@ test('planning mission status and action receipt reflect the post-action state i
 
 test('recon mission status exposes only unverified access until fieldwork records it', () => {
   const journey = createReconJourney({ roleId: 'recce', areaId: 'fort-st-john-plateau' });
-  const block = journey.blocks[0];
+  // Stand the crew on the first cutblock; the staging lot is a waypoint.
+  journey.currentBlockIndex = journey.blocks.findIndex((stop) => stop.kind !== 'waypoint');
+  const block = journey.blocks[journey.currentBlockIndex];
   const ui = makeUi();
 
   const initial = updateReconMissionStatus(ui, journey);
-  assert.ok(initial.alerts.some((alert) => /Not checked yet/.test(alert.text)));
-  assert.equal(initial.alerts.some((alert) => /Passable now/.test(alert.text)), false);
-  assert.ok(initial.checklist.some((item) => item.label === 'access ground-truthed' && !item.done));
+  assert.ok(initial.alerts.some((alert) => /not recorded yet/.test(alert.text)));
+  assert.equal(initial.alerts.some((alert) => /Routine truck access/.test(alert.text)), false);
+  assert.ok(initial.checklist.some((item) => item.label === 'road & crossing notes' && !item.done));
 
   journey.reconIntel.byBlock[block.id].accessGroundTruthed = true;
+  journey.reconIntel.byBlock[block.id].layoutWalked = true;
+  journey.reconIntel.byBlock[block.id].valuesSwept = true;
   journey.reconIntel.byBlock[block.id].assessmentComplete = true;
   journey.blocksAssessed = 1;
   const verified = updateReconMissionStatus(ui, journey);
-  assert.ok(verified.checklist.some((item) => item.label === 'access ground-truthed' && item.done));
-  assert.equal(verified.meter.text, `1/${journey.blocks.length}`);
+  assert.ok(verified.checklist.some((item) => item.label === 'road & crossing notes' && item.done));
+  assert.ok(verified.checklist.some((item) => item.label === 'streams classified (S1–S6)' && item.done));
+  assert.equal(verified.meter.text, `1/${journey.packageTarget}`);
 });
 
 test('access-first block choices include different engineering evidence instead of three equivalent cards', () => {

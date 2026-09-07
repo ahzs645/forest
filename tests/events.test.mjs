@@ -164,7 +164,7 @@ test('field event time costs read as lost ground when authored inside effects', 
   // Content still rates delays on the retired eight-hour scale; the shift
   // turns that into the share of the day's ground the trouble cost.
   assert.equal(journey.travelSetback, 1 / 8);
-  assert.ok(result.messages.some((message) => /cost the crew ground/i.test(message)));
+  assert.ok(result.messages.some((message) => /eats into tomorrow's leg/i.test(message)));
 });
 
 test('a heavy field delay never takes the whole shift', () => {

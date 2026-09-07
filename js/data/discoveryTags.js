@@ -81,14 +81,18 @@ const DISCOVERY_TAG_DEFINITIONS = {
     }
   },
   cultural_hold: {
+    // The id is persisted in saves; the label is what the player reads. A
+    // "hold" is a stop-work, which is not what a CMT or a trail on a block
+    // means — it means an archaeology overview and a conversation with the
+    // Nation before the boundary is final.
     id: 'cultural_hold',
-    label: 'Cultural hold',
-    summary: 'Consultation, archaeology, or cultural-value questions are active on the ground.',
+    label: 'CH follow-up / archaeology overview needed',
+    summary: 'Cultural heritage indicators on the ground need an archaeological overview (AOA/PFR) and engagement with the Nation before layout is final.',
     roleNotes: {
-      planner: 'Consultation-sensitive ground is reducing how aggressively you can sequence blocks.',
-      permitter: 'Accommodation and consultation notes will need a cleaner trail.',
-      silviculture: 'Operational choices will need to respect cultural timing and site care.',
-      recce: 'Ground indicators suggest a cultural or consultation hold is possible.'
+      planner: 'CH indicators on the ground are narrowing how aggressively you can sequence blocks.',
+      permitter: 'The CP file needs the archaeology overview and the engagement record before it goes in.',
+      silviculture: 'Operational choices will need to respect cultural sites and the Nation\'s timing.',
+      recce: 'Ground indicators mean an archaeology overview and a referral before the boundary is final.'
     },
     fieldTypeMultipliers: {
       social: 1.2,

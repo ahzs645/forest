@@ -141,6 +141,25 @@ export function getTemperature(weather, block) {
 }
 
 /**
+ * Air temperature for the status line, in degrees Celsius.
+ *
+ * Each weather condition carries a typical interior-BC daytime reading
+ * (js/data/json/field/weather.json); alpine and pass ground runs colder.
+ * @param {Object} weather - Weather condition
+ * @param {Object} [block] - Current block
+ * @returns {number|null} Rounded °C, or null when the condition has none
+ */
+export function getWeatherTempC(weather, block = null) {
+  const base = Number(weather?.tempC);
+  if (!Number.isFinite(base)) return null;
+  let temp = base;
+  if (block?.features?.includes('alpine') || block?.features?.includes('pass')) {
+    temp -= 5;
+  }
+  return Math.round(temp);
+}
+
+/**
  * Check if a block has any dangerous hazards active
  * @param {Object} block - Block to check
  * @param {Object} weather - Current weather

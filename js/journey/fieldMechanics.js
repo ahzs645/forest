@@ -28,23 +28,28 @@ import {
   FIELD_RESOURCES
 } from '../resources.js';
 import { TERRAIN_TYPES, getRandomWeather, getTemperature } from '../data/blocks.js';
-import { advanceDay as advanceSeasonDay } from '../season.js';
+import { advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromAccess } from '../data/discoveryTags.js';
+import { JOURNEY_MILESTONES, MILESTONE_COPY } from './constants.js';
+import { allPackagesFinalized, getPackageProgress } from './packages.js';
 
+// The road verdict is about the road: fill, grade, crossings, drainage. Values
+// constraints — moose winter range, caribou, VQO, CMTs, a Nation's protocol —
+// belong to the values sweep and the site plan, not to whether a truck can get
+// there today. They used to score here too, which is how a public road came
+// out "heli-only" and a territory marker came out "no-go".
 const ACCESS_NO_GO_HAZARDS = new Set([
   'washout',
   'glacial_outburst',
   'karst_collapse',
   'hidden_cavities',
-  'flood',
-  'cultural_protocol'
+  'flood'
 ]);
 
+// A rockslide-prone grade or a one-lane canyon road is rough road, not a
+// reason to fly. Air access comes from features (a fly-in camp) below.
 const ACCESS_HELI_HAZARDS = new Set([
-  'rockslide',
-  'glacial_current',
-  'weather_delay',
-  'narrow'
+  'weather_delay'
 ]);
 
 const ACCESS_WINTER_HAZARDS = new Set([
@@ -65,17 +70,13 @@ const ACCESS_REHAB_HAZARDS = new Set([
   'brush',
   'erosion',
   'tire_damage',
+  'rough_surface',
   'grade',
-  'visual_constraint',
-  'water_intake',
+  'rockslide',
+  'narrow',
   'traffic',
   'industrial',
   'h2s',
-  'caribou',
-  'restrictions',
-  'wildlife',
-  'moose',
-  'grizzly',
   'bridge_weight'
 ]);
 
@@ -85,27 +86,20 @@ const ACCESS_AIR_FEATURES = new Set([
   'bush_plane'
 ]);
 
-const ACCESS_SENSITIVE_FEATURES = new Set([
-  'community_water',
-  'watershed',
-  'salmon_river',
-  'fish_habitat',
-  'first_nation',
-  'cultural_site',
-  'culturally_modified_trees',
-  'caribou_habitat',
-  'sensitive_area',
-  'visual_quality_zone'
-]);
-
 const ROAD_WEAR_HAZARDS = new Set([
   'road_damage',
   'grade',
   'traffic',
   'industrial',
   'tire_damage',
-  'bridge_weight'
+  'bridge_weight',
+  'washout',
+  'flood',
+  'glacial_outburst'
 ]);
+
+// Reasons that mean the crossing, not the road surface, is what needs work.
+const CROSSING_REASON_PATTERN = /crossing|water|river|washout|bridge|culvert|outburst|flood|freshet/i;
 
 const WATER_SENSITIVE_FEATURES = new Set([
   'community_water',
@@ -139,26 +133,53 @@ function addUniqueReason(bucket, reason) {
   bucket.push(reason);
 }
 
-function buildAccessSummary(verdictId, reasons, weather) {
+function buildAccessSummary(verdictId, reasons) {
   const leadReasons = (reasons || []).slice(0, 2).map(labelizeAccessToken).filter(Boolean);
-  const leadText = leadReasons.length > 0 ? leadReasons.join(' and ') : '';
-  const weatherText = weather?.name ? `${labelizeAccessToken(weather.name)} weather` : '';
-  const joined = [leadText, weatherText].filter(Boolean).join(' with ');
+  const lead = leadReasons.length > 0 ? leadReasons.join(' and ') : '';
 
   switch (verdictId) {
     case 'no_go':
-      return joined ? `No-go: do not proceed because of ${joined}.` : 'No-go under current conditions.';
+      return lead ? `Do not proceed: ${lead}.` : 'Do not proceed under current conditions.';
     case 'heli_only':
-      return joined ? `Use air access because of ${joined}.` : 'Use air access for this block.';
+      return lead ? `Air access only: ${lead}.` : 'Air access only.';
     case 'winter_only':
-      return joined ? `Wait for frozen ground because of ${joined}.` : 'Wait for frozen ground before entering.';
+      return lead ? `Frozen-ground access only: ${lead}.` : 'Frozen-ground access only.';
     case 'rehab_needed':
-      return joined ? `Repair the approach before routine use; main concern: ${joined}.` : 'Repair the approach before routine use.';
+      return lead ? `Road work needed before routine use: ${lead}.` : 'Road work needed before routine use.';
     default:
-      return leadText
-        ? `Routine access for now, with ${leadText} to keep watching.`
-        : 'Routine access for now.';
+      return lead ? `Routine truck access; keep an eye on ${lead}.` : 'Routine truck access.';
   }
+}
+
+/**
+ * The two answers a road check actually gives the file: can the crew truck
+ * get in today, and what does development need before harvest traffic.
+ * @param {string} verdictId
+ * @param {string[]} reasons
+ * @param {Object|null} weather
+ * @param {Object} infrastructure
+ * @returns {{todayAccess: string, developmentAccess: string}}
+ */
+function classifyAccessWindows(verdictId, reasons, weather, infrastructure) {
+  const weatherId = normalizeAccessToken(weather?.id);
+  const frozen = weatherId === 'freezing' || weatherId === 'heavy_snow';
+  const dangerous = Boolean(weather?.dangerous || ['storm', 'heavy_rain', 'heavy_snow', 'freezing'].includes(weatherId));
+  const crossingProblem = (reasons || []).some((reason) => CROSSING_REASON_PATTERN.test(String(reason)))
+    || infrastructure?.crossingConditionId === 'restricted';
+
+  let todayAccess = '4x4';
+  if (verdictId === 'no_go') todayAccess = 'closed';
+  else if (verdictId === 'heli_only') todayAccess = 'walk-in';
+  else if (verdictId === 'winter_only') todayAccess = frozen ? '4x4' : 'walk-in';
+  else if (verdictId === 'rehab_needed' && dangerous) todayAccess = 'walk-in';
+
+  let developmentAccess = 'summer road';
+  if (verdictId === 'no_go') developmentAccess = crossingProblem ? 'bridge upgrade required' : 'road rebuild required';
+  else if (verdictId === 'heli_only') developmentAccess = 'heli';
+  else if (verdictId === 'winter_only') developmentAccess = 'winter road';
+  else if (verdictId === 'rehab_needed') developmentAccess = crossingProblem ? 'bridge upgrade required' : 'summer road (rehab first)';
+
+  return { todayAccess, developmentAccess };
 }
 
 function getAccessStance(routePlan, paceId) {
@@ -317,9 +338,16 @@ function buildFieldInfrastructureProfile(block, weather, journey, existingState 
     roadWear += 1;
   }
 
-  if (seasonId === 'spring' && (crossingWear > 0 || watershedPressure > 0)) {
-    crossingWear += 2;
-    watershedPressure += 2;
+  if (seasonId === 'spring') {
+    // Breakup: soft ground and swollen crossings, whether or not anything was
+    // already worn. Muskeg, hills and damaged road all pump in spring.
+    if (terrain === 'muskeg' || terrain === 'hilly' || hazards.has('road_damage')) {
+      roadWear += 3;
+    }
+    if (crossingWear > 0 || watershedPressure > 0) {
+      crossingWear += 2;
+      watershedPressure += 2;
+    }
   }
 
   if (seasonId === 'summer' || seasonId === 'fall') {
@@ -490,15 +518,24 @@ export function getBlockAccessVerdict(block, weather = null, journey = null) {
     addUniqueReason(reasons.no_go, 'road out of service');
   }
 
+  const bridged = features.has('bridge') || features.has('ferry');
   if (infrastructure.crossingConditionId === 'timing_sensitive') {
-    scores.winter_only += 1;
-    addUniqueReason(reasons.winter_only, 'water timing window');
+    if (!bridged) {
+      scores.winter_only += 1;
+      addUniqueReason(reasons.winter_only, 'water timing window');
+    }
   } else if (infrastructure.crossingConditionId === 'high_water') {
-    scores.no_go += 1;
-    addUniqueReason(reasons.no_go, 'high water crossing');
+    // High water under a bridge is an inspection, not a closure.
+    if (bridged) {
+      scores.rehab_needed += 1;
+      addUniqueReason(reasons.rehab_needed, 'bridge inspection due');
+    } else {
+      scores.no_go += 1;
+      addUniqueReason(reasons.no_go, 'high water crossing');
+    }
   } else if (infrastructure.crossingConditionId === 'restricted') {
-    scores.no_go += 2;
-    addUniqueReason(reasons.no_go, 'crossing restricted');
+    scores.no_go += bridged ? 1 : 2;
+    addUniqueReason(reasons.no_go, bridged ? 'bridge approach restricted' : 'crossing restricted');
   }
 
   if (infrastructure.watershedPressureId === 'elevated') {
@@ -510,24 +547,32 @@ export function getBlockAccessVerdict(block, weather = null, journey = null) {
   }
 
   if (terrain === 'river') {
-    scores.winter_only += 1;
-    addUniqueReason(reasons.winter_only, 'river crossing');
+    // A bridged or ferried river is crossed on the structure; only an
+    // unbridged channel wants frozen ground.
+    if (!bridged) {
+      scores.winter_only += 1;
+      addUniqueReason(reasons.winter_only, 'unbridged crossing');
+    }
   } else if (terrain === 'steep') {
     scores.heli_only += 1;
     scores.rehab_needed += 1;
-    addUniqueReason(reasons.heli_only, 'steep ground');
+    addUniqueReason(reasons.rehab_needed, 'steep grade');
   } else if (terrain === 'muskeg') {
     scores.winter_only += 1;
     addUniqueReason(reasons.winter_only, 'muskeg');
-  } else if (terrain === 'cutblock') {
-    scores.rehab_needed += 1;
-    addUniqueReason(reasons.rehab_needed, 'active cutblock');
   } else if (terrain === 'hilly') {
     scores.rehab_needed += 1;
   }
 
   for (const hazard of hazards) {
     if (ACCESS_NO_GO_HAZARDS.has(hazard)) {
+      // A bridged river that floods in freshet is a closure risk to note,
+      // not a channel the truck has to enter.
+      if (hazard === 'flood' && bridged) {
+        scores.rehab_needed += 1;
+        addUniqueReason(reasons.rehab_needed, 'freshet closure risk');
+        continue;
+      }
       scores.no_go += 4;
       addUniqueReason(reasons.no_go, hazard);
       continue;
@@ -540,14 +585,17 @@ export function getBlockAccessVerdict(block, weather = null, journey = null) {
     }
 
     if (ACCESS_WINTER_HAZARDS.has(hazard)) {
+      // A bridged river's "river_crossing" hazard is the bridge, not a ford.
+      if (hazard === 'river_crossing' && bridged) continue;
       scores.winter_only += 2;
       addUniqueReason(reasons.winter_only, hazard);
       continue;
     }
 
     if (ACCESS_REHAB_HAZARDS.has(hazard)) {
-      scores.rehab_needed += 1;
-      addUniqueReason(reasons.rehab_needed, hazard);
+      scores.rehab_needed += hazard === 'rockslide' ? 2 : 1;
+      const label = hazard === 'rockslide' ? 'slide-prone grade' : hazard === 'grade' ? 'steep grade' : hazard;
+      addUniqueReason(reasons.rehab_needed, label);
     }
   }
 
@@ -568,33 +616,6 @@ export function getBlockAccessVerdict(block, weather = null, journey = null) {
     addUniqueReason(reasons.heli_only, 'bush plane staging');
   }
 
-  for (const feature of features) {
-    if (!ACCESS_SENSITIVE_FEATURES.has(feature)) {
-      continue;
-    }
-
-    if (feature === 'community_water' || feature === 'watershed' || feature === 'salmon_river' || feature === 'fish_habitat') {
-      scores.rehab_needed += 1;
-      addUniqueReason(reasons.rehab_needed, feature);
-      continue;
-    }
-
-    if (feature === 'caribou_habitat' || feature === 'sensitive_area') {
-      scores.winter_only += 1;
-      addUniqueReason(reasons.winter_only, feature);
-      continue;
-    }
-
-    if (feature === 'first_nation' || feature === 'cultural_site' || feature === 'culturally_modified_trees') {
-      scores.rehab_needed += 1;
-      addUniqueReason(reasons.rehab_needed, feature);
-      continue;
-    }
-
-    scores.rehab_needed += 1;
-    addUniqueReason(reasons.rehab_needed, feature);
-  }
-
   if (weatherId === 'freezing' || weatherId === 'heavy_snow') {
     const winterSensitive = hazards.has('bog')
       || hazards.has('subsidence')
@@ -611,11 +632,11 @@ export function getBlockAccessVerdict(block, weather = null, journey = null) {
   }
 
   if (weatherId === 'storm' || weatherId === 'heavy_rain') {
-    if (hazards.has('flood') || hazards.has('washout') || hazards.has('erosion') || terrain === 'river') {
+    if (hazards.has('flood') || hazards.has('washout') || hazards.has('erosion') || (terrain === 'river' && !bridged)) {
       scores.no_go += 2;
-      addUniqueReason(reasons.no_go, weatherId === 'storm' ? 'storm conditions' : 'heavy rain');
+      addUniqueReason(reasons.no_go, weatherId === 'storm' ? 'storm-swollen crossing' : 'rain-swollen crossing');
     } else {
-      scores.heli_only += 1;
+      scores.rehab_needed += 1;
     }
   }
 
@@ -639,18 +660,21 @@ export function getBlockAccessVerdict(block, weather = null, journey = null) {
     verdictId = 'rehab_needed';
   }
 
-  const summary = buildAccessSummary(verdictId, reasons[verdictId], weather);
+  const summary = buildAccessSummary(verdictId, reasons[verdictId]);
+  const windows = classifyAccessWindows(verdictId, reasons[verdictId], weather, infrastructure);
 
   return {
     id: verdictId,
     label: {
-      passable_now: 'Passable now',
-      rehab_needed: 'Rehab needed',
-      winter_only: 'Winter-only',
-      heli_only: 'Heli-only',
-      no_go: 'No-go'
-    }[verdictId] || 'Passable now',
+      passable_now: 'Routine access',
+      rehab_needed: 'Road work needed',
+      winter_only: 'Frozen-ground access',
+      heli_only: 'Air access only',
+      no_go: 'Do not proceed'
+    }[verdictId] || 'Routine access',
     summary,
+    todayAccess: windows.todayAccess,
+    developmentAccess: windows.developmentAccess,
     reasons: reasons[verdictId] || [],
     weatherId: weatherId || null,
     terrain: terrain || null,
@@ -703,8 +727,10 @@ export function applyAccessVerdictPressure(journey, verdict, context = {}) {
 
   let delta = (baseByVerdict[verdict.id] || 0) + (stanceAdjustment[stance] || 0) + (Number(verdict.scrutinyDelta) || 0);
 
-  if (verdict.id === 'passable_now' && stance === 'cautious') {
-    delta = -1;
+  // Scrutiny only eases when the check actually recorded a finding. Driving
+  // the safe line into a block with nothing wrong with it is not a finding.
+  if (verdict.id === 'passable_now') {
+    delta = Math.max(0, delta);
   }
 
   delta = Math.max(-1, Math.min(3, delta));
@@ -723,10 +749,15 @@ export function applyAccessVerdictPressure(journey, verdict, context = {}) {
 
 export function formatAccessVerdict(verdict) {
   if (!verdict?.id) {
-    return 'Access verdict: Passable now';
+    return 'Road check: routine truck access.';
+  }
+  if (verdict.id === 'unverified') {
+    return verdict.summary || 'Road check: not recorded yet.';
   }
 
-  return `Access verdict: ${verdict.label}${verdict.summary ? ` — ${verdict.summary}` : ''}`;
+  const today = verdict.todayAccess || (verdict.id === 'no_go' ? 'closed' : '4x4');
+  const development = verdict.developmentAccess || 'summer road';
+  return `Today's access: ${today} · Development access: ${development}. ${verdict.summary || ''}`.trim();
 }
 
 function getCrewTravelModifier(journey) {
@@ -755,12 +786,15 @@ function travelDistanceForDay(journey, paceId) {
   const weatherMod = journey.weather?.travelModifier || 1;
   const routeMod = journey.routePlan?.distanceMultiplier ?? 1;
   const crewTravelMod = getCrewTravelModifier(journey);
+  // The season drives the road: breakup and early snow slow every leg
+  // (js/season.js SEASONAL_MODIFIERS). Summer is the baseline.
+  const seasonMod = Number(getSeasonModifiers(getSeasonId(journey), 'recce')?.travelSpeed) || 1;
 
   // A day's trouble costs ground, not hours (js/events/resolution.js).
   const setback = Math.min(0.75, Math.max(0, journey.travelSetback || 0));
   const timeModifier = 1 - setback;
   const variance = 1 + (Math.random() * 2 - 1) * DAILY_TRAVEL_VARIANCE;
-  const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance * timeModifier * routeMod * crewTravelMod;
+  const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance * timeModifier * routeMod * crewTravelMod * seasonMod;
   return Math.max(0, distance);
 }
 
@@ -783,7 +817,10 @@ export function calculateTravelDistance(journey, paceId) {
 
   const segmentLength = getCurrentSegmentLength(journey.blocks, journey.currentBlockIndex);
   const distanceIntoSegment = getDistanceIntoCurrentSegment(journey);
-  const remaining = Math.max(0, segmentLength - distanceIntoSegment);
+  // Rounded to a hundredth so binary noise never reaches the player as
+  // "Covered 4.399999999999999 km", while a fractional leg still lands on
+  // its boundary exactly.
+  const remaining = Math.round(Math.max(0, segmentLength - distanceIntoSegment) * 100) / 100;
   const clampedDistance = remaining > 0 ? Math.min(distance, remaining) : 0;
   const reachesBlock = clampedDistance >= remaining && remaining > 0;
 
@@ -808,8 +845,10 @@ export function executeFieldAction(journey, paceId) {
   let effectivePaceId = paceId;
   let pace = PACE_OPTIONS[paceId] || PACE_OPTIONS.normal;
 
-  // Track previous progress for milestone detection
-  const prevProgress = getOperationalProgress(journey);
+  // Track previous progress for milestone detection. A recon file's progress
+  // is packages closed, not stops reached (js/journey/packages.js).
+  const isRecon = journey.journeyType === 'recon';
+  const prevProgress = isRecon ? getPackageProgress(journey) : getOperationalProgress(journey);
   const dayNumber = journey.day;
   const startBlock = getCurrentBlock(journey);
   const nextBlockAtStart = getNextBlock(journey);
@@ -842,7 +881,10 @@ export function executeFieldAction(journey, paceId) {
   journey.pace = effectivePaceId;
 
   if (travelInfo.distance > 0) {
-    messages.push(`Covered ${travelInfo.distance} km of traverse at ${pace.name} pace.`);
+    // A layout crew's traverse is walked line and road location between
+    // stops, not a drive measured in shifts.
+    const toward = nextBlockAtStart?.name ? ` toward ${nextBlockAtStart.name}` : '';
+    messages.push(`Walked ${travelInfo.distance} km of line and road location${toward} at ${pace.name} pace.`);
     journey.travelSetback = 0;
   } else {
     if (effectivePaceId === 'resting') {
@@ -852,7 +894,11 @@ export function executeFieldAction(journey, paceId) {
     }
   }
 
-  recordProgressMilestones(journey, prevProgress, messages, dayNumber);
+  if (isRecon) {
+    recordPackageMilestones(journey, prevProgress, messages, dayNumber);
+  } else {
+    recordProgressMilestones(journey, prevProgress, messages, dayNumber);
+  }
 
   const arrivals = advanceBlocksForDistance(journey);
   if (arrivals.length > 0) {
@@ -887,7 +933,9 @@ export function executeFieldAction(journey, paceId) {
   // Check for travel completion. Recon still needs verified assessments before it counts as a win.
   if (journey.distanceTraveled >= journey.totalDistance || journey.currentBlockIndex >= journey.blocks.length - 1) {
     if (journey.journeyType === 'recon') {
-      messages.push('You have reached the end of the block sequence, but the recon package still needs to be verified.');
+      if (!allPackagesFinalized(journey)) {
+        messages.push('You have reached the last stop on the traverse, but packages are still open on the file.');
+      }
     } else {
       journey.isComplete = true;
       messages.push('You have completed the block sequence!');
@@ -918,12 +966,13 @@ export function executeFieldAction(journey, paceId) {
   );
   journey.resources = consumptionResult.resources;
 
-  // Add consumption warnings
+  // Add consumption warnings. Litres print whole; person-days keep a tenth.
+  const printStock = (entry) => (entry.unit === 'L' ? Math.round(entry.value) : Math.round(entry.value * 10) / 10);
   for (const warning of consumptionResult.warnings) {
-    messages.push(`Warning: ${warning.resource} is running low (${warning.value} ${warning.unit}).`);
+    messages.push(`Warning: ${warning.resource} is running low (${printStock(warning)} ${warning.unit}).`);
   }
   for (const critical of consumptionResult.critical) {
-    messages.push(`CRITICAL: ${critical.resource} is almost gone! (${critical.value} ${critical.unit})`);
+    messages.push(`CRITICAL: ${critical.resource} is almost gone! (${printStock(critical)} ${critical.unit})`);
   }
 
   // Process crew daily updates
@@ -975,9 +1024,13 @@ export function executeFieldAction(journey, paceId) {
     messages.push(journey.gameOverReason);
   }
 
-  if (getActiveCrewCount(journey.crew) === 0) {
+  // A crew with nobody left in the field cannot finish the season — unless
+  // the season is already finished. The end-conditions check awards the win
+  // first; this guard used to fire on the same shift as the last package and
+  // hand the player a loss for a file they had just closed.
+  if (getActiveCrewCount(journey.crew) === 0 && !(journey.journeyType === 'recon' && allPackagesFinalized(journey))) {
     journey.isGameOver = true;
-    journey.gameOverReason = 'ALL CREW LOST - No one remains to continue the journey.';
+    journey.gameOverReason = 'ALL CREW LOST - The crew is off the block: nobody left in the field to finish the season.';
     messages.push(journey.gameOverReason);
   }
 
@@ -1148,9 +1201,34 @@ function applyFieldHardships(journey, resourceStatus, messages) {
     }
   }
 
-  if (pressure.fuel >= 2 && typeof journey.resources.budget === 'number') {
-    const scavengingCost = 120 * pressure.fuel;
-    journey.resources.budget = Math.max(0, journey.resources.budget - scavengingCost);
-    messages.push(`Emergency fuel scavenging burned $${scavengingCost.toLocaleString()} in cash and favors.`);
+  // One favour, once. After that the answer is a fuel run from camp
+  // (js/modes/recon.js), not a daily bill for fuel that never arrives.
+  if (pressure.fuel >= 2 && !journey.fuelFavourUsed && typeof journey.resources.budget === 'number') {
+    journey.fuelFavourUsed = true;
+    journey.resources.fuel = Math.min(FIELD_RESOURCES.fuel.max, (journey.resources.fuel || 0) + 40);
+    journey.resources.budget = Math.max(0, journey.resources.budget - 120);
+    messages.push('The neighbouring planting contractor lends a drum against a case of beer and a favour owed. Fuel +40 L, $120.');
   }
+}
+
+/**
+ * Package milestones for a recon file, on the same shape recordProgressMilestones
+ * writes so the camp beat in js/modes/recon.js reads them unchanged.
+ */
+function recordPackageMilestones(journey, previousProgress, messages = [], dayNumber = journey?.day) {
+  const currentProgress = getPackageProgress(journey);
+  if (!journey.milestonesReached) journey.milestonesReached = [];
+  if (!journey.log) journey.log = [];
+  const reached = [];
+  for (const threshold of JOURNEY_MILESTONES) {
+    if (previousProgress >= threshold || currentProgress < threshold || journey.milestonesReached.includes(threshold)) {
+      continue;
+    }
+    journey.milestonesReached.push(threshold);
+    journey.log.push({ day: dayNumber, type: 'milestone', threshold, summary: `Reached ${threshold}% of the packages` });
+    const copy = MILESTONE_COPY.recon?.[threshold] || `Reached ${threshold}% of the packages.`;
+    messages.push(`*** MILESTONE: ${copy} ***`);
+    reached.push(threshold);
+  }
+  return reached;
 }

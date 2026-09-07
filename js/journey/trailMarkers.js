@@ -1,9 +1,11 @@
 /**
  * Trail Markers
- * Oregon Trail's tombstones, BC bush edition: when a crew member dies on a
- * run, the player can carve a marker with their own epitaph. Markers persist
- * in localStorage and stand where they fell — later runs that travel past
- * the same block find them. Failed runs compost into world memory.
+ * Oregon Trail's tombstones, BC bush edition — minus the graves. Nobody dies
+ * on this crew; when someone is flown or driven out for the season, the
+ * player can leave a marker at the incident site with their own line on it.
+ * Markers persist in localStorage and stand where it happened — later runs
+ * that travel past the same block find them. Failed runs compost into world
+ * memory.
  */
 
 const TRAIL_MARKERS_KEY = 'bcft.trailMarkers.v1';
@@ -29,26 +31,26 @@ export function saveTrailMarkers(markers) {
 }
 
 /**
- * Record a marker for a fallen crew member.
+ * Record a marker for a crew member evacuated at this block.
  * @param {Object} marker
  * @param {string} marker.name - crew member's name
  * @param {string} marker.epitaph - the player's line (or a stock one)
  * @param {string} marker.areaId
  * @param {string} marker.blockId
  * @param {string} marker.blockName
- * @param {number} marker.day - shift number they were lost on
- * @param {string} [marker.cause]
+ * @param {number} marker.day - shift number of the incident
+ * @param {string} [marker.cause] - e.g. "fracture, flown out"
  * @returns {Object} the stored marker
  */
 export function recordTrailMarker(marker) {
   const stored = {
     name: String(marker.name || 'Unknown').slice(0, 24),
-    epitaph: String(marker.epitaph || 'They loved this country.').slice(0, MAX_EPITAPH),
+    epitaph: String(marker.epitaph || 'Watch your footing here.').slice(0, MAX_EPITAPH),
     areaId: marker.areaId || null,
     blockId: marker.blockId || null,
     blockName: String(marker.blockName || '').slice(0, 32),
     day: Number(marker.day) || 0,
-    cause: String(marker.cause || 'the trail').slice(0, 28),
+    cause: String(marker.cause || 'incident').slice(0, 28),
     createdAt: Date.now(),
   };
   const markers = loadTrailMarkers();

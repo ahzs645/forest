@@ -4,6 +4,7 @@
  */
 
 import { getSurveyedBlockCount } from '../../journey.js';
+import { allPackagesFinalized, getPackagesFinalized, getPackageTarget } from '../../journey/packages.js';
 
 /**
  * Whether a FOM's public comment period has closed. Older saves recorded the
@@ -37,17 +38,23 @@ export function isPlanningApprovalReady(journey) {
 export function checkReconEndConditions(journey) {
   const crewBasedMode = !journey.protagonist;
   const activeCrewCount = journey.crew?.filter(m => m.isActive).length || 0;
-  const totalBlocks = journey.blocks?.length || 0;
-  const surveyedBlocks = getSurveyedBlockCount(journey);
+  // Only the cutblocks need packages; staging lots, camps and bridges are
+  // waypoints (js/journey/packages.js). A plain field journey counts stops.
+  const isRecon = journey.journeyType === 'recon';
+  const totalBlocks = isRecon ? getPackageTarget(journey) : (journey.blocks?.length || 0);
+  const surveyedBlocks = isRecon ? getPackagesFinalized(journey) : getSurveyedBlockCount(journey);
 
-  // Victory: objective completed. Reaching the destination should count even if the crew limps over the line.
-  if ((totalBlocks > 0 && surveyedBlocks >= totalBlocks) || (totalBlocks === 0 && journey.distanceTraveled >= journey.totalDistance)) {
+  // Victory: objective completed. Every package closed counts even if the crew limps over the line.
+  if ((isRecon && allPackagesFinalized(journey))
+    || (!isRecon && totalBlocks > 0 && surveyedBlocks >= totalBlocks)
+    || (totalBlocks === 0 && journey.distanceTraveled >= journey.totalDistance)) {
     return { victory: true, reason: 'Expedition completed!' };
   }
 
-  // No crew left
+  // Nobody left in the field. Nobody died — they were flown out, driven out,
+  // or walked — but the season cannot be finished from town.
   if (crewBasedMode && activeCrewCount === 0) {
-    return { gameOver: true, reason: 'All crew members lost' };
+    return { gameOver: true, reason: 'The crew is off the block: nobody left in the field to finish the season' };
   }
 
   // Game over: Stranded (no fuel, no food)
@@ -55,20 +62,22 @@ export function checkReconEndConditions(journey) {
     return { gameOver: true, reason: 'Stranded with no supplies' };
   }
 
+  const lastStopIndex = (journey.blocks?.length || 0) - 1;
   if (totalBlocks > 0 &&
-      journey.currentBlockIndex >= totalBlocks - 1 &&
+      lastStopIndex >= 0 &&
+      journey.currentBlockIndex >= lastStopIndex &&
       surveyedBlocks < totalBlocks &&
       (journey.resources.fuel <= 0 || journey.resources.equipment <= 0)) {
     return { gameOver: true, reason: 'Recon package stalled on the final block with no mobility left' };
   }
 
-  // The access season closes. Checked last so a package finished on the final
-  // day still wins above — but a traverse that runs past the window loses,
+  // The layout deadline. Checked last so a package finished on the final
+  // day still wins above — but a season that runs past the window loses,
   // the same way every other mode's deadline works. Recon shipped without
   // this branch while the mission pane advertised "Days left", which is why
   // no recon day ever competed with any other day.
   if (Number.isFinite(journey.deadline) && journey.day > journey.deadline) {
-    return { gameOver: true, reason: 'The access season closed with blocks still unassessed' };
+    return { gameOver: true, reason: 'The layout deadline passed with blocks still unassessed — the cutting permit goes in without them' };
   }
 
   return null;

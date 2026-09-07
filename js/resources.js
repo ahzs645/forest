@@ -18,19 +18,23 @@ export const FIELD_RESOURCES = {
   fuel: {
     id: 'fuel',
     name: 'Fuel',
-    unit: 'gallons',
-    shortLabel: 'FUEL',
-    baseDaily: 4,          // Base daily consumption
-    max: 200,              // Maximum capacity (increased from 150)
-    warning: 40,           // Warning threshold
-    critical: 15,          // Critical threshold
+    // Litres. The old table was in gallons at a quarter of these numbers;
+    // every stock, price and authored delta is scaled x4 so the crew truck
+    // burns a believable ~12 L on a normal day and a drum is 200 L.
+    unit: 'L',
+    shortLabel: 'FUEL (L)',
+    baseDaily: 16,         // Base daily consumption
+    max: 800,              // Two drums in the back plus the tanks
+    warning: 160,          // Warning threshold
+    critical: 60,          // Critical threshold
+    pricePerUnit: 1.8,     // $/L at a bush cardlock
     paceModifiers: {
       resting: 0,
-      camp_work: 0.8,
-      slow: 2,             // Reduced from 3
-      normal: 3,           // Reduced from 5
-      fast: 5,             // Reduced from 8
-      grueling: 8          // Reduced from 12
+      camp_work: 3.2,
+      slow: 8,
+      normal: 12,
+      fast: 20,
+      grueling: 32
     },
     terrainModifiers: {
       flat: 1.0,
@@ -46,7 +50,10 @@ export const FIELD_RESOURCES = {
     unit: 'person-days',
     shortLabel: 'FOOD',
     baseDaily: 1.0,        // Per crew member per day
-    max: 80,               // Maximum storage (increased from 60)
+    // A crew of five eats a crate every four days; two crates and the camp
+    // box is what the truck actually carries. The old cap leaned on an
+    // emergency cache that could be raided every day (js/modes/recon.js).
+    max: 100,
     warning: 20,
     critical: 8,
     // Food consumed faster in cold
@@ -141,8 +148,8 @@ export function createFieldResources(options = {}) {
     // traverse runs a season's worth of days, and the old stores were cut for
     // a run half that long — crews starved before they finished the packages.
     budget: options.budget ?? 3200,
-    fuel: options.fuel ?? 130,
-    food: options.food ?? 65,
+    fuel: options.fuel ?? 520,
+    food: options.food ?? 80,
     equipment: options.equipment ?? 90,
     firstAid: options.firstAid ?? 8
   };
@@ -432,7 +439,7 @@ export function resupply(resources, purchase, definitions, prices = {}) {
  */
 function getDefaultPrice(resourceId) {
   const prices = {
-    fuel: 5,           // per gallon
+    fuel: 1.8,         // per litre
     food: 8,           // per person-day
     equipment: 50,     // per % point repair
     firstAid: 25       // per kit
@@ -452,10 +459,10 @@ export function getSupplyStoreItems(journeyType, locationId = null) {
       {
         id: 'fuel',
         name: 'Fuel',
-        unit: 'gallons',
-        price: 5,
-        max: 50,
-        description: 'Diesel for trucks and equipment'
+        unit: 'L',
+        price: 1.8,
+        max: 200,
+        description: 'Diesel for the trucks and the quad'
       },
       {
         id: 'food',

@@ -104,7 +104,12 @@ function makeSensibleUi(journey) {
 // equal the sum of the kept blocks' distances.
 function assertBlockSubsetConsistency(normalBlocks, scaledBlocks, totalDistance) {
   assert.ok(scaledBlocks.length < normalBlocks.length, 'campaign scale should shrink the block list');
-  assert.equal(scaledBlocks.length, 6, 'recon/field campaign deployments trim to ~6 blocks');
+  assert.ok(scaledBlocks.length >= 5 && scaledBlocks.length <= 7, 'recon/field campaign deployments trim to the leading stops holding three blocks');
+  assert.equal(
+    scaledBlocks.filter((block) => block.kind !== 'waypoint').length,
+    3,
+    'a campaign recon closes three block packages; the waypoints between them ride along',
+  );
 
   const normalIds = normalBlocks.map((b) => b.id);
   let cursor = -1;
@@ -137,15 +142,16 @@ test('campaign scale: recon trims blocks and scales per-run stockpile resources'
   assert.equal(scaled.resources.food, Math.round(normal.resources.food * 0.45));
   assert.equal(scaled.resources.firstAid, Math.round(normal.resources.firstAid * 0.45));
   assert.equal(scaled.resources.gpsUnits, Math.round(normal.resources.gpsUnits * 0.45));
-  assert.equal(scaled.resources.flaggingTape, Math.round(normal.resources.flaggingTape * 0.45));
 
-  // Exact expected numbers from the current createFieldResources() defaults.
+  // Exact expected numbers from the current createFieldResources() defaults
+  // (fuel in litres, flagging in rolls sized to the campaign's three blocks).
   assert.equal(scaled.resources.budget, 1440);
-  assert.equal(scaled.resources.fuel, 59);
-  assert.equal(scaled.resources.food, 29);
+  assert.equal(scaled.resources.fuel, 234);
+  assert.equal(scaled.resources.food, 36);
   assert.equal(scaled.resources.firstAid, 4);
   assert.equal(scaled.resources.gpsUnits, 2);
-  assert.equal(scaled.resources.flaggingTape, 23);
+  assert.equal(scaled.resources.flaggingTape, 12);
+  assert.equal(scaled.packageTarget, 3);
 
   // Equipment is a condition percentage (0-100), not a stockpile - untouched.
   assert.equal(scaled.resources.equipment, normal.resources.equipment);
@@ -341,12 +347,13 @@ test('unscaled createJourney remains behaviorally identical to before the campai
   assert.equal(recon.journeyType, 'recon');
   assert.equal(recon.blocks.length, 12);
   assert.equal(recon.resources.budget, 3200);
-  assert.equal(recon.resources.fuel, 130);
-  assert.equal(recon.resources.food, 65);
+  assert.equal(recon.resources.fuel, 520);
+  assert.equal(recon.resources.food, 80);
   assert.equal(recon.resources.equipment, 90);
   assert.equal(recon.resources.firstAid, 8);
   assert.equal(recon.resources.gpsUnits, 5);
-  assert.equal(recon.resources.flaggingTape, 50);
+  assert.equal(recon.resources.flaggingTape, 24);
+  assert.equal(recon.packageTarget, 6);
   assert.equal(recon.scrutiny, 28);
 
   // Silviculture

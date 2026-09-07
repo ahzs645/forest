@@ -22,16 +22,16 @@ export const JOURNEY_MILESTONES = [25, 50, 75, 90];
 
 export const MILESTONE_COPY = {
   recon: {
-    25: 'Quarter of the traverse complete. The crew is settling into the bush rhythm.',
-    50: 'Halfway there. The route map finally looks beatable.',
-    75: 'Three-quarters complete. Every fuel drum and dry sock matters now.',
-    90: 'Final push. The extraction point is almost within sight.'
+    25: 'A quarter of the packages closed. The crew is settling into the bush rhythm.',
+    50: 'Half the file finalized. The season finally looks beatable.',
+    75: 'Three-quarters of the packages closed. Every fuel drum and dry sock matters now.',
+    90: 'Final push. The last block is on tomorrow\'s map.'
   },
   field: {
     25: 'Quarter of the traverse complete. The crew is settling into the bush rhythm.',
     50: 'Halfway there. The route map finally looks beatable.',
     75: 'Three-quarters complete. Every fuel drum and dry sock matters now.',
-    90: 'Final push. The extraction point is almost within sight.'
+    90: 'Final push. The last block is on tomorrow\'s map.'
   },
   silviculture: {
     25: 'First blocks in the ground and inspected; the year\'s program has a shape.',
