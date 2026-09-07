@@ -192,7 +192,7 @@ function getObjectiveDetail(journey) {
     }
     case 'planning': {
       const plan = journey.plan || {};
-      return `data ${Math.round(plan.dataCompleteness || 0)}/80, analysis ${Math.round(plan.analysisQuality || 0)}/80, buy-in ${Math.round(plan.stakeholderBuyIn || 0)}/75, confidence ${Math.round(plan.ministerialConfidence || 0)}/80`;
+      return `data ${Math.round(plan.dataCompleteness || 0)}/80, analysis ${Math.round(plan.analysisQuality || 0)}/80, buy-in ${Math.round(plan.stakeholderBuyIn || 0)}/75, DM readiness ${Math.round(plan.ministerialConfidence || 0)}/80`;
     }
     case 'permitting':
     case 'desk': {

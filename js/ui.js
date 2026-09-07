@@ -488,10 +488,10 @@ export class TerminalUI {
 
       case 'planning':
         const phaseLabels = {
-          data_gathering: 'Data Gathering',
-          analysis: 'Analysis',
-          stakeholder_review: 'Stakeholder Review',
-          ministerial_approval: 'Ministerial Approval'
+          data_gathering: 'Inventory & Data',
+          analysis: 'Analysis & Draft Plan',
+          stakeholder_review: 'Engagement & Public Review',
+          ministerial_approval: 'District Manager Decision'
         };
         this.updateLocationPanel({
           name: `Strategic Planning`,
