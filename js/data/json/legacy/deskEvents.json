@@ -9,7 +9,7 @@
     "options": [
       {
         "label": "Redesign the plan around the deferrals",
-        "outcome": "You pull the affected blocks and rebuild the schedule. Slower, but the plan is defensible and the ministry notices.",
+        "outcome": "You pull the affected blocks and rebuild the schedule. Slower, but the plan is defensible and the district notices.",
         "effects": {
           "progress": -5,
           "politicalCapital": 6,
@@ -34,7 +34,7 @@
     "type": "policy",
     "severity": "minor",
     "probability": 0.0125,
-    "description": "Provincial government phases out glyphosate use - chemical vegetation control no longer permitted",
+    "description": "The province phases out glyphosate under the Integrated Pest Management Act - chemical vegetation control no longer permitted",
     "options": [
       {
         "label": "Retool to manual brushing crews",
@@ -47,7 +47,7 @@
       },
       {
         "label": "Stretch the remaining chemical stock through the transition",
-        "outcome": "You use up what is legally on hand and hope the timeline holds. Cheaper, but auditors are watching the phase-out closely.",
+        "outcome": "You use up what is legally on hand and hope the timeline holds. Cheaper, but ENV is watching the phase-out closely.",
         "effects": {
           "budget": -1000,
           "compliance": -4,
@@ -62,7 +62,7 @@
     "type": "natural_disaster",
     "severity": "minor",
     "probability": 0.025,
-    "description": "Major fires affect timber supply, government fast-tracks salvage permits (25-day timeline)",
+    "description": "Major fires affect timber supply; the district is issuing salvage cutting permits on a 25-day target",
     "options": [
       {
         "label": "Chase the fast-tracked salvage window",
@@ -118,7 +118,7 @@
     "type": "policy",
     "severity": "minor",
     "probability": 0.025,
-    "description": "Court ruling strengthens First Nations land rights - stricter consultation requirements now in effect",
+    "description": "A court ruling strengthens First Nations land rights - the Crown's consultation standard just went up, and so did what the district expects of your engagement",
     "options": [
       {
         "label": "Rebuild the consultation plan to the new standard",
@@ -131,7 +131,7 @@
         }
       },
       {
-        "label": "Wait for ministry guidance before changing anything",
+        "label": "Wait for legal's read of the ruling before changing anything",
         "outcome": "You keep working to the old standard while the lawyers read the ruling. The delay is noticed by the Nations most affected.",
         "effects": {
           "progress": 2,
@@ -232,6 +232,10 @@
           "politicalCapital": 5
         }
       }
+    ],
+    "areaTags": [
+      "peatland",
+      "peace-region"
     ]
   },
   {
@@ -240,7 +244,7 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "The province issues an emergency access restriction around a caribou maternal pen overlapping your BWBS and SWB tenure.",
+    "description": "The province issues an emergency access restriction (a GAR order) around a caribou maternal pen overlapping your BWBS and SWB tenure.",
     "options": [
       {
         "label": "Shift development to alternate watersheds",
@@ -252,7 +256,7 @@
       },
       {
         "label": "Negotiate limited access windows with guardians",
-        "outcome": "A co-developed schedule allows short hauling windows with Indigenous monitors on site.",
+        "outcome": "A co-developed schedule allows short access windows with the Nation's Guardians on site.",
         "effects": {
           "permits_approved": 1,
           "politicalCapital": 4
@@ -266,6 +270,9 @@
           "politicalCapital": -5
         }
       }
+    ],
+    "areaTags": [
+      "caribou"
     ]
   },
   {
@@ -300,6 +307,9 @@
           "politicalCapital": 3
         }
       }
+    ],
+    "areaTags": [
+      "sbs"
     ]
   },
   {
@@ -336,6 +346,9 @@
           "politicalCapital": 1
         }
       }
+    ],
+    "areaTags": [
+      "salmon"
     ]
   },
   {
@@ -372,6 +385,10 @@
           "politicalCapital": 1
         }
       }
+    ],
+    "areaTags": [
+      "bwbs",
+      "winter-road"
     ]
   },
   {
@@ -407,6 +424,9 @@
           "politicalCapital": -3
         }
       }
+    ],
+    "areaTags": [
+      "karst"
     ]
   },
   {
@@ -436,12 +456,15 @@
       },
       {
         "label": "Dispute the readings and continue",
-        "outcome": "You question data quality and push ahead. Officials warn that enforcement is imminent.",
+        "outcome": "You question data quality and push ahead. The district warns that a C&E order is imminent.",
         "effects": {
           "permits_approved": 1,
           "politicalCapital": -4
         }
       }
+    ],
+    "areaTags": [
+      "community-water"
     ]
   },
   {
@@ -478,6 +501,10 @@
           "politicalCapital": -4
         }
       }
+    ],
+    "areaTags": [
+      "swb",
+      "glacial"
     ]
   },
   {
@@ -621,6 +648,10 @@
           "politicalCapital": -2
         }
       }
+    ],
+    "areaTags": [
+      "sbs",
+      "beetle-recovery"
     ]
   },
   {
@@ -649,6 +680,10 @@
           "politicalCapital": -2
         }
       }
+    ],
+    "areaTags": [
+      "sbs",
+      "beetle-recovery"
     ]
   },
   {
@@ -685,19 +720,23 @@
           "politicalCapital": -5
         }
       }
+    ],
+    "areaTags": [
+      "sbs",
+      "beetle-recovery"
     ]
   },
   {
     "id": "fatality_falling_tree",
-    "title": "Falling Tree Fatality",
+    "title": "Struck-by Injury - Danger Tree",
     "type": "safety",
     "severity": "moderate",
     "probability": 0.003,
-    "description": "A 28-year-old faller was struck and killed by a widow-maker during harvest operations",
+    "description": "A 28-year-old faller on a contractor's crew was struck by a danger-tree top during harvest operations and medevaced with a fractured pelvis. He is off for the season. WorkSafeBC has been notified and a prevention officer is on site.",
     "options": [
       {
         "label": "Full cooperation with investigation, implement all safety recommendations",
-        "outcome": "Hire external safety consultants, implement gold-standard protocols",
+        "outcome": "Hire external safety consultants, implement every recommendation from the WorkSafeBC investigation.",
         "effects": {
           "budget": -20000,
           "politicalCapital": 3,
@@ -706,7 +745,7 @@
       },
       {
         "label": "Standard compliance response, meet minimum legal requirements",
-        "outcome": "Basic legal compliance, internal safety review",
+        "outcome": "Basic legal compliance, internal safety review.",
         "effects": {
           "budget": -7500,
           "politicalCapital": 1,
@@ -724,8 +763,8 @@
         }
       },
       {
-        "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
+        "label": "Attempt to bribe the WorkSafeBC officers",
+        "outcome": "ILLEGAL: Attempt to corrupt a regulator's officers. Word travels fast, and the file lands on a Crown prosecutor's desk.",
         "effects": {
           "budget": -15000,
           "politicalCapital": -15,
@@ -734,19 +773,22 @@
           "timeUsed": 6
         }
       }
+    ],
+    "roles": [
+      "manager"
     ]
   },
   {
     "id": "fatality_equipment",
-    "title": "Equipment Rollover Fatality",
+    "title": "Equipment Rollover Injury",
     "type": "safety",
     "severity": "moderate",
     "probability": 0.003,
-    "description": "Heavy equipment operator crushed when loader rolled over on steep terrain",
+    "description": "A contractor's loader rolled on steep ground. The operator was cut out of the cab and airlifted with crush injuries - stable, and off for the season. WorkSafeBC has been notified.",
     "options": [
       {
         "label": "Full cooperation with investigation, implement all safety recommendations",
-        "outcome": "Hire external safety consultants, implement gold-standard protocols",
+        "outcome": "Hire external safety consultants, implement every recommendation from the WorkSafeBC investigation.",
         "effects": {
           "budget": -20000,
           "politicalCapital": 3,
@@ -755,7 +797,7 @@
       },
       {
         "label": "Standard compliance response, meet minimum legal requirements",
-        "outcome": "Basic legal compliance, internal safety review",
+        "outcome": "Basic legal compliance, internal safety review.",
         "effects": {
           "budget": -7500,
           "politicalCapital": 1,
@@ -773,8 +815,8 @@
         }
       },
       {
-        "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
+        "label": "Attempt to bribe the WorkSafeBC officers",
+        "outcome": "ILLEGAL: Attempt to corrupt a regulator's officers. Word travels fast, and the file lands on a Crown prosecutor's desk.",
         "effects": {
           "budget": -15000,
           "politicalCapital": -15,
@@ -783,19 +825,22 @@
           "timeUsed": 6
         }
       }
+    ],
+    "roles": [
+      "manager"
     ]
   },
   {
     "id": "fatality_transportation",
-    "title": "Transportation Fatality",
+    "title": "Highway Collision Injury",
     "type": "safety",
     "severity": "moderate",
     "probability": 0.003,
-    "description": "Logging truck driver killed in highway collision with loaded trailer",
+    "description": "A contract log-truck driver was cut out of his cab after a highway collision with a loaded trailer - critical but stable in Prince George. WorkSafeBC and the RCMP are both on the file.",
     "options": [
       {
         "label": "Full cooperation with investigation, implement all safety recommendations",
-        "outcome": "Hire external safety consultants, implement gold-standard protocols",
+        "outcome": "Hire external safety consultants, implement every recommendation from the WorkSafeBC investigation.",
         "effects": {
           "budget": -20000,
           "politicalCapital": 3,
@@ -804,7 +849,7 @@
       },
       {
         "label": "Standard compliance response, meet minimum legal requirements",
-        "outcome": "Basic legal compliance, internal safety review",
+        "outcome": "Basic legal compliance, internal safety review.",
         "effects": {
           "budget": -7500,
           "politicalCapital": 1,
@@ -822,8 +867,8 @@
         }
       },
       {
-        "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
+        "label": "Attempt to bribe the WorkSafeBC officers",
+        "outcome": "ILLEGAL: Attempt to corrupt a regulator's officers. Word travels fast, and the file lands on a Crown prosecutor's desk.",
         "effects": {
           "budget": -15000,
           "politicalCapital": -15,
@@ -832,6 +877,9 @@
           "timeUsed": 6
         }
       }
+    ],
+    "roles": [
+      "manager"
     ]
   },
   {
@@ -840,11 +888,11 @@
     "type": "safety",
     "severity": "moderate",
     "probability": 0.003,
-    "description": "Worker suffered severe leg lacerations requiring emergency helicopter evacuation",
+    "description": "A worker suffered severe leg lacerations requiring helicopter evacuation. WorkSafeBC has been notified.",
     "options": [
       {
         "label": "Full cooperation with investigation, implement all safety recommendations",
-        "outcome": "Hire external safety consultants, implement gold-standard protocols",
+        "outcome": "Hire external safety consultants, implement every recommendation from the WorkSafeBC investigation.",
         "effects": {
           "budget": -20000,
           "politicalCapital": 3,
@@ -853,7 +901,7 @@
       },
       {
         "label": "Standard compliance response, meet minimum legal requirements",
-        "outcome": "Basic legal compliance, internal safety review",
+        "outcome": "Basic legal compliance, internal safety review.",
         "effects": {
           "budget": -7500,
           "politicalCapital": 1,
@@ -871,8 +919,8 @@
         }
       },
       {
-        "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
+        "label": "Attempt to bribe the WorkSafeBC officers",
+        "outcome": "ILLEGAL: Attempt to corrupt a regulator's officers. Word travels fast, and the file lands on a Crown prosecutor's desk.",
         "effects": {
           "budget": -15000,
           "politicalCapital": -15,
@@ -881,19 +929,22 @@
           "timeUsed": 6
         }
       }
+    ],
+    "roles": [
+      "manager"
     ]
   },
   {
     "id": "multiple_injury_helicopter",
-    "title": "Helicopter Crash",
+    "title": "Helicopter Hard Landing",
     "type": "safety",
     "severity": "moderate",
     "probability": 0.003,
-    "description": "Helicopter carrying 4 workers crashed during crew transport, 2 critical injuries",
+    "description": "A helicopter carrying 4 workers made a hard landing during crew transport; 2 critical injuries, everyone alive. WorkSafeBC and the Transportation Safety Board are on the file.",
     "options": [
       {
         "label": "Full cooperation with investigation, implement all safety recommendations",
-        "outcome": "Hire external safety consultants, implement gold-standard protocols",
+        "outcome": "Hire external safety consultants, implement every recommendation from the WorkSafeBC investigation.",
         "effects": {
           "budget": -20000,
           "politicalCapital": 3,
@@ -902,7 +953,7 @@
       },
       {
         "label": "Standard compliance response, meet minimum legal requirements",
-        "outcome": "Basic legal compliance, internal safety review",
+        "outcome": "Basic legal compliance, internal safety review.",
         "effects": {
           "budget": -7500,
           "politicalCapital": 1,
@@ -920,8 +971,8 @@
         }
       },
       {
-        "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
+        "label": "Attempt to bribe the WorkSafeBC officers",
+        "outcome": "ILLEGAL: Attempt to corrupt a regulator's officers. Word travels fast, and the file lands on a Crown prosecutor's desk.",
         "effects": {
           "budget": -15000,
           "politicalCapital": -15,
@@ -930,6 +981,9 @@
           "timeUsed": 6
         }
       }
+    ],
+    "roles": [
+      "manager"
     ]
   },
   {
@@ -938,11 +992,11 @@
     "type": "safety",
     "severity": "moderate",
     "probability": 0.003,
-    "description": "3 workers hospitalized after exposure to herbicide spray drift",
+    "description": "3 workers hospitalized after exposure to herbicide spray drift. WorkSafeBC is on the file and ENV wants the pesticide use notice.",
     "options": [
       {
         "label": "Full cooperation with investigation, implement all safety recommendations",
-        "outcome": "Hire external safety consultants, implement gold-standard protocols",
+        "outcome": "Hire external safety consultants, implement every recommendation from the WorkSafeBC investigation.",
         "effects": {
           "budget": -20000,
           "politicalCapital": 3,
@@ -951,7 +1005,7 @@
       },
       {
         "label": "Standard compliance response, meet minimum legal requirements",
-        "outcome": "Basic legal compliance, internal safety review",
+        "outcome": "Basic legal compliance, internal safety review.",
         "effects": {
           "budget": -7500,
           "politicalCapital": 1,
@@ -969,8 +1023,8 @@
         }
       },
       {
-        "label": "Attempt to bribe WorkSafeBC inspectors",
-        "outcome": "ILLEGAL: Attempt to corrupt government officials. Word travels fast, and the file lands on a prosecutor's desk.",
+        "label": "Attempt to bribe the WorkSafeBC officers",
+        "outcome": "ILLEGAL: Attempt to corrupt a regulator's officers. Word travels fast, and the file lands on a Crown prosecutor's desk.",
         "effects": {
           "budget": -15000,
           "politicalCapital": -15,
@@ -979,6 +1033,9 @@
           "timeUsed": 6
         }
       }
+    ],
+    "roles": [
+      "manager"
     ]
   }
 ]
