@@ -18,6 +18,9 @@ import { ODDS_PREDICATE_NAMES, OUTCOME_BANDS } from '../js/events/odds.js';
 import { CONSEQUENCE_FLAGS } from '../js/events/consequences.js';
 
 const VALID_ROLES = new Set(['planner', 'permitter', 'recce', 'silviculture', 'manager']);
+// Season ids as journey.season.currentSeason carries them (js/season.js);
+// events may gate on them with `seasons: [...]` (eventMatchesJourneyContext).
+const VALID_SEASONS = new Set(['spring', 'summer', 'fall', 'winter']);
 const VALID_JOURNEY_TYPES = new Set(['field', 'recon', 'silviculture', 'desk', 'planning', 'permitting', 'manager']);
 
 // Vocabulary the engine actually consumes (js/events/resolution.js,
@@ -44,6 +47,8 @@ const VALID_EFFECT_KEYS = new Set([
   'budget', 'fuel', 'food', 'equipment', 'firstAid', 'politicalCapital',
   'timeUsed', 'progress', 'crew_health', 'crew_morale', 'compliance',
   'relationships', 'scrutiny', 'reputation', 'permits_approved', 'data',
+  // Planning-file currencies (resolved by the planning mode).
+  'analysis', 'buyIn',
   // Field progress can explicitly mean turning back rather than incidental delay.
   'progressMode',
 ]);
@@ -90,6 +95,18 @@ for (const { pool, event } of ALL) {
   }
   for (const jt of event.journeyTypes || []) {
     if (!VALID_JOURNEY_TYPES.has(jt)) errors.push(`${where}: unknown journeyType "${jt}"`);
+  }
+  if (event.seasons !== undefined) {
+    if (!Array.isArray(event.seasons) || event.seasons.length === 0) {
+      errors.push(`${where}: seasons must be a non-empty array`);
+    } else {
+      for (const season of event.seasons) {
+        if (!VALID_SEASONS.has(season)) errors.push(`${where}: unknown season "${season}"`);
+      }
+    }
+  }
+  if (event.expeditionOnly !== undefined && typeof event.expeditionOnly !== 'boolean') {
+    errors.push(`${where}: expeditionOnly must be a boolean`);
   }
 
   if (!Array.isArray(event.options) || event.options.length === 0) {

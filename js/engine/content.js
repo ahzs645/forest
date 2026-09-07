@@ -7,6 +7,12 @@ import {
   MISCHIEF_OPTIONS,
 } from "../data/index.js";
 import {
+  actFitsRole,
+  buildCaughtNarrative,
+  capitalizeProposer,
+  CATEGORY_CLEAN_OUTCOMES,
+} from "../data/illegalActs.js";
+import {
   AUDIT_TEMPTATION_TAGS,
   COMMUNITY_TEMPTATION_TAGS,
   ECOLOGICAL_TEMPTATION_TAGS,
@@ -25,7 +31,6 @@ import {
   clamp,
   eventTouchesMetric,
   formatMetricName,
-  hasAnyTag,
   hasMatchingTag,
   humanizeLabel,
   issuePreviewSeverity,
@@ -126,17 +131,13 @@ export function drawSeasonalTemptation(state, rng = Math.random) {
     return null;
   }
 
-  const roleId = state.role.id;
-  const matchingActs = ILLEGAL_ACTS.filter((act) => {
-    if (!act) {
-      return false;
-    }
-    if (!Array.isArray(act.roles) || act.roles.length === 0) {
-      return true;
-    }
-    return act.roles.includes(roleId);
-  });
-  const pool = matchingActs.length ? matchingActs : ILLEGAL_ACTS;
+  // Role and phase are hard gates (js/data/illegalActs.js): there is no
+  // fallback to the whole library, so a role with nothing left to be offered
+  // is offered nothing.
+  const pool = ILLEGAL_ACTS.filter((act) => actMatchesSeasonalTemptationContext(act, state));
+  if (!pool.length) {
+    return null;
+  }
   const weightedPool = pool.map((act) => ({
     act,
     weight: scoreIllegalActSelection(act, state),
@@ -630,9 +631,15 @@ function summarizeTemptationRisk(successEffects, failEffects) {
 
 export function adaptIllegalActTemptation(act, state, rng = Math.random) {
   const profile = getTemptationProfile(state);
+  const isDeskRole = state?.role?.id === "planner" || state?.role?.id === "permitter" || state?.role?.id === "manager";
   const rawSuccessEffects = buildIllegalActSuccessEffects(act, state, rng);
   const rawFailEffects = buildIllegalActFailEffects(act, state, rawSuccessEffects);
   const failFlags = buildIllegalActFailFlags(act);
+  const successEffects = adaptOperationalEventEffects(rawSuccessEffects);
+  const failEffects = adaptOperationalEventEffects(rawFailEffects);
+  const cleanLine = act?.cleanOutcome || CATEGORY_CLEAN_OUTCOMES[act?.category] || CATEGORY_CLEAN_OUTCOMES.corporate;
+  const payoffLine = act?.payoff?.line ? ` You get ${act.payoff.line}.` : "";
+  const institution = act?.catch?.by ? ` (${act.catch.by})` : "";
 
   return normalizeSeasonalCard({
     id: `temptation:${act.id}`,
@@ -641,27 +648,29 @@ export function adaptIllegalActTemptation(act, state, rng = Math.random) {
     flavor: `Adapted temptation • ${profile.flavor}`,
     options: [
       {
-        label: "Refuse and keep it clean",
-        outcome: "You walk away. It keeps the season slower, but the file stays defensible.",
+        label: isDeskRole ? "Decline" : "Say no",
+        outcome: "The file stays yours. Nothing else changes.",
         effects: adaptOperationalEventEffects(buildIllegalActRefuseEffects(state)),
       },
       {
-        label: "Take the shortcut (high risk)",
+        label: `Take the shortcut${institution}`,
         outcome: "You attempt something risky...",
-        preview: summarizeTemptationRisk(rawSuccessEffects, rawFailEffects),
+        // Adapted effects, so the preview names the season's five meters
+        // rather than raw keys like equipment or politicalCapital.
+        preview: summarizeTemptationRisk(successEffects, failEffects),
         risk: {
           baseSuccess: getIllegalActBaseSuccess(act, state),
-          successEffects: adaptOperationalEventEffects(rawSuccessEffects),
-          failEffects: adaptOperationalEventEffects(rawFailEffects),
-          successOutcome: "The shortcut lands for now. The gains show up immediately, and the exposure stays buried this season.",
-          failOutcome: "The shortcut unravels fast. Questions start landing before you can shape the story.",
+          successEffects,
+          failEffects,
+          successOutcome: `${cleanLine}${payoffLine} Nobody asks this season.`,
+          failOutcome: `It does not hold. ${buildCaughtNarrative(act, Number(state?.round || 1) % 2)}`,
           failFlags,
           failScheduleIssues: buildIllegalActFailScheduleIssues(act, state),
         },
       },
       {
         label: "Document and report",
-        outcome: "You put the concern on record. It slows the work, but strengthens your position if scrutiny follows.",
+        outcome: "A note to file and a call to your manager. Ten minutes, and the only version of this anyone can audit.",
         effects: adaptOperationalEventEffects(buildIllegalActReportEffects(state)),
       },
     ],
@@ -1064,8 +1073,54 @@ function scoreOperationalEventSelection(event, state) {
   return Math.max(0.25, weight);
 }
 
+const SEASONAL_ROUND_SEASON_IDS = ["spring", "summer", "fall", "winter"];
+
+function seasonIdForRound(round) {
+  const index = Math.max(0, Math.min(SEASONAL_ROUND_SEASON_IDS.length - 1, (Number(round) || 1) - 1));
+  return SEASONAL_ROUND_SEASON_IDS[index];
+}
+
+/**
+ * Whether an act belongs in front of this seasonal run: role and phase from
+ * the library, then season, area, difficulty and scrutiny gates.
+ */
+export function actMatchesSeasonalTemptationContext(act, state) {
+  if (!act || act.retired || !state?.role?.id) {
+    return false;
+  }
+  if (!actFitsRole(act, state.role.id)) {
+    return false;
+  }
+  const season = seasonIdForRound(state.round);
+  if (Array.isArray(act.seasons) && act.seasons.length && !act.seasons.includes(season)) {
+    return false;
+  }
+  const areaTags = Array.isArray(state.area?.tags) ? state.area.tags : [];
+  if (Array.isArray(act.areaTags) && act.areaTags.length && !act.areaTags.some((tag) => areaTags.includes(tag))) {
+    return false;
+  }
+  if (Array.isArray(act.areaIds) && act.areaIds.length && !act.areaIds.includes(state.area?.id)) {
+    return false;
+  }
+  if (act.tier === "comic" && state.difficulty === "hard") {
+    return false;
+  }
+  if (act.onlyWhen === "scrutinyHigh" && Number(state.metrics?.compliance ?? 100) > 45) {
+    return false;
+  }
+  return true;
+}
+
+// Tier weights: grey acts at ~60% of core, comic acts a small side order, rare
+// acts rarer still. The deployment lane sizes comic to ~15% of draws; here the
+// pool is scored per act so the same intent is a flat weight.
+const ILLEGAL_ACT_TIER_WEIGHTS = { core: 1, grey: 0.6, comic: 0.2 };
+
 function scoreIllegalActSelection(act, state) {
-  let weight = 1;
+  let weight = ILLEGAL_ACT_TIER_WEIGHTS[act?.tier] ?? 1;
+  if (act?.rare) {
+    weight *= 0.25;
+  }
   const actTags = Array.isArray(act?.tags) ? act.tags : [];
   const areaTags = Array.isArray(state.area?.tags) ? state.area.tags : [];
   const profile = getTemptationProfile(state);
@@ -1095,7 +1150,7 @@ function scoreIllegalActSelection(act, state) {
     weight += 1;
   }
 
-  return Math.max(0.25, weight);
+  return Math.max(0.1, weight);
 }
 
 function scorePendingIssueCandidateSelection(candidate, issue, state, context) {
@@ -1213,8 +1268,16 @@ function buildOperationalEventDescription(event) {
 }
 
 function buildIllegalActDescription(act, state) {
-  const details = [String(act.description || "A tempting shortcut appears.")];
-  const relevantTags = (Array.isArray(act.tags) ? act.tags : [])
+  const details = [];
+  const pitch = String(act?.pitch || "").trim();
+  if (pitch) {
+    const proposer = capitalizeProposer(act?.proposer);
+    details.push(/^yourself/i.test(String(act?.proposer || ""))
+      ? `It is 4:45 on a Friday and the thought is yours: “${pitch}”`
+      : `${proposer}: “${pitch}”`);
+  }
+  details.push(String(act?.description || "A tempting shortcut appears."));
+  const relevantTags = (Array.isArray(act?.tags) ? act.tags : [])
     .filter((tag) => tag !== state?.role?.id)
     .slice(0, 3);
   if (relevantTags.length) {
@@ -1256,12 +1319,18 @@ function buildIllegalActFailEffects(act, state, successEffects) {
   return effects;
 }
 
-function buildIllegalActRefuseEffects(state) {
-  return { ...getTemptationProfile(state).refuseEffects };
+// Refusing is brief and free: no meter moves because you said no.
+function buildIllegalActRefuseEffects() {
+  return {};
 }
 
+// A note to file and a phone call is ten minutes, not a quarter-shift.
 function buildIllegalActReportEffects(state) {
-  return { ...getTemptationProfile(state).reportEffects };
+  const roleId = state?.role?.id;
+  const desk = roleId === "planner" || roleId === "permitter" || roleId === "manager";
+  return desk
+    ? { compliance: 2, politicalCapital: 1, timeUsed: 0.5 }
+    : { compliance: 2, timeUsed: 0.5 };
 }
 
 function applyIllegalActTagEffects(effects, act) {
@@ -1279,35 +1348,210 @@ function applyIllegalActTagEffects(effects, act) {
   }
 }
 
+// What a caught band leaves behind in the seasonal flag set, by the
+// institution that caught it and the kind of act. These are the flags the
+// chained issues in js/data/chainedIssues.js gate on.
+const FAIL_FLAGS_BY_INSTITUTION = {
+  "C&E": (category) => (["riparian", "wildlife", "fire", "spill", "herbicide"].includes(category)
+    ? { environmentalAudit: true }
+    : { auditTriggered: true }),
+  FPB: () => ({ auditTriggered: true }),
+  FPBC: () => ({ professionalAuditActive: true }),
+  WorkSafeBC: () => ({ safetyInvestigation: true }),
+  BCWS: () => ({ environmentalAudit: true }),
+  COS: () => ({ environmentalViolation: true }),
+  ENV: () => ({ environmentalAudit: true }),
+  DFO: () => ({ environmentalAudit: true }),
+  "Archaeology Branch": () => ({ culturalViolation: true }),
+  "Timber Pricing": () => ({ auditTriggered: true }),
+  "Revenue Branch": () => ({ auditTriggered: true }),
+  "the Nation": () => ({ culturalViolation: true, firstNationReferralHidden: true }),
+  RCMP: () => ({ underInvestigation: true, forgeryInvestigation: true }),
+  CVSE: () => ({ safetyInvestigation: true }),
+  "Transport Canada": () => ({ auditTriggered: true }),
+  "internal audit": () => ({ ethicsInquiry: true }),
+  "the contractor": () => ({}),
+};
+
 function buildIllegalActFailFlags(act) {
-  const flags = {};
-  const tags = Array.isArray(act?.tags) ? act.tags : [];
-
-  if (hasMatchingTag(tags, AUDIT_TEMPTATION_TAGS)) {
-    flags.auditTriggered = true;
+  const category = act?.category || "corporate";
+  const resolver = FAIL_FLAGS_BY_INSTITUTION[act?.catch?.by];
+  const flags = resolver ? resolver(category) : { auditTriggered: true };
+  if (category === "results") {
+    flags.plantingFraud = true;
   }
-  if (hasMatchingTag(tags, ECOLOGICAL_TEMPTATION_TAGS)) {
-    flags.environmentalAudit = true;
-  }
-  if (tags.some((tag) => ["bribery", "collusion", "corruption", "laundering", "payroll", "double-dip"].includes(tag))) {
-    flags.ethicsInquiry = true;
-  }
-  if (tags.some((tag) => ["cultural"].includes(tag))) {
-    flags.culturalViolation = true;
-  }
-  if (tags.some((tag) => ["blatant", "sabotage", "espionage"].includes(tag))) {
-    flags.underInvestigation = true;
-  }
-
   return flags;
+}
+
+/**
+ * Which seasonal issue a caught shortcut schedules, routed by the institution
+ * that caught it and the kind of act, and filtered to issues the role can
+ * actually draw. Hiding a bear den no longer schedules a collar drop because
+ * the word "wildlife" appeared in a tag: the act says C&E caught it and it
+ * was a wildlife act, so a field role gets the wildlife fallout.
+ */
+const FALLOUT_BY_INSTITUTION = {
+  "C&E": (roleId, category, add) => {
+    if (roleId === "planner") add("ministry-data-audit", 5, { progress: 1.5, compliance: 1 });
+    if (roleId === "permitter") add("fom-consistency-gap", 5, { progress: 1.5, compliance: 1 });
+    if (roleId === "recce" || roleId === "silviculture") {
+      if (category === "wildlife") {
+        add("wildlife-collar-drop", 5, { forestHealth: 2.5, relationships: 2 });
+      } else if (["riparian", "fire", "spill", "boundary", "herbicide"].includes(category)) {
+        add(roleId === "silviculture" ? "environmental-audit-fallout" : "riparian-reclassification-call", 5, { forestHealth: 3, compliance: 2 });
+      } else {
+        add(roleId === "silviculture" ? "environmental-audit-fallout" : "compliance-drone-sweep", 4, { compliance: 2.5 });
+      }
+    }
+    add("fpbc-competence-audit", 1.5, { compliance: 1.5 });
+  },
+  FPB: (roleId, category, add) => {
+    add("old-growth-audit", 3.5, { forestHealth: 2, compliance: 1.5 });
+    add("audit-laundry-list", 3, { compliance: 2 });
+    if (roleId === "silviculture") add("environmental-audit-fallout", 3, { forestHealth: 2, compliance: 1.5 });
+  },
+  FPBC: (roleId, category, add) => {
+    add("fpbc-competence-audit", 4, { compliance: 2 });
+    add("audit-laundry-list", 1.5, { compliance: 1 });
+  },
+  WorkSafeBC: (roleId, category, add) => {
+    add("labour-job-action", 3.5, { relationships: 2, progress: 1.5 });
+    add("fpbc-competence-audit", 2, { compliance: 1.5 });
+    add("formal-investigation", 1.5, { compliance: 1.5 });
+  },
+  BCWS: (roleId, category, add) => {
+    add("environmental-audit-fallout", 4, { forestHealth: 3, compliance: 2 });
+    add("smoke-inversion", 2.5, { forestHealth: 1.5, relationships: 1.5 });
+  },
+  COS: (roleId, category, add) => {
+    add("wildlife-collar-drop", 3.5, { forestHealth: 2.5, relationships: 2 });
+    add("formal-investigation", 3, { compliance: 2, relationships: 1.5 });
+  },
+  ENV: (roleId, category, add) => {
+    if (category === "herbicide") add("herbicide-drift-complaint", 4, { forestHealth: 2.5, relationships: 1.5, compliance: 1.5 });
+    add("environmental-audit-fallout", 3.5, { forestHealth: 3, compliance: 2 });
+    add("water-licensee-formal-complaint", 2.5, { relationships: 2, compliance: 1.5 });
+    add("community-water-warning", 2, { relationships: 2 });
+  },
+  DFO: (roleId, category, add) => {
+    add("riparian-reclassification-call", 3.5, { forestHealth: 3, compliance: 2 });
+    add("stream-class-shortcut", 3, { forestHealth: 2, compliance: 2 });
+    add("environmental-audit-fallout", 2.5, { forestHealth: 2, compliance: 1.5 });
+  },
+  "Archaeology Branch": (roleId, category, add) => {
+    add("archaeology-escalation-pause", 4, { relationships: 2, progress: 1 });
+    add("heritage-protocol-gap", 3, { relationships: 3, compliance: 1 });
+  },
+  "Timber Pricing": (roleId, category, add) => {
+    add("cruise-design-grid-shortcut", 3.5, { budget: 2, compliance: 1.5 });
+    add("ministry-data-audit", 3, { progress: 1.5, compliance: 1 });
+    add("budget-freeze", 2.5, { budget: 2.5, compliance: 2 });
+  },
+  "Revenue Branch": (roleId, category, add) => {
+    add("scaler-pressure-memo", 3.5, { budget: 2, compliance: 1.5 });
+    add("budget-freeze", 3, { budget: 2.5, compliance: 2 });
+    add("formal-investigation", 2, { compliance: 2 });
+  },
+  "the Nation": (roleId, category, add) => {
+    add("heritage-protocol-gap", 5, { relationships: 3, compliance: 1 });
+    add("archaeology-escalation-pause", 2, { relationships: 2, progress: 1 });
+    add("referral-miss-at-two-levels", 2, { relationships: 2.5 });
+    add("nation-general-meeting-invite", 1.5, { relationships: 2 });
+    if (roleId === "recce") add("community-blockade", 2, { relationships: 2, progress: 1.5 });
+  },
+  RCMP: (roleId, category, add) => {
+    add("formal-investigation", 6, { compliance: 2.5, relationships: 1.5 });
+  },
+  CVSE: (roleId, category, add) => {
+    add("road-use-permit-standoff", 3.5, { progress: 2, compliance: 1.5 });
+    add("compliance-drone-sweep", 2, { compliance: 2 });
+  },
+  "Transport Canada": (roleId, category, add) => {
+    add("road-use-permit-standoff", 3, { progress: 2, compliance: 1.5 });
+    add("bridge-signoff-window", 3, { progress: 1.5, compliance: 1.5 });
+  },
+  "internal audit": (roleId, category, add) => {
+    add("budget-freeze", 4, { budget: 2.5, compliance: 2, progress: 1 });
+    add("audit-laundry-list", 2.5, { compliance: 2 });
+    add("contractor-bankruptcy", 1.5, { budget: 1.5, progress: 1 });
+  },
+  "the contractor": (roleId, category, add) => {
+    add("labour-job-action", 3, { relationships: 2, progress: 1.5 });
+    add("contractor-bankruptcy", 2.5, { budget: 1.5, progress: 1 });
+    add("audit-laundry-list", 1.5, { compliance: 1 });
+  },
+};
+
+// Category fallout on top of the institution's: the kind of act decides what
+// else comes loose (a seed act in silviculture is a seedlot problem whoever
+// caught it).
+const FALLOUT_BY_CATEGORY = {
+  results: (roleId, add) => {
+    if (roleId === "silviculture") {
+      add("seedlot-vigour-drop", 4, { forestHealth: 2.5, progress: 1 });
+      add("free-growing-catchup-plan", 3.5, { forestHealth: 2, progress: 1, budget: 0.5 });
+    }
+    if (roleId === "planner") add("silviculture-audit-seedlot-traceback", 2.5, { forestHealth: 2, compliance: 1 });
+  },
+  riparian: (roleId, add) => {
+    add("riparian-reclassification-call", 2.5, { forestHealth: 2, compliance: 1.5 });
+    add("stream-class-shortcut", 2, { forestHealth: 1.5, compliance: 1.5 });
+  },
+  roads: (roleId, add) => {
+    add("road-use-permit-standoff", 2.5, { progress: 2, compliance: 1.5 });
+    add("bridge-signoff-window", 2, { progress: 1.5, compliance: 1.5 });
+    add("special-use-permit-stack", 1.5, { progress: 1.5, budget: 1 });
+  },
+  cruise: (roleId, add) => {
+    add("cruise-design-grid-shortcut", 2.5, { budget: 2, compliance: 1.5 });
+    add("rely-on-client-salvage-numbers", 1.5, { compliance: 1.5 });
+  },
+  consultation: (roleId, add) => {
+    add("referral-miss-at-two-levels", 1.5, { relationships: 2.5 });
+    add("fsp-comment-surge", 1, { relationships: 1.5, progress: 1 });
+  },
+  archaeology: (roleId, add) => {
+    add("archaeology-escalation-pause", 1, { relationships: 2, progress: 1 });
+  },
+  wildlife: (roleId, add) => {
+    add("wildlife-collar-drop", 2.5, { forestHealth: 2.5, relationships: 2 });
+    add("old-growth-audit", 1.5, { forestHealth: 2, compliance: 1.5 });
+  },
+  herbicide: (roleId, add) => {
+    add("herbicide-drift-complaint", 3, { forestHealth: 2.5, relationships: 1.5, compliance: 1.5 });
+  },
+  professional: (roleId, add) => {
+    add("fpbc-competence-audit", 2.5, { compliance: 2 });
+  },
+  corporate: (roleId, add) => {
+    add("budget-freeze", 1.5, { budget: 2.5, compliance: 2 });
+  },
+  safety: (roleId, add) => {
+    add("labour-job-action", 2, { relationships: 2, progress: 1.5 });
+  },
+  poaching: (roleId, add) => {
+    add("wildlife-collar-drop", 2, { forestHealth: 2.5, relationships: 2 });
+  },
+  "timber-mark": (roleId, add) => {
+    add("scaler-pressure-memo", 2.5, { budget: 2, compliance: 1.5 });
+  },
+};
+
+function issueAllowsRole(issueId, roleId) {
+  const issue = findIssueById(issueId);
+  if (!issue) {
+    return false;
+  }
+  return !Array.isArray(issue.roles) || issue.roles.length === 0 || issue.roles.includes(roleId);
 }
 
 function buildIllegalActFailScheduleIssues(act, state) {
   const roleId = state?.role?.id;
-  const tags = new Set(Array.isArray(act?.tags) ? act.tags : []);
+  const category = act?.category || "corporate";
+  const institution = act?.catch?.by;
   const candidates = new Map();
   const addCandidate = (id, weight, metricBoosts = null) => {
-    if (!id) {
+    if (!id || !issueAllowsRole(id, roleId)) {
       return;
     }
     const current = candidates.get(id) || { id, weight: 0, force: true, metricBoosts: {} };
@@ -1320,62 +1564,17 @@ function buildIllegalActFailScheduleIssues(act, state) {
     candidates.set(id, current);
   };
 
-  if (roleId === "planner" || roleId === "permitter") {
-    if (hasAnyTag(tags, ["mapping", "data", "modeling", "reporting", "monitoring"])) {
-      addCandidate(roleId === "planner" ? "ministry-data-audit" : "fom-consistency-gap", 4, { progress: 1.5, compliance: 1 });
-      addCandidate("fpbc-competence-audit", 1.5, { compliance: 1.5 });
-    }
-    if (hasAnyTag(tags, ["procurement", "paperwork", "compliance", "forgery", "collusion", "bribery", "corruption", "grants"])) {
-      addCandidate("budget-freeze", 3.5, { budget: 2.5, compliance: 2, progress: 1 });
-      addCandidate("fpbc-competence-audit", 2, { compliance: 1.5 });
-    }
-    if (hasAnyTag(tags, ["cultural"])) {
-      addCandidate("heritage-protocol-gap", 3.5, { relationships: 3, compliance: 1 });
-      addCandidate("archaeology-escalation-pause", 2.5, { relationships: 2, progress: 1 });
-    }
-    if (hasAnyTag(tags, ["access", "riparian", "engineering"])) {
-      addCandidate("road-use-permit-standoff", 3, { progress: 2, compliance: 1.5 });
-    }
-    if (hasAnyTag(tags, ["remote-camps", "gas-interface"])) {
-      addCandidate("special-use-permit-stack", 2.5, { progress: 1.5, budget: 1 });
-    }
+  const byInstitution = FALLOUT_BY_INSTITUTION[institution];
+  if (byInstitution) {
+    byInstitution(roleId, category, addCandidate);
   }
-
-  if (roleId === "recce" || roleId === "silviculture") {
-    if (hasAnyTag(tags, ["wildlife"])) {
-      addCandidate("wildlife-collar-drop", 4, { forestHealth: 2.5, relationships: 2 });
-    }
-    if (hasAnyTag(tags, ["riparian", "salvage", "fire", "erosion", "old-growth"])) {
-      addCandidate(
-        roleId === "silviculture" ? "environmental-audit-fallout" : "riparian-reclassification-call",
-        4,
-        { forestHealth: 3, compliance: 2 }
-      );
-    }
-    if (roleId === "silviculture" && hasAnyTag(tags, ["herbicide"])) {
-      addCandidate("herbicide-drift-complaint", 4, { forestHealth: 2.5, relationships: 1.5, compliance: 1.5 });
-      addCandidate("environmental-audit-fallout", 2, { forestHealth: 2, compliance: 1.5 });
-    }
-    if (roleId === "silviculture" && hasAnyTag(tags, ["nursery", "stocking", "automation", "seed"])) {
-      addCandidate("seedlot-vigour-drop", 3.5, { forestHealth: 2.5, progress: 1 });
-      addCandidate("free-growing-catchup-plan", 2.5, { forestHealth: 2, progress: 1, budget: 0.5 });
-    }
-    if (roleId === "recce" && hasAnyTag(tags, ["drones", "media", "access", "aviation"])) {
-      addCandidate("compliance-drone-sweep", 3.5, { compliance: 2.5, relationships: 1 });
-    }
-    if (hasAnyTag(tags, ["remote-camps", "gas-interface"])) {
-      addCandidate("special-use-permit-stack", 2.5, { progress: 1.5, budget: 1 });
-    }
+  const byCategory = FALLOUT_BY_CATEGORY[category];
+  if (byCategory) {
+    byCategory(roleId, addCandidate);
   }
-
-  if (hasAnyTag(tags, ["fraud", "fabrication", "deception", "records", "paperwork", "monitoring"])) {
-    addCandidate("fpbc-competence-audit", 2, { compliance: 2 });
-  }
-  if (hasAnyTag(tags, ["bribery", "collusion", "corruption", "laundering", "payroll", "double-dip", "blatant", "sabotage", "espionage"])) {
-    addCandidate("formal-investigation", 3, { compliance: 2, relationships: 1.5 });
-  }
-  if (roleId === "planner" && hasAnyTag(tags, ["old-growth", "riparian", "wildlife"])) {
-    addCandidate("environmental-audit-fallout", 2.5, { forestHealth: 2.5, compliance: 1.5 });
+  if (!candidates.size) {
+    addCandidate("audit-laundry-list", 2, { compliance: 1.5 });
+    addCandidate("fpbc-competence-audit", 1.5, { compliance: 1.5 });
   }
 
   const weightedCandidates = Array.from(candidates.values())

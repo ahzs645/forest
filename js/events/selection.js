@@ -12,7 +12,18 @@ import {
 } from './constants.js';
 import { FIELD_EVENTS, getApplicableFieldEvents, selectRandomFieldEvent } from '../data/fieldEvents.js';
 import { DESK_EVENTS, getApplicableDeskEvents, selectRandomDeskEvent } from '../data/deskEvents.js';
-import { ILLEGAL_ACTS } from '../data/illegalActs.js';
+import {
+  ILLEGAL_ACTS,
+  actFitsRole,
+  buildCaughtNarrative,
+  capitalizeProposer,
+  CATEGORY_CLEAN_OUTCOMES,
+  CATEGORY_GO_AROUND,
+  REFUSE_OUTCOMES,
+  REOFFER_PITCHES
+} from '../data/illegalActs.js';
+import { computeBandOdds } from './odds.js';
+import { OPERATING_AREAS } from '../data/operatingAreas.js';
 import { PACE_OPTIONS } from '../journey/constants.js';
 import { getDiscoveryEventTypeMultipliers } from '../data/discoveryTags.js';
 import { getAreaSituationMultipliers } from '../data/areaSituations.js';
@@ -339,6 +350,16 @@ export function eventMatchesJourneyContext(event, journey, options = {}) {
     }
   }
 
+  // Season gate (`seasons: ['summer']`): a deck can keep a heat-shutdown card
+  // out of a winter permitting push. A journey with no season state (legacy
+  // fixtures) is not gated.
+  const currentSeason = journey?.season?.currentSeason;
+  if (Array.isArray(event.seasons) && event.seasons.length > 0 && currentSeason) {
+    if (!event.seasons.includes(currentSeason)) {
+      return false;
+    }
+  }
+
   const becCode = journey?.area?.becCode;
   if (Array.isArray(event.becCodes) && event.becCodes.length > 0) {
     if (!becCode || !event.becCodes.includes(becCode)) {
@@ -510,96 +531,446 @@ function pickRandomCrewMember(crew) {
   return active[Math.floor(Math.random() * active.length)];
 }
 
-// How the shortcut bites depends on what kind of crime it is. Profiles are
-// matched against the act's tags so the 208-act library plays as distinct
-// dilemmas instead of one reskinned template. Ordered: first match wins.
-const TEMPTATION_TAG_PROFILES = [
-  {
-    tags: ['fraud', 'fabrication', 'reporting', 'laundering', 'mapping'],
-    outcome: 'The numbers land clean. The paper trail is now the problem.',
-    take: (gain, isDesk) => (isDesk
-      ? { budget: gain, compliance: -6, scrutiny: 6 }
-      : { budget: Math.min(gain, 1200), compliance: -5, scrutiny: 5 }),
-  },
-  {
-    tags: ['bribery', 'corruption', 'compliance'],
-    outcome: 'Money changes hands and the file moves. Someone now owns a piece of you.',
-    take: (gain, isDesk) => (isDesk
-      ? { budget: gain, politicalCapital: -7, scrutiny: 8 }
-      : { budget: Math.min(gain, 1200), politicalCapital: -4, scrutiny: 6 }),
-    riskInjury: null,
-  },
-  {
-    tags: ['fire', 'risk', 'safety'],
-    outcome: 'It works, this time. The crew saw how close it came.',
-    take: (gain, isDesk) => (isDesk
-      ? { budget: gain, crew_morale: -4, scrutiny: 4 }
-      : { budget: Math.min(gain, 1200), equipment: -6, crew_morale: -5 }),
-    riskInjury: 0.2,
-  },
-  {
-    tags: ['wildlife', 'old-growth', 'habitat', 'water', 'nursery'],
-    outcome: 'The block moves faster. What was living there does not.',
-    take: (gain, isDesk) => (isDesk
-      ? { budget: gain, reputation: -8, compliance: -4 }
-      : { budget: Math.min(gain, 1200), reputation: -6, compliance: -4 }),
-  },
-];
-
-function getTemptationProfileForAct(act) {
-  const tags = Array.isArray(act?.tags) ? act.tags : [];
-  return TEMPTATION_TAG_PROFILES.find((profile) => profile.tags.some((tag) => tags.includes(tag))) || null;
-}
+// ── Temptations ─────────────────────────────────────────────────────────────
+//
+// Somebody on the job proposes a shortcut. The act library (js/data/illegalActs.js)
+// carries who asks, what they say, what it is worth in the role's own currency,
+// and who in BC actually catches it. This lane turns one act into the day's
+// card: a free refusal, a ten-minute note to file, and the shortcut as a
+// three-band gamble whose bad band names the institution.
 
 // Minimum days between shortcut offers, so a higher draw rate reads as texture
 // rather than a nag.
 const TEMPTATION_COOLDOWN_DAYS = 6;
 
-/**
- * The shortcut, as an actual gamble.
- *
- * This option was labelled "(high risk)" and carried no roll at all: every
- * shortcut in the 208-act library paid out, every time, at exactly its
- * advertised price. The only thing that could go wrong was an unrelated injury
- * side-roll. Crime paid at list price.
- *
- * Three bands, because "nobody noticed", "someone noticed" and "it became a
- * file with your name on it" are genuinely different futures rather than three
- * sizes of the same one:
- *
- *   clean   - the money, and it stays buried
- *   noticed - the money, but it leaves a mark that draws attention afterwards
- *   caught  - no money at all, and the file follows you
- *
- * The odds move on things the player controls, which is the point: a clean
- * record and standing with people genuinely buy cover, and a run that has
- * already been cutting corners stops getting the benefit of the doubt. That
- * last one matters most — `seenActIds` already tracked prior shortcuts purely
- * to avoid showing the same act twice. Now it is also the thing that hangs you.
- */
-function buildShortcutOption({ act, gain, isDesk, profile, takeOutcome, takeEffects, takeRiskInjury }) {
-  const shown = Math.min(gain, isDesk ? gain : 1200);
-  const caughtEffects = isDesk
-    ? { compliance: -14, politicalCapital: -10, scrutiny: 22, reputation: -8 }
-    : { compliance: -12, crew_morale: -8, scrutiny: 20, reputation: -6 };
-  const noticedEffects = { ...takeEffects, scrutiny: Number(takeEffects.scrutiny || 0) + 8 };
+// Share of draws that go to the comic tier when the role has any, and the
+// weight of a grey act relative to a core one.
+const COMIC_DRAW_SHARE = 0.15;
+const GREY_TIER_WEIGHT = 0.6;
+const RARE_ACT_WEIGHT = 0.25;
 
+// What a shift of the role's own work is worth in the progress effect that
+// resolution.js applies for that journey type: km for recon, planting points
+// (8 = a block) for silviculture, phase-metric points for planning, pipeline
+// points (10 = one permit moved) for permitting, and operational progress for
+// the GM.
+const SHIFT_OF_WORK = { recon: 4, field: 4, silviculture: 3, planning: 12, desk: 10, permitting: 10, manager: 4 };
+
+// Dollar payoffs are authored at the scale of the role that would naturally be
+// asked. A recce crew's cash is a wallet; a GM's ledger is not.
+const RECCE_CASH_CAP = 1200;
+const MANAGER_BUDGET_MULTIPLIER = 3;
+const MANAGER_BUDGET_CAP = 60000;
+
+// Consequence flags a noticed or caught band leaves behind. Registered as
+// odds-only flags in js/events/odds.js; applyConsequenceFlags records any flag
+// it is handed, so they shift later gambles without more machinery.
+const WATCH_FLAG_BY_INSTITUTION = {
+  'C&E': 'ce_watching', FPB: 'ce_watching', FPBC: 'ce_watching', BCWS: 'ce_watching',
+  COS: 'ce_watching', ENV: 'ce_watching', DFO: 'ce_watching', 'Archaeology Branch': 'ce_watching',
+  'Timber Pricing': 'ce_watching', 'Revenue Branch': 'ce_watching', RCMP: 'ce_watching',
+  CVSE: 'ce_watching', 'Transport Canada': 'ce_watching',
+  'the Nation': 'fn_watching',
+  WorkSafeBC: 'worksafe_watching',
+  'internal audit': 'contractor_owns_you',
+  'the contractor': 'contractor_owns_you',
+};
+
+const WATCH_FLAG_SENTENCES = {
+  ce_watching: 'the district is now reading everything with your name on it',
+  fn_watching: "the Nation's referrals office has a note with your name in it",
+  worksafe_watching: "WorkSafeBC's prevention officer has the site on a list",
+  contractor_owns_you: 'the person who did it for you now owns a piece of you',
+};
+
+// Institutions whose caught band is a criminal or professional-conduct matter
+// rather than an administrative one. These leave their own flag so later
+// machinery (registration status, the RCMP file) can read it.
+const CAUGHT_FLAG_BY_INSTITUTION = {
+  FPBC: 'fpbc_file_open',
+  RCMP: 'rcmp_file',
+  'the Nation': 'locals_soured',
+};
+
+const TAKE_LABEL = 'Take the shortcut';
+const LET_IT_STAND_LABEL = 'Let it stand';
+const SET_ASIDE_ODDS = { drop: 0.55, reoffer: 0.30, goaround: 0.15 };
+
+function ensureTemptationMemory(journey) {
+  const memory = journey.temptationMemory || (journey.temptationMemory = {});
+  if (!Number.isFinite(memory.lastDay)) memory.lastDay = 0;
+  if (!Array.isArray(memory.seenActIds)) memory.seenActIds = [];
+  if (!Array.isArray(memory.takenActIds)) memory.takenActIds = [];
+  if (!Array.isArray(memory.pending)) memory.pending = [];
+  if (!Number.isFinite(memory.missedEligibleDays)) memory.missedEligibleDays = 0;
+  if (!Number.isFinite(memory.refuseIndex)) memory.refuseIndex = 0;
+  if (!Array.isArray(memory.settledFlags)) memory.settledFlags = [];
+  return memory;
+}
+
+function getTemptationRoleId(journey) {
+  return journey?.roleId || journey?.role?.id || null;
+}
+
+function isDeskTemptationJourney(journey) {
+  return isDeskJourney(journey?.journeyType) || journey?.journeyType === 'manager';
+}
+
+function getActById(actId) {
+  return ILLEGAL_ACTS.find((act) => act?.id === actId) || null;
+}
+
+/**
+ * Reconcile the run's log into `takenActIds`: every temptation the player took
+ * (or let stand) counts against them in later odds (priorShortcuts in
+ * js/events/odds.js). Declined and set-aside offers do not.
+ */
+export function reconcileTakenShortcuts(journey) {
+  const memory = ensureTemptationMemory(journey);
+  for (const entry of journey?.log || []) {
+    if (entry?.type !== 'event' || typeof entry.eventId !== 'string') continue;
+    const match = entry.eventId.match(/^temptation_(?:reoffer_|goaround_)?(.+)$/);
+    if (!match) continue;
+    if (entry.optionLabel !== TAKE_LABEL && entry.optionLabel !== LET_IT_STAND_LABEL) continue;
+    if (!memory.takenActIds.includes(match[1])) memory.takenActIds.push(match[1]);
+  }
+  return memory.takenActIds.length;
+}
+
+/**
+ * Consequences that need more than an odds shift, settled the day after they
+ * land: an FPBC complaint puts the registration under review.
+ */
+function settleTemptationFallout(journey) {
+  const memory = ensureTemptationMemory(journey);
+  const flags = Array.isArray(journey.consequenceFlags) ? journey.consequenceFlags : [];
+  if (flags.includes('fpbc_file_open') && !memory.settledFlags.includes('fpbc_file_open')) {
+    memory.settledFlags.push('fpbc_file_open');
+    if (journey.professional && journey.professional.registrationStatus === 'active') {
+      journey.professional.registrationStatus = 'under-review';
+    }
+  }
+}
+
+/**
+ * Whether an act can be offered to this run today. Role and phase come from
+ * the library; season, area, difficulty and scrutiny gates are checked here.
+ */
+export function actMatchesTemptationContext(act, journey) {
+  if (!act || act.retired) return false;
+  const roleId = getTemptationRoleId(journey);
+  if (!actFitsRole(act, roleId)) return false;
+
+  const season = journey?.season?.currentSeason;
+  if (Array.isArray(act.seasons) && act.seasons.length && season && !act.seasons.includes(season)) {
+    return false;
+  }
+  const { areaId, areaTags } = resolveJourneyArea(journey);
+  if (Array.isArray(act.areaTags) && act.areaTags.length) {
+    if (!areaTags.length || !act.areaTags.some((tag) => areaTags.includes(tag))) return false;
+  }
+  if (Array.isArray(act.areaIds) && act.areaIds.length) {
+    if (!areaId || !act.areaIds.includes(areaId)) return false;
+  }
+  if (act.tier === 'comic' && journey?.difficulty === 'hard') return false;
+  if (act.onlyWhen === 'scrutinyHigh' && Number(journey?.scrutiny || 0) < 55) return false;
+  return true;
+}
+
+/**
+ * The run's operating area, whether the journey carries the area object or
+ * only its id (createJourney with an areaId leaves journey.area empty).
+ */
+function resolveJourneyArea(journey) {
+  const areaId = journey?.area?.id || journey?.areaId || null;
+  const carried = Array.isArray(journey?.area?.tags) ? journey.area.tags : null;
+  if (carried?.length) return { areaId, areaTags: carried };
+  const area = areaId ? OPERATING_AREAS.find((entry) => entry?.id === areaId) : null;
+  return { areaId, areaTags: Array.isArray(area?.tags) ? area.tags : [] };
+}
+
+function baseActWeight(act) {
+  let weight = act.tier === 'grey' ? GREY_TIER_WEIGHT : 1;
+  if (act.rare) weight *= RARE_ACT_WEIGHT;
+  return weight;
+}
+
+/**
+ * Weighted pool: core 1, grey 0.6, rare ×0.25, and the comic tier sized so it
+ * lands about 15% of draws whenever the role has any comic acts at all.
+ */
+export function weightTemptationPool(candidates) {
+  const serious = candidates.filter((act) => act.tier !== 'comic');
+  const comic = candidates.filter((act) => act.tier === 'comic');
+  const seriousTotal = serious.reduce((sum, act) => sum + baseActWeight(act), 0);
+  const comicEach = comic.length && seriousTotal > 0
+    ? (COMIC_DRAW_SHARE / (1 - COMIC_DRAW_SHARE)) * seriousTotal / comic.length
+    : 1;
+  return candidates.map((act) => ({
+    act,
+    weight: act.tier === 'comic' ? comicEach : baseActWeight(act),
+  }));
+}
+
+function pickWeightedAct(candidates, rng = Math.random) {
+  const pool = weightTemptationPool(candidates);
+  const total = pool.reduce((sum, entry) => sum + entry.weight, 0);
+  if (total <= 0) return null;
+  let roll = rng() * total;
+  for (const entry of pool) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.act;
+  }
+  return pool[pool.length - 1].act;
+}
+
+/**
+ * The payoff, in the role's own currency. `line` is what the option shows.
+ * @returns {{effects: Object, line: string}}
+ */
+export function buildTemptationPayoff(act, journey) {
+  const payoff = act?.payoff || { kind: 'progress', amount: 1, line: 'a shift of work' };
+  const journeyType = journey?.journeyType || 'field';
+  const shift = SHIFT_OF_WORK[journeyType] || 4;
+  const amount = Number(payoff.amount) || 1;
+  const effects = {};
+
+  const progressForShifts = (shifts) => Math.max(1, Math.round(shift * Math.max(0.25, Math.min(2, shifts))));
+
+  switch (payoff.kind) {
+    case 'budget': {
+      if (journeyType === 'manager') {
+        effects.budget = Math.min(MANAGER_BUDGET_CAP, Math.round(amount * MANAGER_BUDGET_MULTIPLIER));
+      } else if (journeyType === 'recon' || journeyType === 'field') {
+        effects.budget = Math.min(RECCE_CASH_CAP, Math.round(amount));
+      } else {
+        effects.budget = Math.round(amount);
+      }
+      break;
+    }
+    case 'time':
+      // Days of waiting skipped. Two days of waiting is about a shift of the
+      // role's own work back; a month is capped at two shifts, because the
+      // game's day is one action and a shortcut is not a season.
+      effects.progress = progressForShifts(amount / 2);
+      break;
+    case 'files':
+      effects.progress = journeyType === 'permitting' || journeyType === 'desk'
+        ? Math.round(shift * amount)
+        : progressForShifts(amount);
+      break;
+    case 'volume':
+      if (journeyType === 'manager') {
+        effects.budget = Math.min(MANAGER_BUDGET_CAP, Math.round(amount * 5));
+      } else {
+        effects.progress = progressForShifts(1);
+      }
+      break;
+    case 'progress':
+    default:
+      effects.progress = progressForShifts(amount);
+      break;
+  }
+
+  return { effects, line: String(payoff.line || 'a shift of work') };
+}
+
+/**
+ * What the institution does when it catches you, as effects on the run.
+ * Field crews pay in cash, morale and a stop-work; desk roles in budget and
+ * standing; the GM at corporate scale.
+ */
+export function buildCaughtEffects(act, journey) {
+  const journeyType = journey?.journeyType || 'field';
+  const isDesk = isDeskTemptationJourney(journey);
+  const isManager = journeyType === 'manager';
+  const money = (field, desk) => {
+    if (isManager) return -Math.min(MANAGER_BUDGET_CAP, desk * MANAGER_BUDGET_MULTIPLIER);
+    if (isDesk) return -desk;
+    if (journeyType === 'silviculture') return -Math.round(desk * 0.6);
+    return -Math.min(RECCE_CASH_CAP, field);
+  };
+  const standing = isDesk ? 'politicalCapital' : 'crew_morale';
+
+  switch (act?.catch?.by) {
+    case 'C&E':
+      return { compliance: -10, scrutiny: 15, budget: money(800, 3000) };
+    case 'FPB':
+      return { compliance: -8, scrutiny: 12, reputation: -4 };
+    case 'FPBC':
+      return { compliance: -6, scrutiny: 14, reputation: -8 };
+    case 'WorkSafeBC':
+      return { progress: -Math.round((SHIFT_OF_WORK[journeyType] || 4) * 2), crew_morale: -8, compliance: -6, scrutiny: 10 };
+    case 'BCWS':
+      return { compliance: -8, scrutiny: 12, budget: money(1200, 6000) };
+    case 'COS':
+      return { compliance: -8, scrutiny: 10, budget: money(600, 2000), [standing]: -4 };
+    case 'ENV':
+      return { compliance: -8, scrutiny: 12, budget: money(1000, 4000) };
+    case 'DFO':
+      return { compliance: -10, scrutiny: 14, budget: money(1200, 5000) };
+    case 'Archaeology Branch':
+      return { compliance: -8, scrutiny: 12, relationships: -6, budget: money(900, 4000) };
+    case 'Timber Pricing':
+      return { compliance: -6, scrutiny: 12, budget: money(700, 4000) };
+    case 'Revenue Branch':
+      return { compliance: -8, scrutiny: 14, budget: money(1000, 8000) };
+    case 'the Nation':
+      return { relationships: -8, compliance: -3, scrutiny: 8, [standing]: -6 };
+    case 'RCMP':
+      return { compliance: -16, scrutiny: 25, reputation: -12, [standing]: -12 };
+    case 'CVSE':
+      return { compliance: -4, scrutiny: 6, budget: money(600, 2500), progress: -Math.round((SHIFT_OF_WORK[journeyType] || 4) * 0.5) };
+    case 'Transport Canada':
+      return { compliance: -6, scrutiny: 8, budget: money(800, 3000) };
+    case 'internal audit':
+      return { budget: money(600, 3000), [standing]: -8, reputation: -6, scrutiny: 6 };
+    case 'the contractor':
+      return { crew_morale: -6, reputation: -6, relationships: -5, scrutiny: 6 };
+    default:
+      return { compliance: -10, scrutiny: 15 };
+  }
+}
+
+function watchFlagFor(act) {
+  return WATCH_FLAG_BY_INSTITUTION[act?.catch?.by] || 'ce_watching';
+}
+
+function caughtFlagsFor(act) {
+  const flags = [watchFlagFor(act)];
+  const extra = CAUGHT_FLAG_BY_INSTITUTION[act?.catch?.by];
+  if (extra) flags.push(extra);
+  return flags;
+}
+
+// Desk-side proposers voiced at a tailgate: the person who would actually be
+// standing there, or the one on the other end of the radio.
+const FIELD_PROPOSER_VOICE = {
+  'the client': "the client's forester, out for the day",
+  'the woodlands VP': 'the woodlands VP, on the radio',
+  'the appraisal coordinator': 'the appraisal coordinator, on the phone',
+  'the CFO': 'the CFO, on the phone',
+  'the marketing lead': 'the marketing lead, on the phone',
+  'the GIS tech': 'the GIS tech, on the radio',
+  'the mill manager': 'the mill manager, on the radio',
+};
+
+function describeProposer(act, journey = null) {
+  const raw = String(act?.proposer || '');
+  const voiced = journey && !isDeskTemptationJourney(journey) ? (FIELD_PROPOSER_VOICE[raw] || raw) : raw;
+  return capitalizeProposer(voiced);
+}
+
+function isSelfProposed(act) {
+  return /^yourself/i.test(String(act?.proposer || ''));
+}
+
+function lowerFirst(text) {
+  const value = String(text || '').trim();
+  return value.charAt(0).toLowerCase() + value.slice(1);
+}
+
+/**
+ * The card's label and body, in the voice of whoever is asking.
+ * Field roles hear it at the tailgate; desk roles read it or take the call.
+ */
+export function describeTemptation(act, journey, { stage = 'offer', reofferPitch = null } = {}) {
+  const isDesk = isDeskTemptationJourney(journey);
+  const pitch = String(act?.pitch || act?.description || 'Take a shortcut that should not be taken.').trim();
+  const what = lowerFirst(act?.description || '');
+  const proposer = describeProposer(act, journey);
+  const self = isSelfProposed(act);
+
+  let label;
+  let lead;
+  if (self) {
+    label = isDesk ? 'AT YOUR DESK' : 'AT THE TAILGATE';
+    lead = `It is 4:45 on a Friday and the thought is yours: “${pitch}”`;
+  } else if (isDesk) {
+    const byPhone = /super|dispatcher|foreman|contractor|VP|CFO|manager|buyer|rep|engineer|operator/i.test(String(act?.proposer || ''));
+    label = byPhone ? 'PHONE CALL' : 'IN THE INBOX';
+    lead = byPhone
+      ? `${proposer}, on the phone: “${pitch}”`
+      : `${proposer}, by email: “${pitch}”`;
+  } else {
+    label = 'AT THE TAILGATE';
+    lead = `${proposer}, at the tailgate: “${pitch}”`;
+  }
+
+  const parts = [lead];
+  if (stage === 'reoffer' && reofferPitch) {
+    parts.push(`Then, the second time of asking: “${reofferPitch}”`);
+  }
+  if (what) parts.push(`What is actually being asked: ${what}`);
+  return { label, description: parts.join(' ') };
+}
+
+function buildRefuseOption(act, journey) {
+  const memory = ensureTemptationMemory(journey);
+  const isDesk = isDeskTemptationJourney(journey);
+  const deck = isDesk ? REFUSE_OUTCOMES.desk : REFUSE_OUTCOMES.field;
+  const outcome = deck[memory.refuseIndex % deck.length](describeProposer(act, journey));
+  memory.refuseIndex += 1;
   return {
-    label: 'Take the shortcut',
-    // Clean band.
-    outcome: `${takeOutcome} Avoided costs leave $${shown.toLocaleString()} available in the budget, and nobody asks.`,
-    effects: takeEffects,
-    // Noticed band: the money still lands, but so does the attention.
-    partialOutcome: `${takeOutcome} The money is real. So is the fact that somebody wrote down what they saw.`,
-    partialEffects: noticedEffects,
-    // Caught band: the gain never arrives. That is the whole deterrent — a
-    // shortcut whose worst case still pays is not a gamble, it is a discount.
-    failureOutcome: act?.consequence
-      ? `It does not hold. ${String(act.consequence)}`
-      : 'It does not hold. The file lands on a desk that asks questions, and your name is on every page of it.',
-    failureEffects: caughtEffects,
-    chanceSuccess: 0.5,
-    chancePartial: 0.3,
+    label: isDesk ? 'Decline' : 'Say no',
+    outcome,
+    effects: {},
+    reactionTone: 'steady',
+  };
+}
+
+function buildReportOption(act, journey) {
+  const isDesk = isDeskTemptationJourney(journey);
+  const proposer = describeProposer(act, journey);
+  return {
+    label: isDesk ? 'Document and report' : 'Note it to file, call your super',
+    outcome: isDesk
+      ? 'A note to file and a two-line email to your manager. Ten minutes, and the only version of today anyone can audit.'
+      : `Ten minutes: a line in the daybook and a call to your super. ${isSelfProposed(act) ? 'Writing it down is what makes it not happen.' : `${proposer} hears about it before lunch and does not ask again.`}`,
+    effects: isDesk ? { compliance: 2, politicalCapital: 1, timeUsed: 0.5 } : { compliance: 2, timeUsed: 0.5 },
+    reactionTone: 'responsible',
+  };
+}
+
+/**
+ * The shortcut as a three-band gamble.
+ *
+ *   clean   - the payoff, and it stays buried (scrutiny creeps anyway)
+ *   noticed - the payoff, and a flag that shifts later odds
+ *   caught  - no payoff; the institution named in the act does what it does
+ *
+ * Odds move on things the player controls: a clean record and standing buy
+ * cover; a run already cutting corners, or already being watched, does not.
+ */
+export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPenalty = 0 } = {}) {
+  const memory = ensureTemptationMemory(journey);
+  const isDesk = isDeskTemptationJourney(journey);
+  const payoff = buildTemptationPayoff(act, journey);
+  const category = act?.category || 'corporate';
+  const clean = act?.cleanOutcome || CATEGORY_CLEAN_OUTCOMES[category] || CATEGORY_CLEAN_OUTCOMES.corporate;
+  const watchFlag = watchFlagFor(act);
+  const watchSentence = WATCH_FLAG_SENTENCES[watchFlag] || WATCH_FLAG_SENTENCES.ce_watching;
+  const variant = memory.takenActIds.length % 2;
+
+  const tierOdds = act?.tier === 'grey'
+    ? { chanceSuccess: 0.6, chancePartial: 0.25 }
+    : act?.tier === 'comic'
+      ? { chanceSuccess: 0.45, chancePartial: 0.3 }
+      : { chanceSuccess: 0.5, chancePartial: 0.3 };
+  const chanceSuccess = Math.max(0.1, tierOdds.chanceSuccess - oddsPenalty);
+
+  const option = {
+    label,
+    outcome: `${clean} You get ${payoff.line}, and nobody asks.`,
+    effects: { ...payoff.effects, scrutiny: 3 },
+    partialOutcome: `${clean} You get ${payoff.line}. Somebody also wrote down what they saw — ${watchSentence}.`,
+    partialEffects: { ...payoff.effects, scrutiny: 8, compliance: -2 },
+    partialFlags: [watchFlag],
+    failureOutcome: `It does not hold. ${buildCaughtNarrative(act, variant)}`,
+    failureEffects: buildCaughtEffects(act, journey),
+    failureFlags: caughtFlagsFor(act),
+    chanceSuccess,
+    chancePartial: tierOdds.chancePartial,
     oddsModifiers: [
       // A dirty file gets less benefit of the doubt.
       { when: 'scrutinyAbove:55', move: 0.15, from: 'good', to: 'bad' },
@@ -611,10 +982,150 @@ function buildShortcutOption({ act, gain, isDesk, profile, takeOutcome, takeEffe
       { when: 'priorShortcuts:4', move: 0.15, from: 'good', to: 'bad' },
       { when: 'difficulty:hard', move: 0.10, from: 'good', to: 'bad' },
       { when: 'difficulty:easy', move: 0.10, from: 'bad', to: 'good' },
+      // Somebody is already watching. The institution that would catch this
+      // act is the one whose attention hurts most.
+      { when: `hasFlag:${watchFlag}`, move: 0.20, from: 'good', to: 'bad' },
+      { when: 'hasFlag:ce_watching', move: 0.05, from: 'good', to: 'partial' },
+      { when: 'hasFlag:fn_watching', move: 0.05, from: 'good', to: 'partial' },
+      { when: 'hasFlag:worksafe_watching', move: 0.05, from: 'good', to: 'partial' },
+      { when: 'hasFlag:contractor_owns_you', move: 0.05, from: 'good', to: 'partial' },
     ],
-    riskInjury: takeRiskInjury,
-    reactionTone: 'compromised'
+    payoffLine: payoff.line,
+    reactionTone: 'compromised',
   };
+  if (!isDesk && category === 'safety') option.riskInjury = 0.15;
+  // The odds the player actually faces today, not the authored base — shown on
+  // the option the way risk chips are (js/events/display.js).
+  option.liveOdds = computeBandOdds(option, journey);
+  return option;
+}
+
+function buildGoAroundEvent(act, journey) {
+  const category = act?.category || 'corporate';
+  const found = act?.goAround || CATEGORY_GO_AROUND[category] || CATEGORY_GO_AROUND.corporate;
+  const proposer = describeProposer(act, journey);
+  const isDesk = isDeskTemptationJourney(journey);
+  const letItStand = buildShortcutOption(act, journey, { label: LET_IT_STAND_LABEL, oddsPenalty: 0.15 });
+  letItStand.outcome = `${act?.cleanOutcome || CATEGORY_CLEAN_OUTCOMES[category] || CATEGORY_CLEAN_OUTCOMES.corporate} You did not do it. You also did not undo it, and that is the version that is true.`;
+  letItStand.payoffLine = `${letItStand.payoffLine}, for a thing you did not do`;
+
+  return {
+    id: `temptation_goaround_${String(act.id)}`,
+    temptationActId: act.id,
+    temptationStage: 'goaround',
+    title: `${act.title} — Done Anyway`,
+    type: 'temptation',
+    severity: 'minor',
+    probability: 0,
+    cardLabel: isDesk ? 'IN THE INBOX' : 'AT THE TAILGATE',
+    description: `You set it aside and somebody went around you. ${found} ${proposer} is not answering the radio. The question now is whether you report a thing you did not do.`,
+    options: [
+      {
+        label: 'Report it',
+        outcome: `You write it up as found and call it in. It costs you the morning and some goodwill with ${lowerFirst(proposer)}, and it is the only version of this where your name is on the right side.`,
+        effects: isDesk
+          ? { compliance: 4, politicalCapital: -2, scrutiny: 3, timeUsed: 1 }
+          : { compliance: 4, crew_morale: -2, scrutiny: 3, timeUsed: 1 },
+        reactionTone: 'responsible',
+      },
+      {
+        label: 'Fix it quietly',
+        outcome: 'You put it back the way it was and nobody writes anything down. It is fixed. It is also not on file, and the person who did it knows that you know.',
+        effects: isDesk
+          ? { progress: -Math.round((SHIFT_OF_WORK[journey.journeyType] || 4) * 0.5), scrutiny: 4, compliance: -2 }
+          : { progress: -Math.round((SHIFT_OF_WORK[journey.journeyType] || 4) * 0.5), scrutiny: 4, compliance: -2 },
+        flags: ['contractor_owns_you'],
+        reactionTone: 'compromised',
+      },
+      letItStand,
+    ],
+  };
+}
+
+/**
+ * Build the day's temptation card from an act.
+ * @param {Object} act
+ * @param {Object} journey
+ * @param {Object} [options]
+ * @param {string} [options.stage] offer | reoffer
+ */
+export function buildTemptationEvent(act, journey, { stage = 'offer' } = {}) {
+  const memory = ensureTemptationMemory(journey);
+  const reofferPitch = stage === 'reoffer'
+    ? REOFFER_PITCHES[memory.seenActIds.length % REOFFER_PITCHES.length]
+    : null;
+  const { label, description } = describeTemptation(act, journey, { stage, reofferPitch });
+  const prefix = stage === 'reoffer' ? 'temptation_reoffer_' : 'temptation_';
+
+  return {
+    id: `${prefix}${String(act.id || Math.random().toString(36).slice(2))}`,
+    temptationActId: act.id,
+    temptationStage: stage,
+    title: stage === 'reoffer' ? `${act.title} (Again)` : String(act.title || 'Shady Shortcut'),
+    type: 'temptation',
+    // Answering never spends the day: saying no is a sentence, and the
+    // shortcut itself is the thing that costs.
+    severity: 'minor',
+    probability: 0,
+    cardLabel: label,
+    description,
+    options: [
+      buildRefuseOption(act, journey),
+      buildShortcutOption(act, journey),
+      buildReportOption(act, journey),
+    ],
+  };
+}
+
+/**
+ * Declining to answer a proposal is not the same as answering it. Roll what
+ * the proposer does with your silence, queue any follow-up, and hand back the
+ * line to print. Costs nothing on the meters: not answering a contractor's
+ * illegal proposal does not make the district look harder at you.
+ * @returns {{kind: string, message: string}}
+ */
+export function resolveTemptationSetAside(journey, event, rng = Math.random) {
+  const memory = ensureTemptationMemory(journey);
+  const act = getActById(event?.temptationActId);
+  const proposer = describeProposer(act, journey);
+  const day = Number(journey?.day || 1);
+
+  if (event?.temptationStage === 'goaround') {
+    if (act?.id && !memory.takenActIds.includes(act.id)) memory.takenActIds.push(act.id);
+    return { kind: 'condone', message: 'You say nothing. It stands, and so does your silence.' };
+  }
+
+  if (!act) {
+    return { kind: 'drop', message: 'You let it sit. By the end of the week nobody mentions it again.' };
+  }
+
+  const roll = rng();
+  const goaroundOdds = event?.temptationStage === 'reoffer' ? 0.3 : SET_ASIDE_ODDS.goaround;
+  const reofferOdds = event?.temptationStage === 'reoffer' ? 0 : SET_ASIDE_ODDS.reoffer;
+
+  if (roll < goaroundOdds) {
+    memory.pending.push({ actId: act.id, day: day + 2 + Math.floor(rng() * 3), kind: 'goaround' });
+    return { kind: 'goaround', message: `You do not answer. ${proposer} may take that as an answer.` };
+  }
+  if (roll < goaroundOdds + reofferOdds) {
+    memory.pending.push({ actId: act.id, day: day + 2 + Math.floor(rng() * 3), kind: 'reoffer' });
+    return { kind: 'reoffer', message: 'You do not answer. That is not the same as it going away.' };
+  }
+  return { kind: 'drop', message: `You let it sit. ${proposer} does not bring it up again.` };
+}
+
+function takePendingTemptation(journey) {
+  const memory = ensureTemptationMemory(journey);
+  const day = Number(journey?.day || 1);
+  const index = memory.pending.findIndex((entry) => Number(entry?.day) <= day);
+  if (index === -1) return null;
+  const [entry] = memory.pending.splice(index, 1);
+  const act = getActById(entry.actId);
+  if (!act) return null;
+  memory.lastDay = day;
+  return entry.kind === 'goaround'
+    ? buildGoAroundEvent(act, journey)
+    : buildTemptationEvent(act, journey, { stage: 'reoffer' });
 }
 
 function maybeCreateTemptationEvent(journey) {
@@ -622,16 +1133,21 @@ function maybeCreateTemptationEvent(journey) {
     return null;
   }
 
-  // Manager temptations play at boardroom stakes, not bush stakes.
-  const isDesk = isDeskJourney(journey.journeyType) || journey.journeyType === 'manager';
+  const memory = ensureTemptationMemory(journey);
+  reconcileTakenShortcuts(journey);
+  settleTemptationFallout(journey);
+
+  // A proposal you set aside comes back before any new one is drawn.
+  const pending = takePendingTemptation(journey);
+  if (pending) return pending;
 
   // Cooldown gate: at most one offer per few days, never on day 1. A fresh
   // memory has no previous draw, so it must not accidentally impose a four-day
   // opening lockout.
   const day = Number(journey.day || 1);
-  const memory = journey.temptationMemory || (journey.temptationMemory = { lastDay: 0, seenActIds: [], missedEligibleDays: 0 });
   if (day <= 1 || (memory.lastDay > 0 && day - memory.lastDay < TEMPTATION_COOLDOWN_DAYS)) return null;
 
+  const isDesk = isDeskTemptationJourney(journey);
   const baseChance = isDesk ? 0.08 : 0.1;
   const chance = Math.min(0.22, baseChance * getDifficultyEventModifier(journey));
   const guaranteeAfterMisses = 5;
@@ -640,63 +1156,21 @@ function maybeCreateTemptationEvent(journey) {
     return null;
   }
 
-  const roleId = journey.roleId || journey.role?.id;
-  const candidates = ILLEGAL_ACTS.filter((act) => {
-    if (!act) return false;
-    if (memory.seenActIds.includes(act.id)) return false;
-    if (!Array.isArray(act.roles) || act.roles.length === 0) return true;
-    return roleId ? act.roles.includes(roleId) : true;
-  });
+  // Role and phase are hard gates: a GM only ever hears the acts tagged for a
+  // GM, and a recce lead is never offered a post-harvest crime. There is no
+  // fallback to the whole library.
+  const candidates = ILLEGAL_ACTS.filter(
+    (act) => actMatchesTemptationContext(act, journey) && !memory.seenActIds.includes(act.id)
+  );
+  if (!candidates.length) return null;
 
-  const pool = candidates.length ? candidates : ILLEGAL_ACTS;
-  const act = pool[Math.floor(Math.random() * pool.length)];
+  const act = pickWeightedAct(candidates);
   if (!act) return null;
   memory.lastDay = day;
   memory.missedEligibleDays = 0;
   if (act.id) memory.seenActIds.push(act.id);
 
-  const baseGain = isDesk ? 3500 : 650;
-  const swing = isDesk ? 2500 : 550;
-  const gain = Math.max(0, Math.round(baseGain + (Math.random() * 2 - 1) * swing));
-
-  const profile = getTemptationProfileForAct(act);
-  const takeEffects = profile
-    ? profile.take(gain, isDesk)
-    : isDesk
-      ? { budget: gain, politicalCapital: -4 }
-      : { budget: Math.min(gain, 1200), equipment: -8, crew_morale: -3 };
-  const takeOutcome = profile?.outcome || 'It pays off today. Tomorrow is a question mark.';
-  const takeRiskInjury = isDesk
-    ? undefined
-    : (profile && 'riskInjury' in profile ? profile.riskInjury ?? undefined : 0.12);
-
-  const refuseEffects = isDesk ? { politicalCapital: 2 } : { crew_morale: 2 };
-  const reportEffects = isDesk
-    ? { politicalCapital: 4, compliance: 2, timeUsed: 2 }
-    : { crew_morale: 1, compliance: 2, timeUsed: 2 };
-
-  return {
-    id: `legacy_temptation_${String(act.id || Math.random().toString(36).slice(2))}`,
-    title: String(act.title || 'Shady Shortcut'),
-    type: 'temptation',
-    severity: 'moderate',
-    probability: 0,
-    description: `Someone on the job quietly proposes a shortcut: “${String(act.description || 'Take a shortcut that should not be taken.')}”`,
-    options: [
-      {
-        label: 'Refuse and keep it clean',
-        outcome: 'You walk away. It keeps the run boring, but safe.',
-        effects: refuseEffects
-      },
-      buildShortcutOption({ act, gain, isDesk, profile, takeOutcome, takeEffects, takeRiskInjury }),
-      {
-        label: 'Document and report',
-        outcome: 'You put it in writing. It takes time, but strengthens your position.',
-        effects: reportEffects,
-        reactionTone: 'responsible'
-      }
-    ]
-  };
+  return buildTemptationEvent(act, journey);
 }
 
 /**
