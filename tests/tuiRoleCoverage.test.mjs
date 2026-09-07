@@ -52,7 +52,7 @@ const ROLE_FIXTURES = [
     temptationFlavor: /Field desperation/i,
     actId: 'seedling-switcheroo',
     failMetrics: { forestHealth: 20, progress: 30, compliance: 35 },
-    expectedIssueIds: ['seedlot-vigour-drop', 'free-growing-catchup-plan'],
+    expectedIssueIds: ['seedlot-vigour-drop', 'free-growing-catchup-plan', 'environmental-audit-fallout'],
   },
 ];
 

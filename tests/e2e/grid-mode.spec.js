@@ -17,16 +17,27 @@ test.describe('touch grid choices', () => {
         const region = grid._regions.find((entry) => entry.type === 'option' && entry.label === label)
           || grid._regions.find((entry) => entry.type === 'option-page' && entry.label === '[Next]');
         if (!region) return null;
+        const firstOption = grid._regions.find((entry) => entry.type === 'option');
         return { label: region.label, height: region.h * grid.renderer.cellH,
           x: (region.x + region.w / 2) * grid.renderer.cellW,
           y: (region.y + region.h / 2) * grid.renderer.cellH,
-          start: grid._optionStart };
+          start: grid._optionStart,
+          pageLabel: firstOption?.label || null };
       }, target);
       expect(next, 'the last area or a next page must be tappable').not.toBeNull();
       expect(next.height).toBeGreaterThanOrEqual(44);
       await page.touchscreen.tap(next.x, next.y);
       chosen = next.label === target;
-      if (!chosen) await expect.poll(() => page.evaluate(() => window.__forestGame.ui.gridView._optionStart)).toBeGreaterThan(next.start);
+      // A page tap moves _optionStart synchronously but the option regions are
+      // rebuilt on the next animation frame, so wait for the new page to be
+      // drawn before reading the regions again.
+      if (!chosen) {
+        await page.waitForFunction(({ start, prevLabel }) => {
+          const grid = window.__forestGame.ui.gridView;
+          return grid._optionStart > start
+            && grid._regions.some((region) => region.type === 'option' && region.label !== prevLabel);
+        }, { start: next.start, prevLabel: next.pageLabel });
+      }
     }
     expect(chosen).toBe(true);
     await expect(page.locator('#choices')).toContainText('Journeyman');
