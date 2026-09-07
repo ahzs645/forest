@@ -96,7 +96,8 @@ test('campaign plays all four seasons through the year-end review', async ({ pag
     }
     if (index < 0) index = labels.findIndex((label) => !skip.test(label));
     if (index < 0) index = 0;
-    const destination = labels[index].match(/Move on to (.+?) Cover ground/);
+    // Travel labels read "Move on to <stop> | Waypoint — …" or "| Next block on the file; …".
+    const destination = labels[index].match(/Move on to (.+?) (?:Waypoint —|Next block on the file|Cover ground)/);
     if (destination) travelDestination = destination[1];
     await buttons.nth(index).click({ timeout: 3000 }).catch(() => {});
   }
