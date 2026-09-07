@@ -169,18 +169,18 @@ function pickChoice(labels, terminalText, strategyName) {
   const strategyPriorities = {
     planner: planningPriorities,
     permitter: [
+      'Clean response',
+      'Process Permits',
+      'Follow Up on Referrals',
       'Road Permit File',
       'Archaeology File',
       'Special-Use File',
       'Compliance Admin',
       'Renew Registration',
-      'Clean response',
       'Fast-track',
       'Address Revisions',
-      'Follow Up on Referrals',
       'Submit Permit',
       'Draft Permit Application',
-      'Process Permits',
       'Stakeholder Meeting',
       'Reset the office',
       'Take a Break',
@@ -406,7 +406,7 @@ function assertModeSpecificExpectations(modeName, terminalText) {
       if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
         expect(approved.current).toBeGreaterThanOrEqual(Math.ceil(approved.total * 0.8));
       } else {
-        expect(terminalText).toMatch(/could not meet its targets|Budget exhausted|Lost political support|Burnout/i);
+        expect(terminalText).toMatch(/could not meet its targets|could not get the season's permits issued|Budget exhausted|Lost political support|Burnout/i);
       }
       break;
     }
