@@ -182,9 +182,9 @@ function pickChoice(labels, terminalText, strategyName) {
       'Draft Permit Application',
       'Process Permits',
       'Stakeholder Meeting',
-      'Team Building',
+      'Reset the office',
       'Take a Break',
-      'Quiet Day'
+      'Call it a day'
     ],
     silviculture: [
       'Plant Block',
@@ -303,7 +303,7 @@ function getRecommendedActionLabel(terminalText) {
     'Revise FOM',
     'Compliance Admin',
     'Renew Registration',
-    'Ministerial Outreach',
+    'District Pre-Submission Meeting',
     'Prepare Submission',
     'Clean response',
     'Fast-track',
@@ -325,32 +325,32 @@ function getRecommendedActionLabel(terminalText) {
 }
 
 function getPlanningPriorities(terminalText) {
-  const phaseMatch = terminalText.match(/Phase:\s*([A-Za-z ]+)/);
+  const phaseMatch = terminalText.match(/Phase:\s*([A-Za-z &]+)/);
   const phase = phaseMatch ? phaseMatch[1].trim() : '';
   const valuesBlocked = terminalText.includes('BLOCKED') || terminalText.includes('All values must be');
 
-  if (phase === 'Data Gathering') {
+  if (phase === 'Inventory & Data') {
     return valuesBlocked
       ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Gather Data', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
       : ['Gather Data', 'Network', 'Clear the Inbox', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'Hold the Line'];
   }
 
-  if (phase === 'Analysis') {
+  if (phase === 'Analysis & Draft Plan') {
     return valuesBlocked
       ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Run Analysis', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
       : ['Run Analysis', 'Network', 'Clear the Inbox', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'Hold the Line'];
   }
 
-  if (phase === 'Stakeholder Review') {
+  if (phase === 'Engagement & Public Review') {
     return valuesBlocked
       ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Stakeholder Session', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
       : ['Stakeholder Session', 'Balanced Approach', 'Emphasize First Nations', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
   }
 
-  if (phase === 'Ministerial Approval') {
+  if (phase === 'District Manager Decision') {
     return valuesBlocked
-      ? ['Values Workshop', 'Timber Assessment', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Prepare Submission', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
-      : ['Prepare Submission', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
+      ? ['Values Workshop', 'Timber Supply Analysis', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'District Pre-Submission Meeting', 'Prepare Submission', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
+      : ['Prepare Submission', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'District Pre-Submission Meeting', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
   }
 
   return [
@@ -362,7 +362,7 @@ function getPlanningPriorities(terminalText) {
     'Revise FOM',
     'Compliance Admin',
     'Renew Registration',
-    'Ministerial Outreach',
+    'District Pre-Submission Meeting',
     'Prepare Submission',
     'Balanced Approach',
     'Emphasize First Nations',
@@ -393,7 +393,7 @@ function assertModeSpecificExpectations(modeName, terminalText) {
         expect(extractStat(terminalText, 'Data Completeness')).toBeGreaterThanOrEqual(80);
         expect(extractStat(terminalText, 'Analysis Quality')).toBeGreaterThanOrEqual(80);
         expect(extractStat(terminalText, 'Stakeholder Buy-in')).toBeGreaterThanOrEqual(75);
-        expect(extractStat(terminalText, 'Ministerial Confidence')).toBeGreaterThanOrEqual(80);
+        expect(extractStat(terminalText, 'DM Readiness')).toBeGreaterThanOrEqual(80);
       } else {
         expect(terminalText).toMatch(/failed to achieve approval|Budget exhausted|Lost political support|Burnout/i);
       }

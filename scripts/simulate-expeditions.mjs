@@ -164,7 +164,7 @@ function maybeSetAside(journey, options, progress) {
 export const POLICY_VOCABULARY = {
   recon: ['set_aside', 'set_tempo', 'travel', 'ground_truth', 'camp_menu', 'end_shift'],
   planning: ['set_aside', 'desk_menu', 'end', 'professional_admin'],
-  permitting: ['set_aside', 'end_day'],
+  permitting: ['set_aside', 'end_day', 'process_permits', 'professional_admin'],
   silviculture: ['set_aside', 'end'],
 };
 
@@ -250,16 +250,36 @@ function reconPolicy(journey, options, prompt) {
 function planningPolicy(journey, options, prompt) {
   // These menus have dynamic block ids, not action names. Deliberately select
   // the first candidate instead of reporting an unrecognised action.
-  if (prompt === 'Select active block focus:' || prompt === 'Constraint triage:') {
+  if (prompt === 'Select the lead block:' || prompt === 'Constraint triage:') {
     return options[0];
   }
   const plan = journey.plan || {};
+  const fom = journey.blockPlanning?.fom || {};
+  const fomClosed = fom.status === 'closed';
   const gates = (Math.min(1, (plan.dataCompleteness || 0) / 80)
     + Math.min(1, (plan.analysisQuality || 0) / 80)
     + Math.min(1, (plan.stakeholderBuyIn || 0) / 75)
-    + Math.min(1, (plan.ministerialConfidence || 0) / 80)) / 4;
+    + Math.min(1, (plan.ministerialConfidence || 0) / 80)
+    + (fomClosed ? 1 : 0)) / 5;
   const setAside = maybeSetAside(journey, options, gates);
   if (setAside) return setAside;
+
+  // An authored situation. The default option is the authored one, but a
+  // planner with a season's budget to protect does not put a quarter of it
+  // into one afternoon: when the default costs more than the file can carry,
+  // take the cheapest way through the situation instead.
+  if (options.some((option) => option.value === 'set_aside')) {
+    const budget = journey.resources?.budget || 0;
+    const costOf = (option) => {
+      const match = String(option?.description || '').match(/-\$(\d+(?:\.\d+)?)(k?)/i);
+      if (!match) return 0;
+      return Number(match[1]) * (match[2] ? 1000 : 1);
+    };
+    const affordable = options.filter((option) => option.value !== 'set_aside');
+    if (affordable.length && costOf(affordable[0]) > budget * 0.15) {
+      return affordable.reduce((best, option) => (costOf(option) < costOf(best) ? option : best), affordable[0]);
+    }
+  }
 
   const protagonist = journey.protagonist;
   if (protagonist && (protagonist.energy <= 25 || protagonist.stress >= 75)) {
@@ -274,41 +294,96 @@ function planningPolicy(journey, options, prompt) {
       : ['network', 'email', 'rest'];
     return pick(options, wanted) || options[0];
   }
+  // The FOM comment period is the long pole: publish the map the day it is
+  // allowed, keep answering comments while it runs, and republish when the
+  // comments come back. Nothing reaches the District Manager without it.
+  const fomWork = fom.status === 'draft'
+    || fom.status === 'revision_required'
+    || (fom.status === 'public_review' && (fom.commentLoad || 0) > 0);
+  if (fomWork) {
+    const fomAction = pick(options, ['fom_review']);
+    if (fomAction) return fomAction;
+  }
+  // The registration gate and the CPD file: one admin day when the
+  // professional file is what stands between the plan and the decision.
+  const professional = journey.professional || {};
+  if (plan.phase === 'ministerial_approval'
+    && (professional.registrationStatus !== 'active' || (professional.cpdHours || 0) < (professional.cpdTarget || 0))) {
+    const admin = pick(options, ['professional_admin']);
+    if (admin) return admin;
+  }
+  // Prepare Submission is the step that carries the file across the decision
+  // gate; filed early it is $2,200 for a partial lift. Meet the district first.
+  const readiness = plan.ministerialConfidence || 0;
+  const submitCloses = readiness + 14 >= 80;
   return pick(options, [
-    'submit', 'stakeholder', 'analyze', 'gather_data', 'outreach',
-    'fom_review', 'values', 'balanced', 'professional_admin',
+    ...(submitCloses ? ['submit'] : []),
+    'outreach', 'stakeholder', 'analyze', 'gather_data', 'submit',
+    'values', 'balanced', 'professional_admin',
     'network', 'email', 'rest', 'end', 'next', 'continue'
   ]);
 }
 
-function permittingPolicy(journey, options) {
+function permittingPolicy(journey, options, prompt) {
   const permits = journey.permits || {};
   const setAside = maybeSetAside(journey, options, (permits.approved || 0) / (permits.target || 1));
   if (setAside) return setAside;
 
+  // The meeting picks who to see: the district when a decision is due, the
+  // Nation when a referral is out, the agencies otherwise.
+  if (prompt === 'Who do you meet?') {
+    const wanted = (permits.inReview || 0) > 0 ? ['ministry', 'nations', 'agencies']
+      : (permits.inReferral || 0) > 0 ? ['nations', 'ministry', 'agencies']
+        : ['agencies', 'ministry', 'nations'];
+    return pick(options, wanted) || options[0];
+  }
+
   const protagonist = journey.protagonist;
   const inSupportMenu = options.some((option) => option.value === 'support_back');
   if (inSupportMenu) {
-    return pick(options, ['rest', 'team_morale', 'stakeholder_meeting', 'support_back']) || options[0];
+    const tired = protagonist && (protagonist.energy <= 20 || protagonist.stress >= 80);
+    return pick(options, tired
+      ? ['rest', 'team_morale', 'stakeholder_meeting', 'support_back']
+      : ['stakeholder_meeting', 'rest', 'team_morale', 'support_back']) || options[0];
   }
   if (protagonist && (protagonist.energy <= 20 || protagonist.stress >= 80)) {
     const rest = pick(options, ['support_menu']);
     if (rest) return rest;
   }
 
-  // Deficiencies are answered when they stack up, not the instant one lands —
-  // chasing every ticket the day it arrives starves the pipeline that produces
-  // the approvals in the first place.
-  if ((permits.needsRevision || 0) >= 3) {
+  // Deficiency letters are answered when they stack up, or when they are the
+  // only thing holding the queue — Process Permits disappears from the menu
+  // when nothing is moving until the letters are answered.
+  const queueWork = options.some((option) => option.value === 'process_permits');
+  if ((permits.needsRevision || 0) >= 3 || ((permits.needsRevision || 0) > 0 && !queueWork)) {
     const revise = pick(options, ['revise_permit:']);
     if (revise) return revise;
   }
 
-  return pick(options, [
-    'follow_up_referrals', 'process_permits', 'submit_permit', 'draft_permit',
-    'revise_permit:', 'professional_admin', 'support_menu', 'end_day',
-    'next', 'continue'
-  ]);
+  // A warm relationship with the Nation turns a follow-up call into a day off
+  // the referral clock; a cold one is a courtesy call, and the queue comes first.
+  const warm = (journey.relationships?.nations || 0) >= 55;
+  const order = warm
+    ? ['follow_up_referrals', 'process_permits']
+    : ['process_permits', 'follow_up_referrals'];
+
+  // The professional file: one admin day when the filing backlog is what the
+  // next audit will find, or the CPD record is behind and nothing else is due.
+  const professional = journey.professional || {};
+  const adminDue = professional.registrationStatus !== 'active'
+    || (professional.paperworkLoad || 0) >= 20
+    || (!queueWork && (permits.inReferral || 0) === 0 && (professional.cpdHours || 0) < (professional.cpdTarget || 0));
+  const wanted = adminDue && !queueWork
+    ? ['professional_admin', ...order, 'revise_permit:']
+    : [...order, 'revise_permit:', 'professional_admin'];
+
+  // With every clock running and nothing to draft, the day goes to whoever
+  // can move a clock: the support menu holds the meeting.
+  if (!queueWork && (permits.inReferral || 0) === 0 && (permits.needsRevision || 0) === 0 && !adminDue) {
+    wanted.push('support_menu');
+  }
+
+  return pick(options, [...wanted, 'support_menu', 'end_day', 'next', 'continue']);
 }
 
 function silviculturePolicy(journey, options, prompt) {

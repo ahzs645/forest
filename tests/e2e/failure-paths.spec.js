@@ -7,7 +7,7 @@ const FAILURE_RUNS = [
     areaIndex: 0,
     difficultyLabel: 'Old Growth',
     seed: 7004,
-    expectedReason: /(Lost political support|Cabinet window closed before approval|Budget exhausted)/i
+    expectedReason: /(Lost the district's goodwill|The FSP expired before the replacement was approved|Budget exhausted)/i
   },
   {
     name: 'permitter',
@@ -15,7 +15,7 @@ const FAILURE_RUNS = [
     areaIndex: 1,
     difficultyLabel: 'Old Growth',
     seed: 7000,
-    expectedReason: /(Lost political support|Budget exhausted|Failed to meet deadline)/i
+    expectedReason: /(Lost the district's goodwill|Budget exhausted|Failed to meet deadline)/i
   },
   {
     name: 'recce',
@@ -170,11 +170,11 @@ function pickCollapseChoice(labels, terminalText, modeName) {
     if (labels.some((label) => label.includes('Emphasize Timber Supply'))) {
       return findFirstMatching(labels, ['Emphasize Timber Supply', 'Emphasize Community', 'Emphasize Biodiversity', 'Balanced Approach']);
     }
-    return findFirstMatching(labels, ['Timber Assessment', 'Clear the Inbox', 'Network', 'Take a Break', 'Hold the Line', 'Gather Data', 'Run Analysis', 'Stakeholder Session', 'Prepare Submission', 'Values Workshop']);
+    return findFirstMatching(labels, ['Timber Supply Analysis', 'Clear the Inbox', 'Network', 'Take a Break', 'Hold the Line', 'Gather Data', 'Run Analysis', 'Stakeholder Session', 'Prepare Submission', 'Values Workshop']);
   }
 
   if (modeName === 'permitter') {
-    return findFirstMatching(labels, ['Handle Crisis', 'Stakeholder Meeting', 'Team Building', 'Take a Break', 'Quiet Day', 'Process Permits']);
+    return findFirstMatching(labels, ['Work the urgent file', 'Stakeholder Meeting', 'Reset the office', 'Take a Break', 'End Day Early', 'Process Permits']);
   }
 
   if (modeName === 'recce') {

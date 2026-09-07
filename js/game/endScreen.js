@@ -130,7 +130,8 @@ export function writeFinalStatistics(ui, journey) {
       ui.write(`Data Completeness: ${journey.plan.dataCompleteness}%`);
       ui.write(`Analysis Quality: ${journey.plan.analysisQuality}%`);
       ui.write(`Stakeholder Buy-in: ${journey.plan.stakeholderBuyIn}%`);
-      ui.write(`Ministerial Confidence: ${journey.plan.ministerialConfidence}%`);
+      ui.write(`DM Readiness: ${journey.plan.ministerialConfidence}%`);
+      ui.write(`FOM: ${journey.blockPlanning?.fom?.status === 'closed' || journey.blockPlanning?.fom?.status === 'approved' ? 'comment period closed' : (journey.blockPlanning?.fom?.status || 'draft').replaceAll('_', ' ')}`);
       ui.write(`Days Elapsed: ${daysUsed}`);
       ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
       break;
@@ -150,7 +151,7 @@ export function writeFinalStatistics(ui, journey) {
     case 'permitting':
     case 'desk':
     default:
-      ui.write(`Permits Approved: ${journey.permits?.approved ?? 0}/${journey.permits?.target ?? 0}`);
+      ui.write(`Permits Issued: ${journey.permits?.approved ?? 0}/${journey.permits?.target ?? 0}`);
       ui.write(`Days Used: ${daysUsed}/${journey.deadline ?? daysUsed}`);
       ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
       break;
@@ -183,14 +184,14 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
         `${journey.planting.blocksPlanted} blocks planted, ${journey.surveys.freeGrowingComplete} free-growing surveys completed. ` +
         `A new generation of trees will rise from this ground.`;
     case 'planning':
-      return `The landscape plan for ${areaName} received ministerial approval after ${daysUsed} days of analysis, ` +
-        `stakeholder engagement, and careful balancing of competing values. ` +
-        `The plan will shape forestry operations in the region for the next decade.`;
+      return `The Forest Stewardship Plan and first Forest Operations Map for ${areaName} were approved by the District Manager after ${daysUsed} days of analysis, ` +
+        `engagement with the Nations and the public, and careful balancing of competing values. ` +
+        `The plan will shape the licensee's operations in the area for the next five years.`;
     case 'permitting':
     case 'desk':
-      return `${journey.permits?.approved ?? 0} permits approved out of ${journey.permits?.target ?? 0} targeted. ` +
-        `The permit pipeline in ${areaName} is flowing smoothly after ${daysUsed} days of diligent processing ` +
-        `and relationship building.`;
+      return `${journey.permits?.approved ?? 0} permits issued out of ${journey.permits?.target ?? 0} the season needed. ` +
+        `The queue at the district office in ${areaName} is moving after ${daysUsed} days of clean files ` +
+        `and relationships kept warm.`;
     case 'manager':
       return `${crewName} closed out the term in ${areaName} after ${daysUsed} months with the books balanced ` +
         `and the board's confidence intact. The operation is set up to thrive under its new leadership.`;
@@ -215,11 +216,11 @@ export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
       return `The silviculture program in ${areaName} fell short of its targets after ${daysUsed} days. ` +
         `${reason} The unplanted blocks will need to wait for next season.`;
     case 'planning':
-      return `The landscape plan for ${areaName} failed to achieve approval after ${daysUsed} days. ` +
+      return `The FSP replacement for ${areaName} failed to achieve approval after ${daysUsed} days. ` +
         `${reason} The planning process will need to restart with a new approach.`;
     case 'permitting':
     case 'desk':
-      return `The permitting office in ${areaName} could not meet its targets. ` +
+      return `The licensee's permitting desk in ${areaName} could not get the season's permits issued. ` +
         `${reason} After ${daysUsed} days, the backlog remains.`;
     case 'manager':
       return `${crewName}'s tenure leading the ${areaName} operation ended after ${daysUsed} months. ` +

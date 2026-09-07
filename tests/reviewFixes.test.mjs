@@ -431,7 +431,7 @@ test('planning mission guidance recommends direct submission when it can close a
     hazards: [],
   };
   journey.blockPlanning.fom.activeBlockId = 'block-a';
-  journey.blockPlanning.fom.status = 'approved';
+  journey.blockPlanning.fom.status = 'closed';
   journey.blockPlanning.fom.commentLoad = 0;
   journey.blockPlanning.fom.reviewDaysRemaining = 0;
   journey.plan.phase = 'ministerial_approval';
@@ -447,6 +447,8 @@ test('planning mission guidance recommends direct submission when it can close a
 
   let status = null;
   updatePlanningMissionStatus({ setMissionStatus(next) { status = next; } }, journey, { id: 'fall', name: 'Fall' });
-  assert.match(status.guidance, /Prepare Submission can carry confidence/i);
-  assert.ok(status.alerts.some((alert) => /Prepare Submission can close it now/i.test(alert.text)));
+  assert.match(status.guidance, /Prepare Submission can carry DM readiness/i);
+  // The guidance headline is the one recommendation; the alerts no longer
+  // carry a second, sometimes contradictory, approval-gap line.
+  assert.ok(!status.alerts.some((alert) => /Approval gap|Outreach/i.test(alert.text)));
 });

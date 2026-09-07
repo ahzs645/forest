@@ -44,7 +44,7 @@ deployments are sized against it with `npm run sim:expeditions`.
 **Five roles, five distinct journeys:**
 
 - **Strategic Planner** — phase-gated landscape planning under a ministerial deadline.
-- **Permitting Specialist** — a permit pipeline sim: drafting → referral → review → approval.
+- **Permitting Specialist** — a permit pipeline sim: drafting → submission → referral clock → district decision → issued.
 - **Recon Crew Lead** — block-to-block traverse with pace, rations, camps, and crew welfare.
 - **Silviculture Supervisor** — contractor management across planting, brushing, and surveys.
 - **General Manager** — executive mode: hire a CEO, pursue certifications, balance the books.
