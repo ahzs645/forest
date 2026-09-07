@@ -16,7 +16,7 @@ import {
   drawIssue,
 } from '../js/engine.js';
 import { getPlanningSubmissionReadiness } from '../js/modes/planning.js';
-import { TuiGameController } from '../tui/controller.js';
+import { TuiGameController, deriveRiskLevel } from '../tui/controller.js';
 
 function advanceFromSetupToFirstPlannerTask(controller) {
   controller.handleKey({ name: 'return' });
@@ -125,7 +125,7 @@ test('crisis command starts the Williams Lake beetle scenario with map and reuse
   assert.equal(state.contentData.type, 'scenario');
   assert.match(state.contentData.title, /Pine Beetle Outbreak/);
   assert.match(state.contentData.map, /BEETLE/);
-  assert.ok(state.contentData.intelLines.some((line) => line.includes('SBSwk1')));
+  assert.ok(state.contentData.intelLines.some((line) => line.includes('SBSdw2')));
   assert.ok(state.contentData.optionDetails.length >= 5);
 });
 
@@ -627,8 +627,8 @@ test('planning water context holds community watershed blocks and blocks submiss
 
   const readiness = getPlanningSubmissionReadiness(journey, season);
   assert.equal(readiness.ready, false);
-  assert.match(readiness.reasons.join(' | '), /FOM is draft/i);
-  assert.match(readiness.reasons.join(' | '), /working-around-water/i);
+  assert.match(readiness.reasons.join(' | '), /FOM draft/i);
+  assert.match(readiness.reasons.join(' | '), /works in and about a stream/i);
 });
 
 test('planning readiness blocks direct severe road observations with road-engineering reasons', () => {
@@ -855,4 +855,15 @@ test('a season never plays two cards of the same kind back to back', () => {
         `seed ${seed}: ${types[i]} played twice in a row at index ${i} (${types.join(', ')})`);
     }
   }
+});
+
+test('risk bands honour authored levels and treat deferred fallout as exposure', () => {
+  // "Harvest the valuable timber" on an 800-year grove read SAFE because only
+  // its immediate effects were graded.
+  assert.equal(deriveRiskLevel({ effects: { progress: 8, budget: 3 }, riskLevel: 'high' }), 'high');
+  assert.equal(deriveRiskLevel({ effects: { progress: 8 }, setFlags: { underInvestigation: true } }), 'medium');
+  assert.equal(deriveRiskLevel({ effects: { progress: 5 }, scheduleIssues: { id: 'permit-deficiency', delay: 1 } }), 'medium');
+  assert.equal(deriveRiskLevel({ effects: { progress: 5, compliance: 2 } }), 'low');
+  assert.equal(deriveRiskLevel({ effects: { progress: 5, compliance: -6 } }), 'high');
+  assert.equal(deriveRiskLevel({ effects: { progress: 5 }, risk: { chance: 0.5 } }), 'high');
 });

@@ -91,7 +91,7 @@ test('every advertised odds predicate is actually implemented', () => {
     avgMoraleAbove: [{ crew: [{ isActive: true, morale: 90 }] }, 'avgMoraleAbove:70'],
     relationshipsAbove: [{ resources: { politicalCapital: 80 } }, 'relationshipsAbove:70'],
     shortRationStreak: [{ rationPlan: { shortRationStreak: 5 } }, 'shortRationStreak:3'],
-    priorShortcuts: [{ temptationMemory: { seenActIds: [1, 2, 3] } }, 'priorShortcuts:2'],
+    priorShortcuts: [{ temptationMemory: { takenActIds: [1, 2, 3] } }, 'priorShortcuts:2'],
     hasFlag: [{ consequenceFlags: ['locals_soured'] }, 'hasFlag:locals_soured'],
     accessGroundTruthed: [
       { blocks: [{ id: 'b1' }], currentBlockIndex: 0, reconIntel: { byBlock: { b1: { accessGroundTruthed: true } } } },

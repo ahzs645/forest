@@ -22,40 +22,40 @@ export const JOURNEY_MILESTONES = [25, 50, 75, 90];
 
 export const MILESTONE_COPY = {
   recon: {
-    25: 'Quarter of the traverse complete. The crew is settling into the bush rhythm.',
-    50: 'Halfway there. The route map finally looks beatable.',
-    75: 'Three-quarters complete. Every fuel drum and dry sock matters now.',
-    90: 'Final push. The extraction point is almost within sight.'
+    25: 'A quarter of the packages closed. The crew is settling into the bush rhythm.',
+    50: 'Half the file finalized. The season finally looks beatable.',
+    75: 'Three-quarters of the packages closed. Every fuel drum and dry sock matters now.',
+    90: 'Final push. The last block is on tomorrow\'s map.'
   },
   field: {
     25: 'Quarter of the traverse complete. The crew is settling into the bush rhythm.',
     50: 'Halfway there. The route map finally looks beatable.',
     75: 'Three-quarters complete. Every fuel drum and dry sock matters now.',
-    90: 'Final push. The extraction point is almost within sight.'
+    90: 'Final push. The last block is on tomorrow\'s map.'
   },
   silviculture: {
-    25: 'The first wave of regeneration is taking hold across the program.',
-    50: 'Half the silviculture campaign is established. Momentum is finally visible.',
-    75: 'The season is bending your way. One more strong push could finish the contract cleanly.',
-    90: 'Final block pressure. Every contractor call and survey day matters now.'
+    25: 'First blocks in the ground and inspected; the year\'s program has a shape.',
+    50: 'Half the program delivered: blocks inspected, release moving through the older stands.',
+    75: 'The season is bending your way. Last blocks, last release openings, the surveyor booked.',
+    90: 'Last block and last declaration in sight.'
   },
   planning: {
-    25: 'The planning wall has shape now. The expedition no longer feels theoretical.',
-    50: 'Half the plan is standing. Stakeholders can finally see where this is headed.',
-    75: 'Cabinet binders are stacking up. Approval country is finally in sight.',
+    25: 'The inventory wall has shape now. The operating area no longer feels theoretical.',
+    50: 'Half the plan is standing. The Nations and the public can finally see where this is headed.',
+    75: 'The FSP binder has shape. The District Manager\'s decision is in sight.',
     90: 'Last mile to sign-off. One clean submission could carry the plan over the line.'
   },
   permitting: {
     25: 'The permit queue is finally moving. The office can feel the pace change.',
-    50: 'Half the approvals are within reach. The backlog is starting to blink first.',
-    75: 'The deadline board looks winnable now. A few clean reviews could finish the job.',
-    90: 'Final permit sprint. One more run through the pipeline could seal the season.'
+    50: 'Half the permits are issued. The backlog is starting to blink first.',
+    75: 'The deadline board looks winnable now. A few clean decisions could finish the job.',
+    90: 'Final permit sprint. One more pass through the district queue could seal the season.'
   },
   desk: {
     25: 'The permit queue is finally moving. The office can feel the pace change.',
-    50: 'Half the approvals are within reach. The backlog is starting to blink first.',
-    75: 'The deadline board looks winnable now. A few clean reviews could finish the job.',
-    90: 'Final permit sprint. One more run through the pipeline could seal the season.'
+    50: 'Half the permits are issued. The backlog is starting to blink first.',
+    75: 'The deadline board looks winnable now. A few clean decisions could finish the job.',
+    90: 'Final permit sprint. One more pass through the district queue could seal the season.'
   },
   manager: {
     25: 'First quarter closes. Your strategic direction is taking root.',
@@ -130,31 +130,41 @@ export const DESK_ACTIONS = {
   process_permits: {
     id: 'process_permits',
     name: 'Process Permits',
-    description: 'Spend the day on permit paperwork and reviews',
+    description: 'Work the queue: draft the backlog, submit what is drafted, chase the closest clock',
     energyCost: 10
   },
   stakeholder_meeting: {
     id: 'stakeholder_meeting',
     name: 'Stakeholder Meeting',
-    description: 'Meet with ministry, nations, or community',
+    description: 'Meet the district office, the Nation, or the agencies',
     energyCost: 15
   },
   crisis_management: {
     id: 'crisis_management',
-    name: 'Handle Crisis',
-    description: 'Drop everything and deal with the urgent file',
+    name: 'Work the urgent file',
+    description: 'Drop everything and deal with the file that cannot wait',
     energyCost: 30
   },
   team_morale: {
     id: 'team_morale',
-    name: 'Team Building',
-    description: 'Boost crew morale with coffee and encouragement',
+    name: 'Reset the office',
+    description: 'Clear the whiteboard, reset the mill on its dates, recover a little energy',
     energyCost: 5
   },
   end_day: {
     id: 'end_day',
-    name: 'Quiet Day',
-    description: 'Keep the desk ticking over and head home early',
+    name: 'Call it a day',
+    description: 'Head home early; the district clocks keep running',
     energyCost: 0
   }
 };
+
+/**
+ * Planning file gates. The District Manager's decision needs the file's
+ * readiness at DECISION_GATE; everything short of Prepare Submission (the
+ * step that checks the FOM comment period, the water gate, the road file and
+ * registration) tops out at PRE_SUBMISSION_CAP so only the submission crosses
+ * the line. resolution.js reads these for the generic progress fallback.
+ */
+export const PLANNING_DECISION_GATE = 80;
+export const PLANNING_PRE_SUBMISSION_CAP = 66;

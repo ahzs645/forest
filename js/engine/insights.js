@@ -22,11 +22,11 @@ const CONSEQUENCE_INFO = {
   },
   "audit-escalation": {
     title: "Audit escalation",
-    cause: `Compliance stayed under ${COMPLIANCE_AUDIT_THRESHOLD}% for two seasons running, drawing closer review and stoppage delays.`,
+    cause: `Compliance stayed under ${COMPLIANCE_AUDIT_THRESHOLD}% for two seasons running, drawing C&E inspections and stop-work delays.`,
   },
   "registration-lapse": {
-    title: "Registration lapse",
-    cause: "Your professional registration is not active, so practice has to pause until renewal clears.",
+    title: "Registration suspended",
+    cause: "FPBC suspended your registration pending a practice review, so nothing can go out under your seal until it lifts.",
   },
   "paperwork-burn": {
     title: "Paperwork overload",
@@ -34,7 +34,7 @@ const CONSEQUENCE_INFO = {
   },
   "professional-audit": {
     title: "Professional audit risk",
-    cause: "Thin records pushed audit exposure high enough to draw formal review.",
+    cause: "Thin records pushed audit exposure high enough to draw an FPBC practice review.",
   },
   "operational-dividend": {
     title: "Operational dividend",

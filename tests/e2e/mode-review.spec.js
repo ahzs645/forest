@@ -115,7 +115,7 @@ test('refreshing a recon outcome restores its pre-decision resources without ret
   const events = JSON.parse(readFileSync(new URL('../../js/data/json/field/events.json', import.meta.url), 'utf8'));
   const washout = events.find((event) => event.id === 'road_washout');
   await startExpedition(page, roles[2], 6101);
-  await expect(page.locator('#choices button').filter({ hasText: 'Work the block' })).toBeVisible();
+  await expect(page.locator('#choices button').filter({ hasText: /Work the block|Move on to/ }).first()).toBeVisible();
   const original = await page.evaluate((event) => {
     const game = window.__forestGame;
     game.journey.activeReconShift.pendingEvent = event;

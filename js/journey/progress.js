@@ -35,7 +35,10 @@ export function getOperationalProgress(journey) {
   switch (journey?.journeyType) {
     case 'recon':
     case 'field': {
-      const totalBlocks = journey?.blocks?.length || 0;
+      // Packages are the objective; waypoints (camps, bridges, caches) only
+      // count as ground covered. Old saves without a package target fall back
+      // to the stop count.
+      const totalBlocks = journey?.packageTarget ?? journey?.blocks?.length ?? 0;
       if (totalBlocks > 0) {
         return Math.round(safeProgressRatio(getSurveyedBlockCount(journey), totalBlocks) * 100);
       }
@@ -123,7 +126,7 @@ export function recordProgressMilestones(journey, previousProgress, messages = [
  * @returns {number} Count of surveyed blocks
  */
 export function getSurveyedBlockCount(journey) {
-  const totalBlocks = journey?.blocks?.length || 0;
+  const totalBlocks = journey?.packageTarget ?? journey?.blocks?.length ?? 0;
   if (!totalBlocks) return 0;
 
   if (journey?.journeyType === 'recon' && Number.isFinite(journey?.blocksAssessed)) {

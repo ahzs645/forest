@@ -41,7 +41,8 @@ test('access verdicts distinguish hard stops from passable blocks and adjust scr
   );
 
   assert.equal(noGoVerdict.id, 'no_go');
-  assert.match(noGoVerdict.summary, /no-go/i);
+  assert.match(noGoVerdict.summary, /^Do not proceed: /);
+  assert.equal(noGoVerdict.todayAccess, 'closed');
 
   const passableVerdict = getBlockAccessVerdict(
     {
@@ -56,14 +57,16 @@ test('access verdicts distinguish hard stops from passable blocks and adjust scr
 
   assert.equal(passableVerdict.id, 'passable_now');
 
+  // Driving the safe line into a block with nothing wrong with it records no
+  // finding, so it earns no scrutiny relief.
   const journey = { scrutiny: 3 };
   const cautiousDelta = applyAccessVerdictPressure(journey, passableVerdict, { stance: 'cautious' });
-  assert.equal(cautiousDelta, -1);
-  assert.equal(journey.scrutiny, 2);
+  assert.equal(cautiousDelta, 0);
+  assert.equal(journey.scrutiny, 3);
 
   const aggressiveDelta = applyAccessVerdictPressure(journey, noGoVerdict, { stance: 'aggressive' });
   assert.equal(aggressiveDelta, 3);
-  assert.equal(journey.scrutiny, 5);
+  assert.equal(journey.scrutiny, 6);
 });
 
 test('executeFieldAction resolves the shift without rolling the calendar forward', () => {
@@ -189,7 +192,7 @@ test('field travel surfaces access verdicts when the crew pushes into a bad bloc
   try {
     const result = executeFieldDay(journey, 'grueling');
 
-    assert.ok(result.messages.some((message) => /Access verdict: No-go/i.test(message)));
+    assert.ok(result.messages.some((message) => /Today's access: closed/i.test(message)));
     assert.ok(result.messages.some((message) => /Scrutiny rises by/i.test(message)));
     assert.equal(journey.accessVerdicts.risk.id, 'no_go');
     assert.ok(journey.scrutiny >= 3);
@@ -262,7 +265,7 @@ test('field travel records road lifecycle and water timing pressure on sensitive
     const result = executeFieldDay(journey, 'normal');
     const crossingObservation = journey.roadAssets.byBlock.crossing;
 
-    assert.ok(result.messages.some((message) => /Access verdict: /i.test(message)));
+    assert.ok(result.messages.some((message) => /Today's access: /i.test(message)));
     assert.ok(result.messages.some((message) => /Road: /i.test(message)));
     assert.ok(result.messages.some((message) => /Crossing: /i.test(message)));
     assert.ok(result.messages.some((message) => /Watershed: /i.test(message)));

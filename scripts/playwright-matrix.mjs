@@ -85,32 +85,32 @@ function pickReconMenuChoice(labels, priorities) {
 }
 
 function getPlanningPriorities(terminalText) {
-  const phaseMatch = terminalText.match(/Phase:\s*([A-Za-z ]+)/);
+  const phaseMatch = terminalText.match(/Phase:\s*([A-Za-z &]+)/);
   const phase = phaseMatch ? phaseMatch[1].trim() : '';
   const valuesBlocked = terminalText.includes('BLOCKED') || terminalText.includes('All values must be');
 
-  if (phase === 'Data Gathering') {
+  if (phase === 'Inventory & Data') {
     return valuesBlocked
       ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Gather Data', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
       : ['Gather Data', 'Network', 'Clear the Inbox', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'Hold the Line'];
   }
 
-  if (phase === 'Analysis') {
+  if (phase === 'Analysis & Draft Plan') {
     return valuesBlocked
       ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Run Analysis', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
       : ['Run Analysis', 'Network', 'Clear the Inbox', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'Hold the Line'];
   }
 
-  if (phase === 'Stakeholder Review') {
+  if (phase === 'Engagement & Public Review') {
     return valuesBlocked
       ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Stakeholder Session', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
       : ['Stakeholder Session', 'Balanced Approach', 'Emphasize First Nations', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
   }
 
-  if (phase === 'Ministerial Approval') {
+  if (phase === 'District Manager Decision') {
     return valuesBlocked
-      ? ['Values Workshop', 'Timber Assessment', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Prepare Submission', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
-      : ['Prepare Submission', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
+      ? ['Values Workshop', 'Timber Supply Analysis', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'District Pre-Submission Meeting', 'Prepare Submission', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
+      : ['Prepare Submission', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'District Pre-Submission Meeting', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
   }
 
   return [
@@ -122,7 +122,7 @@ function getPlanningPriorities(terminalText) {
     'Revise FOM',
     'Compliance Admin',
     'Renew Registration',
-    'Ministerial Outreach',
+    'District Pre-Submission Meeting',
     'Prepare Submission',
     'Balanced Approach',
     'Emphasize First Nations',
@@ -240,24 +240,25 @@ function pickChoice(labels, terminalText, strategyName) {
       'Draft Permit Application',
       'Process Permits',
       'Stakeholder Meeting',
-      'Team Building',
+      'Reset the office',
       'Take a Break',
-      'Quiet Day'
+      'Call it a day'
     ],
     silviculture: [
-      'Plant Block',
-      'Survival Check',
-      'Fill Planting',
-      'Brush Treatment',
-      'Survey Free-Growing',
+      'Plant (this year',
+      'Planting quality inspection',
+      'Fill plant',
+      'Brush (',
+      'Manual brushing',
+      'Free-growing survey (',
       'Contractor Rotation',
       'Contractor Meeting',
       'Team Briefing',
-      'Upgrade camp',
-      'Inspect & retrain',
-      'Send medic',
-      'Grant rest day',
-      'Pay retention',
+      'Upgrade the camp',
+      'Re-plot with the foreman',
+      'Call a camp inspection',
+      'Back the stand-down',
+      'Accept the re-price',
       'Hold the Line'
     ],
     // Manager runs a 12-month term; this strategy protects the treasury and
@@ -297,7 +298,7 @@ function getRecommendedActionLabel(terminalText) {
     'Revise FOM',
     'Compliance Admin',
     'Renew Registration',
-    'Ministerial Outreach',
+    'District Pre-Submission Meeting',
     'Prepare Submission',
     'Clean response',
     'Fast-track',

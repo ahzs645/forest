@@ -39,6 +39,21 @@ export const ODDS_PREDICATE_NAMES = [
 ];
 
 /**
+ * Flags the temptation lane (js/events/selection.js) leaves behind on a
+ * noticed or caught band. They have no consumer beyond shifting later odds via
+ * `hasFlag:`; applyConsequenceFlags records any flag it is handed, so these
+ * need no handler in js/events/consequences.js to work.
+ */
+export const TEMPTATION_ODDS_FLAGS = Object.freeze({
+  ce_watching: 'Somebody at the district is reading everything with your name on it.',
+  fn_watching: "The Nation's referrals office has a note with your name in it.",
+  worksafe_watching: "WorkSafeBC's prevention officer has the site on a list.",
+  contractor_owns_you: 'The person who did it for you now owns a piece of you.',
+  fpbc_file_open: 'Forest Professionals BC has a file open under your name.',
+  rcmp_file: 'There is an RCMP file with the company name on it.',
+});
+
+/**
  * Read a numeric threshold off a `when` string like "scrutinyAbove:55".
  * @returns {number} NaN when the predicate carries no argument
  */
@@ -107,8 +122,11 @@ export function matchesOddsCondition(when, journey) {
       return Number.isFinite(threshold)
         && Number(journey.rationPlan?.shortRationStreak || 0) >= threshold;
     case 'priorShortcuts':
+      // Shortcuts the player actually took (or let stand once somebody went
+      // around them). Offers that were declined or set aside do not count:
+      // saying no to a contractor cannot be what gets you caught later.
       return Number.isFinite(threshold)
-        && (journey.temptationMemory?.seenActIds?.length || 0) >= threshold;
+        && (journey.temptationMemory?.takenActIds?.length || 0) >= threshold;
     case 'hasFlag':
       // Consequence flags left by earlier bad bands (js/events/consequences.js).
       // This is what closes the loop: a failure does not just cost something

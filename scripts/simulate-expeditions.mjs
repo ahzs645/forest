@@ -20,12 +20,14 @@ import {
   createReconJourney,
   createPlanningJourney,
   createPermittingJourney,
-  createSilvicultureJourney
+  createSilvicultureJourney,
+  createManagerJourney
 } from '../js/journey/factory.js';
 import { runReconDay } from '../js/modes/recon.js';
 import { runPlanningDay } from '../js/modes/planning.js';
 import { runPermittingDay } from '../js/modes/permitting.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
+import { runManagerDay } from '../js/modes/manager.js';
 import { checkEndConditions } from '../js/modes/shared/endConditions.js';
 
 const DEFAULT_AREA = 'fraser-plateau';
@@ -86,10 +88,10 @@ function makeUi(journey, policy, tally, trace = null) {
   const write = (...parts) => trace?.(parts.filter((part) => typeof part === 'string').join(' '));
   return {
     write, writeHeader: write, writeWarning: write, writePositive: write,
-    writeDanger: write, writeBox: write, writeDivider: noop, clear: noop,
+    writeDanger: write, writeBox: write, writeInfo: write, writeDivider: noop, clear: noop,
     updateAllStatus: noop, playEventVignette: noop, playScene: noop,
     playTravelStrip: noop, playRadioAction: noop, setMissionStatus: noop,
-    clearMissionStatus: noop, writeSuccess: noop,
+    clearMissionStatus: noop, writeSuccess: write,
     async promptText() { return 'They loved this country'; },
     async promptChoice(prompt, options = []) {
       if (!options.length) return { value: undefined };
@@ -164,8 +166,9 @@ function maybeSetAside(journey, options, progress) {
 export const POLICY_VOCABULARY = {
   recon: ['set_aside', 'set_tempo', 'travel', 'ground_truth', 'camp_menu', 'end_shift'],
   planning: ['set_aside', 'desk_menu', 'end', 'professional_admin'],
-  permitting: ['set_aside', 'end_day'],
-  silviculture: ['set_aside', 'end'],
+  permitting: ['set_aside', 'end_day', 'process_permits', 'professional_admin'],
+  silviculture: ['set_aside', 'end', 'plant', 'inspect', 'brush', 'survey'],
+  manager: ['set_aside', 'hold', 'plan', 'desk', 'rehearse', 'transparent'],
 };
 
 // ── Role policies ───────────────────────────────────────────────────────────
@@ -189,7 +192,7 @@ function reconPolicy(journey, options, prompt) {
     // triage is gated on first-aid kits that a long run has usually spent.
     if (hurting >= 2) wanted.push('end_shift', 'triage');
     else if (hurting >= 1) wanted.push('triage', 'end_shift');
-    if (food <= 12) wanted.push('food_cache');
+    if (food <= 12) wanted.push('food_cache', 'grocery_run');
     if (equipment <= 30) wanted.push('maintain');
     wanted.push('maintain', 'triage', 'food_cache', 'scout', 'end_shift');
     return pick(options, wanted) || options[0];
@@ -206,8 +209,11 @@ function reconPolicy(journey, options, prompt) {
       return pick(options, food <= 15 ? ['short', generous] : [generous, 'short']);
     }
     // Route, crossing, resupply, acknowledgements — prefer the safe line.
+    // A crossing is scouted first, then crossed by whatever it physically is
+    // (ford, bridge, ferry, culvert); a crossing that refuses the crew is
+    // gone around rather than waited out.
     const sub = pick(options, [
-      'detour', 'mainline', 'scout', 'ford', 'keep',
+      'detour', 'mainline', 'scout', 'ford', 'cross', 'ferry', 'reroute', 'keep',
       'rations', 'done', 'cancel', 'lean', 'skip', 'next', 'continue'
     ]);
     if (sub) return sub;
@@ -241,7 +247,8 @@ function reconPolicy(journey, options, prompt) {
   // the free options (set_tempo, consult_map, briefing) — a policy that did
   // would spin the day against FREE_LOOKUPS_PER_DAY instead of simulating.
   return pick(options, [
-    'ground_truth', 'values_sweep', 'clear_route_constraint', 'detour_route_constraint',
+    'replace_attendant', 'ground_truth', 'values_sweep',
+    'report_route_constraint', 'detour_route_constraint',
     'travel', 'field_notebook',
     'end_shift', 'next', 'continue', 'camp_menu'
   ]);
@@ -250,16 +257,36 @@ function reconPolicy(journey, options, prompt) {
 function planningPolicy(journey, options, prompt) {
   // These menus have dynamic block ids, not action names. Deliberately select
   // the first candidate instead of reporting an unrecognised action.
-  if (prompt === 'Select active block focus:' || prompt === 'Constraint triage:') {
+  if (prompt === 'Select the lead block:' || prompt === 'Constraint triage:') {
     return options[0];
   }
   const plan = journey.plan || {};
+  const fom = journey.blockPlanning?.fom || {};
+  const fomClosed = fom.status === 'closed';
   const gates = (Math.min(1, (plan.dataCompleteness || 0) / 80)
     + Math.min(1, (plan.analysisQuality || 0) / 80)
     + Math.min(1, (plan.stakeholderBuyIn || 0) / 75)
-    + Math.min(1, (plan.ministerialConfidence || 0) / 80)) / 4;
+    + Math.min(1, (plan.ministerialConfidence || 0) / 80)
+    + (fomClosed ? 1 : 0)) / 5;
   const setAside = maybeSetAside(journey, options, gates);
   if (setAside) return setAside;
+
+  // An authored situation. The default option is the authored one, but a
+  // planner with a season's budget to protect does not put a quarter of it
+  // into one afternoon: when the default costs more than the file can carry,
+  // take the cheapest way through the situation instead.
+  if (options.some((option) => option.value === 'set_aside')) {
+    const budget = journey.resources?.budget || 0;
+    const costOf = (option) => {
+      const match = String(option?.description || '').match(/-\$(\d+(?:\.\d+)?)(k?)/i);
+      if (!match) return 0;
+      return Number(match[1]) * (match[2] ? 1000 : 1);
+    };
+    const affordable = options.filter((option) => option.value !== 'set_aside');
+    if (affordable.length && costOf(affordable[0]) > budget * 0.15) {
+      return affordable.reduce((best, option) => (costOf(option) < costOf(best) ? option : best), affordable[0]);
+    }
+  }
 
   const protagonist = journey.protagonist;
   if (protagonist && (protagonist.energy <= 25 || protagonist.stress >= 75)) {
@@ -274,41 +301,96 @@ function planningPolicy(journey, options, prompt) {
       : ['network', 'email', 'rest'];
     return pick(options, wanted) || options[0];
   }
+  // The FOM comment period is the long pole: publish the map the day it is
+  // allowed, keep answering comments while it runs, and republish when the
+  // comments come back. Nothing reaches the District Manager without it.
+  const fomWork = fom.status === 'draft'
+    || fom.status === 'revision_required'
+    || (fom.status === 'public_review' && (fom.commentLoad || 0) > 0);
+  if (fomWork) {
+    const fomAction = pick(options, ['fom_review']);
+    if (fomAction) return fomAction;
+  }
+  // The registration gate and the CPD file: one admin day when the
+  // professional file is what stands between the plan and the decision.
+  const professional = journey.professional || {};
+  if (plan.phase === 'ministerial_approval'
+    && (professional.registrationStatus !== 'active' || (professional.cpdHours || 0) < (professional.cpdTarget || 0))) {
+    const admin = pick(options, ['professional_admin']);
+    if (admin) return admin;
+  }
+  // Prepare Submission is the step that carries the file across the decision
+  // gate; filed early it is $2,200 for a partial lift. Meet the district first.
+  const readiness = plan.ministerialConfidence || 0;
+  const submitCloses = readiness + 14 >= 80;
   return pick(options, [
-    'submit', 'stakeholder', 'analyze', 'gather_data', 'outreach',
-    'fom_review', 'values', 'balanced', 'professional_admin',
+    ...(submitCloses ? ['submit'] : []),
+    'outreach', 'stakeholder', 'analyze', 'gather_data', 'submit',
+    'values', 'balanced', 'professional_admin',
     'network', 'email', 'rest', 'end', 'next', 'continue'
   ]);
 }
 
-function permittingPolicy(journey, options) {
+function permittingPolicy(journey, options, prompt) {
   const permits = journey.permits || {};
   const setAside = maybeSetAside(journey, options, (permits.approved || 0) / (permits.target || 1));
   if (setAside) return setAside;
 
+  // The meeting picks who to see: the district when a decision is due, the
+  // Nation when a referral is out, the agencies otherwise.
+  if (prompt === 'Who do you meet?') {
+    const wanted = (permits.inReview || 0) > 0 ? ['ministry', 'nations', 'agencies']
+      : (permits.inReferral || 0) > 0 ? ['nations', 'ministry', 'agencies']
+        : ['agencies', 'ministry', 'nations'];
+    return pick(options, wanted) || options[0];
+  }
+
   const protagonist = journey.protagonist;
   const inSupportMenu = options.some((option) => option.value === 'support_back');
   if (inSupportMenu) {
-    return pick(options, ['rest', 'team_morale', 'stakeholder_meeting', 'support_back']) || options[0];
+    const tired = protagonist && (protagonist.energy <= 20 || protagonist.stress >= 80);
+    return pick(options, tired
+      ? ['rest', 'team_morale', 'stakeholder_meeting', 'support_back']
+      : ['stakeholder_meeting', 'rest', 'team_morale', 'support_back']) || options[0];
   }
   if (protagonist && (protagonist.energy <= 20 || protagonist.stress >= 80)) {
     const rest = pick(options, ['support_menu']);
     if (rest) return rest;
   }
 
-  // Deficiencies are answered when they stack up, not the instant one lands —
-  // chasing every ticket the day it arrives starves the pipeline that produces
-  // the approvals in the first place.
-  if ((permits.needsRevision || 0) >= 3) {
+  // Deficiency letters are answered when they stack up, or when they are the
+  // only thing holding the queue — Process Permits disappears from the menu
+  // when nothing is moving until the letters are answered.
+  const queueWork = options.some((option) => option.value === 'process_permits');
+  if ((permits.needsRevision || 0) >= 3 || ((permits.needsRevision || 0) > 0 && !queueWork)) {
     const revise = pick(options, ['revise_permit:']);
     if (revise) return revise;
   }
 
-  return pick(options, [
-    'follow_up_referrals', 'process_permits', 'submit_permit', 'draft_permit',
-    'revise_permit:', 'professional_admin', 'support_menu', 'end_day',
-    'next', 'continue'
-  ]);
+  // A warm relationship with the Nation turns a follow-up call into a day off
+  // the referral clock; a cold one is a courtesy call, and the queue comes first.
+  const warm = (journey.relationships?.nations || 0) >= 55;
+  const order = warm
+    ? ['follow_up_referrals', 'process_permits']
+    : ['process_permits', 'follow_up_referrals'];
+
+  // The professional file: one admin day when the filing backlog is what the
+  // next audit will find, or the CPD record is behind and nothing else is due.
+  const professional = journey.professional || {};
+  const adminDue = professional.registrationStatus !== 'active'
+    || (professional.paperworkLoad || 0) >= 20
+    || (!queueWork && (permits.inReferral || 0) === 0 && (professional.cpdHours || 0) < (professional.cpdTarget || 0));
+  const wanted = adminDue && !queueWork
+    ? ['professional_admin', ...order, 'revise_permit:']
+    : [...order, 'revise_permit:', 'professional_admin'];
+
+  // With every clock running and nothing to draft, the day goes to whoever
+  // can move a clock: the support menu holds the meeting.
+  if (!queueWork && (permits.inReferral || 0) === 0 && (permits.needsRevision || 0) === 0 && !adminDue) {
+    wanted.push('support_menu');
+  }
+
+  return pick(options, [...wanted, 'support_menu', 'end_day', 'next', 'continue']);
 }
 
 function silviculturePolicy(journey, options, prompt) {
@@ -324,7 +406,7 @@ function silviculturePolicy(journey, options, prompt) {
     return pick(options, ['cancel']) || options[0];
   }
   if (prompt === 'Adjust which contractor?') {
-    const ready = options.find((option) => option.description?.startsWith('ready'));
+    const ready = options.find((option) => /^(ready|available)/.test(option.description || ''));
     return ready || pick(options, ['cancel']) || options[options.length - 1];
   }
   if (prompt === 'Meet with which contractor?') {
@@ -337,24 +419,59 @@ function silviculturePolicy(journey, options, prompt) {
     return best;
   }
   if (prompt === 'How do you respond?') {
-    return pick(options, ['medic', 'inspect', 'rest', 'pay']) || options[0];
+    // Contractor calls: retrain on a quality dispute, inspect the camp on a
+    // sickness call, back a stand-down, pay a re-price rather than lose half
+    // the crew. Never sign plot cards you did not walk.
+    return pick(options, ['inspect', 'inspect_camp', 'rest', 'pay']) || options[0];
+  }
+  if (prompt.startsWith('Release treatment on ')) {
+    // Manual release when the budget carries it, glyphosate under the PMP
+    // when it does not - the call a supervisor makes with the ledger open.
+    const remainingHa = Math.max(0, (journey.brushing?.hectaresTarget || 0) - (journey.brushing?.hectaresComplete || 0));
+    const remainingTrees = Math.max(0, (journey.planting?.seedlingsAllocated || 0) - (journey.planting?.seedlingsPlanted || 0));
+    const daysLeft = Math.max(0, (journey.deadline || 42) - (journey.day || 1));
+    const restOfProgram = remainingTrees * 0.36 + daysLeft * 550 + 4 * 1800 + 15000;
+    const manualCost = remainingHa * 900;
+    const budget = journey.resources?.budget || 0;
+    const wanted = budget > manualCost + restOfProgram ? ['manual', 'glyphosate', 'sheep'] : ['glyphosate', 'manual', 'sheep'];
+    return pick(options, wanted) || options[0];
   }
 
   const canDeploy = (journey.contractors || []).some((contractor) => {
     const state = contractor.silvicultureState;
     return !contractor.isActive && state?.status !== 'recovering' && !(state?.cooldownDays > 0);
   });
-  const wanted = ['plant', 'inspect', 'fill', 'herbicide', 'survey'];
+  // Plots before the planters move on, then this year's blocks, then the
+  // surveyor onto any opening that is ready (the older stands read better
+  // before the brush gets ahead of the calendar), then fill and release.
+  const wanted = ['inspect', 'plant', 'survey', 'fill', 'brush'];
   if (canDeploy) wanted.push('rotation');
   wanted.push('meeting', 'team_briefing', 'end', 'next', 'continue');
   return pick(options, wanted);
+}
+
+/**
+ * A General Manager who runs a steady year: set the posture, hold the cash,
+ * demand plans rather than buy fixes, rehearse for the board and tell it the
+ * truth. Delegates situations only when the treasury is thin.
+ */
+function managerPolicy(journey, options) {
+  const treasury = journey.resources?.budget || 0;
+  const start = journey.ledger?.startTreasury || 850000;
+  const setAside = options.find((option) => option.value === 'set_aside');
+  if (setAside && treasury < start * 0.4) return setAside;
+  return pick(options, [
+    'steady', 'none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', 'next', 'continue'
+  ]);
 }
 
 const ROLES = {
   recon: { create: createReconJourney, run: runReconDay, policy: reconPolicy, roleId: 'recce' },
   planning: { create: createPlanningJourney, run: runPlanningDay, policy: planningPolicy, roleId: 'planner' },
   permitting: { create: createPermittingJourney, run: runPermittingDay, policy: permittingPolicy, roleId: 'permitter' },
-  silviculture: { create: createSilvicultureJourney, run: runSilvicultureDay, policy: silviculturePolicy, roleId: 'silviculture' }
+  silviculture: { create: createSilvicultureJourney, run: runSilvicultureDay, policy: silviculturePolicy, roleId: 'silviculture' },
+  // The manager runs an operating year, not a campaign season: no campaign scale.
+  manager: { create: createManagerJourney, run: runManagerDay, policy: managerPolicy, roleId: 'manager', fullLengthOnly: true }
 };
 
 /** A one-line read on how far a deployment actually got. */
@@ -372,6 +489,12 @@ function summarizeState(journey) {
     return `planted ${journey.planting.blocksPlanted}/${journey.planting.blocksToPlant}`
       + ` brush ${Math.round(journey.brushing.hectaresComplete)}/${journey.brushing.hectaresTarget}`
       + ` surveys ${journey.surveys.freeGrowingComplete}/${journey.surveys.freeGrowingTarget}`;
+  }
+  if (journey.ledger) {
+    const ledger = journey.ledger;
+    return `delivered ${Math.round(ledger.deliveredYtd).toLocaleString()}/${ledger.aac.toLocaleString()} m³`
+      + ` (${ledger.cutControl || 'year open'}) treasury $${Math.round(journey.resources?.budget || 0).toLocaleString()}`
+      + ` reputation ${Math.round(journey.metrics?.reputation ?? 50)} scrutiny ${Math.round(journey.scrutiny || 0)}`;
   }
   if (journey.blocks) {
     return `packages ${journey.blocksAssessed || 0}/${journey.blocks.length}`
@@ -424,7 +547,9 @@ export async function simulateRun(roleName, seed, scale, trace = null) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const roleNames = args.role ? [args.role] : Object.keys(ROLES);
+  const roleNames = args.role
+    ? [args.role]
+    : Object.keys(ROLES).filter((name) => !(args.scale === 'campaign' && ROLES[name].fullLengthOnly));
   let failed = false;
 
   for (const roleName of roleNames) {
@@ -432,6 +557,10 @@ async function main() {
       console.error(`unknown role: ${roleName}`);
       process.exitCode = 2;
       return;
+    }
+    if (args.scale === 'campaign' && ROLES[roleName].fullLengthOnly) {
+      console.log(`${roleName.padEnd(26)} skipped: runs an operating year, not a campaign season`);
+      continue;
     }
     const results = [];
     for (let i = 0; i < args.runs; i += 1) {

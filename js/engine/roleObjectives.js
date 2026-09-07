@@ -22,11 +22,11 @@ export const ROLE_OBJECTIVES = {
     mandate: "Protect compliance and progress while avoiding paperwork burn.",
   },
   recce: {
-    primary: "relationships",
-    secondary: ["compliance", "progress"],
+    primary: "compliance",
+    secondary: ["progress", "relationships"],
     failureModes: ["heritage-protocol-gap", "wildlife-collar-drop"],
     signatureWin: "Ground truth protected the file",
-    mandate: "Protect relationships and crew confidence while making field progress.",
+    mandate: "Bring back field notes planners and permitters can defend, without losing the season or the crew's trust.",
   },
   silviculture: {
     primary: "forestHealth",

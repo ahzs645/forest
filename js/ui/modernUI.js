@@ -105,8 +105,8 @@ export const ModernUIMixin = {
         recon: 'Complete reconnaissance of all blocks while managing crew fatigue.',
         field: 'Complete field operations while maintaining safety standards.',
         silviculture: 'Meet planting and survey targets within budget constraints.',
-        planning: 'Build ministerial confidence through careful data analysis.',
-        permitting: 'Process permit applications before deadline.',
+        planning: "Get the FSP and first FOM through the District Manager's decision.",
+        permitting: 'Get the season\'s permits issued by the district before the deadline.',
         manager: 'Lead the company through the full term with the books and the board onside.',
         desk: 'Complete administrative tasks efficiently.'
       };

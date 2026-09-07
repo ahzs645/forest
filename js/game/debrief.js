@@ -29,7 +29,7 @@ import {
 
 /**
  * Role-specific closing decision. Three stances, consistent across roles:
- *   integrity — file it straight; earns a professional-reliance commendation
+ *   integrity — file it straight; the file holds if anyone ever pulls it
  *   spin      — dress it up; small score gamble in keeping with risk plays
  *   people    — put the crew/partners first; warms the epilogues
  * @param {string} journeyType
@@ -43,7 +43,7 @@ export function getFinalReportPrompt(journeyType) {
         prompt: 'Back at the office, the traverse write-up is due. How do you file it?',
         options: [
           { label: 'File it straight — every hazard and access gap documented', hint: 'The development forester will grumble, but the record protects the next crew.', value: 'integrity' },
-          { label: 'Soften the access notes so the blocks stay attractive', hint: 'Risky. If an auditor walks that ground, the gaps will show.', value: 'spin' },
+          { label: 'Soften the access notes so the blocks stay attractive', hint: 'Risky. If a C&E officer walks that ground, the gaps will show.', value: 'spin' },
           { label: 'Credit the crew by name in the appendix', hint: 'Recognition travels fast in small towns.', value: 'people' },
         ],
       };
@@ -60,8 +60,8 @@ export function getFinalReportPrompt(journeyType) {
       return {
         prompt: 'The plan needs your seal. How do you sign off as the professional of record?',
         options: [
-          { label: 'Seal it with every condition and caveat documented', hint: 'Professional reliance means the file speaks for itself.', value: 'integrity' },
-          { label: "Lean into the minister's preferred narrative", hint: 'Risky. Plans outlive ministers.', value: 'spin' },
+          { label: 'Seal it with every condition and caveat documented', hint: 'Your seal means the rationale is written down and you can defend it.', value: 'integrity' },
+          { label: "Lean into the licensee's preferred narrative", hint: 'Risky. Plans outlive the people who wanted them.', value: 'spin' },
           { label: 'Co-author the summary with the First Nations partners', hint: 'Shared authorship builds trust that outlasts this plan.', value: 'people' },
         ],
       };
@@ -70,7 +70,7 @@ export function getFinalReportPrompt(journeyType) {
       return {
         prompt: 'Time to close out the files. How do you archive the year?',
         options: [
-          { label: 'Archive everything with full referral records attached', hint: 'Future you — or an auditor — will find exactly what happened.', value: 'integrity' },
+          { label: 'Archive everything with full referral records attached', hint: 'Future you — or the Forest Practices Board — will find exactly what happened.', value: 'integrity' },
           { label: 'Fast-close the stragglers with minimal documentation', hint: 'Risky. Thin files have a way of resurfacing.', value: 'spin' },
           { label: 'Send personal thanks to every agency contact who moved a file', hint: 'Next year’s referrals will move faster.', value: 'people' },
         ],
@@ -108,7 +108,7 @@ export function resolveFinalReport(style, journey, rng = Math.random) {
       }
       return {
         delta: -10,
-        lines: ['A spot audit unpicks the framing line by line. The file gets flagged, and your name is on it.'],
+        lines: ['A check survey unpicks the framing line by line. The file gets flagged, and your name is on it.'],
       };
     }
     case 'people':
@@ -124,7 +124,7 @@ export function resolveFinalReport(style, journey, rng = Math.random) {
     default:
       return {
         delta: 2,
-        lines: ['The association circulates your file as an example of professional reliance done right.'],
+        lines: ['Nothing comes of it, which is the point. If anyone ever pulls the file, it holds.'],
       };
   }
 }
@@ -182,8 +182,8 @@ export function buildCrewEpilogue(member, context = {}) {
   const info = getCrewDisplayInfo(member);
   const name = `${info.name} (${info.role})`;
 
-  if (member.isDead) {
-    return `${name}: A bench at the staging area carries their name now. The crew stops there every season.`;
+  if (member.isDead || (!member.isActive && !member.hasQuit)) {
+    return `${name}: Off the crew for the season; the WorkSafeBC file is still open. Sends the crew a photo from physio.`;
   }
   // Survivors who took an injury during a logged event remember exactly where
   if (member.isActive && context.injuredAt?.has(member.id)) {
@@ -258,8 +258,8 @@ export function buildManagerEpilogue(journey, victory) {
       ? 'methodical as ever'
       : 'already pitching the next venture';
     lines.push(victory
-      ? `${journey.ceo.name}: Renewed for another term, ${style}.`
-      : `${journey.ceo.name}: Parted ways professionally. The handshake was firm, the severance firmer.`);
+      ? `Woodlands manager ${journey.ceo.name}: renewed for another year, ${style}.`
+      : `Woodlands manager ${journey.ceo.name}: moved on to a competitor. The handshake was firm, the exit interview firmer.`);
   }
   for (const cert of journey.certifications || []) {
     lines.push(`${cert.name}: ${victory ? 'The certificate hangs in reception, and buyers notice.' : 'The audit binder outlived the tenure.'}`);

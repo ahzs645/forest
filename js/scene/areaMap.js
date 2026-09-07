@@ -81,7 +81,7 @@ export function buildJourneyMapFeatures(journey) {
   features.push({
     type: 'label',
     point: { x: 50, y: 96 },
-    text: `${surveyed}/${blocks.length} BLOCKS BEHIND YOU`,
+    text: `${surveyed}/${blocks.length} STOPS BEHIND YOU`,
     center: true,
   });
 

@@ -27,7 +27,20 @@ async function startRecce(page) {
   await page.locator('#area-continue-btn').focus();
   await page.keyboard.press('Enter');
   await page.locator('#choices button').filter({ hasText: 'Journeyman' }).click();
-  await expect(page.locator('#choices button').filter({ hasText: 'Work the block' })).toBeVisible();
+  // The traverse starts at a staging waypoint, so the first real action is
+  // the drive to the first block; on an old save it may already be block work.
+  await expect(page.locator('#choices button').filter({ hasText: /Work the block|Move on to/ }).first()).toBeVisible();
+}
+
+// The first action of a traverse is the drive to the first block, which asks
+// for a route before it resolves; answer it with the default so the keyboard
+// flow lands on the outcome the same way block work does.
+async function answerRoutePromptIfShown(page) {
+  const choices = page.locator('#choices');
+  await expect(choices).toContainText(/Stay Mainline|Continue/);
+  if ((await choices.innerText()).includes('Stay Mainline')) {
+    await page.keyboard.press('Enter');
+  }
 }
 
 for (const viewport of [{ width: 1280, height: 720 }, { width: 1440, height: 900 }]) {
@@ -78,6 +91,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1440, height: 900
       await expectContained(page, '#terminal-window');
       await choices.first().focus();
       await page.keyboard.press('Enter');
+      await answerRoutePromptIfShown(page);
       await expect(page.locator('#choices')).toContainText('Continue');
       await page.keyboard.press('Enter');
       await expect(page.locator('#choices')).toContainText('Begin Shift 2');
@@ -114,6 +128,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1440, height: 900
       await expect(page.locator('#modal')).toBeHidden();
       await expect(page.locator('#choices button').first()).toBeFocused();
       await page.keyboard.press('Enter');
+      await answerRoutePromptIfShown(page);
       await expect(page.locator('#choices')).toContainText('Continue');
     });
 

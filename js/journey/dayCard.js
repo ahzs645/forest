@@ -141,8 +141,10 @@ export async function presentDayCard(ui, card = {}) {
  * @returns {Object} partial card: label/title/body/whyNow/prompt/options
  */
 export function buildEventCardContent(formatted, event, usable) {
+  // A temptation is not a radio call: field roles hear it at the tailgate,
+  // desk roles read it or take the phone. The selection lane sets the label.
   return {
-    label: event.reporter ? 'RADIO CHECK' : 'ON THE RADIO',
+    label: event.cardLabel || (event.reporter ? 'RADIO CHECK' : 'ON THE RADIO'),
     title: formatted.title,
     body: formatted.description,
     whyNow: event.whyNow || null,

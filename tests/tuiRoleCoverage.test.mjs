@@ -12,6 +12,10 @@ import {
   recordAssignmentSelection,
 } from '../js/engine.js';
 import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
+import { ISSUE_LIBRARY } from '../js/data/issues.js';
+import { DESK_EVENTS } from '../js/data/deskEvents.js';
+import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
+import { getOperationalEventLibrary } from '../js/engine/content.js';
 
 const ROLE_FIXTURES = [
   {
@@ -48,7 +52,7 @@ const ROLE_FIXTURES = [
     temptationFlavor: /Field desperation/i,
     actId: 'seedling-switcheroo',
     failMetrics: { forestHealth: 20, progress: 30, compliance: 35 },
-    expectedIssueIds: ['seedlot-vigour-drop', 'free-growing-catchup-plan'],
+    expectedIssueIds: ['seedlot-vigour-drop', 'free-growing-catchup-plan', 'environmental-audit-fallout'],
   },
 ];
 
@@ -147,4 +151,34 @@ test('all TUI roles now source normal-season assignments from the seasonal data 
 
     assert.ok(new Set(families).size >= 2, `expected assignment variety for ${fixture.roleId}`);
   }
+});
+
+test('the seasonal event pool leaves expedition beats, chain stages and issue mirrors to the deployments', () => {
+  const issueIds = new Set(ISSUE_LIBRARY.map((issue) => issue.id));
+  const scheduled = new Set();
+  for (const event of [...DESK_EVENTS, ...FIELD_EVENTS]) {
+    for (const option of event.options || []) if (option.schedulesEvent) scheduled.add(option.schedulesEvent);
+  }
+  assert.ok(scheduled.has('story_arc_ancientGrove_stage1_harvest'), 'fixture: the grove protest is a scheduled stage');
+
+  for (const roleId of ['planner', 'permitter', 'recce', 'silviculture']) {
+    const state = createInitialState({ companyName: 'Pool', roleId, areaId: 'fraser-plateau' });
+    const pool = getOperationalEventLibrary(state);
+    assert.ok(pool.length > 0, `${roleId} still has a pool`);
+    for (const event of pool) {
+      assert.ok(!event.expeditionOnly, `${event.id} is expedition-only`);
+      assert.ok(!scheduled.has(event.id), `${event.id} is a scheduled chain stage drawn cold`);
+      assert.ok(!['supply', 'terrain', 'wildlife'].includes(event.type), `${event.id} is a travel beat (${event.type})`);
+      const base = event.id.replace(/_(desk|field)$/, '');
+      assert.ok(base === event.id || !issueIds.has(base), `${event.id} duplicates issue ${base}`);
+    }
+  }
+});
+
+test('scheduled chain stages still arrive when their trigger fired', () => {
+  const state = createInitialState({ companyName: 'Chain', roleId: 'recce', areaId: 'fraser-plateau' });
+  state.round = 2;
+  state.pendingEvents = [{ id: 'story_arc_ancientGrove_stage1_harvest', delay: 0 }];
+  const event = drawSeasonalEvent(state, () => 0);
+  assert.equal(event?.id, 'story_arc_ancientGrove_stage1_harvest');
 });

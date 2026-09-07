@@ -1,50 +1,56 @@
 [
   {
     "id": "faller",
-    "name": "Faller",
-    "description": "Operates chainsaw to fall trees",
-    "skills": ["cutting", "safety"],
+    "name": "Layout Tech",
+    "description": "Runs the boundary, hangs ribbon, and keeps the traverse notes clean",
+    "skills": ["layout", "navigation", "safety"],
     "baseHealth": 100,
-    "baseMorale": 70
+    "baseMorale": 70,
+    "firstAidTicket": "OFA1"
   },
   {
     "id": "bucker",
-    "name": "Bucker",
-    "description": "Bucks fallen trees into logs",
-    "skills": ["processing", "measurement"],
+    "name": "Timber Cruiser",
+    "description": "Puts in the cruise plots and calls species, height and defect",
+    "skills": ["cruising", "measurement"],
     "baseHealth": 100,
-    "baseMorale": 75
+    "baseMorale": 75,
+    "firstAidTicket": "OFA1"
   },
   {
     "id": "spotter",
-    "name": "Spotter",
-    "description": "Surveys terrain and spots hazards",
+    "name": "Compassman / Junior Tech",
+    "description": "Holds the line, chains distance, and flags what the lead walks past",
     "skills": ["navigation", "observation"],
     "baseHealth": 90,
-    "baseMorale": 80
+    "baseMorale": 80,
+    "firstAidTicket": "OFA1"
   },
   {
     "id": "driver",
-    "name": "Driver",
-    "description": "Operates trucks and heavy equipment",
+    "name": "Driver-Swamper",
+    "description": "Drives the crew truck, walks the road location, and swamps for the crew",
     "skills": ["driving", "mechanics"],
     "baseHealth": 95,
-    "baseMorale": 70
+    "baseMorale": 70,
+    "firstAidTicket": "OFA1"
   },
   {
     "id": "medic",
-    "name": "First Aid",
-    "description": "Handles medical emergencies",
+    "name": "OFA 3 Attendant",
+    "description": "Level 3 first aid with the ETV; the crew cannot work without one",
     "skills": ["medical", "safety"],
     "baseHealth": 85,
-    "baseMorale": 85
+    "baseMorale": 85,
+    "firstAidTicket": "OFA3"
   },
   {
     "id": "mechanic",
     "name": "Mechanic",
-    "description": "Repairs and maintains equipment",
+    "description": "Keeps the trucks, the quad and the saws running",
     "skills": ["repair", "mechanics"],
     "baseHealth": 95,
-    "baseMorale": 75
+    "baseMorale": 75,
+    "firstAidTicket": "OFA1"
   }
 ]

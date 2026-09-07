@@ -50,7 +50,7 @@ test('professional compliance chains advance as paperwork moves', () => {
   assert.equal(after.registrationChain.complete, false);
 });
 
-test('planning submission readiness blocks inactive registration and CPD gaps', () => {
+test('planning submission readiness blocks inactive registration but not a CPD gap', () => {
   const journey = createPlanningJourney({
     companyName: 'Planning Co',
     roleId: 'planner',
@@ -64,19 +64,25 @@ test('planning submission readiness blocks inactive registration and CPD gaps', 
   journey.plan.ministerialConfidence = 80;
   journey.blockPlanning.activeBlock = { id: 'block-1', label: 'Block 1' };
   journey.blockPlanning.activeSummary = 'Block 1';
-  journey.blockPlanning.fom.status = 'approved';
+  journey.blockPlanning.fom.activeBlockId = 'block-1';
+  journey.blockPlanning.fom.status = 'closed';
   journey.blockPlanning.fom.reviewDaysRemaining = 0;
   journey.blockPlanning.fom.commentLoad = 0;
   journey.blockPlanning.fom.waterGate = 'clear';
   journey.blockPlanning.fom.roadBlocker = false;
   journey.professional.registrationStatus = 'suspended';
-  journey.professional.cpdHours = 8;
+  journey.professional.cpdHours = 0;
 
   const readiness = getPlanningSubmissionReadiness(journey);
 
   assert.equal(readiness.ready, false);
   assert.ok(readiness.reasons.some((reason) => reason.includes('registration is suspended')));
-  assert.ok(readiness.reasons.some((reason) => reason.includes('CPD gap')));
+  // A CPD shortfall shows up as scrutiny and in an FPBC audit's odds, not as
+  // a reason the District Manager cannot decide the file.
+  assert.ok(!readiness.reasons.some((reason) => /CPD/.test(reason)));
+
+  journey.professional.registrationStatus = 'active';
+  assert.equal(getPlanningSubmissionReadiness(journey).ready, true);
 });
 
 test('permitting pressure rises when compliance exposure is high', () => {
@@ -105,7 +111,7 @@ test('permitting pressure rises when compliance exposure is high', () => {
   assert.ok(pressuredState.overall > baselinePressure.overall);
 });
 
-test('standard desk permit work now carries professional paperwork load forward', () => {
+test('standard desk permit work carries paperwork load forward but does not log CPD', () => {
   const originalRandom = Math.random;
   Math.random = () => 0.99;
 
@@ -115,7 +121,7 @@ test('standard desk permit work now carries professional paperwork load forward'
     areaId: 'fort-st-john-plateau',
   });
   journey.hoursRemaining = 8;
-  journey.permits.backlog = 0;
+  journey.permits.backlog = 2;
   journey.permits.submitted = 1;
   journey.permits.inReview = 0;
 
@@ -125,9 +131,11 @@ test('standard desk permit work now carries professional paperwork load forward'
 
   Math.random = originalRandom;
 
-  assert.ok(result.messages.some((message) => message.includes('Submitted a permit package for review.')));
+  assert.ok(result.messages.some((message) => /^Drafted (CP|RP|RUP|SUP) /.test(message)), result.messages.join(' | '));
   assert.ok(after.paperworkLoad > before.paperworkLoad);
-  assert.ok(after.cpdHours > before.cpdHours);
+  // CPD is logged on the professional file (Compliance Admin), not by moving files.
+  assert.equal(after.cpdHours, before.cpdHours);
+  assert.equal(after.cpdTarget, 8, 'the season target is the season\'s share of the FPBC year');
 });
 
 test('roadPermit and specialUse paperwork chains net negative over a full diligent cycle', () => {

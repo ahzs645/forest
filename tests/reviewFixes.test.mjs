@@ -46,20 +46,20 @@ async function withRandomAsync(value, fn) {
 
 test('silviculture treasury is not clamped to the field cash ceiling', () => {
   const journey = createSilvicultureJourney({ areaId: 'fort-st-john-plateau' });
-  assert.equal(journey.resources.budget, 120000);
+  assert.equal(journey.resources.budget, 380000);
 
   // budget: 0 must be a true no-op (the old clamp fired on typeof checks)
   let { option, event } = makeEvent({ label: 'noop', outcome: 'x', effects: { budget: 0 } });
   resolveEvent(journey, event, option);
-  assert.equal(journey.resources.budget, 120000);
+  assert.equal(journey.resources.budget, 380000);
 
   ({ option, event } = makeEvent({ label: 'cost', outcome: 'x', effects: { budget: -200 } }));
   resolveEvent(journey, event, option);
-  assert.equal(journey.resources.budget, 119800);
+  assert.equal(journey.resources.budget, 379800);
 
   ({ option, event } = makeEvent({ label: 'gain', outcome: 'x', effects: { budget: 50000 } }));
   resolveEvent(journey, event, option);
-  assert.equal(journey.resources.budget, 169800, 'no 8k field ceiling on the program budget');
+  assert.equal(journey.resources.budget, 429800, 'no 8k field ceiling on the program budget');
 });
 
 test('recon cash keeps the field ceiling', () => {
@@ -69,47 +69,28 @@ test('recon cash keeps the field ceiling', () => {
   assert.ok(journey.resources.budget <= 8000, `field cash stays capped, got ${journey.resources.budget}`);
 });
 
-test('silviculture progress effects land on the planting track', () => {
+test('silviculture progress effects bank program schedule, never planted blocks', () => {
   const journey = createSilvicultureJourney({ areaId: 'fort-st-john-plateau' });
   const { option, event } = makeEvent({ label: 'push', outcome: 'x', effects: { progress: 8 } });
-  resolveEvent(journey, event, option);
-  assert.ok(journey.planting.blocksPlanted > 0, 'progress converts to planted blocks');
+  const result = resolveEvent(journey, event, option);
+  assert.equal(journey.planting.blocksPlanted, 0, 'a good day on the radio does not plant a block');
+  assert.equal(journey.planting.seedlingsPlanted, 0);
+  assert.equal(journey.programSchedule.days, 1, 'eight points is a day ahead of schedule');
+  assert.ok(result.messages.some((message) => /Program schedule gained/.test(message)));
 });
 
-test('silviculture progress effects never leave blocksPlanted fractional', () => {
+test('silviculture setback events slip the schedule and leave planted blocks alone', () => {
   const journey = createSilvicultureJourney({ areaId: 'fort-st-john-plateau' });
-  // progress:1 -> blockDelta of 1/8 = 0.125, which used to be applied
-  // directly and could show the player "0.125/15 blocks" in the header.
-  for (let i = 0; i < 5; i++) {
-    const { option, event } = makeEvent({ label: 'nudge', outcome: 'x', effects: { progress: 1 } });
-    resolveEvent(journey, event, option);
-    assert.ok(Number.isInteger(journey.planting.blocksPlanted),
-      `blocksPlanted must stay a whole number, got ${journey.planting.blocksPlanted}`);
-  }
-
-  // The fractional remainder still accumulates across calls instead of
-  // being silently rounded away - eight +1 nudges (1 full block worth)
-  // eventually tips the counter over by one whole block.
-  const journey2 = createSilvicultureJourney({ areaId: 'fort-st-john-plateau' });
-  for (let i = 0; i < 8; i++) {
-    const { option, event } = makeEvent({ label: 'nudge', outcome: 'x', effects: { progress: 1 } });
-    resolveEvent(journey2, event, option);
-  }
-  assert.equal(journey2.planting.blocksPlanted, 1, 'eight +1 progress nudges should accumulate into one whole block');
-});
-
-test('silviculture setback events cannot drag blocksPlanted below what seedlings already back', () => {
-  const journey = createSilvicultureJourney({ areaId: 'fort-st-john-plateau' });
-  // Simulate a fully-seeded program (as if every plant/fill action had run)
-  // where a block counter of 15 is fully backed by the seedling pool.
   journey.planting.seedlingsPlanted = journey.planting.seedlingsAllocated;
   journey.planting.blocksPlanted = journey.planting.blocksToPlant;
 
   const { option, event } = makeEvent({ label: 'setback', outcome: 'x', effects: { progress: -80 } });
-  resolveEvent(journey, event, option);
+  const result = resolveEvent(journey, event, option);
 
   assert.equal(journey.planting.blocksPlanted, journey.planting.blocksToPlant,
-    'a narrative setback must not erase planting progress that seedlings already paid for');
+    'a narrative setback must not erase planting the contractor was paid for');
+  assert.equal(journey.programSchedule.days, -10);
+  assert.ok(result.messages.some((message) => /Program schedule slipped/.test(message)));
 });
 
 test('gamble options use the failure branch when the roll misses', () => {
@@ -173,7 +154,8 @@ test('event option hints disclose whether the response uses the day', () => {
   const mediaFormatted = formatEventForDisplay(media, 'planning');
   const written = mediaFormatted.options.find((option) => option.label === 'Provide a written statement only');
   assert.match(written.hint, /brief response; work continues/i);
-  assert.match(written.hint, /-1h/i);
+  // There is no hour clock any more: the time policy line is the whole story.
+  assert.doesNotMatch(written.hint, /-\d+h/i);
 
   const washout = FIELD_EVENTS.find((event) => event.id === 'road_washout');
   const washoutFormatted = formatEventForDisplay(washout, 'recon');
@@ -286,7 +268,7 @@ test('travel stops at the named next destination and reports clamped distance', 
   const result = withRandom(0.5, () => executeFieldAction(journey, 'grueling'));
   assert.equal(journey.currentBlockIndex, 1);
   assert.equal(journey.distanceTraveled, 5);
-  assert.ok(result.messages.some((message) => /Covered 5 km/.test(message)));
+  assert.ok(result.messages.some((message) => /Walked 5 km of line and road location/.test(message)));
   assert.ok(result.messages.some((message) => /Arrived at Blackwater Road/.test(message)));
   assert.ok(!result.messages.some((message) => /Arrived at Old Burn Edge/.test(message)));
 });
@@ -310,7 +292,7 @@ test('incidental negative field progress creates delay without moving the crew b
   assert.equal(journey.currentBlockIndex, 1);
   assert.equal(journey.distanceTraveled, 5);
   assert.ok(journey.travelSetback > 0);
-  assert.ok(result.messages.some((message) => /Travel delay queued/i.test(message)));
+  assert.ok(result.messages.some((message) => /Tomorrow's leg will be slower/i.test(message)));
 });
 
 test('GIS data recovery does not route a technical setback into stakeholder buy-in', () => {
@@ -353,7 +335,7 @@ test('silviculture task preview names the ready contractor that will auto-deploy
   };
 
   await withRandomAsync(0.99, () => runSilvicultureDay({ ui, journey, gameOver: false }));
-  assert.ok(seenDescriptions.some((description) => /will deploy/i.test(description)));
+  assert.ok(seenDescriptions.some((description) => /available, goes on the block/i.test(description)));
   assert.ok(journey.contractors.some((contractor) => contractor.isActive), 'planting should auto-deploy a ready contractor');
   assert.ok(journey.planting.seedlingsPlanted > 0);
 });
@@ -431,7 +413,7 @@ test('planning mission guidance recommends direct submission when it can close a
     hazards: [],
   };
   journey.blockPlanning.fom.activeBlockId = 'block-a';
-  journey.blockPlanning.fom.status = 'approved';
+  journey.blockPlanning.fom.status = 'closed';
   journey.blockPlanning.fom.commentLoad = 0;
   journey.blockPlanning.fom.reviewDaysRemaining = 0;
   journey.plan.phase = 'ministerial_approval';
@@ -447,6 +429,8 @@ test('planning mission guidance recommends direct submission when it can close a
 
   let status = null;
   updatePlanningMissionStatus({ setMissionStatus(next) { status = next; } }, journey, { id: 'fall', name: 'Fall' });
-  assert.match(status.guidance, /Prepare Submission can carry confidence/i);
-  assert.ok(status.alerts.some((alert) => /Prepare Submission can close it now/i.test(alert.text)));
+  assert.match(status.guidance, /Prepare Submission can carry DM readiness/i);
+  // The guidance headline is the one recommendation; the alerts no longer
+  // carry a second, sometimes contradictory, approval-gap line.
+  assert.ok(!status.alerts.some((alert) => /Approval gap|Outreach/i.test(alert.text)));
 });

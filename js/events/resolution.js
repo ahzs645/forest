@@ -4,7 +4,8 @@
  */
 
 import { isFieldJourney, isDeskJourney } from './constants.js';
-import { applyRandomInjury, applyStatusEffect } from '../crew.js';
+import { PLANNING_PRE_SUBMISSION_CAP } from '../journey/constants.js';
+import { applyRandomInjury, applyStatusEffect, evacuateCrewMember } from '../crew.js';
 import { syncBlocksFromDistance } from '../journey/blockNav.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
@@ -23,6 +24,15 @@ const MAX_TRAVEL_SETBACK = 0.75;
  * same retired eight-hour scale.
  */
 const DESK_DELAY_STRAIN = 2;
+
+/**
+ * Authored field-event fuel deltas are still written on the old gallon scale
+ * (js/data/json/field/events.json, "fuel": -8). The stockpile is litres now
+ * (js/resources.js), so every authored delta is scaled here, at application,
+ * rather than in sixty places of content. A -8 in the deck is -32 L on the
+ * truck.
+ */
+const FUEL_EFFECT_SCALE = 4;
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
@@ -84,14 +94,16 @@ export function resolveEvent(journey, event, option) {
     applyEventEffects(journey, effects, messages);
   }
 
-  // Band-specific crew consequences fire in addition to any the option always
-  // carries, so "you get away with it" and "someone gets hurt doing it" can be
-  // different futures rather than the same one at two sizes.
-  if (option.crewEffect) {
-    handleCrewEffect(journey, option.crewEffect, messages);
-  }
-  if (resolved.crewEffect) {
-    handleCrewEffect(journey, resolved.crewEffect, messages);
+  // The option's own crewEffect describes the good band ("taped, laced tight,
+  // back on light duty"); the partial and bad bands carry their own. Applying
+  // both used to narrate a fracture and a truck at first light while the
+  // state said "sprained ankle" and kept them working.
+  const bandCrewEffect = resolved.band === 'good' || !resolved.band
+    ? option.crewEffect
+    : (resolved.crewEffect || null);
+  journey.lastEventVictimId = null;
+  if (bandCrewEffect) {
+    handleCrewEffect(journey, bandCrewEffect, messages);
   }
 
   // What the band leaves behind. This is what stops a bad outcome from being
@@ -128,8 +140,8 @@ export function resolveEvent(journey, event, option) {
     journey.travelSetback = Math.min(MAX_TRAVEL_SETBACK, (journey.travelSetback || 0) + setback);
     if (setback > 0) {
       messages.push(setback >= 0.35
-        ? 'Sorting that out swallowed most of the shift. The crew makes little ground today.'
-        : 'Sorting that out cost the crew ground today.');
+        ? 'Sorting that out eats most of tomorrow\'s leg.'
+        : 'Sorting that out eats into tomorrow\'s leg.');
     }
   }
 
@@ -213,9 +225,10 @@ function applyEventEffects(journey, effects, messages) {
       messages.push(`Cash: ${label}`);
     }
     if (typeof effects.fuel === 'number' && typeof journey.resources?.fuel === 'number') {
+      const litres = Math.round(effects.fuel * FUEL_EFFECT_SCALE);
       journey.resources.fuel = Math.max(0,
-        Math.min(FIELD_RESOURCES.fuel.max, journey.resources.fuel + effects.fuel));
-      if (effects.fuel < 0) messages.push(`Fuel: ${effects.fuel} gallons`);
+        Math.min(FIELD_RESOURCES.fuel.max, journey.resources.fuel + litres));
+      if (litres < 0) messages.push(`Fuel: ${litres} L`);
     }
     if (typeof effects.food === 'number' && typeof journey.resources?.food === 'number') {
       journey.resources.food = Math.max(0,
@@ -295,6 +308,9 @@ function applyEventEffects(journey, effects, messages) {
   // Progress effects
   if (typeof effects.progress === 'number' && effects.progress !== 0) {
     applyProgressEffects(journey, effects.progress, messages, effects);
+  }
+  if (journey.journeyType === 'planning') {
+    applyPlanningMetricEffects(journey, effects, messages);
   }
 
   // Crew-wide effects
@@ -433,7 +449,7 @@ function applyDiscoveryTagEffects(journey, event, option) {
 function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
   switch (journey.journeyType) {
     case 'planning':
-      applyPlanningProgress(journey, progressPoints, messages);
+      applyPlanningProgress(journey, progressPoints, messages, effects);
       return;
 
     case 'permitting':
@@ -447,7 +463,7 @@ function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
         if (progressPoints < 0 && effects.progressMode !== 'turn_back') {
           const setback = Math.min(MAX_TRAVEL_SETBACK, Math.abs(progressPoints) / 16);
           journey.travelSetback = Math.min(MAX_TRAVEL_SETBACK, (journey.travelSetback || 0) + setback);
-          messages.push(`Travel delay queued; no ground is lost (${Math.abs(progressPoints)} km-equivalent setback).`);
+          messages.push(`Tomorrow's leg will be slower (about ${Math.abs(progressPoints)} km less ground).`);
         } else {
           journey.distanceTraveled = Math.max(0, journey.distanceTraveled + progressPoints);
           syncBlocksFromDistance(journey);
@@ -464,37 +480,20 @@ function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
       return;
 
     case 'silviculture':
-      // Route program progress into the planting track that
-      // getOperationalProgress actually reads (~8 points per block). Blocks
-      // are a whole-number display ("X/15 blocks") - progressPoints/8 is
-      // rarely a whole number, so bank the fractional remainder on the
-      // journey instead of applying it directly, and only ever move
-      // blocksPlanted by whole blocks. Without the remainder carrying over,
-      // a string of small events could either get silently rounded away
-      // (never nudging the counter) or, worse, show the player a
-      // fractional block count like "0.125/15 blocks".
+      // Event progress is program schedule, never planted blocks: a block
+      // is planted when a contractor puts its trees in the ground and gets
+      // paid for them, and nothing on the radio changes that. Eight points
+      // is a day. The mode settles whole days at the end of the day
+      // (js/modes/silviculture.js settleProgramSchedule): a day ahead buys
+      // the release crew an extra shift, a day behind costs crew-days.
       if (journey.planting && typeof journey.planting.blocksToPlant === 'number') {
-        const remainder = (journey.planting._blockProgressRemainder || 0) + progressPoints / 8;
-        const wholeBlocks = Math.trunc(remainder);
-        journey.planting._blockProgressRemainder = remainder - wholeBlocks;
-
-        if (wholeBlocks !== 0) {
-          // A setback event can knock blocksPlanted down, but never below
-          // what has actually been planted (seedlingsPlanted / seedlingsAllocated
-          // in block terms) - otherwise a bad narrative roll could erase
-          // real, resource-backed planting progress and leave the block
-          // counter permanently unable to reach blocksToPlant even after
-          // every seedling in the allocation has gone into the ground.
-          const seedlingsImpliedBlocks = journey.planting.seedlingsAllocated > 0
-            ? Math.floor(((journey.planting.seedlingsPlanted || 0) / journey.planting.seedlingsAllocated) * journey.planting.blocksToPlant)
-            : 0;
-          const nextBlocksPlanted = (journey.planting.blocksPlanted || 0) + wholeBlocks;
-          journey.planting.blocksPlanted = Math.max(seedlingsImpliedBlocks,
-            Math.min(journey.planting.blocksToPlant, nextBlocksPlanted));
-        }
-
-        const direction = progressPoints > 0 ? 'advanced' : 'slipped';
-        messages.push(`Program progress ${direction} (${progressPoints > 0 ? '+' : ''}${progressPoints}).`);
+        journey.programSchedule ||= { days: 0 };
+        journey.programSchedule.days = (journey.programSchedule.days || 0) + progressPoints / 8;
+        const days = Math.abs(progressPoints / 8);
+        const dayText = days >= 1 ? `${days.toFixed(1)} day${days >= 1.05 ? 's' : ''}` : 'part of a day';
+        messages.push(progressPoints > 0
+          ? `Program schedule gained ${dayText} (+${progressPoints}).`
+          : `Program schedule slipped ${dayText} (${progressPoints}).`);
       }
       return;
 
@@ -503,12 +502,51 @@ function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
   }
 }
 
-function applyPlanningProgress(journey, progressPoints, messages) {
+/** Explicit planning-file effect keys a desk event can carry. */
+const PLANNING_METRIC_KEYS = {
+  analysis: { metric: 'analysisQuality', label: 'Analysis quality' },
+  buyIn: { metric: 'stakeholderBuyIn', label: 'Stakeholder buy-in' },
+};
+
+function hasExplicitPlanningKey(effects = {}) {
+  return ['data', 'analysis', 'buyIn'].some((key) => typeof effects?.[key] === 'number' && effects[key] !== 0);
+}
+
+/**
+ * Explicit planning-file effects: `data` lands on data completeness (handled
+ * with the survey-data key above), `analysis` on the draft plan, `buyIn` on
+ * the engagement record. `blockSelection: true` reopens the cutblock
+ * priority decision. None of these moves the District Manager's readiness
+ * or advances a phase — only the planner's own work does that.
+ */
+function applyPlanningMetricEffects(journey, effects, messages) {
   if (!journey.plan) return;
+  for (const [key, { metric, label }] of Object.entries(PLANNING_METRIC_KEYS)) {
+    const delta = effects?.[key];
+    if (typeof delta !== 'number' || delta === 0) continue;
+    journey.plan[metric] = clampPercent((journey.plan[metric] || 0) + delta);
+    messages.push(`${label} ${delta > 0 ? 'improved' : 'slipped'} (${delta > 0 ? '+' : ''}${delta}%).`);
+  }
+  if (effects?.blockSelection === true && journey.blockPlanning) {
+    journey.blockPlanning.pendingSelection = true;
+    messages.push('The lead block set is back on the table; the cutblock priority decision reopens tomorrow.');
+  }
+}
+
+/**
+ * Generic progress on a planning file lands on the metric of the phase the
+ * file is in. It is the fallback for decks that do not say which track
+ * moved; an option that carries an explicit data/analysis/buyIn key has said
+ * so, and the generic amount is not applied on top.
+ */
+function applyPlanningProgress(journey, progressPoints, messages, effects = {}) {
+  if (!journey.plan) return;
+  if (hasExplicitPlanningKey(effects)) return;
 
   const amount = Math.max(3, Math.round(Math.abs(progressPoints) * 1.5));
   let metricKey = 'dataCompleteness';
   let metricLabel = 'Data readiness';
+  let ceiling = 100;
 
   switch (journey.plan.phase) {
     case 'analysis':
@@ -520,18 +558,27 @@ function applyPlanningProgress(journey, progressPoints, messages) {
       metricLabel = 'Stakeholder buy-in';
       break;
     case 'ministerial_approval':
+      // A good week at the district can lift readiness, but never past the
+      // point where only Prepare Submission crosses the decision gate.
       metricKey = 'ministerialConfidence';
-      metricLabel = 'Ministerial confidence';
+      metricLabel = 'DM readiness';
+      ceiling = PLANNING_PRE_SUBMISSION_CAP;
       break;
     default:
       break;
   }
 
   const signedAmount = progressPoints > 0 ? amount : -amount;
-  journey.plan[metricKey] = clampPercent((journey.plan[metricKey] || 0) + signedAmount);
+  const current = journey.plan[metricKey] || 0;
+  const next = signedAmount > 0
+    ? Math.max(current, Math.min(ceiling, current + signedAmount))
+    : clampPercent(current + signedAmount);
+  journey.plan[metricKey] = next;
 
-  const direction = progressPoints > 0 ? 'improved' : 'slipped';
-  messages.push(`${metricLabel} ${direction} (${signedAmount > 0 ? '+' : ''}${signedAmount}%).`);
+  const applied = Math.round(next - current);
+  if (applied === 0) return;
+  const direction = applied > 0 ? 'improved' : 'slipped';
+  messages.push(`${metricLabel} ${direction} (${applied > 0 ? '+' : ''}${applied}%).`);
   advancePlanningPhaseIfReady(journey, messages);
 }
 
@@ -542,18 +589,19 @@ function applyComplianceEffects(journey, delta, messages) {
     return;
   }
 
-  if (isDeskJourney(journey.journeyType) && typeof journey.resources?.politicalCapital === 'number') {
-    journey.resources.politicalCapital = clampPercent(journey.resources.politicalCapital + delta);
-  }
-
-  if (journey.journeyType === 'planning' && journey.plan) {
-    journey.plan.ministerialConfidence = clampPercent(journey.plan.ministerialConfidence + delta);
+  if (journey.journeyType === 'planning') {
+    // On a planning file, compliance is the planner's own standing: it moves
+    // scrutiny (applyScrutinyEffects) and reputation, never the District
+    // Manager's readiness and never the district's goodwill.
     if (journey.protagonist) {
       journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + Math.ceil(delta / 2));
     }
-    messages.push(`Ministerial confidence ${delta > 0 ? 'rose' : 'fell'} (${delta > 0 ? '+' : ''}${delta}%).`);
-    advancePlanningPhaseIfReady(journey, messages);
+    messages.push(`Professional standing ${delta > 0 ? 'improved' : 'slipped'} (${delta > 0 ? '+' : ''}${delta}).`);
     return;
+  }
+
+  if (isDeskJourney(journey.journeyType) && typeof journey.resources?.politicalCapital === 'number') {
+    journey.resources.politicalCapital = clampPercent(journey.resources.politicalCapital + delta);
   }
 
   if (journey.journeyType === 'permitting' && journey.regulations) {
@@ -581,12 +629,11 @@ function applyRelationshipEffects(journey, delta, messages) {
     }
   }
 
-  if (journey.journeyType === 'planning' && journey.plan) {
-    journey.plan.stakeholderBuyIn = clampPercent(journey.plan.stakeholderBuyIn + delta);
-    if (journey.protagonist) {
-      journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + relationshipShift);
-    }
-    advancePlanningPhaseIfReady(journey, messages);
+  if (journey.journeyType === 'planning' && journey.protagonist) {
+    // Relationships land on the stakeholders' moods (above) and the planner's
+    // reputation. Buy-in is the engagement record, and only a Stakeholder
+    // Session or an explicit buyIn effect writes it.
+    journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + relationshipShift);
   }
 
   if (journey.journeyType === 'manager' && journey.metrics) {
@@ -596,30 +643,23 @@ function applyRelationshipEffects(journey, delta, messages) {
   messages.push(`Relationships ${delta > 0 ? 'improved' : 'frayed'} (${delta > 0 ? '+' : ''}${delta}).`);
 }
 
+/**
+ * The technical phases can close on the back of an event; the engagement
+ * phase closes only on a Stakeholder Session, and the District Manager's
+ * decision only on Prepare Submission (js/modes/planning.js).
+ */
 function advancePlanningPhaseIfReady(journey, messages) {
   if (!journey.plan) return;
 
   if (journey.plan.phase === 'data_gathering' && journey.plan.dataCompleteness >= 80) {
     journey.plan.phase = 'analysis';
-    messages.push('Data phase complete! Moving to Analysis.');
+    messages.push('Inventory complete. The analysis opens with the cutblock priority decision.');
     return;
   }
 
   if (journey.plan.phase === 'analysis' && journey.plan.analysisQuality >= 80) {
     journey.plan.phase = 'stakeholder_review';
-    messages.push('Analysis complete! Moving to Stakeholder Review.');
-    return;
-  }
-
-  if (journey.plan.phase === 'stakeholder_review' && journey.plan.stakeholderBuyIn >= 75) {
-    journey.plan.phase = 'ministerial_approval';
-    messages.push('Stakeholder review complete! Moving to Ministerial Approval.');
-    return;
-  }
-
-  if (journey.plan.phase === 'ministerial_approval' && journey.plan.ministerialConfidence >= 80) {
-    journey.isComplete = true;
-    journey.endReason = 'Landscape plan approved by Ministry!';
+    messages.push('Draft plan complete. Moving to Engagement & Public Review.');
   }
 }
 
@@ -627,11 +667,14 @@ function advancePlanningPhaseIfReady(journey, messages) {
  * Handle crew-specific effects
  */
 function handleCrewEffect(journey, crewEffect, messages) {
+  let injured = null;
   if (crewEffect.injury) {
     const victim = pickRandomCrewMember(journey.crew);
     if (victim) {
       const result = applyStatusEffect(victim, crewEffect.injury);
       if (result.message) messages.push(result.message);
+      injured = victim;
+      journey.lastEventVictimId = victim.id;
     }
   }
 
@@ -661,17 +704,28 @@ function handleCrewEffect(journey, crewEffect, messages) {
   if (crewEffect.evacuate_sick) {
     const victim = (journey.crew || []).find(m => m.isActive && m.statusEffects?.length > 0);
     if (victim) {
-      victim.isActive = false;
-      messages.push(`${victim.name} has been sent to town for medical care.`);
+      const evac = evacuateCrewMember(victim, { day: journey.day, reason: 'illness' });
+      if (evac.message) messages.push(evac.message);
     }
   }
 
   if (crewEffect.evacuate) {
-    const victim = journey.crew.find(m => m.isActive &&
-      m.statusEffects.some(e => e.effectId === crewEffect.injury));
+    // Whoever this band hurt goes out: the member it just injured, else the
+    // one carrying the named condition, else the day's victim, else whoever is
+    // hurt, else a random active hand. "Send them out for medical care" has to
+    // actually send someone.
+    const crew = journey.crew || [];
+    const victim = injured
+      || (crewEffect.injury && crew.find(m => m.isActive && m.statusEffects?.some(e => e.effectId === crewEffect.injury)))
+      || (journey.lastEventVictimId && crew.find(m => m.isActive && m.id === journey.lastEventVictimId))
+      || crew.find(m => m.isActive && (m.statusEffects?.length || 0) > 0)
+      || pickRandomCrewMember(crew);
     if (victim) {
-      victim.isActive = false;
-      messages.push(`${victim.name} has been evacuated for medical care.`);
+      if (crewEffect.injury && !victim.statusEffects?.some(e => e.effectId === crewEffect.injury)) {
+        applyStatusEffect(victim, crewEffect.injury);
+      }
+      const evac = evacuateCrewMember(victim, { day: journey.day, reason: 'injury' });
+      if (evac.message) messages.push(evac.message);
     }
   }
 

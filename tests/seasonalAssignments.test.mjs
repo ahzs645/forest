@@ -280,3 +280,22 @@ test('legacy fallback uses an unseen role task once and then stops for the rest 
   const secondFallback = buildLegacyTaskFallback(state, emptyContext);
   assert.equal(secondFallback, null);
 });
+
+test('a new season\'s context describes that season, not the one still on state', () => {
+  // The controller assigns currentSeasonContext after buildSeasonContext
+  // runs, so state still carries last season here. Spring cards used to open
+  // with winter's operation and objective because of it.
+  const state = createInitialState({ companyName: 'Season Turnover', roleId: 'planner', areaId: 'bulkley-valley' });
+  state.round = 1;
+  state.currentSeasonContext = { season: 'winter', round: 4 };
+  const spring = buildSeasonContext(state);
+  assert.equal(spring.season, 'spring');
+  assert.equal(spring.operationState.seasonId, 'spring');
+  assert.equal(spring.operationState.stage, 'scoping');
+
+  state.round = 2;
+  state.currentSeasonContext = spring;
+  const summer = buildSeasonContext(state);
+  assert.equal(summer.operationState.seasonId, 'summer');
+  assert.notEqual(summer.operationState.operation, spring.operationState.operation);
+});

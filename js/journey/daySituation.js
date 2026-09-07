@@ -18,6 +18,7 @@
 
 import { handleEvent } from '../modes/shared/handleEvent.js';
 import { optionSpendsDay } from '../events/timePolicy.js';
+import { resolveTemptationSetAside } from '../events/selection.js';
 import {
   addRouteConstraintFromEvent,
   isRouteObstructionEvent
@@ -63,6 +64,17 @@ export function situationWeight(event) {
  * @param {Object} event
  */
 export function applySetAsideCost(ui, journey, event) {
+  // A temptation is somebody else's proposal, not a situation the file will
+  // notice you ignored. Setting it aside costs nothing on the meters; what it
+  // costs is that the proposer decides what your silence meant (they drop it,
+  // ask again with a deadline, or go around you).
+  if (event?.type === 'temptation') {
+    const reply = resolveTemptationSetAside(journey, event);
+    ui.write('');
+    ui.write(reply.message, 'term-dim');
+    return;
+  }
+
   const weight = situationWeight(event);
   journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + weight);
 

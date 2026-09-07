@@ -141,6 +141,14 @@ const STEEP_EFFECT_THRESHOLDS = {
  */
 function formatOddsHint(option) {
   if (typeof option.chanceSuccess !== 'number') return '';
+  // A temptation carries the odds computed for this run today (`liveOdds`,
+  // js/events/selection.js): the file, the crew and who is already watching
+  // are all in the number, so the card tells the truth about this gamble.
+  if (option.liveOdds && typeof option.liveOdds.good === 'number') {
+    const good = Math.round(option.liveOdds.good * 100);
+    const bad = Math.round((option.liveOdds.bad || 0) * 100);
+    return `${good}% clean, ${bad}% badly wrong for you today`;
+  }
   const good = Math.round(option.chanceSuccess * 100);
   if (typeof option.chancePartial !== 'number') return `${good}% success odds`;
   const bad = Math.max(0, 100 - good - Math.round(option.chancePartial * 100));
@@ -164,6 +172,8 @@ function getOptionHint(option, journeyType, event = null) {
   }
 
   const hints = [];
+  // What the shortcut is actually offering, in the role's own currency.
+  if (option.payoffLine) hints.push(`offer: ${option.payoffLine}`);
   if (timeHint) hints.push(timeHint);
 
   if (option.effects) {
@@ -236,11 +246,9 @@ function getOptionHint(option, journeyType, event = null) {
     hints.push(oddsHint);
   }
 
-  // Managers have no hours mechanic — don't advertise a cost that never lands
-  const timeUsed = option.timeUsed ?? option.effects?.timeUsed;
-  if (typeof timeUsed === 'number' && timeUsed > 0 && journeyType !== 'manager') {
-    hints.push(`-${timeUsed}h`);
-  }
+  // There is no hour clock any more (js/journey/dayPlan.js): a timeUsed is
+  // strain or lost ground, and the time policy line above already says
+  // whether the option uses the day. No "-3h" hints.
 
   // Mechanics that resolveEvent really applies but this builder used to ignore,
   // so the option fell through to the literal string 'Safe choice'. That put

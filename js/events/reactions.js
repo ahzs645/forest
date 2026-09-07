@@ -38,6 +38,14 @@ const CREW_COMPROMISED = [
   (name) => `${name} writes nothing down and does not meet your eye.`,
 ];
 
+// Saying no to a shortcut is not a speech. The crew barely looks up.
+const CREW_STEADY = [
+  (name) => `${name} doesn't look up. "Figured."`,
+  (name) => `${name}: "Good. I wasn't writing that one down anyway."`,
+  (name) => `${name} nods once and goes back to the map.`,
+  (name) => `${name}, not quite under their breath: "That's why I work for you."`,
+];
+
 const CREW_RESPONSIBLE = [
   (name) => `${name} nods. "I will keep the notes and the radio log together."`,
   (name) => `${name} starts the incident entry before the conversation is over.`,
@@ -94,6 +102,9 @@ export function buildEventReaction(journey, option, rng = Math.random) {
     }
     if (option?.reactionTone === 'responsible') {
       return pick(CREW_RESPONSIBLE, rng)(member.name);
+    }
+    if (option?.reactionTone === 'steady') {
+      return pick(CREW_STEADY, rng)(member.name);
     }
     if (member.traits?.includes('cheerful') && rng() < 0.6) {
       return pick(CREW_CHEERFUL, rng)(member.name);

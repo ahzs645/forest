@@ -430,9 +430,11 @@ test('bureaucratic shortcut failures queue specific bureaucratic fallout issues'
 
   assert.equal(state.pendingIssues.length, 1);
   assert.equal(state.pendingIssues[0].force, true);
+  // Routed by who catches it (C&E, a planner's desk act) plus the kind of act
+  // (a consultation dodge): the district audit leads, the referral fallout trails.
   assert.deepEqual(
     state.pendingIssues[0].candidates.map((candidate) => candidate.id),
-    ['ministry-data-audit', 'fpbc-competence-audit']
+    ['ministry-data-audit', 'fpbc-competence-audit', 'referral-miss-at-two-levels', 'fsp-comment-surge']
   );
   assert.equal(state.flags.auditTriggered, true);
   assert.equal(state.flags.ethicsInquiry, undefined);
@@ -478,7 +480,11 @@ test('ecological shortcut failures queue specific ecological fallout issues', ()
   const pending = state.pendingIssues[0];
   assert.equal(pending.delay, 1);
   assert.equal(pending.force, true);
-  assert.deepEqual(pending.candidates, [{ id: 'environmental-audit-fallout', weight: 4, force: true, metricBoosts: { forestHealth: 3, compliance: 2 } }]);
+  // BCWS caught it: the environmental audit leads, the smoke complaint trails.
+  assert.deepEqual(pending.candidates, [
+    { id: 'environmental-audit-fallout', weight: 4, force: true, metricBoosts: { forestHealth: 3, compliance: 2 } },
+    { id: 'smoke-inversion', weight: 2.5, force: true, metricBoosts: { forestHealth: 1.5, relationships: 1.5 } },
+  ]);
   // Provenance stamp ties the delayed fallout to the shortcut that scheduled it.
   assert.equal(pending.causedBy?.sourceType, 'temptation');
   assert.equal(pending.causedBy?.option, riskyOption.label);

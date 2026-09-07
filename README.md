@@ -19,7 +19,7 @@ were unified.
 
 One year, one operating area, four seasons, four hats. Each season opens with
 a strategy briefing, plays a condensed Oregon Trail-style deployment — spring
-recon traverse, summer silviculture program, fall planning file, winter
+silviculture program, summer recon traverse, fall planning file, winter
 permitting push — then closes with a season review where the year's five
 meters (progress, forest health, relationships, compliance, budget) absorb
 what the deployment actually did, consequences and ecology drift included.
@@ -43,11 +43,11 @@ deployments are sized against it with `npm run sim:expeditions`.
 
 **Five roles, five distinct journeys:**
 
-- **Strategic Planner** — phase-gated landscape planning under a ministerial deadline.
-- **Permitting Specialist** — a permit pipeline sim: drafting → referral → review → approval.
-- **Recon Crew Lead** — block-to-block traverse with pace, rations, camps, and crew welfare.
+- **Strategic Planner** — phase-gated FSP and Forest Operations Map planning against the District Manager's decision deadline.
+- **Permitting Specialist** — a permit pipeline sim: drafting → submission → referral clock → district decision → issued.
+- **Recon Crew Lead** — block-to-block layout and recon traverse with pace, rations, camps, and crew welfare.
 - **Silviculture Supervisor** — contractor management across planting, brushing, and surveys.
-- **General Manager** — executive mode: hire a CEO, pursue certifications, balance the books.
+- **General Manager** — woodlands mode: hire a woods manager, chase SFI/FSC certification, hold cut control and the books.
 
 ### Seasonal Strategy (quick-play)
 

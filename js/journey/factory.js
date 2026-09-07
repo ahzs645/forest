@@ -15,6 +15,30 @@ import { getPlanningCadenceDays } from "../data/planningBlocks.js";
 import { createSeasonState } from "../season.js";
 import { createProfessionalComplianceState } from "../engine.js";
 import { ACTIONS_PER_DAY } from './dayPlan.js';
+import { getPackageBlocks, isPackageBlock } from './packages.js';
+import {
+  buildSilvicultureProgram,
+  generateSilvicultureContractors,
+  getProgramFillTrees,
+} from "../data/silvicultureProgram.js";
+import { SILVICULTURE_CREW_ROLES, SILVICULTURE_ESSENTIAL_ROLE_IDS } from "../data/silvicultureCrewRoles.js";
+import { MANAGER_EXECUTIVE_ROLES, MANAGER_ESSENTIAL_ROLE_IDS } from "../data/managerRoles.js";
+import { OPERATING_AREAS } from "../data/operatingAreas.js";
+
+// Silviculture program budgets. Contractors are paid per tree planted and per
+// hectare treated at real interior rates (js/data/silvicultureProgram.js:
+// ~$0.32/tree, manual brushing ~$900/ha, glyphosate ~$350/ha, accredited
+// survey day rate $1,800), plus $550/day supervisor overhead. Sized with
+// scripts/simulate-expeditions.mjs so an all-manual release program still
+// lands on normal difficulty and glyphosate is the affordable route on hard.
+const SILVICULTURE_BUDGET = 380000;
+const SILVICULTURE_CAMPAIGN_BUDGET = 150000;
+
+// The operating year a General Manager runs. Volumes are m³, money is dollars,
+// prices are per m³ delivered to the mill.
+const MANAGER_TREASURY = 850000;
+const MANAGER_AAC = 240000;
+const MANAGER_MONTHLY_OVERHEAD = 290000;
 
 /**
  * Campaign-scale tuning (see docs/unified_campaign.md, section 3).
@@ -25,7 +49,10 @@ import { ACTIONS_PER_DAY } from './dayPlan.js';
  * full-size journey first and only trims it at the very end when scale is
  * requested, so unscaled createJourney() calls are unaffected.
  */
-const CAMPAIGN_RECON_BLOCK_COUNT = 6;
+// A campaign recon closes this many block packages. The stop list is trimmed
+// to the leading run of stops that contains them, so the waypoints (staging,
+// camps, bridges) between those blocks stay in as travel and supply beats.
+const CAMPAIGN_RECON_PACKAGE_COUNT = 3;
 const CAMPAIGN_STOCKPILE_SCALE = 0.45; // per-run field stockpiles (fuel/food/budget/...)
 // Campaign deployments run about two thirds of a full-length file's days now
 // that a day is one action (js/journey/dayPlan.js), so halving the desk budget
@@ -37,15 +64,27 @@ const CAMPAIGN_BUDGET_SCALE = 0.68; // desk-role (planning/permitting) budgets
 const CAMPAIGN_PERCENT_RESOURCE_KEYS = new Set(["equipment"]);
 
 /**
- * Trim an area's block list to a coherent, order-preserving subset for a
- * campaign-length recon/field traverse. Keeps the first supply-bearing
- * block if the natural leading subset would otherwise drop it.
+ * Trim an area's stop list to a coherent, order-preserving leading subset
+ * for a campaign-length recon/field traverse: every stop up to and including
+ * the Nth cutblock (js/journey/packages.js). Keeps the first supply-bearing
+ * stop if the leading subset would otherwise drop it.
  */
-function selectCampaignBlocks(blocks, count = CAMPAIGN_RECON_BLOCK_COUNT) {
-  if (!Array.isArray(blocks) || blocks.length <= count) {
-    return blocks.slice();
+function selectCampaignBlocks(blocks, packageCount = CAMPAIGN_RECON_PACKAGE_COUNT) {
+  if (!Array.isArray(blocks) || blocks.length === 0) {
+    return [];
   }
-  const subset = blocks.slice(0, count);
+  let seen = 0;
+  let end = blocks.length;
+  for (let index = 0; index < blocks.length; index += 1) {
+    if (isPackageBlock(blocks[index])) {
+      seen += 1;
+      if (seen >= packageCount) {
+        end = index + 1;
+        break;
+      }
+    }
+  }
+  const subset = blocks.slice(0, end);
   if (!subset.some((block) => block.hasSupply)) {
     const firstSupplyBlock = blocks.find((block) => block.hasSupply);
     if (firstSupplyBlock) {
@@ -97,7 +136,7 @@ function applyCampaignScale(journey, journeyType) {
       journey.brushing.hectaresTarget = 100;
       journey.surveys.freeGrowingTarget = 2;
       journey.resources.seedlings = 55000;
-      journey.resources.budget = 45000;
+      journey.resources.budget = SILVICULTURE_CAMPAIGN_BUDGET;
       journey.resources.contractorCapacity = Math.round(
         journey.resources.contractorCapacity * CAMPAIGN_STOCKPILE_SCALE,
       );
@@ -106,9 +145,10 @@ function applyCampaignScale(journey, journeyType) {
     case "planning": {
       // A one-action day (js/journey/dayPlan.js) means the file moves one
       // track at a time, and a twelve-day window could not clear data,
-      // analysis, buy-in and confidence before the cabinet closed. The event
-      // days introduced afterward pushed competent files past twenty days;
-      // allow recovery inside the campaign's thirty-day season.
+      // analysis, the FOM comment period, buy-in and DM readiness before the
+      // FSP expired. The event days introduced afterward pushed competent
+      // files past twenty days; allow recovery inside the campaign's
+      // thirty-day season.
       journey.deadline = 26;
       // The shorter deployment still pays for the same approval gates and
       // authored event costs. Fund those fixed costs as well as daily upkeep.
@@ -198,7 +238,9 @@ export function createReconJourney(options = {}) {
     season: createSeasonState(roleId),
     scrutiny: 28,
 
-    // Recon-specific tracking
+    // Recon-specific tracking. Only cutblocks need packages; the staging
+    // lots, camps and bridges on the stop list are waypoints.
+    packageTarget: getPackageBlocks(baseJourney).length,
     blocksAssessed: 0,
     qualitySurveys: 0,
     verifiedBlocks: 0,
@@ -209,7 +251,8 @@ export function createReconJourney(options = {}) {
     resources: {
       ...baseJourney.resources,
       gpsUnits: campaignScale ? Math.round(5 * CAMPAIGN_STOCKPILE_SCALE) : 5,
-      flaggingTape: campaignScale ? Math.round(50 * CAMPAIGN_STOCKPILE_SCALE) : 50,
+      // Rolls of flagging: three a boundary, with a spare box for corners.
+      flaggingTape: campaignScale ? 12 : 24,
     },
     professional: createProfessionalComplianceState(
       roleId,
@@ -224,9 +267,13 @@ export function createReconJourney(options = {}) {
  * Create silviculture journey (contractor management mode)
  */
 export function createSilvicultureJourney(options = {}) {
-  const { roleId, areaId, companyName, crewName, crew, role, area } = options;
-  const effectiveAreaId = areaId || area?.id;
+  const { roleId, areaId, companyName, crewName, crew, role } = options;
+  const effectiveAreaId = areaId || options.area?.id;
   const effectiveRoleId = roleId || role?.id || "silviculture";
+  // The program's block records, stocking standard and per-tree price all
+  // come off the area's BEC code, so resolve the area even when the caller
+  // only passed an id.
+  const area = options.area || OPERATING_AREAS.find((candidate) => candidate.id === effectiveAreaId) || null;
 
   const journey = {
     journeyType: "silviculture",
@@ -283,12 +330,13 @@ export function createSilvicultureJourney(options = {}) {
       regenerationSurveys: 0,
     },
 
-    // Contractors
-    contractors: generateContractors(3),
+    // Contractors: production planters paid per tree, a brushing outfit with
+    // saw crews and a PMP applicator, an accredited survey contractor.
+    contractors: generateSilvicultureContractors(area?.becCode),
 
     // Resources
     resources: {
-      budget: 120000,
+      budget: SILVICULTURE_BUDGET,
       seedlings: 140000,
       contractorCapacity: 320,
       equipment: 100,
@@ -296,8 +344,13 @@ export function createSilvicultureJourney(options = {}) {
     },
     discoveryTags: [],
 
-    // Party
-    crew: crew || generateCrew(4, "field"),
+    // Party: the licensee's own crew - a quality checker, an accredited
+    // surveyor, the OFA 3 attendant and the crummy driver. The contractors
+    // are the workforce; these people check it and sign for it.
+    crew: crew || generateCrew(4, "field", {
+      roles: SILVICULTURE_CREW_ROLES,
+      essentialIds: SILVICULTURE_ESSENTIAL_ROLE_IDS,
+    }),
 
     // State flags
     isComplete: false,
@@ -309,35 +362,26 @@ export function createSilvicultureJourney(options = {}) {
     decisions: [],
   };
 
-  return options.scale === "campaign" ? applyCampaignScale(journey, "silviculture") : journey;
+  if (options.scale === "campaign") {
+    applyCampaignScale(journey, "silviculture");
+  }
+  attachSilvicultureProgram(journey);
+  return journey;
 }
 
 /**
- * Generate contractor crews for silviculture
+ * Derive the per-vintage program (this year's blocks, last year's fill
+ * openings, the 2–5 year old release stands, the 8–15 year old free-growing
+ * candidates) from the journey's targets and area, and stock the reefer with
+ * the fill trees on top of this year's allocation.
  */
-function generateContractors(count) {
-  const names = [
-    "Mountain Pine Planters",
-    "Northern Regen Co",
-    "Boreal Silviculture",
-    "Timber Trail Crew",
-    "Alpine Reforestation",
-  ];
-  const contractors = [];
-
-  for (let i = 0; i < count; i++) {
-    contractors.push({
-      id: `contractor_${i + 1}`,
-      name: names[i] || `Contractor ${i + 1}`,
-      productivity: 80 + Math.floor(Math.random() * 20),
-      morale: 70 + Math.floor(Math.random() * 20),
-      crewSize: 8 + Math.floor(Math.random() * 8),
-      specialty: i === 0 ? "planting" : i === 1 ? "brushing" : "survey",
-      isActive: true,
-    });
-  }
-
-  return contractors;
+export function attachSilvicultureProgram(journey) {
+  journey.program = buildSilvicultureProgram(journey);
+  journey.resources.seedlings = journey.planting.seedlingsAllocated + getProgramFillTrees(journey.program);
+  journey.planting.fillTarget = journey.program.fill.length;
+  journey.planting.fillComplete = 0;
+  journey.planting.qualityAverage = null;
+  return journey;
 }
 
 /**
@@ -363,12 +407,12 @@ export function createPlanningJourney(options = {}) {
     season: createSeasonState(effectiveRoleId),
     scrutiny: 34,
     day: 1,
-    // The cabinet window. Planning has many gates (data, analysis, FOM review,
-    // stakeholder buy-in, ministerial confidence), so the term needs room to
-    // clear them; 20 days was tight. Difficulty nudges this in ForestryTrailGame.
-    // Same resize as the other deployments: with the day's situation costing a
-    // day to answer, a competent planning file runs 21-27 days rather than
-    // 14-20, so the cabinet window has to hold that.
+    // The day the current FSP expires. Planning has many gates (data,
+    // analysis, the FOM comment period, buy-in, the District Manager's
+    // readiness), so the term needs room to clear them; 20 days was tight.
+    // Difficulty nudges this in ForestryTrailGame. With the day's situation
+    // costing a day to answer, a competent planning file runs 21-27 days
+    // rather than 14-20, so the window has to hold that.
     deadline: 34,
     actionsRemaining: ACTIONS_PER_DAY,
 
@@ -384,7 +428,8 @@ export function createPlanningJourney(options = {}) {
       },
     },
 
-    // Plan development phases
+    // Plan development phases. `ministerialConfidence` is the persisted key
+    // for the District Manager's readiness to decide the file.
     plan: {
       phase: "data_gathering",
       phaseDaysRemaining: 20,
@@ -402,10 +447,15 @@ export function createPlanningJourney(options = {}) {
       firstNationsValues: 50,
     },
 
-    // Real-data block selection cadence and active impacts
+    // Real-data lead block set for the first FOM. The cutblock priority
+    // decision runs once, when the analysis opens; `cadenceDays` and
+    // `nextSelectionDay` are kept for saves that predate the lead set.
     blockPlanning: {
       cadenceDays,
-      nextSelectionDay: 1,
+      nextSelectionDay: null,
+      pendingSelection: false,
+      leadBlocks: [],
+      leadBlockIds: [],
       activeBlockId: null,
       activeBlock: null,
       activeSummary: null,
@@ -435,7 +485,8 @@ export function createPlanningJourney(options = {}) {
       inReview: 0,
     },
 
-    // Stakeholders
+    // Stakeholder moods: the district, the Nation, the community, the mill.
+    // Events move them; the Stakeholder Session reads the room.
     stakeholders: {
       ministry: { mood: 50, meetings: 0, lastContact: 0 },
       nations: { mood: 50, meetings: 0, lastContact: 0 },
@@ -451,15 +502,13 @@ export function createPlanningJourney(options = {}) {
       // scripts/simulate-expeditions.mjs.
       // Raised again with the event rate: a file now meets roughly a third
       // more situations and every one it answers or declines draws on this
-      // same pool. Losses moved off the cabinet clock and onto money.
+      // same pool. Losses moved off the FSP clock and onto money.
       budget: 82000,
-      // Standing burns a point a day and six a stakeholder session. Over a
-      // season of one-action days (js/journey/dayPlan.js) that is roughly
-      // twice the calendar the old pool was cut for, so the file lost the
-      // cabinet before it lost the argument. Sized with
-      // scripts/simulate-expeditions.mjs.
-      // Same reason as the budget above.
+      // District goodwill (persisted as politicalCapital). It moves only on
+      // district-facing actions and events — a stakeholder session, a
+      // pre-submission meeting, a complaint — never as a daily drain.
       politicalCapital: 74,
+      // Inventory budget: ten LiDAR/VRI pulls.
       dataCredits: 100,
       consultantDays: 30,
     },
@@ -523,7 +572,9 @@ export function createPermittingJourney(options = {}) {
       },
     },
 
-    // Enhanced permit pipeline
+    // The permit queue. Counters are the persisted summary; the named files
+    // behind them (types, lanes, referral clocks) are seeded on the first
+    // desk day by js/journey/permitPipeline.js.
     permits: {
       target: 15,
       backlog: 8,
@@ -534,6 +585,7 @@ export function createPermittingJourney(options = {}) {
       needsRevision: 0,
       approved: 0,
       rejected: 0,
+      files: [],
     },
 
     // Referral tracking
@@ -543,7 +595,8 @@ export function createPermittingJourney(options = {}) {
       completed: [],
     },
 
-    // Stakeholder relationships
+    // Working relationships: the district office (persisted as `ministry`),
+    // the Nation's referral coordinator, and the agencies (DFO / ENV).
     relationships: {
       ministry: 50,
       nations: 50,
@@ -759,9 +812,11 @@ export function createManagerJourney(options = {}) {
     resources: {
       ...baseDesk,
       ...baseField,
-      // Must cover the mandatory month-1 CEO hire ($180-200k), an optional
-      // certification ($80-150k), and the monthly overhead across the term.
-      budget: 500000,
+      // Opening treasury. The year is run on a monthly ledger (js/modes/manager.js):
+      // delivered m³ × (log price − stumpage − logging/haul) less head-office
+      // overhead and certification costs. The cushion covers spring breakup,
+      // when deliveries fall to a third of plan and the overhead does not.
+      budget: MANAGER_TREASURY,
       // Below the 100-point ceiling so the meter can actually move both ways;
       // starting pinned at max made it read as dead UI for a whole term.
       politicalCapital: 65,
@@ -773,17 +828,40 @@ export function createManagerJourney(options = {}) {
     discoveryTags: [],
     flags: {},
     certifications: [],
+    // The operating posture the woodlands team runs the year on. Kept under
+    // the legacy `ceo` key because the debrief and reaction decks read the
+    // name and decision_making_style off it.
     ceo: null,
-    targetProfit: 100000,
+    // The operating year's ledger. AAC and cut control are annual; the plan
+    // spreads it across twelve months with a seasonal delivery curve.
+    ledger: {
+      aac: MANAGER_AAC,
+      monthlyPlan: Math.round(MANAGER_AAC / 12),
+      deliveredYtd: 0,
+      logPrice: 105,
+      stumpage: 27,
+      loggingHaul: 62,
+      overhead: MANAGER_MONTHLY_OVERHEAD,
+      startTreasury: MANAGER_TREASURY,
+      curtailmentFactor: 1,
+      bonusVolume: 0,
+      costShiftPerM3: 0,
+      months: [],
+      cutControl: null,
+    },
     // The term runs as 12 monthly board periods rather than 100 daily turns:
     // each period is one strategic decision plus its fallout, with quarterly
     // board reviews. ~16 meaningful decisions instead of a 100-turn grind.
     deadline: 12,
     history: [],
 
-    // The GM keeps a small executive crew: they gate requiresRole event
-    // options and act as field reporters for operational (field-pool) events.
-    crew: options.crew || generateCrew(5, "field"),
+    // The GM's executive team: CFO, Woodlands Manager, Chief Forester (RPF),
+    // Indigenous Relations Lead, HSE Manager. They act as reporters for the
+    // operational escalations that reach the GM's desk.
+    crew: options.crew || generateCrew(5, "field", {
+      roles: MANAGER_EXECUTIVE_ROLES,
+      essentialIds: MANAGER_ESSENTIAL_ROLE_IDS,
+    }),
 
     // State flags
     isComplete: false,

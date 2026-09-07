@@ -196,7 +196,11 @@ export async function promptSummaryCard(ui, contentData = {}, options = [], game
     if (contentData.style?.label) {
       ui.write(`Style: ${contentData.style.label} — ${contentData.style.tendency || ''}`, 'term-dim');
     }
+    // The role lens is the one line that says what the year meant for this
+    // hat, so it reads before the achievements and notices, not after them.
+    if (contentData.roleLens) ui.write(contentData.roleLens, 'term-dim');
     for (const bullet of contentData.bullets || []) ui.write(bullet);
+    for (const medal of contentData.achievements || []) ui.write(medal, 'term-dim');
 
     if (showFull) {
       const sections = [
@@ -208,10 +212,6 @@ export async function promptSummaryCard(ui, contentData = {}, options = [], game
         if (!Array.isArray(lines) || !lines.length) continue;
         ui.writeDivider(label);
         for (const line of lines) ui.write(line, 'term-dim');
-      }
-      if (contentData.roleLens) {
-        ui.writeDivider('ROLE LENS');
-        ui.write(contentData.roleLens, 'term-dim');
       }
     }
     ui.write('');

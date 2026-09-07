@@ -4,8 +4,8 @@ export const OPERATING_AREAS = [
     name: "Fort St. John Plateau",
     description:
       "Glaciated uplands bridging agriculture and boreal muskeg in the Peace River district.",
-    becZone: "BWBSmw1 – Boreal White and Black Spruce moist warm",
-    becCode: "BWBSmw1",
+    becZone: "BWBSmw – Boreal White and Black Spruce moist warm",
+    becCode: "BWBSmw",
     zoneSummary:
       "Peace District muskeg country where peat soils, wetlands, and dense linear disturbance can turn a clean access sketch into a winter-only file.",
     dominantTrees: ["white spruce", "trembling aspen", "black spruce"],
@@ -29,7 +29,7 @@ export const OPERATING_AREAS = [
     zoneSummary:
       "Northeast foothill ground where steep drainages, thaw-sensitive fills, and remote camps make access credibility part of every decision.",
     dominantTrees: ["lodgepole pine", "white spruce", "subalpine fir"],
-    focusTopics: ["permafrost slumps", "mountain caribou habitat", "helicopter access planning"],
+    focusTopics: ["permafrost slumps", "northern mountain caribou habitat", "helicopter access planning"],
     seasonalSignals: [
       "Spring runoff destabilizes side-cast, crossings, and old spur fills.",
       "Summer field windows are short once wildlife timing and distance are factored in.",
@@ -48,7 +48,7 @@ export const OPERATING_AREAS = [
     becCode: "SBSmc2",
     zoneSummary:
       "Bulkley bench country above towns and rivers where visual quality, recreation traffic, and community water concerns stay live on every map.",
-    dominantTrees: ["hybrid spruce", "subalpine fir", "paper birch"],
+    dominantTrees: ["hybrid spruce", "subalpine fir", "lodgepole pine"],
     focusTopics: ["visual quality", "community water intakes", "interface fuel management"],
     seasonalSignals: [
       "Spring freshet makes drainage and sediment mistakes visible fast.",
@@ -64,8 +64,8 @@ export const OPERATING_AREAS = [
     name: "Fraser Plateau Uplands",
     description:
       "Gently rolling SBS plateau south of Prince George with long wildfire shadows and beetle legacies.",
-    becZone: "SBSwk1 – Sub-Boreal Spruce wet cool",
-    becCode: "SBSwk1",
+    becZone: "SBSdw2 – Sub-Boreal Spruce dry warm (Blackwater)",
+    becCode: "SBSdw2",
     zoneSummary:
       "Central Interior SBS plateau where beetle-killed pine, mixedwood recovery, and wildfire planning all sit close to community evacuation routes.",
     dominantTrees: ["hybrid spruce", "lodgepole pine", "trembling aspen"],
@@ -84,11 +84,11 @@ export const OPERATING_AREAS = [
     name: "Skeena-Nass Transition",
     description:
       "Fog-laden coastal hemlock valleys with deep ravines, salmon systems, and karst plateaus.",
-    becZone: "CWHws2 – Coastal Western Hemlock very wet submaritime",
-    becCode: "CWHws2",
+    becZone: "CWHws1 – Coastal Western Hemlock wet submaritime (submontane)",
+    becCode: "CWHws1",
     zoneSummary:
       "Northwest coastal transition where fish-bearing crossings, saturated slopes, and karst drainage decide whether the work is even buildable.",
-    dominantTrees: ["western hemlock", "sitka spruce", "western redcedar"],
+    dominantTrees: ["western hemlock", "Sitka spruce", "western redcedar"],
     focusTopics: ["salmon-bearing crossings", "karst conservation", "community water protection"],
     seasonalSignals: [
       "Heavy rain changes crossings and slope stability overnight.",
@@ -96,24 +96,24 @@ export const OPERATING_AREAS = [
       "Thin soils over karst mean small layout mistakes create big downstream problems."
     ],
     indigenousPartners: ["Nisga'a Nation", "Gitanyow"],
-    communities: ["Terrace", "New Aiyansh"],
+    communities: ["Terrace", "Gitlax̱t'aamiks (New Aiyansh)"],
     tags: ["cwh", "karst", "salmon", "community-water", "northern-bc", "bc-wide"],
   },
   {
     id: "tahltan-highland",
     name: "Tahltan Highland",
     description:
-      "High-elevation lodgepole pine and spruce parklands adjacent to alpine plateaus and glacial river systems.",
+      "High, cold spruce–willow–birch parkland above glacial rivers, with alpine plateaus close overhead.",
     becZone: "SWBmk – Spruce–Willow–Birch moist cool",
     becCode: "SWBmk",
     zoneSummary:
       "Tahltan high-country where short field windows, glacial rivers, wildlife timing, and long supply lines punish weak logistics.",
-    dominantTrees: ["engelmann spruce", "subalpine fir", "willow scrub"],
-    focusTopics: ["glacial outburst preparedness", "cultural cedar harvest", "remote nursery logistics"],
+    dominantTrees: ["white spruce", "subalpine fir", "scrub birch and willow"],
+    focusTopics: ["glacial outburst preparedness", "culturally modified trees and heritage screening", "remote seedling cold-storage and camp logistics"],
     seasonalSignals: [
       "Snow lingers on higher benches deep into spring.",
       "Summer access depends on river levels, aviation, and brief weather windows.",
-      "Cold snaps come early and expose any weak camp or nursery logistics."
+      "Cold snaps come early and expose any weak camp or seedling cold-storage logistics."
     ],
     indigenousPartners: ["Tahltan Nation"],
     communities: ["Iskut", "Dease Lake"],
@@ -123,31 +123,31 @@ export const OPERATING_AREAS = [
     id: "vancouver-island-coast",
     name: "Vancouver Island Coast",
     description:
-      "Windfirm and wind-exposed coastal benches, steep creek systems, and public-facing forest roads on the east and west island.",
+      "Alberni Valley: wind-exposed coastal benches where windfirm-edge design is a live issue, with steep creek systems and public-facing forest roads.",
     becZone: "CWHxm2 – Coastal Western Hemlock very dry maritime",
     becCode: "CWHxm2",
     zoneSummary:
-      "Island coastal ground where fish streams, rainfall-driven access failures, and visible roadside harvests stay under close public scrutiny.",
+      "Alberni Valley ground where fish streams, rainfall-driven access failures, windthrow along fresh edges, and visible roadside harvests stay under close public scrutiny.",
     dominantTrees: ["Douglas-fir", "western hemlock", "western redcedar"],
-    focusTopics: ["fish-stream crossings", "coastal storm damage", "visual quality near public roads"],
+    focusTopics: ["fish-stream crossings", "windfirm edge design and blowdown", "visual quality near public roads"],
     seasonalSignals: [
       "Fall and winter rain can turn a manageable crossing into a shutdown overnight.",
       "Summer public traffic makes visible layout and roadside slash a reputation issue fast.",
       "Short dry windows reward crews that already know which work is truly ready to move."
     ],
-    indigenousPartners: ["Huu-ay-aht First Nations", "Tseshaht First Nation"],
-    communities: ["Port Alberni", "Campbell River"],
+    indigenousPartners: ["Tseshaht First Nation", "Hupačasath First Nation"],
+    communities: ["Port Alberni", "Nanaimo"],
     tags: ["cwh", "salmon", "community-interface", "visuals", "community-water", "steep", "bc-wide"],
   },
   {
     id: "kootenay-wetbelt",
     name: "Kootenay Wetbelt",
     description:
-      "Interior cedar-hemlock valleys, avalanche-prone side slopes, and high-value watersheds along the Kootenay trench and wetbelt.",
-    becZone: "ICHmk1 – Interior Cedar–Hemlock moist cool",
-    becCode: "ICHmk1",
+      "Interior cedar-hemlock valleys, avalanche-prone side slopes, and high-value watersheds along the West Kootenay and Creston valleys.",
+    becZone: "ICHmw2 – Interior Cedar–Hemlock moist warm (Columbia–Shuswap)",
+    becCode: "ICHmw2",
     zoneSummary:
-      "Southeast wetbelt ground where cedar-hemlock regen, steep road prisms, and municipal watersheds keep both engineering and public trust in play.",
+      "Southeast wetbelt ground where cedar-hemlock regen, steep road prisms, and community watersheds keep both engineering and public trust in play.",
     dominantTrees: ["western redcedar", "western hemlock", "Douglas-fir"],
     focusTopics: ["community watersheds", "steep-road engineering", "wetbelt regeneration"],
     seasonalSignals: [
@@ -155,7 +155,7 @@ export const OPERATING_AREAS = [
       "Summer storms keep stream timing and sediment control live deep into the operating window.",
       "Wetbelt regen can look acceptable on paper while brush, browse, and patchy light tell a different story."
     ],
-    indigenousPartners: ["Ktunaxa Nation", "Yaqan Nukiy"],
+    indigenousPartners: ["Ktunaxa Nation (yaqan nuʔkiy)", "Sinixt Confederacy"],
     communities: ["Nelson", "Creston"],
     tags: ["watershed", "community-interface", "steep", "karst", "bc-wide"],
   },
@@ -164,8 +164,8 @@ export const OPERATING_AREAS = [
     name: "Okanagan/Shuswap Drybelt",
     description:
       "Dry Douglas-fir and pine benchlands where interface fire planning, community optics, and water sensitivity shape almost every file.",
-    becZone: "IDFdk3 – Interior Douglas-fir dry cool",
-    becCode: "IDFdk3",
+    becZone: "IDFxh1 – Interior Douglas-fir very dry hot (Okanagan)",
+    becCode: "IDFxh1",
     zoneSummary:
       "Southern Interior drybelt where wildfire-operability, visual quality, and community-water concerns can outweigh straightforward timber logic.",
     dominantTrees: ["Douglas-fir", "lodgepole pine", "ponderosa pine"],

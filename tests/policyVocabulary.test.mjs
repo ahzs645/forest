@@ -34,7 +34,10 @@ function seededRandom(seed) {
 }
 
 /** Drive a mode for a while, collecting every option value it ever offers. */
-async function collectOptionValues(create, run, { seed = 4242, days = 25 } = {}) {
+// 40 days: a silviculture inspection only appears the morning after a block is
+// planted out, and a randomly steered crew can take most of the 42-day season
+// to finish one.
+async function collectOptionValues(create, run, { seed = 4242, days = 40 } = {}) {
   const original = Math.random;
   Math.random = seededRandom(seed);
   const seen = new Set();

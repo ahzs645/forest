@@ -108,7 +108,7 @@ test('illegal-act temptations have a priority draw from day two with a cooldown'
     journey.day = 2;
     const first = checkForEvent(journey);
     assert.equal(first?.type, 'temptation');
-    assert.match(first?.id || '', /^legacy_temptation_/);
+    assert.match(first?.id || '', /^temptation_/);
 
     journey.day = 3;
     const coolingDown = checkForEvent(journey);
@@ -164,7 +164,7 @@ test('field event time costs read as lost ground when authored inside effects', 
   // Content still rates delays on the retired eight-hour scale; the shift
   // turns that into the share of the day's ground the trouble cost.
   assert.equal(journey.travelSetback, 1 / 8);
-  assert.ok(result.messages.some((message) => /cost the crew ground/i.test(message)));
+  assert.ok(result.messages.some((message) => /eats into tomorrow's leg/i.test(message)));
 });
 
 test('a heavy field delay never takes the whole shift', () => {
@@ -388,8 +388,12 @@ test('planning events advance the active phase instead of no-oping against permi
 
   assert.equal(journey.plan.phase, 'stakeholder_review');
   assert.equal(journey.plan.analysisQuality, 81);
-  assert.equal(journey.plan.stakeholderBuyIn, 56);
-  assert.equal(journey.plan.ministerialConfidence, 49);
+  // Relationships land on stakeholder moods and the planner's reputation,
+  // compliance on reputation and scrutiny; neither writes the engagement
+  // record or the District Manager's readiness (only the planner's own work does).
+  assert.equal(journey.plan.stakeholderBuyIn, 50);
+  assert.equal(journey.plan.ministerialConfidence, 44);
+  assert.equal(journey.stakeholders.nations.mood, 53);
   assert.equal(journey.protagonist.reputation, 56);
 });
 
@@ -745,7 +749,10 @@ test('permitting revision responses trade the day for scrutiny and political cap
   assert.equal(cleanJourney.actionsRemaining, 0, 'a deficiency response is the day');
   assert.equal(cleanJourney.scrutiny, 27);
   assert.equal(cleanJourney.permits.needsRevision, 0);
-  assert.equal(cleanJourney.permits.submitted, 1);
+  // A substantive letter answered goes back to the District Manager; the
+  // referral is not re-run.
+  assert.equal(cleanJourney.permits.inReview, 1);
+  assert.match(cleanTicket.fileLabel, /^(CP|RP|RUP|SUP|HCA) /);
   assert.equal(cleanJourney.regulations.complianceScore, 75);
   assert.equal(cleanJourney.relationships.agencies, 51);
   assert.ok(cleanResult.messages.some((message) => /watershed response/i.test(message)));
@@ -786,7 +793,7 @@ test('permitting revision responses trade the day for scrutiny and political cap
   assert.equal(fastJourney.scrutiny, 34);
   assert.equal(fastJourney.resources.politicalCapital, 39);
   assert.equal(fastJourney.permits.needsRevision, 0);
-  assert.equal(fastJourney.permits.submitted, 1);
+  assert.equal(fastJourney.permits.inReview, 1);
   assert.equal(fastJourney.regulations.complianceScore, 71);
   assert.equal(fastJourney.relationships.ministry, 49);
 });

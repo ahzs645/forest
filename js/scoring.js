@@ -9,6 +9,8 @@
  * @param {boolean} victory - Whether the player won
  * @returns {Object} Score breakdown with letter grade
  */
+export const SCORE_WEIGHT_PERCENTS = { objectives: 30, compliance: 25, crewWelfare: 25, resourceEfficiency: 10, speed: 10 };
+
 export function calculateScore(journey, victory) {
   const components = {};
 
@@ -19,7 +21,7 @@ export function calculateScore(journey, victory) {
       components.crewWelfare = scoreCrewWelfare(journey);
       components.resourceEfficiency = scoreResourceEfficiency(journey);
       components.objectives = scoreReconObjectives(journey, victory);
-      components.events = scoreEventHandling(journey);
+      components.compliance = scoreSituationsClosedClean(journey);
       break;
 
     case 'silviculture':
@@ -27,7 +29,7 @@ export function calculateScore(journey, victory) {
       components.crewWelfare = scoreCrewWelfare(journey);
       components.resourceEfficiency = scoreDeskResourceEfficiency(journey);
       components.objectives = scoreSilvicultureObjectives(journey, victory);
-      components.events = scoreEventHandling(journey);
+      components.compliance = scoreSituationsClosedClean(journey);
       break;
 
     case 'planning':
@@ -35,7 +37,7 @@ export function calculateScore(journey, victory) {
       components.crewWelfare = { score: 50, label: 'N/A' }; // No crew
       components.resourceEfficiency = scoreDeskResourceEfficiency(journey);
       components.objectives = scorePlanningObjectives(journey, victory);
-      components.events = scoreEventHandling(journey);
+      components.compliance = scoreSituationsClosedClean(journey);
       break;
 
     case 'permitting':
@@ -44,7 +46,7 @@ export function calculateScore(journey, victory) {
       components.crewWelfare = { score: 50, label: 'N/A' };
       components.resourceEfficiency = scoreDeskResourceEfficiency(journey);
       components.objectives = scorePermittingObjectives(journey, victory);
-      components.events = scoreEventHandling(journey);
+      components.compliance = scoreSituationsClosedClean(journey);
       break;
 
     case 'manager':
@@ -52,12 +54,14 @@ export function calculateScore(journey, victory) {
       components.crewWelfare = scoreCrewWelfare(journey);
       components.resourceEfficiency = scoreManagerResources(journey);
       components.objectives = scoreManagerObjectives(journey, victory);
-      components.events = scoreEventHandling(journey);
+      components.compliance = scoreSituationsClosedClean(journey);
       break;
   }
 
-  // Weighted total: Speed 25%, Crew 25%, Resources 20%, Objectives 20%, Events 10%
-  const weights = { speed: 0.25, crewWelfare: 0.25, resourceEfficiency: 0.20, objectives: 0.20, events: 0.10 };
+  // Weighted total: Objectives 30%, Compliance 25%, Crew 25%, Resources 10%,
+  // Time 10%. Delivering the work and keeping the file clean carry the grade;
+  // speed and leftover supplies are minor.
+  const weights = { objectives: 0.30, compliance: 0.25, crewWelfare: 0.25, resourceEfficiency: 0.10, speed: 0.10 };
   let weighted = 0;
   for (const [key, weight] of Object.entries(weights)) {
     weighted += (components[key]?.score || 0) * weight;
@@ -111,8 +115,12 @@ export function getLetterGrade(score) {
 
 function scoreReconSpeed(journey) {
   const daysUsed = journey.day - 1;
+  // Two shifts a block plus the legs between stops is the competent pace.
   const totalBlocks = journey.blocks?.length || 10;
-  const optimalDays = Math.ceil(totalBlocks * 0.8);
+  const packages = Number.isFinite(journey.packageTarget) ? journey.packageTarget : totalBlocks;
+  const optimalDays = journey.journeyType === 'recon'
+    ? Math.ceil(packages * 2 + Math.max(0, totalBlocks - 1) * 0.8)
+    : Math.ceil(totalBlocks * 0.8);
   const ratio = optimalDays / Math.max(1, daysUsed);
   const score = Math.min(100, Math.round(ratio * 80));
   return { score, label: `${daysUsed} shifts (optimal: ~${optimalDays})` };
@@ -158,15 +166,17 @@ function scoreCrewWelfare(journey) {
   if (crew.length === 0) return { score: 50, label: 'No crew' };
 
   const active = crew.filter(m => m.isActive);
-  const dead = crew.filter(m => m.isDead);
+  // Nobody dies out here; the serious outcome is an evacuation (a medevac or
+  // an ETV run, WorkSafeBC notified, off the crew for the season).
+  const evacuated = crew.filter(m => !m.isActive && !m.hasQuit);
   const quit = crew.filter(m => m.hasQuit);
 
   let score = 50;
 
-  // Bonus for keeping everyone alive and active
-  if (dead.length === 0) score += 20;
+  // Bonus for bringing everyone home on their own feet
+  if (evacuated.length === 0) score += 20;
   if (quit.length === 0) score += 10;
-  score -= dead.length * 15;
+  score -= evacuated.length * 15;
   score -= quit.length * 8;
 
   // Average health and morale of survivors
@@ -178,7 +188,7 @@ function scoreCrewWelfare(journey) {
   }
 
   score = Math.max(0, Math.min(100, score));
-  const label = `${active.length}/${crew.length} active, ${dead.length} lost`;
+  const label = `${active.length}/${crew.length} active, ${evacuated.length} evacuated`;
   return { score, label };
 }
 
@@ -189,8 +199,8 @@ function scoreResourceEfficiency(journey) {
   let score = 50;
 
   // Remaining resources are good (didn't waste), but having too much means journey was too easy
-  const fuelPct = (r.fuel || 0) / 80;
-  const foodPct = (r.food || 0) / 35;
+  const fuelPct = (r.fuel || 0) / 320;
+  const foodPct = (r.food || 0) / 40;
   const equipPct = (r.equipment || 0) / 85;
 
   // Sweet spot: 10-40% remaining
@@ -203,7 +213,7 @@ function scoreResourceEfficiency(journey) {
   if (r.food <= 0) score -= 15;
 
   score = Math.max(0, Math.min(100, Math.round(score)));
-  return { score, label: `Fuel: ${Math.round(r.fuel || 0)}, Food: ${Math.round(r.food || 0)}` };
+  return { score, label: `Fuel: ${Math.round(r.fuel || 0)} L, Food: ${Math.round(r.food || 0)} person-days` };
 }
 
 function scoreDeskResourceEfficiency(journey) {
@@ -241,13 +251,13 @@ function scoreManagerResources(journey) {
   return { score, label: `Budget: $${Math.round(r.budget || 0).toLocaleString()}` };
 }
 
-// Returns 0-1 where sweet spot is 10-40% remaining
-function scoreSweetSpot(pct) {
+// Returns 0-1. Running out is the failure; carrying margin home is good
+// practice, not "the journey was too easy", so there is no upper penalty.
+export function scoreSweetSpot(pct) {
   if (pct <= 0) return 0;
   if (pct < 0.1) return 0.3;
-  if (pct <= 0.4) return 1.0;
-  if (pct <= 0.7) return 0.7;
-  return 0.4; // Had too much left, journey was underutilized
+  if (pct < 0.25) return 0.7;
+  return 1.0;
 }
 
 // --- Objectives Scoring ---
@@ -288,7 +298,7 @@ function scorePlanningObjectives(journey, victory) {
   score += Math.round((plan.stakeholderBuyIn || 0) / 10);
   score += Math.round((plan.ministerialConfidence || 0) / 10);
   score = Math.min(100, score);
-  return { score, label: `Ministerial: ${plan.ministerialConfidence || 0}%` };
+  return { score, label: `Decision-maker readiness: ${plan.ministerialConfidence || 0}%` };
 }
 
 function scorePermittingObjectives(journey, victory) {
@@ -312,16 +322,31 @@ function scoreManagerObjectives(journey, victory) {
   return { score, label: `Reputation ${Math.round(reputation)}%${certLabel}` };
 }
 
-// --- Event Handling Scoring ---
+// --- Compliance Scoring ---
 
-function scoreEventHandling(journey) {
+/**
+ * A situation is "closed clean" when the way it was handled cost no
+ * compliance, raised no scrutiny, and hurt nobody. More situations are not
+ * more experience — what counts is the share the file can defend.
+ */
+export function isSituationClosedClean(entry) {
+  if (!entry || entry.type !== 'event') return false;
+  if (entry.victimId || entry.victimName) return false;
+  const effects = entry.effects || {};
+  if (Number(effects.compliance || 0) < 0) return false;
+  if (Number(effects.scrutiny || 0) > 0) return false;
+  return true;
+}
+
+export function scoreSituationsClosedClean(journey) {
   const log = journey.log || [];
-  const eventEntries = log.filter(e => e.type === 'event');
-  if (eventEntries.length === 0) return { score: 50, label: 'No events logged' };
+  const situations = log.filter((e) => e.type === 'event');
+  if (situations.length === 0) return { score: 60, label: 'No situations logged' };
 
-  // Simple heuristic: more events handled = more experience
-  const score = Math.min(100, 40 + eventEntries.length * 5);
-  return { score, label: `${eventEntries.length} events handled` };
+  const clean = situations.filter(isSituationClosedClean).length;
+  const share = clean / situations.length;
+  const score = Math.round(25 + share * 75);
+  return { score, label: `${clean} of ${situations.length} situation${situations.length === 1 ? '' : 's'} closed clean` };
 }
 
 /**
@@ -337,16 +362,18 @@ export function formatScoreDisplay(scoreResult) {
   lines.push('');
 
   const labels = {
-    speed: 'Speed',
+    objectives: 'Objectives',
+    compliance: 'Compliance',
     crewWelfare: 'Crew Welfare',
     resourceEfficiency: 'Resources',
-    objectives: 'Objectives',
-    events: 'Events'
+    speed: 'Time',
   };
 
-  const weights = { speed: 25, crewWelfare: 25, resourceEfficiency: 20, objectives: 20, events: 10 };
+  const weights = SCORE_WEIGHT_PERCENTS;
 
-  for (const [key, component] of Object.entries(components)) {
+  for (const key of Object.keys(labels)) {
+    const component = components[key];
+    if (!component) continue;
     const name = labels[key] || key;
     const weight = weights[key] || 0;
     const bar = makeBar(component.score, 10);

@@ -169,37 +169,38 @@ function pickChoice(labels, terminalText, strategyName) {
   const strategyPriorities = {
     planner: planningPriorities,
     permitter: [
+      'Clean response',
+      'Process Permits',
+      'Follow Up on Referrals',
       'Road Permit File',
       'Archaeology File',
       'Special-Use File',
       'Compliance Admin',
       'Renew Registration',
-      'Clean response',
       'Fast-track',
       'Address Revisions',
-      'Follow Up on Referrals',
       'Submit Permit',
       'Draft Permit Application',
-      'Process Permits',
       'Stakeholder Meeting',
-      'Team Building',
+      'Reset the office',
       'Take a Break',
-      'Quiet Day'
+      'Call it a day'
     ],
     silviculture: [
-      'Plant Block',
-      'Survival Check',
-      'Fill Planting',
-      'Brush Treatment',
-      'Survey Free-Growing',
+      'Planting quality inspection',
+      'Plant (this year',
+      'Free-growing survey (',
+      'Fill plant',
+      'Brush (',
+      'Manual brushing',
       'Contractor Rotation',
       'Contractor Meeting',
       'Team Briefing',
-      'Upgrade camp',
-      'Inspect & retrain',
-      'Send medic',
-      'Grant rest day',
-      'Pay retention',
+      'Upgrade the camp',
+      'Re-plot with the foreman',
+      'Call a camp inspection',
+      'Back the stand-down',
+      'Accept the re-price',
       'Hold the Line'
     ],
     // Manager runs a 100-day term: favour budget-disciplined, no-cost choices so
@@ -303,7 +304,7 @@ function getRecommendedActionLabel(terminalText) {
     'Revise FOM',
     'Compliance Admin',
     'Renew Registration',
-    'Ministerial Outreach',
+    'District Pre-Submission Meeting',
     'Prepare Submission',
     'Clean response',
     'Fast-track',
@@ -325,32 +326,32 @@ function getRecommendedActionLabel(terminalText) {
 }
 
 function getPlanningPriorities(terminalText) {
-  const phaseMatch = terminalText.match(/Phase:\s*([A-Za-z ]+)/);
+  const phaseMatch = terminalText.match(/Phase:\s*([A-Za-z &]+)/);
   const phase = phaseMatch ? phaseMatch[1].trim() : '';
   const valuesBlocked = terminalText.includes('BLOCKED') || terminalText.includes('All values must be');
 
-  if (phase === 'Data Gathering') {
+  if (phase === 'Inventory & Data') {
     return valuesBlocked
       ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Gather Data', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
       : ['Gather Data', 'Network', 'Clear the Inbox', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'Hold the Line'];
   }
 
-  if (phase === 'Analysis') {
+  if (phase === 'Analysis & Draft Plan') {
     return valuesBlocked
       ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Run Analysis', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
       : ['Run Analysis', 'Network', 'Clear the Inbox', 'Values Workshop', 'Balanced Approach', 'Take a Break', 'Hold the Line'];
   }
 
-  if (phase === 'Stakeholder Review') {
+  if (phase === 'Engagement & Public Review') {
     return valuesBlocked
       ? ['Balanced Approach', 'Emphasize First Nations', 'Emphasize Biodiversity', 'Values Workshop', 'Stakeholder Session', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
       : ['Stakeholder Session', 'Balanced Approach', 'Emphasize First Nations', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
   }
 
-  if (phase === 'Ministerial Approval') {
+  if (phase === 'District Manager Decision') {
     return valuesBlocked
-      ? ['Values Workshop', 'Timber Assessment', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Prepare Submission', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
-      : ['Prepare Submission', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'Ministerial Outreach', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
+      ? ['Values Workshop', 'Timber Supply Analysis', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'District Pre-Submission Meeting', 'Prepare Submission', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line']
+      : ['Prepare Submission', 'Open FOM Review', 'Update FOM Review', 'Revise FOM', 'Compliance Admin', 'Renew Registration', 'District Pre-Submission Meeting', 'Values Workshop', 'Network', 'Clear the Inbox', 'Take a Break', 'Hold the Line'];
   }
 
   return [
@@ -362,7 +363,7 @@ function getPlanningPriorities(terminalText) {
     'Revise FOM',
     'Compliance Admin',
     'Renew Registration',
-    'Ministerial Outreach',
+    'District Pre-Submission Meeting',
     'Prepare Submission',
     'Balanced Approach',
     'Emphasize First Nations',
@@ -393,7 +394,7 @@ function assertModeSpecificExpectations(modeName, terminalText) {
         expect(extractStat(terminalText, 'Data Completeness')).toBeGreaterThanOrEqual(80);
         expect(extractStat(terminalText, 'Analysis Quality')).toBeGreaterThanOrEqual(80);
         expect(extractStat(terminalText, 'Stakeholder Buy-in')).toBeGreaterThanOrEqual(75);
-        expect(extractStat(terminalText, 'Ministerial Confidence')).toBeGreaterThanOrEqual(80);
+        expect(extractStat(terminalText, 'DM Readiness')).toBeGreaterThanOrEqual(80);
       } else {
         expect(terminalText).toMatch(/failed to achieve approval|Budget exhausted|Lost political support|Burnout/i);
       }
@@ -405,7 +406,7 @@ function assertModeSpecificExpectations(modeName, terminalText) {
       if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
         expect(approved.current).toBeGreaterThanOrEqual(Math.ceil(approved.total * 0.8));
       } else {
-        expect(terminalText).toMatch(/could not meet its targets|Budget exhausted|Lost political support|Burnout/i);
+        expect(terminalText).toMatch(/could not meet its targets|could not get the season's permits issued|Budget exhausted|Lost political support|Burnout/i);
       }
       break;
     }

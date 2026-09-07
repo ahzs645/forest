@@ -157,7 +157,7 @@ const AREA_SITUATIONS = [
     title: 'Crossing stress',
     summary: 'Fish-bearing crossings and saturated ground are making rushed access choices expensive.',
     areaTags: ['cwh', 'salmon'],
-    becCodes: ['CWHws2'],
+    becCodes: ['CWHws1'],
     seasons: ['spring', 'summer', 'fall'],
     fieldEventMultiplier: 1.16,
     fieldTypeMultipliers: {

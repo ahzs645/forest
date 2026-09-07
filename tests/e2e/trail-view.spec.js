@@ -112,10 +112,35 @@ test('ASCII Grid projects the scene and its pause control', async ({ page }, inf
   await expect(page.locator('#choices')).not.toContainText('Set the tempo');
 });
 
+
+// The crew musters at a staging lot, which is a waypoint with no package.
+// Stand it on the first cutblock (the truck's arrival has already written the
+// road notes) and re-open the card through a free look-up so the menu is
+// rebuilt for that stop.
+async function standOnFirstBlock(page) {
+  await expect(page.locator('#choices button').filter({ hasText: 'Set the tempo' })).toBeVisible();
+  await page.evaluate(() => {
+    const journey = window.__forestGame.journey;
+    const index = journey.blocks.findIndex((stop) => stop.kind === 'block');
+    journey.currentBlockIndex = index;
+    journey.distanceTraveled = journey.blocks.slice(0, index + 1).reduce((sum, stop) => sum + stop.distance, 0);
+    journey.reconIntel = journey.reconIntel || { byBlock: {} };
+    journey.reconIntel.byBlock[journey.blocks[index].id] = {
+      accessGroundTruthed: true, layoutWalked: false, valuesSwept: false, assessmentComplete: false,
+      lastAccessDay: journey.day, lastLayoutDay: 0, lastValuesDay: 0,
+    };
+  });
+  await page.locator('#choices button').filter({ hasText: 'Set the tempo' }).click();
+  await page.locator('#choices button').filter({ hasText: 'Leave it' }).click();
+  await page.locator('#choices button').filter({ hasText: 'Full rations' }).click();
+  await expect(page.locator('#choices button').filter({ hasText: 'Work the block' })).toBeVisible();
+}
+
 for (const mode of ['classic', 'modern']) {
   test(`${mode} results use one plain Continue button`, async ({ page }, info) => {
     await page.addInitScript(mode => localStorage.setItem('bcForestry_displayMode', mode), mode);
     await start(page);
+    await standOnFirstBlock(page);
     await page.locator('#choices button').filter({ hasText: 'Work the block' }).click();
     const button = page.locator('#choices button');
     await expect(button).toHaveCount(1);
