@@ -87,7 +87,7 @@ test('the program derives five vintages from the area and the targets', async ()
   await withSeededRandom(7, async () => {
     const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
     const program = journey.program;
-    assert.equal(program.becCode, 'SBSwk1');
+    assert.equal(program.becCode, 'SBSdw2');
     assert.equal(program.blocks.length, journey.planting.blocksToPlant);
     assert.equal(program.blocks.reduce((sum, block) => sum + block.trees, 0), journey.planting.seedlingsAllocated,
       'block records account for every tree in the allocation');
@@ -188,7 +188,7 @@ test('planting pays per tree less the holdback, and pauses until the plots on th
     const expectedInvoice = Math.round(treesPlanted * price * 0.98);
     assert.equal(budgetBefore - journey.resources.budget, 550 + expectedInvoice, 'overhead plus trees × price less the 2% holdback');
     assert.ok(block.holdback > 0, 'the holdback sits on the finished block');
-    assert.ok(ui.lines.some((line) => /Block 1 FP-\d+ \(SBSwk1, [\d.]+ ha, Sx\/Pl 70\/30, 1,400 sph, 1\+0 plugs/.test(line)), 'the block line carries zone, area, mix, density and stock type');
+    assert.ok(ui.lines.some((line) => /Block 1 FP-\d+ \(SBSdw2, [\d.]+ ha, Sx\/Pl 70\/30, 1,400 sph, 1\+0 plugs/.test(line)), 'the block line carries zone, area, mix, density and stock type');
     assert.ok(ui.lines.some((line) => /trees at \$0\.\d\d\/tree - invoice \$/.test(line)));
 
     // Next morning: planting is paused, inspection is on the menu.

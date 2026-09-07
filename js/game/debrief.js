@@ -258,8 +258,8 @@ export function buildManagerEpilogue(journey, victory) {
       ? 'methodical as ever'
       : 'already pitching the next venture';
     lines.push(victory
-      ? `${journey.ceo.name}: Renewed for another term, ${style}.`
-      : `${journey.ceo.name}: Parted ways professionally. The handshake was firm, the severance firmer.`);
+      ? `Woodlands manager ${journey.ceo.name}: renewed for another year, ${style}.`
+      : `Woodlands manager ${journey.ceo.name}: moved on to a competitor. The handshake was firm, the exit interview firmer.`);
   }
   for (const cert of journey.certifications || []) {
     lines.push(`${cert.name}: ${victory ? 'The certificate hangs in reception, and buyers notice.' : 'The audit binder outlived the tenure.'}`);

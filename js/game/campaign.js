@@ -256,9 +256,9 @@ function computeSeasonBridge(journey, endResult, startBudget) {
   // the ecology drift stays the systemic mover.
   let fh = 0;
   if (journey.journeyType === 'silviculture') {
-    const survival = Number(journey.planting?.survivalRate ?? 85);
-    fh = survival >= 85 ? 4 : survival < 75 ? -3 : 1;
-    causes.push(`Seedling survival ${survival}% → Forest Health ${fh >= 0 ? '+' : ''}${fh}`);
+    const quality = Number(journey.planting?.qualityAverage ?? journey.planting?.survivalRate ?? 85);
+    fh = quality >= 85 ? 4 : quality < 75 ? -3 : 1;
+    causes.push(`Planting quality ${quality}% → Forest Health ${fh >= 0 ? '+' : ''}${fh}`);
   } else if (journey.journeyType === 'recon' || journey.journeyType === 'field') {
     const swept = (journey.blocks || []).filter((block) => {
       const intel = journey.reconIntel?.byBlock?.[block.id];
@@ -472,7 +472,10 @@ async function runCampaignSeason(game, campaign, season) {
       area,
       roleId: season.roleId,
       areaId: campaign.areaId,
-      crew: generateCrew(5, role.journeyType || 'field'),
+      // Silviculture builds its own crew (checker, accredited surveyor, OFA 3
+      // attendant, driver) in the factory; every other field season takes the
+      // generic layout crew.
+      crew: season.roleId === 'silviculture' ? undefined : generateCrew(5, role.journeyType || 'field'),
       scale: 'campaign',
     });
     journey.difficulty = campaign.difficulty;
