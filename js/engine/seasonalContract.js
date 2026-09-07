@@ -8,6 +8,16 @@ const GENERIC_AREA_TAG_COMPATIBILITY = {
   [GENERIC_BC_AREA_TAG]: ["northern-bc"],
 };
 
+// Tags that nearly every operating area carries. They keep a card *eligible*
+// but must never count as evidence that it belongs to a particular region —
+// otherwise a "northern-bc" card outscores a card written for the valley the
+// player is actually working in.
+export const GENERIC_AREA_TAGS = Object.freeze(["northern-bc", GENERIC_BC_AREA_TAG]);
+
+export function isGenericAreaTag(tag) {
+  return GENERIC_AREA_TAGS.includes(tag);
+}
+
 const ROLE_OPERATION_BLUEPRINTS = {
   planner: {
     spring: {
@@ -391,6 +401,18 @@ export function matchesAreaContext(requiredTags = [], areaTags = []) {
     const compatibleTags = GENERIC_AREA_TAG_COMPATIBILITY[requiredTag] || [];
     return compatibleTags.some((compatibleTag) => areaTags.includes(compatibleTag));
   });
+}
+
+// Place-named content (a card that says "Smithers" or "the Stikine") declares
+// the operating areas it is written for. When `areaIds` is present it is a
+// hard gate; area tags alone are too coarse to keep a Bulkley card out of the
+// Okanagan.
+export function matchesAreaIds(item, areaId) {
+  const areaIds = item?.areaIds;
+  if (!Array.isArray(areaIds) || !areaIds.length) {
+    return true;
+  }
+  return Boolean(areaId) && areaIds.includes(areaId);
 }
 
 export function matchesPreconditions(itemOrPreconditions, state, operationState = getRoleOperationState(state)) {

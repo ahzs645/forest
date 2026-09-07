@@ -28,12 +28,13 @@ test("every role × area × strategy finishes a full seasonal year", () => {
 test("Outstanding is reachable under a known seed", () => {
   // Regression guard for the reachable-Outstanding tuning pass. The witness
   // seed is re-picked whenever draw-order changes shift the RNG stream (last:
-  // the 2026-07 seasonal depth increase + excellence-gate raise).
+  // the 2026-09 realism pass — region gating, event-pool trims, fallout
+  // resolution led by authored weights).
   const run = simulateRun({
     roleId: "permitter",
     areaId: "fort-st-john-plateau",
     strategy: "greedy",
-    seed: 1004,
+    seed: 1000,
   });
   assert.equal(run.endingTier, "outstanding");
 });

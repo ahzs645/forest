@@ -150,11 +150,11 @@ const ROLE_AREA_FINDINGS = {
     ],
     "fraser-plateau": [
       "beetle-killed pine ground with dry knolls, frost-prone lows, and heavy moose browse on young mixedwood recovery",
-      "SBSwk1 sites where species diversification sounds easy until brush, browse, and patchy residual structure start pulling the numbers apart",
+      "SBSdw2 sites where species diversification sounds easy until brush, browse, and patchy residual structure start pulling the numbers apart",
     ],
     "skeena-nass": [
       "waterlogged pockets, salmonberry and devil's club competition, and steep access making survey efficiency hard to maintain",
-      "higher-elevation CWHws2 ground where hemlock-amabilis fir mixes dominate and minor species only fit on the right microsites",
+      "wet CWHws1 valley-bottom ground where hemlock–amabilis fir mixes dominate and minor species only fit on the right microsites",
     ],
     "tahltan-highland": [
       "cold-air valley bottoms, shrub fields, and moist meadows that stay nearly treeless while adjacent uplands still carry spruce-fir potential",
@@ -201,7 +201,7 @@ function formatOverlaySummary(signalCounts = {}) {
     summary.push(`species-at-risk flags on ${signalCounts.speciesAtRiskNearby}`);
   }
   if (signalCounts.firstNationsReserveNearby > 0) {
-    summary.push(`community-proxy overlap on ${signalCounts.firstNationsReserveNearby}`);
+    summary.push(`reserve lands adjacent to ${signalCounts.firstNationsReserveNearby}`);
   }
 
   return summary.join(", ");

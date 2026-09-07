@@ -264,8 +264,8 @@ export function applyRoundConsequences(state) {
         {
           type: "consequence",
           id: "registration-lapse",
-          title: "Registration lapse creates compliance drag",
-          option: "Active practice has to stop until renewal clears",
+          title: "Registration suspended pending practice review",
+          option: "Nothing goes out under your seal until FPBC lifts the suspension",
           round,
         },
       );

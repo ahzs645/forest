@@ -73,7 +73,11 @@ export function buildSeasonContext(state) {
   const planningRoadContext = getPlanningRoadAssetContext(journey);
   const permittingRoadContext = getPermittingRoadAssetContext(journey);
   const discoveryTags = getJourneyDiscoveryTags(journey);
-  const operationState = getRoleOperationState(state);
+  // The controller assigns the new season context *after* this runs, so
+  // state.currentSeasonContext still describes last season here. Derive the
+  // operation from the season being built, or a spring assignment card opens
+  // with winter's operation and objective.
+  const operationState = getRoleOperationState({ ...state, currentSeasonContext: { season } });
 
   return {
     round,

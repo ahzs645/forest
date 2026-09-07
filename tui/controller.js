@@ -359,19 +359,37 @@ export function summarizeEffects(effects, option = null) {
 // *shape* of the downside (how deep the worst hit is, whether compliance takes a
 // dive, whether the option is an explicit gamble), never on the magnitude of the
 // upside, so the tag hints at exposure without spoiling the outcome.
-function deriveRiskLevel(option, { danger = false } = {}) {
+const RISK_LEVELS = ["low", "medium", "high"];
+
+function hasDeferredFallout(option) {
+  if (!option || typeof option !== "object") return false;
+  if (option.scheduleIssues || option.scheduleEvents || option.schedulesEvent) return true;
+  if (option.setFlags && Object.keys(option.setFlags).length) return true;
+  return false;
+}
+
+export function deriveRiskLevel(option, { danger = false } = {}) {
   // An explicit gamble (success/failure roll) or a danger-issue response is
   // always the high band — its downside is by definition uncertain or severe.
   if (option?.risk || danger) return "high";
 
+  // An authored band wins: the writer knows "harvest the old-growth grove"
+  // is not SAFE just because nothing on the card goes negative today.
+  const authored = String(option?.riskLevel || "").toLowerCase();
+  if (RISK_LEVELS.includes(authored)) return authored;
+
+  // Options that plant a delayed consequence (a scheduled issue, an
+  // investigation flag) carry an exposure the immediate effects don't show.
+  const deferredFloor = hasDeferredFallout(option) ? "medium" : "low";
+
   const effects = option?.effects;
-  if (!effects || typeof effects !== "object") return "low";
+  if (!effects || typeof effects !== "object") return deferredFloor;
 
   const negatives = Object.entries(effects)
     .map(([key, value]) => [key, Number(value)])
     .filter(([, value]) => Number.isFinite(value) && value < 0);
 
-  if (!negatives.length) return "low";
+  if (!negatives.length) return deferredFloor;
 
   const worst = Math.min(...negatives.map(([, value]) => value));
   const totalDown = negatives.reduce((sum, [, value]) => sum + value, 0);

@@ -13,6 +13,8 @@ import {
 import { AREA_BLOCKS } from '../js/data/blocks.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
 import { simulateRun } from '../scripts/simulate-expeditions.mjs';
+import { CAMPAIGN_SEASONS } from '../js/game/campaign.js';
+import { FORESTER_ROLES } from '../js/data/roles.js';
 
 // Deterministic PRNG so the headless drive below never flakes on Math.random().
 function seededRandomFactory(seed) {
@@ -424,4 +426,15 @@ test('headless drive: a campaign-scale silviculture deployment is winnable insid
     // headroom over the range scripts/simulate-expeditions.mjs measures.
     assert.ok(win.day <= 26, `expected a win within a plausible season, got day ${win.day} (seed ${win.seed})`);
   }
+});
+
+test('the campaign year follows a licensee calendar: plant, recon, plan, permit', () => {
+  assert.deepEqual(CAMPAIGN_SEASONS.map((season) => season.id), ['spring', 'summer', 'fall', 'winter']);
+  assert.deepEqual(CAMPAIGN_SEASONS.map((season) => season.roleId), ['silviculture', 'recce', 'planner', 'permitter']);
+  for (const season of CAMPAIGN_SEASONS) {
+    assert.ok(FORESTER_ROLES.some((role) => role.id === season.roleId), `${season.roleId} is a real role`);
+    assert.ok(season.title && season.situation, `${season.id} has a title and situation`);
+  }
+  assert.match(CAMPAIGN_SEASONS[0].situation, /spring plant/);
+  assert.match(CAMPAIGN_SEASONS[3].situation, /District Manager/);
 });

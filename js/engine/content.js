@@ -40,7 +40,9 @@ import {
   scaleDerivedEffect,
 } from "./shared.js";
 import {
+  isGenericAreaTag,
   matchesAreaContext,
+  matchesAreaIds,
   matchesPreconditions,
   normalizeSeasonalCard,
 } from "./seasonalContract.js";
@@ -216,11 +218,14 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
 export function scoreIssueSelection(issue, state, context) {
   let weight = Math.max(1, Number(issue.baseWeight) || 1);
   if (issue.areaTags?.length) {
-    const matches = issue.areaTags.filter((tag) => matchesAreaContext([tag], context.tags)).length;
-    // Cap the area-match bonus: a handful of issues carry 4–5 area tags
-    // (including the near-universal "northern-bc"), which let them dominate the
-    // pool in almost every region. Capping at 2 keeps area relevance without
-    // crowding out the long tail of regional issues.
+    // "northern-bc" / "bc-wide" keep a card eligible but say nothing about
+    // where it belongs, so they never earn a relevance bonus.
+    const matches = issue.areaTags
+      .filter((tag) => !isGenericAreaTag(tag))
+      .filter((tag) => matchesAreaContext([tag], context.tags)).length;
+    // Cap the area-match bonus: a handful of issues carry 4–5 area tags, which
+    // let them dominate the pool in almost every region. Capping at 2 keeps
+    // area relevance without crowding out the long tail of regional issues.
     weight += Math.min(matches, 2);
 
     // Breadth dampener: a widely-tagged issue is already eligible in far more
@@ -712,11 +717,54 @@ export function combineScheduledIssueTeasers(...teasers) {
   return unique.length ? { text: unique.join("\n\n"), severity } : null;
 }
 
-function getOperationalEventLibrary(state) {
+// Expedition travel beats — a supply cache to scavenge, a washed-out ford, a
+// bear at camp — belong to the day-by-day deployment, not to a season-scale
+// strategy card on a supervisor's desk.
+const EXPEDITION_TRAVEL_EVENT_TYPES = new Set(["supply", "terrain", "wildlife"]);
+const ISSUE_MIRROR_SUFFIX = /_(desk|field)$/;
+
+let scheduledEventTargetIds = null;
+function getScheduledEventTargetIds() {
+  if (!scheduledEventTargetIds) {
+    scheduledEventTargetIds = new Set();
+    for (const event of [...DESK_EVENTS, ...FIELD_EVENTS]) {
+      for (const option of event?.options || []) {
+        if (option?.schedulesEvent) scheduledEventTargetIds.add(option.schedulesEvent);
+      }
+    }
+  }
+  return scheduledEventTargetIds;
+}
+
+let issueLibraryIds = null;
+function isLegacyIssueMirror(event) {
+  const id = String(event?.id || "");
+  if (!ISSUE_MIRROR_SUFFIX.test(id)) return false;
+  if (!issueLibraryIds) {
+    issueLibraryIds = new Set([...ISSUE_LIBRARY, ...CHAINED_ISSUES].map((issue) => issue.id));
+  }
+  return issueLibraryIds.has(id.replace(ISSUE_MIRROR_SUFFIX, ""));
+}
+
+// The pool the random seasonal event draw may pick from. Pending follow-ups
+// still resolve through findOperationalEventById, which searches the full
+// libraries, so a scheduled chain stage keeps arriving once its trigger fired.
+export function getOperationalEventLibrary(state) {
   const library = ROLE_EVENT_DOMAINS[state?.role?.id] === "field" ? FIELD_EVENTS : DESK_EVENTS;
-  // Events authored for the expedition game stay out of the seasonal draws;
-  // remove the flag on an event to promote it into this pool deliberately.
-  return library.filter((event) => !event.expeditionOnly);
+  const scheduledTargets = getScheduledEventTargetIds();
+  return library.filter((event) => {
+    // Events authored for the expedition game stay out of the seasonal draws;
+    // remove the flag on an event to promote it into this pool deliberately.
+    if (event.expeditionOnly) return false;
+    // Legacy "_desk"/"_field" copies of issue-library cards would draw the same
+    // scenario twice a year under two different frames.
+    if (isLegacyIssueMirror(event)) return false;
+    // A chain stage ("the protest reaches the road") only makes sense after
+    // the card that schedules it; drawn cold it references a choice never made.
+    if (scheduledTargets.has(event.id)) return false;
+    if (EXPEDITION_TRAVEL_EVENT_TYPES.has(event.type)) return false;
+    return true;
+  });
 }
 
 function findOperationalEventById(eventId, state) {
@@ -817,6 +865,9 @@ function issueMatchesContext(issue, state, tags, options = {}) {
   if (!matchesPreconditions(issue, state)) {
     return false;
   }
+  if (!matchesAreaIds(issue, state.area?.id || state.areaId)) {
+    return false;
+  }
   if (issue.areaTags?.length) {
     return matchesAreaContext(issue.areaTags, tags);
   }
@@ -838,6 +889,10 @@ function eventMatchesSeasonalContext(event, state) {
     if (!matchesJourney) {
       return false;
     }
+  }
+
+  if (!matchesAreaIds(event, state.area.id)) {
+    return false;
   }
 
   const tags = Array.isArray(state.area.tags) ? state.area.tags : [];
@@ -1098,15 +1153,22 @@ function scoreIllegalActSelection(act, state) {
   return Math.max(0.25, weight);
 }
 
+// Which branch of scheduled fallout fires is led by the authored candidate
+// weight (a cultural bribe points at the heritage branch, not a budget freeze)
+// plus how hard the relevant meters are actually hurting. Season and area
+// relevance is only a capped tiebreaker: the pool score also carries a
+// role-count multiplier that has no business deciding consequences.
 function scorePendingIssueCandidateSelection(candidate, issue, state, context) {
-  let weight = scoreIssueSelection(issue, state, context) * Math.max(0.1, Number(candidate?.weight) || 1);
+  let weight = Math.max(0.1, Number(candidate?.weight) || 1) * 2;
 
   for (const [metric, bonus] of Object.entries(candidate?.metricBoosts || {})) {
-    if (Number(state.metrics?.[metric]) < 55) {
-      weight += Number(bonus) || 0;
-    }
+    const value = Number(state.metrics?.[metric]);
+    if (!Number.isFinite(value)) continue;
+    const pressure = clamp((55 - value) / 30, 0, 1);
+    weight += (Number(bonus) || 0) * pressure;
   }
 
+  weight += Math.min(2, scoreIssueSelection(issue, state, context));
   return Math.max(0.1, weight);
 }
 

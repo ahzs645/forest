@@ -10,7 +10,7 @@ export function buildSummary(state) {
 
   const messages = [];
   if (metrics.compliance < 35) {
-    messages.push("[!] Compliance concerns triggered a ministry audit.");
+    messages.push("[!] Low compliance drew a C&E inspection and a Forest Practices Board complaint.");
   }
   if (metrics.relationships < 30) {
     messages.push("[!] Community partners are distancing themselves from your program.");
@@ -35,7 +35,7 @@ export function buildSummary(state) {
     outstanding: `Outstanding season – the ${roleName} kept the ${area.name} program balanced.`,
     solid: "Solid performance with room to fine-tune priorities next cycle.",
     mixed: "Mixed outcomes. Consider where trade-offs eroded trust or ecological outcomes.",
-    stumbled: "Operations stumbled. Leadership will expect a recovery plan before the next season.",
+    stumbled: "Operations stumbled. The woods manager will expect a recovery plan before the next season.",
   }[score.tier];
   if (!messages.length) {
     messages.push("[+] Stakeholders acknowledge the cohesive strategy you delivered.");
@@ -141,23 +141,23 @@ function futureOutlook(metrics, trends, area) {
   if (metrics.forestHealth < 45) {
     pieces.push("Forest health indicators need restorative investment to avoid long-term decline.");
   } else if (trends.forestHealth > 5) {
-    pieces.push("Regeneration efforts suggest a resilient canopy in the coming decade.");
+    pieces.push("Stocking is on track; free-growing looks reachable on schedule.");
   }
   if (metrics.relationships < 40) {
     pieces.push("Community rapport is strained; invest early in dialogue with Nations and municipalities.");
   } else if (metrics.relationships >= 70) {
-    pieces.push("Partnership momentum could unlock co-management pilots next cycle.");
+    pieces.push("There is room to propose a joint field review with the Nation next year.");
   }
   if (metrics.compliance < 35) {
-    pieces.push("Compliance risk remains high—expect ministerial oversight until audits stabilize.");
+    pieces.push("Compliance risk remains high — expect C&E inspections and a possible FPB audit until the file stabilizes.");
   } else if (metrics.compliance >= 70) {
-    pieces.push(`Audit teams cite the ${area.name} program as a benchmark for peers.`);
+    pieces.push(`The district holds up the ${area.name} program as the example in its next licensee meeting.`);
   }
   if (metrics.budget < 35) {
     pieces.push("Budget buffers are thin; plan for emergency financing or scope reductions.");
   }
   if (!pieces.length) {
-    pieces.push("Trajectory is stable. Consider experimenting with innovation pilots next year.");
+    pieces.push("Steady year. Bank it.");
   }
   return pieces;
 }

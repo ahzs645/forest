@@ -55,7 +55,7 @@ function getSnapshotIndicatorEntries(snapshot) {
     counts.ogmaNearby ? `OGMA ${counts.ogmaNearby}` : '',
     counts.whaNoHarvestNearby ? `WHA ${counts.whaNoHarvestNearby}` : '',
     counts.speciesAtRiskNearby ? `SAR ${counts.speciesAtRiskNearby}` : '',
-    counts.firstNationsReserveNearby ? `Consult ${counts.firstNationsReserveNearby}` : '',
+    counts.firstNationsReserveNearby ? `IR nearby ${counts.firstNationsReserveNearby}` : '',
   ].filter(Boolean);
 }
 
