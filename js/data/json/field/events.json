@@ -57,7 +57,8 @@
     },
     "timeUsed": 4
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "engine_trouble",
@@ -65,7 +66,7 @@
   "type": "equipment",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "The skidder coughs and sputters. Smoke rises from the engine compartment.",
+  "description": "The crummy coughs and sputters on the climb. Smoke rises from under the hood.",
   "options": [
    {
     "label": "Field repair with spare parts",
@@ -79,7 +80,7 @@
      "equipment": -20,
      "progress": -4
     },
-    "failureOutcome": "It is not a fuel line, it is a spun bearing, and no box of belts fixes that. The skidder is dead where it sits — the parts you burned trying are gone, and the tow you were avoiding is now the only call left to make.",
+    "failureOutcome": "It is not a fuel line, it is a spun bearing, and no box of belts fixes that. The truck is dead where it sits — the parts you burned trying are gone, and the tow you were avoiding is now the only call left to make.",
     "failureEffects": {
      "equipment": -22,
      "budget": -500,
@@ -111,12 +112,12 @@
    },
    {
     "label": "Limp to the next block slowly",
-    "outcome": "Running on half power, you nurse it in. The machine reaches somewhere a proper repair is actually possible.",
+    "outcome": "Running on half power, you nurse it in. The truck reaches somewhere a proper repair is actually possible.",
     "effects": {
      "equipment": -20,
      "progress": -8
     },
-    "failureOutcome": "Halfway there the temperature needle buries itself and the engine seizes with a sound nobody forgets. Now it is a dead machine blocking a bush road, and the tow that was five hundred dollars from camp costs a lot more from here.",
+    "failureOutcome": "Halfway there the temperature needle buries itself and the engine seizes with a sound nobody forgets. Now it is a dead truck blocking a bush road, and the tow that was five hundred dollars from camp costs a lot more from here.",
     "failureEffects": {
      "equipment": -28,
      "progress": -10,
@@ -146,13 +147,14 @@
    },
    {
     "label": "Call for tow truck ($500)",
-    "outcome": "The machine gets hauled out. Expensive, but the right choice.",
+    "outcome": "The truck gets hauled out. Expensive, but the right choice.",
     "effects": {
      "budget": -500,
      "equipment": -5
     }
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "chainsaw_failure",
@@ -160,11 +162,11 @@
   "type": "equipment",
   "severity": "minor",
   "probability": 0.06,
-  "description": "The primary saw throws its chain into a stump. Something's bent.",
+  "description": "The line-clearing saw throws its chain into a stump. Something's bent.",
   "options": [
    {
     "label": "Swap to backup saw",
-    "outcome": "The backup saw is slower but works. Production drops for the day.",
+    "outcome": "The backup saw is slower but works. Line clearing drags for the day.",
     "effects": {
      "progress": -3
     }
@@ -176,7 +178,7 @@
      "fuel": -10,
      "equipment": -8
     },
-    "failureOutcome": "The runner comes back at dusk with a chocolate bar and no parts — the dealer stopped stocking that bar two seasons ago. It is the slow backup saw until a proper order comes up from Kamloops, and production is capped until it does.",
+    "failureOutcome": "The runner comes back at dusk with a chocolate bar and no parts — the dealer stopped stocking that bar two seasons ago. It is the slow backup saw until a proper order comes up from Kamloops, and line cutting is capped until it does.",
     "failureEffects": {
      "fuel": -10,
      "progress": -5,
@@ -252,13 +254,13 @@
   "description": "The truck sinks to its axles in soft ground. It's not going anywhere without help.",
   "options": [
    {
-    "label": "Winch it out with the skidder",
-    "outcome": "The skidder anchors to a stump and the winch does the rest, slow and ugly. The truck comes free with the fenders full of muskeg.",
+    "label": "Winch it off a stump with the truck's own winch",
+    "outcome": "The winch line goes around a big stump and does the rest, slow and ugly. The truck comes free with the fenders full of muskeg.",
     "effects": {
      "equipment": -12,
      "fuel": -5
     },
-    "failureOutcome": "Ten metres out the skidder finds the same soft ground and settles in beside the truck. Two machines down to the axles and nothing left in camp big enough to pull either one — it is shovels and brush now, or waiting on drier weather.",
+    "failureOutcome": "The stump you anchored to is rotten through — it lets go on the second pull and the truck settles deeper. Now the winch line is buried with it and nothing left in camp is big enough to pull it out. It is shovels and brush now, or waiting on drier weather.",
     "failureEffects": {
      "equipment": -15,
      "fuel": -8,
@@ -473,7 +475,7 @@
      "crew_health": -8,
      "crew_morale": -10
     },
-    "failureOutcome": "By morning one of the fallers can't feel two fingers, and by noon they're the wrong colour. He's bandaged, useless for saw work, and you're short a set of hands with the cold snap still parked overhead.",
+    "failureOutcome": "By morning the compassman can't feel two fingers, and by noon they're the wrong colour. He's bandaged, off the line, and you're short a set of hands with the cold snap still parked overhead.",
     "failureEffects": {
      "crew_health": -12,
      "crew_morale": -14,
@@ -596,10 +598,18 @@
     ]
    },
    {
-    "label": "Fire a warning shot",
-    "outcome": "The blast startles the bear into the bush. Compliance might ask questions.",
+    "label": "Bang pots, then strip the camp of attractants and move the food to the truck",
+    "outcome": "The noise buys you the minutes you need. Every cooler, grease can and garbage bag goes into the locked truck and the cook tent gets scrubbed. She circles once at dusk, finds nothing, and moves on.",
     "effects": {
-     "compliance": -5
+     "food": -5,
+     "crew_morale": -3
+    }
+   },
+   {
+    "label": "Report the habituated bear (RAPP line)",
+    "outcome": "You call it in to the RAPP line from the ridge where the phone reaches. The conservation officer logs it, asks about attractants, and tells you what you already know: fix the camp before she comes back.",
+    "effects": {
+     "compliance": 4
     }
    }
   ]
@@ -620,7 +630,7 @@
      "progress": -5,
      "crew_morale": -8
     },
-    "failureOutcome": "Mid-afternoon the watch's horn goes and she is there, close, ears back. The pull-out is fast and ugly — tools left where they dropped. The block is off-limits until wildlife officers walk it, and the crew has made it clear they're in no hurry to go back.",
+    "failureOutcome": "Mid-afternoon the watch's horn goes and she is there, close, ears back. The pull-out is fast and ugly — tools left where they dropped. Nobody goes back into that block without a new plan and a second look at the sign, and the crew has made it clear they're in no hurry.",
     "failureEffects": {
      "progress": -12,
      "crew_morale": -14,
@@ -657,12 +667,11 @@
     }
    },
    {
-    "label": "Report and request guidance",
-    "outcome": "Wildlife officers advise caution. A two-day delay while they assess.",
+    "label": "Bear-aware protocol: pairs, spray, hourly radio checks",
+    "outcome": "Nobody runs line alone. Every pair carries spray on the hip, not in the pack, and the radio check goes out on the hour. Slower, noisier, and everyone sleeps.",
     "effects": {
-     "progress": -12,
-     "relationships": 5,
-     "compliance": 5
+     "progress": -2,
+     "crew_morale": -2
     }
    }
   ]
@@ -683,12 +692,12 @@
     }
    },
    {
-    "label": "Honk and inch forward",
+    "label": "Honk and creep forward",
     "outcome": "He charges, bounces off the bull bar, and stomps into the willows to think about it. Minor dents; everyone's okay.",
     "effects": {
      "equipment": -5
     },
-    "failureOutcome": "He comes off his front feet and puts both hooves through the grille. Coolant sprays across the road and the gauge climbs before you've backed off fifty metres. The truck is done moving until the radiator is, and he stands over his victory for another half hour.",
+    "failureOutcome": "He rears up and puts both hooves through the grille. Coolant sprays across the road and the gauge climbs before you've backed off fifty metres. The truck is done moving until the radiator is, and he stands over his victory for another half hour.",
     "failureEffects": {
      "equipment": -12,
      "progress": -6,
@@ -723,7 +732,8 @@
      "fuel": -3
     }
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "caribou_herd",
@@ -744,7 +754,8 @@
     "label": "Radio ahead about the delay",
     "outcome": "Office appreciates the update. Lost an hour.",
     "effects": {
-     "relationships": 3
+     "relationships": 3,
+     "timeUsed": 1
     }
    },
    {
@@ -754,7 +765,7 @@
      "crew_morale": -5,
      "compliance": -3
     },
-    "failureOutcome": "The herd breaks the wrong way and pours down the ditch line in a panic — right past a wildlife officer's parked truck at the junction. Caribou are a listed species and he was writing before you'd stopped. The complaint lands on the district desk with your plate number on it.",
+    "failureOutcome": "The herd breaks the wrong way and pours down the ditch line in a panic — right past a conservation officer's parked truck at the junction. Southern mountain caribou are listed under SARA and he was writing before you'd stopped. The complaint lands with C&E with your plate number on it.",
     "failureEffects": {
      "compliance": -8,
      "relationships": -6,
@@ -783,7 +794,8 @@
      }
     ]
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "worker_injury",
@@ -791,10 +803,10 @@
   "type": "injury",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "A crew member slips on a log and goes down hard, clutching their ankle.",
+  "description": "A crew member slips on a wet log along the traverse and goes down hard, clutching their ankle.",
   "options": [
    {
-    "label": "Apply first aid and continue",
+    "label": "Have the OFA 3 tape it and keep them on light duty",
     "outcome": "Taped, laced tight, back on light duty. Sore for days, but it's a sprain and it behaves like one.",
     "effects": {
      "firstAid": -1
@@ -802,7 +814,7 @@
     "crewEffect": {
      "injury": "sprained_ankle"
     },
-    "failureOutcome": "By supper the ankle is the size of a grapefruit and the wrong colour, and they can't put any weight on it. It was never a sprain. A truck goes out at first light, and the crew does the math on your medical judgment.",
+    "failureOutcome": "By supper the ankle is the size of a grapefruit and the wrong colour, and they can't put any weight on it. It was never a sprain. The ETV goes out at first light, the X-ray says fracture, and the OFA 3 does the math on your call. They're off the crew for the season.",
     "failureEffects": {
      "firstAid": -1,
      "progress": -6,
@@ -810,6 +822,7 @@
      "crew_morale": -8
     },
     "failureCrewEffect": {
+     "injury": "broken_leg",
      "evacuate": true
     },
     "chanceSuccess": 0.6,
@@ -835,8 +848,8 @@
     ]
    },
    {
-    "label": "Send them out for medical care",
-    "outcome": "One truck heads to town. You're short-handed but it's the right call.",
+    "label": "Send them out for medical care in the ETV",
+    "outcome": "The ETV heads to town with the OFA 3 riding along. You're short-handed but it's the right call.",
     "effects": {
      "fuel": -8,
      "progress": -5
@@ -852,13 +865,14 @@
     "crewEffect": {
      "rest": 2
     },
-    "failureOutcome": "Overnight it balloons until the boot won't go on. You send them out in the morning anyway — a day later than you should have, and the X-ray will say exactly that.",
+    "failureOutcome": "Overnight it balloons until the boot won't go on. You send them out in the ETV in the morning anyway — a day later than you should have, and the X-ray will say exactly that. They're off the crew for the season.",
     "failureEffects": {
      "progress": -5,
      "fuel": -8,
      "crew_morale": -4
     },
     "failureCrewEffect": {
+     "injury": "broken_leg",
      "evacuate": true
     },
     "chanceSuccess": 0.65,
@@ -912,7 +926,7 @@
      "crew_morale": -12
     },
     "riskInjury": 0.15,
-    "failureOutcome": "Mid-morning one of the sick ones goes down on the landing, two metres from the running processor. He's concussed where he hit the deck. Work stops, and the near-miss writeup asks in plain language why sick men were working equipment.",
+    "failureOutcome": "Mid-morning one of the sick ones goes down on a bluff along the traverse line and cracks his head on a rock. He's concussed where he landed. Work stops, and the near-miss write-up asks in plain language why sick people were on a steep line.",
     "failureEffects": {
      "progress": -8,
      "crew_morale": -14,
@@ -962,7 +976,7 @@
   "probability": 0.05,
   "managerVariant": {
    "title": "Serious Injury - Medevac Decision",
-   "description": "A faller took a kickback to the leg on the north block. First aid has the bleeding controlled, barely. The superintendent needs an answer while the helicopter company holds the line.",
+   "description": "A layout tech took a kickback to the leg clearing line on the north block. The OFA 3 has the bleeding controlled, barely. The superintendent needs an answer while the helicopter company holds the line.",
    "options": [
     {
      "label": "Authorize the medevac charter",
@@ -988,11 +1002,11 @@
     }
    ]
   },
-  "description": "A saw kicks back. There's blood. This is serious.",
+  "description": "A saw kicks back clearing line. There's blood. This is serious.",
   "options": [
    {
     "label": "Call helicopter medevac",
-    "outcome": "Air ambulance arrives within the hour. The bill is steep, but the crew sees that people come before production.",
+    "outcome": "The OFA 3 has the bleed controlled and the air ambulance is on the ground within the hour. The bill is steep, but the crew sees that people come before the line.",
     "effects": {
      "crew_morale": 6,
      "compliance": 2
@@ -1002,8 +1016,8 @@
     }
    },
    {
-    "label": "Apply first aid and drive to hospital",
-    "outcome": "Pressure bandage, elevation, and three hours of washboard road. The bleeding stays controlled the whole way and the ER takes it from there.",
+    "label": "First aid, then the ETV to hospital with the OFA 3 aboard",
+    "outcome": "Pressure bandage, elevation, and three hours of washboard road with the OFA 3 in the back of the ETV. The bleeding stays controlled the whole way and the ER takes it from there.",
     "effects": {
      "crew_morale": -6,
      "fuel": -8,
@@ -1012,7 +1026,7 @@
     "crewEffect": {
      "evacuate": true
     },
-    "failureOutcome": "An hour out the bandage soaks through and he goes grey and quiet. The ER stabilizes him, but the damage done on that road is the kind that ends seasons. Everyone in camp knows a helicopter would have had him there in forty minutes, and the incident review will ask why it wasn't called.",
+    "failureOutcome": "An hour out the bandage soaks through and he goes grey and quiet. The OFA 3 keeps him talking. The ER stabilizes him, but the damage done on that road is the kind that ends seasons. Everyone in camp knows a helicopter would have had him there in forty minutes, and the incident review will ask why it wasn't called.",
     "failureEffects": {
      "crew_morale": -16,
      "fuel": -8,
@@ -1043,7 +1057,7 @@
     ]
    },
    {
-    "label": "Treat on site and keep crews working",
+    "label": "Treat on site and keep the crew working",
     "outcome": "The bandage holds and he rides out the day in the crummy, white-faced. It was the cheap choice and everyone knows it, but it didn't get worse.",
     "effects": {
      "crew_morale": -18,
@@ -1060,7 +1074,7 @@
      "progress": -2,
      "fuel": -8
     },
-    "failureOutcome": "Three days on, the leg is septic and he's running a fever of thirty-nine and change in a camp four hours from pavement. The helicopter you didn't call the first time comes anyway, on worse terms, with worse odds. WorkSafe opens a file on why a severe laceration was treated with a bandage and a shift schedule.",
+    "failureOutcome": "Three days on, the leg is septic and he's running a fever of thirty-nine and change in a camp four hours from pavement. The helicopter you didn't call the first time comes anyway, on worse terms, with worse odds. WorkSafeBC opens a file on why a severe laceration was treated with a bandage and a shift schedule.",
     "failureEffects": {
      "crew_morale": -20,
      "firstAid": -5,
@@ -1135,7 +1149,7 @@
    },
    {
     "label": "Report and wait for road crew",
-    "outcome": "You spend the shift coordinating a road crew and waiting for a temporary crossing. The road reopens by closeout, with slow travel through the repair next shift.",
+    "outcome": "You spend the shift on the radio with the office and the road permit holder, then waiting on a temporary crossing. The road reopens by closeout, with slow travel through the repair next shift.",
     "spendsDay": true,
     "effects": {
      "progress": -15,
@@ -1199,27 +1213,34 @@
   "type": "terrain",
   "severity": "minor",
   "probability": 0.12,
-  "description": "The log bridge ahead looks... tired. Uncertain if it will hold the truck.",
+  "description": "The log-stringer bridge ahead looks... tired. Nobody is sure it will hold the truck.",
   "options": [
    {
-    "label": "Test it on foot first",
-    "outcome": "You walk it, bouncing on the stringers at the mid-span. It talks back but it does not move. Trucks go one at a time, very slowly, and everyone watches.",
+    "label": "Check the bridge tag and the road permit holder's last inspection",
+    "outcome": "The tag is on the abutment post and the office pulls the RP holder's inspection sheet: rated for light vehicles, last looked at in the spring. You cross at a walk, one truck at a time, and note the sag for the next report.",
+    "effects": {
+     "compliance": 3
+    }
+   },
+   {
+    "label": "Walk it and look at the stringers and abutments, then cross empty, one truck",
+    "outcome": "You walk it, bouncing on the stringers at the mid-span, and get a light down under the abutments. It talks back but it does not move. Trucks go one at a time, empty, very slowly, and everyone watches.",
+    "partialOutcome": "Underfoot it is fine. Under a loaded crummy it is not — a stringer splits on the first truck and the deck sags ten centimetres. You get across. Nothing is coming back this way.",
+    "failureOutcome": "It holds you and lets go under the truck. The rear duals drop through the deck onto the cribbing and stop there, which is the only luck in it. The rest of the day is spent getting the truck out, and the crossing is finished.",
     "effects": {
      "timeUsed": 1
     },
-    "partialOutcome": "Underfoot it is fine. Under nine tonnes it is not — a stringer splits on the first truck and the deck sags four inches. You get across. Nothing loaded is coming back this way.",
     "partialEffects": {
      "timeUsed": 1,
      "progress": -4
     },
-    "failureOutcome": "It holds you and lets go under the truck. The rear duals drop through the deck onto the cribbing and stop there, which is the only luck in it. The rest of the day is spent getting the box out, and the crossing is finished.",
     "failureEffects": {
      "equipment": -18,
      "fuel": -6,
      "progress": -8
     },
-    "chanceSuccess": 0.55,
-    "chancePartial": 0.3,
+    "chanceSuccess": 0.65,
+    "chancePartial": 0.2,
     "oddsModifiers": [
      {
       "when": "equipmentBelow:50",
@@ -1234,7 +1255,7 @@
       "to": "bad"
      },
      {
-      "when": "crewHasRole:faller",
+      "when": "crewHasRole:driver",
       "move": 0.1,
       "from": "bad",
       "to": "partial"
@@ -1246,13 +1267,6 @@
     "failureFlags": [
      "bridge_condemned"
     ]
-   },
-   {
-    "label": "Reinforce with fresh logs",
-    "outcome": "An hour of cutting and the bridge is solid. Good work.",
-    "effects": {
-     "fuel": -2
-    }
    },
    {
     "label": "Find another crossing",
@@ -1272,14 +1286,14 @@
   "description": "A slope has let go across the road. Trees, mud, and rock block the path.",
   "options": [
    {
-    "label": "Clear it with equipment",
-    "outcome": "The skidder works blade-first through the debris while everyone else watches the slope above. By late afternoon there's a lane.",
+    "label": "Winch the stems off with the truck and shovel the rest",
+    "outcome": "The truck winches stems off one at a time while everyone else watches the slope above. By late afternoon there's a lane.",
     "spendsDay": true,
     "effects": {
      "equipment": -12,
      "fuel": -8
     },
-    "failureOutcome": "The operator never hears the second pulse over the engine — the first anyone knows is mud coming over the blade and up the door. He climbs out the far side unhurt; the skidder stays, buried to the cab. Now you make the call to the geotech you were trying to avoid, and add a machine recovery to the file.",
+    "failureOutcome": "Nobody hears the second pulse over the winch — the first anyone knows is mud coming down across the hood. The driver bails out the far side unhurt; the truck stays, buried to the doors. Now you make the call to the geotech you were trying to avoid, and add a vehicle recovery to the file.",
     "failureEffects": {
      "equipment": -25,
      "fuel": -8,
@@ -1353,7 +1367,7 @@
    },
    {
     "label": "Turn back and report",
-    "outcome": "Safety first. The office will coordinate geotechnical review.",
+    "outcome": "Safety first. The office will get a qualified geotech to look at it before anyone drives through.",
     "effects": {
      "progress": -12,
      "progressMode": "turn_back",
@@ -1394,7 +1408,8 @@
      "crew_morale": 3
     }
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "lost_supplies",
@@ -1454,7 +1469,8 @@
      "crew_morale": 2
     }
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "good_road_conditions",
@@ -1478,7 +1494,8 @@
      "fuel": 5
     }
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "abandoned_cache",
@@ -1495,7 +1512,7 @@
      "fuel": 15,
      "equipment": 5
     },
-    "failureOutcome": "The cans sat through too many freeze-thaws and nobody checked with a clear jar. By mid-morning the skidder's filters are plugged with rust and water, and the machine is down while somebody drains and bleeds the whole system. The free fuel cost more than town prices.",
+    "failureOutcome": "The cans sat through too many freeze-thaws and nobody checked with a clear jar. By mid-morning the truck's filters are plugged with rust and water, and it is down while somebody drains and bleeds the whole system. The free fuel cost more than town prices.",
     "failureEffects": {
      "equipment": -10,
      "progress": -5
@@ -1563,7 +1580,8 @@
      "firstAid": 2
     }
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "crew_morale_boost",
@@ -1574,11 +1592,11 @@
   "description": "The evening sky puts on a spectacular show. Everyone stops to watch.",
   "options": [
    {
-    "label": "Take a break and enjoy it",
-    "outcome": "Moments like this remind everyone why they love this work.",
+    "label": "Knock off early and watch it from the ridge",
+    "outcome": "Twenty minutes of line left undone. Moments like this remind everyone why they love this work.",
     "effects": {
      "crew_morale": 15,
-     "timeUsed": 1
+     "progress": -1
     }
    },
    {
@@ -1596,11 +1614,11 @@
   "type": "social",
   "severity": "positive",
   "probability": 0.08,
-  "description": "Some local First Nations members stop by with advice and coffee.",
+  "description": "Two members of the Nation on their way to fish camp stop at the truck with advice and coffee.",
   "options": [
    {
     "label": "Share a meal and listen",
-    "outcome": "They point out a shortcut and warn about a washout ahead.",
+    "outcome": "They point out a shortcut, warn about a washout ahead, and tell you which crossing the map lies about.",
     "effects": {
      "crew_morale": 10,
      "progress": 5
@@ -1780,58 +1798,31 @@
   "description": "The crossing looks rougher on the ground than on the map: fresh scour, perched flow, and salmon visible below the pipe but not above it.",
   "options": [
    {
-    "label": "Shut the crossing down and call it in",
-    "outcome": "You stop traffic, document the outlet, and force the fix into the engineering queue before more damage is done.",
+    "label": "Close the crossing to the crew's trucks and call it in",
+    "outcome": "You stop the trucks, document the outlet, and get it into the engineering queue before more damage is done.",
     "effects": {
      "progress": -5,
-     "equipment": -1
+     "compliance": 8
     }
    },
    {
-    "label": "Restrict loads and post a spotter",
-    "outcome": "Half loads, one truck at a time, a spotter on the outlet watching for fresh scour. The crossing survives the day — on borrowed time, and everyone knows it.",
+    "label": "Photograph the outlet, GPS it, red-flag the crossing for the engineer's fish-passage assessment",
+    "outcome": "Photos of the perched outlet with a tape in frame, a GPS point, and a red-flag note on the road card. The engineer has what she needs for the fish-passage assessment, and the office knows about it before anyone else does.",
     "effects": {
      "progress": -2,
-     "crew_morale": -3
-    },
-    "failureOutcome": "It lets go under a half load anyway — the outlet undercuts and a slug of road fill goes into the channel where the salmon are holding. The spotter's radio call is the first line of a fisheries file that has your traffic log stapled to it. The crossing is closed, and not by you.",
-    "failureEffects": {
-     "compliance": -10,
-     "scrutiny": 10,
-     "progress": -6,
-     "relationships": -4
-    },
-    "chanceSuccess": 0.6,
-    "oddsModifiers": [
-     {
-      "when": "weather:rain",
-      "move": 0.15,
-      "from": "good",
-      "to": "bad"
-     },
-     {
-      "when": "season:fall",
-      "move": 0.1,
-      "from": "good",
-      "to": "bad"
-     },
-     {
-      "when": "crewHasRole:spotter",
-      "move": 0.12,
-      "from": "bad",
-      "to": "good"
-     }
-    ]
+     "compliance": 4,
+     "data": 6
+    }
    },
    {
     "label": "Keep moving and note it for later",
-    "outcome": "The pipe holds one more day and you bank the production hours. The note goes in the file for later, where it sits with all the other laters.",
+    "outcome": "The pipe holds one more day and you bank the traverse. The note goes in the field book for later, where it sits with all the other laters.",
     "effects": {
      "progress": 4,
      "equipment": -5,
      "crew_morale": -5
     },
-    "partialOutcome": "The crossing holds. What you didn't see was the hatchery crew downstream, and the photos of the perched outlet — with your loaded truck on top — are on a district desk by Friday. Nobody calls. A file just opens.",
+    "partialOutcome": "The crossing holds. What you didn't see was the hatchery crew downstream, and the photos of the perched outlet — with your crummy on top — are on a district desk by Friday. Nobody calls. A file just opens.",
     "partialEffects": {
      "progress": 4,
      "equipment": -5,
@@ -1839,7 +1830,7 @@
      "scrutiny": 8,
      "relationships": -4
     },
-    "failureOutcome": "Mid-haul the culvert lets go completely. The road drops a metre, the truck barely stops in time, and a brown plume rolls through the pool where the spawners were holding. This one isn't a note for later — it's an investigation, and the crossing is gone.",
+    "failureOutcome": "Mid-afternoon the culvert lets go completely. The road drops a metre, the truck barely stops in time, and a brown plume rolls through the pool where the spawners were holding. This one isn't a note for later — it's a DFO file, and the crossing is gone.",
     "failureEffects": {
      "compliance": -14,
      "scrutiny": 15,
@@ -1914,14 +1905,14 @@
     }
    },
    {
-    "label": "Push full production",
+    "label": "Push a full shift anyway",
     "outcome": "The numbers look better by supper. The crew is hoarse and drained, and the call gets harder to defend every hour, but it holds.",
     "effects": {
      "progress": 5,
      "crew_morale": -8
     },
     "riskInjury": 0.12,
-    "failureOutcome": "Mid-afternoon a faller goes down on the hill, hands on knees and then all the way down, coughing like a man twice his age. The stand-down order comes over the radio while you're still getting him to the truck. You shut down anyway — later, with an injury on the books and nothing to show for the difference.",
+    "failureOutcome": "Mid-afternoon the compassman goes down on the hill, hands on knees and then all the way down, coughing like a man twice his age. The stand-down order comes over the radio while you're still getting him to the truck. You shut down anyway — later, with an injury on the books and nothing to show for the difference.",
     "failureEffects": {
      "progress": -4,
      "crew_morale": -12,
@@ -2005,26 +1996,35 @@
   "type": "narrative",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "Survey crews have found an untouched ancient cedar grove with trees older than 800 years",
+  "description": "Running the east boundary, the crew walks into a grove of cedar that nobody's inventory shows: veterans well over two metres at breast height, some of them older than the treaty. It is inside the block as drawn.",
   "options": [
    {
-    "label": "Protect the grove and seek heritage status",
-    "outcome": "You decided to Protect the grove and seek heritage status.",
+    "label": "Flag it for the OGMA / big-tree screening and call the district",
+    "outcome": "You GPS the biggest stems, tape the diameters, and ribbon a reserve around the grove. The planner takes it into the OGMA screening and the district's stewardship forester wants to walk it. The boundary moves.",
     "effects": {
      "reputation": 5,
-     "budget": 0
+     "compliance": 6,
+     "data": 4
     },
     "schedulesEvent": "story_arc_ancientGrove_stage1_protect"
    },
    {
-    "label": "Harvest the valuable timber",
-    "outcome": "The fallers take the grove down in two days. The mill pays a premium for clear old-growth cedar — $3,000 lands in the crew account. Word travels faster than the logging trucks.",
+    "label": "Leave it out of the package — ribbon the boundary straight through it and don't mention the diameters",
+    "outcome": "The line goes through the grove without a plot card. The block keeps its volume, the package goes in clean, and the diameters stay in your field book. Word travels anyway — the cruiser saw the tape too.",
     "effects": {
      "reputation": -10,
-     "budget": 3000
+     "scrutiny": 12
     },
     "schedulesEvent": "story_arc_ancientGrove_stage1_harvest"
    }
+  ],
+  "roles": [
+   "recce"
+  ],
+  "becCodes": [
+   "CWHws2",
+   "CWHxm2",
+   "ICHmk1"
   ]
  },
  {
@@ -2033,7 +2033,7 @@
   "type": "social",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "Your most experienced faller corners you after dinner. He says he's had enough — the pay isn't worth the conditions. He wants out tomorrow morning.",
+  "description": "Your most experienced layout tech corners you after dinner. He says he's had enough — the pay isn't worth the conditions. He wants out tomorrow morning.",
   "options": [
    {
     "label": "Let them go",
@@ -2136,15 +2136,14 @@
   "type": "social",
   "severity": "moderate",
   "probability": 0.04,
-  "description": "You find fresh-cut stumps on the adjacent block. Someone's been logging here without permits — and it's not your crew.",
+  "description": "You find fresh-cut stumps and skid trails on the adjacent block. Someone's been logging here without a cutting permit or a timber mark — and it's not anyone you know.",
   "options": [
    {
-    "label": "Report it to the district office",
-    "outcome": "You radio it in and file a report. The office appreciates it but sends an inspector, costing you a day of work.",
+    "label": "Call it in — RAPP line and the district's natural resource officer",
+    "outcome": "You call the RAPP line from the ridge where the phone reaches and the office follows up with the district's NRO. Someone will want your photos and the GPS points; nobody needs your day.",
     "effects": {
-     "progress": -5,
      "compliance": 10,
-     "relationships": 5
+     "relationships": 4
     }
    },
    {
@@ -2189,7 +2188,7 @@
    },
    {
     "label": "Investigate quietly on your own",
-    "outcome": "You go in on foot after dark and get what you came for — plate numbers, a photo of the skidder's brand plate, the gate coordinates. Nobody sees you. Whatever happens next, you have proof.",
+    "outcome": "You go in on foot after dark and get what you came for — plate numbers, a photo of the machine's serial plate, the gate coordinates. Nobody sees you. Whatever happens next, you have proof.",
     "effects": {
      "crew_morale": -3,
      "data": 4
@@ -2197,7 +2196,7 @@
     "hiddenOutcome": true,
     "schedulesEvent": "unauthorized_logging_followup",
     "scheduledDelay": 3,
-    "failureOutcome": "Headlights swing across the landing while you're still beside their skidder, and you leave through the slash at a dead run. No photos, no plates — but they got a good look at you. When the visit comes, it'll be them holding the cards.",
+    "failureOutcome": "Headlights swing across the clearing while you're still beside their machine, and you leave through the slash at a dead run. No photos, no plates — but they got a good look at you. When the visit comes, it'll be them holding the cards.",
     "failureEffects": {
      "crew_morale": -8
     },
@@ -2246,7 +2245,7 @@
     "effects": {
      "crew_morale": -10
     },
-    "failureOutcome": "They leave without a word, which should have been the warning. In the morning three tires are flat with clean knife cuts and the fuel tank's water trap is full of something that isn't diesel. The machines stay parked while you sort it out, and you call the conservation officers you could have called yesterday — now as the victim, not the witness.",
+    "failureOutcome": "They leave without a word, which should have been the warning. In the morning three tires are flat with clean knife cuts and the fuel tank's water trap is full of something that isn't diesel. The trucks stay parked while you sort it out, and you call the NRO you could have called yesterday — now as the victim, not the witness.",
     "failureEffects": {
      "crew_morale": -14,
      "equipment": -15,
@@ -2291,7 +2290,7 @@
      "compliance": -15
     },
     "hiddenOutcome": true,
-    "failureOutcome": "Months later a compliance sweep rolls up their operation, and they hand over your name before the coffee's poured — the licensee next door who agreed to look away. Every inspection you get for the rest of the season starts from that sentence.",
+    "failureOutcome": "Months later a C&E investigation rolls up their operation, and they hand over your name before the coffee's poured — the licensee next door who agreed to look away. Every inspection you get for the rest of the season starts from that sentence.",
     "failureEffects": {
      "compliance": -20,
      "scrutiny": 15,
@@ -2327,8 +2326,8 @@
     ]
    },
    {
-    "label": "Call the authorities immediately",
-    "outcome": "Conservation officers arrive within hours. The poachers scatter. You did the right thing.",
+    "label": "Call the NRO and the RCMP immediately",
+    "outcome": "The district's natural resource officer and an RCMP member arrive within hours. The pickup is gone before they get there. You did the right thing.",
     "effects": {
      "progress": -5,
      "compliance": 15,
@@ -2347,19 +2346,19 @@
   "description": "A local pilot's afternoon charter was cancelled. At a reduced rate, the pilot can sling supplies to your next block or fly an aerial reconnaissance.",
   "options": [
    {
-    "label": "Sling supplies ahead ($1500)",
-    "outcome": "Equipment and fuel are waiting at the next block. Massive time savings.",
+    "label": "Sling supplies ahead ($2,000)",
+    "outcome": "Two thousand dollars of flight time and the fuel and gear are waiting at the next block. Massive time savings.",
     "effects": {
-     "budget": -1500,
+     "budget": -2000,
      "progress": 12,
      "fuel": 10
     }
    },
    {
-    "label": "Aerial recon of the route ($800)",
-    "outcome": "From above you spot a washout, a good crossing, and the best path forward.",
+    "label": "Aerial recon of the route ($1,800)",
+    "outcome": "An hour in the front seat, eighteen hundred dollars on the card. From above you spot a washout, a good crossing, and the best line for the traverse.",
     "effects": {
-     "budget": -800,
+     "budget": -1800,
      "progress": 5
     }
    },
@@ -2391,7 +2390,7 @@
    },
    {
     "label": "Let them do light duty",
-    "outcome": "They sort chokers and file chains by the fire, moving slow but staying warm. Not much use today, but they hold steady and are on their feet by morning.",
+    "outcome": "They sort the ribbon box and file the saw chain by the fire, moving slow but staying warm. Not much use today, but they hold steady and are up and moving by morning.",
     "effects": {
      "progress": -4
     },
@@ -2487,15 +2486,15 @@
  },
  {
   "id": "safety_inspection_notice",
-  "title": "Safety Inspection Notice",
+  "title": "WorkSafeBC Site Visits This Week",
   "type": "social",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "A crackly radio message from district: a safety inspector will be visiting your operation in a few days. Better get things in order.",
+  "description": "Word from the office: a WorkSafeBC prevention officer is doing site visits in the district this week. Better get things in order.",
   "options": [
    {
     "label": "Spend the day prepping for inspection",
-    "outcome": "You clean up the site, check PPE, organize paperwork. Lost a day of production but you'll be ready.",
+    "outcome": "You clean up the site, check PPE and the ETV, and get the ERP, the tailgate records and the check-in log in order. Lost a day on the line but you'll be ready.",
     "effects": {
      "progress": -6,
      "compliance": 8
@@ -2505,7 +2504,7 @@
    },
    {
     "label": "Do a quick tidy and keep working",
-    "outcome": "A half-hearted cleanup. Things look okay-ish. You keep production moving.",
+    "outcome": "A half-hearted cleanup. Things look okay-ish. You keep the line moving.",
     "effects": {
      "progress": -2,
      "compliance": 3
@@ -2525,15 +2524,15 @@
  },
  {
   "id": "inspector_arrives",
-  "title": "Safety Inspector Arrives",
+  "title": "WorkSafeBC Officer Arrives",
   "type": "social",
   "severity": "moderate",
   "probability": 0,
-  "description": "A white government truck pulls into camp. The inspector steps out with a clipboard and a serious expression.",
+  "description": "A WorkSafeBC truck pulls into camp. The prevention officer steps out with a tablet and asks for the crew lead, the OFA 3, and the emergency response plan.",
   "options": [
    {
     "label": "Give them the full tour confidently",
-    "outcome": "You walk them through every operation, and it takes most of the day. They note a few minor issues but leave satisfied.",
+    "outcome": "You walk her through the ERP, the ETV, the check-in procedure and the tailgate records, and it takes most of the day. She notes a few minor items but leaves satisfied.",
     "effects": {
      "progress": -6,
      "compliance": 5,
@@ -2542,13 +2541,13 @@
    },
    {
     "label": "Be cooperative but let them lead",
-    "outcome": "You answer what they ask and nothing more. They find a frayed lanyard and a dated extinguisher, note both without drama, and are gone by two.",
+    "outcome": "You answer what she asks and nothing more. She finds a frayed lanyard and a dated extinguisher, notes both without drama, and is gone by two.",
     "effects": {
      "progress": -2,
      "compliance": 2
     },
     "hiddenOutcome": true,
-    "failureOutcome": "They find the thing you did not know about — the guard missing off the landing saw. A partial stop-work goes on the landing until it is corrected and signed off, and a follow-up visit lands on the calendar.",
+    "failureOutcome": "She finds the thing you did not know about — the ETV's stretcher straps rotted through and last year's repeater channel in the ERP. An order goes on the crew until both are fixed and signed off, and a follow-up visit lands on the calendar.",
     "failureEffects": {
      "progress": -6,
      "compliance": -8,
@@ -2578,13 +2577,13 @@
    },
    {
     "label": "Distract them with coffee and stories",
-    "outcome": "He takes the coffee, tells a better story than yours, and gives the site a light once-over between refills. The crews never stop working.",
+    "outcome": "She takes the coffee, tells a better story than yours, and gives the site a light once-over between refills. The crew never stops working.",
     "effects": {
      "progress": -1,
      "compliance": -3
     },
     "hiddenOutcome": true,
-    "failureOutcome": "He sets the cup down half-finished and starts opening tool boxes. By the end of it you have citations on three items, a lecture about wasting his time, and your operation flagged for an unannounced re-visit.",
+    "failureOutcome": "She sets the cup down half-finished and starts opening the first aid kit. By the end of it you have orders on three items, a lecture about wasting her time, and your operation flagged for an unannounced re-visit.",
     "failureEffects": {
      "progress": -4,
      "compliance": -8,
@@ -2644,8 +2643,8 @@
     "scheduledDelay": 2
    },
    {
-    "label": "Report to wildlife office",
-    "outcome": "They log it and tell you to be cautious. Standard advice.",
+    "label": "Call it in to the RAPP line",
+    "outcome": "The conservation officer logs it and tells you to be cautious. Standard advice.",
     "effects": {
      "compliance": 3,
      "timeUsed": 1
@@ -2714,7 +2713,7 @@
      "crew_morale": -12,
      "crew_health": -5
     },
-    "failureOutcome": "A wolf takes a cooler off the tailgate at noon, twenty feet from the bucker. Habituated is the word the wildlife office uses. Nobody works alone after that and nobody works at dusk, and the pace shows it.",
+    "failureOutcome": "A wolf takes a cooler off the tailgate at noon, six metres from the cruiser. Habituated is the word the conservation officer uses. Nobody works alone after that and nobody works at dusk, and the pace shows it.",
     "failureEffects": {
      "crew_morale": -14,
      "crew_health": -5,
@@ -2756,7 +2755,7 @@
   "options": [
    {
     "label": "Push hard now to get ahead of it",
-    "outcome": "The crew works double-time and hates it. But the decking is ahead of schedule when the first gusts arrive, and that is money in the bank.",
+    "outcome": "The crew works double-time and hates it. But the traverse is ahead of schedule when the first gusts arrive, and that is money in the bank.",
     "effects": {
      "progress": 6,
      "crew_health": -8,
@@ -2764,7 +2763,7 @@
     },
     "schedulesEvent": "major_storm_hits",
     "scheduledDelay": 2,
-    "failureOutcome": "Double-time is when corners get cut. The skidder throws a track on a slope it had no business on, and it is still sitting there when the front rolls in. You meet the storm tired, behind, and down a machine.",
+    "failureOutcome": "Double-time is when corners get cut. The crummy drops a wheel off a soft shoulder on a spur it had no business on, and it is still sitting there when the front rolls in. You meet the storm tired, behind, and down a truck.",
     "failureEffects": {
      "progress": -2,
      "crew_health": -8,
@@ -2926,8 +2925,8 @@
   "description": "Pushing through dense brush, you stumble into a cathedral-like grove of ancient cedars. Some of these trees are 500 years old. Sunlight filters through the canopy like stained glass.",
   "options": [
    {
-    "label": "Report the grove to the district",
-    "outcome": "The office is grateful — this area needs protection. Your compliance record shines.",
+    "label": "Flag it for the big-tree / OGMA screening and call the office",
+    "outcome": "The planner pulls it into the OGMA screening and the boundary moves. Your compliance record shines.",
     "effects": {
      "crew_morale": 10,
      "compliance": 12,
@@ -2935,10 +2934,11 @@
     }
    },
    {
-    "label": "Mark it on the map and move on quietly",
-    "outcome": "You GPS the location for your own records. A private treasure.",
+    "label": "GPS it for yourself and keep the diameters out of the notes",
+    "outcome": "You GPS the location for your own records and leave the diameters out of the plot cards. A private treasure — and a gap in the package if anyone ever walks it.",
     "effects": {
-     "crew_morale": 8
+     "crew_morale": 8,
+     "compliance": -4
     }
    },
    {
@@ -2950,7 +2950,12 @@
     }
    }
   ],
-  "expeditionOnly": true
+  "expeditionOnly": true,
+  "becCodes": [
+   "CWHws2",
+   "CWHxm2",
+   "ICHmk1"
+  ]
  },
  {
   "id": "unmapped_creek",
@@ -2958,32 +2963,32 @@
   "type": "discovery",
   "severity": "minor",
   "probability": 0.05,
-  "description": "Your planned route crosses a creek that doesn't appear on any map. It's not huge, but it's definitely fish-bearing — you can see spawning beds.",
+  "description": "Your traverse crosses a creek that doesn't appear on any map. It's not huge, but it's definitely fish-bearing — you can see spawning beds.",
   "options": [
    {
-    "label": "Report it and reroute — proper protocol",
-    "outcome": "The district is impressed by your diligence. A new buffer zone is established. Your route gets longer.",
+    "label": "Classify it — width, gradient, fish presence — and put the RMA on the map",
+    "outcome": "Channel width, gradient, a look for fish and the default riparian class: S4, thirty-metre RMA. Two hours with the stream card and the camera, and the boundary moves before anyone has to ask.",
     "effects": {
-     "progress": -10,
-     "compliance": 15,
-     "relationships": 8
+     "progress": -6,
+     "compliance": 12,
+     "data": 8
     }
    },
    {
-    "label": "Cross carefully and note it for later",
-    "outcome": "You pick a wide cobble bar, ford it gently, and mark it on the map. Should have reported it first, and you know it, but the day keeps moving.",
+    "label": "Call it S6 from the truck",
+    "outcome": "You write S6 in the field book from the cab, ford the wide cobble bar, and keep moving. Should have walked it, and you know it, but the day keeps moving.",
+    "failureOutcome": "The bank cuts loose under the second truck and a plume of silt runs a hundred metres down through the spawning beds. A creek that is not on your map is on somebody's — a natural resource officer is out within the week with photographs, and DFO gets a copy. It is a fisheries file now, with your name in it.",
     "effects": {
      "progress": -2,
      "compliance": -8
     },
-    "hiddenOutcome": true,
-    "failureOutcome": "The bank cuts loose under the second truck and a plume of silt runs a hundred metres down through the spawning beds. A creek that is not on your map is on somebody's — a compliance officer is out within the week with photographs. It is a formal file now, with your name in it.",
     "failureEffects": {
      "progress": -4,
      "compliance": -15,
      "scrutiny": 15,
      "relationships": -5
     },
+    "hiddenOutcome": true,
     "chanceSuccess": 0.65,
     "oddsModifiers": [
      {
@@ -3013,12 +3018,12 @@
     ]
    },
    {
-    "label": "Investigate the watershed",
-    "outcome": "You spend time mapping the drainage. Valuable data for future planning.",
+    "label": "Flag it and reroute the traverse; let the planner classify it",
+    "outcome": "You ribbon a wide detour and hand it to the office as unclassified. The planner will send someone back with a stream card — the file waits for that.",
     "effects": {
-     "progress": -6,
-     "compliance": 8,
-     "data": 10
+     "progress": -8,
+     "compliance": 5,
+     "data": 3
     }
    }
   ],
@@ -3046,7 +3051,7 @@
    },
    {
     "label": "Use them to verify your current lines",
-    "outcome": "Cross-referencing reveals your map is off by 40 meters. Good catch before you cut too far.",
+    "outcome": "Cross-referencing reveals your map is off by 40 metres. Good catch before the boundary goes in wrong.",
     "effects": {
      "data": 10,
      "compliance": 8
@@ -3125,8 +3130,8 @@
     ]
    },
    {
-    "label": "Leave it undisturbed — could be heritage",
-    "outcome": "You photograph it and report the location. The historical society is very interested.",
+    "label": "Leave it — it's on someone's trapline",
+    "outcome": "You photograph it, GPS it, and leave it. The office runs it past the trapline holder and the archaeology screening; both appreciate the call.",
     "effects": {
      "relationships": 8,
      "compliance": 5
@@ -3191,7 +3196,7 @@
     },
     "hiddenOutcome": true,
     "riskInjury": 0.2,
-    "partialOutcome": "Nobody swings. The winner pockets the pot, the loser goes to his tent, and the thing sits there festering. They will not buck on the same strip now, and you are building each day's plan around it.",
+    "partialOutcome": "Nobody swings. The winner pockets the pot, the loser goes to his tent, and the thing sits there festering. They will not run line together now, and you are building each day's plan around it.",
     "partialEffects": {
      "crew_morale": -6,
      "progress": -2
@@ -3246,7 +3251,7 @@
    },
    {
     "label": "Try to fix it with what you have",
-    "outcome": "A cracked solder joint on the power board. Your handiest man reflows it with a screwdriver blade heated on the stove, and district comes back scratchy but readable.",
+    "outcome": "A cracked solder joint on the power board. Your handiest tech reflows it with a screwdriver blade heated on the stove, and the office comes back scratchy but readable.",
     "effects": {
      "progress": -3
     },
@@ -3285,7 +3290,7 @@
      "compliance": -8
     },
     "hiddenOutcome": true,
-    "failureOutcome": "District has been calling for two days about a fire-weather shutdown you never heard. Silence reads as dodging — a white truck shows up unannounced with a formal warning in it, and the file it starts stays open.",
+    "failureOutcome": "The office has been calling for two days about a BCWS shutdown you never heard. Silence reads as dodging — a WorkSafeBC officer, tipped by the office's own check-in log, shows up with a written order about check-in procedure (OHS Reg. 4.21), and the file it starts stays open.",
     "failureEffects": {
      "compliance": -12,
      "scrutiny": 12,
@@ -3312,6 +3317,15 @@
       "to": "bad"
      }
     ]
+   },
+   {
+    "label": "Stand down until comms are restored; drive to the repeater for the check-in",
+    "outcome": "Nobody works in the bush without a check-in procedure. The crew stays in camp on maps and plot cards while the driver runs up to the repeater to check in and order the part. A day mostly lost, and nothing to explain.",
+    "effects": {
+     "progress": -4,
+     "fuel": -4,
+     "compliance": 6
+    }
    }
   ],
   "expeditionOnly": true
@@ -3322,7 +3336,7 @@
   "type": "equipment",
   "severity": "moderate",
   "probability": 0.04,
-  "description": "The diesel smells wrong. Water got into the fuel barrel somehow. Your equipment sputters and stalls.",
+  "description": "The diesel smells wrong. Water got into the fuel barrel somehow. The truck sputters and stalls.",
   "options": [
    {
     "label": "Drain and filter what you can",
@@ -3332,7 +3346,7 @@
      "equipment": -8,
      "progress": -4
     },
-    "failureOutcome": "The water is through every can, not just the barrel. You save a quarter of it, the skidder's injectors are already scored from the morning's running, and the fresh-fuel order goes in anyway — with a machine limping until it comes.",
+    "failureOutcome": "The water is through every can, not just the barrel. You save a quarter of it, the truck's injectors are already scored from the morning's running, and the fresh-fuel order goes in anyway — with a truck limping until it comes.",
     "failureEffects": {
      "fuel": -25,
      "equipment": -14,
@@ -3372,14 +3386,14 @@
    },
    {
     "label": "Use it anyway — it's mostly diesel",
-    "outcome": "The equipment runs, barely, on what you tell yourself is mostly diesel. Something is going to break sooner rather than later.",
+    "outcome": "The truck runs, barely, on what you tell yourself is mostly diesel. Something is going to break sooner rather than later.",
     "effects": {
      "fuel": -5
     },
     "hiddenOutcome": true,
     "schedulesEvent": "engine_trouble",
     "scheduledDelay": 2,
-    "failureOutcome": "The injection pump seizes with the skidder halfway up the main trail, and a dead machine there is a roadblock, not a breakdown. Parts are days out, and everything walks around it until they come.",
+    "failureOutcome": "The injection pump seizes with the crummy halfway up the spur, and a dead truck there is a roadblock, not a breakdown. Parts are days out, and everything walks around it until they come.",
     "failureEffects": {
      "fuel": -5,
      "equipment": -18,
@@ -3413,20 +3427,20 @@
  },
  {
   "id": "competing_crew",
-  "title": "Competing Crew on Adjacent Block",
+  "title": "Planting Crew Drifting Across the Line",
   "type": "social",
   "severity": "minor",
   "probability": 0.06,
-  "description": "Another logging crew has set up on the next block over. They're loud, fast, and their foreman keeps 'accidentally' encroaching on your boundary.",
+  "description": "Another contractor's planting crew has started on the adjacent opening and their planters are drifting across your boundary ribbon. Their foreman keeps calling it an honest mistake.",
   "options": [
    {
-    "label": "Confront the foreman directly",
-    "outcome": "A heated but productive conversation over the hood of his pickup. Boundaries get re-flagged while you both watch. Uneasy truce.",
+    "label": "Talk to their foreman over the hood",
+    "outcome": "A heated but productive conversation over the hood of his pickup. The boundary gets re-ribboned while you both watch. Uneasy truce.",
     "effects": {
      "crew_morale": 3,
      "relationships": -5
     },
-    "failureOutcome": "He is not interested in a conversation, and the shouting carries. By the weekend there is a written complaint about your operation on the district's desk, and their flagging line is ten metres further over than it was.",
+    "failureOutcome": "He is not interested in a conversation, and the shouting carries. By the weekend there is a written complaint about your crew on the licensee's desk, and their planters are ten metres further over than they were.",
     "failureEffects": {
      "crew_morale": -3,
      "relationships": -8,
@@ -3456,8 +3470,8 @@
     ]
    },
    {
-    "label": "Report the encroachment officially",
-    "outcome": "Paperwork and phone calls. The district sends a surveyor. Takes days to resolve.",
+    "label": "Report the encroachment to the office",
+    "outcome": "Phone calls and a GPS track of the ribbon. The office sorts it out with the other contractor and the checker re-plots the line. Takes days to resolve.",
     "effects": {
      "progress": -5,
      "compliance": 8,
@@ -3465,15 +3479,15 @@
     }
    },
    {
-    "label": "Challenge them to a production race",
-    "outcome": "Both crews push hard to bury each other, and yours wins by a truckload. Dangerous, loud, and the best week of morale all season.",
+    "label": "Race them to the line",
+    "outcome": "Both crews push to bury each other, and yours wins by a bag. Dangerous, loud, and the best week of morale all season.",
     "effects": {
      "progress": 5,
      "crew_morale": 8,
      "crew_health": -5
     },
     "riskInjury": 0.15,
-    "failureOutcome": "Racing does not leave time to look up. Your second-best faller drops a stem across a marked reserve and takes a limb across the shin on the way clear. He is limping, the ribbon is on the ground, and you lose the race anyway — their foreman makes sure the whole valley hears.",
+    "failureOutcome": "Racing does not leave time to look at the ribbon. Your fastest planter runs a bag through the riparian reserve and rolls an ankle on the way out. She is limping, the plots in the reserve are a stocking problem, and you lose the race anyway — their foreman makes sure the whole valley hears.",
     "failureEffects": {
      "progress": -3,
      "crew_morale": -10,
@@ -3483,7 +3497,7 @@
     "chanceSuccess": 0.6,
     "oddsModifiers": [
      {
-      "when": "crewHasRole:faller",
+      "when": "crewHasRole:spotter",
       "move": 0.12,
       "from": "bad",
       "to": "good"
@@ -3503,7 +3517,10 @@
     ]
    }
   ],
-  "expeditionOnly": true
+  "expeditionOnly": true,
+  "roles": [
+   "silviculture"
+  ]
  },
  {
   "id": "satellite_phone_call",
@@ -3575,46 +3592,37 @@
  },
  {
   "id": "wildlife_nesting_area",
-  "title": "Raptor Nesting Area",
+  "title": "Eagle Nest in the Block",
   "type": "wildlife",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "An eagle nest sits in a massive Douglas fir right in your planned cut path. Two chicks are visible. This tree is protected by law.",
+  "description": "A bald eagle nest sits in a big veteran Douglas-fir inside the boundary you're flagging. Two chicks are visible. Nest trees are protected under the Wildlife Act whether or not anyone has mapped them.",
   "options": [
    {
-    "label": "Establish a buffer zone and reroute",
-    "outcome": "You flag a 100-meter buffer. Adds distance but keeps you legal and ethical.",
+    "label": "GPS the nest tree, flag a WTP around it, note the buffer in the site plan",
+    "outcome": "You GPS the tree, ribbon a wildlife tree patch around it, and write the buffer and the timing window into the notes for the site plan. Adds distance to the boundary and takes a few stems out of the block — and nobody has to revisit it.",
     "effects": {
-     "progress": -8,
+     "progress": -4,
      "compliance": 12,
-     "crew_morale": 5
+     "data": 5,
+     "crew_morale": 3
     }
    },
    {
-    "label": "Report it and wait for wildlife assessment",
-    "outcome": "A biologist will come out... eventually. Could be days.",
+    "label": "Note it and let the planner decide",
+    "outcome": "A point in the GPS and a line in the field book. The planner picks it up in the office review and the buffer goes in on the map. It worked, this time.",
+    "failureOutcome": "The point gets lost between your field book and the site plan, and the block goes to permit with the nest tree inside the boundary. The district's wildlife biologist finds it on the pre-harvest walk instead of you. The CP waits for the amendment, and the question of who noticed and said nothing has your name on it.",
     "effects": {
-     "progress": -12,
-     "compliance": 15,
-     "relationships": 5
-    }
-   },
-   {
-    "label": "Work around it as close as regulations allow",
-    "outcome": "You cut to the legal minimum and not a metre closer. The adults scream at the saws all week, but they keep bringing fish to the nest.",
-    "effects": {
-     "progress": -3,
+     "progress": -1,
      "compliance": 3
     },
-    "hiddenOutcome": true,
-    "failureOutcome": "Three days of saws at the minimum distance and the adults stop coming back. Abandonment of an active nest is a Wildlife Act incident whether you were legal or not. Work stops for the assessment, and the file follows the licence, not the block.",
     "failureEffects": {
-     "progress": -10,
-     "compliance": -12,
-     "scrutiny": 12,
-     "relationships": -5
+     "progress": -6,
+     "compliance": -10,
+     "scrutiny": 8
     },
-    "chanceSuccess": 0.6,
+    "hiddenOutcome": true,
+    "chanceSuccess": 0.55,
     "oddsModifiers": [
      {
       "when": "crewHasRole:spotter",
@@ -3623,8 +3631,8 @@
       "to": "good"
      },
      {
-      "when": "season:spring",
-      "move": 0.12,
+      "when": "scrutinyAbove:50",
+      "move": 0.1,
       "from": "good",
       "to": "bad"
      },
@@ -3633,12 +3641,43 @@
       "move": 0.1,
       "from": "good",
       "to": "bad"
+     }
+    ]
+   },
+   {
+    "label": "Leave it off the map",
+    "outcome": "The boundary goes where the timber is. The nest stays out of the notes, and the adults keep bringing fish to it all week while you flag past.",
+    "failureOutcome": "The nest was never a secret — the neighbour across the valley has been watching that pair for years. The complaint goes to COS, the district walks the block with your ribbon in the photos, and an eagle nest inside a boundary you flagged is a Wildlife Act file whether or not anyone has cut a tree. The block stops for the assessment, and the file follows the licence, not the block.",
+    "effects": {
+     "progress": 2,
+     "compliance": -8
+    },
+    "failureEffects": {
+     "progress": -10,
+     "compliance": -14,
+     "scrutiny": 14,
+     "relationships": -5
+    },
+    "hiddenOutcome": true,
+    "chanceSuccess": 0.5,
+    "oddsModifiers": [
+     {
+      "when": "season:spring",
+      "move": 0.12,
+      "from": "good",
+      "to": "bad"
      },
      {
       "when": "scrutinyAbove:50",
-      "move": 0.1,
+      "move": 0.12,
       "from": "good",
       "to": "bad"
+     },
+     {
+      "when": "scrutinyBelow:20",
+      "move": 0.08,
+      "from": "bad",
+      "to": "good"
      }
     ]
    }
@@ -3660,7 +3699,7 @@
      "progress": -4,
      "equipment": -10
     },
-    "failureOutcome": "Half a day of grid-walking turns up nothing of yours — then all of it, tarped and staged by the old landing for pickup. Whoever it is, they are coming back for the load. Camp security is now the evening's plan, not sleep.",
+    "failureOutcome": "Half a day of grid-walking turns up nothing of yours — then all of it, tarped and staged by the old pullout for pickup. Whoever it is, they are coming back for the load. Camp security is now the evening's plan, not sleep.",
     "failureEffects": {
      "progress": -6,
      "equipment": -10,
@@ -3714,18 +3753,18 @@
   "type": "terrain",
   "severity": "moderate",
   "probability": 0.06,
-  "description": "The frost is coming out of the ground. Roads that were solid yesterday are turning to mush. The window for heavy equipment is closing fast.",
+  "description": "The frost is coming out of the ground. Roads that were solid yesterday are turning to mush. The window for getting trucks into the block is closing fast.",
   "options": [
    {
-    "label": "Push hard now — run equipment day and night",
-    "outcome": "You run iron around the clock while the frost holds the road together. Exhausting, hard on the machines, and worth every hour of it.",
+    "label": "Push the trucks in while the frost holds — early starts, late finishes",
+    "outcome": "You run the trucks in before dawn while the frost holds the road together and walk out after dark. Exhausting, hard on the vehicles, and worth every hour of it.",
     "effects": {
      "progress": 10,
      "crew_health": -10,
      "crew_morale": -8,
      "equipment": -10
     },
-    "partialOutcome": "On the second night the buncher goes in to the belly pan on a stretch that held all day. Six hours of digging and matting gets it out, and that is the end of it — the road will not take iron again until it dries.",
+    "partialOutcome": "On the second morning the crummy goes in to the frame on a stretch that held all day. Six hours of digging and matting gets it out, and that is the end of it — the road will not take a truck again until it dries.",
     "partialEffects": {
      "progress": 4,
      "crew_health": -10,
@@ -3733,7 +3772,7 @@
      "equipment": -14,
      "fuel": -6
     },
-    "failureOutcome": "A loaded skidder punches through the road base where the frost went out from underneath, and it sits down to the frame. The machine is buried, the road is destroyed behind it, and the district's repair order arrives before the tow does. Heavy equipment is done for the season, and everything now comes in on foot or waits.",
+    "failureOutcome": "The loaded crummy punches through the road base where the frost went out from underneath, and it sits down to the frame. The truck is buried, the road is destroyed behind it, and the road permit holder's repair bill arrives before the tow does. Vehicle access is done for the season, and everything now comes in on foot or waits.",
     "failureEffects": {
      "progress": -10,
      "equipment": -20,
@@ -3775,16 +3814,16 @@
     ]
    },
    {
-    "label": "Switch to lighter operations only",
-    "outcome": "Hand-falling and foot-based work. Slow going but no road damage.",
+    "label": "Walk in from the mainline — foot access only",
+    "outcome": "Long walks, light packs, no wheels past the mainline. Slow going but no road damage.",
     "effects": {
      "progress": -5,
      "compliance": 5
     }
    },
    {
-    "label": "Shut down and wait for dry conditions",
-    "outcome": "The responsible choice. Equipment stays parked. Could be a week or more.",
+    "label": "Shut down and wait for the roads to firm up",
+    "outcome": "The responsible choice. The trucks stay parked at the mainline. Could be a week or more.",
     "effects": {
      "progress": -15,
      "compliance": 10,
@@ -3792,7 +3831,10 @@
     }
    }
   ],
-  "expeditionOnly": true
+  "expeditionOnly": true,
+  "seasons": [
+   "spring"
+  ]
  },
  {
   "id": "water_source_found",
@@ -3874,7 +3916,7 @@
    },
    {
     "label": "Ask him to scout the road ahead",
-    "outcome": "The drone reveals a major washout two kilometers ahead. You reroute and save a day.",
+    "outcome": "The drone reveals a major washout two kilometres ahead. You reroute and save a day.",
     "effects": {
      "progress": 5
     }
@@ -4072,7 +4114,7 @@
  },
  {
   "id": "first_nations_consultation_field",
-  "title": "First Nations Elder Visits",
+  "title": "An Elder Visits Camp",
   "type": "social",
   "severity": "moderate",
   "managerEscalation": true,
@@ -4091,15 +4133,15 @@
     },
     {
      "label": "Retain her as a cultural monitor for the division",
-     "outcome": "An added line in the budget and a standing seat at the table. The auditors and the Nation both approve."
+     "outcome": "An added line in the budget and a standing seat at the table. The certification auditor and the Nation both approve."
     }
    ]
   },
-  "description": "An elder from the local First Nations band arrives at camp. She says there are culturally modified trees nearby that need protection. She's calm but serious.",
+  "description": "An Elder from the Nation arrives at camp. She says there are culturally modified trees nearby that need protection. She's calm but serious.",
   "options": [
    {
     "label": "Stop work and walk the area with her",
-    "outcome": "She shows you bark-stripped cedars with centuries of history. You adjust your cut plan together.",
+    "outcome": "She shows you bark-stripped cedars with centuries of history. You move the boundary together and flag the CMTs for the site plan.",
     "effects": {
      "progress": -8,
      "relationships": 15,
@@ -4109,12 +4151,12 @@
    },
    {
     "label": "Acknowledge and promise to investigate later",
-    "outcome": "She's skeptical but accepts your word, and nothing your saws touch this week proves her right. The relationship is strained, and you still owe the walk.",
+    "outcome": "She's skeptical but accepts your word, and nothing the crew ribbons this week proves her right. The relationship is strained, and you still owe the walk.",
     "effects": {
      "relationships": -5
     },
     "hiddenOutcome": true,
-    "failureOutcome": "Wednesday a faller puts down a cedar with old bark-strip scars nobody flagged, because nobody looked. A culturally modified tree on the ground is a Heritage Conservation Act violation, not a misunderstanding. Stop-work goes on the block, the district opens an investigation, and the elder does not come back to talk.",
+    "failureOutcome": "Wednesday the compassman runs line straight through a stand of bark-stripped cedars nobody flagged, because nobody looked, and blazes two of them for the boundary. A fresh blaze in a CMT is a Heritage Conservation Act problem, not a misunderstanding. The office pulls the crew off the block, the Archaeology Branch opens a file, and the Elder does not come back to talk.",
     "failureEffects": {
      "relationships": -15,
      "compliance": -12,
@@ -4181,7 +4223,7 @@
   "options": [
    {
     "label": "Flag it and establish a buffer",
-    "outcome": "The right thing to do. Wildlife officers will be pleased with the data.",
+    "outcome": "The right thing to do. The planner and the district's wildlife biologist will want the point, and the buffer goes in the site plan.",
     "effects": {
      "progress": -3,
      "compliance": 8,
@@ -4215,11 +4257,11 @@
   "type": "equipment",
   "severity": "severe",
   "probability": 0.04,
-  "description": "The loader's hydraulic line ruptures, spraying hot fluid everywhere. The machine drops its load and goes dead. There's oil soaking into the ground.",
+  "description": "The site-prep excavator's hydraulic line ruptures, spraying hot fluid everywhere. The machine drops its bucket and goes dead. There's oil soaking into the ground.",
   "options": [
    {
     "label": "Contain the spill immediately",
-    "outcome": "You deploy absorbent pads and dig a containment trench. Machine is down but the spill is managed.",
+    "outcome": "You deploy absorbent pads, dig a containment trench, and call the spill in. Machine is down but the spill is managed.",
     "effects": {
      "equipment": -20,
      "progress": -8,
@@ -4228,7 +4270,7 @@
    },
    {
     "label": "Try to patch the line in the field",
-    "outcome": "Hose clamps and a length of spare line. It holds at reduced pressure and the loader finishes the shift, slowly, with somebody watching the coupling the whole time.",
+    "outcome": "Hose clamps and a length of spare line. It holds at reduced pressure and the excavator finishes the shift, slowly, with somebody watching the coupling the whole time.",
     "effects": {
      "equipment": -15
     },
@@ -4270,7 +4312,7 @@
    },
    {
     "label": "Shut everything down and call for a mechanic",
-    "outcome": "Professional repair takes two days. Expensive but done right. You report the spill properly.",
+    "outcome": "The contractor's mechanic takes two days. Expensive but done right. You report the spill to the provincial spill line and log the cleanup.",
     "effects": {
      "budget": -800,
      "progress": -12,
@@ -4286,15 +4328,15 @@
  },
  {
   "id": "perfect_falling_day",
-  "title": "Perfect Falling Conditions",
+  "title": "Perfect Planting Conditions",
   "type": "morale",
   "severity": "positive",
   "probability": 0.08,
-  "description": "Cool air, no wind, dry ground, sharp saws. Every tree drops exactly where you aim. The crew is in a groove.",
+  "description": "Cool air, overcast, soft ground, no wind. Every planter is hitting numbers and the checker can't find a fault. The crew is in a groove.",
   "options": [
    {
     "label": "Ride the momentum — keep pushing",
-    "outcome": "An exceptional day of production. The crew celebrates with extra rations at dinner.",
+    "outcome": "An exceptional day. The crew celebrates with extra rations at dinner.",
     "effects": {
      "progress": 10,
      "crew_morale": 10
@@ -4321,7 +4363,7 @@
   "type": "weather",
   "severity": "minor",
   "probability": 0.08,
-  "description": "You can't see twenty feet. The forest has vanished into white. Falling trees in this is asking for trouble.",
+  "description": "You can't see twenty metres. The forest has vanished into white. Running line in this is asking for trouble — you can't see the danger trees, let alone the ribbon.",
   "options": [
    {
     "label": "Wait for it to burn off",
@@ -4331,21 +4373,21 @@
     }
    },
    {
-    "label": "Do ground work until it clears",
-    "outcome": "Limbing, bucking, road clearing — no falling. Decent use of time.",
+    "label": "Do truck work until it clears",
+    "outcome": "Plot cards, GPS downloads, ribbon inventory — no line work. Decent use of time.",
     "effects": {
      "progress": -2
     }
    },
    {
-    "label": "Fall carefully with extra spotters",
-    "outcome": "Slow, tense work — every stem called, every landing confirmed by voice. One close call that makes everyone sweat, but the wood keeps moving.",
+    "label": "Run line anyway, tight spacing, voice contact",
+    "outcome": "Slow, tense work — every call answered, every danger tree called by voice. One close call that makes everyone sweat, but the line keeps moving.",
     "effects": {
      "progress": -1,
      "crew_morale": -5
     },
     "riskInjury": 0.2,
-    "failureOutcome": "A fir walks off its stump in the white and comes down where the spotter was not. It misses the man and finds the crummy's hood. Falling is done for the day, and the crew makes it plain they will not fall in fog again this trip.",
+    "failureOutcome": "A dead fir lets go in the white and comes down where the compassman was not. It misses him and finds the quad. Line work is done for the day, and the crew makes it plain they will not run line in fog again this trip.",
     "failureEffects": {
      "progress": -4,
      "equipment": -12,
@@ -4418,42 +4460,43 @@
  },
  {
   "id": "boundary_dispute",
-  "title": "Boundary Line Unclear",
+  "title": "Old Ribbon Doesn't Match the Map",
   "type": "terrain",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "The flagging tape ends abruptly and the boundary marks don't match your map. If you cut the wrong trees, there'll be hell to pay.",
+  "description": "The old flagging peters out and the last tie point doesn't sit where the map says it should. If the boundary goes in wrong, the block ends up somewhere it isn't permitted to be.",
   "options": [
    {
-    "label": "Stop cutting and survey properly",
-    "outcome": "You break out the GPS and compass. Takes half a day but the line is confirmed.",
+    "label": "Tie into the last known point and re-run the line",
+    "outcome": "You walk back to the last pin you trust, shoot it in, and re-run the line from there with the GPS and a compass. Takes the rest of the day but the boundary is right, and the notes say why.",
     "effects": {
-     "progress": -6,
-     "compliance": 10,
-     "data": 5
-    }
+     "progress": -4,
+     "compliance": 8,
+     "data": 8
+    },
+    "spendsDay": true
    },
    {
-    "label": "Use your best judgment and continue",
-    "outcome": "You read it off the draw and the ridge and back yourself. When the real survey catches up weeks later you were inside a few metres the whole way. Nobody ever finds out you guessed.",
+    "label": "Trust the old ribbon and keep flagging",
+    "outcome": "You follow the faded tape and back yourself. When the office overlays the track weeks later you were inside a few metres the whole way. Nobody ever finds out you guessed.",
+    "partialOutcome": "You are off, but you are off on your own side. The block edge wanders where it should run straight, and the shape of it is going to be somebody's question at the next audit.",
+    "failureOutcome": "You were very wrong. When the block is logged next winter the line you followed puts the harvest crew forty metres into the neighbouring licence, and the stumps do not move. Stop-work goes on the block, C&E opens a trespass file, and the ribbon in the photos is yours.",
     "effects": {
      "data": 3
     },
-    "hiddenOutcome": true,
-    "riskCompliance": 0.4,
-    "partialOutcome": "You are off, but you are off on your own side. The block edge wanders where it should run straight, and the shape of it is going to be somebody's question at the next audit.",
     "partialEffects": {
      "progress": -4,
      "compliance": -4,
      "scrutiny": 6
     },
-    "failureOutcome": "You were very wrong. The line you eyeballed put fallers forty metres into the neighbouring licence, and the stumps do not move. Stop-work goes on the block while two companies' lawyers work out whose mistake it was.",
     "failureEffects": {
      "compliance": -14,
      "scrutiny": 18,
      "budget": -1500,
      "progress": -10
     },
+    "hiddenOutcome": true,
+    "riskCompliance": 0.4,
     "chanceSuccess": 0.4,
     "chancePartial": 0.35,
     "oddsModifiers": [
@@ -4487,11 +4530,12 @@
     ]
    },
    {
-    "label": "Call the office for clarification",
-    "outcome": "They dig up the original survey data and talk you through it. Accurate but slow.",
+    "label": "Call the office for the survey plan",
+    "outcome": "They dig up the survey plan and the original tie notes and talk you through it over the radio. Accurate but slow.",
     "effects": {
      "progress": -4,
-     "compliance": 5
+     "compliance": 5,
+     "data": 3
     }
    }
   ],
@@ -4506,7 +4550,7 @@
   "type": "social",
   "severity": "minor",
   "probability": 0.07,
-  "description": "Your newest crew member drops a tree the wrong way. It hangs up in another tree — a dangerous 'widow maker' situation. He looks terrified.",
+  "description": "Your newest crew member on the spacing saw drops a stem the wrong way. It hangs up in a leave tree — a dangerous 'widow maker' situation. He looks terrified.",
   "options": [
    {
     "label": "Talk him through fixing it safely",
@@ -4515,7 +4559,7 @@
      "progress": -2,
      "crew_morale": 5
     },
-    "failureOutcome": "Halfway through the lesson the hung stem lets go on its own schedule. It grazes his shoulder going down — a bruise and a torn sleeve, pure luck at that. He hands you the saw, done falling for the trip, and the crew is asking quietly why the kid was under it at all.",
+    "failureOutcome": "Halfway through the lesson the hung stem lets go on its own schedule. It grazes his shoulder going down — a bruise and a torn sleeve, pure luck at that. He hands you the saw, done with saw work for the trip, and the crew is asking quietly why the kid was under it at all.",
     "failureEffects": {
      "progress": -3,
      "crew_morale": -8,
@@ -4552,8 +4596,8 @@
     }
    },
    {
-    "label": "Use the skidder to pull it down",
-    "outcome": "Brute force solution. Works but burns fuel and risks equipment damage.",
+    "label": "Pull it down with the truck's winch",
+    "outcome": "Brute force solution. Works but burns fuel and is hard on the winch.",
     "effects": {
      "fuel": -3,
      "equipment": -5
@@ -4695,11 +4739,11 @@
   "type": "narrative",
   "severity": "moderate",
   "probability": 0,
-  "description": "A local entrepreneur wants to create an eco-tourism venture around the protected grove",
+  "description": "With the grove reserved, a local outfitter wants to build a guided walk to it — and wants the company's name on the boardwalk.",
   "options": [
    {
     "label": "Back the eco-tourism pitch ($1,500)",
-    "outcome": "You front the guiding outfit's first season. By fall, the boardwalk to the grove has a guestbook with three hundred names in it — several of them ministers' staff.",
+    "outcome": "You front the guiding outfit's first season. By fall, the boardwalk to the grove has a guestbook with three hundred names in it — several of them district staff.",
     "effects": {
      "reputation": 10,
      "budget": -1500
@@ -4739,24 +4783,25 @@
      "reputation": 2
     }
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "story_arc_ancientGrove_stage1_harvest",
-  "title": "Environmental Protest",
+  "title": "Blockade on the Spur",
   "type": "narrative",
   "severity": "moderate",
   "probability": 0,
-  "description": "Activists blockade the road to the grove, demanding its preservation",
+  "description": "The diameters got out. Activists have blockaded the spur road below the grove, demanding it be pulled from the block before the CP is issued.",
   "options": [
    {
     "label": "Negotiate and offer partial protection",
-    "outcome": "Two tense days at the blockade end with a map on a tailgate: the oldest stand stays, the rest is released. Nobody is happy, which the mediator calls success.",
+    "outcome": "Two tense days at the blockade end with a map on a tailgate: the oldest stand comes out of the block, the rest stays in. Nobody is happy, which the mediator calls success.",
     "effects": {
      "reputation": 5,
      "crew_morale": 3
     },
-    "partialOutcome": "The moderates sign the tailgate map; the hardliners walk into the trees without a word. Within the week there are fresh spikes chalked on the haul road and someone glassing the block from the ridge.",
+    "partialOutcome": "The moderates sign the tailgate map; the hardliners walk into the trees without a word. Within the week there are fresh spikes chalked on the spur and someone glassing the block from the ridge.",
     "partialEffects": {
      "reputation": 3,
      "progress": -3,
@@ -4792,8 +4837,8 @@
     ]
    },
    {
-    "label": "Call law enforcement to clear the blockade",
-    "outcome": "The RCMP clear the road by noon. The footage clears the evening news by six. Legal fees and a hostile district office follow.",
+    "label": "Get an injunction and ask the RCMP to enforce it",
+    "outcome": "The RCMP clear the road by noon. The footage clears the evening news by six. Legal fees and a cold district office follow.",
     "effects": {
      "reputation": -15,
      "budget": -2000,
@@ -4834,7 +4879,8 @@
      "locals_soured"
     ]
    }
-  ]
+  ],
+  "expeditionOnly": true
  },
  {
   "id": "trade_hauling_contractor",

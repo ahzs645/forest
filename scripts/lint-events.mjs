@@ -44,6 +44,8 @@ const VALID_EFFECT_KEYS = new Set([
   'budget', 'fuel', 'food', 'equipment', 'firstAid', 'politicalCapital',
   'timeUsed', 'progress', 'crew_health', 'crew_morale', 'compliance',
   'relationships', 'scrutiny', 'reputation', 'permits_approved', 'data',
+  // Planning gate meters (percentage points), resolved in js/events/resolution.js.
+  'analysis', 'buyIn',
   // Field progress can explicitly mean turning back rather than incidental delay.
   'progressMode',
 ]);

@@ -5,7 +5,7 @@
     "type": "legacy",
     "severity": "minor",
     "probability": 0.02,
-    "description": "A Sasquatch family has moved into one of your harvest blocks",
+    "description": "A Sasquatch family has moved into one of your blocks",
     "options": [
       {
         "label": "Negotiate with Sasquatch family for coexistence",
@@ -50,7 +50,7 @@
     "options": [
       {
         "label": "Lean into it",
-        "outcome": "Merchandise sales generate $30,000",
+        "outcome": "Merchandise sales generate $1,500 and a week of ribbing on the radio.",
         "effects": {
           "budget": 1500,
           "crew_morale": 6,
@@ -59,7 +59,7 @@
       },
       {
         "label": "Stay focused",
-        "outcome": "The trend passes without you. The crew is mildly disappointed but the blocks get walked.",
+        "outcome": "The trend passes without you. The crew is mildly disappointed but the lines get run.",
         "effects": {}
       }
     ]
@@ -95,7 +95,7 @@
     "type": "legacy",
     "severity": "minor",
     "probability": 0.02,
-    "description": "An alien spacecraft lands in your logging road",
+    "description": "An alien spacecraft lands on your access road",
     "options": [
       {
         "label": "Trade alien technology for Earth wood samples",
@@ -155,6 +155,14 @@
           "crew_morale": 5
         }
       }
+    ],
+    "areaTags": [
+      "peatland",
+      "peace-region"
+    ],
+    "roles": [
+      "silviculture",
+      "manager"
     ]
   },
   {
@@ -163,7 +171,7 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "The province issues an emergency access restriction around a caribou maternal pen overlapping your BWBS and SWB tenure.",
+    "description": "The province issues an emergency access restriction (a GAR order) around a caribou maternal pen overlapping your BWBS and SWB tenure.",
     "options": [
       {
         "label": "Shift development to alternate watersheds",
@@ -175,7 +183,7 @@
       },
       {
         "label": "Negotiate limited access windows with guardians",
-        "outcome": "A co-developed schedule allows short hauling windows with Indigenous monitors on site.",
+        "outcome": "A co-developed schedule allows short access windows with the Nation's Guardians on site.",
         "effects": {
           "progress": 4,
           "crew_morale": 4
@@ -189,6 +197,9 @@
           "crew_morale": -5
         }
       }
+    ],
+    "areaTags": [
+      "caribou"
     ]
   },
   {
@@ -223,6 +234,9 @@
           "crew_morale": 6
         }
       }
+    ],
+    "areaTags": [
+      "sbs"
     ]
   },
   {
@@ -259,6 +273,13 @@
           "crew_morale": 1
         }
       }
+    ],
+    "areaTags": [
+      "salmon"
+    ],
+    "roles": [
+      "silviculture",
+      "manager"
     ]
   },
   {
@@ -279,13 +300,17 @@
       },
       {
         "label": "Maintain field work with respirators and hazard pay",
-        "outcome": "Productivity stays high but morale drops and WorkSafeBC raises concerns.",
+        "outcome": "Productivity stays high but morale drops and the WorkSafeBC prevention officer raises concerns on her next visit.",
         "effects": {
           "progress": 10,
           "budget": -250,
           "crew_morale": -2
         }
       }
+    ],
+    "areaTags": [
+      "sbs",
+      "wildfire"
     ]
   },
   {
@@ -315,11 +340,14 @@
       },
       {
         "label": "Monitor and hope for natural predators",
-        "outcome": "Monitoring costs stay low, yet defoliation expands and auditors flag the passive stance.",
+        "outcome": "Monitoring costs stay low, yet defoliation expands and the free-growing surveys flag the passive stance.",
         "effects": {
           "progress": -6
         }
       }
+    ],
+    "areaTags": [
+      "sbs"
     ]
   },
   {
@@ -357,6 +385,14 @@
           "crew_morale": 1
         }
       }
+    ],
+    "areaTags": [
+      "bwbs",
+      "winter-road"
+    ],
+    "roles": [
+      "silviculture",
+      "manager"
     ]
   },
   {
@@ -392,6 +428,9 @@
           "crew_morale": -3
         }
       }
+    ],
+    "areaTags": [
+      "karst"
     ]
   },
   {
@@ -428,6 +467,10 @@
           "crew_morale": -4
         }
       }
+    ],
+    "areaTags": [
+      "swb",
+      "glacial"
     ]
   },
   {
@@ -464,6 +507,9 @@
           "crew_morale": 4
         }
       }
+    ],
+    "areaTags": [
+      "wildfire"
     ]
   },
   {
@@ -499,6 +545,10 @@
           "budget": 250
         }
       }
+    ],
+    "roles": [
+      "silviculture",
+      "manager"
     ]
   },
   {
@@ -535,6 +585,10 @@
           "crew_morale": -3
         }
       }
+    ],
+    "roles": [
+      "silviculture",
+      "manager"
     ]
   },
   {
@@ -570,6 +624,10 @@
           "crew_morale": -2
         }
       }
+    ],
+    "areaTags": [
+      "sbs",
+      "beetle-recovery"
     ]
   },
   {
@@ -598,6 +656,10 @@
           "crew_morale": -4
         }
       }
+    ],
+    "areaTags": [
+      "sbs",
+      "beetle-recovery"
     ]
   }
 ]
