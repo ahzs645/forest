@@ -151,7 +151,7 @@ function getObjectiveCompletion(journey) {
   switch (journey.journeyType) {
     case 'recon':
     case 'field': {
-      const total = journey.blocks?.length || 0;
+      const total = journey.packageTarget ?? journey.blocks?.length ?? 0;
       return total ? clamp((journey.blocksAssessed || 0) / total, 0, 1) : 0;
     }
     case 'silviculture': {
@@ -182,7 +182,7 @@ function getObjectiveDetail(journey) {
     case 'recon':
     case 'field': {
       const achieved = journey.blocksAssessed || 0;
-      const target = journey.blocks?.length || 0;
+      const target = journey.packageTarget ?? journey.blocks?.length ?? 0;
       return `${achieved}/${target} block packages finalized`;
     }
     case 'silviculture': {

@@ -182,8 +182,8 @@ export function buildCrewEpilogue(member, context = {}) {
   const info = getCrewDisplayInfo(member);
   const name = `${info.name} (${info.role})`;
 
-  if (member.isDead) {
-    return `${name}: Recovering at home. The incident report is still working through WorkSafeBC.`;
+  if (member.isDead || (!member.isActive && !member.hasQuit)) {
+    return `${name}: Off the crew for the season; the WorkSafeBC file is still open. Sends the crew a photo from physio.`;
   }
   // Survivors who took an injury during a logged event remember exactly where
   if (member.isActive && context.injuredAt?.has(member.id)) {
