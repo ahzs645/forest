@@ -99,13 +99,16 @@ export function deriveTier(metrics = {}) {
   // Excellence gates were re-raised when the seasonal year deepened from ~12
   // to ~17 decision cards: optimizer play banks proportionally more compliance
   // and relationships across the longer year, and the old gates let ~1 in 3
-  // greedy runs finish Outstanding. These keep it near the top sixth.
+  // greedy runs finish Outstanding. These keep it near the top sixth. The
+  // weighted-average gate went 64 -> 67 in the 2026-09 realism pass: trimming
+  // travel beats and district-office audits out of the seasonal draw made the
+  // year a little kinder, and optimizer play crept back over a tenth of runs.
   const stewardshipExcellence = metrics.compliance >= 88 && metrics.relationships >= 72;
   const ecologicalExcellence =
     metrics.forestHealth >= 67 && metrics.compliance >= 75 && metrics.relationships >= 65;
 
   if (
-    averages >= 64
+    averages >= 67
     && metrics.progress >= 45
     && nothingCollapsed
     && (stewardshipExcellence || ecologicalExcellence)
