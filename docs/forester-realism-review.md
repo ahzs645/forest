@@ -69,7 +69,7 @@ Six independent audits read the code and generated transcripts for each role: re
 | `npm run lint:events`, `npm run lint:seasonal`, `npx eslint .` | clean |
 | Expedition simulator, 8 runs per role, campaign and full scale | recon 8/8 and 8/8 (full scale was 3/8), planning 8/8 and 8/8, permitting 8/8 and 8/8, silviculture 8/8 and 8/8, manager 6/8 |
 | Seasonal simulator | Outstanding stays under a tenth of runs; the balanced-strategy tier spread is 0/60/46/2 |
-| Playwright, desktop and mobile projects | see the commit history for the run that accompanied this document |
+| Playwright, desktop and mobile projects | 112 desktop and 2 mobile tests pass on the final tree |
 
 ## Limits and follow-ups
 
