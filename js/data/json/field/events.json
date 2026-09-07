@@ -1673,7 +1673,7 @@
    "peace-region"
   ],
   "becCodes": [
-   "BWBSmw1"
+   "BWBSmw"
   ],
   "terrainTrigger": [
    "muskeg"
@@ -1790,7 +1790,7 @@
    "cwh"
   ],
   "becCodes": [
-   "CWHws2"
+   "CWHws1"
   ],
   "terrainTrigger": [
    "river"
@@ -1883,7 +1883,7 @@
    "wildfire"
   ],
   "becCodes": [
-   "SBSwk1"
+   "SBSdw2"
   ],
   "description": "Smoke settles over camp and the air quality keeps climbing. The block is still there, but the work window is shrinking by the hour.",
   "options": [
@@ -1960,7 +1960,7 @@
    "beetle-recovery"
   ],
   "becCodes": [
-   "SBSwk1"
+   "SBSdw2"
   ],
   "description": "A beetle-era planting block looks fine from the road, but the walk-through tells a different story: thin stocking on hot knolls, brush pressure in the draws, and seedlings already losing ground.",
   "options": [
@@ -2022,9 +2022,11 @@
    "recce"
   ],
   "becCodes": [
+   "CWHws1",
    "CWHws2",
    "CWHxm2",
-   "ICHmk1"
+   "ICHmk1",
+   "ICHmw2"
   ]
  },
  {
@@ -2952,9 +2954,11 @@
   ],
   "expeditionOnly": true,
   "becCodes": [
+   "CWHws1",
    "CWHws2",
    "CWHxm2",
-   "ICHmk1"
+   "ICHmk1",
+   "ICHmw2"
   ]
  },
  {
