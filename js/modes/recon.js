@@ -1778,6 +1778,10 @@ function buildBlockMap(journey) {
 function abbreviateBlockName(name) {
   if (!name) return '???';
   if (name.length <= 8) return name;
+  // "Block FP-03 - Blackwater Salvage" reads as its block code on the strip,
+  // not as the word "Block" seven times over.
+  const code = name.match(/^Block\s+([A-Z]{1,3}-\d+[A-Z]?)/i);
+  if (code) return code[1];
   // Take first word, truncate if needed
   const words = name.split(/[\s-]+/);
   if (words[0].length <= 8) return words[0];

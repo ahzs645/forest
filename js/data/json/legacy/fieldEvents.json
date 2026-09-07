@@ -4,7 +4,7 @@
     "title": "Sasquatch Family Establishes Homestead",
     "type": "legacy",
     "severity": "minor",
-    "probability": 0.02,
+    "probability": 0.005,
     "description": "A Sasquatch family has moved into one of your blocks",
     "options": [
       {
@@ -45,7 +45,7 @@
     "title": "TikTok Dance Trend",
     "type": "legacy",
     "severity": "minor",
-    "probability": 0.02,
+    "probability": 0.005,
     "description": "A TikTok dance trend starts among forestry workers",
     "options": [
       {
@@ -69,7 +69,7 @@
     "title": "Ryan Reynolds Endorsement",
     "type": "legacy",
     "severity": "minor",
-    "probability": 0.02,
+    "probability": 0.005,
     "description": "Ryan Reynolds makes sarcastic commercials about your sustainable logging",
     "options": [
       {
@@ -94,7 +94,7 @@
     "title": "Alien First Contact",
     "type": "legacy",
     "severity": "minor",
-    "probability": 0.02,
+    "probability": 0.005,
     "description": "An alien spacecraft lands on your access road",
     "options": [
       {

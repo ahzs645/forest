@@ -999,7 +999,7 @@ async function handleFillPlanting(game, seasonMods, silvicultureState, zoneProfi
   opening.done = true;
   journey.planting.fillComplete = (journey.planting.fillComplete || 0) + 1;
 
-  ui.write(`Fill plant on ${opening.id} (${opening.year}, ${opening.ha} ha): ${trees.toLocaleString()} trees into the gaps, ${opening.stockedSph} sph back above MSS ${opening.mss}.`);
+  ui.write(`Fill plant on ${opening.id} (${opening.year}, ${opening.ha} ha): ${trees.toLocaleString()} trees into the gaps take the opening from ${opening.stockedSph} sph back above MSS ${opening.mss}.`);
   ui.write(`${contractor.name}: fill work at $${price.toFixed(2)}/tree - invoice $${invoice.toLocaleString()}.`);
   if (output < trees) {
     ui.write('Fill work is slow walking: the crew hunts gaps between live seedlings instead of planting lines.');

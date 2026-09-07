@@ -1138,7 +1138,10 @@ function applyRoutePlanConsequences(journey, routePlan, paceId, fromBlock, toBlo
 
     if (Math.random() < actualRisk) {
       const victim = activeCrew[Math.floor(Math.random() * activeCrew.length)];
-      const severity = actualRisk >= 0.4 ? 'severe' : 'moderate';
+      // A careful line on a graded road turns an ankle; it does not break an
+      // arm. Only a genuinely risky leg (hazards stacked on a hard pace) can
+      // put someone out for the season.
+      const severity = actualRisk >= 0.4 ? 'severe' : actualRisk >= 0.2 ? 'moderate' : 'minor';
       const result = applyRandomInjury(victim, severity);
       messages.push(`Route mishap! ${result.message}`);
     }
