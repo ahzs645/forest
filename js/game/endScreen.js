@@ -119,7 +119,13 @@ export function writeFinalStatistics(ui, journey) {
       const plantingPct = Math.round((journey.planting.seedlingsPlanted / journey.planting.seedlingsAllocated) * 100);
       ui.write(`Seedlings Planted: ${journey.planting.seedlingsPlanted.toLocaleString()}/${journey.planting.seedlingsAllocated.toLocaleString()} (${plantingPct}%)`);
       ui.write(`Blocks Planted: ${journey.planting.blocksPlanted}/${journey.planting.blocksToPlant}`);
-      ui.write(`Brushing Complete: ${journey.brushing.hectaresComplete}/${journey.brushing.hectaresTarget} ha`);
+      if (journey.planting.qualityAverage) {
+        ui.write(`Planting Quality: ${journey.planting.qualityAverage}% average on the plot cards`);
+      }
+      if (journey.planting.fillTarget) {
+        ui.write(`Fill Planted: ${journey.planting.fillComplete || 0}/${journey.planting.fillTarget} of last year's openings`);
+      }
+      ui.write(`Brushing Complete: ${Math.round(journey.brushing.hectaresComplete)}/${journey.brushing.hectaresTarget} ha`);
       ui.write(`Free-Growing Surveys: ${journey.surveys.freeGrowingComplete}/${journey.surveys.freeGrowingTarget}`);
       ui.write(`Days Elapsed: ${daysUsed}`);
       ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
@@ -139,8 +145,11 @@ export function writeFinalStatistics(ui, journey) {
       ui.write(`Term Served: ${daysUsed}/${journey.deadline} months`);
       ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
       ui.write(`Reputation: ${Math.round(journey.metrics?.reputation ?? 50)}%`);
+      if (journey.ledger?.aac) {
+        ui.write(`Delivered: ${Math.round(journey.ledger.deliveredYtd || 0).toLocaleString()}/${journey.ledger.aac.toLocaleString()} m³ of AAC${journey.ledger.cutControl ? ` (${journey.ledger.cutControl})` : ''}`);
+      }
       if (journey.ceo) {
-        ui.write(`CEO: ${journey.ceo.name}`);
+        ui.write(`Operating posture: ${journey.ceo.posture || journey.ceo.name}${journey.ceo.posture ? ` (woodlands manager ${journey.ceo.name})` : ''}`);
       }
       if (journey.certifications?.length) {
         ui.write(`Certifications: ${journey.certifications.map((c) => c.name).join(', ')}`);
@@ -179,9 +188,9 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
         `The reconnaissance data will guide forest operations in this area for years to come.`;
     }
     case 'silviculture':
-      return `After ${daysUsed} days of hard work, the silviculture program in ${areaName} reached its targets. ` +
-        `${journey.planting.blocksPlanted} blocks planted, ${journey.surveys.freeGrowingComplete} free-growing surveys completed. ` +
-        `A new generation of trees will rise from this ground.`;
+      return `After ${daysUsed} days, the silviculture program in ${areaName} is delivered: ` +
+        `${journey.planting.blocksPlanted} blocks planted and inspected, ${journey.surveys.freeGrowingComplete} free-growing declaration${journey.surveys.freeGrowingComplete === 1 ? '' : 's'} submitted. ` +
+        `The year's program is in the ground and in RESULTS.`;
     case 'planning':
       return `The landscape plan for ${areaName} received ministerial approval after ${daysUsed} days of analysis, ` +
         `stakeholder engagement, and careful balancing of competing values. ` +
@@ -192,8 +201,8 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
         `The permit pipeline in ${areaName} is flowing smoothly after ${daysUsed} days of diligent processing ` +
         `and relationship building.`;
     case 'manager':
-      return `${crewName} closed out the term in ${areaName} after ${daysUsed} months with the books balanced ` +
-        `and the board's confidence intact. The operation is set up to thrive under its new leadership.`;
+      return `${crewName} closed out the operating year in ${areaName} after ${daysUsed} months with the cut delivered, the books balanced ` +
+        `and the board's confidence intact. The cut-control statement goes to the District Manager without a covering letter.`;
     default:
       return journey.endReason || 'Expedition completed successfully.';
   }
@@ -213,7 +222,7 @@ export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
     }
     case 'silviculture':
       return `The silviculture program in ${areaName} fell short of its targets after ${daysUsed} days. ` +
-        `${reason} The unplanted blocks will need to wait for next season.`;
+        `${reason} The unplanted blocks roll into next year's program and the nursery invoices for the stock either way.`;
     case 'planning':
       return `The landscape plan for ${areaName} failed to achieve approval after ${daysUsed} days. ` +
         `${reason} The planning process will need to restart with a new approach.`;

@@ -1,0 +1,197 @@
+[
+  {
+    "id": "gm_mill_curtailment",
+    "title": "Mill Curtailment Notice",
+    "type": "market",
+    "severity": "moderate",
+    "probability": 0.08,
+    "roles": ["manager"],
+    "expeditionOnly": true,
+    "description": "The sawmill that takes two thirds of your sawlogs announces a four-week curtailment: lumber is off forty dollars and the yard is full. Your logging contractors have crews and iron sitting on a plan that just lost its destination.",
+    "options": [
+      {
+        "label": "Curtail with the mill and park the crews",
+        "outcome": "Logging stops on the mainline blocks. The contractors send crews home on standby rates and the deck inventory stays sane. Next month's delivery will be thin, and everybody knows it.",
+        "effects": { "progress": -6, "crew_morale": -4, "budget": -35000 }
+      },
+      {
+        "label": "Keep logging and deck the wood on the landings",
+        "outcome": "The cut control number keeps moving and the crews stay busy, but you are now carrying a month of logs on the ground, financing them, and hoping the beetles and the blue stain wait for the market.",
+        "effects": { "progress": 3, "budget": -90000, "scrutiny": 3 },
+        "chanceSuccess": 0.55,
+        "failureOutcome": "The market does not come back in four weeks. The decked wood degrades, the mill takes it at a discount, and the CFO has a chart with your name on it.",
+        "failureEffects": { "budget": -160000, "reputation": -3, "progress": -2 },
+        "oddsModifiers": [
+          { "when": "relationshipsAbove:60", "move": 0.1, "from": "bad", "to": "good" }
+        ]
+      },
+      {
+        "label": "Divert volume to the pulp mill and a second sawmill",
+        "outcome": "The woodlands manager spends a week on the phone. Pulp takes the low end at pulp prices, a smaller sawmill takes a few loads a day. Haul distances stretch and the margin thins, but the crews keep working.",
+        "effects": { "budget": -55000, "relationships": 3, "progress": -2 }
+      }
+    ]
+  },
+  {
+    "id": "gm_bcts_bid",
+    "title": "BCTS Timber Sale Opens",
+    "type": "market",
+    "severity": "minor",
+    "probability": 0.07,
+    "roles": ["manager"],
+    "expeditionOnly": true,
+    "description": "BC Timber Sales posts a licence in the next drainage: 48,000 m³, roads mostly built, appraised at a stumpage your CFO calls 'ambitious'. Bids close in three weeks. Two of your logging contractors are already asking whether they should hold crews.",
+    "options": [
+      {
+        "label": "Bid at the appraisal plus a modest bonus",
+        "outcome": "The woodlands manager builds a bid off the cruise compilation and the haul cycle. If it lands, it is a clean block of volume that fills the winter program.",
+        "effects": { "budget": -12000, "progress": 2 },
+        "chanceSuccess": 0.5,
+        "failureOutcome": "A competitor bids twenty dollars over appraisal and takes it. You keep your cash and your crews keep asking about winter.",
+        "failureEffects": { "crew_morale": -2 },
+        "oddsModifiers": [
+          { "when": "difficulty:hard", "move": 0.1, "from": "good", "to": "bad" }
+        ]
+      },
+      {
+        "label": "Bid high to lock the volume",
+        "outcome": "You win the sale. The bonus bid is a number the board will remember, and the stumpage on every load out of that block is money you volunteered.",
+        "effects": { "budget": -70000, "progress": 6, "politicalCapital": -2 }
+      },
+      {
+        "label": "Pass, and keep the crews on the licence blocks",
+        "outcome": "No bid. The contractors grumble about winter and the CFO sleeps well.",
+        "effects": { "politicalCapital": 1, "crew_morale": -3 }
+      }
+    ]
+  },
+  {
+    "id": "gm_softwood_duty_deposit",
+    "title": "Softwood Duty Deposit Comes Due",
+    "type": "market",
+    "severity": "moderate",
+    "probability": 0.06,
+    "roles": ["manager"],
+    "expeditionOnly": true,
+    "description": "The lumber customer that takes most of your sawlog output has been paying countervailing and anti-dumping deposits at the border all year. Their procurement lead calls: the rate review landed high, and they want to reopen the log supply agreement at a lower price or shorter volumes.",
+    "options": [
+      {
+        "label": "Take the lower price for the rest of the year",
+        "outcome": "The margin on every sawlog thins. The customer stays, the volume stays, and the ledger absorbs a number the board will ask about at year end.",
+        "effects": { "budget": -60000, "relationships": 2 }
+      },
+      {
+        "label": "Hold the price and shop the volume",
+        "outcome": "You put the volume out to two other mills and a log broker. The customer comes back to the table at a smaller cut, but not before the woodlands manager has spent a month hedging.",
+        "effects": { "budget": -20000, "relationships": -4, "reputation": 1 },
+        "chanceSuccess": 0.6,
+        "failureOutcome": "The other mills are full and the broker's price is worse than the customer's. You go back with less leverage than you left with.",
+        "failureEffects": { "budget": -80000, "relationships": -4, "politicalCapital": -3 }
+      },
+      {
+        "label": "Trade price for a longer contract term",
+        "outcome": "A modest price cut in exchange for a three-year supply agreement. The CFO likes the forecast; the customer likes the certainty; the board likes that somebody thought past December.",
+        "effects": { "budget": -40000, "politicalCapital": 4, "progress": 1 }
+      }
+    ]
+  },
+  {
+    "id": "gm_fn_revenue_sharing",
+    "title": "Revenue-Sharing Agreement on the Table",
+    "type": "political",
+    "severity": "moderate",
+    "probability": 0.07,
+    "roles": ["manager"],
+    "expeditionOnly": true,
+    "description": "The Nation's economic development corporation tables a draft agreement: a per-cubic-metre payment on volume from their territory, Guardians on every active block, first right on the roadside chipping contract, and a joint review of the FSP before the next amendment. Your Indigenous Relations lead says the terms are fair; your CFO says the number is a number.",
+    "options": [
+      {
+        "label": "Sign it as tabled",
+        "outcome": "The chief and your board chair sign in the band office. The Guardians are on the blocks by the next month, the referrals move, and every load out of the territory now carries a line in the ledger.",
+        "effects": { "budget": -45000, "relationships": 8, "reputation": 4, "compliance": 3 }
+      },
+      {
+        "label": "Counter on the rate and the chipping right",
+        "outcome": "Two more rounds at the table. The rate comes down a little; the chipping right stays in. The Nation's negotiator notes, politely, that the counter took longer than the draft.",
+        "effects": { "budget": -30000, "relationships": 3, "politicalCapital": 2 },
+        "chanceSuccess": 0.65,
+        "failureOutcome": "The counter reads as bad faith after the last two years of engagement. The table goes quiet, the next referral sits, and a letter goes to the District Manager.",
+        "failureEffects": { "relationships": -8, "scrutiny": 5, "progress": -3 },
+        "oddsModifiers": [
+          { "when": "relationshipsAbove:60", "move": 0.15, "from": "bad", "to": "good" }
+        ]
+      },
+      {
+        "label": "Defer it to next fiscal year",
+        "outcome": "You thank them for the draft and ask for time. The Nation has heard that before. The FOM comment period on the territory blocks fills with letters, and the District Manager asks what the engagement record looks like.",
+        "effects": { "relationships": -7, "scrutiny": 4, "politicalCapital": -3, "budget": 5000 }
+      }
+    ]
+  },
+  {
+    "id": "gm_contractor_rate_renegotiation",
+    "title": "Logging Contractor Rate Renegotiation",
+    "type": "operations",
+    "severity": "moderate",
+    "probability": 0.08,
+    "roles": ["manager"],
+    "expeditionOnly": true,
+    "description": "Your largest stump-to-dump contractor asks for a rate meeting. Fuel is up, a processor operator left for the oil patch, and their rate has not moved in two years. They mention, once, that the Timber Harvesting Contract and Subcontract Regulation gives them a path to mediation.",
+    "options": [
+      {
+        "label": "Agree a fuel-indexed rate increase",
+        "outcome": "A modest lift with a fuel index attached. The contractor keeps the crew, the iron stays on your blocks, and the cost per cubic metre moves up a little for the rest of the year.",
+        "effects": { "budget": -50000, "crew_morale": 4, "relationships": 2 }
+      },
+      {
+        "label": "Hold the rate and let them go to mediation",
+        "outcome": "The contractor files. Mediation takes three months and the rate lands close to what they asked for, plus the mediator's invoice, plus a contractor who now reads your emails twice.",
+        "effects": { "budget": -20000, "relationships": -5, "scrutiny": 2 },
+        "chanceSuccess": 0.45,
+        "failureOutcome": "They pull the processor and one crew mid-month. Delivery slips, the mediator still gets paid, and the rate you eventually sign is higher than the one you refused.",
+        "failureEffects": { "budget": -70000, "progress": -6, "crew_morale": -5 }
+      },
+      {
+        "label": "Trade a rate lift for a longer contract and a safety clause",
+        "outcome": "The rate goes up, the term goes to three years, and the contract carries a SAFE Companies clause with teeth. The HSE manager is quietly pleased.",
+        "effects": { "budget": -55000, "compliance": 4, "politicalCapital": 2 }
+      }
+    ]
+  },
+  {
+    "id": "gm_log_export_permit",
+    "title": "Log Export Permit Application",
+    "type": "market",
+    "severity": "minor",
+    "probability": 0.06,
+    "roles": ["manager"],
+    "expeditionOnly": true,
+    "description": "A log broker offers a premium on a parcel of hemlock and low-grade spruce that no local mill wants at a workable price. Exporting it means a federal permit, a provincial surplus test, and the parcel advertised so domestic mills can bid. The broker's price expires before the surplus test does.",
+    "options": [
+      {
+        "label": "Run the surplus test and apply properly",
+        "outcome": "The parcel goes on the advertised list. No domestic mill bids at a workable number, the permit issues, and the broker's price is mostly still there when it does.",
+        "effects": { "budget": 40000, "compliance": 3, "progress": 1 },
+        "chanceSuccess": 0.6,
+        "failureOutcome": "A local mill bids on the parcel at a price that is barely workable, which is enough to fail the surplus test. You sell domestic and the broker moves on.",
+        "failureEffects": { "budget": 8000, "compliance": 2 }
+      },
+      {
+        "label": "Sell the parcel domestic at the low price",
+        "outcome": "No permit, no advertising, no broker. The parcel moves to the pulp mill and a small sawmill for what they will pay, and the woodlands manager gets on with the month.",
+        "effects": { "budget": 12000, "relationships": 2 }
+      },
+      {
+        "label": "Ship to the broker on the strength of a pending application",
+        "outcome": "The parcel is on a barge before the permit is. If the permit lands, nobody notices the dates.",
+        "effects": { "budget": 55000, "scrutiny": 6, "compliance": -6 },
+        "chanceSuccess": 0.5,
+        "failureOutcome": "The Timber Export Advisory Committee flags the parcel, the permit is refused, and the barge is now an unauthorized export with a federal file number. The broker's premium does not cover the penalty or the letter to the board.",
+        "failureEffects": { "budget": -90000, "compliance": -10, "scrutiny": 10, "reputation": -5 },
+        "oddsModifiers": [
+          { "when": "scrutinyAbove:50", "move": 0.15, "from": "good", "to": "bad" }
+        ]
+      }
+    ]
+  }
+]

@@ -184,7 +184,7 @@ function pickCollapseChoice(labels, terminalText, modeName) {
   }
 
   if (modeName === 'silviculture') {
-    return findFirstMatching(labels, ['Brush Treatment', 'Contractor Meeting', 'Team Briefing', 'Survival Check', 'Hold the Line', 'Survey Free-Growing', 'Plant Block']);
+    return findFirstMatching(labels, ['Brush (', 'Manual brushing', 'Contractor Meeting', 'Team Briefing', 'Planting quality inspection', 'Hold the Line', 'Free-growing survey (', 'Plant (this year']);
   }
 
   return 0;

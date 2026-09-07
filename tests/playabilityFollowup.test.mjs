@@ -93,7 +93,7 @@ test('planting preview and outcome name the same contractor when using support o
   } finally {
     Math.random = random;
   }
-  assert.ok(preview.includes(`deployed ${contractor.name}`), preview);
+  assert.ok(preview.includes(`on the block: ${contractor.name}`), preview);
   assert.ok(messages.includes(`Working crew: ${contractor.name}.`));
   assert.ok(journey.planting.seedlingsPlanted > 0);
 });

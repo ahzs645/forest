@@ -71,27 +71,27 @@ export const SEASONAL_MODIFIERS = {
   },
   silviculture: {
     spring: {
-      plantingEfficiency: 1.2,  // Prime planting
+      plantingEfficiency: 1.2,  // The planting window: cool soil, moisture in the rooting zone
       contractorMorale: 1.0,
-      description: 'Critical planting window'
+      description: 'Planting window - this year\'s blocks go in'
     },
     summer: {
-      plantingEfficiency: 0.6,  // Too hot/dry
-      brushingEfficiency: 1.2,  // Good for herbicide
+      plantingEfficiency: 0.6,  // Hot, dry ground stresses the stock
+      brushingEfficiency: 1.2,  // Release window: full leaf on the brush, manual or glyphosate under the PMP
       contractorMorale: 0.9,
-      description: 'Brushing and herbicide season'
+      description: 'Release season - brushing the 2-5 year old stands'
     },
     fall: {
-      plantingEfficiency: 0.8,  // Fall planting possible
-      surveyEfficiency: 1.2,    // Good for survival surveys
+      plantingEfficiency: 0.8,  // Fall planting on the right sites
+      surveyEfficiency: 1.2,    // Survey season: free-growing and year-1 survival surveys
       contractorMorale: 0.85,
-      description: 'Survey and assessment season'
+      description: 'Survey season - free-growing and survival surveys'
     },
     winter: {
       plantingEfficiency: 0,    // No planting
-      planningEfficiency: 1.3,  // Good for next year planning
+      planningEfficiency: 1.3,  // RESULTS submissions, seedling orders, next year's program
       contractorMorale: 0.7,
-      description: 'Planning for next season'
+      description: 'Frozen ground - RESULTS submissions and next year\'s seedling order'
     }
   },
   planner: {

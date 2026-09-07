@@ -5,10 +5,14 @@
 
 // Import data from JSON (Vite handles JSON imports natively)
 import eventsData from "./json/desk/events.json" with { type: "json" };
+import managerEventsData from "./json/desk/managerEvents.json" with { type: "json" };
 import legacyEventsData from "./json/legacy/deskEvents.json" with { type: "json" };
 
-// Export events
-export const DESK_EVENTS = [...eventsData, ...(legacyEventsData || [])];
+// Export events. The manager deck (mill curtailments, BCTS sales, duty
+// deposits, revenue-sharing, contractor rates, log exports) is authored in its
+// own file and merged here so the selection pipeline and the content lint see
+// one desk pool.
+export const DESK_EVENTS = [...eventsData, ...(managerEventsData || []), ...(legacyEventsData || [])];
 
 /**
  * Get events filtered by current phase

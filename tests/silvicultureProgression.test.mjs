@@ -26,7 +26,7 @@ async function withSeededRandom(seed, fn) {
   }
 }
 
-const ACTION_PRIORITY = ['plant', 'inspect', 'fill', 'herbicide', 'survey', 'rotation', 'meeting', 'team_briefing', 'briefing', 'end'];
+const ACTION_PRIORITY = ['inspect', 'plant', 'survey', 'fill', 'brush', 'rotation', 'meeting', 'team_briefing', 'briefing', 'end'];
 
 // A minimal "sensible player" UI: always take the highest-priority
 // target-advancing action that's on offer, deploy ready contractors rather
@@ -71,7 +71,7 @@ function makeSensibleUi(journey, actionCounts) {
       }
 
       if (prompt === 'Adjust which contractor?') {
-        const readyIdx = options.findIndex((o) => o.description && o.description.startsWith('ready'));
+        const readyIdx = options.findIndex((o) => o.description && /^(ready|available)/.test(o.description));
         if (readyIdx !== -1) return options[readyIdx];
         return options.find((o) => o.value === 'cancel') || options[options.length - 1];
       }
@@ -241,7 +241,7 @@ test('recovering contractors cannot be assigned fieldwork; rest makes work avail
     ui.promptChoice = async (_prompt, options = []) => {
       if (options.some((o) => o.value === 'end')) {
         if (!checkedFirstMenu) {
-          assert.equal(options.some((o) => ['plant', 'fill', 'herbicide', 'inspect', 'survey'].includes(o.value)), false);
+          assert.equal(options.some((o) => ['plant', 'fill', 'brush', 'inspect', 'survey'].includes(o.value)), false);
           assert.ok(options.some((o) => o.label === 'Rest crews and plan tomorrow'));
           checkedFirstMenu = true;
           sawRest = true;

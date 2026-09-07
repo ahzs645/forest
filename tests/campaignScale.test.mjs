@@ -33,7 +33,7 @@ async function withSeededRandom(seed, fn) {
   }
 }
 
-const ACTION_PRIORITY = ['plant', 'inspect', 'fill', 'herbicide', 'survey', 'rotation', 'meeting', 'team_briefing', 'briefing', 'end'];
+const ACTION_PRIORITY = ['inspect', 'plant', 'survey', 'fill', 'brush', 'rotation', 'meeting', 'team_briefing', 'briefing', 'end'];
 
 // A minimal "sensible player" UI (same shape as tests/silvicultureProgression.test.mjs):
 // always take the highest-priority target-advancing action on offer, deploy
@@ -76,7 +76,7 @@ function makeSensibleUi(journey) {
       }
 
       if (prompt === 'Adjust which contractor?') {
-        const readyIdx = options.findIndex((o) => o.description && o.description.startsWith('ready'));
+        const readyIdx = options.findIndex((o) => o.description && /^(ready|available)/.test(o.description));
         if (readyIdx !== -1) return options[readyIdx];
         return options.find((o) => o.value === 'cancel') || options[options.length - 1];
       }
@@ -179,16 +179,16 @@ test('campaign scale: silviculture sets season-sized targets, budget and contrac
   assert.equal(normal.planting.seedlingsAllocated, 140000);
   assert.equal(normal.brushing.hectaresTarget, 260);
   assert.equal(normal.surveys.freeGrowingTarget, 3);
-  assert.equal(normal.resources.budget, 120000);
+  assert.equal(normal.resources.budget, 380000);
   assert.equal(normal.resources.contractorCapacity, 320);
 
   // Campaign season targets from docs/unified_campaign.md section 3.
   assert.equal(scaled.planting.blocksToPlant, 3);
   assert.equal(scaled.planting.seedlingsAllocated, 55000);
-  assert.equal(scaled.resources.seedlings, 55000);
+  assert.equal(scaled.resources.seedlings, 55000 + scaled.program.fill.reduce((sum, opening) => sum + opening.trees, 0), 'this year\'s allocation plus the fill stock');
   assert.equal(scaled.brushing.hectaresTarget, 100);
   assert.equal(scaled.surveys.freeGrowingTarget, 2);
-  assert.equal(scaled.resources.budget, 45000);
+  assert.equal(scaled.resources.budget, 150000);
   assert.equal(scaled.resources.contractorCapacity, Math.round(320 * 0.45));
   assert.equal(scaled.resources.contractorCapacity, 144);
 
@@ -204,41 +204,45 @@ test('campaign scale: silviculture sets season-sized targets, budget and contrac
 });
 
 test('campaign scale: silviculture arithmetic is winnable within a season', () => {
-  // Mirrors js/modes/silviculture.js handlePlanting()'s formula:
-  //   seedlingsToPlant = round(baseSeedlings * (avgProductivity/100) * plantingEff * crowdingFactor * (1 - zoneDrag))
-  // baseSeedlings: 9500 (plant) / 7000 (fill); contractors start at 80-100%
-  // productivity (avg ~85-90%); zoneDrag/crowding trims a further ~10-15%.
+  // Mirrors js/modes/silviculture.js estimatePlantingOutput(): planters ×
+  // ~950 trees/planter/day × productivity × planting window × site fit,
+  // less zone drag. A 12-planter crew at ~85% productivity in the spring
+  // window (1.2) with a 10% zone drag puts ~11,000 trees a day in the ground.
   const seedlingsAllocated = 55000;
-  const perPlantAction = Math.round(9500 * 0.85 * 1.0 * 1.0 * 0.9); // ~7267
-  const actionsNeeded = Math.ceil(seedlingsAllocated / perPlantAction);
-  assert.ok(actionsNeeded >= 6 && actionsNeeded <= 10, `expected 6-10 plant/fill actions, got ${actionsNeeded}`);
+  const perPlantDay = Math.round(12 * 950 * 0.85 * 1.2 * 0.9); // ~10,465
+  const plantDays = Math.ceil(seedlingsAllocated / perPlantDay);
+  assert.ok(plantDays >= 4 && plantDays <= 8, `expected 4-8 planting days, got ${plantDays}`);
 
-  // A day is one action now (js/journey/dayPlan.js), so planting actions map
-  // one-to-one onto days and the whole program has to fit the season beside
-  // brushing, surveys, and the days events take over.
-  assert.ok(actionsNeeded <= 12, `planting alone should fit inside the season, got ${actionsNeeded} days`);
+  // Every planted block is followed by a day of quality plots before the
+  // contractor moves on, so the planting track is plant days + 3 inspections.
+  const blocks = 3;
+  assert.ok(plantDays + blocks <= 12, `planting and plots should fit inside the season, got ${plantDays + blocks} days`);
 
-  // Budget: $550/day overhead + $1700/plant action + brushing/survey passes,
-  // must clear the scaled budget even after the 0.8x hard multiplier. The
-  // overhead runs the full measured season now, not a packed fortnight — see
-  // scripts/simulate-expeditions.mjs (campaign silviculture lands 12-19 days).
+  // Budget at real rates (js/data/silvicultureProgram.js): trees × ~$0.32,
+  // fill at +$0.06, release at $900/ha manual or $350/ha glyphosate, an
+  // accredited survey day at $1,800, and $550/day supervisor overhead. An
+  // all-manual release program has to clear the campaign budget on normal;
+  // glyphosate under the PMP has to clear it after the 0.8x hard multiplier.
   const overheadDays = 20;
-  const plantCost = actionsNeeded * 1700;
-  const brushCost = 3 * 1400; // ~3 brushing actions to cover 100ha
-  const surveyCost = 4 * 700; // a few survey attempts to land 2 free-growing calls
+  const plantCost = seedlingsAllocated * 0.35;
+  const fillCost = 4500 * 0.41;
+  const surveyCost = 3 * 1800;
   const overheadCost = overheadDays * 550;
-  const totalCost = plantCost + brushCost + surveyCost + overheadCost;
+  const manualBrush = 100 * 900;
+  const glyphosateBrush = 100 * 350;
+  const manualTotal = plantCost + fillCost + surveyCost + overheadCost + manualBrush;
+  const glyphosateTotal = plantCost + fillCost + surveyCost + overheadCost + glyphosateBrush;
 
-  const scaledBudget = 45000;
+  const scaledBudget = 150000;
   const hardBudget = Math.round(scaledBudget * 0.8);
-  assert.ok(totalCost <= scaledBudget, `estimated cost ${totalCost} should fit the $45k campaign budget`);
-  assert.ok(totalCost <= hardBudget, `estimated cost ${totalCost} should still fit the hard-mode budget ${hardBudget}`);
+  assert.ok(manualTotal <= scaledBudget, `all-manual release ${manualTotal} should fit the $150k campaign budget`);
+  assert.ok(glyphosateTotal <= hardBudget, `glyphosate release ${glyphosateTotal} should fit the hard-mode budget ${hardBudget}`);
 
-  // Contractor capacity: plant=4/action, fill/brush/survey draw further capacity;
-  // scaled capacity (144, or 115 on hard) must comfortably cover the program.
+  // Contractor capacity: plant=4/day, fill=3, brush=2; scaled capacity (144,
+  // or 115 on hard) must comfortably cover the program.
   const scaledCapacity = Math.round(320 * 0.45);
   const hardCapacity = Math.round(scaledCapacity * 0.8);
-  const capacityNeeded = actionsNeeded * 4 + 3 * 2; // plant actions + brushing passes
+  const capacityNeeded = plantDays * 4 + 3 + 3 * 2;
   assert.ok(capacityNeeded <= hardCapacity, `estimated capacity use ${capacityNeeded} should fit hard-mode capacity ${hardCapacity}`);
 });
 
@@ -326,7 +330,7 @@ test('campaign scale: manager is not one of the four campaign roles and throws',
 test('campaign scale: manager without scale is unaffected', () => {
   const journey = createManagerJourney({ roleId: 'manager' });
   assert.equal(journey.deadline, 12);
-  assert.equal(journey.resources.budget, 500000);
+  assert.equal(journey.resources.budget, 850000);
 });
 
 test('unscaled createJourney remains behaviorally identical to before the campaign-scale change', () => {
@@ -350,8 +354,8 @@ test('unscaled createJourney remains behaviorally identical to before the campai
   assert.equal(silviculture.planting.seedlingsAllocated, 140000);
   assert.equal(silviculture.brushing.hectaresTarget, 260);
   assert.equal(silviculture.surveys.freeGrowingTarget, 3);
-  assert.equal(silviculture.resources.budget, 120000);
-  assert.equal(silviculture.resources.seedlings, 140000);
+  assert.equal(silviculture.resources.budget, 380000);
+  assert.ok(silviculture.resources.seedlings > 140000, 'allocation plus fill stock');
   assert.equal(silviculture.resources.contractorCapacity, 320);
 
   // Planning
@@ -371,7 +375,7 @@ test('unscaled createJourney remains behaviorally identical to before the campai
   const manager = createJourney({ roleId: 'manager' });
   assert.equal(manager.journeyType, 'manager');
   assert.equal(manager.deadline, 12);
-  assert.equal(manager.resources.budget, 500000);
+  assert.equal(manager.resources.budget, 850000);
 
   // Legacy field fallback (no roleId / unmapped role)
   const legacyField = createJourney({ areaId: 'fort-st-john-plateau' });
