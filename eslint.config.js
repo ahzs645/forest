@@ -5,6 +5,7 @@ export default [
     ignores: [
       'dist/**',
       'node_modules/**',
+      '.claude/**',
       'FPBC Source/**',
       'cli-game.tsx',
       'tui/**/*.tsx'
