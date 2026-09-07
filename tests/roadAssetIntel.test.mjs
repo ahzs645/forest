@@ -65,7 +65,7 @@ test('planning road join matches hydrology-sensitive blocks to observed route se
   assert.equal(join.routeBlock.id, 'blk-7');
   assert.equal(context.source, 'joined');
   assert.equal(context.joinedFromBlockId, 'blk-7');
-  assert.equal(context.joinedFromBlockName, 'Water Intake Buffer');
-  assert.match(context.note, /matched recce segment water intake buffer/i);
+  assert.equal(context.joinedFromBlockName, 'Block BV-07 - Water Intake Buffer');
+  assert.match(context.note, /matched recce segment block bv-07 - water intake buffer/i);
   assert.equal(context.blocker, false);
 });

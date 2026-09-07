@@ -7,6 +7,7 @@ import { getCurrentSeasonInfo } from '../season.js';
 import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { getRoleProfessionalContext } from '../data/professionalPractice.js';
+import { getPackageTarget } from '../journey/packages.js';
 
 function formatScrutiny(scrutiny) {
   const value = Number(scrutiny || 0);
@@ -44,19 +45,22 @@ export function showJourneyIntro(ui, journey) {
   }
 
   switch (journeyType) {
-    case 'recon':
-      ui.write(`Mission: Verify a recon package for every one of the ${journey.blocks.length} forest blocks — reaching the end of the traverse is not the win.`);
-      ui.write('Each block needs its access ground-truthed and, where values are flagged, a values sweep. Then the package finalizes.');
-      ui.write('Field Notebook can close missed packages from notes, but each write-up adds 2 scrutiny. One shift is one job — pick it and live with it.');
-      ui.write('Manage fuel, food, and equipment while documenting hazards, cultural sites, and road/crossing condition.');
+    case 'recon': {
+      const packages = getPackageTarget(journey);
+      const stops = journey.blocks?.length || 0;
+      ui.write(`Mission: Close a layout package on every one of the ${packages} blocks on the file — ${stops} stops on the traverse, but only the blocks count.`);
+      ui.write('Each block takes the road and crossing notes on arrival, then two shifts on the ground: boundary, streams and terrain first; WTP, wildlife and cultural heritage second. Then the package finalizes.');
+      ui.write('Missed checks need a return visit: one shift and fuel per block. One shift is one job — pick it and live with it.');
+      ui.write('Manage fuel, food, and equipment while documenting hazards, cultural sites, and road and crossing condition.');
       ui.write('');
       ui.write('Starting supplies:');
       ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
-      ui.write(`  Fuel: ${journey.resources.fuel} gallons`);
-      ui.write(`  Food: ${journey.resources.food} person-days`);
+      ui.write(`  Fuel: ${Math.round(journey.resources.fuel)} L`);
+      ui.write(`  Food: ${Math.round(journey.resources.food)} person-days`);
       ui.write(`  Equipment: ${journey.resources.equipment}% condition`);
-      ui.write(`  GPS Units: ${journey.resources.gpsUnits || 5}`);
+      ui.write(`  Flagging: ${journey.resources.flaggingTape ?? 0} rolls`);
       break;
+    }
 
     case 'silviculture':
       ui.write(`Mission: Meet regeneration targets for the ${journey.planting.blocksToPlant} blocks in your program.`);
@@ -114,7 +118,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write('');
       ui.write('Starting supplies:');
       ui.write(`  Cash: $${journey.resources.budget?.toLocaleString() || 0}`);
-      ui.write(`  Fuel: ${journey.resources.fuel} gallons`);
+      ui.write(`  Fuel: ${Math.round(journey.resources.fuel)} L`);
       ui.write(`  Food: ${journey.resources.food} person-days`);
       ui.write(`  Equipment: ${journey.resources.equipment}% condition`);
       ui.write(`  First Aid: ${journey.resources.firstAid} kits`);

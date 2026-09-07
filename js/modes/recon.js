@@ -5,14 +5,24 @@
 
 import {
   applyRandomInjury,
-  applyStatusEffect,
   crewHasRole,
+  generateCrewMember,
   getCrewComment,
   getCrewDisplayInfo,
+  hasActiveFirstAidAttendant,
   healCrewMember,
   treatCrewCondition
 } from '../crew.js';
-import { getFieldProgressInfo, getSurveyedBlockCount } from '../journey.js';
+import { FIELD_ROLES } from '../data/crewNames.js';
+import { getFieldProgressInfo } from '../journey.js';
+import {
+  getPackageBlocks,
+  getPackageProgress,
+  getPackagesFinalized,
+  getPackageTarget,
+  isPackageBlock
+} from '../journey/packages.js';
+import { getWeatherTempC } from '../data/blocks.js';
 import {
   executeFieldAction,
   endFieldDay,
@@ -33,9 +43,8 @@ import {
 import { renderJourneyMap } from '../scene/areaMap.js';
 import {
   getCrossingContext,
-  scoutCrossing,
-  winchCrossing,
-  fordCrossing
+  getCrossingOptions,
+  resolveCrossingChoice
 } from '../journey/riverCrossing.js';
 import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journey/blockNav.js';
 import { getActiveRouteConstraint, resolveRouteConstraint } from '../journey/routeConstraints.js';
@@ -107,12 +116,6 @@ const RECON_WATER_FEATURES = new Set([
   'fish_habitat'
 ]);
 
-const RECON_CULTURAL_FEATURES = new Set([
-  'first_nation',
-  'cultural_site',
-  'culturally_modified_trees'
-]);
-
 const RECON_VISIBILITY_FEATURES = new Set([
   'visual_quality_zone',
   'recreation',
@@ -133,6 +136,39 @@ const RECON_ACCESS_HAZARDS = new Set([
   'hidden_cavities'
 ]);
 
+// Stream features and the riparian class a layout crew would call them in
+// the field (FPPR s.47 widths). Fish presence is assumed until a fish
+// sampling says otherwise; the sweep flags what needs sampling.
+const RECON_STREAM_FEATURES = {
+  river: { label: 'main river', cls: 'S1/S2', rma: '70 m RMA, 50 m RRZ' },
+  salmon_river: { label: 'salmon river', cls: 'S1', rma: '70 m RMA, 50 m RRZ' },
+  salmon_stream: { label: 'salmon stream', cls: 'S2', rma: '50 m RMA, 30 m RRZ' },
+  fish_habitat: { label: 'fish stream', cls: 'S2/S3', rma: '40-50 m RMA' },
+  creek: { label: 'creek', cls: 'S4 (S6 if fish sampling comes back empty)', rma: '30 m RMA, no RRZ' },
+  watershed: { label: 'community watershed tributary', cls: 'S3', rma: '40 m RMA, 20 m RRZ' },
+  community_water: { label: 'intake stream', cls: 'S3', rma: '40 m RMA, 20 m RRZ' },
+  wetland: { label: 'wetland', cls: 'W1-W3', rma: '30-50 m RMA' },
+  wetland_buffer: { label: 'wetland', cls: 'W3', rma: '30 m RMA' },
+  lake: { label: 'lakeshore', cls: 'L1', rma: '10 m RRZ, 100 m RMA' },
+  flood_channel: { label: 'outburst channel', cls: 'S3 (non-classified drainage)', rma: 'keep the road out of it' },
+};
+
+// Fuel the return visit to an earlier block burns, in litres.
+const NOTEBOOK_FUEL_L = 16;
+// Fuel a run to a marked emergency cache burns, in litres.
+const CACHE_FUEL_L = 12;
+// A cardlock fuel run: one shift, this much fuel, priced by remoteness.
+const FUEL_RUN_LITRES = 80;
+const FUEL_RUN_BASE_COST = 150;
+// A grocery run to town: one shift, this much food, priced by remoteness.
+const GROCERY_RUN_FOOD = 25;
+const GROCERY_RUN_BASE_COST = 180;
+// A replacement OFA 3 attendant driven out from town: one shift and this
+// much money, priced by remoteness.
+const ATTENDANT_REPLACEMENT_COST = 400;
+// Rolls of flagging a boundary shift hangs.
+const FLAGGING_PER_BLOCK = 3;
+
 function normalizeReconToken(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -152,39 +188,64 @@ function getReconBlockIntel(journey, block) {
   const key = block?.id || `block-${journey?.currentBlockIndex || 0}`;
   if (!state.byBlock[key]) {
     state.byBlock[key] = {
+      // Road and crossing notes — written on arrival by truck.
       accessGroundTruthed: false,
+      // Boundary walked and ribboned, streams classified, terrain and soils
+      // noted — the first shift on the ground.
+      layoutWalked: false,
+      // WTP candidates, wildlife features, CH/archaeology overview — the
+      // second shift on the ground.
       valuesSwept: false,
       assessmentComplete: false,
       lastAccessDay: 0,
+      lastLayoutDay: 0,
       lastValuesDay: 0
     };
   }
-  return state.byBlock[key];
+  const intel = state.byBlock[key];
+  // Saves from before the layout shift existed: a swept block had walked it.
+  if (intel.layoutWalked === undefined) intel.layoutWalked = Boolean(intel.valuesSwept);
+  return intel;
+}
+
+/**
+ * The steps a block package needs, in the order the crew does them. Only
+ * cutblocks have packages; a staging lot or a bridge is a waypoint
+ * (js/journey/packages.js).
+ */
+function getReconMissingSteps(journey, block) {
+  if (!isPackageBlock(block)) return [];
+  const intel = getReconBlockIntel(journey, block);
+  const missing = [];
+  if (!intel.accessGroundTruthed) missing.push('road & crossing notes');
+  if (!intel.layoutWalked) missing.push('boundary, streams & terrain');
+  if (!intel.valuesSwept) missing.push('WTP, wildlife & CH sweep');
+  return missing;
 }
 
 function getReconOpenPackages(journey) {
-  const blocks = Array.isArray(journey?.blocks) ? journey.blocks : [];
-  return blocks
+  return getPackageBlocks(journey)
     .map((block) => {
       const intel = getReconBlockIntel(journey, block);
-      const sweep = getReconValueSweepProfile(block, journey);
-      if (intel.assessmentComplete) {
-        return null;
-      }
-
-      const missing = [];
-      if (!intel.accessGroundTruthed) {
-        missing.push('access check');
-      }
-      if (sweep.needed && !intel.valuesSwept) {
-        missing.push('values sweep');
-      }
-
+      if (intel.assessmentComplete) return null;
+      const missing = getReconMissingSteps(journey, block);
       return missing.length > 0
-        ? { block, intel, sweep, missing }
+        ? { block, intel, sweep: getReconValueSweepProfile(block, journey), missing }
         : null;
     })
     .filter(Boolean);
+}
+
+/**
+ * Write the road and crossing notes for a stop the crew just drove into.
+ * The truck did the check; the layout shift does not need to repeat it.
+ */
+function recordArrivalRoadNotes(journey, block) {
+  if (!block) return;
+  const intel = getReconBlockIntel(journey, block);
+  if (intel.accessGroundTruthed) return;
+  intel.accessGroundTruthed = true;
+  intel.lastAccessDay = journey.day;
 }
 
 function maybeFinalizeReconAssessment(ui, journey, block) {
@@ -204,51 +265,157 @@ function maybeFinalizeReconAssessment(ui, journey, block) {
     return false;
   }
 
-  const sweep = getReconValueSweepProfile(block, journey);
-  const assessmentReady = intel.accessGroundTruthed && (!sweep.needed || intel.valuesSwept);
-  if (!assessmentReady) {
+  if (!isPackageBlock(block)) {
+    return false;
+  }
+  if (getReconMissingSteps(journey, block).length > 0) {
     return false;
   }
 
+  const target = getPackageTarget(journey);
   intel.assessmentComplete = true;
-  journey.blocksAssessed = Math.min((journey.blocks?.length || 0), (journey.blocksAssessed || 0) + 1);
-  journey.verifiedBlocks = Math.min((journey.blocks?.length || 0), (journey.verifiedBlocks || 0) + 1);
-  ui.writePositive(`Assessment package complete for ${block.name}. Blocks assessed: ${journey.blocksAssessed}/${journey.blocks?.length || 0}.`);
+  journey.blocksAssessed = Math.min(target, (journey.blocksAssessed || 0) + 1);
+  journey.verifiedBlocks = Math.min(target, (journey.verifiedBlocks || 0) + 1);
+  ui.writePositive(`Package finalized for ${block.name}: boundary, streams, terrain, WTP and CH notes in the file. Packages: ${journey.blocksAssessed}/${target}.`);
   return true;
 }
 
+/**
+ * What the WTP / wildlife / cultural heritage shift finds on this block,
+ * read off its features. Every cutblock needs the sweep; what it produces
+ * is the block's own content, not a generic checklist.
+ */
 function getReconValueSweepProfile(block, journey) {
   const features = new Set((block?.features || []).map(normalizeReconToken).filter(Boolean));
   const hazards = new Set((block?.hazards || []).map(normalizeReconToken).filter(Boolean));
   const tags = new Set();
   const notes = [];
+  const wtp = [];
+  const wildlife = [];
+  const cultural = [];
 
+  if (!isPackageBlock(block)) {
+    return { needed: false, notes, tags: [], wtp, wildlife, cultural };
+  }
+
+  // Wildlife tree patches and retention.
+  if (features.has('old_growth') || features.has('cedar_stand')) {
+    wtp.push('veteran cedar and hemlock on the bench — the obvious WTP anchor, with the largest snags inside it');
+  }
+  if (features.has('beetle_kill') || features.has('wildfire_scar') || features.has('burn_recovery')) {
+    wtp.push('grey snags with cavities — keep a patch of the safest ones and a danger-tree assessment on the rest');
+  }
+  if (features.has('blowdown') || hazards.has('windthrow')) {
+    wtp.push('windfirm edge retention on the exposed side; the WTP goes in the lee');
+  }
+  if (features.has('wetland') || features.has('wetland_buffer') || features.has('lake')) {
+    wtp.push('riparian reserve doubles as retention; anchor the WTP on the wetland edge');
+  }
+  if (features.has('spruce_forest') || features.has('mixedwood') || features.has('subalpine_forest')) {
+    wtp.push('a mixedwood corner with the biggest stems for the 7% retention target');
+  }
+  if (wtp.length === 0) {
+    wtp.push('a windfirm corner with the biggest stems for the retention target');
+  }
+
+  // Wildlife features and habitat.
+  if (features.has('caribou_habitat') || hazards.has('caribou')) {
+    wildlife.push('caribou sign and lichen on the flats — check the UWR/WHA boundary and the GAR order timing window');
+    tags.add('winter_access');
+  }
+  if (hazards.has('moose') || features.has('wetland') || features.has('wetland_buffer')) {
+    wildlife.push('moose browse and a wallow on the wetland edge — record as a wildlife feature for the site plan');
+  }
+  if (hazards.has('grizzly') || features.has('wildlife')) {
+    wildlife.push('bear sign and a day bed — a wildlife feature for the site plan and a note for the tailgate');
+  }
+  if (features.has('karst') || features.has('sensitive_area')) {
+    wildlife.push('karst sinks and disappearing streams — each one a reserve and a terrain note');
+  }
+  if (features.has('alpine') || features.has('subalpine_forest')) {
+    wildlife.push('goat and wolverine sign above tree line — a wildlife feature and a note for the biologist');
+  }
+  if (wildlife.length === 0) {
+    wildlife.push('raptor nest search on the big cottonwoods and a den search on the south aspect');
+  }
+
+  // Cultural heritage.
+  if (features.has('culturally_modified_trees') || features.has('cedar_harvest')) {
+    cultural.push('bark-stripped cedar (CMTs) — flag, photograph, GPS, do not disturb; AOA/PFR and a referral before the boundary is final');
+    tags.add('cultural_hold');
+  }
+  if (features.has('first_nation') || hazards.has('cultural_protocol')) {
+    cultural.push('a trail and possible cache pits — record for the Nation; engagement before layout, not after');
+    tags.add('cultural_hold');
+  }
+  if (features.has('cultural_site')) {
+    cultural.push('a registered heritage site nearby — HCA applies; the archaeology overview decides the buffer');
+    tags.add('cultural_hold');
+  }
+  if (cultural.length === 0) {
+    cultural.push('no CH indicators seen; note the AOA result and the Nation\'s referral status on the site plan');
+  }
+
+  // Carry-forward tags off the same features.
   if ([...features].some((feature) => RECON_WATER_FEATURES.has(feature)) || [...hazards].some((hazard) => hazard === 'river_crossing' || hazard === 'flood' || hazard === 'washout')) {
     tags.add('watershed_watch');
-    notes.push('locate streams and riparian areas, and flag water concerns for layout');
   }
-  if ([...features].some((feature) => RECON_CULTURAL_FEATURES.has(feature)) || [...hazards].some((hazard) => hazard === 'cultural_protocol')) {
-    tags.add('cultural_hold');
-    notes.push('record cultural indicators without disturbance and refer them for follow-up with the affected Nation and specialists');
-  }
-  if ([...features].some((feature) => RECON_VISIBILITY_FEATURES.has(feature)) || [...hazards].some((hazard) => hazard === 'traffic' || hazard === 'visual_constraint')) {
+  if ([...features].some((feature) => RECON_VISIBILITY_FEATURES.has(feature)) || hazards.has('visual_constraint')) {
     tags.add('community_visibility');
-    notes.push('record recreation use and visible slopes for the planning team');
+    notes.push('the block is inside a VQO polygon; the visible slope needs a visual design before the boundary is final');
   }
   if ([...hazards].some((hazard) => RECON_ACCESS_HAZARDS.has(hazard))) {
     tags.add('access_rehab');
-    notes.push('flag road repairs that need assessment before development');
   }
   if (normalizeReconToken(journey?.weather?.id) === 'storm') {
     tags.add('access_rehab');
-    notes.push('record storm damage and drainage concerns before the next access review');
+    notes.push('storm damage and drainage concerns recorded for the road file');
   }
 
+  notes.unshift(`WTP: ${wtp[0]}`, `Wildlife: ${wildlife[0]}`, `CH: ${cultural[0]}`);
+
   return {
-    needed: notes.length > 0,
+    needed: true,
     notes,
-    tags: [...tags]
+    tags: [...tags],
+    wtp,
+    wildlife,
+    cultural
   };
+}
+
+/**
+ * What the boundary shift produces on this block: the ribbon, the streams
+ * it crossed and the class it called them, terrain and soils, danger trees.
+ */
+function getReconLayoutProfile(block) {
+  const features = new Set((block?.features || []).map(normalizeReconToken).filter(Boolean));
+  const hazards = new Set((block?.hazards || []).map(normalizeReconToken).filter(Boolean));
+  const streams = [];
+  for (const [feature, stream] of Object.entries(RECON_STREAM_FEATURES)) {
+    if (features.has(feature)) {
+      streams.push(`${stream.label}: ${stream.cls} — ${stream.rma}`);
+    }
+  }
+  if (streams.length === 0) {
+    streams.push('no defined channels crossed; two non-classified drainages noted for the site plan');
+  }
+
+  const terrain = [];
+  const terrainId = normalizeReconToken(block?.terrain);
+  if (terrainId === 'steep' || hazards.has('grade')) terrain.push('slopes over 60% on the upper boundary — terrain stability field card, likely Class IV');
+  if (hazards.has('rockslide') || features.has('moraine') || features.has('glacial_terrain')) terrain.push('unstable till and slide scars — road location wants the bench, not the toe');
+  if (terrainId === 'muskeg' || hazards.has('bog') || hazards.has('subsidence') || features.has('permafrost')) terrain.push('organic soils and standing water — frozen-ground harvest window, no summer machine traffic');
+  if (features.has('karst')) terrain.push('karst: sinks, grikes and a disappearing stream — each one flagged and buffered');
+  if (hazards.has('erosion') || features.has('watershed') || features.has('community_water')) terrain.push('fine-textured soils on the lower slope — sediment control notes for every crossing');
+  if (terrain.length === 0) terrain.push('gentle ground, well-drained morainal soils, no stability concerns noted');
+
+  const dangerTrees = [];
+  if (hazards.has('snag_hazard') || hazards.has('falling_timber') || features.has('beetle_kill') || features.has('wildfire_scar')) dangerTrees.push('dangerous-tree assessment on the snags along the boundary; the worst ones flagged for the faller before anyone works under them');
+  if (hazards.has('windthrow') || hazards.has('hang_ups') || features.has('blowdown')) dangerTrees.push('hang-ups and root-sprung stems along the north line — flagged, walked around, no one under them');
+  if (dangerTrees.length === 0) dangerTrees.push('no danger trees on the line beyond the usual dead tops');
+
+  return { streams, terrain, dangerTrees };
 }
 
 function getReconAccessSeverity(verdict) {
@@ -270,7 +437,7 @@ function getDisplayedAccessVerdict(journey, block) {
     return {
       id: 'unverified',
       label: 'Not checked yet',
-      summary: 'Choose Work the block to inspect the road and crossing approaches. The map alone does not confirm access.'
+      summary: 'Road check: not recorded yet. The truck writes it on arrival; the map alone does not confirm access.'
     };
   }
   const recorded = block?.id ? journey.accessVerdicts?.[block.id] : null;
@@ -454,12 +621,11 @@ async function runFieldDay(game) {
   const freeChoices = { count: 0 };
   while (!dayIsSpent(journey)) {
     const currentBlock = journey.blocks[journey.currentBlockIndex];
-    const openPackages = getReconOpenPackages(journey);
     const hasNextBlock = journey.currentBlockIndex < journey.blocks.length - 1;
     const canTravel = !hasTraveled && hasNextBlock && journey.resources.fuel > 0 && journey.resources.equipment > 0;
     const blockIntel = getReconBlockIntel(journey, currentBlock);
-    const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
     const routeConstraint = getActiveRouteConstraint(journey);
+    const attendantOnCrew = hasActiveFirstAidAttendant(journey.crew);
 
     updateReconMissionStatus(ui, journey);
 
@@ -518,36 +684,44 @@ async function runFieldDay(game) {
     // the reference material lives in the card's free "More context".
     const options = [];
 
-    const blockWorkPending = currentBlock && !blockIntel.accessGroundTruthed
-      ? 'access'
-      : currentBlock && valuesSweep.needed && !blockIntel.valuesSwept
-        ? 'values'
-        : null;
+    // WorkSafeBC: no Level 3 attendant with an ETV, no line work more than
+    // twenty minutes from hospital. The crew can drive, camp and resupply.
+    if (!attendantOnCrew) {
+      options.push({
+        label: 'Drive to town for a replacement attendant',
+        description: `One shift and about $${priceByRemoteness(journey, ATTENDANT_REPLACEMENT_COST)}; the crew cannot work more than 20 minutes from hospital without a Level 3 attendant and ETV`,
+        value: 'replace_attendant'
+      });
+    }
 
-    if (blockWorkPending === 'access') {
+    const blockWorkPending = attendantOnCrew && currentBlock && isPackageBlock(currentBlock) && !blockIntel.assessmentComplete
+      ? (!blockIntel.layoutWalked ? 'layout' : (!blockIntel.valuesSwept ? 'values' : null))
+      : null;
+
+    if (blockWorkPending === 'layout') {
       options.push({
         label: 'Work the block',
-        description: 'Check the road and crossing approaches; record hazards without entering unsafe ground. Uses this shift.',
+        description: 'Walk the boundary and ribbon it; classify every stream you cross; note terrain, soils and danger trees. Uses this shift.',
         value: 'ground_truth'
       });
     } else if (blockWorkPending === 'values') {
       options.push({
         label: 'Work the block',
-        description: `Check sensitive sites — ${valuesSweep.notes[0]}. Uses this shift.`,
+        description: 'Locate WTP candidates, wildlife features and cultural indicators; record them for the site plan and the Nation. Uses this shift.',
         value: 'values_sweep'
       });
     }
 
     if (routeConstraint) {
       options.push({
-        label: 'Clear route obstruction',
-        description: `${routeConstraint.title} blocks ${routeConstraint.toBlockName} - uses this shift`,
-        tag: 'SAFE',
-        value: 'clear_route_constraint'
+        label: 'Report it and work the near side',
+        description: `${routeConstraint.title} blocks ${routeConstraint.toBlockName}. Flag it, photograph it, call the road permit holder — uses this shift`,
+        tag: 'TRADEOFF',
+        value: 'report_route_constraint'
       });
       options.push({
-        label: 'Mark a detour',
-        description: `Bypass ${routeConstraint.title.toLowerCase()} with extra fuel and rougher travel - uses this shift`,
+        label: routeConstraint.kind === 'landslide' ? 'Take the old spur around' : 'Walk in from the last sound approach',
+        description: `Bypass ${routeConstraint.title.toLowerCase()} on the old line with extra fuel and rougher travel — uses this shift`,
         tag: 'TRADEOFF',
         value: 'detour_route_constraint'
       });
@@ -556,18 +730,18 @@ async function runFieldDay(game) {
     if (canTravel && !routeConstraint) {
       const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
       options.push({
-        label: `Move on to ${nextBlock?.name || 'the next block'}`,
-        description: `Cover ground at ${PACE_OPTIONS[getReconPace(journey)]?.name || 'Standard'} pace`,
+        label: `Move on to ${nextBlock?.name || 'the next stop'}`,
+        description: `${isPackageBlock(nextBlock) ? 'Next block on the file' : 'Waypoint — travel, camp or supply'}; cover ground at ${PACE_OPTIONS[getReconPace(journey)]?.name || 'Standard'} pace`,
         value: 'travel'
       });
     }
 
-    const notebookTargets = getReconNotebookTargets(journey);
-    if (notebookTargets.length > 0 && (journey.resources.fuel || 0) >= 4) {
+    const notebookTargets = attendantOnCrew ? getReconNotebookTargets(journey) : [];
+    if (notebookTargets.length > 0 && (journey.resources.fuel || 0) >= NOTEBOOK_FUEL_L) {
       const nextPackage = notebookTargets[0];
       options.push({
         label: 'Follow up missed fieldwork',
-        description: `Return to ${nextPackage.block.name} for one missing check, then rejoin camp — uses this shift and 4 fuel`,
+        description: `Return to ${nextPackage.block.name} for one missing check (${nextPackage.missing[0]}), then rejoin camp — uses this shift and ${NOTEBOOK_FUEL_L} L`,
         value: 'field_notebook'
       });
     }
@@ -582,7 +756,7 @@ async function runFieldDay(game) {
 
     options.push({
       label: 'Camp & crew',
-      description: 'Stand down, work on the gear, patch someone up, send a scout ahead',
+      description: 'Stand down, work on the gear, patch someone up, drive the next leg ahead in one truck',
       value: 'camp_menu'
     });
 
@@ -615,18 +789,51 @@ async function runFieldDay(game) {
         value: 'triage'
       });
     }
+    if (!attendantOnCrew) {
+      campOptions.push({
+        label: 'Drive to town for a replacement attendant',
+        description: `One shift, about $${priceByRemoteness(journey, ATTENDANT_REPLACEMENT_COST)}`,
+        value: 'replace_attendant'
+      });
+    }
     if (journey.currentBlockIndex < journey.blocks.length - 1) {
       campOptions.push({
-        label: 'Send someone ahead',
-        description: 'Scout the next block before the crew commits to it',
+        label: 'Drive the next leg ahead in one truck',
+        description: 'Look at the road and the next stop before the crew commits to it',
         value: 'scout'
       });
     }
-    if ((journey.resources.fuel || 0) >= 3 && (journey.resources.food || 0) <= FIELD_RESOURCES.food.warning) {
+    if (canPullRationCache(journey, currentBlock) && (journey.resources.food || 0) <= FIELD_RESOURCES.food.warning) {
       campOptions.push({
-        label: 'Go get the cache',
-        description: 'Detour to a marked emergency cache; restores food, costs fuel',
+        label: `Pull the emergency crate from the cache at ${currentBlock.name}`,
+        description: `Sealed field rations, one crate per cache; ${CACHE_FUEL_L} L to get there and back`,
         value: 'food_cache'
+      });
+    }
+    if ((journey.resources.fuel || 0) <= FIELD_RESOURCES.fuel.max - FUEL_RUN_LITRES) {
+      campOptions.push({
+        label: 'Fuel run',
+        description: `Send the driver to the nearest cardlock: +${FUEL_RUN_LITRES} L, about $${priceByRemoteness(journey, FUEL_RUN_BASE_COST)}; uses this shift`,
+        value: 'fuel_run'
+      });
+    }
+    if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.max - GROCERY_RUN_FOOD) {
+      campOptions.push({
+        label: 'Grocery run',
+        description: `Send the driver to town for a rations restock: +${GROCERY_RUN_FOOD} person-days, about $${priceByRemoteness(journey, GROCERY_RUN_BASE_COST)}; uses this shift`,
+        value: 'grocery_run'
+      });
+    }
+    if (journey.campBear) {
+      campOptions.push({
+        label: 'Clean up the attractants',
+        description: 'Burn the grease, move the food to the truck cab and the bear cache, wash the camp down — uses this shift',
+        value: 'bear_cleanup'
+      });
+      campOptions.push({
+        label: 'Report the habituated bear (RAPP)',
+        description: 'Call it in to the Conservation Officer Service — brief response; work continues',
+        value: 'bear_report'
       });
     }
 
@@ -689,12 +896,38 @@ async function runFieldDay(game) {
       await handleSetTempo(ui, journey);
     } else if (actionId === 'ground_truth') {
       spendDay(journey);
-      handleGroundTruthAccess(ui, journey, currentBlock);
-      logReconAction(journey, 'Ground-truthed access', currentBlock?.name || 'Current block');
+      handleLayoutShift(ui, journey, currentBlock);
+      logReconAction(journey, 'Walked the boundary and classified streams', currentBlock?.name || 'Current block');
     } else if (actionId === 'values_sweep') {
       spendDay(journey);
       handleValuesSweep(ui, journey, currentBlock);
-      logReconAction(journey, 'Completed values sweep', currentBlock?.name || 'Current block');
+      logReconAction(journey, 'Completed WTP, wildlife and CH sweep', currentBlock?.name || 'Current block');
+    } else if (actionId === 'replace_attendant') {
+      spendDay(journey);
+      handleReplaceAttendant(ui, journey);
+      logReconAction(journey, 'Drove to town for a replacement attendant');
+    } else if (actionId === 'fuel_run') {
+      spendDay(journey);
+      handleFuelRun(ui, journey);
+      logReconAction(journey, 'Fuel run', `Fuel: ${Math.round(journey.resources.fuel || 0)} L`);
+    } else if (actionId === 'grocery_run') {
+      spendDay(journey);
+      handleGroceryRun(ui, journey);
+      logReconAction(journey, 'Grocery run', `Food: ${Math.round(journey.resources.food || 0)} person-days`);
+    } else if (actionId === 'bear_cleanup') {
+      spendDay(journey);
+      journey.campBear = false;
+      ui.writeHeader('CAMP CLEANUP');
+      ui.write('The crew burns the grease pit, scrubs the cook tent, and moves every scrap of food into the truck cab and the bear cache on the far side of the landing.');
+      ui.writePositive('Nothing to come back for. It will test the camp once more and move on.');
+      logReconAction(journey, 'Cleaned up the camp attractants');
+    } else if (actionId === 'bear_report') {
+      ui.writeHeader('RAPP CALL');
+      ui.write('You call the habituated bear in to the Conservation Officer Service on the RAPP line with the camp location and what it has been into.');
+      journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
+      journey.bearReported = true;
+      ui.write('Logged. Brief response; the shift is still yours.', 'term-dim');
+      logReconAction(journey, 'Reported the habituated bear (RAPP)');
     } else if (actionId === 'field_notebook') {
       if (handleFieldNotebook(ui, journey)) {
         spendDay(journey);
@@ -720,7 +953,7 @@ async function runFieldDay(game) {
       spendDay(journey);
       handleScoutAhead(ui, journey);
       logReconAction(journey, 'Scouted the next block');
-    } else if (actionId === 'clear_route_constraint' || actionId === 'detour_route_constraint') {
+    } else if (actionId === 'report_route_constraint' || actionId === 'detour_route_constraint') {
       const constraint = getActiveRouteConstraint(journey);
       if (!constraint) {
         ui.write('No route obstruction is active on the next leg.');
@@ -729,7 +962,7 @@ async function runFieldDay(game) {
         const result = resolveRouteConstraint(
           journey,
           constraint.id,
-          actionId === 'detour_route_constraint' ? 'detour' : 'clear'
+          actionId === 'detour_route_constraint' ? 'detour' : 'report'
         );
         for (const message of result.messages) {
           if (actionId === 'detour_route_constraint') ui.writeWarning(message);
@@ -746,7 +979,7 @@ async function runFieldDay(game) {
     checkpointReconShift(game, shiftState, pendingEvent);
 
     const acknowledgedActions = {
-      ground_truth: 'Ground-truth access',
+      ground_truth: 'Boundary shift',
       values_sweep: 'Values sweep',
       field_notebook: 'Return field visit',
       food_cache: 'Cached-ration retrieval',
@@ -754,7 +987,11 @@ async function runFieldDay(game) {
       triage: 'Triage',
       resupply: 'Resupply',
       scout: 'Scouting',
-      clear_route_constraint: 'Route clearing',
+      replace_attendant: 'Replacement attendant',
+      fuel_run: 'Fuel run',
+      grocery_run: 'Grocery run',
+      bear_cleanup: 'Camp cleanup',
+      report_route_constraint: 'Route report',
       detour_route_constraint: 'Route detour'
     };
     if (acknowledgedActions[actionId]) {
@@ -802,8 +1039,9 @@ async function runFieldDay(game) {
     ui.writeWarning(`${bear.note} Food ${bear.food}, morale ${bear.morale}.`);
   }
 
-  // Anyone lost today gets their marker before the day closes.
-  await maybeMemorializeFallen(game);
+  // Anyone flown or driven out today gets their incident marker before the
+  // day closes.
+  await maybeMarkIncidents(game);
 
   ui.updateAllStatus(journey);
 
@@ -847,27 +1085,31 @@ function showTrailMarkers(ui, journey, block) {
 }
 
 /**
- * Offer a marker for anyone who died today. The epitaph is the player's
- * to write — it will stand at this block for every future run.
+ * Offer a marker for anyone evacuated today. Nobody dies on this crew; the
+ * marker is an incident flag at the spot, with the player's own line on it —
+ * it will stand at this block for every future run.
  */
-async function maybeMemorializeFallen(game) {
+async function maybeMarkIncidents(game) {
   const { ui, journey } = game;
   if (!journey.trailMarkerEpoch) journey.trailMarkerEpoch = Date.now();
   if (!journey.memorializedIds) journey.memorializedIds = [];
 
   for (const member of journey.crew) {
-    if (!member.isDead || journey.memorializedIds.includes(member.id)) continue;
+    const evacuated = !member.isActive && !member.hasQuit && !member.isDead;
+    if (!evacuated || journey.memorializedIds.includes(member.id)) continue;
     journey.memorializedIds.push(member.id);
 
     const block = journey.blocks[journey.currentBlockIndex];
     const lastEffect = member.statusEffects?.[member.statusEffects.length - 1];
-    const cause = lastEffect ? String(lastEffect.effectId).replace(/_/g, ' ') : 'the trail';
+    const cause = lastEffect
+      ? `${String(lastEffect.effectId).replace(/_/g, ' ')}, flown out`
+      : 'evacuated';
 
     ui.write('');
-    ui.writeHeader(`+ ${member.name} +`);
-    const choice = await ui.promptChoice('Mark the spot?', [
-      { label: 'Carve a marker', description: 'Write a line for whoever passes this way next', value: 'carve' },
-      { label: 'Let the bush take it quietly', description: 'No marker. The crew will remember.', value: 'skip' },
+    ui.writeHeader(`INCIDENT — ${member.name}`);
+    const choice = await ui.promptChoice('Flag the incident site?', [
+      { label: 'Hang a marker', description: 'Write a line for whoever works this ground next', value: 'carve' },
+      { label: 'Just the incident report', description: 'No marker. WorkSafeBC gets the paperwork; the crew will remember.', value: 'skip' },
     ]);
     if (choice.value !== 'carve') {
       ui.write('The crew stands a moment, then shoulders their packs.');
@@ -876,12 +1118,12 @@ async function maybeMemorializeFallen(game) {
 
     let epitaph = null;
     if (typeof ui.promptText === 'function') {
-      epitaph = (await ui.promptText('Epitaph (one line):', 'They loved this country'))
-        || 'They loved this country';
+      epitaph = (await ui.promptText('Marker line (one line):', 'Watch your footing here'))
+        || 'Watch your footing here';
     }
     const marker = recordTrailMarker({
       name: member.name,
-      epitaph: epitaph || 'They loved this country',
+      epitaph: epitaph || 'Watch your footing here',
       areaId: journey.areaId,
       blockId: block?.id,
       blockName: block?.name,
@@ -910,17 +1152,24 @@ function pickTrailWildlife(journey, paceId) {
 }
 
 /**
- * The river-crossing set piece: gauge readout, ford/scout/winch/wait
- * decision, animated resolution, consequences on the shared systems.
- * No-op for blocks without a crossing.
+ * The water-crossing set piece: gauge readout, a decision that depends on
+ * what the crossing physically is (ford, bridge, ferry, culvert — see
+ * js/journey/riverCrossing.js), animated resolution, consequences on the
+ * shared systems. No-op for blocks without a crossing.
  */
 async function runRiverCrossingBeat(game, block) {
   const { ui, journey } = game;
   let ctx = getCrossingContext(journey, block);
   if (!ctx) return;
 
+  const heading = {
+    bridge: 'BRIDGE',
+    ferry: 'FERRY',
+    culvert: 'WASHOUT',
+    ford: 'WATER CROSSING',
+  }[ctx.mode] || 'WATER CROSSING';
   ui.write('');
-  ui.writeHeader(`WATER CROSSING — ${block.name}`);
+  ui.writeHeader(`${heading} — ${block.name}`);
 
   while (true) {
     ctx = getCrossingContext(journey, block);
@@ -932,42 +1181,26 @@ async function runRiverCrossingBeat(game, block) {
       });
     }
     ui.write(`The gauge reads ${ctx.gaugeLabel}. ${ctx.gaugeDescription}`);
-    if (ctx.scouted) {
+    if (ctx.holdMessage) {
+      ui.writeWarning(ctx.holdMessage);
+    }
+    if (ctx.scouted && ctx.mode === 'ford') {
       ui.write('You know the line now. The odds are better than they look.', 'term-dim');
     }
 
-    const options = [
-      { label: 'Ford it now', description: 'Take the channel as it stands', value: 'ford' },
-    ];
     // The crossing is part of the shift that walked into it, so its choices
     // trade risk and gear rather than hours off a clock.
-    if (!ctx.scouted) {
-      options.push({
-        label: 'Walk the line first',
-        description: 'Probe the crossing on foot — halves the risk',
-        value: 'scout',
-      });
-    }
-    if (ctx.canWinch) {
-      options.push({
-        label: 'Rig a winch line (fuel & gear)',
-        description: 'Slow and costly, but the water never gets a vote',
-        value: 'winch',
-      });
-    }
-    options.push({
-      label: 'Camp and wait for the level to drop',
-      description: 'Give up the rest of the shift; tomorrow is another river',
-      value: 'wait',
-    });
-
-    const choice = await ui.promptChoice('The far bank is right there:', options);
+    const options = getCrossingOptions(ctx);
+    const prompt = {
+      bridge: 'The deck is right there:',
+      ferry: 'The landing is right there:',
+      culvert: 'The road prism is right there:',
+      ford: 'The far bank is right there:',
+    }[ctx.mode] || 'The far bank is right there:';
+    const choice = await ui.promptChoice(prompt, options);
     ui.write('');
 
-    if (choice.value === 'scout') {
-      const result = scoutCrossing(journey, ctx);
-      for (const msg of result.messages) ui.write(msg);
-      ui.write('');
+    if (choice.value === 'noop') {
       continue;
     }
 
@@ -978,13 +1211,21 @@ async function runRiverCrossingBeat(game, block) {
       break;
     }
 
-    let result;
-    if (choice.value === 'winch') {
-      result = winchCrossing(journey, ctx);
-    } else {
-      result = fordCrossing(journey, ctx);
+    const result = resolveCrossingChoice(journey, ctx, choice.value);
+
+    if (result.severity === 'scouted') {
+      for (const msg of result.messages) ui.write(msg);
+      ui.write('');
+      continue;
     }
-    if (typeof ui.playScene === 'function') {
+
+    if (result.severity === 'refused' || !result.crossed) {
+      for (const msg of result.messages) ui.writeWarning(msg);
+      ui.write('');
+      continue;
+    }
+
+    if (typeof ui.playScene === 'function' && choice.value !== 'reroute') {
       await ui.playScene(buildCrossingResolveFrames(ctx, result, { seed: journey.day * 13 + 5 }), {
         delay: 140,
       });
@@ -996,7 +1237,7 @@ async function runRiverCrossingBeat(game, block) {
     journey.log?.push({
       day: journey.day,
       type: 'crossing',
-      summary: `${block.name}: ${ctx.gaugeLabel} water, ${choice.value}${result.mishap ? ' — mishap' : ''}`,
+      summary: `${block.name}: ${ctx.gaugeLabel} water, ${ctx.mode} ${choice.value}${result.mishap ? ' — mishap' : ''}`,
       severity: result.severity === 'swept' ? 'high' : result.mishap ? 'medium' : 'low',
     });
     break;
@@ -1086,17 +1327,18 @@ async function runMilestoneCamp(game, threshold) {
 export function updateReconMissionStatus(ui, journey) {
   const currentBlock = journey.blocks?.[journey.currentBlockIndex];
   const progressInfo = getFieldProgressInfo(journey);
-  const totalBlocks = progressInfo.totalBlocks || journey.blocks?.length || 0;
-  const packagesDone = Math.min(totalBlocks, journey.blocksAssessed || 0);
-  const completionPct = totalBlocks > 0 ? Math.round((packagesDone / totalBlocks) * 100) : 0;
+  const totalBlocks = getPackageTarget(journey);
+  const packagesDone = getPackagesFinalized(journey);
+  const completionPct = getPackageProgress(journey);
   const packagesRemaining = Math.max(0, totalBlocks - packagesDone);
   const scrutiny = Math.round(Math.max(0, Number(journey.scrutiny ?? journey.heat ?? 0)));
+  const tempC = getWeatherTempC(journey.weather, currentBlock);
   const facts = [
-    { label: 'Weather', value: journey.weather?.name || 'Clear' },
+    { label: 'Weather', value: `${journey.weather?.name || 'Clear'}${tempC === null ? '' : ` ${tempC}°C`}` },
     { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
     { label: 'Days left', value: Number.isFinite(journey.deadline) ? `${Math.max(0, journey.deadline - journey.day)}` : '—' },
-    { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km` },
-    { label: 'Reached', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` },
+    { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km` },
+    { label: 'Stops', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` },
     {
       label: 'Scrutiny',
       value: `${scrutiny}%`,
@@ -1105,20 +1347,23 @@ export function updateReconMissionStatus(ui, journey) {
   ];
   const checklist = [];
 
-  if (currentBlock) {
+  if (currentBlock && isPackageBlock(currentBlock)) {
     const intel = getReconBlockIntel(journey, currentBlock);
-    const sweep = getReconValueSweepProfile(currentBlock, journey);
-    const finalized = intel.accessGroundTruthed && (!sweep.needed || intel.valuesSwept);
-    checklist.push({ label: 'access ground-truthed', done: intel.accessGroundTruthed });
-    checklist.push({
-      label: sweep.needed ? 'values sweep' : 'values sweep (not flagged)',
-      done: sweep.needed ? intel.valuesSwept : true
-    });
+    const finalized = intel.assessmentComplete || getReconMissingSteps(journey, currentBlock).length === 0;
+    checklist.push({ label: 'road & crossing notes', done: intel.accessGroundTruthed });
+    checklist.push({ label: 'boundary walked & ribboned', done: intel.layoutWalked });
+    checklist.push({ label: 'streams classified (S1–S6)', done: intel.layoutWalked });
+    checklist.push({ label: 'terrain / soils noted', done: intel.layoutWalked });
+    checklist.push({ label: 'WTP & wildlife features flagged', done: intel.valuesSwept });
+    checklist.push({ label: 'CH / archaeology overview', done: intel.valuesSwept });
     checklist.push({ label: 'package finalized', done: finalized });
     facts.push({
       label: 'Intel',
-      value: `access ${intel.accessGroundTruthed ? 'verified' : 'unverified'} · values ${sweep.needed ? (intel.valuesSwept ? 'swept' : 'pending') : 'quiet'}`
+      value: `road ${intel.accessGroundTruthed ? 'noted' : 'pending'} · layout ${intel.layoutWalked ? 'walked' : 'pending'} · values ${intel.valuesSwept ? 'swept' : 'pending'}`
     });
+  } else if (currentBlock) {
+    checklist.push({ label: 'road & crossing notes', done: getReconBlockIntel(journey, currentBlock).accessGroundTruthed });
+    facts.push({ label: 'Intel', value: 'waypoint — no package here' });
   }
 
   const alerts = [];
@@ -1145,7 +1390,7 @@ export function updateReconMissionStatus(ui, journey) {
   const status = {
     objective: packagesRemaining > 0
       ? `Finalize every block package — ${packagesRemaining} still open`
-      : `Win condition met: all ${totalBlocks} block packages finalized`,
+      : `All ${totalBlocks} packages finalized — demob when ready.`,
     meter: { label: 'Packages', value: completionPct, text: `${packagesDone}/${totalBlocks}` },
     facts,
     checklist,
@@ -1193,7 +1438,7 @@ async function runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent 
   if (condemned.fuel > 0 || condemned.equipment > 0) {
     journey.resources.fuel = Math.max(0, journey.resources.fuel - condemned.fuel);
     journey.resources.equipment = Math.max(0, journey.resources.equipment - condemned.equipment);
-    ui.writeWarning(`${condemned.note} Fuel -${condemned.fuel}, equipment -${condemned.equipment}.`);
+    ui.writeWarning(`${condemned.note} Fuel -${condemned.fuel} L, equipment -${condemned.equipment}.`);
   }
 
   // Losing the machine for the season is paid on every leg after it, not once.
@@ -1233,11 +1478,16 @@ async function runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent 
   shiftState.hasTraveled = true;
   shiftState.dayResolved = true;
 
-  // Reaching a water crossing is a played decision, not terrain math.
+  // Reaching a water crossing is a played decision, not terrain math. The
+  // truck's own arrival is the road and crossing check for the file.
   if (journey.currentBlockIndex !== blockIndexBefore) {
     const arrivedBlock = journey.blocks[journey.currentBlockIndex];
     await runRiverCrossingBeat(game, arrivedBlock);
     if (game.gameOver) return { gameOver: true };
+    recordArrivalRoadNotes(journey, arrivedBlock);
+    if (isPackageBlock(arrivedBlock)) {
+      ui.write('Road and crossing notes recorded on arrival. Two shifts on the ground close the package.', 'term-dim');
+    }
     showTrailMarkers(ui, journey, arrivedBlock);
   }
 
@@ -1327,10 +1577,10 @@ function maybeSpeakCrew(ui, journey) {
 function buildQuietShiftTitle(journey) {
   if (journey.recentSituationContext?.day === journey.day) return 'AFTER THE CALL';
   const weather = normalizeReconToken(journey.weather?.id);
-  if (weather === 'rain' || weather === 'drizzle') return 'A WET START';
-  if (weather === 'snow' || weather === 'heavy_snow') return 'SNOW ON THE TRUCKS';
+  if (weather === 'light_rain' || weather === 'heavy_rain') return 'A WET START';
+  if (weather === 'light_snow' || weather === 'heavy_snow' || weather === 'freezing') return 'SNOW ON THE TRUCKS';
   if (weather === 'fog') return 'SOCKED IN';
-  if (weather === 'heat' || weather === 'heat_dome') return 'ALREADY HOT AT SEVEN';
+  if (weather === 'clear' && (getWeatherTempC(journey.weather) ?? 0) >= 18) return 'ALREADY WARM AT SEVEN';
   if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.warning) return 'THIN IN THE FOOD BOX';
   if (journey.crew.some((m) => m.isActive && m.health < 60)) return 'A SLOW MORNING IN CAMP';
   return 'NOTHING ON THE RADIO';
@@ -1338,7 +1588,7 @@ function buildQuietShiftTitle(journey) {
 
 function buildQuietShiftBody(journey) {
   const currentBlock = journey.blocks[journey.currentBlockIndex];
-  const openHere = currentBlock ? !getReconBlockIntel(journey, currentBlock).assessmentComplete : false;
+  const openHere = currentBlock ? isPackageBlock(currentBlock) && !getReconBlockIntel(journey, currentBlock).assessmentComplete : false;
   const daysLeft = Number.isFinite(journey.deadline) ? Math.max(0, journey.deadline - journey.day) : null;
 
   const recent = journey.recentSituationContext?.day === journey.day
@@ -1351,7 +1601,7 @@ function buildQuietShiftBody(journey) {
     parts.push(`${currentBlock.name} is still open in the file.`);
   }
   if (daysLeft !== null && daysLeft <= 5) {
-    parts.push(`The season closes in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.`);
+    parts.push(`The layout deadline is ${daysLeft} day${daysLeft === 1 ? '' : 's'} out.`);
   }
   return parts.join(' ');
 }
@@ -1372,7 +1622,8 @@ function buildReconDayHeader(journey) {
  */
 function buildReconStatusLine(journey) {
   const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
-  const segments = [journey.weather?.name || 'Clear'];
+  const tempC = getWeatherTempC(journey.weather, journey.blocks[journey.currentBlockIndex]);
+  const segments = [`${journey.weather?.name || 'Clear'}${tempC === null ? '' : ` ${tempC}°C`}`];
 
   if (nextBlock) {
     const segment = getCurrentSegmentLength(journey.blocks, journey.currentBlockIndex);
@@ -1387,8 +1638,8 @@ function buildReconStatusLine(journey) {
     segments.push(`${left} day${left === 1 ? '' : 's'} left`);
   }
 
-  segments.push(`food ${Math.round(journey.resources.food || 0)}`);
-  segments.push(`fuel ${Math.round(journey.resources.fuel || 0)}`);
+  segments.push(`food ${Math.round(journey.resources.food || 0)} pd`);
+  segments.push(`fuel ${Math.round(journey.resources.fuel || 0)} L`);
 
   return formatStatusLine(segments);
 }
@@ -1402,7 +1653,7 @@ function buildReconStatusLine(journey) {
 function buildReconContextLines(journey) {
   const lines = [buildBlockMap(journey), '* supply point'];
   lines.push(`Traverse: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`);
-  lines.push(`Packages: ${journey.blocksAssessed || 0}/${journey.blocks?.length || 0} finalized`);
+  lines.push(`Packages: ${getPackagesFinalized(journey)}/${getPackageTarget(journey)} finalized`);
 
   // The briefing used to cost a slot on the decision list. It is reference
   // material, so it belongs here, behind the card's free "More context".
@@ -1575,6 +1826,29 @@ function getRouteHazardSummary(currentBlock, nextBlock, weather) {
     : '';
 }
 
+/**
+ * What the detour actually goes around, in the words a crew would use for
+ * this leg's ground: snag patches on a beetle-kill road, soft spots on
+ * muskeg, the steepest pitches on a grade, the roughest ground otherwise.
+ */
+function describeDetourObstacle(nextBlock, currentBlock) {
+  const hazards = new Set([...(nextBlock?.hazards || []), ...(currentBlock?.hazards || [])].map(normalizeReconToken));
+  const terrain = normalizeReconToken(nextBlock?.terrain || currentBlock?.terrain);
+  if (hazards.has('snag_hazard') || hazards.has('falling_timber') || hazards.has('deadfall') || hazards.has('windthrow')) {
+    return 'the worst of the snag patches';
+  }
+  if (terrain === 'muskeg' || hazards.has('bog') || hazards.has('subsidence') || hazards.has('permafrost')) {
+    return 'the worst of the soft spots';
+  }
+  if (hazards.has('washout') || hazards.has('erosion')) {
+    return 'the washed-out stretch';
+  }
+  if (terrain === 'steep' || hazards.has('grade') || hazards.has('rockslide') || hazards.has('narrow')) {
+    return 'the steepest pitches';
+  }
+  return 'the roughest ground';
+}
+
 function buildRoutePlan(choiceId, journey, currentBlock, nextBlock) {
   const preset = ROUTE_PRESETS[choiceId] || ROUTE_PRESETS.mainline;
   const terrainLabel = formatTerrainLabel(nextBlock?.terrain || currentBlock?.terrain || 'unknown').toLowerCase();
@@ -1582,7 +1856,7 @@ function buildRoutePlan(choiceId, journey, currentBlock, nextBlock) {
   let note = 'You hold to the existing line and keep the crew on a steady tempo.';
 
   if (choiceId === 'detour') {
-    note = `You swing wide around the roughest ${terrainLabel} and lose time, but the crew gets a cleaner line.`;
+    note = `You take the longer, better-graded line around ${describeDetourObstacle(nextBlock, currentBlock)} and lose time, but the crew gets a cleaner ${terrainLabel} leg.`;
   } else if (choiceId === 'shortcut') {
     note = `You cut a rough shortcut through the ${terrainLabel}, gambling that the extra speed is worth the wear.`;
   } else if (hazardCount > 0) {
@@ -1685,6 +1959,17 @@ async function maybePromptRouteChoice(game, currentBlock) {
     return;
   }
 
+  // A flat leg with nothing on it is not a decision. The route call is only
+  // worth asking when the ground or the sky give it something to trade.
+  const flatQuietLeg = normalizeReconToken(nextBlock.terrain) === 'flat'
+    && (nextBlock.hazards || []).length === 0
+    && !journey.weather?.dangerous;
+  if (flatQuietLeg) {
+    journey.routePlan = buildRoutePlan('mainline', journey, currentBlock, nextBlock);
+    journey.routePlan.note = `Good road to ${nextBlock.name}. The crew rides easy and talks about lunch.`;
+    return;
+  }
+
   const hazardSummary = getRouteHazardSummary(currentBlock, nextBlock, journey.weather);
   const choice = await ui.promptChoice(
     hazardSummary || `Choose today's route to ${nextBlock.name}.`,
@@ -1722,11 +2007,11 @@ function applyReconTravelIntelPenalty(ui, journey, currentBlock, actionId) {
 
   if (!blockIntel.accessGroundTruthed && accessSeverity > 0) {
     const equipmentLoss = accessSeverity + pacePressure;
-    const fuelLoss = Math.max(1, accessSeverity - 1 + pacePressure);
+    const fuelLoss = Math.max(1, accessSeverity - 1 + pacePressure) * 4;
     journey.resources.equipment = Math.max(0, journey.resources.equipment - equipmentLoss);
     journey.resources.fuel = Math.max(0, journey.resources.fuel - fuelLoss);
     journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + accessSeverity);
-    ui.writeWarning(`You moved without ground-truthing the access. ${accessVerdict.summary} Equipment -${equipmentLoss}, fuel -${fuelLoss}, scrutiny +${accessSeverity}.`);
+    ui.writeWarning(`You moved without recording the road check. ${accessVerdict.summary} Equipment -${equipmentLoss}, fuel -${fuelLoss} L, scrutiny +${accessSeverity}.`);
 
     if (Math.random() < (0.08 * accessSeverity) + (pacePressure * 0.04)) {
       const activeCrew = journey.crew.filter((member) => member.isActive);
@@ -1739,55 +2024,67 @@ function applyReconTravelIntelPenalty(ui, journey, currentBlock, actionId) {
   }
 
   const valuesSweep = getReconValueSweepProfile(currentBlock, journey);
-  if (!blockIntel.valuesSwept && valuesSweep.needed) {
+  if (isPackageBlock(currentBlock) && !blockIntel.assessmentComplete && (!blockIntel.layoutWalked || !blockIntel.valuesSwept)) {
     const scrutinyGain = Math.min(3, Math.max(1, valuesSweep.tags.length));
     journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + scrutinyGain);
-    ui.writeWarning(`Sensitive-site checks remain unfinished: ${valuesSweep.notes.slice(0, 2).join('; ')}. Scrutiny +${scrutinyGain}.`);
+    ui.writeWarning(`${currentBlock.name} leaves the file open: ${getReconMissingSteps(journey, currentBlock).join(', ')} still to do. Scrutiny +${scrutinyGain}.`);
   }
 }
 
-function handleGroundTruthAccess(ui, journey, block) {
+/**
+ * The first shift on a block: boundary walked and ribboned, streams
+ * classified, terrain and soils noted, danger trees flagged. Writes the road
+ * check too if the truck never did (a block the crew started on).
+ */
+function handleLayoutShift(ui, journey, block) {
   if (!block) {
-    ui.write('There is no active block to ground-truth.');
+    ui.write('There is no active block to work.');
     return;
   }
 
-  const verdict = recordAccessVerdict(
-    journey,
-    block,
-    getBlockAccessVerdict(block, journey.weather, journey),
-    journey.weather
-  );
   const intel = getReconBlockIntel(journey, block);
-  intel.accessGroundTruthed = true;
-  intel.lastAccessDay = journey.day;
-
-  addDiscoveryTags(journey, inferDiscoveryTagsFromAccess(block, verdict, journey.weather), {
-    source: `ground-truth:${block.id}`,
-    severity: verdict.id === 'no_go' ? 3 : verdict.id === 'heli_only' || verdict.id === 'winter_only' ? 2 : 1,
-    note: verdict.summary,
-    details: {
-      blockId: block.id,
-      verdict: verdict.id
-    }
-  });
-
-  ui.writeHeader('GROUND-TRUTH ACCESS');
-  if (verdict.id === 'passable_now') {
-    ui.writePositive(formatAccessVerdict(verdict));
-  } else if (verdict.id === 'no_go' || verdict.id === 'heli_only') {
-    ui.writeDanger(formatAccessVerdict(verdict));
-  } else {
-    ui.writeWarning(formatAccessVerdict(verdict));
+  const recordedRoad = !intel.accessGroundTruthed;
+  const verdict = recordedRoad
+    ? recordAccessVerdict(journey, block, getBlockAccessVerdict(block, journey.weather, journey), journey.weather)
+    : (journey.accessVerdicts?.[block.id] || getBlockAccessVerdict(block, journey.weather, journey));
+  if (recordedRoad) {
+    intel.accessGroundTruthed = true;
+    intel.lastAccessDay = journey.day;
+    addDiscoveryTags(journey, inferDiscoveryTagsFromAccess(block, verdict, journey.weather), {
+      source: `ground-truth:${block.id}`,
+      severity: verdict.id === 'no_go' ? 3 : verdict.id === 'heli_only' || verdict.id === 'winter_only' ? 2 : 1,
+      note: verdict.summary,
+      details: { blockId: block.id, verdict: verdict.id }
+    });
   }
+  intel.layoutWalked = true;
+  intel.lastLayoutDay = journey.day;
 
-  const infrastructureLine = formatInfrastructureStatus(verdict);
-  if (infrastructureLine) {
-    ui.write(infrastructureLine);
+  const layout = getReconLayoutProfile(block);
+  ui.writeHeader('BOUNDARY SHIFT');
+  const rolls = Math.min(FLAGGING_PER_BLOCK, Number(journey.resources.flaggingTape) || 0);
+  if (Number.isFinite(journey.resources.flaggingTape)) {
+    journey.resources.flaggingTape = Math.max(0, journey.resources.flaggingTape - FLAGGING_PER_BLOCK);
+  }
+  ui.write(rolls >= FLAGGING_PER_BLOCK
+    ? `Boundary walked and ribboned; ${rolls} rolls of flagging hung, corners tied in with the GPS.`
+    : 'Boundary walked; the crew is out of flagging and ties the corners with survey tape and a promise to come back with ribbon.');
+  for (const line of layout.streams) ui.write(`Stream: ${line}.`);
+  for (const line of layout.terrain) ui.write(`Terrain: ${line}.`);
+  for (const line of layout.dangerTrees) ui.write(`Danger trees: ${line}.`);
+
+  if (recordedRoad) {
+    ui.write('');
+    if (verdict.id === 'passable_now') ui.writePositive(formatAccessVerdict(verdict));
+    else if (verdict.id === 'no_go' || verdict.id === 'heli_only') ui.writeDanger(formatAccessVerdict(verdict));
+    else ui.writeWarning(formatAccessVerdict(verdict));
+    const infrastructureLine = formatInfrastructureStatus(verdict);
+    if (infrastructureLine) ui.write(infrastructureLine);
+    ui.write('Road check recorded. This is a field observation, not authorization to build a road or use a damaged crossing.');
   }
 
   journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
-  ui.write('Road check recorded. This is a field observation, not authorization to build a road or use a damaged crossing.');
+  ui.write('Traverse notes and stream cards go in the file. One more shift on the ground closes the package.', 'term-dim');
   maybeFinalizeReconAssessment(ui, journey, block);
 }
 
@@ -1802,30 +2099,106 @@ function handleValuesSweep(ui, journey, block) {
   intel.valuesSwept = true;
   intel.lastValuesDay = journey.day;
 
-  ui.writeHeader('VALUES SWEEP');
+  ui.writeHeader('WTP, WILDLIFE & CH SWEEP');
   if (!sweep.needed) {
-    ui.write('The block reads quiet. No new water, cultural, or visibility concerns stand out today.');
-    journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
+    ui.write('A waypoint, not a block. Nothing to sweep here beyond the road notes.');
     return;
   }
 
-  addDiscoveryTags(journey, sweep.tags, {
-    source: `values-sweep:${block.id}`,
-    severity: 2,
-    note: sweep.notes.join(' | '),
-    details: {
-      blockId: block.id,
-      weather: journey.weather?.id || null
-    }
-  });
+  if (sweep.tags.length) {
+    addDiscoveryTags(journey, sweep.tags, {
+      source: `values-sweep:${block.id}`,
+      severity: 2,
+      note: sweep.notes.join(' | '),
+      details: {
+        blockId: block.id,
+        weather: journey.weather?.id || null
+      }
+    });
+  }
 
   for (const note of sweep.notes) {
     ui.write(note.charAt(0).toUpperCase() + note.slice(1) + '.');
   }
-  const labels = sweep.tags.map((tagId) => getDiscoveryTagDefinition(tagId)?.label || tagId);
-  ui.writePositive(`Logged: ${labels.join(', ')}`);
-  journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - Math.min(2, sweep.tags.length));
+  if (sweep.tags.length) {
+    const labels = sweep.tags.map((tagId) => getDiscoveryTagDefinition(tagId)?.label || tagId);
+    ui.writePositive(`Carry-forward for the site plan: ${labels.join('; ')}`);
+  } else {
+    ui.writePositive('Recorded for the site plan. No carry-forward flags off this block.');
+  }
+  journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - Math.min(2, Math.max(1, sweep.tags.length)));
   maybeFinalizeReconAssessment(ui, journey, block);
+}
+
+/**
+ * Drive to town and bring back a Level 3 attendant. One shift, paid by
+ * remoteness; the crew is legal to work again tomorrow.
+ */
+function handleReplaceAttendant(ui, journey) {
+  const cost = priceByRemoteness(journey, ATTENDANT_REPLACEMENT_COST);
+  const cash = Number(journey.resources.budget || 0);
+  ui.writeHeader('REPLACEMENT ATTENDANT');
+  if (cash < cost) {
+    ui.writeWarning(`The office will not release a Level 3 without $${cost} on the card. Cash on hand: $${Math.round(cash)}.`);
+    ui.write('The crew stays in camp on light duties. Nobody works a line until an attendant is back.');
+    return;
+  }
+  journey.resources.budget = Math.max(0, cash - cost);
+  const role = FIELD_ROLES.find((r) => r.id === 'medic');
+  const replacement = generateCrewMember('field', role || null);
+  const names = new Set(journey.crew.map((m) => m.name));
+  let guard = 0;
+  while (names.has(replacement.name) && guard++ < 20) {
+    replacement.name = generateCrewMember('field', role || null).name;
+  }
+  journey.crew.push(replacement);
+  ui.writePositive(`${replacement.name} (OFA 3, with the ETV) rides back out with the driver. $${cost} on the card.`);
+  ui.write('WorkSafeBC first aid coverage is back in place. The crew can work the line tomorrow.');
+}
+
+/**
+ * A cardlock fuel run: one truck, one shift, priced by how far out the crew is.
+ */
+function handleFuelRun(ui, journey) {
+  const cost = priceByRemoteness(journey, FUEL_RUN_BASE_COST);
+  const cash = Number(journey.resources.budget || 0);
+  ui.writeHeader('FUEL RUN');
+  if (cash < cost) {
+    ui.writeWarning(`The cardlock wants $${cost} and the card has $${Math.round(cash)} on it. The driver comes back with coffee and no fuel.`);
+    return;
+  }
+  journey.resources.budget = Math.max(0, cash - cost);
+  journey.resources.fuel = Math.min(FIELD_RESOURCES.fuel.max, (journey.resources.fuel || 0) + FUEL_RUN_LITRES);
+  ui.writePositive(`The driver fills two jerry cans and the tank at the cardlock. Fuel +${FUEL_RUN_LITRES} L, $${cost}. Fuel now ${Math.round(journey.resources.fuel)} L.`);
+}
+
+/**
+ * A grocery run to town: one truck, one shift, a crate and the camp box
+ * refilled, priced by how far out the crew is.
+ */
+function handleGroceryRun(ui, journey) {
+  const cost = priceByRemoteness(journey, GROCERY_RUN_BASE_COST);
+  const cash = Number(journey.resources.budget || 0);
+  ui.writeHeader('GROCERY RUN');
+  if (cash < cost) {
+    ui.writeWarning(`The store wants $${cost} and the card has $${Math.round(cash)} on it. The driver comes back with a bag of apples and an apology.`);
+    return;
+  }
+  journey.resources.budget = Math.max(0, cash - cost);
+  journey.resources.food = Math.min(FIELD_RESOURCES.food.max, (journey.resources.food || 0) + GROCERY_RUN_FOOD);
+  ui.writePositive(`The driver fills the cooler and the dry box in town. Food +${GROCERY_RUN_FOOD} person-days, $${cost}. Food now ${Math.round(journey.resources.food)} person-days.`);
+}
+
+/**
+ * Freight economics for anything bought out here: the deeper into the
+ * traverse, the more everything costs.
+ */
+function priceByRemoteness(journey, base) {
+  const remoteness = journey.totalDistance > 0
+    ? Math.min(1, journey.distanceTraveled / journey.totalDistance)
+    : 0;
+  const priceFactor = 1 + remoteness * 0.45 + (journey.day > 15 ? 0.1 : 0);
+  return Math.round((base * priceFactor) / 10) * 10;
 }
 
 // Keep the saved action value for compatibility, but require real fieldwork.
@@ -1846,16 +2219,16 @@ function handleFieldNotebook(ui, journey) {
     ui.write('No earlier blocks need a field follow-up. Use Work the block for checks at your current location.');
     return false;
   }
-  if ((journey.resources.fuel || 0) < 4) {
-    ui.writeWarning('The return field visit needs 4 fuel. Resupply before sending the crew.');
+  if ((journey.resources.fuel || 0) < NOTEBOOK_FUEL_L) {
+    ui.writeWarning(`The return field visit needs ${NOTEBOOK_FUEL_L} L. Resupply before sending the crew.`);
     return false;
   }
 
-  journey.resources.fuel -= 4;
+  journey.resources.fuel -= NOTEBOOK_FUEL_L;
   ui.writeHeader('RETURN FIELD VISIT');
-  ui.write(`The crew revisits ${target.block.name}, then returns to camp. Fuel used: 4.`);
-  if (!target.intel.accessGroundTruthed) {
-    handleGroundTruthAccess(ui, journey, target.block);
+  ui.write(`The crew revisits ${target.block.name}, then returns to camp. Fuel used: ${NOTEBOOK_FUEL_L} L.`);
+  if (!target.intel.layoutWalked) {
+    handleLayoutShift(ui, journey, target.block);
   } else {
     handleValuesSweep(ui, journey, target.block);
   }
@@ -1875,8 +2248,8 @@ function handleScoutAhead(ui, journey) {
   const nextBlock = journey.blocks[nextIndex];
   const hasSpotter = journey.crew.some(m => m.isActive && m.role === 'spotter');
 
-  ui.writeHeader('SCOUT REPORT');
-  ui.write(`Next: ${nextBlock.name}`);
+  ui.writeHeader('ROAD SCOUT');
+  ui.write(`Next: ${nextBlock.name}${isPackageBlock(nextBlock) ? ' (block)' : ' (waypoint)'}`);
   ui.write(`Terrain: ${nextBlock.terrain} | Distance: ${nextBlock.distance} km`);
   ui.write(`Description: ${nextBlock.description}`);
 
@@ -1922,9 +2295,9 @@ function handleScoutAhead(ui, journey) {
     if (blocksAhead.length > 0) {
       const supplyBlocks = blocksAhead.filter(b => b.hasSupply);
       if (supplyBlocks.length > 0) {
-        ui.writePositive(`Spotter reports supply point at ${supplyBlocks[0].name} (${supplyBlocks[0].distance} km ahead).`);
+        ui.writePositive(`The compassman reports a supply point at ${supplyBlocks[0].name} (${supplyBlocks[0].distance} km on).`);
       } else {
-        ui.write('Spotter sees no supply points in the next few blocks.');
+        ui.write('The compassman sees no supply points in the next few stops.');
       }
     }
   }
@@ -1960,17 +2333,18 @@ export async function handleResupply(game, block) {
   };
 
   const offers = [
-    { id: 'fuel_drum', label: 'Fuel Drum', description: '+40 fuel', cost: priced(180), apply: () => { journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 40); } },
-    { id: 'rations', label: 'Rations Crate', description: '+20 food', cost: priced(160), apply: () => { journey.resources.food = clampToMax('food', journey.resources.food + 20); } },
-    { id: 'first_aid', label: 'First Aid Kit', description: '+1 kit', cost: priced(120), apply: () => { journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 1); } },
-    { id: 'field_repair', label: 'Field Repair', description: '+15% equipment', cost: priced(220), apply: () => { journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 15); } },
+    { id: 'fuel_drum', label: 'Fuel drum (+200 L)', description: 'A 205 L drum of diesel, pumped into the tanks and the cans', cost: priced(360), apply: () => { journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 200); } },
+    { id: 'rations', label: 'Rations crate (+20 person-days)', description: 'Four days of camp food for five', cost: priced(160), apply: () => { journey.resources.food = clampToMax('food', journey.resources.food + 20); } },
+    { id: 'first_aid', label: 'First aid kit (+1 kit)', description: 'Level 3 kit restock', cost: priced(120), apply: () => { journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 1); } },
+    { id: 'flagging', label: 'Flagging (+12 rolls)', description: 'Ribbon for the next four boundaries', cost: priced(60), apply: () => { journey.resources.flaggingTape = Math.min(60, (journey.resources.flaggingTape || 0) + 12); } },
+    { id: 'field_repair', label: 'Field repair (+15% equipment)', description: 'Tires, a fuel filter, a chain and bar', cost: priced(220), apply: () => { journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 15); } },
     {
       id: 'full_restock',
-      label: 'Full Restock',
-      description: '+50 fuel, +25 food, +20% equip, +2 kits',
-      cost: priced(650),
+      label: 'Full restock',
+      description: '+200 L fuel, +25 person-days food, +20% equipment, +2 kits',
+      cost: priced(700),
       apply: () => {
-        journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 50);
+        journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 200);
         journey.resources.food = clampToMax('food', journey.resources.food + 25);
         journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 20);
         journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 2);
@@ -2053,7 +2427,9 @@ export async function handleTriage(game) {
     const healed = healCrewMember(target, treated.cleared ? 14 : 8);
     if (healed.message) ui.writePositive(healed.message);
     if (!treated.cleared) {
-      ui.write('They are stabilized for now, but this will take another treatment day or a rest shift to finish.');
+      ui.write(effectId === 'broken_arm'
+        ? 'Splinted and slung. They ride in the truck and do the paperwork until it is cleared; another treatment day or a rest shift finishes it.'
+        : 'They are stabilized for now, but this will take another treatment day or a rest shift to finish.');
     }
   } else {
     const healed = healCrewMember(target, 25);
@@ -2078,7 +2454,7 @@ export async function handleMaintenance(game) {
     },
     {
       label: 'Hire Mobile Mechanic',
-      description: '+25% equipment, costs $250',
+      description: '+25% equipment, costs $600 (call-out and mileage)',
       value: 'pro'
     }
   ];
@@ -2086,11 +2462,11 @@ export async function handleMaintenance(game) {
   const choice = await ui.promptChoice('How do you handle maintenance?', options);
 
   if (choice.value === 'pro') {
-    if (cash < 250) {
+    if (cash < 600) {
       ui.writeWarning('Not enough cash to hire a mechanic.');
       return;
     }
-    journey.resources.budget = Math.max(0, cash - 250);
+    journey.resources.budget = Math.max(0, cash - 600);
     journey.resources.equipment = Math.min(100, journey.resources.equipment + 25);
     ui.writePositive('Equipment serviced and patched up.');
     return;
@@ -2110,18 +2486,40 @@ export async function handleMaintenance(game) {
   }
 }
 
+/**
+ * Whether this stop has an emergency crate the crew has not already pulled.
+ * One crate per cache — a supply point, a fire cache or a fuel cache — for
+ * the whole season. It used to be raided every day.
+ */
+function canPullRationCache(journey, block) {
+  if (!block?.id) return false;
+  const features = new Set((block.features || []).map(normalizeReconToken));
+  const cached = block.hasSupply || features.has('fire_cache') || features.has('fuel_cache');
+  if (!cached) return false;
+  if ((journey.resources.fuel || 0) < CACHE_FUEL_L) return false;
+  return !(journey.rationCacheUsedAtBlockIds || []).includes(block.id);
+}
+
 /** Recover a known emergency cache instead of treating wildlife as routine provisioning. */
 function retrieveCachedRations(ui, journey) {
+  const block = journey.blocks[journey.currentBlockIndex];
+  if (!canPullRationCache(journey, block)) {
+    ui.writeWarning('There is no sealed crate left at this stop.');
+    return;
+  }
+  journey.rationCacheUsedAtBlockIds = journey.rationCacheUsedAtBlockIds || [];
+  journey.rationCacheUsedAtBlockIds.push(block.id);
+
   const foodBefore = Number(journey.resources.food || 0);
   const fuelBefore = Number(journey.resources.fuel || 0);
   const foodRecovered = Math.min(12, Math.max(0, FIELD_RESOURCES.food.max - foodBefore));
-  const fuelUsed = Math.min(3, fuelBefore);
+  const fuelUsed = Math.min(CACHE_FUEL_L, fuelBefore);
 
   journey.resources.food = foodBefore + foodRecovered;
   journey.resources.fuel = Math.max(0, fuelBefore - fuelUsed);
 
   ui.write('');
   ui.writeHeader('RATION CACHE');
-  ui.writePositive(`Recovered ${foodRecovered} person-days of sealed field rations.`);
-  ui.write(`Fuel used reaching the cache: ${fuelUsed}. Food now ${Math.round(journey.resources.food)} person-days.`);
+  ui.writePositive(`The sealed crate was where the map said. ${foodRecovered} person-days.`);
+  ui.write(`Fuel used reaching the cache: ${fuelUsed} L. Food now ${Math.round(journey.resources.food)} person-days.`);
 }

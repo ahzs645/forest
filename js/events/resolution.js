@@ -4,7 +4,7 @@
  */
 
 import { isFieldJourney, isDeskJourney } from './constants.js';
-import { applyRandomInjury, applyStatusEffect } from '../crew.js';
+import { applyRandomInjury, applyStatusEffect, evacuateCrewMember } from '../crew.js';
 import { syncBlocksFromDistance } from '../journey/blockNav.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
@@ -23,6 +23,15 @@ const MAX_TRAVEL_SETBACK = 0.75;
  * same retired eight-hour scale.
  */
 const DESK_DELAY_STRAIN = 2;
+
+/**
+ * Authored field-event fuel deltas are still written on the old gallon scale
+ * (js/data/json/field/events.json, "fuel": -8). The stockpile is litres now
+ * (js/resources.js), so every authored delta is scaled here, at application,
+ * rather than in sixty places of content. A -8 in the deck is -32 L on the
+ * truck.
+ */
+const FUEL_EFFECT_SCALE = 4;
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
@@ -84,14 +93,16 @@ export function resolveEvent(journey, event, option) {
     applyEventEffects(journey, effects, messages);
   }
 
-  // Band-specific crew consequences fire in addition to any the option always
-  // carries, so "you get away with it" and "someone gets hurt doing it" can be
-  // different futures rather than the same one at two sizes.
-  if (option.crewEffect) {
-    handleCrewEffect(journey, option.crewEffect, messages);
-  }
-  if (resolved.crewEffect) {
-    handleCrewEffect(journey, resolved.crewEffect, messages);
+  // The option's own crewEffect describes the good band ("taped, laced tight,
+  // back on light duty"); the partial and bad bands carry their own. Applying
+  // both used to narrate a fracture and a truck at first light while the
+  // state said "sprained ankle" and kept them working.
+  const bandCrewEffect = resolved.band === 'good' || !resolved.band
+    ? option.crewEffect
+    : (resolved.crewEffect || null);
+  journey.lastEventVictimId = null;
+  if (bandCrewEffect) {
+    handleCrewEffect(journey, bandCrewEffect, messages);
   }
 
   // What the band leaves behind. This is what stops a bad outcome from being
@@ -128,8 +139,8 @@ export function resolveEvent(journey, event, option) {
     journey.travelSetback = Math.min(MAX_TRAVEL_SETBACK, (journey.travelSetback || 0) + setback);
     if (setback > 0) {
       messages.push(setback >= 0.35
-        ? 'Sorting that out swallowed most of the shift. The crew makes little ground today.'
-        : 'Sorting that out cost the crew ground today.');
+        ? 'Sorting that out eats most of tomorrow\'s leg.'
+        : 'Sorting that out eats into tomorrow\'s leg.');
     }
   }
 
@@ -213,9 +224,10 @@ function applyEventEffects(journey, effects, messages) {
       messages.push(`Cash: ${label}`);
     }
     if (typeof effects.fuel === 'number' && typeof journey.resources?.fuel === 'number') {
+      const litres = Math.round(effects.fuel * FUEL_EFFECT_SCALE);
       journey.resources.fuel = Math.max(0,
-        Math.min(FIELD_RESOURCES.fuel.max, journey.resources.fuel + effects.fuel));
-      if (effects.fuel < 0) messages.push(`Fuel: ${effects.fuel} gallons`);
+        Math.min(FIELD_RESOURCES.fuel.max, journey.resources.fuel + litres));
+      if (litres < 0) messages.push(`Fuel: ${litres} L`);
     }
     if (typeof effects.food === 'number' && typeof journey.resources?.food === 'number') {
       journey.resources.food = Math.max(0,
@@ -447,7 +459,7 @@ function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
         if (progressPoints < 0 && effects.progressMode !== 'turn_back') {
           const setback = Math.min(MAX_TRAVEL_SETBACK, Math.abs(progressPoints) / 16);
           journey.travelSetback = Math.min(MAX_TRAVEL_SETBACK, (journey.travelSetback || 0) + setback);
-          messages.push(`Travel delay queued; no ground is lost (${Math.abs(progressPoints)} km-equivalent setback).`);
+          messages.push(`Tomorrow's leg will be slower (about ${Math.abs(progressPoints)} km less ground).`);
         } else {
           journey.distanceTraveled = Math.max(0, journey.distanceTraveled + progressPoints);
           syncBlocksFromDistance(journey);
@@ -627,11 +639,14 @@ function advancePlanningPhaseIfReady(journey, messages) {
  * Handle crew-specific effects
  */
 function handleCrewEffect(journey, crewEffect, messages) {
+  let injured = null;
   if (crewEffect.injury) {
     const victim = pickRandomCrewMember(journey.crew);
     if (victim) {
       const result = applyStatusEffect(victim, crewEffect.injury);
       if (result.message) messages.push(result.message);
+      injured = victim;
+      journey.lastEventVictimId = victim.id;
     }
   }
 
@@ -661,17 +676,28 @@ function handleCrewEffect(journey, crewEffect, messages) {
   if (crewEffect.evacuate_sick) {
     const victim = (journey.crew || []).find(m => m.isActive && m.statusEffects?.length > 0);
     if (victim) {
-      victim.isActive = false;
-      messages.push(`${victim.name} has been sent to town for medical care.`);
+      const evac = evacuateCrewMember(victim, { day: journey.day, reason: 'illness' });
+      if (evac.message) messages.push(evac.message);
     }
   }
 
   if (crewEffect.evacuate) {
-    const victim = journey.crew.find(m => m.isActive &&
-      m.statusEffects.some(e => e.effectId === crewEffect.injury));
+    // Whoever this band hurt goes out: the member it just injured, else the
+    // one carrying the named condition, else the day's victim, else whoever is
+    // hurt, else a random active hand. "Send them out for medical care" has to
+    // actually send someone.
+    const crew = journey.crew || [];
+    const victim = injured
+      || (crewEffect.injury && crew.find(m => m.isActive && m.statusEffects?.some(e => e.effectId === crewEffect.injury)))
+      || (journey.lastEventVictimId && crew.find(m => m.isActive && m.id === journey.lastEventVictimId))
+      || crew.find(m => m.isActive && (m.statusEffects?.length || 0) > 0)
+      || pickRandomCrewMember(crew);
     if (victim) {
-      victim.isActive = false;
-      messages.push(`${victim.name} has been evacuated for medical care.`);
+      if (crewEffect.injury && !victim.statusEffects?.some(e => e.effectId === crewEffect.injury)) {
+        applyStatusEffect(victim, crewEffect.injury);
+      }
+      const evac = evacuateCrewMember(victim, { day: journey.day, reason: 'injury' });
+      if (evac.message) messages.push(evac.message);
     }
   }
 

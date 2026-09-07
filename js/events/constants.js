@@ -17,18 +17,18 @@ export function isDeskJourney(journeyType) {
 }
 
 export const GENERIC_RADIO_TASKS = [
-  'cruising a transect',
-  'checking access lines',
-  'flagging boundaries',
-  'scouting terrain',
-  'marking hazards'
+  'running a boundary',
+  'classifying a stream',
+  'putting in cruise plots',
+  'walking a road location',
+  'flagging a WTP'
 ];
 
 export const RADIO_TASKS_BY_ROLE = {
-  driver: ['checking access roads', 'shuttling gear', 'moving fuel drums'],
-  mechanic: ['inspecting the ATV', 'tuning saws', 'fixing a winch line'],
-  medic: ['running a safety sweep', 'checking med kits', 'monitoring fatigue'],
-  faller: ['clearing danger trees', 'opening a sight line', 'topping hazard snags'],
-  bucker: ['measuring stems', 'bucking windthrow', 'tagging log decks'],
-  spotter: ['flagging boundaries', 'scouting slope breaks', 'logging wildlife sign']
+  driver: ['walking a road location', 'shuttling gear', 'moving fuel drums'],
+  mechanic: ['looking at the quad', 'sharpening the brush saws', 'fixing a winch line'],
+  medic: ['checking the ETV', 'restocking the kit', 'watching the crew for fatigue'],
+  faller: ['running a boundary', 'hanging ribbon on the north line', 'tying in a corner'],
+  bucker: ['putting in cruise plots', 'calling defect on the big spruce', 'checking a plot against the typing'],
+  spotter: ['classifying a stream', 'chaining a line', 'flagging a WTP']
 };

@@ -1,14 +1,14 @@
 {
   "departure": {
-    "death_injury": [
-      "{name} succumbed to their injuries.",
-      "{name} didn't make it through the night.",
-      "Despite everyone's efforts, {name} passed away."
+    "evacuated_injury": [
+      "{name} is flown out. WorkSafeBC is notified and the shift stops.",
+      "{name} goes out in the ETV with the attendant. WorkSafeBC gets the call from the truck.",
+      "{name} is driven to town. The doctor pulls them for the season."
     ],
-    "death_illness": [
-      "{name} died from illness.",
-      "{name} grew weaker each day until they were gone.",
-      "The sickness took {name} from us."
+    "evacuated_illness": [
+      "{name} is driven to town. The doctor pulls them for the season.",
+      "{name} is too sick to stay in camp. One truck runs them to the clinic and they do not come back this season.",
+      "{name} is flown out. WorkSafeBC is notified and the shift stops."
     ],
     "quit_morale": [
       "{name} packed their bags and left camp.",
@@ -18,7 +18,7 @@
     ],
     "quit_fear": [
       "{name} refused to continue after seeing the conditions.",
-      "{name} said this job isn't worth dying for.",
+      "{name} said no block is worth getting hurt for.",
       "After the incident, {name} wouldn't get back in the truck."
     ]
   },

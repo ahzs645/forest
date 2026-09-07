@@ -93,17 +93,31 @@ test('recce smoke exposes role-specific ground-truth actions', async ({ page }) 
 
   // Block intel renders as a mission-pane fact now, not a log line.
   await expect(page.locator('#mission-panel .mission-fact-label').filter({ hasText: 'Intel' })).toBeVisible();
-  // The outstanding block work is one option now ("Work the block", described
-  // by whichever step is actually outstanding) rather than a separate
-  // Ground-Truth Access / Values Sweep pair — see docs/day_as_situation.md.
-  await resolveUntil(
-    page,
-    async () => (await page.locator('#choices').textContent())?.includes('Work the block') ?? false,
-    2
-  );
+  // The crew musters at a staging lot, which is a waypoint with no package.
+  // Stand it on the first cutblock (the truck's arrival has already written
+  // the road notes) and re-open the card through a free look-up so the menu
+  // is rebuilt for that stop.
+  await expect(page.locator('#choices button').filter({ hasText: 'Set the tempo' })).toBeVisible();
+  await page.evaluate(() => {
+    const journey = window.__forestGame.journey;
+    const index = journey.blocks.findIndex((stop) => stop.kind === 'block');
+    journey.currentBlockIndex = index;
+    journey.distanceTraveled = journey.blocks.slice(0, index + 1).reduce((sum, stop) => sum + stop.distance, 0);
+    journey.reconIntel = journey.reconIntel || { byBlock: {} };
+    journey.reconIntel.byBlock[journey.blocks[index].id] = {
+      accessGroundTruthed: true, layoutWalked: false, valuesSwept: false, assessmentComplete: false,
+      lastAccessDay: journey.day, lastLayoutDay: 0, lastValuesDay: 0,
+    };
+  });
+  await page.locator('#choices button').filter({ hasText: 'Set the tempo' }).click();
+  await page.locator('#choices button').filter({ hasText: 'Leave it' }).click();
+  await page.locator('#choices button').filter({ hasText: 'Full rations' }).click();
+  // The outstanding block work is one option ("Work the block", described by
+  // whichever shift is actually outstanding): the boundary shift first, then
+  // the WTP / wildlife / CH sweep — see docs/day_as_situation.md.
   const workTheBlock = page.locator('#choices button').filter({ hasText: 'Work the block' });
   await expect(workTheBlock).toBeVisible();
-  await expect(workTheBlock).toContainText('Check the road and crossing approaches');
+  await expect(workTheBlock).toContainText('Walk the boundary and ribbon it');
   await workTheBlock.click();
   await expect(page.locator('#choices button').filter({ hasText: 'Continue' })).toBeVisible();
   await page.locator('#choices button').filter({ hasText: 'Continue' }).click();

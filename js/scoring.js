@@ -111,8 +111,12 @@ export function getLetterGrade(score) {
 
 function scoreReconSpeed(journey) {
   const daysUsed = journey.day - 1;
+  // Two shifts a block plus the legs between stops is the competent pace.
   const totalBlocks = journey.blocks?.length || 10;
-  const optimalDays = Math.ceil(totalBlocks * 0.8);
+  const packages = Number.isFinite(journey.packageTarget) ? journey.packageTarget : totalBlocks;
+  const optimalDays = journey.journeyType === 'recon'
+    ? Math.ceil(packages * 2 + Math.max(0, totalBlocks - 1) * 0.8)
+    : Math.ceil(totalBlocks * 0.8);
   const ratio = optimalDays / Math.max(1, daysUsed);
   const score = Math.min(100, Math.round(ratio * 80));
   return { score, label: `${daysUsed} shifts (optimal: ~${optimalDays})` };
@@ -158,15 +162,17 @@ function scoreCrewWelfare(journey) {
   if (crew.length === 0) return { score: 50, label: 'No crew' };
 
   const active = crew.filter(m => m.isActive);
-  const dead = crew.filter(m => m.isDead);
+  // Nobody dies out here; the serious outcome is an evacuation (a medevac or
+  // an ETV run, WorkSafeBC notified, off the crew for the season).
+  const evacuated = crew.filter(m => !m.isActive && !m.hasQuit);
   const quit = crew.filter(m => m.hasQuit);
 
   let score = 50;
 
-  // Bonus for keeping everyone alive and active
-  if (dead.length === 0) score += 20;
+  // Bonus for bringing everyone home on their own feet
+  if (evacuated.length === 0) score += 20;
   if (quit.length === 0) score += 10;
-  score -= dead.length * 15;
+  score -= evacuated.length * 15;
   score -= quit.length * 8;
 
   // Average health and morale of survivors
@@ -178,7 +184,7 @@ function scoreCrewWelfare(journey) {
   }
 
   score = Math.max(0, Math.min(100, score));
-  const label = `${active.length}/${crew.length} active, ${dead.length} lost`;
+  const label = `${active.length}/${crew.length} active, ${evacuated.length} evacuated`;
   return { score, label };
 }
 
@@ -189,8 +195,8 @@ function scoreResourceEfficiency(journey) {
   let score = 50;
 
   // Remaining resources are good (didn't waste), but having too much means journey was too easy
-  const fuelPct = (r.fuel || 0) / 80;
-  const foodPct = (r.food || 0) / 35;
+  const fuelPct = (r.fuel || 0) / 320;
+  const foodPct = (r.food || 0) / 40;
   const equipPct = (r.equipment || 0) / 85;
 
   // Sweet spot: 10-40% remaining
@@ -203,7 +209,7 @@ function scoreResourceEfficiency(journey) {
   if (r.food <= 0) score -= 15;
 
   score = Math.max(0, Math.min(100, Math.round(score)));
-  return { score, label: `Fuel: ${Math.round(r.fuel || 0)}, Food: ${Math.round(r.food || 0)}` };
+  return { score, label: `Fuel: ${Math.round(r.fuel || 0)} L, Food: ${Math.round(r.food || 0)} person-days` };
 }
 
 function scoreDeskResourceEfficiency(journey) {

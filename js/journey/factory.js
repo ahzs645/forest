@@ -15,6 +15,7 @@ import { getPlanningCadenceDays } from "../data/planningBlocks.js";
 import { createSeasonState } from "../season.js";
 import { createProfessionalComplianceState } from "../engine.js";
 import { ACTIONS_PER_DAY } from './dayPlan.js';
+import { getPackageBlocks, isPackageBlock } from './packages.js';
 
 /**
  * Campaign-scale tuning (see docs/unified_campaign.md, section 3).
@@ -25,7 +26,10 @@ import { ACTIONS_PER_DAY } from './dayPlan.js';
  * full-size journey first and only trims it at the very end when scale is
  * requested, so unscaled createJourney() calls are unaffected.
  */
-const CAMPAIGN_RECON_BLOCK_COUNT = 6;
+// A campaign recon closes this many block packages. The stop list is trimmed
+// to the leading run of stops that contains them, so the waypoints (staging,
+// camps, bridges) between those blocks stay in as travel and supply beats.
+const CAMPAIGN_RECON_PACKAGE_COUNT = 3;
 const CAMPAIGN_STOCKPILE_SCALE = 0.45; // per-run field stockpiles (fuel/food/budget/...)
 // Campaign deployments run about two thirds of a full-length file's days now
 // that a day is one action (js/journey/dayPlan.js), so halving the desk budget
@@ -37,15 +41,27 @@ const CAMPAIGN_BUDGET_SCALE = 0.68; // desk-role (planning/permitting) budgets
 const CAMPAIGN_PERCENT_RESOURCE_KEYS = new Set(["equipment"]);
 
 /**
- * Trim an area's block list to a coherent, order-preserving subset for a
- * campaign-length recon/field traverse. Keeps the first supply-bearing
- * block if the natural leading subset would otherwise drop it.
+ * Trim an area's stop list to a coherent, order-preserving leading subset
+ * for a campaign-length recon/field traverse: every stop up to and including
+ * the Nth cutblock (js/journey/packages.js). Keeps the first supply-bearing
+ * stop if the leading subset would otherwise drop it.
  */
-function selectCampaignBlocks(blocks, count = CAMPAIGN_RECON_BLOCK_COUNT) {
-  if (!Array.isArray(blocks) || blocks.length <= count) {
-    return blocks.slice();
+function selectCampaignBlocks(blocks, packageCount = CAMPAIGN_RECON_PACKAGE_COUNT) {
+  if (!Array.isArray(blocks) || blocks.length === 0) {
+    return [];
   }
-  const subset = blocks.slice(0, count);
+  let seen = 0;
+  let end = blocks.length;
+  for (let index = 0; index < blocks.length; index += 1) {
+    if (isPackageBlock(blocks[index])) {
+      seen += 1;
+      if (seen >= packageCount) {
+        end = index + 1;
+        break;
+      }
+    }
+  }
+  const subset = blocks.slice(0, end);
   if (!subset.some((block) => block.hasSupply)) {
     const firstSupplyBlock = blocks.find((block) => block.hasSupply);
     if (firstSupplyBlock) {
@@ -198,7 +214,9 @@ export function createReconJourney(options = {}) {
     season: createSeasonState(roleId),
     scrutiny: 28,
 
-    // Recon-specific tracking
+    // Recon-specific tracking. Only cutblocks need packages; the staging
+    // lots, camps and bridges on the stop list are waypoints.
+    packageTarget: getPackageBlocks(baseJourney).length,
     blocksAssessed: 0,
     qualitySurveys: 0,
     verifiedBlocks: 0,
@@ -209,7 +227,8 @@ export function createReconJourney(options = {}) {
     resources: {
       ...baseJourney.resources,
       gpsUnits: campaignScale ? Math.round(5 * CAMPAIGN_STOCKPILE_SCALE) : 5,
-      flaggingTape: campaignScale ? Math.round(50 * CAMPAIGN_STOCKPILE_SCALE) : 50,
+      // Rolls of flagging: three a boundary, with a spare box for corners.
+      flaggingTape: campaignScale ? 12 : 24,
     },
     professional: createProfessionalComplianceState(
       roleId,

@@ -189,7 +189,7 @@ function reconPolicy(journey, options, prompt) {
     // triage is gated on first-aid kits that a long run has usually spent.
     if (hurting >= 2) wanted.push('end_shift', 'triage');
     else if (hurting >= 1) wanted.push('triage', 'end_shift');
-    if (food <= 12) wanted.push('food_cache');
+    if (food <= 12) wanted.push('food_cache', 'grocery_run');
     if (equipment <= 30) wanted.push('maintain');
     wanted.push('maintain', 'triage', 'food_cache', 'scout', 'end_shift');
     return pick(options, wanted) || options[0];
@@ -206,8 +206,11 @@ function reconPolicy(journey, options, prompt) {
       return pick(options, food <= 15 ? ['short', generous] : [generous, 'short']);
     }
     // Route, crossing, resupply, acknowledgements — prefer the safe line.
+    // A crossing is scouted first, then crossed by whatever it physically is
+    // (ford, bridge, ferry, culvert); a crossing that refuses the crew is
+    // gone around rather than waited out.
     const sub = pick(options, [
-      'detour', 'mainline', 'scout', 'ford', 'keep',
+      'detour', 'mainline', 'scout', 'ford', 'cross', 'ferry', 'reroute', 'keep',
       'rations', 'done', 'cancel', 'lean', 'skip', 'next', 'continue'
     ]);
     if (sub) return sub;
@@ -241,7 +244,8 @@ function reconPolicy(journey, options, prompt) {
   // the free options (set_tempo, consult_map, briefing) — a policy that did
   // would spin the day against FREE_LOOKUPS_PER_DAY instead of simulating.
   return pick(options, [
-    'ground_truth', 'values_sweep', 'clear_route_constraint', 'detour_route_constraint',
+    'replace_attendant', 'ground_truth', 'values_sweep',
+    'report_route_constraint', 'detour_route_constraint',
     'travel', 'field_notebook',
     'end_shift', 'next', 'continue', 'camp_menu'
   ]);

@@ -10,7 +10,10 @@ function setup() {
   journey.weather = { id: 'clear', name: 'Clear' };
   Object.assign(journey.resources, { food: 200, fuel: 100, equipment: 100 });
   journey.currentBlockIndex = 1;
-  journey.blocks[0].features = ['stream'];
+  // The staging lot is a waypoint in the data; make it a block so the return
+  // visit has a package to work.
+  journey.blocks[0].kind = 'block';
+  journey.blocks[0].features = ['creek'];
   journey.blocks[0].hazards = ['river_crossing'];
   return journey;
 }
@@ -48,27 +51,29 @@ test('field follow-up inspects one missing item per shift and records the actual
   const startDay = journey.day;
   const distance = journey.distanceTraveled;
   const first = await runShift(journey, (options) => {
-    if (options.some((o) => o.presentation === 'continue')) assert.equal(journey.resources.fuel, 96);
+    if (options.some((o) => o.presentation === 'continue')) assert.equal(journey.resources.fuel, 84);
   });
   const intel = journey.reconIntel.byBlock[block.id];
   assert.equal(intel.accessGroundTruthed, true);
-  assert.equal(intel.valuesSwept, false, 'one visit must not invent a sensitive-site survey');
+  assert.equal(intel.layoutWalked, true, 'the first visit walks the boundary and classifies the streams');
+  assert.equal(intel.valuesSwept, false, 'one visit must not invent a WTP/CH sweep');
   assert.equal(intel.assessmentComplete, false);
   assert.ok(journey.accessVerdicts[block.id], 'record the real road condition');
-  assert.ok(first.some((line) => line.includes('Fuel used: 4')));
-  assert.ok(journey.resources.fuel <= 96);
+  assert.ok(first.some((line) => line.includes('Fuel used: 16 L')));
+  assert.ok(first.some((line) => /^Stream: creek: S4/.test(line)), 'the boundary shift classifies the creek');
+  assert.ok(journey.resources.fuel <= 84);
   assert.equal(journey.day, startDay + 1);
   assert.equal(journey.currentBlockIndex, 1);
   assert.equal(journey.distanceTraveled, distance, 'a return visit is not forward traverse progress');
 
   const fuelBeforeSecondVisit = journey.resources.fuel;
   await runShift(journey, (options) => {
-    if (options.some((o) => o.presentation === 'continue')) assert.equal(journey.resources.fuel, fuelBeforeSecondVisit - 4);
+    if (options.some((o) => o.presentation === 'continue')) assert.equal(journey.resources.fuel, fuelBeforeSecondVisit - 16);
   });
   assert.equal(intel.valuesSwept, true);
   assert.equal(intel.assessmentComplete, true);
   assert.equal(journey.blocksAssessed, 1);
-  assert.ok(journey.resources.fuel <= fuelBeforeSecondVisit - 4);
+  assert.ok(journey.resources.fuel <= fuelBeforeSecondVisit - 16);
 });
 
 test('field follow-up cannot inspect unvisited ground or replace work at the current block', async () => {
@@ -94,7 +99,7 @@ test('a stop-work block is excluded from return field visits', async () => {
 
 test('insufficient fuel cannot fabricate follow-up observations', async () => {
   const journey = setup();
-  journey.resources.fuel = 3;
+  journey.resources.fuel = 12;
   await runShift(journey, (options) => {
     assert.equal(options.some((o) => o.value === 'field_notebook'), false);
   });
