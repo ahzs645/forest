@@ -108,7 +108,7 @@ test('illegal-act temptations have a priority draw from day two with a cooldown'
     journey.day = 2;
     const first = checkForEvent(journey);
     assert.equal(first?.type, 'temptation');
-    assert.match(first?.id || '', /^legacy_temptation_/);
+    assert.match(first?.id || '', /^temptation_/);
 
     journey.day = 3;
     const coolingDown = checkForEvent(journey);

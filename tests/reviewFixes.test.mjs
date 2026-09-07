@@ -154,7 +154,8 @@ test('event option hints disclose whether the response uses the day', () => {
   const mediaFormatted = formatEventForDisplay(media, 'planning');
   const written = mediaFormatted.options.find((option) => option.label === 'Provide a written statement only');
   assert.match(written.hint, /brief response; work continues/i);
-  assert.match(written.hint, /-1h/i);
+  // There is no hour clock any more: the time policy line is the whole story.
+  assert.doesNotMatch(written.hint, /-\d+h/i);
 
   const washout = FIELD_EVENTS.find((event) => event.id === 'road_washout');
   const washoutFormatted = formatEventForDisplay(washout, 'recon');
