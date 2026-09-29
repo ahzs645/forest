@@ -38,3 +38,14 @@ The balance harness drove 24 seeded campaign-length assignments per role using r
 The remaining simulated losses were supply/fuel exhaustion or planning bankruptcy. This is evidence that completion is reachable under a consistent strategy, not a population win-rate estimate or proof that every possible choice succeeds.
 
 The Mac remained locked during this implementation pass, so fresh verification used headless browser interaction and engine tests. The earlier visible manual campaign is documented separately. The updated local game is available at `http://127.0.0.1:5178/` while its development server is running.
+
+## 2026-09-29: recon field mechanics (playtest follow-up)
+
+- Event "+N km traverse" effects no longer move the crew. Gained ground is banked for the next leg, which still stops at the next stop, road check and crossing. Lost ground slows the next leg. A turn-back never goes behind the last stop.
+- Event options that cost more cash than the crew has are left off the card, and the card gives the reason.
+- Short rations are a standing order that holds until changed. An empty food box escalates health and morale loss every shift, rest does not offset it, and the crew drives out after six shifts. Full-or-short rations are not offered at zero food.
+- A leg that ends within 1.5 km of a stop finishes it.
+- Event fuel previews are in litres at the resolved scale, and gains are reported.
+- A broken arm or concussion is treated once and then heals with time (broken arm: 12 shifts). A second kit is not spent.
+- Resupply sells only what fits. The bear is reported to RAPP once. Fording a fish stream outside the summer work window costs scrutiny. The flood message matches the crossing type.
+- Recon expedition sims: 24/24 wins before and after. The median dropped from 27 to 24 shifts because of the arrival snap.
