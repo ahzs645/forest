@@ -335,7 +335,8 @@ async function autoPlayToEnd(page, strategyName, maxSteps = 360) {
     }
 
     await page.waitForSelector('#choices button', { timeout: 15000 });
-    const buttons = page.locator('#choices button');
+    // A disabled option (a crew on days off) is on the card, not a choice.
+    const buttons = page.locator('#choices button:not([disabled])');
     const labels = await buttons.evaluateAll((nodes) =>
       nodes.map((node) => node.innerText.replace(/\s+/g, ' ').trim())
     );
