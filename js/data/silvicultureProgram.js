@@ -35,6 +35,24 @@ export const BRUSH_RATES = {
 export const FILL_PRICE_PREMIUM = 0.06; // $/tree over the block price for fill work
 export const SURVEY_DAY_RATE = 1800;     // $/day, accredited survey contractor
 
+/**
+ * The free-growing list carries one more opening than the year must declare:
+ * not every stand reads free-growing when the surveyor walks it, and a stand
+ * that fails waits out its resurvey interval rather than going back on the
+ * list the next morning.
+ */
+export const FG_SPARE_CANDIDATES = 1;
+
+/** A stand that fails free-growing is prescribed treatment and resurveyed later. */
+export const FG_RESURVEY_YEARS = 2;
+
+/**
+ * Days before a released stand reads as released to a surveyor. Cut brush is
+ * down the day after the saws; grazed brush needs the flock to come back
+ * through; sprayed brush stands green for weeks before it browns out.
+ */
+export const RELEASE_TAKES_DAYS = { manual: 1, sheep: 3, glyphosate: 10 };
+
 function rand(min, max) {
   return min + Math.random() * (max - min);
 }
@@ -90,6 +108,7 @@ export function buildSilvicultureProgram(journey) {
   const seedlingsAllocated = Math.max(1000, Number(journey?.planting?.seedlingsAllocated) || 0);
   const brushTarget = Math.max(10, Number(journey?.brushing?.hectaresTarget) || 0);
   const fgTarget = Math.max(1, Number(journey?.surveys?.freeGrowingTarget) || 1);
+  const fgCandidates = fgTarget + FG_SPARE_CANDIDATES;
   const campaign = blocksToPlant <= 4;
 
   let nextNumber = 20 + Math.floor(Math.random() * 6);
@@ -110,6 +129,7 @@ export function buildSilvicultureProgram(journey) {
     status: 'pending',      // pending -> planting -> planted -> inspected
     quality: null,
     holdback: 0,
+    plantedDay: null,
     inspectedDay: null,
   }));
 
@@ -131,12 +151,13 @@ export function buildSilvicultureProgram(journey) {
     });
   }
 
-  // Free-growing candidates: 8–15 year old openings. One of them is still
-  // under brush and has to be released before the surveyor will pass it.
+  // Free-growing candidates: 8–15 year old openings, one more than the year
+  // must declare. One of them is still under brush and has to be released
+  // before the surveyor will pass it.
   const [fgMin, fgMax] = standard.fgWindow;
   const freeGrowing = [];
-  const releaseIndex = Math.floor(Math.random() * fgTarget);
-  for (let i = 0; i < fgTarget; i += 1) {
+  const releaseIndex = Math.floor(Math.random() * fgCandidates);
+  for (let i = 0; i < fgCandidates; i += 1) {
     const age = Math.round(rand(fgMin, fgMax));
     const needsRelease = i === releaseIndex;
     freeGrowing.push({
@@ -146,12 +167,15 @@ export function buildSilvicultureProgram(journey) {
       wellSpacedSph: Math.round(standard.mss * rand(1.15, 1.95)),
       // The stand's real condition: share of plots that would read
       // free-growing today. Under brush it fails on competition.
-      fgPlotPct: needsRelease ? Math.round(rand(46, 66)) : Math.round(rand(82, 96)),
+      fgPlotPct: needsRelease ? Math.round(rand(46, 66)) : Math.round(rand(84, 96)),
       needsRelease,
       released: false,
+      releasedDay: null,
       surveyed: false,
       result: null,
       attempts: 0,
+      // Program year the stand can next be surveyed after a failed survey.
+      resurveyYear: null,
     });
   }
 
@@ -191,6 +215,8 @@ export function buildSilvicultureProgram(journey) {
     fill,
     brush,
     freeGrowing,
+    // What the program started with, so the grade can read what it cost.
+    budgetStart: Number(journey?.resources?.budget) || null,
     // Free-form notes the mode appends to (spray maps, replant orders).
     notes: [],
   };
@@ -311,4 +337,114 @@ export function summarizeProgram(program) {
     fgDone: fg.filter((opening) => opening.surveyed && opening.result === 'pass').length,
     fgTotal: fg.length,
   };
+}
+
+/**
+ * Whether a free-growing candidate can go in front of a surveyor today: not
+ * already declared, not waiting out a resurvey interval, and not under brush
+ * or under a release treatment that has not taken yet.
+ * @param {Object} opening - free-growing candidate
+ * @param {Object} [context] - { year, day } of the program today
+ */
+export function isFreeGrowingSurveyable(opening, { year = PROGRAM_YEAR, day = 1 } = {}) {
+  if (!opening) return false;
+  if (opening.surveyed && opening.result === 'pass') return false;
+  if (Number.isFinite(opening.resurveyYear) && opening.resurveyYear > year) return false;
+  if (!opening.needsRelease) return true;
+  if (!opening.released) return false;
+  return !Number.isFinite(opening.releaseReadyDay) || day >= opening.releaseReadyDay;
+}
+
+/** Share of the stocking component a planting-quality average earns. */
+function qualityShare(quality) {
+  if (!Number.isFinite(quality)) return 0;
+  if (quality >= 90) return 1;
+  if (quality >= 85) return 0.5 + (quality - 85) / 10;
+  if (quality >= 80) return (quality - 80) / 10;
+  return 0;
+}
+
+/**
+ * Weights of each track in what "the program delivered" means. The year's
+ * planting carries the most, but fill, release and the declarations are each
+ * obligations on the licensee, and the plot cards say how well the trees
+ * went in.
+ */
+export const PROGRAM_TRACK_WEIGHTS = {
+  planting: 0.25,
+  inspection: 0.10,
+  fill: 0.15,
+  release: 0.20,
+  freeGrowing: 0.20,
+  stocking: 0.10,
+};
+
+/**
+ * Read the whole program against its obligations. This is the one
+ * definition of "delivered" that the win condition, the grade and the
+ * progress meter share.
+ * @param {Object} journey - silviculture journey
+ * @returns {{complete: boolean, delivered: number, parts: Object, shortfalls: string[], label: string}}
+ */
+export function assessSilvicultureProgram(journey) {
+  const program = journey?.program || {};
+  const planting = journey?.planting || {};
+  const surveys = journey?.surveys || {};
+  const brushing = journey?.brushing || {};
+  const blocks = Array.isArray(program.blocks) ? program.blocks : [];
+  const blocksToPlant = Math.max(1, Number(planting.blocksToPlant) || blocks.length || 1);
+  const blocksPlanted = Math.min(blocksToPlant, Number(planting.blocksPlanted) || 0);
+  const inspected = blocks.length
+    ? Math.min(blocksToPlant, blocks.filter((block) => block.status === 'inspected').length)
+    : blocksPlanted;
+
+  const fill = Array.isArray(program.fill) ? program.fill : [];
+  const fillTotal = fill.length || Number(planting.fillTarget) || 0;
+  const fillDone = fill.length
+    ? fill.filter((opening) => opening.done).length
+    : Math.min(fillTotal, Number(planting.fillComplete) || 0);
+
+  const brush = Array.isArray(program.brush) ? program.brush : [];
+  const releaseTotal = brush.length
+    ? brush.reduce((sum, opening) => sum + (Number(opening.ha) || 0), 0)
+    : Number(brushing.hectaresTarget) || 0;
+  const releaseDone = brush.length
+    ? brush.reduce((sum, opening) => sum + Math.min(Number(opening.ha) || 0, Number(opening.treated) || 0), 0)
+    : Math.min(releaseTotal, Number(brushing.hectaresComplete) || 0);
+  const releaseOpen = brush.filter((opening) => (Number(opening.treated) || 0) < (Number(opening.ha) || 0)).length;
+
+  const fgTarget = Math.max(1, Number(surveys.freeGrowingTarget) || 1);
+  const fgDone = Math.min(fgTarget, Number(surveys.freeGrowingComplete) || 0);
+  const quality = Number.isFinite(planting.qualityAverage) ? planting.qualityAverage : null;
+
+  const parts = {
+    planting: blocksPlanted / blocksToPlant,
+    inspection: inspected / blocksToPlant,
+    fill: fillTotal ? fillDone / fillTotal : 1,
+    release: releaseTotal ? Math.min(1, releaseDone / releaseTotal) : 1,
+    freeGrowing: fgDone / fgTarget,
+    stocking: qualityShare(quality) * (inspected / blocksToPlant),
+  };
+  const delivered = Object.entries(PROGRAM_TRACK_WEIGHTS)
+    .reduce((sum, [track, weight]) => sum + (parts[track] || 0) * weight, 0);
+
+  const shortfalls = [];
+  if (blocksPlanted < blocksToPlant) shortfalls.push(`${blocksToPlant - blocksPlanted} of ${blocksToPlant} blocks unplanted`);
+  else if (inspected < blocksToPlant) shortfalls.push(`${blocksToPlant - inspected} planted block${blocksToPlant - inspected === 1 ? '' : 's'} never inspected`);
+  if (fillDone < fillTotal) shortfalls.push(`fill ${fillDone}/${fillTotal}`);
+  if (releaseOpen > 0 || releaseDone < releaseTotal) shortfalls.push(`release ${Math.round(parts.release * 100)}% of ${Math.round(releaseTotal)} ha`);
+  if (fgDone < fgTarget) shortfalls.push(`free-growing ${fgDone}/${fgTarget}`);
+
+  const complete = blocksPlanted >= blocksToPlant
+    && inspected >= blocksToPlant
+    && fillDone >= fillTotal
+    && releaseOpen === 0
+    && releaseDone >= releaseTotal
+    && fgDone >= fgTarget;
+
+  const label = `${blocksPlanted}/${blocksToPlant} planted (${inspected} inspected), fill ${fillDone}/${fillTotal}, `
+    + `release ${Math.round(parts.release * 100)}%, FG ${fgDone}/${fgTarget}`
+    + (quality !== null ? `, quality ${quality}%` : '');
+
+  return { complete, delivered, parts, shortfalls, label };
 }

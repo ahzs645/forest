@@ -244,8 +244,6 @@ test('a stalled silviculture program closes after the outside delivery window', 
     resources: { budget: 21000, contractorCapacity: 3 }
   });
 
-  assert.deepEqual(result, {
-    gameOver: true,
-    reason: 'Silviculture program fell short of its targets'
-  });
+  assert.equal(result.gameOver, true);
+  assert.equal(result.reason, 'The season closed with the program short: 14 of 15 blocks unplanted, free-growing 0/5.');
 });

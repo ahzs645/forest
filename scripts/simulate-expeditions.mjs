@@ -441,10 +441,18 @@ function silviculturePolicy(journey, options, prompt) {
     const state = contractor.silvicultureState;
     return !contractor.isActive && state?.status !== 'recovering' && !(state?.cooldownDays > 0);
   });
-  // Plots before the planters move on, then this year's blocks, then the
-  // surveyor onto any opening that is ready (the older stands read better
-  // before the brush gets ahead of the calendar), then fill and release.
-  const wanted = ['inspect', 'plant', 'survey', 'fill', 'brush'];
+  // Plots before the planters move on. The older stands read best before the
+  // brush gets ahead of the calendar, and a failed free-growing survey waits
+  // out its resurvey interval, so the surveyor goes out early and the release
+  // crew is kept on the calendar. Then this year's blocks, fill and release.
+  const deadline = journey.deadline || 42;
+  const calendar = Math.min(1, (journey.day || 1) / deadline);
+  const brushRatio = (journey.brushing?.hectaresComplete || 0) / Math.max(1, journey.brushing?.hectaresTarget || 1);
+  const releaseBehind = calendar - brushRatio > 0.12;
+  const wanted = ['inspect'];
+  if (calendar - brushRatio < 0.2) wanted.push('survey');
+  if (releaseBehind) wanted.push('brush');
+  wanted.push('plant', 'survey', 'fill', 'brush');
   if (canDeploy) wanted.push('rotation');
   wanted.push('meeting', 'team_briefing', 'end', 'next', 'continue');
   return pick(options, wanted);
