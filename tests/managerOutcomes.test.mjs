@@ -200,7 +200,7 @@ test('a GM shortcut\'s operations are paid in margin: chip, stakes and applied a
   const cost = fittedFallout.options[0].effects;
   assert.equal(cost.progress, undefined);
   assert.ok(cost.budget < -9000);
-  assert.deepEqual(fittedFallout.stakes, [`What it costs: -$${Number((Math.abs(cost.budget) / 1000).toFixed(1))}k, -10 compliance.`]);
+  assert.deepEqual(fittedFallout.stakes, [`What it costs: -$${Number((Math.abs(cost.budget) / 1000).toFixed(1))}k, -10 compliance, +15 scrutiny.`]);
 });
 
 test('a woodlands manager who resigns leaves the seat, and an acting successor carries the posture', async () => {
