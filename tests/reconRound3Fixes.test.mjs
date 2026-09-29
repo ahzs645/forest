@@ -23,6 +23,8 @@ import { applyEventTravelEffect, executeFieldAction, fitEventToCrew, fitEventToR
 import { calculateScore, formatScoreDisplay } from '../js/scoring.js';
 import { addRouteConstraintFromEvent, getActiveRouteConstraint } from '../js/journey/routeConstraints.js';
 import { runDaySituation } from '../js/journey/daySituation.js';
+import { getCrossingContext } from '../js/journey/riverCrossing.js';
+import { buildVictoryNarrative, buildDefeatNarrative } from '../js/game/endScreen.js';
 import { buildCrewEpilogue } from '../js/game/debrief.js';
 
 function withRandom(value, fn) {
@@ -430,6 +432,27 @@ test('turning back to report a slide closes the road but slows the reopened leg 
   assert.ok(getActiveRouteConstraint(journey), 'the road is shut for the rest of the shift');
   const setback = Number(journey.travelSetback || 0) + Number(journey.pendingTravelSetback || 0);
   assert.ok(setback > 0 && setback <= 0.25, `setback ${setback}`);
+});
+
+test('a bridge gauge describes water under a deck, and endings are told from the run', () => {
+  const journey = slideJourney();
+  const bridge = { id: 'br', name: 'Salmo River Bridge', kind: 'waypoint', features: ['bridge', 'river'], hazards: [], terrain: 'river' };
+  const seen = new Set();
+  for (let i = 0; i < 40; i += 1) {
+    const ctx = withRandom((i + 0.5) / 40, () => getCrossingContext(journey, bridge));
+    if (ctx?.mode === 'bridge') seen.add(ctx.gaugeDescription);
+  }
+  assert.ok(seen.size > 0, 'the bridge was read as a bridge');
+  for (const line of seen) assert.doesNotMatch(line, /Thigh-deep|Knee-deep|swims/);
+
+  const won = createReconJourney({ areaId: 'tahltan-highland' });
+  won.distanceTraveled = won.totalDistance;
+  won.deadline = 40;
+  const story = buildVictoryNarrative(won, 'Tahltan Highland', 'The Timber Wolves', 25);
+  assert.doesNotMatch(story, /settled in/);
+  assert.match(story, /15 shifts left/);
+  const lost = buildDefeatNarrative({ ...won, distanceTraveled: 10, endReason: 'NO FOOD' }, 'Tahltan Highland', 'The Timber Wolves', 19);
+  assert.match(lost, /After 19 shifts, the Timber Wolves could go no further/);
 });
 
 // ── Block cards stay on open blocks ────────────────────────────────────────

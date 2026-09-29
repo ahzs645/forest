@@ -773,7 +773,7 @@
       "id": "thl-11",
       "name": "Block TH-11 - Highland Bench",
       "kind": "block",
-      "description": "The last block on the file, on a subarctic bench. The most remote timber in the province, bar none.",
+      "description": "The last block on the file, on a subarctic bench, about as far from a mill as timber gets.",
       "distance": 15,
       "terrain": "cutblock",
       "hasSupply": true,

@@ -1425,7 +1425,7 @@ export function updateReconMissionStatus(ui, journey) {
     { label: 'Weather', value: `${journey.weather?.name || 'Clear'}${tempC === null ? '' : ` ${tempC}°C`}` },
     { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
     { label: 'Days left', value: Number.isFinite(journey.deadline) ? `${Math.max(0, journey.deadline - journey.day)}` : '—' },
-    { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km` },
+    { label: 'Traverse', value: `${formatKm(journey.distanceTraveled)}/${formatKm(journey.totalDistance)} km` },
     { label: 'Stops', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` },
     {
       label: 'Scrutiny',
@@ -1648,6 +1648,11 @@ async function handleSetTempo(ui, journey) {
   }
 }
 
+/** Kilometres as the travel lines print them: a 6.5 km leg is not "7". */
+function formatKm(km) {
+  return String(Number((Number(km) || 0).toFixed(1)));
+}
+
 /** An occasional voice from the crew — not a daily ritual. */
 function maybeSpeakCrew(ui, journey) {
   const activeCrew = journey.crew.filter((m) => m.isActive);
@@ -1747,7 +1752,7 @@ function buildReconStatusLine(journey) {
  */
 function buildReconContextLines(journey) {
   const lines = [buildBlockMap(journey), '* supply point'];
-  lines.push(`Traverse: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`);
+  lines.push(`Traverse: ${formatKm(journey.distanceTraveled)}/${formatKm(journey.totalDistance)} km`);
   lines.push(`Packages: ${getPackagesFinalized(journey)}/${getPackageTarget(journey)} finalized`);
 
   // The briefing used to cost a slot on the decision list. It is reference
@@ -1803,7 +1808,7 @@ function displayDayHeader(ui, journey) {
     const into = getDistanceIntoCurrentSegment(journey);
     const kmToNext = Math.max(0, segment - into);
     ui.write(
-      `NEXT: ${nextBlock.name} — ${kmToNext.toFixed(1)} km   ·   TRAVELED: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`,
+      `NEXT: ${nextBlock.name} — ${kmToNext.toFixed(1)} km   ·   TRAVELED: ${formatKm(journey.distanceTraveled)}/${formatKm(journey.totalDistance)} km`,
       'term-dim'
     );
   }
