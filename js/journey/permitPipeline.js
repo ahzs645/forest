@@ -33,6 +33,8 @@ export const WSA_NOTIFICATION_WINDOW_DAYS = 45;
 export const DAILY_PERMIT_THROUGHPUT = 3;
 /** Heritage/referral load at which a cutting permit needs its own HCA permit. */
 export const HCA_HERITAGE_LOAD_THRESHOLD = 36;
+/** How much each clean deficiency response lifts that file's odds at decision. */
+export const CLEAN_RESPONSE_APPROVAL_LIFT = 0.25;
 
 export const PERMIT_LANES = ['drafted', 'screening', 'referral', 'decision', 'deficiency', 'issued'];
 
@@ -478,10 +480,18 @@ export function shortenPermitClock(journey, lanes, days = 1) {
  * back to the completeness screen (the district will not start the referral
  * clock until the package is whole); a substantive letter goes back to the
  * decision-maker, who does not re-run the referral.
+ *
+ * The file remembers what it was answered for: the district does not send
+ * the same letter about a gap the licensee has already closed, and a clean
+ * response makes the next decision more likely to issue (advancePermitClocks).
  */
-export function resubmitPermitFile(journey, fileId, { completeness = false, clockDays = null } = {}) {
+export function resubmitPermitFile(journey, fileId, { completeness = false, clockDays = null, clean = false } = {}) {
   const file = getPermitFileById(journey, fileId);
   if (!file || file.lane !== 'deficiency') return null;
+  if (file.deficiencyProfileId && clean) {
+    file.answeredProfiles = [...new Set([...(file.answeredProfiles || []), file.deficiencyProfileId])];
+  }
+  if (clean) file.cleanResponses = (file.cleanResponses || 0) + 1;
   file.deficiencyProfileId = null;
   enterLane(file, completeness ? 'screening' : 'decision', journey, { clockDays });
   syncPermitCounters(journey);
@@ -534,7 +544,9 @@ export function advancePermitClocks(journey, options = {}) {
     if (!Number.isFinite(file.clockCloses) || file.clockCloses > day) continue;
 
     if (file.lane === 'screening') {
-      if (random() < completenessReturnRate) {
+      // A package the licensee has already made whole is not bounced again.
+      const madeWhole = (file.answeredProfiles || []).includes('package-completeness');
+      if (!madeWhole && random() < completenessReturnRate) {
         file.deficiencyCount = (file.deficiencyCount || 0) + 1;
         file.deficiencyProfileId = 'package-completeness';
         enterLane(file, 'deficiency', journey);
@@ -560,7 +572,10 @@ export function advancePermitClocks(journey, options = {}) {
       result.held.push({ file, reason: hold.reason });
       continue;
     }
-    if (random() < approvalRate) {
+    // Each clean answer on this file closes a gap the decision-maker would
+    // otherwise find; a flat roll sent one file back eight times running.
+    const fileRate = Math.min(0.95, approvalRate + CLEAN_RESPONSE_APPROVAL_LIFT * (file.cleanResponses || 0));
+    if (random() < fileRate) {
       enterLane(file, 'issued', journey);
       result.issued.push({ file });
     } else {

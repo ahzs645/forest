@@ -465,7 +465,10 @@ function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
           journey.travelSetback = Math.min(MAX_TRAVEL_SETBACK, (journey.travelSetback || 0) + setback);
           messages.push(`Tomorrow's leg will be slower (about ${Math.abs(progressPoints)} km less ground).`);
         } else {
-          journey.distanceTraveled = Math.max(0, journey.distanceTraveled + progressPoints);
+          // Ground gained never runs past the end of the route: the traverse
+          // read 40/35 km after a late +5 km.
+          const routeEnd = Number.isFinite(journey.totalDistance) ? journey.totalDistance : Infinity;
+          journey.distanceTraveled = Math.min(routeEnd, Math.max(0, journey.distanceTraveled + progressPoints));
           syncBlocksFromDistance(journey);
         }
       }
@@ -543,6 +546,21 @@ function applyPlanningProgress(journey, progressPoints, messages, effects = {}) 
   if (!journey.plan) return;
   if (hasExplicitPlanningKey(effects)) return;
 
+  // A generic setback is time lost, not a gate unwound: evacuating for a fire
+  // or fixing a print job used to wipe whichever gate was current (DM
+  // readiness 29% -> 0%, buy-in -15%). The planner absorbs it as strain, the
+  // way any other desk delay lands. Only explicit data/analysis/buyIn keys
+  // move a gate down.
+  if (progressPoints < 0) {
+    const strain = Math.max(1, Math.round(Math.abs(progressPoints) * DESK_DELAY_STRAIN / 2));
+    if (journey.protagonist) {
+      journey.protagonist.stress = clampPercent((journey.protagonist.stress || 0) + strain);
+      journey.protagonist.energy = clampPercent((journey.protagonist.energy || 0) - strain);
+    }
+    messages.push('It costs the file time, not ground: you catch up late and tired.');
+    return;
+  }
+
   const amount = Math.max(3, Math.round(Math.abs(progressPoints) * 1.5));
   let metricKey = 'dataCompleteness';
   let metricLabel = 'Data readiness';
@@ -582,7 +600,19 @@ function applyPlanningProgress(journey, progressPoints, messages, effects = {}) 
   advancePlanningPhaseIfReady(journey, messages);
 }
 
+/**
+ * Running total of the relationship and compliance effects a deployment's
+ * events announced ("Relationships improved (+12)"). Field and desk journeys
+ * have no year meters of their own, so without this the campaign's season
+ * review could not see any of it (js/game/campaign.js computeSeasonBridge).
+ */
+function recordStanding(journey, key, delta) {
+  journey.standingLedger ||= { relationships: 0, compliance: 0 };
+  journey.standingLedger[key] = (Number(journey.standingLedger[key]) || 0) + delta;
+}
+
 function applyComplianceEffects(journey, delta, messages) {
+  recordStanding(journey, 'compliance', delta);
   if (journey.journeyType === 'manager' && journey.metrics) {
     journey.metrics.compliance = clampPercent((journey.metrics.compliance || 0) + delta);
     messages.push(`Compliance posture ${delta > 0 ? 'improved' : 'slipped'} (${delta > 0 ? '+' : ''}${delta}).`);
@@ -611,6 +641,7 @@ function applyComplianceEffects(journey, delta, messages) {
 }
 
 function applyRelationshipEffects(journey, delta, messages) {
+  recordStanding(journey, 'relationships', delta);
   const relationshipShift = delta > 0 ? Math.max(1, Math.round(delta / 2)) : Math.min(-1, Math.round(delta / 2));
 
   if (journey.relationships && typeof journey.relationships === 'object') {

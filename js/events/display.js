@@ -222,6 +222,10 @@ function getOptionHint(option, journeyType, event = null) {
       const field = journeyType === 'field' || journeyType === 'recon';
       if (field && option.effects.progress < 0 && option.effects.progressMode !== 'turn_back') {
         hints.push('slower next travel leg');
+      } else if (journeyType === 'planning' && option.effects.progress < 0) {
+        // A planning setback is strain, not a gate, and an explicit data /
+        // analysis / buy-in key replaces it (js/events/resolution.js).
+        if (!['data', 'analysis', 'buyIn'].some((key) => option.effects[key])) hints.push('costs the file time');
       } else {
         const unit = field ? ' km traverse' : ' progress';
         hints.push(option.effects.progress > 0

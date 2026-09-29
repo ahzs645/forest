@@ -468,7 +468,7 @@ function managerPolicy(journey, options) {
   ]);
 }
 
-const ROLES = {
+export const ROLES = {
   recon: { create: createReconJourney, run: runReconDay, policy: reconPolicy, roleId: 'recce' },
   planning: { create: createPlanningJourney, run: runPlanningDay, policy: planningPolicy, roleId: 'planner' },
   permitting: { create: createPermittingJourney, run: runPermittingDay, policy: permittingPolicy, roleId: 'permitter' },

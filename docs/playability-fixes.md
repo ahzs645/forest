@@ -45,3 +45,35 @@ The Mac remained locked during this implementation pass, so fresh verification u
 - **No area can dead-end the block decision.** An area without a snapshot gets four labelled area-profile placeholder blocks instead of an empty pool (`js/data/planningBlocks.js`).
 - **The triage scrutiny shift lands once.** The shift is a standing posture. Re-picking the same triage after an event reopens the block question moves nothing, and switching moves only the difference (`applyTriageScrutinyShift` in `js/modes/planning.js`).
 - **Checks.** `tests/planningFomGate.test.mjs` drives every operating area, plus one with no snapshot, to FOM publication headlessly. `node scripts/simulate-expeditions.mjs --role planning --area all --runs 36` gives 36/36 wins in every area at full length. At campaign scale the southern areas win 36/36 and the northern areas 34–36/36.
+## 2026-09-29: Campaign meters and carry-forward (playtest finding #9)
+
+- **Season bridge.** Relationships and compliance now come from what happened in the season:
+  - the relationship and compliance effects that events announced (`journey.standingLedger`);
+  - each mode's own work: crew morale, the planning engagement record, and permitting's working relationships;
+  - how far scrutiny moved from where the deployment opened.
+
+  The bridge used to read `journey.metrics`, which only manager journeys have. Cause lines now name their drivers. The review no longer says "File compliance held" when scrutiny is at 100.
+- **Honest numbers.** Reviews and the Year in Review print the change each meter actually took, with the earned amount when diminishing returns cut it (for example, "+8 (+14 earned)").
+- **Fixes for the idle year:**
+  - A 0% season now costs Progress -8.
+  - A Push stance that falls short gives back its +3.
+  - Unspent allowance earns Budget only in proportion to the work delivered.
+- **Tier and ending copy.**
+  - Solid needs at least 2 of 4 deployments delivered, and Outstanding needs at least 3.
+  - The ending copy follows the number delivered.
+  - The Year in Review names the floors that held the year back.
+- **Fall carries into winter.** If the fall FSP was not approved, winter runs under an extension of the old plan: 4 cutting permits are held, starting scrutiny is higher and the district is cooler. Completion is still measured against the full program.
+- **Event routing.**
+  - A generic setback on a planning file now costs strain instead of lowering the current gate.
+  - Traverse gains are clamped at the end of the route.
+  - A cleanly answered deficiency letter is not sent again for the same file, and each clean answer lifts that file's approval odds.
+- **Headless campaign sim.** Run it with `node scripts/simulate-campaign.mjs --difficulty normal`: 6 northern areas × 6 seeds per style.
+
+| Style | Before: Solid / Mixed / Stumbled | After: Solid / Mixed / Stumbled |
+| --- | --- | --- |
+| good | 15 / 21 / 0 (mean R52 C68) | 36 / 0 / 0 (R65 C78) |
+| average | 0 / 12 / 24 | 1 / 20 / 15 |
+| terrible | 0 / 0 / 36 (P71) | 0 / 0 / 36 (P61) |
+| idle | 0 / 0 / 36 (P52 B52) | 0 / 0 / 36 (P27 B38) |
+
+No style reaches Outstanding in the sim. Forest Health tops out near 64, below the ecological path's 67. Careful play averages Compliance 78, below the stewardship path's 88. Whether the campaign should have its own excellence gates is a separate balance decision.

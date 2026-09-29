@@ -839,8 +839,7 @@ function scoreRevisionProfiles(journey, file = null) {
           score += profile.id === 'package-completeness' ? 50 : 0;
         } else if (profile.id === 'package-completeness') {
           score -= 6;
-        }
-      }
+        }      }
       return { profile, score };
     })
     .sort((a, b) => b.score - a.score)
@@ -855,7 +854,12 @@ function pickRevisionProfile(journey, index = 0, file = null) {
   if (file?.deficiencyProfileId) {
     return profiles.find((profile) => profile.id === file.deficiencyProfileId) || profiles[0];
   }
-  return profiles[index % profiles.length];
+  // A gap the licensee already closed cleanly is not the next letter: the
+  // same watershed letter used to come back verbatim after its fix.
+  const answered = file?.answeredProfiles || [];
+  const fresh = profiles.filter((profile) => !answered.includes(profile.id));
+  const pool = fresh.length ? fresh : profiles;
+  return pool[index % pool.length];
 }
 
 function buildDeficiencySummary(profile, file, journey) {
@@ -1013,7 +1017,10 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
     if (index !== -1) queue.splice(index, 1);
     const file = entry.fileId ? getPermitFileById(journey, entry.fileId) : null;
     if (file) {
-      resubmitPermitFile(journey, file.id, { completeness: Boolean(entry.completeness) });
+      resubmitPermitFile(journey, file.id, {
+        completeness: Boolean(entry.completeness),
+        clean: selectedMode === 'clean',
+      });
       refiled.push(file);
     }
   }
