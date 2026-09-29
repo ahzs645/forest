@@ -90,8 +90,8 @@ const LEDGER_HOOKS = {
     { curtailment: 0.85, monthCostShift: 4, note: 'volume diverted to pulp and a second sawmill for the month' },
   ],
   gm_bcts_bid: [
-    { bonusVolume: 9000, stumpageShift: 1, note: 'BCTS sale won at appraisal plus bonus' },
-    { bonusVolume: 12000, stumpageShift: 3, note: 'BCTS sale won on a high bid' },
+    { bonusVolume: 9000, bonusSource: 'the BCTS sale', stumpageShift: 1, note: 'BCTS sale won at appraisal plus bonus' },
+    { bonusVolume: 12000, bonusSource: 'the BCTS sale', stumpageShift: 3, note: 'BCTS sale won on a high bid' },
     {},
   ],
   gm_softwood_duty_deposit: [
@@ -110,9 +110,9 @@ const LEDGER_HOOKS = {
     { costShift: 3, note: 'three-year logging contract with SAFE clause' },
   ],
   gm_log_export_permit: [
-    { bonusVolume: 1500, note: 'export parcel moved' },
+    { bonusVolume: 1500, bonusSource: 'the export parcel', note: 'export parcel moved' },
     {},
-    { bonusVolume: 1500, note: 'export parcel shipped ahead of the permit' },
+    { bonusVolume: 1500, bonusSource: 'the export parcel', note: 'export parcel shipped ahead of the permit' },
   ],
 };
 
@@ -123,7 +123,107 @@ const LEDGER_HOOKS = {
  */
 const MANAGER_EVENT_GATES = {
   gm_certification_audit_prep: (journey) => activeCertifications(journey).length > 0,
+  // A department head's budget fight "with the CEO's ear": the GM is the
+  // executive the woodlands manager would be lobbying.
+  competing_budget_claim: () => false,
 };
+
+// BC's fire season runs roughly May to September; smoke from fires to the
+// south settles into the valleys late in it. Atmospheric rivers are an
+// autumn and winter coast storm; ice bridges exist only in deep winter.
+const FIRE_SEASON = [5, 6, 7, 8, 9];
+const STORM_SEASON = [10, 11, 12, 1, 2];
+const ICE_ROAD_SEASON = [12, 1, 2, 3];
+
+/**
+ * Months a card can land in. The shared decks gate on a coarse `seasons`
+ * field, and most of these carry none, so the GM drew an approaching
+ * wildfire in December and a smoke inversion in March. The GM plays every
+ * month of the calendar, so the gate is by month here.
+ */
+const MANAGER_MONTH_GATES = {
+  wildfire_threat: FIRE_SEASON,
+  'smoke-inversion_field': [7, 8, 9],
+  'salmon-crossing-washout_field': STORM_SEASON,
+  'salmon-crossing-washout_desk': STORM_SEASON,
+  'ice-road-window_field': ICE_ROAD_SEASON,
+  'ice-road-window_desk': ICE_ROAD_SEASON,
+};
+// Any other fire or smoke card that reaches the GM: gated to the fire season by its title.
+const FIRE_CARD_TITLE = /wildfire|smoke|fire weather|heat dome/i;
+
+function eventFitsMonth(event, month) {
+  const months = MANAGER_MONTH_GATES[event.id]
+    || (event.type !== 'temptation' && FIRE_CARD_TITLE.test(event.title || '') ? FIRE_SEASON : null);
+  return !months || months.includes(month);
+}
+
+/**
+ * Shared-library shortcuts written for a woodlot licensee or a community
+ * forest's manager. This GM runs a 240,000 m³ replaceable licence with a
+ * board, so they are struck from the journey's draw before it happens (the
+ * act library has no tenure-size gate); striking them after the draw would
+ * cost the month its offer.
+ */
+const UNFIT_TEMPTATION_ACTS = ['woodlot-overcut-gambit', 'community-forest-coasting'];
+
+function retireUnfitTemptations(journey) {
+  const memory = journey.temptationMemory || (journey.temptationMemory = {});
+  if (!Array.isArray(memory.seenActIds)) memory.seenActIds = [];
+  for (const id of UNFIT_TEMPTATION_ACTS) {
+    if (!memory.seenActIds.includes(id)) memory.seenActIds.push(id);
+  }
+}
+
+/**
+ * Options the shared desk deck writes for a line manager that mean
+ * something else at a licensee's head office. Keyed by event id and option
+ * index; the override replaces the option for the GM only.
+ */
+const MANAGER_OPTION_OVERRIDES = {
+  'labour-job-action_desk': {
+    2: {
+      label: 'Call the bluff and line up replacement crews',
+      outcome: 'Labour-relations counsel reads you section 68 of the Labour Relations Code before the first call goes out: replacement workers cannot be used in a legal strike in BC. The union hears about the plan anyway, takes a strike vote, and the slowdown starts on schedule.',
+      effects: { budget: -25000, progress: -6, relationships: -4, politicalCapital: -4, reputation: -3 },
+    },
+  },
+};
+
+/** What a ledger hook does to the rest of the year, in the ledger's own units. */
+function describeLedgerHook(hook) {
+  const parts = [];
+  if (hook.costShift) parts.push(`logging & haul +$${formatRate(hook.costShift)}/m³ for the rest of the year`);
+  if (hook.stumpageShift) parts.push(`stumpage +$${formatRate(hook.stumpageShift)}/m³ for the rest of the year`);
+  if (hook.priceShift) parts.push(`log price ${hook.priceShift > 0 ? '+' : '-'}$${formatRate(Math.abs(hook.priceShift))}/m³, easing back over the months`);
+  if (hook.bonusVolume) parts.push(`+${hook.bonusVolume.toLocaleString()} m³ on this month's cut`);
+  if (hook.curtailment && hook.curtailment < 1) parts.push(`this month's deliveries at ${Math.round(hook.curtailment * 100)}% of plan`);
+  if (hook.monthCostShift) parts.push(`+$${formatRate(hook.monthCostShift)}/m³ haul this month`);
+  return parts.join(', ');
+}
+
+/**
+ * The drawn card as the GM should see it, or null when it does not belong
+ * in this month or at this desk. Options with a ledger hook say on their
+ * chip what they do to the ledger for the rest of the year; the resolver
+ * alone would print only the one-off budget line.
+ */
+export function fitManagerEvent(journey, event) {
+  if (!event) return null;
+  if (MANAGER_EVENT_GATES[event.id] && !MANAGER_EVENT_GATES[event.id](journey)) return null;
+  if (!eventFitsMonth(event, journey.day)) return null;
+  const overrides = MANAGER_OPTION_OVERRIDES[event.id];
+  const hooks = LEDGER_HOOKS[event.id];
+  if (!overrides && !hooks) return event;
+  return {
+    ...event,
+    options: (event.options || []).map((option, index) => {
+      const replaced = overrides?.[index] ? { ...option, ...overrides[index] } : option;
+      const hint = hooks?.[index] ? describeLedgerHook(hooks[index]) : '';
+      return hint ? { ...replaced, ledgerHint: `ledger: ${hint}` } : replaced;
+    }),
+  };
+}
 
 export async function runManagerDay(game) {
   const { journey, ui } = game;
@@ -147,10 +247,8 @@ export async function runManagerDay(game) {
 
   await runStrategicDecision(game);
 
-  let event = journey.day > 1 ? checkForEvent(journey) : null;
-  if (event && MANAGER_EVENT_GATES[event.id] && !MANAGER_EVENT_GATES[event.id](journey)) {
-    event = null;
-  }
+  retireUnfitTemptations(journey);
+  const event = fitManagerEvent(journey, journey.day > 1 ? checkForEvent(journey) : null);
   if (event) {
     const monthsLeft = Math.max(0, (journey.deadline || 0) - journey.day);
     const logBefore = journey.log.length;
@@ -164,7 +262,11 @@ export async function runManagerDay(game) {
         ]),
         onRender: () => updateManagerMissionStatus(ui, journey),
       },
-      setAsideDescription: 'Delegate it. Keep the month for the business.',
+      // Setting a proposal aside is leaving it unanswered, not handing it to
+      // someone; setting a situation aside leaves it where it landed.
+      setAsideDescription: event.type === 'temptation'
+        ? 'Leave the proposal unanswered for now.'
+        : 'Leave it with the division and keep the month for the business.',
     });
     if (outcome.gameOver) return;
     // Manager months have no dayPlan action budget - the board period runs
@@ -533,7 +635,7 @@ function updateManagerMissionStatus(ui, journey) {
     });
   }
   if (ledger.curtailmentFactor && ledger.curtailmentFactor < 1) {
-    alerts.push({ level: 'warn', text: `Deliveries curtailed next month (${Math.round(ledger.curtailmentFactor * 100)}% of plan).` });
+    alerts.push({ level: 'warn', text: `Deliveries curtailed this month (${Math.round(ledger.curtailmentFactor * 100)}% of plan).` });
   }
 
   ui.setMissionStatus?.({
@@ -893,12 +995,16 @@ function applyLedgerHooks(ui, journey, event, logBefore) {
   if (!hook || !Object.keys(hook).length) return;
   const ledger = journey.ledger;
   if (hook.curtailment) ledger.curtailmentFactor = Math.min(ledger.curtailmentFactor, hook.curtailment);
-  if (hook.bonusVolume) ledger.bonusVolume += hook.bonusVolume;
+  if (hook.bonusVolume) {
+    ledger.bonusVolume += hook.bonusVolume;
+    ledger.bonusSource = hook.bonusSource || 'the extra volume';
+  }
   if (hook.costShift) ledger.costShiftPerM3 += hook.costShift;
   if (hook.monthCostShift) ledger.monthCostShift = (ledger.monthCostShift || 0) + hook.monthCostShift;
   if (hook.priceShift) ledger.logPrice = Math.max(60, ledger.logPrice + hook.priceShift);
   if (hook.stumpageShift) ledger.stumpage += hook.stumpageShift;
-  if (hook.note) ui.writeInfo(`Ledger: ${hook.note}.`);
+  const lasting = describeLedgerHook(hook);
+  if (hook.note) ui.writeInfo(`Ledger: ${hook.note}${lasting ? ` - ${lasting}` : ''}.`);
 }
 
 /**
@@ -976,6 +1082,7 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
 
   let delivered;
   let bonus = 0;
+  let bonusSource = '';
   let curtailed = false;
   if (carryIn) {
     delivered = Math.round(planned * JANUARY_CARRY_IN);
@@ -984,8 +1091,10 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
     const noise = 0.94 + rng() * 0.12;
     delivered = Math.round(planned * runRate(journey) * ledger.curtailmentFactor * noise);
     bonus = Math.round(ledger.bonusVolume || 0);
+    bonusSource = ledger.bonusSource || 'the extra volume';
     delivered += bonus;
     ledger.bonusVolume = 0;
+    ledger.bonusSource = null;
     curtailed = ledger.curtailmentFactor < 1;
     ledger.curtailmentFactor = 1;
 
@@ -1024,7 +1133,7 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
 
   const volumeNotes = [
     curtailed ? 'curtailed' : null,
-    bonus ? `incl. ${bonus.toLocaleString()} m³ from the sale` : null,
+    bonus ? `incl. ${bonus.toLocaleString()} m³ from ${bonusSource}` : null,
     pace.factor !== 1 ? pace.name.toLowerCase() : null,
   ].filter(Boolean);
   const deliveredLine = `Delivered: ${delivered.toLocaleString()} m³ (plan ${planned.toLocaleString()}${volumeNotes.length ? `, ${volumeNotes.join(', ')}` : ''}; year to date ${Math.round(ledger.deliveredYtd).toLocaleString()} / ${ledger.aac.toLocaleString()} m³ AAC)`;

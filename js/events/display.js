@@ -175,6 +175,9 @@ function getOptionHint(option, journeyType, event = null) {
   const hints = [];
   // What the shortcut is actually offering, in the role's own currency.
   if (option.payoffLine) hints.push(`offer: ${option.payoffLine}`);
+  // A lasting effect the mode applies on top of the effects object (the GM's
+  // per-m³ ledger hooks, js/modes/manager.js), which would otherwise be hidden.
+  if (option.ledgerHint) hints.push(option.ledgerHint);
   if (timeHint) hints.push(timeHint);
 
   const field = isFieldJourney(journeyType);
