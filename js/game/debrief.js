@@ -10,6 +10,7 @@
 import { ASCII_ART } from '../ascii_art.js';
 import { getCrewDisplayInfo } from '../crew.js';
 import { calculateScore, formatScoreDisplay, getLetterGrade } from '../scoring.js';
+import { resolveSilvicultureFinalReport } from '../modes/silvicultureIntegrity.js';
 import {
   foldRunIntoRecord,
   loadServiceRecord,
@@ -51,8 +52,8 @@ export function getFinalReportPrompt(journeyType) {
       return {
         prompt: 'The regeneration report heads to the district office. How do you frame it?',
         options: [
-          { label: 'Report survival rates exactly as surveyed', hint: 'Free-growing obligations stay honest, whatever the numbers say.', value: 'integrity' },
-          { label: 'Project optimistic survival from the best plots', hint: 'Risky. A check survey could unpick the projection.', value: 'spin' },
+          { label: 'Report stocking and free-growing exactly as surveyed', hint: 'Free-growing obligations stay honest, whatever the numbers say.', value: 'integrity' },
+          { label: 'Project the stocking from the best plots', hint: 'Risky. A check survey could unpick the projection, and a file already under scrutiny is the one they check.', value: 'spin' },
           { label: 'Highlight the contractor crews who beat the weather', hint: 'Good contractors remember who spoke up for them.', value: 'people' },
         ],
       };
@@ -97,6 +98,9 @@ export function getFinalReportPrompt(journeyType) {
  * @returns {{delta: number, lines: string[]}}
  */
 export function resolveFinalReport(style, journey, rng = Math.random) {
+  // Silviculture's report is read against the plot cards and the check
+  // survey, so its odds come from the run (js/modes/silvicultureIntegrity.js).
+  if (journey?.journeyType === 'silviculture') return resolveSilvicultureFinalReport(style, journey, rng);
   const hasCrew = Boolean(journey.crew?.length);
   switch (style) {
     case 'spin': {
