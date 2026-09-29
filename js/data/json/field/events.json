@@ -1017,7 +1017,7 @@
     }
    ]
   },
-  "description": "A saw kicks back clearing line. There's blood. This is serious.",
+  "description": "A saw kicks back on the block. There's blood. This is serious.",
   "options": [
    {
     "label": "Call helicopter medevac",
@@ -1089,6 +1089,9 @@
      "firstAid": -5,
      "progress": -2,
      "fuel": -8
+    },
+    "partialCrewEffect": {
+     "evacuate": true
     },
     "failureOutcome": "Three days on, the leg is septic and he's running a fever of thirty-nine and change in a camp four hours from pavement. The helicopter you didn't call the first time comes anyway, on worse terms, with worse odds. WorkSafeBC opens a file on why a severe laceration was treated with a bandage and a shift schedule.",
     "failureEffects": {
