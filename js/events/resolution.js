@@ -56,7 +56,7 @@ function clampScrutiny(value) {
  */
 const GOODWILL_WARNING_THRESHOLD = 15;
 
-function readGoodwill(journey) {
+export function readGoodwill(journey) {
   const value = journey?.resources?.politicalCapital;
   return typeof value === 'number' ? value : null;
 }
@@ -66,7 +66,7 @@ function readGoodwill(journey) {
  * effects and band fallout all drain the same meter, and until now none of
  * them said so - the run ended from a "start next day" button.
  */
-function describeGoodwillChange(journey, before) {
+export function describeGoodwillChange(journey, before) {
   const after = readGoodwill(journey);
   if (before === null || after === null) return [];
   const delta = Math.round(after - before);
@@ -248,9 +248,11 @@ export function resolveEvent(journey, event, option) {
 }
 
 /**
- * Apply effects from an event option
+ * Apply effects from an event option. Exported for the deferral path
+ * (js/events/deferral.js), which lands an imposed situation's cost without
+ * an option having been chosen.
  */
-function applyEventEffects(journey, effects, messages) {
+export function applyEventEffects(journey, effects, messages) {
   journey.scrutiny = clampScrutiny(Number(journey.scrutiny || 0));
 
   // Resource effects (field)

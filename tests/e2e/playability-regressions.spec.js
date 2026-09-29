@@ -55,6 +55,9 @@ test('a deferred washout survives autosave and can be cleared without moving the
   const defer = page.locator('#choices button').filter({ hasText: 'Set it aside' });
   await expect(defer).toContainText('route stays blocked');
   await defer.click();
+  // The deferral's cost stays on screen until acknowledged.
+  await expect(page.locator('#terminal')).toContainText('Scrutiny +');
+  await page.locator('#choices button').filter({ hasText: 'Take the shift back' }).click();
   await expect(page.locator('#choices button').filter({ hasText: 'Report it and work the near side' })).toBeVisible();
   await expect(page.locator('#choices button').filter({ hasText: 'Move on to' })).toHaveCount(0);
   await expect(page.locator('#choices button').filter({ hasText: 'Work the block' })).toBeVisible();

@@ -99,7 +99,7 @@ export function deriveOptionRiskTag(option) {
 }
 
 /** Effect keys where a negative number is a good thing for the player. */
-const INVERTED_EFFECT_KEYS = new Set(['scrutiny', 'heat', 'paperwork', 'stress', 'backlog']);
+export const INVERTED_EFFECT_KEYS = new Set(['scrutiny', 'heat', 'paperwork', 'stress', 'backlog']);
 
 /**
  * What counts as a steep single hit, per effect key. Sized against the actual
@@ -107,7 +107,7 @@ const INVERTED_EFFECT_KEYS = new Set(['scrutiny', 'heat', 'paperwork', 'stress',
  * starting stockpiles in js/resources.js — a number here should mean "this one
  * line hurts", not "this line is nonzero".
  */
-const STEEP_EFFECT_THRESHOLDS = {
+export const STEEP_EFFECT_THRESHOLDS = {
   budget: -800,
   fuel: -15,
   food: -12,
