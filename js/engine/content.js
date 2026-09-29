@@ -25,8 +25,14 @@ import {
   ROLE_JOURNEY_TYPES,
   ROLE_TEMPTATION_PROFILES,
   SEASONS,
+  SHORTCUT_BAND_ODDS,
+  SHORTCUT_CLEAN_BAND_COSTS,
+  SHORTCUT_NOTICED_BAND_COSTS,
+  SHORTCUT_ODDS_SHIFTS,
+  SHORTCUT_PAYOFF_SCALE,
   TEMPTATION_REPEAT_COOLDOWN_ROUNDS,
 } from "./constants.js";
+import { riskBandOdds } from "../risk.js";
 import {
   clamp,
   eventTouchesMetric,
@@ -41,7 +47,6 @@ import {
   pickWeightedItem,
   pressurePriority,
   previewSeverityRank,
-  rollRange,
   scaleDerivedEffect,
 } from "./shared.js";
 import {
@@ -146,12 +151,15 @@ export function drawSeasonalTemptation(state, rng = Math.random) {
   }));
 
   const selected = pickWeightedItem(weightedPool, rng, "act");
-  return selected ? adaptIllegalActTemptation(selected, state, rng) : null;
+  return selected ? adaptIllegalActTemptation(selected, state) : null;
 }
 
 // Same `advancePending` / `excludeIds` contract as drawSeasonalEvent: tick
 // scheduled fallout once per round, and never repeat an issue within a season.
-export function drawIssue(state, rng = Math.random, { advancePending = true, excludeIds = [] } = {}) {
+// `drainPending` lets a season's second contested call pick up a follow-up
+// that is already due (two shortcuts' fallout landing the same season) without
+// ticking the clocks again.
+export function drawIssue(state, rng = Math.random, { advancePending = true, excludeIds = [], drainPending = true } = {}) {
   if (!state) {
     return null;
   }
@@ -167,7 +175,9 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
       }
       pending.delay = Math.max(0, pending.delay - 1);
     }
+  }
 
+  if ((advancePending || drainPending) && Array.isArray(state.pendingIssues)) {
     for (let i = 0; i < state.pendingIssues.length; i++) {
       const pending = state.pendingIssues[i];
       if (!pending) continue;
@@ -179,7 +189,12 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
         state.pendingIssues.splice(i, 1);
         // `scheduled` marks a card an earlier choice put on the calendar, so the
         // deal (tui/controller.js drawDistinctLabel) never redraws it away.
-        const sourced = { ...candidate, scheduled: true, ...(pending.causedBy ? { causedBy: pending.causedBy } : {}) };
+        // `causedBy` / `sourceTitle` name that choice for the card UI.
+        const sourced = {
+          ...candidate,
+          scheduled: true,
+          ...(pending.causedBy ? { causedBy: pending.causedBy, sourceTitle: pending.causedBy.title || null } : {}),
+        };
         return normalizeSeasonalCard(sourced, state, "issue");
       }
       state.pendingIssues.splice(i, 1);
@@ -664,66 +679,167 @@ export function adaptOperationalEvent(event, state) {
   }, state, "event");
 }
 
-function summarizeTemptationRisk(successEffects, failEffects) {
-  const gains = Object.entries(successEffects || {})
-    .filter(([, value]) => Number(value) > 0)
-    .map(([key]) => formatMetricName(key));
-  const costs = Object.entries(failEffects || {})
-    .filter(([, value]) => Number(value) < 0)
-    .map(([key]) => formatMetricName(key));
-  const gainText = gains.length ? `${gains.join(", ")} up if it lands` : "";
-  const costText = costs.length ? `${costs.join(", ")} down if caught` : "";
-  return [gainText, costText].filter(Boolean).join(" · ");
+// Signed meter deltas as the option previews print them ("Progress -6, Budget -5").
+function formatSeasonalDelta(effects = {}) {
+  return Object.entries(effects)
+    .filter(([, value]) => Number.isFinite(Number(value)) && Number(value) !== 0)
+    .map(([key, value]) => `${formatMetricName(key)} ${Number(value) > 0 ? "+" : ""}${value}`)
+    .join(", ");
 }
 
-export function adaptIllegalActTemptation(act, state, rng = Math.random) {
+function formatOddsLine(odds, institution) {
+  const pct = (value) => `${Math.round(Number(value || 0) * 100)}%`;
+  return `${pct(odds.clean)} clean, ${pct(odds.noticed)} noticed, ${pct(odds.caught)} caught by ${institution}`;
+}
+
+// What the noticed band leaves behind, in the voice of who is now watching.
+const WATCH_SENTENCE_BY_INSTITUTION = {
+  "C&E": "the district is now reading everything with your name on it",
+  FPB: "the district is now reading everything with your name on it",
+  FPBC: "Forest Professionals BC has a note with your name in it",
+  WorkSafeBC: "WorkSafeBC's prevention officer has the site on a list",
+  BCWS: "the Wildfire Service has the block on a list",
+  COS: "a conservation officer has the plate number",
+  ENV: "an environmental protection officer has the block on a list",
+  DFO: "a DFO fishery officer has the crossing on a list",
+  "Archaeology Branch": "the Archaeology Branch has the block on a list",
+  "Timber Pricing": "Timber Pricing has your cruises on the check list",
+  "Revenue Branch": "the check scaler is pulling your loads",
+  "the Nation": "the Nation's referrals office has a note with your name in it",
+  RCMP: "the RCMP have a file with your name in it",
+  CVSE: "CVSE has the hauling contractor on a list",
+  "Transport Canada": "Transport Canada has asked for the authorization",
+  "internal audit": "internal audit has flagged the invoice",
+  "the contractor": "the person who did it for you now owns a piece of you",
+};
+
+/**
+ * The seasonal shortcut offer built from one act: a free refusal, a ten-minute
+ * note to file, and the shortcut as a three-band gamble. The payoff is the
+ * act's own (js/data/illegalActs.js), landed on the season's meters; the
+ * caught band costs what the role profile says and schedules the fallout the
+ * teaser promises.
+ *
+ * Fields the card UI reads (besides the option list): `shortcut` (act id,
+ * title, proposer, institution, category, tier), `odds` / `oddsLine` (the
+ * three bands for this file today), `payoffChip` / `payoffLine` /
+ * `payoffEffects`, `institution`, and `promisedFallout` (the issue a catch
+ * schedules, with its severity). The take option carries the same odds,
+ * chips and a `bands` map of every outcome's effects and text.
+ */
+export function adaptIllegalActTemptation(act, state) {
   const profile = getTemptationProfile(state);
-  const isDeskRole = state?.role?.id === "planner" || state?.role?.id === "permitter" || state?.role?.id === "manager";
-  const rawSuccessEffects = buildIllegalActSuccessEffects(act, state, rng);
-  const rawFailEffects = buildIllegalActFailEffects(act, state, rawSuccessEffects);
+  const roleId = state?.role?.id;
+  const isDeskRole = roleId === "planner" || roleId === "permitter" || roleId === "manager";
+  const institution = act?.catch?.by || "the district";
+  const payoff = buildIllegalActPayoff(act);
+  const cleanEffects = buildIllegalActCleanEffects(act, payoff.effects);
+  const noticedEffects = buildIllegalActNoticedEffects(act, payoff.effects);
+  const caughtEffects = adaptOperationalEventEffects(buildIllegalActFailEffects(act, state, payoff));
   const failFlags = buildIllegalActFailFlags(act);
-  const successEffects = adaptOperationalEventEffects(rawSuccessEffects);
-  const failEffects = adaptOperationalEventEffects(rawFailEffects);
   const cleanLine = act?.cleanOutcome || CATEGORY_CLEAN_OUTCOMES[act?.category] || CATEGORY_CLEAN_OUTCOMES.corporate;
-  const payoffLine = act?.payoff?.line ? ` You get ${act.payoff.line}.` : "";
-  const institution = act?.catch?.by ? ` (${act.catch.by})` : "";
+  const watchSentence = WATCH_SENTENCE_BY_INSTITUTION[institution] || WATCH_SENTENCE_BY_INSTITUTION["C&E"];
+  const failScheduleIssues = buildIllegalActFailScheduleIssues(act, state);
+  const promisedFallout = describePromisedFallout(state, failScheduleIssues);
+  const tierOdds = SHORTCUT_BAND_ODDS[act?.tier] || SHORTCUT_BAND_ODDS.core;
+  const shortcut = {
+    actId: act?.id,
+    title: act?.title,
+    proposer: act?.proposer || null,
+    institution,
+    category: act?.category || "corporate",
+    tier: act?.tier || "core",
+  };
+
+  const risk = {
+    baseSuccess: getIllegalActBaseSuccess(act, state),
+    chancePartial: tierOdds.noticed,
+    successEffects: cleanEffects,
+    successOutcome: `${cleanLine} You get ${payoff.line}. Nobody asks this season.`,
+    partialEffects: noticedEffects,
+    partialOutcome: `${cleanLine} You get ${payoff.line}. Somebody also wrote down what they saw: ${watchSentence}.`,
+    partialFlags: failFlags,
+    failEffects: caughtEffects,
+    failOutcome: `It does not hold. ${buildCaughtNarrative(act, Number(state?.round || 1) % 2)}`,
+    failFlags,
+    failScheduleIssues,
+    shortcut,
+  };
+  const odds = riskBandOdds(state, risk);
+  const oddsLine = formatOddsLine(odds, institution);
 
   return normalizeSeasonalCard({
     id: `temptation:${act.id}`,
     title: act.title,
-    description: buildIllegalActDescription(act, state),
+    description: buildIllegalActDescription(act),
     flavor: `Adapted temptation • ${profile.flavor}`,
+    shortcut,
+    institution,
+    odds,
+    oddsLine,
+    payoffChip: payoff.chip,
+    payoffLine: payoff.line,
+    payoffEffects: payoff.effects,
+    promisedFallout,
     options: [
       {
         label: isDeskRole ? "Decline" : "Say no",
-        outcome: "The file stays yours. Nothing else changes.",
+        outcome: isDeskRole
+          ? "The file stays yours. Nothing else changes."
+          : "Not on your ticket. Nothing else changes.",
         effects: adaptOperationalEventEffects(buildIllegalActRefuseEffects(state)),
       },
       {
-        label: `Take the shortcut${institution}`,
+        label: "Take the shortcut",
         outcome: "You attempt something risky...",
-        // Adapted effects, so the preview names the season's five meters
-        // rather than raw keys like equipment or politicalCapital.
-        preview: summarizeTemptationRisk(successEffects, failEffects),
-        risk: {
-          baseSuccess: getIllegalActBaseSuccess(act, state),
-          successEffects,
-          failEffects,
-          successOutcome: `${cleanLine}${payoffLine} Nobody asks this season.`,
-          failOutcome: `It does not hold. ${buildCaughtNarrative(act, Number(state?.round || 1) % 2)}`,
-          failFlags,
-          failScheduleIssues: buildIllegalActFailScheduleIssues(act, state),
+        preview: [
+          `${formatSeasonalDelta(cleanEffects)} if it lands`,
+          oddsLine,
+          `caught: ${formatSeasonalDelta(caughtEffects)}`,
+        ].join(" · "),
+        odds,
+        oddsLine,
+        payoffChip: payoff.chip,
+        payoffLine: payoff.line,
+        institution,
+        bands: {
+          clean: { effects: cleanEffects, outcome: risk.successOutcome },
+          noticed: { effects: noticedEffects, outcome: risk.partialOutcome },
+          caught: { effects: caughtEffects, outcome: risk.failOutcome, fallout: promisedFallout },
         },
+        risk,
       },
       {
         label: "Document and report",
-        outcome: "A note to file and a call to your manager. Ten minutes, and the only version of this anyone can audit.",
+        outcome: isDeskRole
+          ? "A note to file and a call to your manager. Ten minutes, and the only version of this anyone can audit."
+          : "A line in the daybook and a call to your super. Ten minutes, and the only version of this anyone can audit.",
         effects: adaptOperationalEventEffects(buildIllegalActReportEffects(state)),
       },
     ],
     context: act.context || null,
     riskClass: "unethical",
   }, state, "temptation");
+}
+
+// The round a scheduled issue lands in, as a state to test its gates against:
+// a promise made in fall is about winter's draw, not fall's. Past the last
+// round the fallout has no season to land in; it settles at the year end
+// (js/engine/effects.js applyRoundConsequences), so its gates are read
+// against the season it would open next year.
+export function falloutLandingContext(state, delay = 1) {
+  const totalRounds = Number(state?.totalRounds) || SEASONS.length;
+  const round = Number(state?.round || 1) + Math.max(1, Number(delay) || 1);
+  const afterYear = round > totalRounds;
+  const landingRound = afterYear ? ((round - 1) % totalRounds) + 1 : round;
+  const seasonIndex = clamp(landingRound - 1, 0, SEASONS.length - 1);
+  return {
+    state: { ...state, round: landingRound, currentSeasonContext: null },
+    tags: state?.area?.tags || [],
+    season: SEASONS[seasonIndex],
+    round: landingRound,
+    afterYear,
+  };
 }
 
 export function buildScheduledIssueTeaser(state, scheduleSpec) {
@@ -739,17 +855,31 @@ export function buildScheduledIssueTeaser(state, scheduleSpec) {
     return null;
   }
 
-  const tags = state?.area?.tags || [];
-  const seasonIndex = Math.max(0, Math.min(SEASONS.length - 1, (state?.round || 1) - 1));
-  const season = SEASONS[seasonIndex];
-
   for (const schedule of schedules) {
-    const preview = resolvePendingIssue(state, schedule, { tags, season }, () => 0);
+    const landing = falloutLandingContext(state, schedule.delay);
+    const preview = resolvePendingIssue(landing.state, schedule, { tags: landing.tags, season: landing.season }, () => 0);
     if (preview) {
-      return formatScheduledIssueTeaser(preview);
+      return formatScheduledIssueTeaser(preview, { promised: typeof schedule.id === "string", afterYear: landing.afterYear });
     }
   }
 
+  return null;
+}
+
+/**
+ * The card a caught shortcut's schedule promises: id, title and severity, or
+ * null when the schedule has nowhere to land. Read at card-build time so the
+ * offer can show what a catch costs later, and at year end for fallout that
+ * never got its season.
+ */
+export function describePromisedFallout(state, scheduleSpec) {
+  for (const schedule of normalizeScheduleEntries(scheduleSpec)) {
+    const landing = falloutLandingContext(state, schedule.delay);
+    const preview = resolvePendingIssue(landing.state, schedule, { tags: landing.tags, season: landing.season }, () => 0);
+    if (preview) {
+      return { id: preview.id, title: preview.title, severity: issuePreviewSeverity(preview), afterYear: landing.afterYear };
+    }
+  }
   return null;
 }
 
@@ -1307,14 +1437,23 @@ function findIssueById(issueId) {
     || null;
 }
 
+// A pending entry names the card it promised (`id`) and, behind it, the
+// candidates to fall back on if that card's gates have closed since (the
+// player resolved the same audit in the meantime). The promise is kept
+// whenever it can be; the weighted draw only decides among fallbacks.
 function resolvePendingIssue(state, pending, context, rng) {
   const candidates = Array.isArray(pending?.candidates) ? pending.candidates : null;
-  if (!candidates?.length) {
-    const issue = findIssueById(pending?.id);
-    if (!issue) {
+  if (typeof pending?.id === "string") {
+    const issue = findIssueById(pending.id);
+    if (issue && issueMatchesContext(issue, state, context.tags, { ignoreRequirements: Boolean(pending?.force) })) {
+      const promised = candidates?.find((candidate) => candidate?.id === pending.id) || null;
+      return annotatePendingIssue(issue, promised, state, pending);
+    }
+    if (!candidates?.length) {
       return null;
     }
-    return issueMatchesContext(issue, state, context.tags, { ignoreRequirements: Boolean(pending?.force) }) ? issue : null;
+  } else if (!candidates?.length) {
+    return null;
   }
 
   const weightedPool = candidates
@@ -1331,7 +1470,7 @@ function resolvePendingIssue(state, pending, context, rng) {
         issue,
         candidate,
         weight: scorePendingIssueCandidateSelection(candidate, issue, state, context),
-        resolvedIssue: annotatePendingIssue(issue, candidate, state),
+        resolvedIssue: annotatePendingIssue(issue, candidate, state, pending),
       };
     })
     .filter(Boolean)
@@ -1340,8 +1479,8 @@ function resolvePendingIssue(state, pending, context, rng) {
   return pickWeightedItem(weightedPool, rng, "resolvedIssue");
 }
 
-function annotatePendingIssue(issue, candidate, state) {
-  const surfaceReason = buildPendingIssueSurfaceReason(candidate, state);
+function annotatePendingIssue(issue, candidate, state, pending = null) {
+  const surfaceReason = buildShortcutFalloutReason(pending?.causedBy) || buildPendingIssueSurfaceReason(candidate, state);
   const surfaceSeverity = issuePreviewSeverity(issue);
   if (!surfaceReason) {
     return surfaceSeverity === "info"
@@ -1356,6 +1495,18 @@ function annotatePendingIssue(issue, candidate, state) {
     surfaceReason,
     surfaceSeverity,
   };
+}
+
+// Fallout from a caught shortcut says so, naming the act and who caught it,
+// instead of blaming a meter for a card the player's own choice put on the
+// calendar.
+function buildShortcutFalloutReason(causedBy) {
+  if (causedBy?.kind !== "shortcut" || !causedBy?.title) {
+    return null;
+  }
+  const when = causedBy.season ? ` in ${String(causedBy.season).toLowerCase()}` : "";
+  const who = causedBy.institution || "the district";
+  return `Why this surfaced: you took the shortcut “${causedBy.title}”${when}, and ${who} caught it.`;
 }
 
 function buildPendingIssueSurfaceReason(candidate, state) {
@@ -1403,7 +1554,7 @@ function buildOperationalEventDescription(event) {
   return details.join("\n\n");
 }
 
-function buildIllegalActDescription(act, state) {
+function buildIllegalActDescription(act) {
   const details = [];
   const pitch = String(act?.pitch || "").trim();
   if (pitch) {
@@ -1413,8 +1564,10 @@ function buildIllegalActDescription(act, state) {
       : `${proposer}: “${pitch}”`);
   }
   details.push(String(act?.description || "A tempting shortcut appears."));
+  // Role ids and the library's own meta tags are not pressure points; a
+  // permitter's card used to end "Pressure points: Recce, Materials".
   const relevantTags = (Array.isArray(act?.tags) ? act.tags : [])
-    .filter((tag) => tag !== state?.role?.id)
+    .filter((tag) => !ROLE_TEMPTATION_PROFILES[tag] && tag !== "manager" && tag !== "illegal" && tag !== "blatant")
     .slice(0, 3);
   if (relevantTags.length) {
     details.push(`Pressure points: ${relevantTags.map(humanizeLabel).join(", ")}.`);
@@ -1422,24 +1575,104 @@ function buildIllegalActDescription(act, state) {
   return details.join("\n\n");
 }
 
-function buildIllegalActSuccessEffects(act, state, rng) {
-  const profile = getTemptationProfile(state);
-  const gain = rollRange(profile.gainRange[0], profile.gainRange[1], rng);
-  const effects = {
-    ...profile.successBaseEffects,
-    budget: gain,
-  };
+// What the clean band costs besides the payoff: the paper trail, and what the
+// ground or the community pays whether or not anyone looks.
+function buildIllegalActCleanCosts(act) {
+  const costs = { compliance: SHORTCUT_CLEAN_BAND_COSTS.compliance };
+  if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
+    costs.forestHealth = SHORTCUT_CLEAN_BAND_COSTS.ecologicalForestHealth;
+  }
+  if (hasMatchingTag(act?.tags, COMMUNITY_TEMPTATION_TAGS)) {
+    costs.relationships = SHORTCUT_CLEAN_BAND_COSTS.communityRelationships;
+  }
+  return costs;
+}
 
-  applyIllegalActTagEffects(effects, act);
+// The score weights (js/engine/scoring.js), so "a clean take is a gain" is
+// judged the way the year is.
+const SHORTCUT_METRIC_WEIGHTS = { progress: 1, forestHealth: 1, relationships: 1, compliance: 1.2, budget: 0.8 };
+const SHORTCUT_CLEAN_NET_FLOOR = 2;
+
+function weightedShortcutSwing(effects) {
+  return Object.entries(effects || {}).reduce((sum, [metric, value]) => sum + (SHORTCUT_METRIC_WEIGHTS[metric] ?? 1) * Number(value || 0), 0);
+}
+
+/**
+ * The act's payoff on the season's meters, in the role's own currency:
+ * dollars to Budget; days skipped, files moved, volume kept and shifts of
+ * work to Progress. `chip` is what the take option shows ("Budget +6").
+ * The payoff always outweighs the clean band's own costs: a shortcut that
+ * paid less than the harm it did would not be a temptation.
+ */
+export function buildIllegalActPayoff(act) {
+  const payoff = act?.payoff || { kind: "progress", amount: 1, line: "a shift of work" };
+  const amount = Number(payoff.amount) || 1;
+  const scale = SHORTCUT_PAYOFF_SCALE;
+  let metric = "progress";
+  let points;
+  let max;
+  switch (payoff.kind) {
+    case "budget":
+      metric = "budget";
+      points = clamp(Math.ceil(amount / scale.budget.perPoint), scale.budget.min, scale.budget.max);
+      max = scale.budget.max;
+      break;
+    case "time":
+      points = clamp(Math.round(scale.time.base + amount / scale.time.perPoint), scale.time.min, scale.time.max);
+      max = scale.time.max;
+      break;
+    case "files":
+      points = clamp(Math.round(scale.files.base + amount * scale.files.perFile), scale.files.min, scale.files.max);
+      max = scale.files.max;
+      break;
+    case "volume":
+      points = clamp(Math.round(scale.volume.base + amount / scale.volume.perPoint), scale.volume.min, scale.volume.max);
+      max = scale.volume.max;
+      break;
+    default:
+      points = clamp(Math.round(scale.progress.base + amount * scale.progress.perShift), scale.progress.min, scale.progress.max);
+      max = scale.progress.max;
+      break;
+  }
+  const costs = weightedShortcutSwing(buildIllegalActCleanCosts(act));
+  while (points < max && points * SHORTCUT_METRIC_WEIGHTS[metric] + costs < SHORTCUT_CLEAN_NET_FLOOR) {
+    points += 1;
+  }
+  return {
+    kind: payoff.kind || "progress",
+    amount,
+    effects: { [metric]: points },
+    chip: `${formatMetricName(metric)} +${points}`,
+    line: String(payoff.line || "a shift of work"),
+  };
+}
+
+// Clean band: the payoff, and what the clean band costs.
+function buildIllegalActCleanEffects(act, payoffEffects) {
+  const effects = { ...payoffEffects };
+  for (const [metric, delta] of Object.entries(buildIllegalActCleanCosts(act))) {
+    effects[metric] = (effects[metric] || 0) + delta;
+  }
   return effects;
 }
 
-function buildIllegalActFailEffects(act, state, successEffects) {
+// Noticed band: the payoff lands, and somebody wrote it down.
+function buildIllegalActNoticedEffects(act, payoffEffects) {
+  const effects = buildIllegalActCleanEffects(act, payoffEffects);
+  const add = (metric, delta) => {
+    effects[metric] = (effects[metric] || 0) + delta;
+  };
+  add("compliance", SHORTCUT_NOTICED_BAND_COSTS.compliance - SHORTCUT_CLEAN_BAND_COSTS.compliance);
+  add("relationships", SHORTCUT_NOTICED_BAND_COSTS.relationships);
+  return effects;
+}
+
+function buildIllegalActFailEffects(act, state, payoff) {
   const profile = getTemptationProfile(state);
-  const successBudget = Number(successEffects?.budget || 0);
+  const payoffDollars = payoff?.kind === "budget" ? Number(payoff.amount || 0) : 0;
   const effects = {
     ...profile.failConfig.effects,
-    budget: -Math.max(profile.failConfig.budgetMin, Math.round(successBudget * profile.failConfig.budgetMultiplier)),
+    budget: -Math.max(profile.failConfig.budgetMin, Math.round(payoffDollars * profile.failConfig.budgetMultiplier)),
   };
 
   if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
@@ -1467,21 +1700,6 @@ function buildIllegalActReportEffects(state) {
   return desk
     ? { compliance: 2, politicalCapital: 1, timeUsed: 0.5 }
     : { compliance: 2, timeUsed: 0.5 };
-}
-
-function applyIllegalActTagEffects(effects, act) {
-  if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
-    effects.forestHealth = (effects.forestHealth || 0) - 6;
-  }
-  if (hasMatchingTag(act?.tags, COMMUNITY_TEMPTATION_TAGS)) {
-    effects.relationships = (effects.relationships || 0) - 4;
-  }
-  if (hasMatchingTag(act?.tags, ETHICS_TEMPTATION_TAGS)) {
-    effects.compliance = (effects.compliance || 0) - 4;
-  }
-  if (hasMatchingTag(act?.tags, AUDIT_TEMPTATION_TAGS)) {
-    effects.compliance = (effects.compliance || 0) - 3;
-  }
 }
 
 // What a caught band leaves behind in the seasonal flag set, by the
@@ -1684,6 +1902,22 @@ function issueAllowsRole(issueId, roleId) {
   return !Array.isArray(issue.roles) || issue.roles.length === 0 || issue.roles.includes(roleId);
 }
 
+// Somewhere for fallout to land whatever the institution, category, role and
+// area: both are bc-wide and open to every seasonal role.
+const FALLOUT_LAST_RESORT = [
+  ["audit-laundry-list", 2, { compliance: 1.5 }],
+  ["fpbc-competence-audit", 1.5, { compliance: 1.5 }],
+];
+
+const FALLOUT_DELAY_ROUNDS = 1;
+
+/**
+ * What a caught shortcut puts on next season's calendar. The promise is one
+ * card, chosen here so the offer, the outcome notice and the draw all agree:
+ * the heaviest authored candidate for this institution and kind of act whose
+ * gates are open in the season it lands. The rest stay behind it as
+ * fallbacks, in case that card's gates close before it is dealt.
+ */
 function buildIllegalActFailScheduleIssues(act, state) {
   const roleId = state?.role?.id;
   const category = act?.category || "corporate";
@@ -1711,55 +1945,101 @@ function buildIllegalActFailScheduleIssues(act, state) {
   if (byCategory) {
     byCategory(roleId, addCandidate);
   }
-  if (!candidates.size) {
-    addCandidate("audit-laundry-list", 2, { compliance: 1.5 });
-    addCandidate("fpbc-competence-audit", 1.5, { compliance: 1.5 });
+
+  const landing = falloutLandingContext(state, FALLOUT_DELAY_ROUNDS);
+  const landsThere = (candidate) => {
+    const issue = findIssueById(candidate.id);
+    return Boolean(issue) && issueMatchesContext(issue, landing.state, landing.tags, { ignoreRequirements: true });
+  };
+  const ordered = () => Array.from(candidates.values()).sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id));
+
+  let promised = ordered().find(landsThere) || null;
+  if (!promised) {
+    for (const [id, weight, boosts] of FALLOUT_LAST_RESORT) addCandidate(id, weight, boosts);
+    promised = ordered().find(landsThere) || null;
   }
 
-  const weightedCandidates = Array.from(candidates.values())
-    .sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id));
+  const weightedCandidates = ordered();
   if (!weightedCandidates.length) {
     return [];
   }
 
   return [{
-    delay: 1,
+    delay: FALLOUT_DELAY_ROUNDS,
     force: true,
+    ...(promised ? { id: promised.id } : {}),
     candidates: weightedCandidates,
   }];
 }
 
-function getIllegalActBaseSuccess(act, state) {
-  const profile = getTemptationProfile(state);
-  let success = profile.baseSuccess;
-
-  if (hasMatchingTag(act?.tags, ETHICS_TEMPTATION_TAGS)) {
-    success -= 0.08;
-  }
-  if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
-    success -= 0.06;
-  }
-  if (hasMatchingTag(act?.tags, AUDIT_TEMPTATION_TAGS)) {
-    success += 0.02;
-  }
-  if (hasMatchingTag(act?.tags, COMMUNITY_TEMPTATION_TAGS)) {
-    success -= 0.02;
-  }
-
-  return clamp(success, 0.16, 0.65);
+function hasTakenShortcutThisYear(state) {
+  return (Array.isArray(state?.history) ? state.history : [])
+    .some((entry) => entry?.type === "temptation" && /^Take the shortcut/.test(String(entry.option || "")));
 }
 
-function formatScheduledIssueTeaser(issue) {
+// Whether the institution that would catch this act is already reading the
+// file: any flag its caught band would set is set.
+function isAlreadyWatched(act, state) {
+  const flags = state?.flags || {};
+  return Object.keys(buildIllegalActFailFlags(act)).some((flag) => Boolean(flags[flag]));
+}
+
+/**
+ * The clean-band base for this act on this file, before js/risk.js reads the
+ * meters: the tier's odds, the kind of act, and whether the player has been
+ * here before this year.
+ */
+function getIllegalActBaseSuccess(act, state) {
+  const tierOdds = SHORTCUT_BAND_ODDS[act?.tier] || SHORTCUT_BAND_ODDS.core;
+  let success = tierOdds.clean;
+
+  if (hasMatchingTag(act?.tags, ETHICS_TEMPTATION_TAGS)) {
+    success += SHORTCUT_ODDS_SHIFTS.ethicsTag;
+  }
+  if (hasMatchingTag(act?.tags, ECOLOGICAL_TEMPTATION_TAGS)) {
+    success += SHORTCUT_ODDS_SHIFTS.ecologicalTag;
+  }
+  if (hasMatchingTag(act?.tags, AUDIT_TEMPTATION_TAGS)) {
+    success += SHORTCUT_ODDS_SHIFTS.auditTag;
+  }
+  if (hasMatchingTag(act?.tags, COMMUNITY_TEMPTATION_TAGS)) {
+    success += SHORTCUT_ODDS_SHIFTS.communityTag;
+  }
+  if (hasTakenShortcutThisYear(state)) {
+    success += SHORTCUT_ODDS_SHIFTS.priorShortcutThisYear;
+  }
+  if (isAlreadyWatched(act, state)) {
+    success += SHORTCUT_ODDS_SHIFTS.alreadyWatched;
+  }
+
+  return clamp(success, 0.15, 0.7);
+}
+
+// A promised card ("Fallout: X lands next season") is the one the draw will
+// deal; a weighted bundle without a promise stays "likely". Past the last
+// round the card cannot be dealt, and the notice says where it goes instead.
+function formatScheduledIssueTeaser(issue, { promised = false, afterYear = false } = {}) {
   if (!issue?.title) {
     return null;
   }
 
   const severity = issuePreviewSeverity(issue);
   const label = ISSUE_PREVIEW_SEVERITY_LABELS[severity] || "notable";
+  if (afterYear) {
+    return {
+      text: `Fallout (${label}): ${issue.title}. It lands after the year closes and goes on next year's file.`,
+      severity,
+      issueId: issue.id,
+      afterYear: true,
+    };
+  }
+  if (promised) {
+    return { text: `Fallout (${label}): ${issue.title}. It lands next season.`, severity, issueId: issue.id };
+  }
   const reason = String(issue.surfaceReason || "").replace(/^Why this surfaced:\s*/i, "").trim();
   const prefix = `Likely fallout (${label}): ${issue.title}.`;
   if (reason) {
-    return { text: `${prefix} ${reason}`, severity, issueId: issue.id };
+    return { text: `${prefix} ${reason.charAt(0).toUpperCase()}${reason.slice(1)}`, severity, issueId: issue.id };
   }
   return { text: prefix, severity, issueId: issue.id };
 }

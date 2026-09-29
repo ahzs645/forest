@@ -153,8 +153,11 @@ function MobileMetricStrip({ gameState }) {
 // metric swing in view so the loop reads as choice → consequence → next choice.
 function LastDecisionPanel({ decision }) {
   if (!decision?.label) return null;
-  const resultTone = decision.success === true ? "green" : decision.success === false ? "red" : null;
-  const resultWord = decision.success === true ? "Success" : decision.success === false ? "Caught" : null;
+  // A shortcut resolves to one of three bands (js/risk.js); "noticed" landed
+  // the payoff with somebody watching, so it is neither a clean success nor a catch.
+  const noticed = decision.band === "noticed";
+  const resultTone = noticed ? "yellow" : decision.success === true ? "green" : decision.success === false ? "red" : null;
+  const resultWord = noticed ? "Noticed" : decision.success === true ? "Success" : decision.success === false ? "Caught" : null;
   return (
     <section className="tui-panel tui-last-decision" aria-label="Last decision">
       <div className="tui-panel-title">Last Decision</div>

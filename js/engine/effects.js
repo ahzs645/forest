@@ -9,7 +9,7 @@ import {
   DEFAULT_CPD_TARGET,
   RELATIONSHIP_TRUST_THRESHOLD,
 } from "./constants.js";
-import { buildScheduledIssueTeaser, combineScheduledIssueTeasers } from "./content.js";
+import { buildScheduledIssueTeaser, combineScheduledIssueTeasers, describePromisedFallout } from "./content.js";
 import { ensureProfessionalComplianceState } from "./professional.js";
 import {
   applyDiminishingReturns,
@@ -76,7 +76,7 @@ export function applyOptionOutcome(state, option = {}, source, rng = Math.random
     return null;
   }
 
-  const causedBy = buildCausedBy(state, source);
+  const causedBy = buildCausedBy(state, source, option);
 
   if (option.risk) {
     const result = resolveRisk(state, option.risk, rng);
@@ -113,9 +113,12 @@ export function applyOptionOutcome(state, option = {}, source, rng = Math.random
 }
 
 // Provenance stamp attached to anything this decision schedules for later, so a
-// delayed issue/event can name the choice that caused it.
-function buildCausedBy(state, source) {
+// delayed issue/event can name the choice that caused it. A shortcut's fallout
+// also carries the act and the institution, so the card can say "because you
+// took X and C&E caught it" (`kind: "shortcut"`).
+function buildCausedBy(state, source, option = null) {
   if (!source) return null;
+  const shortcut = option?.risk?.shortcut || null;
   return {
     round: source.round ?? state.round ?? null,
     season: state.currentSeasonContext?.season || null,
@@ -124,7 +127,49 @@ function buildCausedBy(state, source) {
     title: source.title || null,
     option: source.option || null,
     stance: source.stance || null,
+    ...(shortcut
+      ? {
+          kind: "shortcut",
+          actId: shortcut.actId || null,
+          title: shortcut.title || source.title || null,
+          institution: shortcut.institution || null,
+        }
+      : {}),
   };
+}
+
+// Fallout a caught shortcut scheduled that never got its season (caught in
+// the last round, or crowded out): it settles here, as a consequence the
+// year-end review can name, instead of being promised and then dropped.
+function settleUnlandedFallout(state, round) {
+  const pending = Array.isArray(state.pendingIssues) ? state.pendingIssues : [];
+  const settled = [];
+  for (const entry of pending) {
+    if (entry?.causedBy?.kind !== "shortcut") continue;
+    const fallout = describePromisedFallout(state, [{ ...entry, delay: 1 }]);
+    if (!fallout) continue;
+    const { causedBy } = entry;
+    const when = causedBy.season ? ` in ${String(causedBy.season).toLowerCase()}` : "";
+    const who = causedBy.institution || "the district";
+    applyEffects(
+      state,
+      fallout.severity === "danger" ? { compliance: -6, relationships: -3 } : { compliance: -3, relationships: -1 },
+      {
+        type: "consequence",
+        id: "unlanded-fallout",
+        title: `${fallout.title} lands after the year closes`,
+        option: `You took the shortcut “${causedBy.title}”${when}, and ${who} caught it. The file carries it into next year.`,
+        round,
+        falloutId: fallout.id,
+        actId: causedBy.actId || null,
+      },
+    );
+    settled.push(entry);
+  }
+  if (settled.length) {
+    state.pendingIssues = pending.filter((entry) => !settled.includes(entry));
+  }
+  return settled.length;
 }
 
 // Widest gap between the strongest and weakest meter that still counts as a
@@ -322,6 +367,10 @@ export function applyRoundConsequences(state) {
 
   applyEcologyDrift(state, round, consequences);
   applyRoundRecoveries(state, round, consequences);
+
+  if (round >= (Number(state.totalRounds) || 4) && settleUnlandedFallout(state, round)) {
+    consequences.push("unlanded-fallout");
+  }
 
   return consequences;
 }
@@ -563,7 +612,13 @@ function applyRiskOutcomeSchedules(state, option, result, causedBy = null) {
     return null;
   }
 
-  const scheduleSpec = result.success ? risk.successScheduleIssues : risk.failScheduleIssues;
+  // The noticed band leaves a watch flag, not a scheduled card.
+  const band = result.band || (result.success ? "clean" : "caught");
+  const scheduleSpec = band === "clean"
+    ? risk.successScheduleIssues
+    : band === "noticed"
+      ? risk.partialScheduleIssues
+      : risk.failScheduleIssues;
   if (scheduleSpec) {
     scheduleIssueEntries(state, scheduleSpec, causedBy);
     return buildScheduledIssueTeaser(state, scheduleSpec);
