@@ -1944,29 +1944,44 @@ export const ISSUE_LIBRARY = [
       },
     ],
   },
-  // source: FPBC 2013-13 (von der Gonna / McBride Community Forest)
+  // source: FPBC 2013-13 (von der Gonna / McBride Community Forest). Retold
+  // as a Board audit of the licence the player works under, so it reads true
+  // for any role in any area. It follows a year that gave an audit something
+  // to find (an escalation, a flagged file, a record signed blind) or a
+  // caught shortcut's fallout; drawn cold at bc-wide weight it was the most
+  // common issue in the game.
   {
     id: "audit-laundry-list",
     title: "FPB Audit Laundry List",
     description:
-      "A side-file from your consulting practice: A Forest Practices Board audit of your community forest lands ten findings at once: vague road mapping, drifting OGMA boundaries, unclear contractor obligations, and six more items.",
+      "A Forest Practices Board audit of the licence you work under lands ten findings at once: vague road mapping, drifting OGMA boundaries, unclear contractor obligations, and seven more. Several of them trace back to your files.",
     roles: ["planner", "permitter", "recce", "silviculture"],
     areaTags: ["bc-wide"],
     seasonBias: ["Winter Operations", "Spring Planning"],
+    requiresAnyFlags: [
+      "auditEscalationActive",
+      "regulatoryScrutiny",
+      "rushJob",
+      "streamMisclassified",
+      "missingCruiseFieldNotes",
+      "crossingAssuranceSignedBlind",
+      "firstNationReferralHidden",
+      "salvageEstimatesUnchecked",
+    ],
     options: [
       {
-        label: "Triage the ten findings and publish a public response plan",
-        outcome: "The board likes the transparency. Community members show up to the plan meeting in good faith and the file starts to heal.",
+        label: "Triage the ten findings and publish a response plan",
+        outcome: "The Board notes the transparency in its report. The Nation and the local stakeholders come to the response meeting in good faith, and the file starts to heal.",
         effects: { progress: -4, compliance: 6, relationships: 5, budget: -3 },
       },
       {
-        label: "Fix the two or three easiest findings and debate the rest",
-        outcome: "The easy wins help, but the unresolved findings follow you into the next annual report and sour the board's tone.",
+        label: "Fix the two or three easiest findings and argue the rest",
+        outcome: "The easy wins help, but the open findings are listed again in the Board's follow-up report, and the district reads it.",
         effects: { progress: 1, compliance: -2, relationships: -2 },
       },
       {
-        label: "Dispute the methodology and keep operating while you litigate it",
-        outcome: "The dispute buys a year but the cumulative publicity damages council's confidence in the forest manager role entirely.",
+        label: "Dispute the methodology and keep operating",
+        outcome: "The dispute buys a season. The Board publishes anyway, and the district manager starts reading every submission from your shop twice.",
         effects: { progress: 3, compliance: -8, relationships: -6 },
         setFlags: { auditDisputeStance: true, regulatoryScrutiny: true },
       },
