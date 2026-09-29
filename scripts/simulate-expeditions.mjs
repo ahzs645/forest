@@ -189,7 +189,12 @@ function reconPolicy(journey, options, _prompt) {
   const crew = journey.crew || [];
   const hurting = crew.filter((member) => member.isActive && member.health < 45).length;
   const food = journey.resources?.food ?? 0;
+  const fuel = journey.resources?.fuel ?? 0;
   const equipment = journey.resources?.equipment ?? 100;
+  // A leg burns 15-20 L and a bad day can take a barrel; a competent lead
+  // tops up before the tank is a gamble, not after the trucks stop.
+  // Only worth a shift when the card can pay for the run.
+  const fuelLow = fuel <= 140 && (journey.resources?.budget ?? 0) >= 300;
   // The quiet-shift card is the only prompt carrying 'set_tempo'. Detect on
   // that rather than on 'end_shift', which lives in the camp submenu now.
   const atQuietCard = options.some((option) => option.value === 'set_tempo');
@@ -205,6 +210,7 @@ function reconPolicy(journey, options, _prompt) {
     if (hurting >= 2) wanted.push('end_shift', 'triage');
     else if (hurting >= 1) wanted.push('triage', 'end_shift');
     if (food <= 12) wanted.push('food_cache', 'grocery_run');
+    if (fuelLow) wanted.push('fuel_run');
     if (equipment <= 30) wanted.push('maintain');
     wanted.push('maintain', 'triage', 'food_cache', 'scout', 'end_shift');
     return pick(options, wanted) || options[0];
@@ -224,16 +230,26 @@ function reconPolicy(journey, options, _prompt) {
     // A crossing is scouted first, then crossed by whatever it physically is
     // (ford, bridge, ferry, culvert); a crossing that refuses the crew is
     // gone around rather than waited out.
+    // At the supply point, buy what is actually short before anything else.
+    const shopping = options.some((option) => option.value === 'fuel_drum' || option.value === 'rations');
     const sub = pick(options, [
+      // Food first: an empty box ends a season in six shifts; a thin tank
+      // still has a fuel run.
+      ...(shopping && food <= 60 ? ['rations'] : []),
+      ...(shopping && fuel <= 250 ? ['fuel_drum'] : []),
       'detour', 'mainline', 'scout', 'ford', 'cross', 'ferry', 'reroute', 'keep',
-      'rations', 'done', 'cancel', 'lean', 'skip', 'next', 'continue'
+      ...(shopping ? [] : ['rations']), 'done', 'cancel', 'lean', 'skip', 'next', 'continue'
     ]);
     if (sub) return sub;
     // An authored event card. A competent crew lead does not deal with
     // everything: when the season is running ahead of the file, they drive on
     // and wear the scrutiny. Model that, or the policy spends every day of the
     // run answering the radio and finishes three blocks out of eleven.
-    const setAside = maybeSetAside(
+    // Except when somebody is hurt: nobody competent leaves a bleeding saw
+    // cut on the radio to make ground, and the card lands its cost anyway.
+    const onTheRadio = journey.activeReconShift?.pendingEvent;
+    const someoneHurt = ['injury', 'illness'].includes(onTheRadio?.type);
+    const setAside = someoneHurt ? null : maybeSetAside(
       journey,
       options,
       (journey.blocksAssessed || 0) / (journey.blocks?.length || 1)
@@ -250,9 +266,20 @@ function reconPolicy(journey, options, _prompt) {
     const care = pick(options, ['camp_menu']);
     if (care) return care;
   }
-  if (food <= 12) {
-    const feed = pick(options, ['resupply', 'camp_menu']);
+  if (food <= 12 || fuelLow) {
+    // With no cash the supply point sells nothing; the camp menu still has
+    // the ration cache.
+    const cash = journey.resources?.budget ?? 0;
+    const feed = pick(options, cash >= 250 ? ['resupply', 'camp_menu'] : ['camp_menu']);
     if (feed) return feed;
+  }
+  // Standing at a supply point with the box or the tank half gone: stock up
+  // here rather than burn a shift on a run to town later.
+  // The thresholds match what the shop policy above will actually buy, or
+  // the crew spends shift after shift walking in and out of the store.
+  if ((food <= 50 || fuel <= 250) && (journey.resources?.budget ?? 0) >= 400) {
+    const stock = pick(options, ['resupply']);
+    if (stock) return stock;
   }
 
   // Otherwise: finish the package under foot, then cover ground. Never picks
