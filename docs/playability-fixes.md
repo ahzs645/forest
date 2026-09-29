@@ -38,3 +38,14 @@ The balance harness drove 24 seeded campaign-length assignments per role using r
 The remaining simulated losses were supply/fuel exhaustion or planning bankruptcy. This is evidence that completion is reachable under a consistent strategy, not a population win-rate estimate or proof that every possible choice succeeds.
 
 The Mac remained locked during this implementation pass, so fresh verification used headless browser interaction and engine tests. The earlier visible manual campaign is documented separately. The updated local game is available at `http://127.0.0.1:5178/` while its development server is running.
+
+## 2026-09-29 — Seasonal Strategy playtest fixes
+
+- Paperwork chains advance (the stage index was written to a stale copy) and process cards show stage-specific answers.
+- Dead seasonal content revived: 15 unreachable issues retagged or given flag producers; caught-shortcut fallout always has somewhere to land. `lint:seasonal` now fails on unknown area tags, undrawable issues, flags nothing sets, dead schedules and ungated season-bound copy.
+- Season gating: events honour `seasons`; heat dome, whiteout, early snow, snowmelt flooding and the pine beetle chain are season-locked.
+- Ending tier is read off the displayed score; meter gates cap the score and the scorecard says which gate held the year back.
+- Hub: "Your mission" brief, line-by-line "Why This Happened", no duplicated alert, [L] Log reads the seasonal year, role card explains why General Manager is not offered.
+- Field events: gains no longer add Progress, gambles land as their expected outcome, medevac is charged. Practice-burden cards log CPD; the CPD gap is prorated across the year.
+- Expedition housekeeping: scrutiny clamped at 100, crew ids unique across reloads, resource scoring uses the run's real starting stores. eslint warnings 31 -> 5.
+- Balance (`npm run sim:seasonal`, 12,600 years): greedy 2.28 -> 2.22, role-optimal 2.05 -> 1.85, cautious 1.80 -> 1.72, balanced 1.47 -> 1.50; greedy Outstanding by role planner 3% -> 15%, silviculture 30% -> 7%.
