@@ -220,6 +220,39 @@ function buildMissionBriefing(gs) {
   };
 }
 
+// Banners that name a kind of card rather than a subject. A season may carry
+// several of these; a specific banner ("Compliance flag") twice reads as the
+// game repeating itself, and the type shuffle below cannot fix three of them.
+const GENERIC_CARD_LABELS = new Set([
+  "Operational update",
+  "Operational issue",
+  "Operational constraint",
+  "Seasonal task",
+  "Shortcut offer",
+]);
+
+/**
+ * Draw a card whose specific banner is not already on this season's queue.
+ * Re-draws (without ticking the pending-event clocks again) a few times, and
+ * settles for the last draw when nothing distinct is left in the pool.
+ */
+function drawDistinctLabel(draw, queue, start, excludeIds = []) {
+  const taken = new Set(
+    queue.slice(start)
+      .map((entry) => entry?.data?.cardLabel)
+      .filter((label) => label && !GENERIC_CARD_LABELS.has(label)),
+  );
+  let card = draw(excludeIds, true);
+  const skipped = [...excludeIds];
+  for (let attempt = 0; attempt < 4 && card && taken.has(card.cardLabel); attempt += 1) {
+    skipped.push(card.id);
+    const next = draw(skipped, false);
+    if (!next) break;
+    card = next;
+  }
+  return card;
+}
+
 /**
  * Keep two cards of the same kind from landing back to back.
  *
@@ -257,7 +290,11 @@ function separateAdjacentCardTypes(queue, start, previousType = null) {
     // Seeded with the previous season's closing card, so the guard holds
     // across the season boundary too — a fall that ends on a contested call
     // and a winter that opens on one still read as two of the same thing.
-    const priorType = ordered.length ? ordered[ordered.length - 1].type : previousType;
+    const priorCard = ordered.length ? ordered[ordered.length - 1] : null;
+    const priorType = priorCard ? priorCard.type : previousType;
+    // Two different cards under the same banner ("Compliance flag") back to
+    // back read as a repeat, so the same label counts as a match too.
+    const priorLabel = priorCard?.data?.cardLabel || null;
 
     // Spend the most-repeated kind first. Taking merely the earliest
     // non-matching card is short-sighted: with one event and two contested
@@ -270,6 +307,7 @@ function separateAdjacentCardTypes(queue, start, previousType = null) {
     let bestCount = -1;
     for (let i = 0; i < remaining.length; i += 1) {
       if (remaining[i].type === priorType) continue;
+      if (priorLabel && remaining[i].data?.cardLabel === priorLabel) continue;
       const count = counts.get(remaining[i].type);
       if (count > bestCount) {
         bestCount = count;
@@ -889,7 +927,11 @@ export class TuiGameController {
         this.queue.push({ type: "event", data: event });
       }
 
-      const issue = drawIssue(gs, this.rng);
+      const issue = drawDistinctLabel(
+        (exclude, advancePending) => drawIssue(gs, this.rng, { advancePending, excludeIds: exclude }),
+        this.queue,
+        seasonCardStart,
+      );
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
       }
@@ -900,18 +942,22 @@ export class TuiGameController {
       }
 
       if (gs.round <= 2) {
-        const secondEvent = drawSeasonalEvent(gs, this.rng, {
-          advancePending: false,
-          excludeIds: event ? [event.id] : [],
-        });
+        const secondEvent = drawDistinctLabel(
+          (exclude) => drawSeasonalEvent(gs, this.rng, { advancePending: false, excludeIds: exclude }),
+          this.queue,
+          seasonCardStart,
+          event ? [event.id] : [],
+        );
         if (secondEvent) {
           this.queue.push({ type: "event", data: secondEvent });
         }
       } else {
-        const secondIssue = drawIssue(gs, this.rng, {
-          advancePending: false,
-          excludeIds: issue ? [issue.id] : [],
-        });
+        const secondIssue = drawDistinctLabel(
+          (exclude) => drawIssue(gs, this.rng, { advancePending: false, excludeIds: exclude }),
+          this.queue,
+          seasonCardStart,
+          issue ? [issue.id] : [],
+        );
         if (secondIssue) {
           this.queue.push({ type: "issue", data: secondIssue });
         }
