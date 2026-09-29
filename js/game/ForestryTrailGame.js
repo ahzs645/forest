@@ -593,7 +593,7 @@ export class ForestryTrailGame {
           const roleName = savedRun.role?.name || 'Forester';
           msg.textContent = `${savedRun.companyName || 'Your crew'} — ${roleName}, `
             + `${savedRun.area?.name || 'operating area'}, day ${savedRun.day}`
-            + `${savedRun.activeReconShift || savedRun.activeDeskDay?.day === savedRun.day ? ' — mid-shift' : ''}.`;
+            + `${savedRun.activeReconShift ? ' — mid-shift' : savedRun.activeDeskDay?.day === savedRun.day ? ' — mid-day' : ''}.`;
           msg.style.marginTop = '0';
           container.appendChild(msg);
         },
