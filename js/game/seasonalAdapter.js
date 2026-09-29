@@ -92,6 +92,40 @@ function riskTag(detail) {
   return '';
 }
 
+/**
+ * The offer's terms, in reading order, for a shortcut card: what it pays, the
+ * odds it holds this season, and that refusing is free. Empty for any other
+ * card.
+ */
+export function collectShortcutLines(contentData = {}) {
+  const shortcut = contentData.shortcut;
+  if (!shortcut) return [];
+  const odds = [shortcut.oddsText, shortcut.declineText].filter(Boolean).join('. ');
+  return [
+    shortcut.offerText ? { text: shortcut.offerText, className: 'term-shortcut-offer' } : null,
+    odds ? { text: odds.endsWith('.') ? odds : `${odds}.`, className: 'term-shortcut-odds' } : null,
+  ].filter(Boolean);
+}
+
+// The terminal re-anchors to its bottom after every write, so on a short
+// screen a long offer scrolled its own banner and title out of view. Pin the
+// first of `selectors` that still leaves `endSelector` on screen (the banner,
+// else the title) to the top, when the card would not otherwise fit.
+function anchorCardTop(ui, selectors, endSelector) {
+  const terminal = ui?.terminal;
+  if (!terminal || typeof terminal.querySelector !== 'function') return;
+  const offset = (el) => el.getBoundingClientRect().top - terminal.getBoundingClientRect().top + terminal.scrollTop;
+  const end = endSelector ? terminal.querySelector(endSelector) : null;
+  const endBottom = end ? offset(end) + end.getBoundingClientRect().height : terminal.scrollHeight;
+  const anchors = selectors.map((selector) => terminal.querySelector(selector)).filter(Boolean);
+  if (!anchors.length) return;
+  const anchor = anchors.find((el) => endBottom - offset(el) <= terminal.clientHeight) || anchors[anchors.length - 1];
+  const top = offset(anchor);
+  if (top < terminal.scrollTop || endBottom > terminal.scrollTop + terminal.clientHeight) {
+    terminal.scrollTop = Math.max(0, top - 4);
+  }
+}
+
 export function collectDetailLines(contentData = {}) {
   const lines = [];
   const context = contentData.context;
@@ -190,26 +224,43 @@ function writeNotice(ui, notice) {
  */
 export async function promptSeasonalCard(ui, contentData = {}, options = [], gameState = null) {
   const details = contentData.optionDetails || [];
-  const detailLines = collectDetailLines(contentData);
+  const shortcut = contentData.shortcut || null;
+  // An offer prints its whole brief up front; its context block only
+  // restated the role's standing objective, so it gets no More context.
+  const detailLines = shortcut ? [] : collectDetailLines(contentData);
   let showDetail = false;
 
   for (;;) {
     ui.clear();
-    if (gameState) {
+    if (gameState?.metrics) {
       renderMetricStrip(ui, gameState);
       ui.write('');
+    } else if (gameState === null) {
+      // Setup and resume cards (the controller's null snapshot) have no run
+      // yet: never leave the last year's meters standing beside them.
+      ui.clearMissionStatus?.();
     }
 
     writeNotice(ui, contentData.notice);
 
     const title = contentData.title || contentData.heading || contentData.text || '';
-    if (contentData.cardLabel) ui.write(contentData.cardLabel, 'term-dim');
+    if (shortcut) {
+      ui.write(shortcut.banner, 'term-shortcut-banner');
+    } else if (contentData.cardLabel) {
+      ui.write(contentData.cardLabel, 'term-dim');
+    }
     if (title) ui.writeHeader(title);
-    if (contentData.headline && contentData.headline !== title) ui.write(contentData.headline);
+    // A card scheduled by an earlier choice says which one, right under its
+    // title rather than behind More context.
+    if (contentData.provenance) ui.write(contentData.provenance, 'term-provenance');
+    if (contentData.headline && contentData.headline !== title) {
+      ui.write(contentData.headline, shortcut ? 'term-shortcut-headline' : '');
+    }
     if (contentData.subtitle) ui.write(contentData.subtitle, 'term-dim');
     if (contentData.note) ui.write(contentData.note, 'term-dim');
     const body = contentData.description || contentData.body || '';
     if (body) writeLines(ui, body);
+    for (const line of collectShortcutLines(contentData)) ui.write(line.text, line.className);
     writeMission(ui, contentData.mission);
 
     if (showDetail && detailLines.length) {
@@ -231,7 +282,10 @@ export async function promptSeasonalCard(ui, contentData = {}, options = [], gam
       choices.push({ label: 'More context', description: 'Background on this card (free)', value: 'detail' });
     }
 
-    const picked = await ui.promptChoice(contentData.decisionPrompt || '', choices);
+    const pending = ui.promptChoice(contentData.decisionPrompt || '', choices);
+    if (shortcut) anchorCardTop(ui, ['.term-shortcut-banner', '.term-shortcut-banner + .term-header'], '.term-shortcut-odds');
+    else if (contentData.provenance) anchorCardTop(ui, ['.term-header', '.term-provenance'], '.term-provenance');
+    const picked = await pending;
     if (picked.value === 'detail') {
       showDetail = true;
       continue;
@@ -386,6 +440,8 @@ async function runSeasonalGameInner(ui, options = {}) {
     const { mode, contentData } = view;
 
     if (mode === 'setup-name') {
+      // Play Again lands here with last year's meters still in the pane.
+      ui.clearMissionStatus?.();
       ui.clear();
       ui.writeHeader('SEASONAL STRATEGY');
       ui.write('Four seasons, five meters, one operating area. Decisions echo.');

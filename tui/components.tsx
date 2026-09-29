@@ -361,7 +361,25 @@ export function ContentView({ data }: { data: ContentData }) {
           {data.phaseLabel ? (
             <text content={data.phaseLabel} style={{ fg: C.yellow, bold: true }} />
           ) : null}
+          {data.shortcut ? (
+            <text content={`[!] ${data.shortcut.banner.toUpperCase()}`} style={{ fg: C.red, bold: true }} />
+          ) : null}
           <text content={data.title} style={{ fg: C.yellow, bold: true }} />
+          {data.provenance ? <text content={data.provenance} style={{ fg: C.yellow }} /> : null}
+          {data.shortcut ? (
+            <>
+              {data.headline ? <text content={data.headline} style={{ fg: C.red }} /> : null}
+              <text content="" />
+              <text content={data.description} style={{ fg: C.white }} />
+              {data.shortcut.offerText ? <text content={data.shortcut.offerText} style={{ fg: C.white, bold: true }} /> : null}
+              {data.shortcut.oddsText ? (
+                <text
+                  content={[data.shortcut.oddsText, data.shortcut.declineText].filter(Boolean).join(". ")}
+                  style={{ fg: C.yellow }}
+                />
+              ) : null}
+            </>
+          ) : null}
           {data.type === "scenario" ? (
             <>
               <text content="" />
@@ -380,7 +398,7 @@ export function ContentView({ data }: { data: ContentData }) {
               ) : null}
             </>
           ) : null}
-          {data.context?.operation ? (
+          {data.context?.operation && !data.shortcut ? (
             <>
               <text content="" />
               <text content="What job am I doing?" style={{ fg: C.white, bold: true }} />
@@ -390,16 +408,20 @@ export function ContentView({ data }: { data: ContentData }) {
               ) : null}
             </>
           ) : null}
-          <text content="" />
-          <text content="What changed?" style={{ fg: C.white, bold: true }} />
-          <text content={data.description} style={{ fg: C.white }} />
+          {data.shortcut ? null : (
+            <>
+              <text content="" />
+              <text content="What changed?" style={{ fg: C.white, bold: true }} />
+              <text content={data.description} style={{ fg: C.white }} />
+            </>
+          )}
           {data.flavor && (
             <>
               <text content="" />
               <text content={data.flavor} style={{ fg: C.dim, italic: true }} />
             </>
           )}
-          {(data.context?.stakes || data.whyNow || data.surfaceReason) && (
+          {!data.shortcut && (data.context?.stakes || data.whyNow || data.surfaceReason) && (
             <>
               <text content="" />
               <text content="Why does it matter now?" style={{ fg: C.white, bold: true }} />
@@ -428,10 +450,12 @@ export function ContentView({ data }: { data: ContentData }) {
                 content={`${i + 1}. ${opt.label}`}
                 style={{ fg: optionColor }}
               />
-              {opt.outcome && (
+              {/* The pre-commit hint (a shortcut's odds bands included),
+                  never the outcome, which is the result of the choice. */}
+              {opt.preview && (
                 <box style={{ paddingLeft: 3 }}>
                   <text
-                    content={opt.outcome}
+                    content={opt.bands?.length ? opt.bands.map((band) => band.text).join("\n") : opt.preview}
                     style={{ fg: C.dim }}
                   />
                 </box>

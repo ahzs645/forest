@@ -117,9 +117,25 @@ export function describeConsequences(state, ids = []) {
  * Fall decision" connection. Returns "" when the card surfaced for other
  * reasons (area context, low metric, random operational noise).
  */
+// Refusing or reporting an offer never schedules fallout today, but the label
+// check keeps a future "report it" follow-up from reading as "you took it".
+const SHORTCUT_NOT_TAKEN = /^(decline|say no|document and report)\b/i;
+
+function isTakenShortcut(causedBy) {
+  if (causedBy.shortcut === true || causedBy.tookShortcut === true) return true;
+  return causedBy.sourceType === "temptation" && !SHORTCUT_NOT_TAKEN.test(String(causedBy.option || ""));
+}
+
 export function describeCardCause(card) {
   const causedBy = card?.causedBy;
   if (!causedBy) return "";
+  // Fallout from a shortcut names the act itself ("Fudge the Species
+  // Composition"), not the generic option label every offer shares.
+  const shortcutTitle = isTakenShortcut(causedBy) ? causedBy.sourceTitle || causedBy.title : "";
+  if (shortcutTitle) {
+    const seasonWord = String(causedBy.season || "").split(" ")[0];
+    return `Because you took: ${shortcutTitle}${seasonWord ? ` — your ${seasonWord} shortcut` : ""}.`;
+  }
   const season = causedBy.season ? `${causedBy.season} ` : "";
   const option = causedBy.option ? `“${causedBy.option}”` : "an earlier call";
   return `Connected to your ${season}decision: ${option}.`;

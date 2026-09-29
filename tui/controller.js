@@ -23,6 +23,9 @@ import {
   SEASONS,
 } from "../js/engine.js";
 import { formatMetricName } from "../js/engine/shared.js";
+import { applyEffects } from "../js/engine/effects.js";
+import { resolveRisk } from "../js/risk.js";
+import { ILLEGAL_ACTS } from "../js/data/illegalActs.js";
 import { SEASONAL_SAVE_KEY, validateSeasonalSave } from "../js/game/saveLoad.js";
 import { detectArt } from "./art.js";
 import {
@@ -164,11 +167,23 @@ function outcomeAcknowledgement(cardType, round) {
   return "Decision logged";
 }
 
-function buildOutcomeNotice(option, outcomeResult, cardType = null, round = null) {
+// A teaser names fallout for a later season. In the last season there is no
+// later season, so the promise could never land; it is only shown when the
+// engine says the fallout does land (a teaser carrying `lands: true`).
+function landingTeaser(teaser, gs) {
+  if (!teaser?.text) return null;
+  if (teaser.lands === false || teaser.willLand === false) return null;
+  const finalSeason = gs && Number(gs.round || 0) >= Number(gs.totalRounds || SEASONS.length);
+  if (finalSeason && teaser.lands !== true && teaser.willLand !== true) return null;
+  // "…Ministry Data Audit. schedule strain made…": sentence-case the joins.
+  return { ...teaser, text: teaser.text.replace(/([.!?]\s+)([a-z])/g, (_, stop, letter) => stop + letter.toUpperCase()) };
+}
+
+function buildOutcomeNotice(option, outcomeResult, cardType = null, round = null, gs = null) {
   const riskResult = outcomeResult?.riskResult ?? null;
   const outcomeText = outcomeResult?.outcome ?? option?.outcome ?? "";
   const deltaText = formatMetricDelta(outcomeResult?.effects || {});
-  const scheduledIssuePreview = outcomeResult?.scheduledIssueTeaser ?? null;
+  const scheduledIssuePreview = landingTeaser(outcomeResult?.scheduledIssueTeaser, gs);
   const scheduledIssueText = scheduledIssuePreview?.text ?? "";
   const body = [outcomeText, deltaText ? `Effects: ${deltaText}` : "", scheduledIssueText]
     .filter(Boolean)
@@ -358,6 +373,25 @@ function buildCardHeadline(gs, item) {
   return seasonShort ? `${seasonShort}: ${tail}` : tail;
 }
 
+// The generic headline reads the card's metric swing across all three
+// options, so on an offer it called the report option's compliance gain "the
+// upside". An offer is framed by what it is and who checks.
+function buildShortcutFraming(gs, item, shortcut) {
+  const season = SEASONS[(gs?.round || 1) - 1] || "";
+  const seasonShort = season ? `${String(season).split(" ")[0]}: ` : "";
+  const stakes = `This breaks the rules, and ${shortcut.catcher || "somebody"} is who checks.`;
+  const decisionPrompt = "Turn it down, take it, or put it on the record?";
+  return {
+    headline: `${seasonShort}${stakes}`,
+    decisionPrompt,
+    context: {
+      ...(item?.context || {}),
+      stakes,
+      objective: decisionPrompt,
+    },
+  };
+}
+
 // Running cause/effect feed for the dashboard: the last few choices *and* the
 // fallout they triggered, newest first, so the world visibly responds to the
 // player instead of feeling random. Built from the engine's decision history,
@@ -379,14 +413,15 @@ function buildDecisionTrail(gs, limit = 5) {
 // Turn a raw effects delta into a concrete tradeoff hint shown *before* the
 // player commits. Exact magnitudes and time costs keep two "safe" options from
 // looking accidentally dominated when their real strengths differ.
-export function summarizeEffects(effects, option = null) {
+export function summarizeEffects(effects, option = null, tapers = null) {
   if (!effects || typeof effects !== "object") return null;
 
   const changes = [];
   for (const [key, value] of Object.entries(effects)) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric === 0 || key === "timeUsed") continue;
-    changes.push(`${formatMetricName(key)} ${numeric > 0 ? "+" : ""}${numeric}`);
+    const taper = tapers?.[key] ? ` (tapered: ${tapers[key]})` : "";
+    changes.push(`${formatMetricName(key)} ${numeric > 0 ? "+" : ""}${numeric}${taper}`);
   }
 
   const timeUsed = Number.isFinite(Number(option?.timeUsed))
@@ -397,6 +432,203 @@ export function summarizeEffects(effects, option = null) {
   }
 
   return changes.length ? changes.join(" · ") : null;
+}
+
+/**
+ * What an effects delta will actually move on the meters as they stand.
+ * applyEffects tapers gains on a meter at 75+ (and trims relationship gains
+ * under a trust deficit, budget gains under a loan), so previewing the
+ * authored number promised "+4" and delivered "+2". Runs applyEffects itself
+ * against a scratch copy, so the preview cannot drift from the engine.
+ * @returns {{ effects: Object, tapers: Object }} applied deltas in authored
+ *   order (timeUsed kept), and a reason per metric whose gain was cut
+ */
+export function projectAppliedEffects(gs, effects) {
+  if (!effects || typeof effects !== "object") return { effects: {}, tapers: {} };
+  if (!gs?.metrics) return { effects: { ...effects }, tapers: {} };
+  const scratch = { metrics: { ...gs.metrics }, flags: { ...(gs.flags || {}) }, history: [] };
+  const applied = applyEffects(scratch, effects);
+  const projected = {};
+  const tapers = {};
+  for (const [key, value] of Object.entries(effects)) {
+    if (!(key in applied)) {
+      projected[key] = value;
+      continue;
+    }
+    projected[key] = applied[key];
+    if (Number(value) > applied[key]) {
+      tapers[key] = Number(gs.metrics[key]) >= 75
+        ? "meter high"
+        : key === "relationships" && gs.flags?.trustDeficitActive
+          ? "trust deficit"
+          : key === "budget" && gs.flags?.budgetLoanActive ? "loan repayments" : "reduced";
+    }
+  }
+  return { effects: projected, tapers };
+}
+
+function summarizeProjectedEffects(gs, effects, option = null) {
+  const { effects: projected, tapers } = projectAppliedEffects(gs, effects);
+  return summarizeEffects(projected, option, tapers);
+}
+
+// ── Shortcut offers ─────────────────────────────────────────────────────────
+// A shortcut is a legal and ethical call, not another operational card, so it
+// is presented on its own terms: who checks, the odds it holds this season,
+// what it pays, what a catch costs, and that saying no is free. The engine
+// may carry the odds and payoff on the card; when it does not, they are read
+// from the risk roll and the act itself.
+
+const SHORTCUT_CATCHERS = {
+  "C&E": "Compliance and Enforcement (C&E)",
+  FPB: "the Forest Practices Board",
+  FPBC: "Forest Professionals BC",
+  WorkSafeBC: "WorkSafeBC",
+  BCWS: "BC Wildfire Service",
+  COS: "the Conservation Officer Service",
+  ENV: "the Ministry of Environment",
+  DFO: "Fisheries and Oceans Canada",
+  "Archaeology Branch": "the Archaeology Branch",
+  "Timber Pricing": "Timber Pricing Branch",
+  "Revenue Branch": "the Revenue Branch",
+  "the Nation": "the Nation",
+  RCMP: "the RCMP",
+  CVSE: "Commercial Vehicle Safety and Enforcement",
+  "Transport Canada": "Transport Canada",
+  "internal audit": "your company's internal audit",
+  "the contractor": "the contractor",
+};
+
+const ILLEGAL_ACTS_BY_ID = new Map(ILLEGAL_ACTS.map((act) => [act.id, act]));
+
+function findShortcutAct(item) {
+  const id = item?.actId || String(item?.id || "").replace(/^temptation:/, "");
+  return ILLEGAL_ACTS_BY_ID.get(id) || null;
+}
+
+function toPercent(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.round(numeric <= 1 ? numeric * 100 : numeric);
+}
+
+// Odds the engine already put on the card, in any of the shapes the lanes
+// use ({clean, caught, bad}, {good, partial, bad}, a live-odds block).
+function readCardOdds(item, option) {
+  const source = option?.odds || option?.risk?.odds || option?.liveOdds || item?.odds;
+  if (!source || typeof source !== "object") return null;
+  const clean = toPercent(source.clean ?? source.good ?? source.success ?? source.holds);
+  if (clean === null) return null;
+  const bad = toPercent(source.bad ?? source.badlyWrong ?? source.severe ?? source.serious) ?? 0;
+  const caught = toPercent(source.caught ?? source.partial ?? source.mixed) ?? Math.max(0, 100 - clean - bad);
+  return { clean, caught, bad };
+}
+
+/**
+ * The chance a risk roll succeeds on this file, read from resolveRisk itself:
+ * it succeeds when the roll lands under its threshold, so bisecting on the
+ * roll recovers the threshold without restating the compliance and
+ * relationship modifiers here.
+ */
+export function riskHoldChance(gs, risk) {
+  if (!risk || !Number.isFinite(Number(risk.baseSuccess)) || !gs?.metrics) return null;
+  const state = { metrics: { ...gs.metrics }, flags: { ...(gs.flags || {}) } };
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 24; i += 1) {
+    const mid = (low + high) / 2;
+    if (resolveRisk(state, risk, () => mid).success) low = mid;
+    else high = mid;
+  }
+  return Math.round(((low + high) / 2) * 1e4) / 1e4;
+}
+
+function readShortcutOdds(gs, item, option) {
+  const carried = readCardOdds(item, option);
+  if (carried) return carried;
+  const chance = riskHoldChance(gs, option?.risk);
+  if (chance === null) return null;
+  const clean = Math.round(chance * 100);
+  return { clean, caught: 100 - clean, bad: 0 };
+}
+
+export function formatShortcutOdds(odds) {
+  if (!odds) return "";
+  const parts = [`holds ${odds.clean}%`, `caught ${odds.caught}%`];
+  if (odds.bad) parts.push(`badly wrong ${odds.bad}%`);
+  return parts.join(" · ");
+}
+
+function isFreeRefusal(option) {
+  if (!option || option.risk) return false;
+  return !Object.entries(option.effects || {})
+    .some(([key, value]) => key !== "timeUsed" && Number(value) !== 0);
+}
+
+/**
+ * Everything the offer card shows beyond its title and pitch. Null when the
+ * card carries no shortcut roll (nothing to price).
+ */
+export function buildShortcutBrief(gs, item) {
+  const options = Array.isArray(item?.options) ? item.options : [];
+  const takeIndex = options.findIndex((option) => option?.risk);
+  if (takeIndex < 0) return null;
+  const take = options[takeIndex];
+  const act = findShortcutAct(item);
+  const odds = readShortcutOdds(gs, item, take);
+  const catcherKey = take.risk?.institution || item?.institution || act?.catch?.by || null;
+  const catcher = catcherKey ? SHORTCUT_CATCHERS[catcherKey] || catcherKey : null;
+  const payoffLine = take.payoffLine || take.payoff?.line || item?.payoffLine || act?.payoff?.line || "";
+  const payoffChip = take.payoffChip || item?.payoffChip || "";
+  const finalSeason = Number(gs?.round || 0) >= Number(gs?.totalRounds || SEASONS.length);
+  // Fallout scheduled in the last season has no season left to land in.
+  const followUp = take.risk?.failScheduleIssues && !finalSeason ? "follow-up review" : "";
+  const holdEffects = summarizeProjectedEffects(gs, take.risk?.successEffects || {}) || "no meter change";
+  const caughtEffects = [summarizeProjectedEffects(gs, take.risk?.failEffects || {}), followUp]
+    .filter(Boolean).join(" · ") || "no meter change";
+  const badEffects = summarizeProjectedEffects(gs, take.risk?.badEffects || take.risk?.severeEffects || {});
+  const bands = [];
+  if (odds) {
+    bands.push({ tone: "positive", text: `Holds ${odds.clean}%: ${holdEffects}` });
+    bands.push({ tone: "danger", text: `Caught ${odds.caught}%: ${caughtEffects}` });
+    if (odds.bad) bands.push({ tone: "danger", text: `Badly wrong ${odds.bad}%: ${badEffects || "worse than caught"}` });
+  } else {
+    bands.push({ tone: "positive", text: `If it holds: ${holdEffects}` });
+    bands.push({ tone: "danger", text: `If caught: ${caughtEffects}` });
+  }
+  const declineIndex = options.findIndex((option, index) => index !== takeIndex && /^(decline|say no)\b/i.test(option?.label || ""));
+
+  return {
+    takeIndex,
+    banner: "Shortcut offer · off the books",
+    odds,
+    oddsText: odds ? `Odds this season: ${formatShortcutOdds(odds)}` : "",
+    catcher,
+    catcherText: catcher ? `Who checks: ${catcher}` : "",
+    payoffLine,
+    payoffChip,
+    offerText: payoffLine || payoffChip
+      ? `On offer: ${[payoffChip, payoffLine].filter(Boolean).join(" — ")}`
+      : "",
+    declineText: declineIndex >= 0 && isFreeRefusal(options[declineIndex]) ? "Saying no costs nothing." : "",
+    bands,
+    preview: bands.map((band) => band.text).join(" | "),
+  };
+}
+
+// The act description ends with a "Pressure points:" line built from the
+// act's raw tags (other roles' ids, "Illegal", "Fsp"), which read as framing
+// the card does not mean. The brief's odds, catcher and offer lines replace it.
+function stripShortcutTagLine(description) {
+  return String(description || "")
+    .split(/\n{2,}/)
+    .filter((paragraph) => !/^Pressure points:/i.test(paragraph.trim()))
+    .join("\n\n");
+}
+
+// "Adapted desk event • Weather" is an internal provenance tag, not copy.
+function playerFacingFlavor(flavor) {
+  return /^Adapted\b/i.test(String(flavor || "").trim()) ? "" : flavor;
 }
 
 // Classify an option's downside into one readable risk band — SAFE / TRADEOFF /
@@ -446,11 +678,12 @@ export function deriveRiskLevel(option, { danger = false } = {}) {
   return "medium";
 }
 
-function presentOption(option) {
+function presentOption(option, gs = null) {
   return {
     label: option.label,
-    // Authored hint wins; otherwise derive a neutral tradeoff from the effects.
-    preview: option.preview ?? summarizeEffects(option.effects, option),
+    // Authored hint wins; otherwise derive a neutral tradeoff from the
+    // effects as they will actually apply to these meters.
+    preview: option.preview ?? summarizeProjectedEffects(gs, option.effects, option),
     // Kept for the post-choice result notice and danger-issue copy tests.
     outcome: option.outcome,
     // Surfaced for headless strategy policies (sims/tests). The browser UI
@@ -463,15 +696,22 @@ function presentOption(option) {
   };
 }
 
-function buildPresentedOptions(item, phaseType) {
+function buildPresentedOptions(item, phaseType, gs = null, shortcut = null) {
   const options = Array.isArray(item?.options) ? item.options : [];
   if (phaseType === "issue" && item?.surfaceSeverity === "danger") {
-    return options.map((option, index) => presentDangerIssueOption(item, option, index));
+    return options.map((option, index) => presentDangerIssueOption(item, option, index, gs));
   }
-  return options.map(presentOption);
+  return options.map((option, index) => {
+    const presented = presentOption(option, gs);
+    // The take option prices each band with the same odds the card shows.
+    if (shortcut && index === shortcut.takeIndex) {
+      return { ...presented, preview: shortcut.preview, bands: shortcut.bands, shortcut: true };
+    }
+    return presented;
+  });
 }
 
-function presentDangerIssueOption(item, option, index) {
+function presentDangerIssueOption(item, option, index, gs = null) {
   if (item?.id === "formal-investigation") {
     const crisisCopy = [
       {
@@ -491,7 +731,7 @@ function presentDangerIssueOption(item, option, index) {
     if (crisisCopy) {
       return {
         ...crisisCopy,
-        preview: summarizeEffects(option?.effects, option),
+        preview: summarizeProjectedEffects(gs, option?.effects, option),
         riskLevel: deriveRiskLevel(option, { danger: true }),
       };
     }
@@ -499,7 +739,7 @@ function presentDangerIssueOption(item, option, index) {
 
   return {
     label: option?.label || `Option ${index + 1}`,
-    preview: option?.preview ?? summarizeEffects(option?.effects, option),
+    preview: option?.preview ?? summarizeProjectedEffects(gs, option?.effects, option),
     outcome: option?.outcome,
     riskLevel: deriveRiskLevel(option, { danger: true }),
   };
@@ -1101,17 +1341,22 @@ export class TuiGameController {
     ) {
       const item = phase.data;
       const isCrisisIssue = phase.type === "issue" && item.surfaceSeverity === "danger";
-      const presentedOptions = buildPresentedOptions(item, phase.type);
+      const shortcut = phase.type === "temptation" ? buildShortcutBrief(gs, item) : null;
+      const presentedOptions = buildPresentedOptions(item, phase.type, gs, shortcut);
+      const framing = shortcut ? buildShortcutFraming(gs, item, shortcut) : null;
       this.present(
         {
           type: phase.type,
           title: item.title,
-          headline: buildCardHeadline(gs, item),
-          description: item.description ?? item.prompt ?? "",
+          headline: framing?.headline ?? buildCardHeadline(gs, item),
+          description: shortcut
+            ? stripShortcutTagLine(item.description ?? item.prompt)
+            : item.description ?? item.prompt ?? "",
           cardLabel: item.cardLabel,
-          context: item.context,
-          decisionPrompt: item.decisionPrompt,
-          flavor: item.flavor,
+          context: framing?.context ?? item.context,
+          decisionPrompt: framing?.decisionPrompt ?? item.decisionPrompt,
+          flavor: playerFacingFlavor(item.flavor),
+          shortcut: shortcut || undefined,
           sourceLabel: item.sourceLabel,
           whyNow: item.whyNow,
           surfaceReason: item.surfaceReason,
@@ -1137,7 +1382,7 @@ export class TuiGameController {
           gs.lastDecision = buildLastDecision(option, outcomeResult);
           this.emit();
 
-          this.processNext(buildOutcomeNotice(option, outcomeResult, phase.type, gs.round));
+          this.processNext(buildOutcomeNotice(option, outcomeResult, phase.type, gs.round, gs));
         },
         artText,
       );

@@ -58,9 +58,9 @@ test("a delayed issue carries the decision that scheduled it, and describeCardCa
 
   const issue = drawIssue(state, () => 0);
   assert.ok(issue.causedBy, "drawn issue should carry provenance forward");
+  // Shortcut fallout names the act itself, not the generic option label.
   const sentence = describeCardCause(issue);
-  assert.match(sentence, /Connected to your Fall Integration decision/);
-  assert.match(sentence, new RegExp(risky.label.slice(0, 8)));
+  assert.equal(sentence, `Because you took: ${temptation.title} — your Fall shortcut.`);
 });
 
 test("describeCardCause returns empty string when there is no provenance", () => {
