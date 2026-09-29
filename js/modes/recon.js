@@ -2541,59 +2541,94 @@ export async function handleResupply(game, block) {
     };
   };
 
+  // The restock is a freight bundle at a bundle price, charged for what the
+  // truck actually takes: a full list is $700 against about $1,090 bought
+  // item by item, and a part-load pays the same share of the bundle. With
+  // room for only one of its lines it is that single item at a discount, so
+  // it comes off the shelf; the single item is still there.
+  const RESTOCK = [
+    { resourceId: 'fuel', amount: 200, unit: ' L fuel', rate: 360 / 200, min: 50 },
+    { resourceId: 'food', amount: 25, unit: ' person-days food', rate: 160 / 20, min: 6 },
+    { resourceId: 'equipment', amount: 20, unit: '% equipment', rate: 220 / 15, min: 5 },
+    { resourceId: 'firstAid', amount: 2, unit: ' kits', rate: 120, min: 1 }
+  ];
+  const restock = () => {
+    const lines = RESTOCK.map((line) => ({ ...line, qty: Math.min(line.amount, Math.floor(roomFor(line.resourceId))) }));
+    if (lines.filter((line) => line.qty >= line.min).length < 2) return null;
+    const full = lines.every((line) => line.qty === line.amount);
+    const value = lines.reduce((sum, line) => sum + line.qty * line.rate, 0);
+    const listValue = RESTOCK.reduce((sum, line) => sum + line.amount * line.rate, 0);
+    const cost = full ? priced(700) : Math.max(10, Math.round((priced(700) * value / listValue) / 10) * 10);
+    const landing = lines.filter((line) => line.qty > 0);
+    return {
+      id: 'full_restock',
+      label: full ? 'Full restock' : 'Restock, part (all that fits)',
+      description: landing.map((line) => `+${line.qty}${line.unit}`).join(', '),
+      cost,
+      apply: () => {
+        for (const line of landing) {
+          journey.resources[line.resourceId] = clampToMax(line.resourceId, journey.resources[line.resourceId] + line.qty);
+        }
+      }
+    };
+  };
+  const SHELF_NAMES = {
+    fuel_drum: 'Fuel drum', rations: 'Rations crate', first_aid: 'First aid kit',
+    flagging: 'Flagging', field_repair: 'Field repair', full_restock: 'Full restock'
+  };
+
   const offerBuilders = [
     single('fuel_drum', 'fuel', 200, ' L', 'Fuel drum', 'A 205 L drum of diesel, pumped into the tanks and the cans', 360),
     single('rations', 'food', 20, ' person-days', 'Rations crate', 'Four days of camp food for five', 160),
     single('first_aid', 'firstAid', 1, ' kit', 'First aid kit', 'Level 3 kit restock', 120),
     single('flagging', 'flaggingTape', 12, ' rolls', 'Flagging', 'Ribbon for the next four boundaries', 60),
     single('field_repair', 'equipment', 15, '% equipment', 'Field repair', 'Tires, a fuel filter, a chain and bar', 220),
-    () => (['fuel', 'food', 'equipment', 'firstAid'].some((id) => roomFor(id) >= 1) ? {
-      id: 'full_restock',
-      label: 'Full restock',
-      description: '+200 L fuel, +25 person-days food, +20% equipment, +2 kits (up to what the truck holds)',
-      cost: priced(700),
-      apply: () => {
-        journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 200);
-        journey.resources.food = clampToMax('food', journey.resources.food + 25);
-        journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 20);
-        journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 2);
-      }
-    } : null)
+    restock
   ];
 
-  const listedShort = new Set();
+  // Positions hold for the whole visit: an item that stops fitting, or that
+  // the card can no longer cover, stays in its row, disabled with the reason,
+  // so a number key never slides onto the next item on the shelf.
+  const shelf = offerBuilders.map((build) => build()?.id ?? null);
   while (true) {
     const money = journey.resources.budget || 0;
-    const offers = offerBuilders.map((build) => build()).filter(Boolean);
+    const built = offerBuilders.map((build) => build());
+    const offers = built.filter(Boolean);
     const affordableOffers = offers.filter((offer) => money >= offer.cost);
 
     if (offers.length === 0) {
       ui.write('The truck is full. Nothing here it can carry.');
       break;
     }
-    // What the card cannot cover stays on the list as a line with its price,
-    // the way an event card says what it could not pay for, instead of
-    // quietly vanishing from the shelf.
-    for (const offer of offers.filter((o) => money < o.cost && !listedShort.has(o.id))) {
-      listedShort.add(offer.id);
-      ui.write(`${offer.label} ($${offer.cost}): $${Math.ceil(offer.cost - money)} short.`, 'term-dim');
-    }
     if (affordableOffers.length === 0) {
+      // What the card cannot cover is still named with its price, the way an
+      // event card says what it could not pay for.
+      for (const offer of offers) {
+        ui.write(`${offer.label} ($${offer.cost}): $${Math.ceil(offer.cost - money)} short.`, 'term-dim');
+      }
       ui.writeWarning('You cannot afford anything at this stop. Better keep moving.');
       break;
     }
 
-    const options = [
-      ...affordableOffers.map(o => ({
-        label: `${o.label} ($${o.cost})`,
-        description: o.description,
-        value: o.id
-      })),
-      { label: 'Done', description: 'Finish shopping', value: 'done' }
-    ];
+    const options = [];
+    shelf.forEach((id, index) => {
+      const offer = built[index];
+      if (offer) {
+        const short = money < offer.cost;
+        options.push({
+          label: `${offer.label} ($${offer.cost})`,
+          description: short ? `$${Math.ceil(offer.cost - money)} short` : offer.description,
+          value: offer.id,
+          ...(short ? { disabled: true } : {})
+        });
+      } else if (id) {
+        options.push({ label: SHELF_NAMES[id] || id, description: 'No room left on the truck for it', value: id, disabled: true });
+      }
+    });
+    options.push({ label: 'Done', description: 'Finish shopping', value: 'done' });
 
     const choice = await ui.promptChoice(`Buy supplies (cash: ${formatDollars(money)}):`, options);
-    if (choice.value === 'done') break;
+    if (!choice || choice.value === 'done') break;
 
     const offer = affordableOffers.find(o => o.id === choice.value);
     if (!offer) continue;

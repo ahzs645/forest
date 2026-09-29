@@ -398,8 +398,12 @@ test('the supply point lists what the card cannot cover, with the shortfall', as
   journey.resources.food = 30;
   journey.resources.fuel = 200;
   const log = [];
-  await handleResupply({ ui: makeUi((options) => options.find((o) => o.value === 'done'), log), journey }, { name: 'Supply Point' });
-  assert.ok(log.some((line) => /^Full restock \(\$\d+\): \$\d+ short\.$/.test(line)), log.join('\n'));
+  let menu = [];
+  await handleResupply({ ui: makeUi((options) => { menu = options; return options.find((o) => o.value === 'done'); }, log), journey }, { name: 'Supply Point' });
+  // Listed in its row, disabled, with the shortfall as the reason.
+  const restock = menu.find((o) => o.value === 'full_restock');
+  assert.ok(restock?.disabled, JSON.stringify(menu));
+  assert.match(restock.description, /^\$\d+ short$/);
 });
 
 test('a set-aside never lands a cost the card could not have paid', () => {
