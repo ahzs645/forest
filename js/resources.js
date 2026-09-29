@@ -367,7 +367,7 @@ export function getFormattedResourceStatus(resources, definitions) {
     // Format display value
     let display;
     if (def.unit === '$') {
-      display = '$' + Math.round(value).toLocaleString();
+      display = formatDollars(value);
     } else if (def.unit === '%') {
       display = Math.round(value) + '%';
     } else {
@@ -598,6 +598,17 @@ export function getResourcePercentage(current, definition) {
 }
 
 /**
+ * Whole dollars with the sign in front of the dollar sign: an overdrawn
+ * budget reads "-$858", never "$-858".
+ * @param {number} value
+ * @returns {string}
+ */
+export function formatDollars(value) {
+  const rounded = Math.round(Number(value) || 0);
+  return `${rounded < 0 ? '-' : ''}$${Math.abs(rounded).toLocaleString('en-CA')}`;
+}
+
+/**
  * Format resource value for display
  * @param {string} resourceId - Resource ID
  * @param {number} value - Current value
@@ -609,7 +620,7 @@ export function formatResourceValue(resourceId, value, definitions) {
   if (!def) return String(value);
 
   if (def.unit === '$') {
-    return '$' + Math.round(value).toLocaleString();
+    return formatDollars(value);
   }
   if (def.unit === '%') {
     return Math.round(value) + '%';

@@ -41,6 +41,7 @@ import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
 import { checkpointDeskDay, closeDeskDay, resumingDeskDay } from '../journey/deskMechanics.js';
 import { describeGoodwillChange, readGoodwill } from '../events/resolution.js';
+import { formatDollars } from '../resources.js';
 
 /**
  * What a day on each track of the planning file is worth.
@@ -766,7 +767,7 @@ export function buildPlanningActionReceipt(before, journey) {
 
   const budgetDelta = after.budget - before.budget;
   if (budgetDelta !== 0) {
-    parts.push(`Budget ${budgetDelta > 0 ? '+' : '-'}$${Math.abs(Math.round(budgetDelta)).toLocaleString()} → $${Math.round(after.budget).toLocaleString()}`);
+    parts.push(`Budget ${budgetDelta > 0 ? '+' : '-'}$${Math.abs(Math.round(budgetDelta)).toLocaleString()} → ${formatDollars(after.budget)}`);
   }
   const politicalDelta = after.political - before.political;
   if (politicalDelta !== 0) parts.push(`District goodwill ${signed(politicalDelta)} → ${Math.round(after.political)}`);
@@ -841,7 +842,7 @@ export async function runPlanningDay(game) {
           getPlanningPhaseLabel(journey.plan.phase),
           daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
           `DM readiness ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
-          `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
+          `budget ${formatDollars((journey.resources.budget || 0) / 1000)}k`,
         ]),
         onRender: () => updatePlanningMissionStatus(ui, journey, seasonInfo),
         onResolved: ({ spendsDay, setAside }) => {
@@ -902,7 +903,7 @@ export async function runPlanningDay(game) {
         getPlanningPhaseLabel(journey.plan.phase),
         daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
         `DM readiness ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
-        `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
+        `budget ${formatDollars((journey.resources.budget || 0) / 1000)}k`,
       ]),
       label: 'AT THE DESK',
       title: 'THE FILE, AS IT STANDS',

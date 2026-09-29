@@ -9,6 +9,7 @@
  */
 
 import { isFieldJourney } from './constants.js';
+import { formatDollars } from '../resources.js';
 
 /**
  * What an option costs that the crew does not have, or null when it can pay.
@@ -33,7 +34,7 @@ export function getOptionShortfall(journey, option) {
  * @returns {string}
  */
 export function formatShortfall(label, shortfall) {
-  const cost = `$${Math.round(shortfall.cost).toLocaleString()}`;
-  const cash = `$${Math.round(shortfall.cash).toLocaleString()}`;
+  const cost = formatDollars(shortfall.cost);
+  const cash = formatDollars(shortfall.cash);
   return `Can't pay for "${label}": it needs ${cost} and the card has ${cash}.`;
 }

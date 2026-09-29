@@ -55,7 +55,7 @@ import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journe
 import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
 import { buildCampfireFrames } from '../scene/textmode/effects.js';
 import { buildNightCampFrames } from '../scene/textmode/scenes.js';
-import { FIELD_RESOURCES } from '../resources.js';
+import { FIELD_RESOURCES, formatDollars } from '../resources.js';
 import {
   addDiscoveryTags,
   getDiscoveryTagDefinition,
@@ -2294,7 +2294,7 @@ function handleReplaceAttendant(ui, journey) {
   const cash = Number(journey.resources.budget || 0);
   ui.writeHeader('REPLACEMENT ATTENDANT');
   if (cash < cost) {
-    ui.writeWarning(`The office will not release a Level 3 without $${cost} on the card. Cash on hand: $${Math.round(cash)}.`);
+    ui.writeWarning(`The office will not release a Level 3 without $${cost} on the card. Cash on hand: ${formatDollars(cash)}.`);
     ui.write('The crew stays in camp on light duties. Nobody works a line until an attendant is back.');
     return;
   }
@@ -2320,7 +2320,7 @@ function handleFuelRun(ui, journey) {
   const cash = Number(journey.resources.budget || 0);
   ui.writeHeader('FUEL RUN');
   if (cash < cost) {
-    ui.writeWarning(`The cardlock wants $${cost} and the card has $${Math.round(cash)} on it. The driver comes back with coffee and no fuel.`);
+    ui.writeWarning(`The cardlock wants $${cost} and the card has ${formatDollars(cash)} on it. The driver comes back with coffee and no fuel.`);
     return;
   }
   journey.resources.budget = Math.max(0, cash - cost);
@@ -2338,7 +2338,7 @@ function handleGroceryRun(ui, journey) {
   const cash = Number(journey.resources.budget || 0);
   ui.writeHeader('GROCERY RUN');
   if (cash < cost) {
-    ui.writeWarning(`The store wants $${cost} and the card has $${Math.round(cash)} on it. The driver comes back with a bag of apples and an apology.`);
+    ui.writeWarning(`The store wants $${cost} and the card has ${formatDollars(cash)} on it. The driver comes back with a bag of apples and an apology.`);
     return;
   }
   journey.resources.budget = Math.max(0, cash - cost);
@@ -2494,7 +2494,7 @@ export async function handleResupply(game, block) {
   const { ui, journey } = game;
   const cash = journey.resources.budget || 0;
   ui.writeHeader(`RESUPPLY: ${block?.name || 'Supply Point'}`);
-  ui.write(`Cash on hand: $${Math.round(cash).toLocaleString()}`);
+  ui.write(`Cash on hand: ${formatDollars(cash)}`);
 
   // Freight economics: the deeper into the traverse, the more everything
   // costs — buy early or pay the remoteness premium.
@@ -2592,7 +2592,7 @@ export async function handleResupply(game, block) {
       { label: 'Done', description: 'Finish shopping', value: 'done' }
     ];
 
-    const choice = await ui.promptChoice(`Buy supplies (cash: $${Math.round(money).toLocaleString()}):`, options);
+    const choice = await ui.promptChoice(`Buy supplies (cash: ${formatDollars(money)}):`, options);
     if (choice.value === 'done') break;
 
     const offer = affordableOffers.find(o => o.id === choice.value);

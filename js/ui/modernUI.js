@@ -6,6 +6,7 @@
 import { displayMode } from '../displayMode.js';
 import { getActiveCrewCount, getAverageMorale } from '../crew.js';
 import { getOperationalProgress } from '../journey.js';
+import { formatDollars } from '../resources.js';
 
 /**
  * Modern UI mixin
@@ -26,8 +27,7 @@ export const ModernUIMixin = {
       this.modernYearValue.textContent = journey.season?.year ? `Year ${journey.season.year}` : `Day ${journey.day}`;
     }
     if (this.modernFundsValue) {
-      const budget = Math.round(journey.resources?.budget ?? 0);
-      this.modernFundsValue.textContent = `$${budget.toLocaleString()}`;
+      this.modernFundsValue.textContent = formatDollars(journey.resources?.budget ?? 0);
     }
     if (this.modernZoneValue) {
       // becZone reads "SBSmc2 – Sub-Boreal Spruce moist cold"; the card is a

@@ -10,6 +10,7 @@ import { getCurrentSeasonInfo } from '../season.js';
 import { calculateScore, formatScoreDisplay } from '../scoring.js';
 import { summarizeIntegrity } from '../modes/silvicultureIntegrity.js';
 import { getPlanningPhaseLabel } from '../modes/planning.js';
+import { formatDollars } from '../resources.js';
 
 /**
  * Show the end-of-game screen
@@ -131,7 +132,7 @@ export function writeFinalStatistics(ui, journey) {
       ui.write(`Brushing Complete: ${Math.round(journey.brushing.hectaresComplete)}/${journey.brushing.hectaresTarget} ha`);
       ui.write(`Free-Growing Surveys: ${journey.surveys.freeGrowingComplete}/${journey.surveys.freeGrowingTarget}`);
       ui.write(`Days Elapsed: ${daysUsed}`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      ui.write(`Budget Remaining: ${formatDollars(journey.resources.budget)}`);
       break;
     }
     case 'planning':
@@ -142,12 +143,12 @@ export function writeFinalStatistics(ui, journey) {
       ui.write(`DM Readiness: ${journey.plan.ministerialConfidence}%`);
       ui.write(`FOM: ${journey.blockPlanning?.fom?.status === 'closed' || journey.blockPlanning?.fom?.status === 'approved' ? 'comment period closed' : (journey.blockPlanning?.fom?.status || 'draft').replaceAll('_', ' ')}`);
       ui.write(`Days Elapsed: ${daysUsed}`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      ui.write(`Budget Remaining: ${formatDollars(journey.resources.budget)}`);
       break;
 
     case 'manager':
       ui.write(`Term Served: ${daysUsed}/${journey.deadline} months`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      ui.write(`Budget Remaining: ${formatDollars(journey.resources.budget)}`);
       ui.write(`Reputation: ${Math.round(journey.metrics?.reputation ?? 50)}%`);
       if (journey.ledger?.aac) {
         ui.write(`Delivered: ${Math.round(journey.ledger.deliveredYtd || 0).toLocaleString()}/${journey.ledger.aac.toLocaleString()} m³ of AAC${journey.ledger.cutControl ? ` (${journey.ledger.cutControl})` : ''}`);
@@ -165,7 +166,7 @@ export function writeFinalStatistics(ui, journey) {
     default:
       ui.write(`Permits Issued: ${journey.permits?.approved ?? 0}/${journey.permits?.target ?? 0}`);
       ui.write(`Days Used: ${daysUsed}/${journey.deadline ?? daysUsed}`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      ui.write(`Budget Remaining: ${formatDollars(journey.resources.budget)}`);
       break;
   }
 }

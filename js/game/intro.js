@@ -9,6 +9,7 @@ import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { getRoleProfessionalContext } from '../data/professionalPractice.js';
 import { getStockingStandard, describeStockingStandard } from '../data/stockingStandards.js';
 import { getPackageTarget } from '../journey/packages.js';
+import { formatDollars } from '../resources.js';
 
 function formatScrutiny(scrutiny) {
   const value = Number(scrutiny || 0);
@@ -55,7 +56,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write('Manage fuel, food, and equipment while documenting hazards, cultural sites, and road and crossing condition.');
       ui.write('');
       ui.write('Starting supplies:');
-      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Budget: ${formatDollars(journey.resources.budget)}`);
       ui.write(`  Fuel: ${Math.round(journey.resources.fuel)} L`);
       ui.write(`  Food: ${Math.round(journey.resources.food)} person-days`);
       ui.write(`  Equipment: ${journey.resources.equipment}% condition`);
@@ -79,7 +80,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write(`  Stocking standard: ${describeStockingStandard(standard)}`);
       ui.write('');
       ui.write('Starting resources:');
-      ui.write(`  Program budget: $${journey.resources.budget?.toLocaleString() || 0} (supervisor overhead $550/day; contractor invoices on top)`);
+      ui.write(`  Program budget: ${formatDollars(journey.resources.budget)} (supervisor overhead $550/day; contractor invoices on top)`);
       ui.write(`  Seedling inventory: ${journey.resources.seedlings?.toLocaleString() || 0} (this year's allocation plus fill stock)`);
       ui.write(`  Contractor capacity: ${journey.resources.contractorCapacity} crew-days`);
       break;
@@ -94,7 +95,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write('Current phase: Inventory & Data');
       ui.write('');
       ui.write('Starting resources:');
-      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Budget: ${formatDollars(journey.resources.budget)}`);
       ui.write(`  District goodwill: ${journey.resources.politicalCapital}`);
       ui.write(`  Inventory budget: ${Math.round((journey.resources.dataCredits || 0) / 10)} LiDAR/VRI pulls`);
       break;
@@ -112,7 +113,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write(`  In review: ${journey.permits.inReview}`);
       ui.write('');
       ui.write('Starting resources:');
-      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Budget: ${formatDollars(journey.resources.budget)}`);
       ui.write(`  Political Capital: ${journey.resources.politicalCapital}`);
       break;
 
@@ -122,7 +123,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write('Manage fuel, food, and equipment while keeping radio contact.');
       ui.write('');
       ui.write('Starting supplies:');
-      ui.write(`  Cash: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Cash: ${formatDollars(journey.resources.budget)}`);
       ui.write(`  Fuel: ${Math.round(journey.resources.fuel)} L`);
       ui.write(`  Food: ${journey.resources.food} person-days`);
       ui.write(`  Equipment: ${journey.resources.equipment}% condition`);
@@ -135,7 +136,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write('Set the year\'s operating plan with your woodlands team, then run the monthly ledger: delivered cubic metres against the AAC, log price less stumpage and logging/haul, head-office overhead, certification costs. The divisions escalate what they cannot settle; the board reviews you quarterly.');
       ui.write('');
       ui.write('Operating overview:');
-      ui.write(`  Opening treasury: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Opening treasury: ${formatDollars(journey.resources.budget)}`);
       if (ledger.aac) ui.write(`  AAC: ${ledger.aac.toLocaleString()} m³ (plan ${ledger.monthlyPlan.toLocaleString()} m³/month; cut control judged at year end)`);
       if (ledger.logPrice) ui.write(`  Log price $${ledger.logPrice}/m³ - stumpage $${ledger.stumpage} - logging & haul $${ledger.loggingHaul}; overhead $${ledger.overhead.toLocaleString()}/month`);
       ui.write(`  Operating year: ${journey.deadline} months`);
@@ -149,7 +150,7 @@ export function showJourneyIntro(ui, journey) {
       ui.write('Manage your budget, political capital, and team energy.');
       ui.write('');
       ui.write('Starting resources:');
-      ui.write(`  Budget: $${journey.resources.budget?.toLocaleString() || 0}`);
+      ui.write(`  Budget: ${formatDollars(journey.resources.budget)}`);
       ui.write(`  Political Capital: ${journey.resources.politicalCapital}`);
       ui.write('  Daily Pace: one substantive action per day');
       break;

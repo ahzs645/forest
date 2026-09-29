@@ -18,6 +18,7 @@ import { formatStatusLine } from '../journey/dayCard.js';
 import { buildBoardChartFrames } from "../scene/textmode/scenes.js";
 import { getOperationalProgress, recordProgressMilestones } from "../journey.js";
 import { SEASONS } from "../season.js";
+import { formatDollars } from "../resources.js";
 import {
   OPERATING_POSTURES,
   getOperatingPosture,
@@ -264,7 +265,7 @@ export async function runManagerDay(game) {
       frame: {
         dayHeader: `${monthName(journey.day).toUpperCase()} - MONTH ${journey.day}/${journey.deadline} - GENERAL MANAGER`,
         statusLine: formatStatusLine([
-          `$${Math.round((journey.resources.budget || 0) / 1000).toLocaleString()}k treasury`,
+          `${formatDollars((journey.resources.budget || 0) / 1000)}k treasury`,
           `${Math.round(journey.ledger.deliveredYtd).toLocaleString()} m³ delivered YTD`,
           monthsLeft > 0 ? `${monthsLeft} month${monthsLeft === 1 ? '' : 's'} left after this one` : 'last month of the year',
         ]),
@@ -386,7 +387,7 @@ async function runOperatingPlan(game) {
   ui.writeHeader(`GENERAL MANAGER - MONTH ${journey.day}/${journey.deadline} - OPERATING PLAN`);
   ui.write(`January. The woodlands team is in the boardroom with the cut plan, the stumpage forecast and last year's cut-control statement${woodlands ? `; ${woodlands.name}, your woodlands manager, has the floor` : ''}.`);
   ui.write('');
-  ui.write(`AAC ${ledger.aac.toLocaleString()} m³ · plan ${ledger.monthlyPlan.toLocaleString()} m³/month · log price $${ledger.logPrice}/m³ · stumpage $${ledger.stumpage} (tracks the market) · logging & haul $${ledger.loggingHaul} · overhead $${ledger.overhead.toLocaleString()}/month · treasury $${Math.round(journey.resources.budget).toLocaleString()}`);
+  ui.write(`AAC ${ledger.aac.toLocaleString()} m³ · plan ${ledger.monthlyPlan.toLocaleString()} m³/month · log price $${ledger.logPrice}/m³ · stumpage $${ledger.stumpage} (tracks the market) · logging & haul $${ledger.loggingHaul} · overhead $${ledger.overhead.toLocaleString()}/month · treasury ${formatDollars(journey.resources.budget)}`);
   ui.write(area.market);
   ui.write(`Cut control is judged in December: ${Math.round(CUT_CONTROL.bandLow * 100)}-${Math.round(CUT_CONTROL.bandHigh * 100)}% of the AAC goes in clean. Outside it the statement carries a finding, with a C&E penalty of $${CUT_CONTROL.overcutPenaltyPerM3}/m³ past the ceiling. Below ${Math.round(CUT_CONTROL.limitLow * 100)}% or above ${Math.round(CUT_CONTROL.limitHigh * 100)}%, the board ends your term.`);
   if (cfo) ui.write(`${cfo.name} (CFO) notes that ${area.gaps}, and the overhead does not move.`);
@@ -675,7 +676,7 @@ function updateManagerMissionStatus(ui, journey) {
   const inBand = cutStatus === 'in_band';
 
   const facts = [
-    { label: 'Treasury', value: `$${Math.round(journey.resources.budget || 0).toLocaleString()}`, tone: budgetOk ? undefined : 'danger' },
+    { label: 'Treasury', value: formatDollars(journey.resources.budget || 0), tone: budgetOk ? undefined : 'danger' },
     { label: 'Reputation', value: `${Math.round(journey.metrics.reputation)}%`, tone: repOk ? undefined : 'danger' },
     { label: 'Scrutiny', value: `${Math.round(journey.scrutiny || 0)}%`, tone: (journey.scrutiny || 0) > 70 ? 'warn' : undefined },
     { label: 'Posture', value: journey.ceo ? `${journey.ceo.posture || journey.ceo.name}` : 'Unset', tone: journey.ceo ? undefined : 'warn' },
@@ -828,7 +829,7 @@ async function runBudgetAllocation(game) {
   // A thin treasury changes what the CFO is offering.
   const tight = ledger.startTreasury && journey.resources.budget < ledger.startTreasury * 0.25;
   ui.write(tight
-    ? `${cfoName} would rather nothing went out this month: the treasury is at $${Math.round(journey.resources.budget).toLocaleString()}. Every division is asking anyway.`
+    ? `${cfoName} would rather nothing went out this month: the treasury is at ${formatDollars(journey.resources.budget)}. Every division is asking anyway.`
     : `${cfoName} has freed up discretionary room this month. Every division has opinions about it.`);
   ui.write("");
 
@@ -1153,7 +1154,7 @@ async function endOfManagerDay(game, progressBeforeDay) {
 
   const monthsLeft = journey.deadline - journey.day;
   const continueLabel = monthsLeft >= 0
-    ? `Continue... (${monthName(journey.day)}, month ${journey.day} of ${journey.deadline}, $${Math.round(journey.resources.budget).toLocaleString()} treasury)`
+    ? `Continue... (${monthName(journey.day)}, month ${journey.day} of ${journey.deadline}, ${formatDollars(journey.resources.budget)} treasury)`
     : "Continue... (YEAR COMPLETE)";
   await ui.promptChoice("", [{ label: continueLabel, value: "next" }]);
 }
@@ -1235,9 +1236,9 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
     pace.factor !== 1 ? pace.name.toLowerCase() : null,
   ].filter(Boolean);
   const deliveredLine = `Delivered: ${delivered.toLocaleString()} m³ (plan ${planned.toLocaleString()}${volumeNotes.length ? `, ${volumeNotes.join(', ')}` : ''}; year to date ${Math.round(ledger.deliveredYtd).toLocaleString()} / ${ledger.aac.toLocaleString()} m³ AAC)`;
-  const marginLine = `Log price $${ledger.logPrice}${premium ? ` + $${formatRate(premium)} certified premium` : ''} - stumpage $${stumpage} - logging & haul $${formatRate(cost)} = $${formatRate(margin)}/m³ margin -> ${formatSignedDollars(revenue)}`;
+  const marginLine = `Log price $${ledger.logPrice}${premium ? ` + $${formatRate(premium)} certified premium` : ''} - stumpage $${stumpage} - logging & haul $${formatRate(cost)} = ${margin < 0 ? '-' : ''}$${formatRate(Math.abs(margin))}/m³ margin -> ${formatSignedDollars(revenue)}`;
   const chargesLine = `Overhead -$${ledger.overhead.toLocaleString()}${certCost ? ` · certification -$${certCost.toLocaleString()}` : ''}${standby ? ` · standby -$${standby.toLocaleString()}` : ''}`;
-  const netLine = `Net ${formatSignedDollars(net)} -> treasury $${Math.round(journey.resources.budget).toLocaleString()}${shortfall ? ` ($${Math.round(shortfall).toLocaleString()} it could not cover)` : ''}`;
+  const netLine = `Net ${formatSignedDollars(net)} -> treasury ${formatDollars(journey.resources.budget)}${shortfall ? ` (${formatDollars(shortfall)} it could not cover)` : ''}`;
   ui.write(deliveredLine);
   ui.write(marginLine);
   ui.write(chargesLine);
@@ -1248,7 +1249,7 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
     day: month,
     type: 'ledger',
     summary: `${monthName(month)} ledger: ${delivered.toLocaleString()} m³, net ${formatSignedDollars(net)}`,
-    detail: `${marginLine}. ${chargesLine}. Treasury $${Math.round(journey.resources.budget).toLocaleString()}; ${Math.round(ledger.deliveredYtd).toLocaleString()} / ${ledger.aac.toLocaleString()} m³ AAC year to date.`,
+    detail: `${marginLine}. ${chargesLine}. Treasury ${formatDollars(journey.resources.budget)}; ${Math.round(ledger.deliveredYtd).toLocaleString()} / ${ledger.aac.toLocaleString()} m³ AAC year to date.`,
   });
 
   // Budget health: the treasury against where the year started.
@@ -1357,7 +1358,7 @@ function runCutControl(ui, journey) {
     adjustMetric(journey, 'compliance', status === 'severe_overcut' ? -12 : -8);
     journey.scrutiny = clampPercentValue((journey.scrutiny || 0) + (status === 'severe_overcut' ? 10 : 6));
     journey.resources.budget = Math.max(0, journey.resources.budget - penalty);
-    statement = `Overcut: ${statementOf}, past the ${Math.round(CUT_CONTROL.bandHigh * 100)}% ceiling. C&E opens a file; the penalty on ${excess.toLocaleString()} m³ is $${penalty.toLocaleString()} at $${CUT_CONTROL.overcutPenaltyPerM3}/m³, more than the wood earned. Treasury $${Math.round(journey.resources.budget).toLocaleString()}.`;
+    statement = `Overcut: ${statementOf}, past the ${Math.round(CUT_CONTROL.bandHigh * 100)}% ceiling. C&E opens a file; the penalty on ${excess.toLocaleString()} m³ is $${penalty.toLocaleString()} at $${CUT_CONTROL.overcutPenaltyPerM3}/m³, more than the wood earned. Treasury ${formatDollars(journey.resources.budget)}.`;
     if (status === 'severe_overcut') {
       statement += ` Past ${Math.round(CUT_CONTROL.limitHigh * 100)}%, the District Manager's letter copies the board chair.`;
     }
@@ -1390,7 +1391,7 @@ function bookSilvicultureProvision(ui, journey) {
   ledger.silvicultureProvision = provision;
   journey.resources.budget = Math.max(0, journey.resources.budget - provision);
   adjustMetric(journey, 'forestHealth', -3);
-  const statement = `The auditors book the silviculture the year deferred as a provision: $${provision.toLocaleString()} ($${formatRate(rate)}/m³ on ${Math.round(ledger.deliveredYtd).toLocaleString()} m³). Treasury $${Math.round(journey.resources.budget).toLocaleString()}.`;
+  const statement = `The auditors book the silviculture the year deferred as a provision: $${provision.toLocaleString()} ($${formatRate(rate)}/m³ on ${Math.round(ledger.deliveredYtd).toLocaleString()} m³). Treasury ${formatDollars(journey.resources.budget)}.`;
   ui.write('');
   ui.writeDivider('SILVICULTURE PROVISION');
   ui.writeWarning(statement);
@@ -1452,7 +1453,7 @@ function readQuarter(journey, baseline, quarterMonths, quarter) {
   if (treasury <= 0) {
     reasons.push('the treasury is empty');
   } else if (ledger.startTreasury && treasury < ledger.startTreasury * 0.5) {
-    reasons.push(`the treasury is down to $${treasury.toLocaleString()} from $${Math.round(ledger.startTreasury).toLocaleString()}`);
+    reasons.push(`the treasury is down to ${formatDollars(treasury)} from ${formatDollars(ledger.startTreasury)}`);
   }
   const falling = Object.entries(METRIC_LABELS)
     .filter(([key]) => Math.round(journey.metrics[key] ?? 50) - Math.round(baseline[key] ?? 50) <= -3)
@@ -1505,7 +1506,7 @@ async function runBoardReview(game, monthClosed) {
   const quarterNet = quarterMonths.reduce((sum, entry) => sum + (entry.net || 0), 0);
   const quarterVolume = quarterMonths.reduce((sum, entry) => sum + (entry.delivered || 0), 0);
   ui.write(
-    `Treasury: $${Math.round(journey.resources.budget).toLocaleString()}`
+    `Treasury: ${formatDollars(journey.resources.budget)}`
     + ` | Quarter: ${quarterVolume.toLocaleString()} m³, net ${formatSignedDollars(quarterNet)}`
     + ` | YTD ${Math.round(ledger.deliveredYtd || 0).toLocaleString()} / ${(ledger.aac || 0).toLocaleString()} m³`
     + ` | Political Capital: ${Math.round(journey.resources.politicalCapital)}`,
