@@ -22,12 +22,14 @@ import { runManagerDay } from '../modes/manager.js';
 import { createInitialState } from '../engine/state.js';
 import { applyEffects, applyRoundConsequences, applyOptionOutcome, formatMetricDelta } from '../engine/effects.js';
 import { describeConsequences } from '../engine/insights.js';
-import { deriveTier } from '../engine/scoring.js';
+import { deriveTier, scoreMetricHealth } from '../engine/scoring.js';
 import { drawIssue } from '../engine/content.js';
 import { makeRng } from '../engine/rng.js';
 import { clamp, formatMetricName } from '../engine/shared.js';
 import { applyDifficultyMultipliers } from './ForestryTrailGame.js';
 import { readCampaignSave, saveCampaignState, clearCampaignSave } from './saveLoad.js';
+import { getCareerDeltas } from './debrief.js';
+import { recordTieredRun } from '../career.js';
 import { promptSeasonalCard, promptSummaryCard, renderMetricStrip, setExpeditionChromeHidden } from './seasonalAdapter.js';
 
 // One year, four hats, in the order the work actually happens on a licensee's
@@ -348,8 +350,36 @@ async function runCampaignInner(game) {
     saveCampaign(serializeCampaign(campaign));
   }
 
+  // One service-record entry per year (docs/unified_campaign.md), filed before
+  // the review so a reload on the year-end card cannot file it twice.
+  if (!campaign.recorded) {
+    recordCampaignYear(campaign);
+    campaign.recorded = true;
+    saveCampaign(serializeCampaign(campaign));
+  }
+
   await showYearEnd(ui, campaign);
   clearCampaign();
+}
+
+/**
+ * File a finished campaign year to the service record: one tree in the career
+ * forest, graded by the year's tier, plus the field counters (km, seedlings,
+ * plans, permits) its four deployments earned.
+ * @param {Object} campaign
+ * @returns {Object} the updated service record
+ */
+export function recordCampaignYear(campaign) {
+  const careerDeltas = {};
+  for (const season of campaign.seasonLog || []) {
+    for (const [key, value] of Object.entries(season.careerDeltas || {})) {
+      if (Number.isFinite(value)) careerDeltas[key] = (careerDeltas[key] || 0) + value;
+    }
+  }
+  return recordTieredRun('campaign', {
+    tier: deriveTier(campaign.yearMetrics),
+    score: scoreMetricHealth(campaign.yearMetrics),
+  }, careerDeltas);
 }
 
 async function setupCampaign(ui) {
@@ -646,6 +676,7 @@ async function runCampaignSeason(game, campaign, season) {
     completion: Math.round(bridge.completion * 100),
     deltas: bridge.deltas,
     metricsAfter: { ...campaign.yearMetrics },
+    careerDeltas: getCareerDeltas(journey, endResult.victory === true),
   });
 
   game.journey = null;
@@ -668,7 +699,7 @@ async function showYearEnd(ui, campaign) {
   const summary = {
     heading: 'YEAR IN REVIEW',
     tier,
-    body: `${wins}/${CAMPAIGN_SEASONS.length} deployments delivered. ${tierBody}`,
+    body: `${wins}/${CAMPAIGN_SEASONS.length} deployments delivered. ${tierBody} The year goes on your service record — look for its tree at the district office.`,
     scoreReasons: [],
     seasonSummaries: campaign.seasonLog.map((s) =>
       `• ${s.season} ${s.title}: ${s.victory ? 'delivered' : 'fell short'} at ${s.completion}% (${s.detail || 'counts unavailable'}) — ${formatMetricDelta(s.deltas) || 'no metric movement'}`),

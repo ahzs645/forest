@@ -69,6 +69,7 @@ const SPECIES_BY_BUCKET = {
   manager: 'dogwood',
   seasonal: 'aspen',
   'crisis-command': 'pine',
+  campaign: 'cottonwood',
 };
 
 export function getSprite(type, growth) {
