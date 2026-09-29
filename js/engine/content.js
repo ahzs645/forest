@@ -1392,7 +1392,7 @@ function seasonIdForRound(round) {
 
 /**
  * Whether an act belongs in front of this seasonal run: role and phase from
- * the library, then season, area, difficulty and scrutiny gates.
+ * the library, then season, area and scrutiny gates.
  */
 export function actMatchesSeasonalTemptationContext(act, state) {
   if (!act || act.retired || !state?.role?.id) {
@@ -1412,9 +1412,9 @@ export function actMatchesSeasonalTemptationContext(act, state) {
   if (Array.isArray(act.areaIds) && act.areaIds.length && !act.areaIds.includes(state.area?.id)) {
     return false;
   }
-  if (act.tier === "comic" && state.difficulty === "hard") {
-    return false;
-  }
+  // No comic-on-hard gate here: seasonal play has no difficulty setting (the
+  // expedition lane's gate lives in js/events/selection.js), and this one
+  // read a state.difficulty the seasonal state never carries.
   if (act.onlyWhen === "scrutinyHigh" && Number(state.metrics?.compliance ?? 100) > 45) {
     return false;
   }

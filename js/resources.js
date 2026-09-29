@@ -253,7 +253,7 @@ export function calculateFieldConsumption(conditions = {}, crewCount = 5) {
  * @returns {Object} Resource consumption/changes
  */
 export function calculateDeskConsumption(conditions = {}) {
-  const { overtime = 0, meetings = 0, crisisMode = false } = conditions;
+  const { overtime = 0, crisisMode = false } = conditions;
   const consumption = {};
 
   // Budget consumption
