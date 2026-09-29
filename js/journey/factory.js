@@ -38,7 +38,7 @@ const SILVICULTURE_CAMPAIGN_BUDGET = 150000;
 // prices are per m³ delivered to the mill.
 const MANAGER_TREASURY = 850000;
 const MANAGER_AAC = 240000;
-const MANAGER_MONTHLY_OVERHEAD = 290000;
+const MANAGER_MONTHLY_OVERHEAD = 270000;
 
 /**
  * Campaign-scale tuning (see docs/unified_campaign.md, section 3).

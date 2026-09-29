@@ -82,7 +82,7 @@ export function getFinalReportPrompt(journeyType) {
         options: [
           { label: 'Open the books — every win and write-down on one slide', hint: 'Boards forgive bad quarters. They don’t forgive surprises.', value: 'integrity' },
           { label: 'Spin the quarter with creative accounting categories', hint: 'Risky. Auditors read footnotes.', value: 'spin' },
-          { label: 'Give the floor to your CEO and crew leads', hint: 'Credit shared is loyalty earned.', value: 'people' },
+          { label: 'Give the floor to your executive team and division leads', hint: 'Credit shared is loyalty earned.', value: 'people' },
         ],
       };
   }
@@ -246,7 +246,26 @@ export function buildProtagonistEpilogue(journey, victory) {
 }
 
 /**
- * Epilogue lines for manager journeys: CEO and certifications.
+ * How the woodlands manager spends the next year, by the posture they ran.
+ */
+const MANAGER_POSTURE_EPILOGUES = {
+  conservative: 'methodical as ever',
+  'relationship-focused': 'still keeping the engagement table warm',
+  'aggressive-growth': "already scouting next year's BCTS sales",
+  'cost-cutting': 'already reopening the haul rates',
+};
+
+const CERTIFICATION_EPILOGUES = {
+  certified: 'The certificate hangs in reception, and buyers notice.',
+  suspended: 'Suspended at the surveillance audit. The buyers remember the letter.',
+  withdrawn: 'Withdrawn after the re-audit. The system binder is on a shelf.',
+  corrective: 'Still working through the corrective-action request.',
+  pending: 'The registration audit never happened on your watch.',
+};
+
+/**
+ * Epilogue lines for manager journeys: the woodlands manager who ran the
+ * posture, and how each certification came through its audits.
  * @param {Object} journey
  * @param {boolean} victory
  * @returns {string[]}
@@ -254,15 +273,17 @@ export function buildProtagonistEpilogue(journey, victory) {
 export function buildManagerEpilogue(journey, victory) {
   const lines = [];
   if (journey.ceo) {
-    const style = journey.ceo.decision_making_style === 'conservative'
-      ? 'methodical as ever'
-      : 'already pitching the next venture';
+    const style = MANAGER_POSTURE_EPILOGUES[journey.ceo.decision_making_style] || 'methodical as ever';
     lines.push(victory
       ? `Woodlands manager ${journey.ceo.name}: renewed for another year, ${style}.`
       : `Woodlands manager ${journey.ceo.name}: moved on to a competitor. The handshake was firm, the exit interview firmer.`);
   }
   for (const cert of journey.certifications || []) {
-    lines.push(`${cert.name}: ${victory ? 'The certificate hangs in reception, and buyers notice.' : 'The audit binder outlived the tenure.'}`);
+    const status = cert.status || 'certified';
+    const line = status === 'certified' && !victory
+      ? 'The audit binder outlived the tenure.'
+      : CERTIFICATION_EPILOGUES[status] || CERTIFICATION_EPILOGUES.certified;
+    lines.push(`${cert.name}: ${line}`);
   }
   return lines;
 }
@@ -365,7 +386,7 @@ export async function runFinalDebrief(ui, journey, victory) {
   if (moments.length) {
     ui.write('');
     ui.writeDivider('MOMENTS THAT MATTERED');
-    const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon' ? 'Shift' : 'Day';
+    const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon' ? 'Shift' : journey.journeyType === 'manager' ? 'Month' : 'Day';
     for (const m of moments) {
       const injury = m.victimName ? ` ${m.victimName} carries the scar.` : '';
       ui.write(`${dayLabel} ${m.day} — ${m.title}. You chose: ${m.choice}.${injury}`);

@@ -5,6 +5,7 @@
 
 import { getSurveyedBlockCount } from '../../journey.js';
 import { allPackagesFinalized, getPackagesFinalized, getPackageTarget } from '../../journey/packages.js';
+import { CUT_CONTROL } from '../../data/managerRoles.js';
 
 /**
  * Whether a FOM's public comment period has closed. Older saves recorded the
@@ -164,18 +165,31 @@ export function checkPlanningEndConditions(journey) {
  * @returns {Object|null} End condition result or null
  */
 export function checkManagerEndConditions(journey) {
-  // Victory: the operating year is run with the books solvent and the board onside
+  // Year end: the books, the cut-control statement (js/modes/manager.js
+  // records its status against CUT_CONTROL) and the board's confidence.
   if (journey.day > journey.deadline) {
-    if (journey.resources.budget > 0 && (journey.metrics.reputation ?? 50) > 40) {
-      return { victory: true, reason: 'The operating year is delivered with the books solvent and the board onside.' };
-    } else {
-      return { gameOver: true, reason: 'Term ended with poor performance' };
+    const reputation = Math.round(journey.metrics.reputation ?? 50);
+    const cutControl = journey.ledger?.cutControlStatus;
+    if (cutControl === 'severe_overcut') {
+      return { gameOver: true, reason: `Overcut past ${Math.round(CUT_CONTROL.limitHigh * 100)}% of the AAC: the C&E file and the cut it will cost next year end the term.` };
     }
+    if (cutControl === 'severe_undercut') {
+      return { gameOver: true, reason: `Cut under ${Math.round(CUT_CONTROL.limitLow * 100)}% of the AAC: the board will not carry a GM who leaves that much wood in the bush.` };
+    }
+    if (journey.resources.budget <= 0) {
+      return { gameOver: true, reason: 'Budget exhausted - the bank calls the covenant and operations halt.' };
+    }
+    if (reputation <= 40) {
+      return { gameOver: true, reason: `The board's confidence is gone: reputation ${reputation}% at the year-end review, and it needed to be above 40%.` };
+    }
+    return cutControl && cutControl !== 'in_band'
+      ? { victory: true, reason: 'The operating year closes solvent with the board onside, but the cut-control statement goes in with a finding.' }
+      : { victory: true, reason: 'The operating year is delivered inside the cut-control band, with the books solvent and the board onside.' };
   }
 
   // Game over: treasury gone
   if (journey.resources.budget <= 0) {
-    return { gameOver: true, reason: 'Budget exhausted - the bank calls the covenant and operations halt' };
+    return { gameOver: true, reason: 'Budget exhausted - the bank calls the covenant and operations halt.' };
   }
 
   // Game over: Poor reputation

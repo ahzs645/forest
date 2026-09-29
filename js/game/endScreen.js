@@ -154,7 +154,7 @@ export function writeFinalStatistics(ui, journey) {
         ui.write(`Operating posture: ${journey.ceo.posture || journey.ceo.name}${journey.ceo.posture ? ` (woodlands manager ${journey.ceo.name})` : ''}`);
       }
       if (journey.certifications?.length) {
-        ui.write(`Certifications: ${journey.certifications.map((c) => c.name).join(', ')}`);
+        ui.write(`Certifications: ${journey.certifications.map((c) => `${c.name}${c.status ? ` - ${c.status}` : ''}`).join('; ')}`);
       }
       break;
 
@@ -202,9 +202,20 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
       return `${journey.permits?.approved ?? 0} permits issued out of ${journey.permits?.target ?? 0} the season needed. ` +
         `The queue at the district office in ${areaName} is moving after ${daysUsed} days of clean files ` +
         `and relationships kept warm.`;
-    case 'manager':
+    case 'manager': {
+      const ledger = journey.ledger || {};
+      const pct = ledger.aac ? `${(Math.round((ledger.deliveredYtd / ledger.aac) * 1000) / 10).toFixed(1)}%` : '';
+      if (ledger.cutControlStatus === 'overcut') {
+        return `${crewName} closed out the operating year in ${areaName} after ${daysUsed} months with the books balanced and the board's confidence intact. ` +
+          `The cut-control statement goes in at ${pct} of the AAC with a C&E penalty attached, and next year's plan starts behind.`;
+      }
+      if (ledger.cutControlStatus === 'undercut') {
+        return `${crewName} closed out the operating year in ${areaName} after ${daysUsed} months with the books balanced and the board's confidence intact. ` +
+          `The cut-control statement goes in at ${pct} of the AAC; the wood left standing is lost to the period.`;
+      }
       return `${crewName} closed out the operating year in ${areaName} after ${daysUsed} months with the cut delivered, the books balanced ` +
         `and the board's confidence intact. The cut-control statement goes to the District Manager without a covering letter.`;
+    }
     default:
       return journey.endReason || 'Expedition completed successfully.';
   }
