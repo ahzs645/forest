@@ -365,7 +365,10 @@ export class ForestryTrailGame {
     this.ui.write('');
 
     const legacyJourneyType = role.journeyType || 'field';
-    const crew = generateCrew(5, legacyJourneyType);
+    // The GM's executive team (CFO, woodlands manager, chief forester...) is
+    // built by createManagerJourney; a generic desk crew here handed the
+    // woodlands portfolio to whichever analyst came first.
+    const crew = legacyJourneyType === 'manager' ? undefined : generateCrew(5, legacyJourneyType);
 
     this.journey = createJourney({
       crewName,
@@ -386,7 +389,7 @@ export class ForestryTrailGame {
     this.ui.write('');
 
     this.ui.writeDivider('YOUR CREW');
-    for (const member of crew) {
+    for (const member of this.journey.crew || []) {
       const info = getCrewDisplayInfo(member);
       this.ui.write(`${info.name} - ${info.role}`);
     }
