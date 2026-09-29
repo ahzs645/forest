@@ -8,7 +8,7 @@
   "description": "The lead truck hits a sharp rock. Hissing air signals another flat.",
   "options": [
    {
-    "label": "Change it yourself (2 hours)",
+    "label": "Change it at the roadside",
     "outcome": "The crew changes the tire in the rain. Back on the road, but behind schedule.",
     "effects": {
      "equipment": -5
@@ -698,7 +698,7 @@
   "options": [
    {
     "label": "Wait him out",
-    "outcome": "After 20 minutes of staring, he finally ambles off.",
+    "outcome": "He stares the trucks down for the better part of an hour before he ambles off into the willows.",
     "effects": {
      "timeUsed": 1
     }
@@ -1663,7 +1663,7 @@
   "type": "equipment",
   "severity": "positive",
   "probability": 0.1,
-  "description": "Everything is humming along perfectly today. Not a single mechanical issue.",
+  "description": "Nothing breaks today. The trucks start on the first turn and the saws run clean.",
   "options": [
    {
     "label": "Keep up the momentum",
@@ -3233,9 +3233,10 @@
    },
    {
     "label": "Let them sort it out themselves",
-    "outcome": "They scuffle behind the fuel shed. One gets a black eye, the pot gets settled, and somehow they respect each other more after.",
+    "outcome": "They scuffle behind the fuel shed before you get there. One gets a black eye and the pot gets settled, and you write it up: a fight on a worksite is an incident report, whoever threw first.",
     "effects": {
-     "crew_morale": 3
+     "crew_morale": -2,
+     "compliance": -2
     },
     "hiddenOutcome": true,
     "riskInjury": 0.2,
@@ -4980,7 +4981,7 @@
  },
  {
   "id": "trade_survey_crew_chains",
-  "title": "Survey Crew Wants Your Chains",
+  "title": "Cruising Crew Wants Your Chains",
   "type": "trade",
   "severity": "minor",
   "probability": 0.05,

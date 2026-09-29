@@ -38,7 +38,7 @@ import { TERRAIN_TYPES, getRandomWeather, getTemperature } from '../data/blocks.
 import { advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromAccess } from '../data/discoveryTags.js';
 import { JOURNEY_MILESTONES, MILESTONE_COPY } from './constants.js';
-import { allPackagesFinalized, getPackageProgress } from './packages.js';
+import { allPackagesFinalized, getPackageProgress, isPackageBlock } from './packages.js';
 
 // The road verdict is about the road: fill, grade, crossings, drainage. Values
 // constraints — moose winter range, caribou, VQO, CMTs, a Nation's protocol —
@@ -853,6 +853,23 @@ export function fitEventToRemainingRoute(journey, event) {
 }
 
 /**
+ * Fit a card to the crew on the roster. "Send out your sick crew member" on
+ * a crew with nobody sick evacuated no one and paid its morale anyway; the
+ * option is not offered until someone is carrying a condition.
+ * @param {Object} journey
+ * @param {Object|null} event
+ * @returns {Object|null}
+ */
+export function fitEventToCrew(journey, event) {
+  if (!event || !Array.isArray(event.options)) return event;
+  const someoneSick = (journey?.crew || []).some((member) => member.isActive && (member.statusEffects?.length || 0) > 0);
+  if (someoneSick) return event;
+  const options = event.options.filter((option) => !option?.crewEffect?.evacuate_sick);
+  if (options.length === event.options.length) return event;
+  return options.length ? { ...event, options } : null;
+}
+
+/**
  * Route an event's "+/- N km traverse" through the travel system instead of
  * moving the crew directly.
  *
@@ -993,13 +1010,18 @@ export function executeFieldAction(journey, paceId) {
   if (travelInfo.distance > 0) {
     // A layout crew's traverse is walked line and road location between
     // stops, not a drive measured in shifts.
+    // A leg to a bridge, a camp or a yard is road driven, not line walked.
     const toward = nextBlockAtStart?.name ? ` toward ${nextBlockAtStart.name}` : '';
-    messages.push(`Walked ${travelInfo.distance} km of line and road location${toward} at ${pace.name} pace.`);
+    messages.push(nextBlockAtStart && !isPackageBlock(nextBlockAtStart)
+      ? `Covered ${travelInfo.distance} km of road${toward} at ${pace.name} pace.`
+      : `Walked ${travelInfo.distance} km of line and road location${toward} at ${pace.name} pace.`);
     journey.travelSetback = 0;
     journey.travelBonusKm = 0;
   } else {
     if (effectivePaceId === 'resting') {
-      messages.push('The crew stood down and recovered this shift.');
+      messages.push(journey.resources.food <= 0
+        ? 'The crew stood down this shift, but nobody recovers on an empty food box.'
+        : 'The crew stood down and recovered this shift.');
     } else {
       messages.push('The shift ends without a travel leg.');
     }

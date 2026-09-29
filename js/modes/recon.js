@@ -27,6 +27,7 @@ import { getWeatherTempC } from '../data/blocks.js';
 import {
   executeFieldAction,
   endFieldDay,
+  fitEventToCrew,
   fitEventToRemainingRoute,
   formatAccessVerdict,
   formatInfrastructureStatus,
@@ -587,7 +588,7 @@ async function runFieldDay(game) {
   // The first shift teaches the base loop — nothing fires on day 1.
   let pendingEvent = resumingShift
     ? (journey.activeReconShift.pendingEvent || null)
-    : (journey.day > 1 ? fitEventToRemainingRoute(journey, checkForEvent(journey)) : null);
+    : (journey.day > 1 ? fitEventToCrew(journey, fitEventToRemainingRoute(journey, checkForEvent(journey))) : null);
   const shiftState = ensureActiveReconShift(journey, pendingEvent);
   checkpointReconShift(game, shiftState, pendingEvent);
 
@@ -2124,7 +2125,11 @@ async function maybePromptRouteChoice(game, currentBlock) {
     && !journey.weather?.dangerous;
   if (flatQuietLeg) {
     journey.routePlan = buildRoutePlan('mainline', journey, currentBlock, nextBlock);
-    journey.routePlan.note = `Good road to ${nextBlock.name}. The crew rides easy and talks about lunch.`;
+    // Flat is not the same as easy: fog or rain still slows the trucks.
+    const slowSky = (journey.weather?.travelModifier ?? 1) < 1;
+    journey.routePlan.note = slowSky
+      ? `Flat road to ${nextBlock.name}, but the ${String(journey.weather.name).toLowerCase()} keeps the trucks slow.`
+      : `Good road to ${nextBlock.name}. The crew rides easy and talks about lunch.`;
     return;
   }
 

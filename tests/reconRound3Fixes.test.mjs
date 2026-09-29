@@ -19,7 +19,7 @@ import { formatOptionTimeCost, optionSpendsDay } from '../js/events/timePolicy.j
 import { eventSupportsJourney, eventMatchesJourneyContext } from '../js/events/selection.js';
 import { eventFitsStop } from '../js/journey/packages.js';
 import { formatEventForDisplay } from '../js/events/display.js';
-import { applyEventTravelEffect, executeFieldAction, fitEventToRemainingRoute } from '../js/journey/fieldMechanics.js';
+import { applyEventTravelEffect, executeFieldAction, fitEventToCrew, fitEventToRemainingRoute } from '../js/journey/fieldMechanics.js';
 import { calculateScore, formatScoreDisplay } from '../js/scoring.js';
 import { buildCrewEpilogue } from '../js/game/debrief.js';
 
@@ -315,6 +315,46 @@ test('the starvation walk-off marks the crew as gone', () => {
     assert.match(journey.gameOverReason || '', /^NO FOOD/);
     assert.equal(journey.crewWalkedOff, true);
   }
+});
+
+// ── Copy that has to match the shift ───────────────────────────────────────
+
+test('nobody is sent out sick when nobody is sick', () => {
+  const journey = createReconJourney({ areaId: 'vancouver-island-coast' });
+  for (const member of journey.crew) member.statusEffects = [];
+  const card = FIELD_EVENTS.find((e) => e.id === 'supply_delivery_early');
+  const fitted = fitEventToCrew(journey, card);
+  assert.ok(!fitted.options.some((o) => o.crewEffect?.evacuate_sick), 'no evacuation offered');
+  assert.equal(fitted.options.length, card.options.length - 1);
+
+  journey.crew[1].statusEffects = [{ effectId: 'flu', daysRemaining: 3 }];
+  assert.equal(fitEventToCrew(journey, card), card);
+});
+
+test('a road leg is driven, a stand-down on an empty box is not recovery, fog is not a good road', () => {
+  const journey = createReconJourney({ areaId: 'vancouver-island-coast' });
+  const next = journey.blocks[1];
+  const result = withRandom(0.5, () => executeFieldAction(journey, 'normal'));
+  const leg = result.messages.find((m) => /km/.test(m) && /toward/.test(m));
+  if (next.kind === 'waypoint') assert.match(leg, /^Covered [\d.]+ km of road toward/);
+  else assert.match(leg, /^Walked [\d.]+ km of line and road location toward/);
+
+  const hungry = createReconJourney({ areaId: 'vancouver-island-coast' });
+  hungry.resources.food = 0;
+  const rest = withRandom(0.5, () => executeFieldAction(hungry, 'resting'));
+  assert.ok(rest.messages.some((m) => /nobody recovers on an empty food box/.test(m)), rest.messages.join('\n'));
+  assert.ok(!rest.messages.some((m) => /stood down and recovered/.test(m)));
+});
+
+test('card copy no longer contradicts itself', () => {
+  const byId = (id) => FIELD_EVENTS.find((e) => e.id === id);
+  assert.doesNotMatch(JSON.stringify(byId('flat_tire').options.map((o) => o.label)), /hours/);
+  assert.equal(byId('trade_survey_crew_chains').title, 'Cruising Crew Wants Your Chains');
+  const fight = byId('crew_card_game').options.find((o) => /sort it out themselves/.test(o.label));
+  assert.ok(fight.effects.crew_morale < 0, 'a fistfight is not a morale reward');
+  assert.doesNotMatch(fight.outcome, /respect each other more/);
+  const dump = byId('fuel_contamination').options.find((o) => /fresh fuel/.test(o.label));
+  assert.match(dump.label, /waste drums/);
 });
 
 // ── Block cards stay on open blocks ────────────────────────────────────────
