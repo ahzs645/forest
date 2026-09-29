@@ -28,6 +28,7 @@
 
 import { getPlanningAreaBlockPool, getPlanningBlockHeritageLoad, getPlanningBlockWaterContext } from '../data/planningBlocks.js';
 import { getBlocksForArea } from '../data/blocks.js';
+import { isPackageBlock } from './packages.js';
 import { getSeasonModifiers } from '../season.js';
 
 export const CALENDAR_DAYS_PER_DESK_DAY = 15;
@@ -121,16 +122,44 @@ function compactBlockId(block) {
   return String(block.label || block.id || '').trim();
 }
 
-function getAreaRoadNames(areaId) {
-  const names = [];
+// A named road: "Blackwater Road", "Decker Lake Road Junction", "Franklin
+// River Main", or "the Harris Creek FSR" in a stop's description.
+const ROAD_NAME_PATTERN = /\b((?:[A-Z][\w'.]*\s+)*?[A-Z][\w'.]*)\s+(Road|FSR|Main)\b/g;
+
+/**
+ * The area's named roads, read off its route waypoints. Cutblocks are skipped:
+ * "Block A-12 - End of Road" is a block, not a road. A "Main" is a licensee
+ * mainline, so it carries road permits but never a road use permit, which is
+ * only for industrial use of a Forest Service Road.
+ * @returns {{name: string, fsr: boolean}[]}
+ */
+function getAreaRoads(areaId) {
+  const roads = [];
   for (const block of getBlocksForArea(areaId) || []) {
-    const name = String(block?.name || '');
-    const match = name.match(/^(.*?)\s+(Road|FSR|Main)\b/i);
-    // "Block A-12 - End of Road" names a block, not a road.
-    if (!match || /^Block\b|\s-\s|\b(of|to|the|at)$/i.test(match[1])) continue;
-    if (!names.includes(match[1])) names.push(match[1]);
+    if (isPackageBlock(block)) continue;
+    for (const text of [block?.name, block?.description]) {
+      for (const match of String(text || '').matchAll(ROAD_NAME_PATTERN)) {
+        const name = match[1].trim();
+        if (/^(Highway|The|A|An)\b/.test(name) || roads.some((road) => road.name === name)) continue;
+        roads.push({ name, fsr: match[2] !== 'Main' });
+      }
+    }
   }
-  return names;
+  return roads;
+}
+
+/**
+ * Short block codes off the route ("Block VI-03 - Cedar Draw" -> "VI-03"),
+ * used to name files when an area has no planning-block pool to draw on.
+ */
+function getRouteBlockCodes(areaId) {
+  const codes = [];
+  for (const block of getBlocksForArea(areaId) || []) {
+    if (!isPackageBlock(block)) continue;
+    const match = String(block?.name || '').match(/\b([A-Z]{1,3}-\d{1,3})\b/);
+    if (match && !codes.includes(match[1])) codes.push(match[1]);
+  }
+  return codes;
 }
 
 /** Whether a file is one of the District Manager's, and so on the counters. */
@@ -167,7 +196,9 @@ export function buildPermitFileCatalogue(journey) {
   const areaId = journey?.areaId || journey?.area?.id || null;
   const area = journey?.area || null;
   const blocks = getPlanningAreaBlockPool(areaId);
-  const roads = getAreaRoadNames(areaId);
+  const roads = getAreaRoads(areaId);
+  const serviceRoads = roads.filter((road) => road.fsr);
+  const routeCodes = blocks.length ? [] : getRouteBlockCodes(areaId);
   const catalogue = [];
   const roadUses = new Map();
   const labelUses = new Map();
@@ -181,8 +212,10 @@ export function buildPermitFileCatalogue(journey) {
     // their slot.
     const blockIndex = type === 'CP' ? cuttingPermits++ : index;
     const block = blocks.length ? blocks[blockIndex % blocks.length] : null;
-    const blockId = compactBlockId(block) || `${String(areaId || 'area').slice(0, 4).toUpperCase()}-${index + 1}`;
-    const road = roads.length ? roads[index % roads.length] : null;
+    const blockId = compactBlockId(block)
+      || (routeCodes.length ? routeCodes[blockIndex % routeCodes.length] : `${String(areaId || 'area').slice(0, 4).toUpperCase()}-${index + 1}`);
+    const road = roads.length ? roads[index % roads.length].name : null;
+    const serviceRoad = serviceRoads.length ? serviceRoads[index % serviceRoads.length].name : null;
     const water = block ? getPlanningBlockWaterContext(block, area, null) : { gate: 'clear', hydrologyLabel: 'water timing' };
     const heritage = block ? getPlanningBlockHeritageLoad(block, area) : { score: 0, className: 'light', notes: [] };
     const streamTouch = (type === 'CP' || type === 'RP') && (water.gate !== 'clear' || hashString(`${blockId}:${type}`) % 3 === 0);
@@ -195,9 +228,9 @@ export function buildPermitFileCatalogue(journey) {
         break;
       }
       case 'RUP': {
-        const uses = (roadUses.get(`RUP:${road}`) || 0) + 1;
-        roadUses.set(`RUP:${road}`, uses);
-        label = road ? `RUP ${road} FSR${uses > 1 ? ` (${blockId})` : ''}` : `RUP ${blockId} access`;
+        const uses = (roadUses.get(`RUP:${serviceRoad}`) || 0) + 1;
+        roadUses.set(`RUP:${serviceRoad}`, uses);
+        label = serviceRoad ? `RUP ${serviceRoad} FSR${uses > 1 ? ` (${blockId})` : ''}` : `RUP ${blockId} access`;
         break;
       }
       case 'SUP':
