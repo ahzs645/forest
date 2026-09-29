@@ -1157,6 +1157,10 @@ export class TuiGameController {
           type: "setup",
           heading: "Select your Specialization",
           subtitle: "Choose the work stream you will be judged on this year.",
+          note: FORESTER_ROLES
+            .filter((role) => role.seasonalEnabled === false && role.seasonalDisabledNote)
+            .map((role) => role.seasonalDisabledNote)
+            .join(" ") || undefined,
           optionDetails: [
             ...playableRoles.map((role) => ({
               label: getRoleDisplayName(role),

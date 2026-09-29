@@ -84,6 +84,72 @@ test('a balanced answer on a seasonal chain card brings the next stage with its 
   assert.ok(chain.stageIndex >= 1);
 });
 
+function makeHubUi() {
+  const lines = [];
+  const ui = {
+    lines,
+    mission: null,
+    clear() { lines.length = 0; },
+    write(text) { lines.push(String(text)); },
+    writeHeader(text) { lines.push(`# ${text}`); },
+    writeDivider(text) { lines.push(`-- ${text}`); },
+    writeWarning(text) { lines.push(String(text)); },
+    writeDanger(text) { lines.push(String(text)); },
+    setMissionStatus(status) { ui.mission = status; },
+    async promptChoice() { return { value: 0 }; },
+  };
+  return ui;
+}
+
+test('the hub renders the mission brief, keeps body lines apart, and does not repeat alerts', async () => {
+  const { promptSeasonalCard, renderMetricStrip } = await import('../js/game/seasonalAdapter.js');
+  const ui = makeHubUi();
+  await promptSeasonalCard(ui, {
+    title: 'Why This Happened',
+    body: '• Stands recovering\n  Why: Compliance stayed strong.\n  This season: Forest Health +3',
+    mission: { goal: 'Finish the year strong.', steps: ['Pick one response.'], mandate: 'Keep compliance stable.', win: 'Defensible plan' },
+  }, ['Continue']);
+  assert.ok(ui.lines.includes('• Stands recovering'));
+  assert.ok(ui.lines.includes('  Why: Compliance stayed strong.'));
+  assert.ok(ui.lines.includes('-- YOUR MISSION'));
+  assert.ok(ui.lines.includes('Goal: Finish the year strong.'));
+  assert.ok(ui.lines.includes('Win: Defensible plan'));
+
+  renderMetricStrip(ui, {
+    metrics: { progress: 30, forestHealth: 50, relationships: 50, compliance: 50, budget: 20 },
+    round: 2,
+    objectiveStrip: {
+      goal: 'Goal',
+      pressure: 'budget low',
+      risks: [{ metric: 'budget', label: 'budget low' }, { metric: 'progress', label: 'progress behind' }],
+    },
+  });
+  assert.equal(ui.mission.guidance, 'budget low');
+  assert.deepEqual(ui.mission.alerts.map((alert) => alert.text), ['progress behind']);
+});
+
+test('the seasonal role card says why General Manager is not offered', () => {
+  const controller = new TuiGameController({ storage: null, onExit() {} });
+  controller.setInputText('T');
+  controller.submitCurrent();
+  const view = controller.getState();
+  assert.ok(!view.options.includes('General Manager'));
+  assert.match(view.contentData.note, /General Manager is not in Seasonal Strategy/);
+});
+
+test('the hub journey log reads the seasonal year', async () => {
+  const { buildSeasonalLogEntries } = await import('../js/game/seasonalAdapter.js');
+  const controller = new TuiGameController({ rng: makeRng(5), storage: null, onExit() {} });
+  controller.setInputText('T');
+  controller.submitCurrent();
+  controller.selectOption(0);
+  controller.selectOption(0);
+  for (let step = 0; step < 8; step += 1) controller.selectOption(0);
+  const entries = buildSeasonalLogEntries(controller.gs);
+  assert.ok(entries.length >= 3, 'decisions so far should be in the log');
+  assert.ok(entries.every((entry) => entry.dayLabel === 'Season' && entry.summary));
+});
+
 test('season-bound events and issues only surface in their season', async () => {
   const { drawSeasonalEvent, getOperationalEventLibrary } = await import('../js/engine/content.js');
   const { ISSUE_LIBRARY, CHAINED_ISSUES } = await import('../js/data/index.js');

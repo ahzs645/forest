@@ -372,6 +372,9 @@ export const FORESTER_ROLES = [
     name: "General Manager",
     seasonalName: "General Manager",
     seasonalEnabled: false,
+    // Shown on the seasonal role card so the missing role reads as a choice.
+    seasonalDisabledNote:
+      "General Manager is not in Seasonal Strategy: the GM's year is judged on cut control, stumpage and certification, which these five meters don't track. Run the GM term from New Expedition.",
     journeyType: "manager",
     description:
       "Run the woodlands operation: cut control against the AAC, appraisals and stumpage, contractor rates, SFI/FSC certification, and a SAFE Companies record that survives an audit.",

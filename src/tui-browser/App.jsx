@@ -554,6 +554,7 @@ function ContentView({ data, objective }) {
         <NoticeBlock notice={data.notice} />
         <div className="tui-heading">{data.heading}</div>
         {data.subtitle ? <p className="tui-copy dim">{data.subtitle}</p> : null}
+        {data.note ? <p className="tui-copy dim">{data.note}</p> : null}
       </div>
     );
   }

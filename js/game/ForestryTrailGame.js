@@ -79,6 +79,7 @@ export class ForestryTrailGame {
     this._campaignActive = false;
     this._seasonalActive = false;
     this._seasonalExitFn = null;
+    this._seasonalLogFn = null;
 
     this.ui.onRestartRequest(() => this._promptRestart());
     this.ui.onLogRequest(() => this._showLog());
@@ -91,6 +92,10 @@ export class ForestryTrailGame {
   }
 
   _showLog() {
+    if (this._seasonalActive && this._seasonalLogFn) {
+      this.ui.showLog(this._seasonalLogFn());
+      return;
+    }
     if (!this.journey) {
       this.ui.showLog([]);
       return;
@@ -409,11 +414,13 @@ export class ForestryTrailGame {
     this._seasonalExitFn = null;
     try {
       await runSeasonalGame(this.ui, {
-        onExitAvailable: (fn) => { this._seasonalExitFn = fn; }
+        onExitAvailable: (fn) => { this._seasonalExitFn = fn; },
+        onLogAvailable: (fn) => { this._seasonalLogFn = fn; }
       });
     } finally {
       this._seasonalActive = false;
       this._seasonalExitFn = null;
+      this._seasonalLogFn = null;
     }
   }
 
