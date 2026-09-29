@@ -84,3 +84,13 @@ test("no single issue dominates the matrix beyond a cap", () => {
     `top issue ${topId} appeared in ${(100 * share).toFixed(1)}% of runs (cap 45%)`,
   );
 });
+
+test("the harness starts neighbouring seeds on unrelated streams", async () => {
+  const { mixSeed } = await import("../js/engine/simulate.js");
+  const { makeRng } = await import("../js/engine/rng.js");
+  const firstDraws = Array.from({ length: 50 }, (_, i) => makeRng(mixSeed(1000 + i))());
+  assert.ok(Math.min(...firstDraws) < 0.1 && Math.max(...firstDraws) > 0.9, "seeds 1000-1049 should not share an opening draw");
+  // Unscrambled, the same 50 seeds open within a fraction of a percent of each other.
+  const raw = Array.from({ length: 50 }, (_, i) => makeRng(1000 + i)());
+  assert.ok(Math.max(...raw) - Math.min(...raw) < 0.05);
+});

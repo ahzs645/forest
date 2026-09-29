@@ -130,6 +130,9 @@ function buildCausedBy(state, source) {
 // program run on all fronts (see applyRoundRecoveries).
 const STEADY_PROGRAM_SPREAD = 30;
 
+// The meters the tier floors read as the file's standing.
+const STANDING_METERS = ["relationships", "compliance", "forestHealth"];
+
 // Flags the end-of-season pass sets, for the content lint's reachability check.
 export const ROUND_CONSEQUENCE_FLAGS = Object.freeze([
   "lowBudgetStreak",
@@ -466,12 +469,14 @@ function applyRoundRecoveries(state, round, consequences) {
   // Steady program: the dividends above pay a file that piles up compliance
   // and trust, which made turtling the dominant line. A program that kept
   // every meter in play earns its own return: the weakest meter gets room to
-  // recover. Paid only in a season no dividend already rewarded.
+  // recover. Paid only in a season no dividend already rewarded, and from a
+  // weakest meter of 35 up: a middling year with one thin meter is the file
+  // this is for.
   if (round >= 2 && consequences.length === firedBefore) {
     const values = Object.values(metrics).map((value) => Number(value) || 0);
     const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
     const spread = Math.max(...values) - Math.min(...values);
-    if (weakest && Number(weakest[1]) >= 40 && Number(weakest[1]) < 60 && spread <= STEADY_PROGRAM_SPREAD) {
+    if (weakest && Number(weakest[1]) >= 35 && Number(weakest[1]) < 60 && spread <= STEADY_PROGRAM_SPREAD) {
       applyEffects(
         state,
         { [weakest[0]]: 3 },
@@ -487,14 +492,22 @@ function applyRoundRecoveries(state, round, consequences) {
     }
   }
 
-  // Comeback window: late in the year a single collapsing meter gets a modest
-  // rebound — but only if the overall file is still salvageable, so one rough
-  // stretch doesn't doom an otherwise competent run.
-  if (round >= 3) {
+  // Comeback window: a single collapsing meter gets a modest rebound — but
+  // only if the overall file is still salvageable, so one rough stretch
+  // doesn't doom an otherwise competent run. Standing (relationships,
+  // compliance, forest health) can be repaired from the second season, once it
+  // slips toward the Mixed floors and before it sinks under the trust and
+  // audit lines and compounds; any other meter waits for the back half of the
+  // year. The schedule and the budget keep the later, lower line, so a turtled
+  // file is not refunded.
+  if (round >= 2) {
     const values = Object.values(metrics).map((value) => Number(value) || 0);
     const average = values.reduce((sum, value) => sum + value, 0) / (values.length || 1);
-    const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
-    if (weakest && Number(weakest[1]) < 35 && average >= 42) {
+    const byValue = Object.entries(metrics).sort((a, b) => a[1] - b[1]);
+    const standing = byValue.find(([key, value]) => STANDING_METERS.includes(key) && Number(value) < 43);
+    const late = round >= 3 && Number(byValue[0]?.[1]) < 35 ? byValue[0] : null;
+    const weakest = standing || late;
+    if (weakest && average >= 42) {
       applyEffects(
         state,
         { [weakest[0]]: 5 },

@@ -88,6 +88,26 @@ test("comeback window steadies the weakest meter late in a salvageable run", () 
   assert.equal(state.metrics.progress, 35);
 });
 
+test("slipping standing can be repaired from the second season; a thin schedule waits", () => {
+  const slipping = makeState("planner");
+  slipping.round = 2;
+  slipping.metrics = { progress: 50, forestHealth: 55, relationships: 41, compliance: 75, budget: 50 };
+  assert.ok(applyRoundConsequences(slipping).includes("comeback-window"));
+  assert.equal(slipping.metrics.relationships, 46);
+
+  // A turtled file's thin Progress is not refunded before the back half.
+  const turtled = makeState("planner");
+  turtled.round = 2;
+  turtled.metrics = { progress: 30, forestHealth: 60, relationships: 70, compliance: 80, budget: 50 };
+  assert.ok(!applyRoundConsequences(turtled).includes("comeback-window"));
+});
+
+test("Mixed sits just above the consequence lines: a middling year that never collapsed is not Stumbled", () => {
+  assert.equal(deriveTier({ progress: 40, forestHealth: 50, relationships: 41, compliance: 44, budget: 40 }), "mixed");
+  assert.equal(deriveTier({ progress: 40, forestHealth: 50, relationships: 34, compliance: 44, budget: 38 }), "stumbled");
+  assert.equal(deriveTier({ progress: 40, forestHealth: 50, relationships: 45, compliance: 39, budget: 38 }), "stumbled");
+});
+
 test("comeback window stays shut when the run is already collapsing", () => {
   const state = makeState("recce");
   state.round = 4;

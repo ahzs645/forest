@@ -121,9 +121,13 @@ export const SEASONAL_TIER_GATES = Object.freeze({
     // A stewardship-first year that still delivered something reads Solid.
     alternate: { compliance: 80, relationships: 68, forestHealth: 50, progress: 30 },
   },
+  // Stumbled is a year whose standing fell into the consequence zone (trust
+  // lost under 35, audits under 40). Set just above those lines; at 45
+  // a year that never collapsed still stumbled about half the time it was
+  // played without reading the cards.
   mixed: {
-    average: 45,
-    floors: { compliance: 45, relationships: 42, forestHealth: 42 },
+    average: 43,
+    floors: { compliance: 43, relationships: 40, forestHealth: 42 },
   },
 });
 
