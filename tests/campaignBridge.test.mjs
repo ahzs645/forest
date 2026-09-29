@@ -12,6 +12,7 @@ import { createInitialState } from '../js/engine.js';
 import { resolveEvent } from '../js/events/resolution.js';
 import {
   CAMPAIGN_SEASONS,
+  applyCampaignAllowance,
   applySeasonCarryForward,
   applyYearEffects,
   computeSeasonBridge,
@@ -25,6 +26,7 @@ import {
 } from '../js/game/campaign.js';
 import { CAMPAIGN_TIER_GATES, deriveTier, gradeTier } from '../js/engine/scoring.js';
 import { simulateCampaign } from '../scripts/simulate-campaign.mjs';
+import { applyDifficultyMultipliers } from '../js/game/ForestryTrailGame.js';
 
 const AREA_ID = 'fraser-plateau';
 const area = OPERATING_AREAS.find((candidate) => candidate.id === AREA_ID);
@@ -167,6 +169,48 @@ test('shortcut cash is not a saving, and a crew left on an empty food box is not
   const starvedBridge = computeSeasonBridge(starved, { victory: true }, starved.campaignStartBudget);
   assert.equal(starvedBridge.deltas.budget, -2, 'an untouched allowance with a hungry crew costs, it does not pay');
   assert.match(entryFor(starvedBridge, 'budget').reason, /the crew went 2 shifts on an empty food box/);
+});
+
+test('a desk season that failed early earns no thrift credit for the allowance it never got to spend', () => {
+  // Pulled off the file on day 11 with half the permits out and most of the
+  // allowance untouched: that is a stop, not a saving.
+  const journey = opened(createPermittingJourney({ roleId: 'permitter', areaId: AREA_ID, area, scale: 'campaign' }));
+  journey.permits.approved = Math.round(journey.permits.target / 2);
+  journey.resources.budget = Math.round(journey.campaignStartBudget * 0.84);
+  const failed = computeSeasonBridge(journey, { gameOver: true, reason: 'Lost the district goodwill' }, journey.campaignStartBudget);
+  assert.equal(failed.deltas.budget, 0);
+  assert.match(entryFor(failed, 'budget').reason, /the season fell short, so the unspent allowance is not a saving/);
+
+  // The same spend on a delivered season is still value for money.
+  journey.permits.approved = journey.permits.target;
+  const delivered = computeSeasonBridge(journey, { victory: true }, journey.campaignStartBudget);
+  assert.ok(delivered.deltas.budget > 0);
+
+  // A failed season that overspent still pays for it.
+  journey.permits.approved = Math.round(journey.permits.target / 4);
+  journey.resources.budget = 0;
+  const overspent = computeSeasonBridge(journey, { gameOver: true }, journey.campaignStartBudget);
+  assert.ok(overspent.deltas.budget < 0);
+});
+
+test('the hard fall planning file is funded for its gates, not cut below the normal allowance', () => {
+  const allowance = (difficulty) => {
+    const journey = createPlanningJourney({ roleId: 'planner', areaId: AREA_ID, area, scale: 'campaign' });
+    applyDifficultyMultipliers(journey, difficulty);
+    applyCampaignAllowance(journey, difficulty);
+    return journey;
+  };
+  const normal = allowance('normal');
+  const hard = allowance('hard');
+  assert.ok(hard.resources.budget > normal.resources.budget, `hard ${hard.resources.budget} vs normal ${normal.resources.budget}`);
+  assert.equal(hard.startingResources.budget, hard.resources.budget);
+  assert.ok(hard.deadline < normal.deadline, 'the hard file keeps its shorter window');
+  // Only the planning file: a hard permitting desk keeps the difficulty cut.
+  const desk = createPermittingJourney({ roleId: 'permitter', areaId: AREA_ID, area, scale: 'campaign' });
+  const deskBudget = desk.resources.budget;
+  applyDifficultyMultipliers(desk, 'hard');
+  applyCampaignAllowance(desk, 'hard');
+  assert.equal(desk.resources.budget, Math.round(deskBudget * 0.8));
 });
 
 test('an idle spring earns no Forest Health for planting it never did, and the brush costs the stands', () => {
