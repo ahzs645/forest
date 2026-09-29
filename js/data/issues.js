@@ -321,7 +321,7 @@ export const ISSUE_LIBRARY = [
     description:
       "North American lumber prices tank overnight, forcing difficult decisions about volume commitments.",
     roles: ["planner", "permitter"],
-    areaTags: ["market", "northern-bc"],
+    areaTags: ["market", "bc-wide"],
     seasonBias: ["Winter Operations"],
     options: [
       {
@@ -439,7 +439,7 @@ export const ISSUE_LIBRARY = [
     description:
       "FESBC claws back part of your stewardship grant mid-year after a provincial budget update, and the funded fuel treatments and rehab work have to be reprioritized.",
     roles: ["planner", "permitter"],
-    areaTags: ["policy", "northern-bc"],
+    areaTags: ["policy", "bc-wide"],
     seasonBias: ["Winter Operations"],
     options: [
       {
@@ -497,7 +497,7 @@ export const ISSUE_LIBRARY = [
     description:
       "The union stewards on the road and log-haul crews demand revised safety provisions or threaten a slowdown before the fall push.",
     roles: ["recce", "silviculture", "planner"],
-    areaTags: ["remote-camps", "northern-bc"],
+    areaTags: ["remote-camps", "bc-wide"],
     seasonBias: ["Fall Close-out"],
     options: [
       {
@@ -532,7 +532,7 @@ export const ISSUE_LIBRARY = [
       {
         label: "Launch sanitation crews immediately",
         outcome:
-          "You fall trap-trees and chip hotspots, buying valuable time against the beetles.",
+          "You fall and burn the green-attack trees and chip the hotspots, buying valuable time against the beetles.",
         effects: { progress: -2, forestHealth: 5, compliance: 3, relationships: 2, budget: -3 },
         clearFlags: ["pineBeetleMonitor", "pineBeetleUnchecked"],
       },
@@ -755,7 +755,7 @@ export const ISSUE_LIBRARY = [
     id: "exhibit-a-redline-return",
     title: "Exhibit A Redline Return",
     roles: ["permitter"],
-    areaTags: ["bwbs", "peace-region", "peatland", "gas-interface", "northern-bc"],
+    areaTags: ["bwbs", "peace-region", "peatland", "gas-interface"],
     seasonBias: ["Spring Planning"],
     seasonLock: true,
     baseWeight: 2,
@@ -879,7 +879,7 @@ export const ISSUE_LIBRARY = [
     seasonBias: ["Spring Planning"],
     seasonLock: true,
     description:
-      "Breakup reactivates a ravine crossing you flagged in winter, and the traverse line you sold as workable no longer lands on stable ground.",
+      "Spring runoff reactivates a ravine crossing you flagged in winter, and the traverse line you sold as workable no longer lands on stable ground.",
     options: [
       {
         label: "Reroute onto the ridge and refly the notes",
@@ -920,7 +920,7 @@ export const ISSUE_LIBRARY = [
       {
         label: "Hold the line and bring in geotech",
         outcome:
-          "You lose time while a specialist confirms what can actually stand up through breakup and storms.",
+          "You lose time while a specialist confirms what can actually stand up through spring runoff and storms.",
         effects: { progress: -3, compliance: 5, budget: -3 },
       },
       {
@@ -1170,7 +1170,7 @@ export const ISSUE_LIBRARY = [
     description:
       "An independent audit reveals your old-growth retention is dipping toward provincial minimums.",
     roles: ["planner", "permitter"],
-    areaTags: ["northern-bc", "forest-legacy"],
+    areaTags: ["bc-wide", "forest-legacy"],
     seasonBias: ["Winter Operations"],
     options: [
       {
@@ -1228,7 +1228,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A long-time road builder files for bankruptcy, leaving projects mid-stream.",
     roles: ["planner", "recce"],
-    areaTags: ["winter-road", "remote-camps", "northern-bc"],
+    areaTags: ["winter-road", "remote-camps", "bc-wide"],
     seasonBias: ["Winter Operations"],
     options: [
       {
@@ -1286,7 +1286,7 @@ export const ISSUE_LIBRARY = [
     description:
       "Compliance and Enforcement starts flying unannounced drone inspections over your harvest blocks.",
     roles: ["planner", "permitter", "recce"],
-    areaTags: ["technology", "northern-bc"],
+    areaTags: ["technology", "bc-wide"],
     seasonBias: ["Summer Field"],
     options: [
       {
@@ -1315,7 +1315,7 @@ export const ISSUE_LIBRARY = [
     description:
       "Operating funds are exhausted. Finance offers an emergency loan that will dampen future budget gains.",
     roles: ["planner", "permitter", "recce", "silviculture"],
-    areaTags: ["northern-bc"],
+    areaTags: ["bc-wide"],
     seasonBias: ["Fall Close-out", "Winter Operations"],
     requiresFlags: ["budgetEmergencyScheduled"],
     options: [
@@ -1349,7 +1349,7 @@ export const ISSUE_LIBRARY = [
     description:
       "Your practice file has drawn enough scrutiny that FPBC asks for CPD records, your competence declaration, development plan, and work samples tied to your current practice areas.",
     roles: ["planner", "permitter", "recce", "silviculture"],
-    areaTags: ["northern-bc"],
+    areaTags: ["bc-wide"],
     seasonBias: ["Winter Operations", "Spring Planning"],
     requiresAnyFlags: ["professionalAuditActive"],
     context: {
@@ -1775,7 +1775,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A scaler in your yard emails that they feel pressured by your supervisor to downgrade loads beyond what the scaling manual supports, and has attached a week of examples.",
     roles: ["recce", "planner"],
-    areaTags: ["yard", "northern-bc"],
+    areaTags: ["yard", "bc-wide"],
     seasonBias: ["Fall Close-out", "Winter Operations"],
     options: [
       {
@@ -1860,7 +1860,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A side-file from your consulting practice: Your cruise of four small expropriation parcels is behind schedule, and the Cruising Manual allows a 100 by 100 grid that waives the sampling error requirement. Two parcels look low volume from the road.",
     roles: ["planner", "recce"],
-    areaTags: ["private-land", "cruise", "northern-bc"],
+    areaTags: ["private-land", "cruise", "bc-wide"],
     seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
