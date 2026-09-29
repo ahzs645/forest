@@ -823,7 +823,13 @@ async function runBudgetAllocation(game) {
   const { journey, ui } = game;
   const cfo = findExecutive(journey, 'cfo');
   ui.writeDivider("STRATEGIC DECISION - DISCRETIONARY SPEND");
-  ui.write(`${cfo ? `${cfo.name}, your CFO,` : 'The CFO'} has freed up discretionary room this month. Every division has opinions about it.`);
+  const cfoName = cfo ? `${cfo.name}, your CFO,` : 'The CFO';
+  const ledger = journey.ledger || {};
+  // A thin treasury changes what the CFO is offering.
+  const tight = ledger.startTreasury && journey.resources.budget < ledger.startTreasury * 0.25;
+  ui.write(tight
+    ? `${cfoName} would rather nothing went out this month: the treasury is at $${Math.round(journey.resources.budget).toLocaleString()}. Every division is asking anyway.`
+    : `${cfoName} has freed up discretionary room this month. Every division has opinions about it.`);
   ui.write("");
 
   const choice = await ui.promptChoice("Where does the money go?", [
@@ -1214,6 +1220,8 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
   const net = revenue - ledger.overhead - certCost - standby;
 
   ledger.deliveredYtd += delivered;
+  // What the treasury could not cover, so a bankrupt month still reconciles on screen.
+  const shortfall = Math.max(0, -(journey.resources.budget + net));
   journey.resources.budget = Math.max(0, journey.resources.budget + net);
   ledger.months.push({
     month, planned, delivered, logPrice: ledger.logPrice, premium, stumpage, cost,
@@ -1229,7 +1237,7 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
   const deliveredLine = `Delivered: ${delivered.toLocaleString()} m³ (plan ${planned.toLocaleString()}${volumeNotes.length ? `, ${volumeNotes.join(', ')}` : ''}; year to date ${Math.round(ledger.deliveredYtd).toLocaleString()} / ${ledger.aac.toLocaleString()} m³ AAC)`;
   const marginLine = `Log price $${ledger.logPrice}${premium ? ` + $${formatRate(premium)} certified premium` : ''} - stumpage $${stumpage} - logging & haul $${formatRate(cost)} = $${formatRate(margin)}/m³ margin -> ${formatSignedDollars(revenue)}`;
   const chargesLine = `Overhead -$${ledger.overhead.toLocaleString()}${certCost ? ` · certification -$${certCost.toLocaleString()}` : ''}${standby ? ` · standby -$${standby.toLocaleString()}` : ''}`;
-  const netLine = `Net ${formatSignedDollars(net)} -> treasury $${Math.round(journey.resources.budget).toLocaleString()}`;
+  const netLine = `Net ${formatSignedDollars(net)} -> treasury $${Math.round(journey.resources.budget).toLocaleString()}${shortfall ? ` ($${Math.round(shortfall).toLocaleString()} it could not cover)` : ''}`;
   ui.write(deliveredLine);
   ui.write(marginLine);
   ui.write(chargesLine);

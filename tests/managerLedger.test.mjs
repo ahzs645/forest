@@ -166,6 +166,27 @@ test('the operating area sets the ledger: wood, stumpage, logging cost, price sw
   assert.equal(treasuries.size, OPERATING_AREAS.length * 2);
 });
 
+test('a thin treasury changes the CFO\'s offer, and a month it cannot cover says by how much', async () => {
+  const journey = createManagerJourney({ areaId: 'fraser-plateau' });
+  journey.flags.managerInitComplete = true;
+  journey.ceo = { id: 'steady', name: 'x', decision_making_style: 'conservative', posture: 'Steady delivery', volumeFactor: 1, costPerM3: 0, quarterly: {} };
+  journey.day = 2; // the discretionary-spend month
+  journey.flags.paceSetMonth = 2;
+  journey.resources.budget = 60000;
+  journey.ledger.curtailmentFactor = 0.2; // a mill curtailment on a thin treasury
+  const ui = makeUi(steadyAnswers);
+  await withSeededRandom(4, () => runManagerDay({ ui, journey, gameOver: false, checkpoint() {} }));
+  assert.ok(ui.lines.some((line) => /your CFO, would rather nothing went out this month: the treasury is at \$60,000\./.test(line)));
+  assert.ok(!ui.lines.some((line) => /freed up discretionary room/.test(line)));
+  const month = journey.ledger.months.at(-1);
+  assert.ok(month.net < -60000, `net ${month.net}`);
+  const netLine = ui.lines.find((line) => /^Net /.test(line));
+  const match = netLine.match(/^Net -\$([\d,]+) -> treasury \$0 \(\$([\d,]+) it could not cover\)$/);
+  assert.ok(match, netLine);
+  assert.equal(Number(match[1].replaceAll(',', '')), -month.net);
+  assert.ok(Number(match[2].replaceAll(',', '')) < -month.net, 'the shortfall is what the treasury did not have');
+});
+
 test('board reviews sit quarterly on the calendar and only once each', async () => {
   await withSeededRandom(13, async () => {
     const journey = createManagerJourney({ areaId: 'fraser-plateau' });
