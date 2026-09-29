@@ -431,12 +431,17 @@ export function getReconLayoutProfile(block) {
       streams.push(`${stream.label}: ${stream.cls} — ${stream.rma}`);
     }
   }
+  const terrainId = normalizeReconToken(block?.terrain);
   if (streams.length === 0) {
-    streams.push('no defined channels crossed; two non-classified drainages noted for the site plan');
+    // Read off the ground, so every dry block does not file the same line.
+    streams.push(terrainId === 'hilly' || terrainId === 'steep'
+      ? 'no defined channels crossed; seepage in the side draws noted as non-classified drainages'
+      : terrainId === 'muskeg'
+        ? 'no defined channels; diffuse flow through the fen noted for the site plan'
+        : 'no defined channels crossed; one wet swale noted as a non-classified drainage');
   }
 
   const terrain = [];
-  const terrainId = normalizeReconToken(block?.terrain);
   if (terrainId === 'steep' || hazards.has('grade')) terrain.push('slopes over 60% on the upper boundary — terrain stability field card, likely Class IV');
   if (hazards.has('rockslide') || features.has('moraine') || features.has('glacial_terrain')) terrain.push('unstable till and slide scars — road location wants the bench, not the toe');
   if (hazards.has('debris_flow')) terrain.push('a debris-flow gully above the fan — the terrain stability assessment covers the channel above the road, not just the block');
@@ -444,7 +449,13 @@ export function getReconLayoutProfile(block) {
   if (terrainId === 'muskeg' || hazards.has('bog') || hazards.has('subsidence') || features.has('permafrost')) terrain.push('organic soils and standing water — frozen-ground harvest window, no summer machine traffic');
   if (features.has('karst')) terrain.push('karst: sinks, grikes and a disappearing stream — each one flagged and buffered');
   if (hazards.has('erosion') || features.has('watershed') || features.has('community_water')) terrain.push('fine-textured soils on the lower slope — sediment control notes for every crossing');
-  if (terrain.length === 0) terrain.push('gentle ground, well-drained morainal soils, no stability concerns noted');
+  if (terrain.length === 0) {
+    terrain.push(terrainId === 'hilly'
+      ? 'rolling ground, side slopes of 20-40%; cutbanks noted, no stability concerns'
+      : terrainId === 'steep'
+        ? 'steep side slopes on the boundary; walked, no slide scars or tension cracks found'
+        : 'gentle ground, well-drained morainal soils, no stability concerns noted');
+  }
 
   const dangerTrees = [];
   if (hazards.has('snag_hazard') || hazards.has('falling_timber') || features.has('beetle_kill') || features.has('wildfire_scar')) dangerTrees.push('dangerous-tree assessment on the snags along the boundary; the worst ones flagged for the faller before anyone works under them');
@@ -1608,7 +1619,9 @@ async function handleSetTempo(ui, journey) {
     },
     {
       label: `Short rations${rations.mode === 'short' ? ' (current)' : ''}`,
-      description: '65% portions; stretches the food, the crew feels it',
+      // The cost is on the option itself: the warning printed after the
+      // choice is cleared by the day screen's redraw.
+      description: `65% portions; stretches the food, ${SHORT_RATION_MORALE_COST} morale a shift for everyone`,
       value: 'short',
     },
   ]);
@@ -2090,7 +2103,7 @@ async function maybeHandleFoodDecision(game) {
     },
     {
       label: 'Short Rations and Push On',
-      description: '65% portions until you change the order; the crew will feel it',
+      description: `65% portions until you change the order; ${SHORT_RATION_MORALE_COST} morale a shift for everyone`,
       value: 'short'
     }
   ]);

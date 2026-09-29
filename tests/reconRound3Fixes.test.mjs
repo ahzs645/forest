@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createReconJourney, createJourney } from '../js/journey/factory.js';
-import { handleResupply, runReconDay } from '../js/modes/recon.js';
+import { handleResupply, runReconDay, getReconLayoutProfile } from '../js/modes/recon.js';
 import { FIELD_RESOURCES } from '../js/resources.js';
 import { FIELD_EVENTS, FORESTER_ROLES, OPERATING_AREAS } from '../js/data/index.js';
 import { WEATHER_CONDITIONS, getRandomWeather } from '../js/data/blocks.js';
@@ -355,6 +355,36 @@ test('card copy no longer contradicts itself', () => {
   assert.doesNotMatch(fight.outcome, /respect each other more/);
   const dump = byId('fuel_contamination').options.find((o) => /fresh fuel/.test(o.label));
   assert.match(dump.label, /waste drums/);
+});
+
+test('the short-rations option names its morale cost where the player chooses it', async () => {
+  const journey = createReconJourney({ areaId: 'fraser-plateau' });
+  journey.day = 3;
+  journey.resources.food = 14;
+  journey.weather = WEATHER_CONDITIONS.find((w) => w.id === 'clear');
+  let rationMenu = null;
+  const pick = (options) => {
+    if (options.some((o) => o.value === 'short')) {
+      rationMenu = options;
+      return options.find((o) => o.value !== 'short');
+    }
+    return options.find((o) => o.value === 'set_aside')
+      || options.find((o) => o.value === 'camp_menu')
+      || options.find((o) => o.value === 'end_shift')
+      || options.find((o) => o.value === 'next' || o.value === 'continue')
+      || options[0];
+  };
+  await withRandom(0.99, () => runReconDay({ ui: makeUi(pick), journey, checkpoint() {} }));
+  assert.ok(rationMenu, 'the low-food beat asked about rations');
+  assert.match(rationMenu.find((o) => o.value === 'short').description, /4 morale a shift/);
+});
+
+test('a dry block\'s layout notes are read off its ground', () => {
+  const flat = getReconLayoutProfile({ terrain: 'flat', features: [], hazards: [] });
+  const hilly = getReconLayoutProfile({ terrain: 'hilly', features: [], hazards: [] });
+  assert.notEqual(flat.terrain[0], hilly.terrain[0]);
+  assert.notEqual(flat.streams[0], hilly.streams[0]);
+  assert.doesNotMatch(hilly.terrain[0], /gentle ground/);
 });
 
 // ── Block cards stay on open blocks ────────────────────────────────────────
