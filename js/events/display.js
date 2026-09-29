@@ -5,7 +5,7 @@
 
 import { isFieldJourney } from './constants.js';
 import { formatOptionTimeCost } from './timePolicy.js';
-import { FUEL_EFFECT_SCALE, projectAppliedEffects } from './resolution.js';
+import { FUEL_EFFECT_SCALE, isProjectedEffects, projectAppliedEffects } from './resolution.js';
 
 /**
  * Give field events one consistent radio lead without making the reporter's
@@ -365,7 +365,9 @@ function effectChips(effects, journeyType) {
     // On a permit desk compliance lands on district goodwill one for one
     // (js/events/resolution.js applyComplianceEffects), so the goodwill chip
     // carries both: "+8 compliance" alone hid eight points of goodwill.
-    const complianceGoodwill = COMPLIANCE_MOVES_GOODWILL.has(journeyType) ? Number(option.effects.compliance) || 0 : 0;
+    const complianceGoodwill = COMPLIANCE_MOVES_GOODWILL.has(journeyType) && !isProjectedEffects(option.effects)
+      ? Number(option.effects.compliance) || 0
+      : 0;
     if (option.effects.politicalCapital !== undefined || complianceGoodwill !== 0) {
       // The outcome line calls it district goodwill on a desk file
       // (js/events/resolution.js describeGoodwillChange); the hint should too.

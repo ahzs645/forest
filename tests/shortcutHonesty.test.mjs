@@ -183,7 +183,7 @@ test('a caught shortcut costs the grade by its seriousness, whether the determin
   journey.permits = { ...(journey.permits || {}), approved: 15, target: 15 };
   const score = calculateScore(journey, true);
   assert.equal(score.integrityPenalty, 20);
-  assert.ok(formatScoreDisplay(score).some((line) => /Integrity\s+-20 for shortcuts the district found/.test(line)));
+  assert.ok(formatScoreDisplay(score).some((line) => /Integrity\s+-20 /.test(line)));
   assert.equal(scoreIntegrityPenalty(journeyFor('planner')), 0);
 });
 

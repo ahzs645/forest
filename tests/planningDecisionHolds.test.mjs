@@ -194,6 +194,7 @@ test('a desk run answers in the grade for the shortcuts that were noticed or cau
   logShortcut(journey, 'bad', 5);
   logShortcut(journey, 'partial', 8);
   const score = calculateScore(journey, true);
-  assert.equal(score.integrityPenalty, 11);
-  assert.ok(formatScoreDisplay(score).some((line) => /Integrity\s+-11 for shortcuts that were noticed or caught/.test(line)));
+  // A serious catch (12, by the act's own severity floor) and a noticed take (3).
+  assert.equal(score.integrityPenalty, 15);
+  assert.ok(formatScoreDisplay(score).some((line) => /Integrity\s+-15 for shortcuts that were noticed or caught/.test(line)));
 });

@@ -297,9 +297,22 @@ function coupledScrutiny(effects = {}) {
  * @param {string} journeyType
  * @returns {Object} projected effects
  */
+const PROJECTED_EFFECTS = new WeakSet();
+
+/**
+ * Whether an effects object already carries its knock-ons (it came out of
+ * projectAppliedEffects), so a chip built from it must not add them again.
+ * @param {Object} effects
+ * @returns {boolean}
+ */
+export function isProjectedEffects(effects) {
+  return PROJECTED_EFFECTS.has(effects);
+}
+
 export function projectAppliedEffects(effects, journeyType = 'field') {
   const source = effects && typeof effects === 'object' ? effects : {};
   const projected = { ...source };
+  PROJECTED_EFFECTS.add(projected);
   const knockOn = coupledScrutiny(source);
   if (knockOn !== 0) projected.scrutiny = (Number(source.scrutiny) || 0) + knockOn;
   const compliance = Number(source.compliance) || 0;
