@@ -291,7 +291,8 @@ export class GridView {
       const step = this._touch ? Math.ceil(44 / this.renderer.cellH) : 1;
       const cap = Math.max(2 + step * 2, Math.floor(rows * 0.45));
       const detail = this._focusedDetailRows(optionRows, mainW - 4).length;
-      optH = Math.min(optionRows.length * step + 2 + detail, cap);
+      const extra = detail ? Math.max(0, 1 + detail - step) : 0;
+      optH = Math.min(optionRows.length * step + 2 + extra, cap);
     } else if (inputVisible) optH = 3;
 
     const logH = bottom - top - optH - (hasSidebar ? 0 : (this.ui._missionStatus ? 1 : 0));
@@ -303,7 +304,10 @@ export class GridView {
     // Keep a readable log and full-size choice targets on short grids. Larger
     // grids project the same live diorama as the DOM, with semantic cell tones.
     const trail = this.ui.trailView;
-    const sceneH = trail?.state && !trail.collapsed && mainW >= 48 && logH >= 26 ? 16 : 0;
+    // A shortcut card folds the picture, as the DOM does: its pitch and odds
+    // need the rows.
+    const shortcutUp = Boolean(this.ui.terminal?.querySelector?.('.term-shortcut.term-anchor'));
+    const sceneH = trail?.state && !trail.collapsed && !shortcutUp && mainW >= 48 && logH >= 26 ? 16 : 0;
     if (sceneH) {
       t.drawBox(mainX, logY, mainW, sceneH, C.borderStrong, `TRAIL VIEW · ${trail.state.title}`);
       const frame = renderTrailFrame(trail.state, trail.tick, { cols: Math.min(120, mainW - 4), rows: 14, action: trail.action });
@@ -436,15 +440,28 @@ export class GridView {
         if (fact?.value === undefined || fact?.value === null || fact?.value === '') continue;
         const label = String(fact.label);
         const value = String(fact.value);
-        const pad = Math.max(1, innerW - 1 - label.length - value.length);
         const tone = fact.tone === 'danger' ? C.danger : fact.tone === 'warn' ? C.warn : fact.tone === 'ok' ? C.ok : C.text;
         if (row >= limit) break;
-        t.drawText(label.slice(0, innerW), innerX + 1, row, C.muted);
-        t.drawText(value.slice(0, innerW - label.length - 1), innerX + 1 + label.length + pad, row, tone);
+        t.drawText(clip(label, innerW - 1), innerX + 1, row, C.muted);
+        if (label.length + 1 + value.length <= innerW - 1) {
+          t.drawText(value, innerX + innerW - value.length, row, tone);
+          row += 1;
+          continue;
+        }
+        // A value too long for the label's row goes under it, whole where it
+        // can be: "Freezing Conditions -12" without its °C read as a value.
         row += 1;
+        const rows = wrap(value, innerW - 3);
+        if (rows.length > 2) rows.splice(1, rows.length - 1, clip(rows.slice(1).join(' '), innerW - 3));
+        for (const l of rows) {
+          if (row >= limit) break;
+          t.drawText(l, innerX + innerW - l.length, row, tone);
+          row += 1;
+        }
       }
       for (const item of mission.checklist || []) {
-        line(`${item.done ? '[x]' : '[ ]'} ${item.label}`, item.done ? C.ok : C.text);
+        const rows = wrap(`${item.done ? '[x]' : '[ ]'} ${item.label}`, innerW - 5);
+        rows.forEach((l, i) => line(i ? `    ${l}` : l, item.done ? C.ok : C.text));
       }
       if (mission.guidance) {
         for (const l of wrap(`> ${mission.guidance}`, innerW - 1)) line(l, C.accent);
@@ -619,25 +636,37 @@ export class GridView {
       tag: btn.querySelector('.choice-tag')?.textContent.trim() || '',
       focused: document.activeElement === btn,
       click: () => btn.click()
+    })).map((entry) => ({
+      ...entry,
+      // An option that breaks a rule is never taken by one stray tap or
+      // click: the first selects it and opens its whole detail, the second
+      // (or Enter) takes it.
+      guarded: /OFF-BOOK/.test(entry.tag),
     }));
   }
 
   /**
    * The focused option's detail as rows of its own, when its one-line form
-   * would be clipped: at most three, and none on a touch grid (whose rows
-   * already spend their spare height on the detail).
+   * would be clipped: at most three on a keyboard grid. A touch grid's rows
+   * already spend their spare height on the detail, so it only expands an
+   * off-book option, in full, with the line that says how to take it.
    * @returns {string[]}
    */
   _focusedDetailRows(entries, innerW) {
-    if (this._touch) return [];
     const entry = entries.find((e) => e.focused);
-    if (!entry?.hint) return [];
+    if (!entry || (this._touch && !entry.guarded)) return [];
+    const confirm = entry.guarded
+      ? [this._touch ? 'Tap again to take it.' : 'Enter or click again to take it.']
+      : [];
+    if (!entry.hint) return confirm;
     const tagText = entry.tag ? ` ‹${entry.tag}›` : '';
     const lead = entry.key ? `${entry.key} ` : '  ';
-    if (`${lead}${entry.label} · ${entry.hint}`.length <= innerW - tagText.length - 3) return [];
+    const fits = `${lead}${entry.label} · ${entry.hint}`.length <= innerW - tagText.length - 3;
+    if (fits && !entry.guarded) return [];
     const rows = wrap(entry.hint, innerW - 4);
-    if (rows.length > 3) rows.splice(2, rows.length - 2, clip(rows.slice(2).join(' '), innerW - 4));
-    return rows;
+    const max = entry.guarded ? 8 : 3;
+    if (rows.length > max) rows.splice(max - 1, rows.length - max + 1, clip(rows.slice(max - 1).join(' '), innerW - 4));
+    return [...rows, ...confirm];
   }
 
   _drawOptions(t, C, x, y, w, h, entries) {
@@ -648,10 +677,11 @@ export class GridView {
     // its own hit area; a clipped menu must never require a physical keyboard.
     const inner = h - 2;
     const step = this._touch ? Math.ceil(44 / this.renderer.cellH) : 1;
-    // The focused row's full detail, on the rows under it (keyboard grids).
-    const focusDetail = step === 1 ? this._focusedDetailRows(entries, innerW) : [];
-    const paged = entries.length * step + focusDetail.length > inner;
-    const capacity = Math.max(1, Math.floor((inner - focusDetail.length - (paged ? step : 0)) / step));
+    // The focused row's full detail, on the rows under it.
+    const focusDetail = this._focusedDetailRows(entries, innerW);
+    const focusExtra = focusDetail.length ? Math.max(0, 1 + focusDetail.length - step) : 0;
+    const paged = entries.length * step + focusExtra > inner;
+    const capacity = Math.max(1, Math.floor((inner - focusExtra - (paged ? step : 0)) / step));
     const focusIndex = entries.findIndex((e) => e.focused);
     const focusElement = entries[focusIndex]?.element;
     if (this._optionMenu !== entries[0]?.element) {
@@ -684,7 +714,7 @@ export class GridView {
       if (!expanded && detailRows.length > extra.length) {
         extra[extra.length - 1] = clip(`${extra[extra.length - 1]} ${detailRows[extra.length]}`, innerW - 3);
       }
-      const rowH = expanded ? 1 + expanded.length : step;
+      const rowH = expanded ? Math.max(step, 1 + expanded.length) : step;
 
       if (entry.focused) {
         t.fillRect(x + 1, rowY, w - 2, rowH, C.accent);
@@ -700,7 +730,14 @@ export class GridView {
         }
         extra.forEach((l, i) => t.drawText(l, innerX + 2, rowY + 1 + i, C.muted));
       }
-      this._regions.push({ x: x + 1, y: rowY, w: w - 2, h: rowH, label: entry.label, type: 'option', action: entry.click });
+      const select = () => {
+        entry.element.focus();
+        this._scheduleDraw();
+      };
+      this._regions.push({
+        x: x + 1, y: rowY, w: w - 2, h: rowH, label: entry.label, type: 'option',
+        action: entry.guarded && !entry.focused ? select : entry.click,
+      });
       rowY += rowH;
     });
 
