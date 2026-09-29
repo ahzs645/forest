@@ -320,10 +320,11 @@
   "severity": "moderate",
   "probability": 0.05,
   "description": "Dark clouds roll in fast. Lightning flashes over the ridge.",
+  "seasons": ["spring", "summer", "fall"],
   "options": [
    {
     "label": "Take shelter immediately",
-    "outcome": "Everyone piles into vehicles. Safe but no work gets done.",
+    "outcome": "Everyone piles into the trucks until the cell passes over. An hour of the shift goes to watching the ridge, and nobody is sorry.",
     "effects": {
      "progress": -5
     }
@@ -2779,6 +2780,7 @@
   "severity": "minor",
   "probability": 0.06,
   "description": "The weather service broadcasts a warning: a major system is building to the west. Heavy rain and wind expected within 48 hours.",
+  "journeyTypes": ["recon", "field"],
   "options": [
    {
     "label": "Push hard now to get ahead of it",
@@ -2849,6 +2851,7 @@
   "severity": "severe",
   "probability": 0,
   "description": "The storm arrives with a vengeance. Trees bend sideways, rain comes in sheets, and the road turns to soup. No one's working today.",
+  "arrivesAsWeather": "storm",
   "options": [
    {
     "label": "Hunker down and ride it out",

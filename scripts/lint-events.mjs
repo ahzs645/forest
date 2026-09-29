@@ -113,6 +113,9 @@ for (const { pool, event } of ALL) {
   for (const weatherId of event.notInWeather || []) {
     if (!VALID_WEATHER_IDS.has(weatherId)) errors.push(`${where}: unknown weather "${weatherId}" in notInWeather`);
   }
+  if (event.arrivesAsWeather !== undefined && !VALID_WEATHER_IDS.has(event.arrivesAsWeather)) {
+    errors.push(`${where}: unknown weather "${event.arrivesAsWeather}" in arrivesAsWeather`);
+  }
   if (event.expeditionOnly !== undefined && typeof event.expeditionOnly !== 'boolean') {
     errors.push(`${where}: expeditionOnly must be a boolean`);
   }

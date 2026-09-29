@@ -9,9 +9,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createReconJourney } from '../js/journey/factory.js';
-import { handleResupply } from '../js/modes/recon.js';
+import { createReconJourney, createJourney } from '../js/journey/factory.js';
+import { handleResupply, runReconDay } from '../js/modes/recon.js';
 import { FIELD_RESOURCES } from '../js/resources.js';
+import { FIELD_EVENTS, FORESTER_ROLES, OPERATING_AREAS } from '../js/data/index.js';
+import { WEATHER_CONDITIONS, getRandomWeather } from '../js/data/blocks.js';
+import { checkScheduledEvents } from '../js/events.js';
+import { formatOptionTimeCost, optionSpendsDay } from '../js/events/timePolicy.js';
+import { eventSupportsJourney, eventMatchesJourneyContext } from '../js/events/selection.js';
+
+function withRandom(value, fn) {
+  const original = Math.random;
+  Math.random = () => value;
+  const restore = () => { Math.random = original; };
+  try {
+    const result = fn();
+    if (result && typeof result.then === 'function') return result.finally(restore);
+    restore();
+    return result;
+  } catch (error) {
+    restore();
+    throw error;
+  }
+}
+
+function withSeed(seed, fn) {
+  let state = seed >>> 0;
+  const original = Math.random;
+  Math.random = () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+  try {
+    return fn();
+  } finally {
+    Math.random = original;
+  }
+}
 
 function makeUi(pickValue, log = []) {
   const write = (message) => log.push(String(message ?? ''));
@@ -94,4 +128,64 @@ test('shop rows keep their number when an item stops being affordable', async ()
   }, { name: 'Sproat Lake Camp' });
   assert.deepEqual(menus[1].map((o) => o.value), menus[0].map((o) => o.value));
   assert.equal(menus[1].find((o) => o.value === 'fuel_drum').disabled, true);
+});
+
+// ── The storm the radio promised ───────────────────────────────────────────
+
+test('the scheduled storm brings storm weather, grounds the shift, and never promises work', async () => {
+  const journey = shopJourney();
+  journey.day = 5;
+  journey.weather = WEATHER_CONDITIONS.find((w) => w.id === 'clear');
+  journey.scheduledEvents = [{ eventId: 'major_storm_hits', triggerDay: 5 }];
+  const card = checkScheduledEvents(journey);
+  assert.equal(card.id, 'major_storm_hits');
+  assert.equal(journey.weather.id, 'storm', 'the panel shows the storm the card describes');
+  for (const option of card.options) {
+    const label = formatOptionTimeCost(card, option, 'recon');
+    assert.doesNotMatch(label, /work continues/);
+    assert.match(label, /storm holds the crew in camp/);
+  }
+
+  // The shift that follows is the grounded storm day, not a quiet clear one.
+  const log = [];
+  const game = { ui: makeUi((options) => options.find((o) => o.value === 'next') || options[0], log), journey, checkpoint() {} };
+  const dayBefore = journey.day;
+  await withRandom(0.99, () => runReconDay(game));
+  assert.ok(log.some((line) => /Storm has grounded all operations/.test(line)), log.join('\n'));
+  assert.equal(journey.day, dayBefore + 1);
+  assert.equal(journey.distanceTraveled, 0);
+});
+
+test('the storm warning is only dealt to a traverse that can be grounded by it', () => {
+  const warning = FIELD_EVENTS.find((e) => e.id === 'radio_weather_warning');
+  assert.equal(eventSupportsJourney(warning, { journeyType: 'recon' }), true);
+  assert.equal(eventSupportsJourney(warning, { journeyType: 'silviculture' }), false);
+});
+
+test('a sudden storm is not lightning over a winter ridge, and sheltering does not claim the shift', () => {
+  const storm = FIELD_EVENTS.find((e) => e.id === 'sudden_storm');
+  assert.equal(eventMatchesJourneyContext(storm, { season: { currentSeason: 'winter' } }), false);
+  const shelter = storm.options.find((o) => /Take shelter/.test(o.label));
+  assert.equal(optionSpendsDay(storm, shelter, 'recon'), false);
+  assert.doesNotMatch(shelter.outcome, /no work gets done/i);
+});
+
+test('a summer pass can squall but never freezes, and day 1 rolls the role season', () => {
+  const pass = { id: 'pass', features: ['pass', 'alpine'] };
+  const seen = new Set();
+  for (let i = 0; i < 200; i += 1) {
+    seen.add(withRandom((i + 0.5) / 200, () => getRandomWeather(pass, 5, 'summer')).id);
+  }
+  assert.ok(!seen.has('freezing') && !seen.has('heavy_snow'), [...seen].join(','));
+  assert.ok(seen.has('light_snow'), 'a summer squall is still possible up high');
+
+  // The new-game screen passes the role as an object, not an id. Summer puts
+  // no weight on light snow in the valley; the spring table did.
+  const role = FORESTER_ROLES.find((r) => r.id === 'recce');
+  const area = OPERATING_AREAS.find((a) => a.id === 'kootenay-wetbelt');
+  for (let seed = 1; seed <= 40; seed += 1) {
+    const journey = withSeed(seed, () => createJourney({ role, area }));
+    assert.equal(journey.season.currentSeason, 'summer');
+    assert.notEqual(journey.weather.id, 'light_snow');
+  }
 });

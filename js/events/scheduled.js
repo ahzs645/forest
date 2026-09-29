@@ -6,6 +6,7 @@
 import { isFieldJourney } from './constants.js';
 import { FIELD_EVENTS } from '../data/fieldEvents.js';
 import { DESK_EVENTS } from '../data/deskEvents.js';
+import { WEATHER_CONDITIONS } from '../data/blocks.js';
 
 /**
  * Get event by ID
@@ -37,5 +38,23 @@ export function checkScheduledEvents(journey) {
   if (index === -1) return null;
 
   const scheduled = journey.scheduledEvents.splice(index, 1)[0];
-  return getEventById(scheduled.eventId, journey.journeyType);
+  return arriveWithWeather(journey, getEventById(scheduled.eventId, journey.journeyType));
+}
+
+/**
+ * A follow-up that IS weather (`arrivesAsWeather: "storm"`) brings it: on a
+ * traverse the day's sky becomes that weather, so the panel, the grounded
+ * day and the card's time labels all tell the same story. It used to land
+ * under clear skies, say nobody was working, and offer "work continues".
+ * @param {Object} journey
+ * @param {Object|null} event
+ * @returns {Object|null}
+ */
+function arriveWithWeather(journey, event) {
+  const weather = event?.arrivesAsWeather
+    && journey.weather
+    && WEATHER_CONDITIONS.find((condition) => condition.id === event.arrivesAsWeather);
+  if (!weather) return event;
+  journey.weather = weather;
+  return { ...event, heldInCamp: `${weather.name.toLowerCase()} holds the crew in camp` };
 }

@@ -675,7 +675,9 @@ export function createFieldJourney(options = {}) {
 
     // Current conditions
     pace: "normal",
-    weather: getRandomWeather(blocks[0], 1, createSeasonState(roleId)?.currentSeason),
+    // The role arrives as an id from the campaign and the sims, and as an
+    // object from the new-game screen; without it day 1 rolled spring skies.
+    weather: getRandomWeather(blocks[0], 1, createSeasonState(roleId || role?.id)?.currentSeason),
     temperature: "cool",
     travelSetback: 0,
     pendingTravelSetback: 0,

@@ -96,10 +96,15 @@ export function getRandomWeather(block, day, seasonId = null) {
     }
   }
 
-  // Adjust for terrain/features
+  // Adjust for terrain/features. High ground can still snow in summer, but a
+  // summer pass gets a squall, not a -17 freeze.
   if (block?.features?.includes('alpine') || block?.features?.includes('pass')) {
-    weights.heavy_snow += 5;
-    weights.freezing += 3;
+    if (seasonId === 'summer') {
+      weights.light_snow += 3;
+    } else {
+      weights.heavy_snow += 5;
+      weights.freezing += 3;
+    }
     weights.storm += 2;
   }
 
