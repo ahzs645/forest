@@ -38,3 +38,12 @@ The balance harness drove 24 seeded campaign-length assignments per role using r
 The remaining simulated losses were supply/fuel exhaustion or planning bankruptcy. This is evidence that completion is reachable under a consistent strategy, not a population win-rate estimate or proof that every possible choice succeeds.
 
 The Mac remained locked during this implementation pass, so fresh verification used headless browser interaction and engine tests. The earlier visible manual campaign is documented separately. The updated local game is available at `http://127.0.0.1:5178/` while its development server is running.
+
+## 2026-09-29 — Planner and permitter playtest fixes (W10)
+
+- **Prepare Submission spam:** a filing that cannot cross the District Manager's gate is returned unread (day, $2,200, goodwill -3, scrutiny +2, DM readiness -5). Pre-submission meetings are the only way to the cap; the card says whether a filing will land.
+- **Values Workshop:** values are shown on the day card, mission pane and workshop prompt. The analysis and Timber Supply Analysis wear the non-timber values down; below 40 a value blocks the session and submission and costs the file daily. The workshop has Back, and each line shows the whole day's cost.
+- **Permit pipeline:** outside counter changes act on named files and are refused where the pipeline disallows them: nothing is conjured into `issued`, no file is deleted, setbacks pull the named file back to drafting. HCA permits sit outside the District Manager's 15.
+- **Deficiency letters:** fast-track is decided that night with a higher chance of return. A cleanly answered gap is never the next letter on the same file. A district meeting decides only its own file.
+- **Scoring and debrief:** an undelivered file earns no Time, and its unspent budget is scaled by work done. Resources use the run's own starting budget. Desk roles score the protagonist's wellbeing instead of a flat 50. A failed plan is handed over, not sealed.
+- **Sims:** `node scripts/simulate-expeditions.mjs --role planning --area all --compare` (also for `permitting`). Competent play grades about 98–100; reckless play grades 38–65 in every area. Competent planning still cannot win the three southern areas until they have planning block data.
