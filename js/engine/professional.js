@@ -246,8 +246,13 @@ export function applyProfessionalComplianceShift(state, changes = {}) {
     return null;
   }
 
+  // An open FPBC complaint (a caught shortcut, js/events/selection.js) is not
+  // a lapsed renewal: paperwork cannot restore active status while it stands.
+  const complaintOpen = Array.isArray(state?.consequenceFlags) && state.consequenceFlags.includes("fpbc_file_open");
   if (typeof changes.registrationStatus === "string") {
-    professional.registrationStatus = changes.registrationStatus;
+    professional.registrationStatus = complaintOpen && changes.registrationStatus === "active"
+      ? "under-review"
+      : changes.registrationStatus;
   }
   if (typeof changes.cpdHours === "number") {
     professional.cpdHours = clampValue(professional.cpdHours + changes.cpdHours);
@@ -264,7 +269,7 @@ export function applyProfessionalComplianceShift(state, changes = {}) {
   if (changes.resetRegistration === true) {
     professional.chains.registration.stepIndex = 0;
     professional.chains.registration.complete = false;
-    professional.registrationStatus = "active";
+    professional.registrationStatus = complaintOpen ? "under-review" : "active";
   }
 
   return professional;

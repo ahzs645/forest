@@ -12,6 +12,8 @@
  * flag so a flag can never be authored into content without a reader existing.
  */
 
+import { TEMPTATION_FLAG_LABELS } from './odds.js';
+
 /**
  * Every flag a band may declare, and where it is consumed. A flag with no
  * consumer is a lie to the player, so this table is the contract: adding a
@@ -60,11 +62,21 @@ export function applyConsequenceFlags(journey, flags, messages = []) {
   // modifiers can read it. This is the cheap half of a consequence: the
   // failure keeps shifting later gambles even when it has no other machinery.
   journey.consequenceFlags = journey.consequenceFlags || [];
+  const added = new Set();
   for (const flag of flags) {
-    if (!journey.consequenceFlags.includes(flag)) journey.consequenceFlags.push(flag);
+    if (!journey.consequenceFlags.includes(flag)) {
+      journey.consequenceFlags.push(flag);
+      added.add(flag);
+    }
   }
 
   for (const flag of flags) {
+    // A shortcut's watch flag says so the day it lands, and what it does:
+    // every later shortcut is read with it in mind.
+    if (TEMPTATION_FLAG_LABELS[flag]) {
+      if (added.has(flag)) messages.push(`On your record now: ${TEMPTATION_FLAG_LABELS[flag]}. Later shortcuts get worse odds while it stands.`);
+      continue;
+    }
     if (ODDS_ONLY_FLAGS.has(flag)) {
       messages.push(flag === 'locals_soured'
         ? 'That account will be along this valley before you are.'

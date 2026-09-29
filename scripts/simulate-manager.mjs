@@ -93,7 +93,7 @@ export const MANAGER_STYLES = {
    */
   reckless(journey, options) {
     return byValue(options, ['growth', 'FSC', 'operations', 'intervene', 'visit', 'wing', 'spin', 'pace:1.1'])
-      || byTag(options, ['RISKY', 'TRADEOFF']);
+      || byTag(options, ['OFF-BOOK', 'RISKY', 'TRADEOFF']);
   },
 
   /**

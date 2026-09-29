@@ -40,9 +40,11 @@ export const ODDS_PREDICATE_NAMES = [
 
 /**
  * Flags the temptation lane (js/events/selection.js) leaves behind on a
- * noticed or caught band. They have no consumer beyond shifting later odds via
- * `hasFlag:`; applyConsequenceFlags records any flag it is handed, so these
- * need no handler in js/events/consequences.js to work.
+ * noticed or caught band. They shift later odds via `hasFlag:`, the shortcut
+ * card names the ones that moved today's odds, the mission panel lists them
+ * while they stand (js/events/shortcutRecord.js), and a campaign carries
+ * them into the next season. applyConsequenceFlags prints the sentence the
+ * day a flag first lands.
  */
 export const TEMPTATION_ODDS_FLAGS = Object.freeze({
   ce_watching: 'Somebody at the district is reading everything with your name on it.',
@@ -51,6 +53,16 @@ export const TEMPTATION_ODDS_FLAGS = Object.freeze({
   contractor_owns_you: 'The person who did it for you now owns a piece of you.',
   fpbc_file_open: 'Forest Professionals BC has a file open under your name.',
   rcmp_file: 'There is an RCMP file with the company name on it.',
+});
+
+/** The same flags as a short status line: who has you on a list. */
+export const TEMPTATION_FLAG_LABELS = Object.freeze({
+  ce_watching: 'the regulator is watching your files',
+  fn_watching: "the Nation's referrals office is watching",
+  worksafe_watching: 'WorkSafeBC has the site on a list',
+  contractor_owns_you: 'someone who did it for you owns a piece of you',
+  fpbc_file_open: 'an FPBC complaint file is open',
+  rcmp_file: 'an RCMP file is open',
 });
 
 /**
@@ -178,6 +190,21 @@ export function computeBandOdds(option, journey) {
     const moved = Math.min(Math.max(0, Number(modifier.move) || 0), bands[from]);
     bands[from] -= moved;
     bands[to] += moved;
+  }
+
+  // A gamble can carry its own floor on the bad band (`badFloor`): a careful
+  // record buys cover, but it cannot make burying a diesel spill safe. The
+  // floor is taken from the good band first, then the middle one, so the
+  // odds still sum to 1 and the card can print them as they are.
+  const badFloor = Math.max(0, Math.min(0.9, Number(option.badFloor) || 0));
+  if (bands.bad < badFloor) {
+    let short = badFloor - bands.bad;
+    for (const from of ['good', 'partial']) {
+      const moved = Math.min(short, bands[from]);
+      bands[from] -= moved;
+      bands.bad += moved;
+      short -= moved;
+    }
   }
 
   // Floors, so a run that has gone badly cannot make a gamble a certainty in

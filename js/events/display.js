@@ -38,7 +38,9 @@ export function formatEventForDisplay(event, journeyType = 'field') {
       index: index + 1,
       label: opt.label,
       hint: getOptionHint(opt, journeyType, event),
-      tag: deriveOptionRiskTag(opt)
+      // An option can name its own chip: a shortcut is OFF-BOOK, which says
+      // more than the RISKY every ordinary gamble carries.
+      tag: opt.riskTag || deriveOptionRiskTag(opt)
     }))
   };
 }
@@ -145,10 +147,13 @@ function formatOddsHint(option) {
   // A temptation carries the odds computed for this run today (`liveOdds`,
   // js/events/selection.js): the file, the crew and who is already watching
   // are all in the number, so the card tells the truth about this gamble.
+  // All three bands, named, so "badly wrong" is never left undefined.
   if (option.liveOdds && typeof option.liveOdds.good === 'number') {
     const good = Math.round(option.liveOdds.good * 100);
     const bad = Math.round((option.liveOdds.bad || 0) * 100);
-    return `${good}% clean, ${bad}% badly wrong for you today`;
+    const partial = Math.max(0, 100 - good - bad);
+    const catcher = option.caughtBy ? ` by ${option.caughtBy}` : '';
+    return `today: ${good}% clean · ${partial}% noticed · ${bad}% caught${catcher}`;
   }
   const good = Math.round(option.chanceSuccess * 100);
   if (typeof option.chancePartial !== 'number') return `${good}% success odds`;
@@ -172,88 +177,25 @@ function getOptionHint(option, journeyType, event = null) {
     return [formatOddsHint(option) || 'Outcome uncertain', timeHint].filter(Boolean).join(', ');
   }
 
-  const hints = [];
-  // What the shortcut is actually offering, in the role's own currency.
-  if (option.payoffLine) hints.push(`offer: ${option.payoffLine}`);
-  if (timeHint) hints.push(timeHint);
+  // A shortcut leads with what decides it: today's odds, then what you get.
+  // The pitch's own words come after, because a narrow screen clips the tail
+  // of this line and the numbers are what must survive (js/gridview).
+  if (option.liveOdds && typeof option.liveOdds.good === 'number') {
+    return [
+      formatOddsHint(option),
+      ...describeEffectChips(option.effects, journeyType),
+      option.riskInjury ? `${Math.round(option.riskInjury * 100)}% injury risk` : '',
+      option.payoffLine ? `offer: ${option.payoffLine}` : '',
+      timeHint,
+    ].filter(Boolean).join(', ');
+  }
 
-  const field = isFieldJourney(journeyType);
+  const hints = [];
+  if (timeHint) hints.push(timeHint);
+  hints.push(...effectChips(option.effects, journeyType));
+
   // Only a crew on a traverse has a next leg for ground to land on.
   const traverse = journeyType === 'field' || journeyType === 'recon';
-  if (option.effects) {
-    if (option.effects.fuel !== undefined) {
-      // The deck is written in the old units; a field crew's stock is litres
-      // and resolution scales the delta, so the preview has to as well.
-      const fuel = field ? Math.round(option.effects.fuel * FUEL_EFFECT_SCALE) : option.effects.fuel;
-      const unit = field ? ' L fuel' : ' fuel';
-      hints.push(fuel > 0 ? `+${fuel}${unit}` : `${fuel}${unit}`);
-    }
-    if (option.effects.food !== undefined) {
-      hints.push(option.effects.food > 0 ? `+${option.effects.food} food` : `${option.effects.food} food`);
-    }
-    if (option.effects.equipment !== undefined) {
-      hints.push(option.effects.equipment > 0 ? `+${option.effects.equipment}% equip` : `${option.effects.equipment}% equip`);
-    }
-    if (option.effects.firstAid !== undefined) {
-      hints.push(option.effects.firstAid > 0 ? `+${option.effects.firstAid} med` : `${option.effects.firstAid} med`);
-    }
-    if (option.effects.budget !== undefined) {
-      const amount = option.effects.budget;
-      const budgetStr = Math.abs(amount) >= 1000
-        ? `$${Math.round(Math.abs(amount) / 1000)}k`
-        : `$${Math.abs(amount)}`;
-      const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
-      hints.push(`${sign}${budgetStr}`);
-    }
-
-    if (option.effects.crew_health !== undefined) {
-      hints.push(option.effects.crew_health > 0 ? `+${option.effects.crew_health} health` : `${option.effects.crew_health} health`);
-    }
-    if (option.effects.crew_morale !== undefined) {
-      hints.push(option.effects.crew_morale > 0 ? `+${option.effects.crew_morale} morale` : `${option.effects.crew_morale} morale`);
-    }
-
-    if (option.effects.relationships !== undefined) {
-      hints.push(option.effects.relationships > 0 ? `+${option.effects.relationships} relations` : `${option.effects.relationships} relations`);
-    }
-    if (option.effects.compliance !== undefined) {
-      hints.push(option.effects.compliance > 0 ? `+${option.effects.compliance} compliance` : `${option.effects.compliance} compliance`);
-    }
-    if (option.effects.politicalCapital !== undefined) {
-      // The outcome line calls it district goodwill on a desk file
-      // (js/events/resolution.js describeGoodwillChange); the hint should too.
-      const unit = journeyType === 'manager' ? 'capital' : 'goodwill';
-      hints.push(option.effects.politicalCapital > 0 ? `+${option.effects.politicalCapital} ${unit}` : `${option.effects.politicalCapital} ${unit}`);
-    }
-
-    if (option.effects.data !== undefined && option.effects.data !== 0) {
-      hints.push(option.effects.data > 0 ? `+${option.effects.data} data` : `${option.effects.data} data`);
-    }
-    if (option.effects.progress !== undefined && option.effects.progress !== 0) {
-      // Field ground goes through the next leg (applyEventTravelEffect), so
-      // the hint says so rather than promising a jump down the road.
-      if (traverse && option.effects.progressMode === 'turn_back') {
-        hints.push('turn back; slower next travel leg');
-      } else if (traverse && option.effects.progress < 0) {
-        hints.push('slower next travel leg');
-      } else if (journeyType === 'planning') {
-        // On a planning file generic progress is the planner's own time
-        // (js/events/resolution.js applyPlanningProgress), never a gate.
-        hints.push(option.effects.progress > 0 ? 'time back on the file' : 'lost time on the file');
-      } else if (traverse) {
-        hints.push(`up to +${option.effects.progress} km on the next leg`);
-      } else {
-        hints.push(option.effects.progress > 0
-          ? `+${option.effects.progress} progress`
-          : `${option.effects.progress} progress`);
-      }
-    }
-    if (option.effects.permits_approved !== undefined) {
-      const amount = option.effects.permits_approved;
-      const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
-      hints.push(`${sign}${Math.abs(amount)} permits`);
-    }
-  }
 
   // A brief response that still costs ground (js/events/resolution.js turns
   // timeUsed into a travel setback) has to say so.
@@ -309,16 +251,138 @@ function getOptionHint(option, journeyType, event = null) {
   if (typeof complianceRisk === 'number') {
     hints.push(`${Math.round(complianceRisk * 100)}% chance it comes back on you`);
   }
-  if (option.effects?.scrutiny) {
-    const value = option.effects.scrutiny;
-    hints.push(value > 0 ? `+${value} scrutiny` : `${value} scrutiny`);
-  }
-  if (option.effects?.reputation) {
-    const value = option.effects.reputation;
-    hints.push(value > 0 ? `+${value} reputation` : `${value} reputation`);
-  }
+  hints.push(...standingChips(option.effects));
 
   return hints.length > 0 ? hints.join(', ') : 'No direct cost';
+}
+
+/**
+ * An effects object as the short chips an option hint uses ("+$25k",
+ * "-10 compliance", "+15 scrutiny"). The shortcut card uses the same words
+ * for its gain and for what each band costs, so the numbers the player reads
+ * on the chip, in the stakes and in the outcome are one set of numbers.
+ * @param {Object} effects
+ * @param {string} journeyType
+ * @returns {string[]}
+ */
+export function describeEffectChips(effects, journeyType = 'field') {
+  return [...effectChips(effects, journeyType), ...standingChips(effects)];
+}
+
+function standingChips(effects) {
+  const chips = [];
+  if (effects?.scrutiny) {
+    const value = effects.scrutiny;
+    chips.push(value > 0 ? `+${value} scrutiny` : `${value} scrutiny`);
+  }
+  if (effects?.reputation) {
+    const value = effects.reputation;
+    chips.push(value > 0 ? `+${value} reputation` : `${value} reputation`);
+  }
+  return chips;
+}
+
+function effectChips(effects, journeyType) {
+  const hints = [];
+  const option = { effects };
+  const field = isFieldJourney(journeyType);
+  // Only a crew on a traverse has a next leg for ground to land on.
+  const traverse = journeyType === 'field' || journeyType === 'recon';
+  if (option.effects) {
+    if (option.effects.fuel !== undefined) {
+      // The deck is written in the old units; a field crew's stock is litres
+      // and resolution scales the delta, so the preview has to as well.
+      const fuel = field ? Math.round(option.effects.fuel * FUEL_EFFECT_SCALE) : option.effects.fuel;
+      const unit = field ? ' L fuel' : ' fuel';
+      hints.push(fuel > 0 ? `+${fuel}${unit}` : `${fuel}${unit}`);
+    }
+    if (option.effects.food !== undefined) {
+      hints.push(option.effects.food > 0 ? `+${option.effects.food} food` : `${option.effects.food} food`);
+    }
+    if (option.effects.equipment !== undefined) {
+      hints.push(option.effects.equipment > 0 ? `+${option.effects.equipment}% equip` : `${option.effects.equipment}% equip`);
+    }
+    if (option.effects.firstAid !== undefined) {
+      hints.push(option.effects.firstAid > 0 ? `+${option.effects.firstAid} med` : `${option.effects.firstAid} med`);
+    }
+    if (option.effects.budget !== undefined) {
+      const amount = option.effects.budget;
+      // One decimal when it matters: $36,600 is "$36.6k", never "$37k".
+      const budgetStr = Math.abs(amount) >= 1000
+        ? `$${Number((Math.abs(amount) / 1000).toFixed(1))}k`
+        : `$${Math.abs(amount)}`;
+      const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
+      hints.push(`${sign}${budgetStr}`);
+    }
+
+    if (option.effects.crew_health !== undefined) {
+      hints.push(option.effects.crew_health > 0 ? `+${option.effects.crew_health} health` : `${option.effects.crew_health} health`);
+    }
+    if (option.effects.crew_morale !== undefined) {
+      hints.push(option.effects.crew_morale > 0 ? `+${option.effects.crew_morale} morale` : `${option.effects.crew_morale} morale`);
+    }
+
+    if (option.effects.relationships !== undefined) {
+      hints.push(option.effects.relationships > 0 ? `+${option.effects.relationships} relations` : `${option.effects.relationships} relations`);
+    }
+    if (option.effects.compliance !== undefined) {
+      hints.push(option.effects.compliance > 0 ? `+${option.effects.compliance} compliance` : `${option.effects.compliance} compliance`);
+    }
+    if (option.effects.politicalCapital !== undefined) {
+      // The outcome line calls it district goodwill on a desk file
+      // (js/events/resolution.js describeGoodwillChange); the hint should too.
+      const unit = journeyType === 'manager' ? 'capital' : 'goodwill';
+      hints.push(option.effects.politicalCapital > 0 ? `+${option.effects.politicalCapital} ${unit}` : `${option.effects.politicalCapital} ${unit}`);
+    }
+
+    if (option.effects.data !== undefined && option.effects.data !== 0) {
+      hints.push(option.effects.data > 0 ? `+${option.effects.data} data` : `${option.effects.data} data`);
+    }
+    // Explicit planning-file keys (js/events/resolution.js
+    // applyPlanningMetricEffects) move the gate they name.
+    if (typeof option.effects.analysis === 'number' && option.effects.analysis !== 0) {
+      hints.push(`${option.effects.analysis > 0 ? '+' : ''}${option.effects.analysis} analysis`);
+    }
+    if (typeof option.effects.buyIn === 'number' && option.effects.buyIn !== 0) {
+      hints.push(`${option.effects.buyIn > 0 ? '+' : ''}${option.effects.buyIn} buy-in`);
+    }
+    if (option.effects.progress !== undefined && option.effects.progress !== 0) {
+      const progress = option.effects.progress;
+      // Field ground goes through the next leg (applyEventTravelEffect), so
+      // the hint says so rather than promising a jump down the road.
+      if (traverse && option.effects.progressMode === 'turn_back') {
+        hints.push('turn back; slower next travel leg');
+      } else if (traverse && progress < 0) {
+        hints.push('slower next travel leg');
+      } else if (journeyType === 'planning') {
+        // On a planning file generic progress is the planner's own time
+        // (js/events/resolution.js applyPlanningProgress), never a gate.
+        hints.push(progress > 0 ? 'time back on the file' : 'lost time on the file');
+      } else if (traverse) {
+        hints.push(`up to +${progress} km on the next leg`);
+      } else if (journeyType === 'permitting' || journeyType === 'desk') {
+        // A permit queue moves by clock-days, five points each
+        // (js/events/resolution.js applyDeskProgress).
+        const days = Math.min(4, Math.max(1, Math.round(Math.abs(progress) / 5)));
+        hints.push(`${days} permit clock-day${days === 1 ? '' : 's'} ${progress > 0 ? 'sooner' : 'later'}`);
+      } else if (journeyType === 'silviculture') {
+        // Program schedule, eight points to the day.
+        const days = Math.abs(progress) / 8;
+        const text = days >= 1
+          ? `${Number(days.toFixed(1))} day${days >= 1.05 ? 's' : ''}`
+          : days >= 0.5 ? 'half a day' : 'part of a day';
+        hints.push(`${progress > 0 ? '+' : '-'}${text} on the program schedule`);
+      } else {
+        hints.push(progress > 0 ? `+${progress} progress` : `${progress} progress`);
+      }
+    }
+    if (option.effects.permits_approved !== undefined) {
+      const amount = option.effects.permits_approved;
+      const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
+      hints.push(`${sign}${Math.abs(amount)} permits`);
+    }
+  }
+  return hints;
 }
 
 /**

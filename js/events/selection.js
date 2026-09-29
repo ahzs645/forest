@@ -22,12 +22,17 @@ import {
   REFUSE_OUTCOMES,
   REOFFER_PITCHES
 } from '../data/illegalActs.js';
-import { computeBandOdds } from './odds.js';
+import { computeBandOdds, matchesOddsCondition, TEMPTATION_FLAG_LABELS } from './odds.js';
 import { OPERATING_AREAS } from '../data/operatingAreas.js';
 import { getDiscoveryEventTypeMultipliers } from '../data/discoveryTags.js';
 import { getAreaSituationMultipliers } from '../data/areaSituations.js';
-import { formatRadioReport } from './display.js';
+import { describeEffectChips, formatRadioReport } from './display.js';
 import { getDayRng } from './dayRng.js';
+import { getPendingFallout, takeDueFallout } from './fallout.js';
+import { applyEventEffects } from './resolution.js';
+import { applyConsequenceFlags } from './consequences.js';
+import { DESK_RESOURCES } from '../resources.js';
+import { getChaseableFiles } from '../journey/permitPipeline.js';
 
 /**
  * Chance that an ordinary day carries an event at all.
@@ -544,11 +549,22 @@ function pickRandomCrewMember(crew, rng = Math.random) {
 // carries who asks, what they say, what it is worth in the role's own currency,
 // and who in BC actually catches it. This lane turns one act into the day's
 // card: a free refusal, a ten-minute note to file, and the shortcut as a
-// three-band gamble whose bad band names the institution.
+// three-band gamble whose bad band names the institution. A caught band's
+// determination lands later, on its own card (js/events/fallout.js).
 
 // Minimum days between shortcut offers, so a higher draw rate reads as texture
-// rather than a nag.
+// rather than a nag. A GM's day is a month, and six of them made the GM's
+// shortcut a once-a-year event.
 const TEMPTATION_COOLDOWN_DAYS = 6;
+const MANAGER_TEMPTATION_COOLDOWN_MONTHS = 4;
+
+// Chance of an offer on an eligible day. It climbs with every eligible day
+// that passes without one and is certain after the last miss. A flat chance
+// with a guarantee after five misses put the first offer on day 7 in most
+// runs, like a timer; the ramp keeps the same count per run and spreads when.
+const TEMPTATION_BASE_CHANCE = { field: 0.1, desk: 0.08, manager: 0.15 };
+const TEMPTATION_CHANCE_RAMP = 0.5;
+const TEMPTATION_GUARANTEE_AFTER = { field: 9, desk: 9, manager: 6 };
 
 // Share of draws that go to the comic tier when the role has any, and the
 // weight of a grey act relative to a core one.
@@ -557,17 +573,56 @@ const GREY_TIER_WEIGHT = 0.6;
 const RARE_ACT_WEIGHT = 0.25;
 
 // What a shift of the role's own work is worth in the progress effect that
-// resolution.js applies for that journey type: km for recon, planting points
-// (8 = a block) for silviculture, phase-metric points for planning, pipeline
-// points (10 = one permit moved) for permitting, and operational progress for
-// the GM.
-const SHIFT_OF_WORK = { recon: 4, field: 4, silviculture: 3, planning: 12, desk: 10, permitting: 10, manager: 4 };
+// resolution.js applies for that journey type: km for recon, program-schedule
+// points (8 = a day) for silviculture, gate points for planning, pipeline
+// points (5 = a permit clock-day) for permitting, and operational progress
+// for the GM.
+const SHIFT_OF_WORK = { recon: 4, field: 4, silviculture: 8, planning: 12, desk: 10, permitting: 10, manager: 4 };
 
-// Dollar payoffs are authored at the scale of the role that would naturally be
-// asked. A recce crew's cash is a wallet; a GM's ledger is not.
+// A crew wallet is not where a licensee's saving lands. Money up to this much
+// is cash in the truck; anything bigger buys the crew the day it would cost.
 const RECCE_CASH_CAP = 1200;
-const MANAGER_BUDGET_MULTIPLIER = 3;
-const MANAGER_BUDGET_CAP = 60000;
+// Penalties are authored at desk scale; a GM pays them at corporate scale.
+const MANAGER_PENALTY_MULTIPLIER = 3;
+const MANAGER_PENALTY_CAP = 60000;
+// What a cubic metre the licence should not have cut is worth to a GM's books.
+const MANAGER_VOLUME_MARGIN = 5;
+
+// A planner's time goes to the gate the pitch names, or else to the gate the
+// plan is working on.
+const PLANNING_GATE_BY_PHASE = { data_gathering: 'data', analysis: 'analysis', stakeholder_review: 'buyIn' };
+const PLANNING_GATE_BY_LINE = [
+  [/\banalys|\bmodel|timber supply|\bAAC\b/i, 'analysis'],
+  [/referral|consult|engagement|comment|sign-off from the Nation/i, 'buyIn'],
+  [/\bdata\b|inventory|cruise|survey|layer|\bplots?\b/i, 'data'],
+];
+
+// A careful record buys cover, but some things are never safe: the least
+// chance of being caught, by how serious the act is (js/events/odds.js).
+const SERIOUS_CATEGORIES = new Set(['spill', 'riparian', 'archaeology', 'wildlife', 'fire', 'poaching', 'safety', 'herbicide', 'timber-mark']);
+const SERIOUS_INSTITUTIONS = new Set(['RCMP', 'DFO', 'ENV', 'Archaeology Branch', 'WorkSafeBC']);
+const BAD_BAND_FLOOR = { serious: 0.15, core: 0.1, grey: 0.05, comic: 0.05 };
+
+// How the card names who catches it.
+const INSTITUTION_NAMES = {
+  'C&E': 'C&E',
+  FPB: 'the Forest Practices Board',
+  FPBC: 'Forest Professionals BC',
+  WorkSafeBC: 'WorkSafeBC',
+  BCWS: 'BC Wildfire Service',
+  COS: 'the Conservation Officer Service',
+  ENV: 'ENV',
+  DFO: 'DFO',
+  'Archaeology Branch': 'the Archaeology Branch',
+  'Timber Pricing': 'Timber Pricing Branch',
+  'Revenue Branch': 'Revenue Branch',
+  'the Nation': 'the Nation',
+  RCMP: 'the RCMP',
+  CVSE: 'CVSE',
+  'Transport Canada': 'Transport Canada',
+  'internal audit': 'internal audit',
+  'the contractor': 'the contractor',
+};
 
 // Consequence flags a noticed or caught band leaves behind. Registered as
 // odds-only flags in js/events/odds.js; applyConsequenceFlags records any flag
@@ -584,15 +639,15 @@ const WATCH_FLAG_BY_INSTITUTION = {
 };
 
 const WATCH_FLAG_SENTENCES = {
-  ce_watching: 'the district is now reading everything with your name on it',
   fn_watching: "the Nation's referrals office has a note with your name in it",
   worksafe_watching: "WorkSafeBC's prevention officer has the site on a list",
   contractor_owns_you: 'the person who did it for you now owns a piece of you',
 };
 
 // Institutions whose caught band is a criminal or professional-conduct matter
-// rather than an administrative one. These leave their own flag so later
-// machinery (registration status, the RCMP file) can read it.
+// rather than an administrative one. Their flag outlasts the season: an FPBC
+// file keeps the registration under review (js/engine/professional.js), and
+// both stand on the mission panel while they are open.
 const CAUGHT_FLAG_BY_INSTITUTION = {
   FPBC: 'fpbc_file_open',
   RCMP: 'rcmp_file',
@@ -602,6 +657,16 @@ const CAUGHT_FLAG_BY_INSTITUTION = {
 const TAKE_LABEL = 'Take the shortcut';
 const LET_IT_STAND_LABEL = 'Let it stand';
 const SET_ASIDE_ODDS = { drop: 0.55, reoffer: 0.30, goaround: 0.15 };
+const SHORTCUT_TAG = 'OFF-BOOK';
+
+// What the set-aside option says on each kind of card, so silence is a choice
+// the player can read before making it.
+const SET_ASIDE_DESCRIPTIONS = {
+  offer: 'Do not answer. They may drop it, ask again, or do it without you.',
+  reoffer: 'Do not answer. This time they may do it without you.',
+  goaround: 'Say nothing. It stands, and your silence counts as a shortcut taken.',
+  fallout: 'Leave it unanswered. It lands anyway, and silence reads as contempt.',
+};
 
 function ensureTemptationMemory(journey) {
   const memory = journey.temptationMemory || (journey.temptationMemory = {});
@@ -612,6 +677,7 @@ function ensureTemptationMemory(journey) {
   if (!Number.isFinite(memory.missedEligibleDays)) memory.missedEligibleDays = 0;
   if (!Number.isFinite(memory.refuseIndex)) memory.refuseIndex = 0;
   if (!Array.isArray(memory.settledFlags)) memory.settledFlags = [];
+  getPendingFallout(journey);
   return memory;
 }
 
@@ -625,6 +691,33 @@ function isDeskTemptationJourney(journey) {
 
 function getActById(actId) {
   return ILLEGAL_ACTS.find((act) => act?.id === actId) || null;
+}
+
+function institutionName(act) {
+  return institutionDisplayName(act?.catch?.by);
+}
+
+/**
+ * How the game names a catching institution in a sentence ("the RCMP",
+ * "Forest Professionals BC").
+ * @param {string} by - an act's catch.by
+ * @returns {string}
+ */
+export function institutionDisplayName(by) {
+  return INSTITUTION_NAMES[by] || 'the district';
+}
+
+function sentenceStart(text) {
+  const value = String(text || '');
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** "3 days", "1 shift", "2 months": the run's own unit of time. */
+function describeSpan(journey, count) {
+  const unit = journey?.journeyType === 'manager'
+    ? 'month'
+    : ['recon', 'field'].includes(journey?.journeyType) ? 'shift' : 'day';
+  return `${count} ${unit}${count === 1 ? '' : 's'}`;
 }
 
 /**
@@ -646,14 +739,16 @@ export function reconcileTakenShortcuts(journey) {
 
 /**
  * Consequences that need more than an odds shift, settled the day after they
- * land: an FPBC complaint puts the registration under review.
+ * land: an FPBC complaint puts the registration under review, and it stays
+ * there while the file is open (js/engine/professional.js will not let a
+ * renewal restore it).
  */
 function settleTemptationFallout(journey) {
   const memory = ensureTemptationMemory(journey);
   const flags = Array.isArray(journey.consequenceFlags) ? journey.consequenceFlags : [];
   if (flags.includes('fpbc_file_open') && !memory.settledFlags.includes('fpbc_file_open')) {
     memory.settledFlags.push('fpbc_file_open');
-    if (journey.professional && journey.professional.registrationStatus === 'active') {
+    if (journey.professional && journey.professional.registrationStatus !== 'suspended') {
       journey.professional.registrationStatus = 'under-review';
     }
   }
@@ -731,83 +826,115 @@ function pickWeightedAct(candidates, rng = Math.random) {
   return pool[pool.length - 1].act;
 }
 
+/** Room left under the desk budget's ceiling (js/resources.js). */
+function deskBudgetHeadroom(journey) {
+  const budget = Number(journey?.resources?.budget);
+  if (!Number.isFinite(budget)) return Infinity;
+  return Math.max(0, DESK_RESOURCES.budget.max - budget);
+}
+
 /**
- * The payoff, in the role's own currency. `line` is what the option shows.
- * @returns {{effects: Object, line: string}}
+ * Permit clock-days a payoff could bring forward today: every live clock can
+ * come forward to tonight and no further (js/journey/permitPipeline.js).
+ */
+function permitClockCapacity(journey) {
+  if (!journey?.permits) return Infinity;
+  const day = Number(journey.day) || 1;
+  return getChaseableFiles(journey, PERMIT_CLOCK_LANES)
+    .reduce((sum, file) => sum + Math.max(0, file.clockCloses - day), 0);
+}
+const PERMIT_CLOCK_LANES = ['screening', 'referral', 'decision'];
+
+/**
+ * The payoff, in the role's own currency, sized so that what the card promises
+ * is what lands. `line` is the act's own words; `effects` is the one source
+ * for the chip, the stakes line and the outcome. `deliverable` is false when
+ * nothing today can take the payoff (no permit clock running, no room left
+ * under the budget ceiling), and such an act is not offered today.
+ *
+ * Money is paid as authored: a GM is offered "$25,000 of pulp" and gets
+ * $25,000, not three times it. A recce crew is paid cash only when the sum
+ * fits a truck wallet; a planner is paid in the gate the plan is on; a
+ * permitter in clock-days, never more than the queue can take.
+ * @returns {{effects: Object, line: string, deliverable: boolean}}
  */
 export function buildTemptationPayoff(act, journey) {
   const payoff = act?.payoff || { kind: 'progress', amount: 1, line: 'a shift of work' };
   const journeyType = journey?.journeyType || 'field';
   const shift = SHIFT_OF_WORK[journeyType] || 4;
   const amount = Number(payoff.amount) || 1;
+  const kind = payoff.kind || 'progress';
   const effects = {};
 
   const progressForShifts = (shifts) => Math.max(1, Math.round(shift * Math.max(0.25, Math.min(2, shifts))));
+  // Days of waiting skipped: two are about a shift of the role's own work
+  // back, capped at two shifts, because the game's day is one action and a
+  // shortcut is not a season. Volume outside the GM's books is a shift.
+  const shifts = kind === 'time' ? amount / 2 : kind === 'volume' ? 1 : amount;
+  const isMoney = kind === 'budget' || (kind === 'volume' && journeyType === 'manager');
 
-  switch (payoff.kind) {
-    case 'budget': {
-      if (journeyType === 'manager') {
-        effects.budget = Math.min(MANAGER_BUDGET_CAP, Math.round(amount * MANAGER_BUDGET_MULTIPLIER));
-      } else if (journeyType === 'recon' || journeyType === 'field') {
-        effects.budget = Math.min(RECCE_CASH_CAP, Math.round(amount));
-      } else {
-        effects.budget = Math.round(amount);
-      }
-      break;
+  if (isMoney) {
+    const dollars = Math.round(kind === 'volume' ? amount * MANAGER_VOLUME_MARGIN : amount);
+    if (journeyType === 'recon' || journeyType === 'field') {
+      if (dollars <= RECCE_CASH_CAP) effects.budget = dollars;
+      else effects.progress = progressForShifts(1);
+    } else if (isDeskJourney(journeyType)) {
+      effects.budget = Math.min(dollars, deskBudgetHeadroom(journey));
+    } else {
+      effects.budget = dollars;
     }
-    case 'time':
-      // Days of waiting skipped. Two days of waiting is about a shift of the
-      // role's own work back; a month is capped at two shifts, because the
-      // game's day is one action and a shortcut is not a season.
-      effects.progress = progressForShifts(amount / 2);
-      break;
-    case 'files':
-      effects.progress = journeyType === 'permitting' || journeyType === 'desk'
-        ? Math.round(shift * amount)
-        : progressForShifts(amount);
-      break;
-    case 'volume':
-      if (journeyType === 'manager') {
-        effects.budget = Math.min(MANAGER_BUDGET_CAP, Math.round(amount * 5));
-      } else {
-        effects.progress = progressForShifts(1);
-      }
-      break;
-    case 'progress':
-    default:
-      effects.progress = progressForShifts(amount);
-      break;
+  } else if (journeyType === 'planning') {
+    // The gate the pitch names ("the analysis clears"), else the one the plan
+    // is on; past the gates it is the planner's own time back.
+    const named = PLANNING_GATE_BY_LINE.find(([pattern]) => pattern.test(String(payoff.line || '')));
+    const gate = named?.[1] || PLANNING_GATE_BY_PHASE[journey?.plan?.phase];
+    effects[gate || 'progress'] = progressForShifts(shifts);
+  } else if (journeyType === 'permitting' || journeyType === 'desk') {
+    const wanted = kind === 'files' ? Math.round(shift * amount) : progressForShifts(shifts);
+    const clockDays = Math.min(4, Math.max(1, Math.round(wanted / 5)), permitClockCapacity(journey));
+    if (clockDays > 0) effects.progress = clockDays * 5;
+  } else {
+    effects.progress = progressForShifts(shifts);
   }
 
-  return { effects, line: String(payoff.line || 'a shift of work') };
+  return {
+    effects,
+    line: String(payoff.line || 'a shift of work'),
+    deliverable: Object.values(effects).some((value) => Number(value) > 0),
+  };
 }
 
 /**
- * What the institution does when it catches you, as effects on the run.
- * Field crews pay in cash, morale and a stop-work; desk roles in budget and
- * standing; the GM at corporate scale.
+ * What the institution decides when it catches you, as effects on the run.
+ * Every catcher has a cost mix that reads as what it does: fines and orders
+ * cost money, stop-work and paused files cost the role's own work, standing
+ * and scrutiny carry the rest. Field crews pay at wallet scale, desk roles in
+ * budget and standing, the GM at corporate scale.
  */
 export function buildCaughtEffects(act, journey) {
   const journeyType = journey?.journeyType || 'field';
   const isDesk = isDeskTemptationJourney(journey);
   const isManager = journeyType === 'manager';
   const money = (field, desk) => {
-    if (isManager) return -Math.min(MANAGER_BUDGET_CAP, desk * MANAGER_BUDGET_MULTIPLIER);
+    if (isManager) return -Math.min(MANAGER_PENALTY_CAP, desk * MANAGER_PENALTY_MULTIPLIER);
     if (isDesk) return -desk;
     if (journeyType === 'silviculture') return -Math.round(desk * 0.6);
     return -Math.min(RECCE_CASH_CAP, field);
   };
   const standing = isDesk ? 'politicalCapital' : 'crew_morale';
+  const shifts = (count) => -Math.round((SHIFT_OF_WORK[journeyType] || 4) * count);
 
   switch (act?.catch?.by) {
     case 'C&E':
       return { compliance: -10, scrutiny: 15, budget: money(800, 3000) };
     case 'FPB':
-      return { compliance: -8, scrutiny: 12, reputation: -4 };
+      // The Board cannot fine; answering its investigation still costs.
+      return { compliance: -8, scrutiny: 12, reputation: -4, budget: money(500, 2500) };
     case 'FPBC':
-      return { compliance: -6, scrutiny: 14, reputation: -8 };
+      // Counsel for the practice review, and the cost award behind it.
+      return { compliance: -6, scrutiny: 14, reputation: -8, budget: money(400, 2000) };
     case 'WorkSafeBC':
-      return { progress: -Math.round((SHIFT_OF_WORK[journeyType] || 4) * 2), crew_morale: -8, compliance: -6, scrutiny: 10 };
+      return { progress: shifts(2), crew_morale: -8, compliance: -6, scrutiny: 10, budget: money(800, 4000) };
     case 'BCWS':
       return { compliance: -8, scrutiny: 12, budget: money(1200, 6000) };
     case 'COS':
@@ -823,17 +950,19 @@ export function buildCaughtEffects(act, journey) {
     case 'Revenue Branch':
       return { compliance: -8, scrutiny: 14, budget: money(1000, 8000) };
     case 'the Nation':
-      return { relationships: -8, compliance: -3, scrutiny: 8, [standing]: -6 };
+      // Every file with your name on it waits for a meeting.
+      return { relationships: -8, compliance: -3, scrutiny: 8, [standing]: -6, progress: shifts(1), budget: money(500, 2500) };
     case 'RCMP':
-      return { compliance: -16, scrutiny: 25, reputation: -12, [standing]: -12 };
+      return { compliance: -16, scrutiny: 25, reputation: -12, [standing]: -12, budget: money(1200, 6000) };
     case 'CVSE':
-      return { compliance: -4, scrutiny: 6, budget: money(600, 2500), progress: -Math.round((SHIFT_OF_WORK[journeyType] || 4) * 0.5) };
+      return { compliance: -4, scrutiny: 6, budget: money(600, 2500), progress: shifts(0.5) };
     case 'Transport Canada':
       return { compliance: -6, scrutiny: 8, budget: money(800, 3000) };
     case 'internal audit':
       return { budget: money(600, 3000), [standing]: -8, reputation: -6, scrutiny: 6 };
     case 'the contractor':
-      return { crew_morale: -6, reputation: -6, relationships: -5, scrutiny: 6 };
+      // The contractor bills for their silence, or for the redo.
+      return { crew_morale: -6, reputation: -6, relationships: -5, scrutiny: 6, budget: money(600, 3000) };
     default:
       return { compliance: -10, scrutiny: 15 };
   }
@@ -843,11 +972,47 @@ function watchFlagFor(act) {
   return WATCH_FLAG_BY_INSTITUTION[act?.catch?.by] || 'ce_watching';
 }
 
+/** Who is now watching, named for the institution that noticed. */
+function watchSentenceFor(act) {
+  const flag = watchFlagFor(act);
+  return WATCH_FLAG_SENTENCES[flag]
+    || `${institutionName(act)} is now reading everything with your name on it`;
+}
+
 function caughtFlagsFor(act) {
   const flags = [watchFlagFor(act)];
   const extra = CAUGHT_FLAG_BY_INSTITUTION[act?.catch?.by];
   if (extra) flags.push(extra);
   return flags;
+}
+
+/**
+ * The least chance of being caught this act ever carries. Serious harm and
+ * criminal or federal catchers get the highest floor; grey and comic acts
+ * the lowest.
+ * @param {Object} act
+ * @returns {number}
+ */
+export function badBandFloorFor(act) {
+  if (act?.tier === 'comic') return BAD_BAND_FLOOR.comic;
+  if (SERIOUS_CATEGORIES.has(act?.category) || SERIOUS_INSTITUTIONS.has(act?.catch?.by)) return BAD_BAND_FLOOR.serious;
+  if (act?.tier === 'grey') return BAD_BAND_FLOOR.grey;
+  return BAD_BAND_FLOOR.core;
+}
+
+/**
+ * How long the institution takes to decide, in the run's own days (months for
+ * a GM). `catch.lagDays` is real time; a deployment compresses it about seven
+ * to one so a six-week determination still lands inside the season. Zero
+ * means it lands the same day.
+ * @param {Object} act
+ * @param {Object} journey
+ * @returns {number}
+ */
+export function catchDelayFor(act, journey) {
+  const lag = Math.max(0, Number(act?.catch?.lagDays) || 0);
+  if (journey?.journeyType === 'manager') return Math.min(6, Math.round(lag / 30));
+  return Math.min(8, Math.round(lag / 7));
 }
 
 // Desk-side proposers voiced at a tailgate: the person who would actually be
@@ -929,14 +1094,54 @@ function buildRefuseOption(act, journey) {
 function buildReportOption(act, journey) {
   const isDesk = isDeskTemptationJourney(journey);
   const proposer = describeProposer(act, journey);
+  // A GM has no manager to email; the board's audit chair is who hears it.
+  const deskNote = journey?.journeyType === 'manager'
+    ? 'A note to file and a two-line email to the chair of the audit committee. Ten minutes, and the only version of this month anyone can audit.'
+    : 'A note to file and a two-line email to your manager. Ten minutes, and the only version of today anyone can audit.';
   return {
     label: isDesk ? 'Document and report' : 'Note it to file, call your super',
     outcome: isDesk
-      ? 'A note to file and a two-line email to your manager. Ten minutes, and the only version of today anyone can audit.'
+      ? deskNote
       : `Ten minutes: a line in the daybook and a call to your super. ${isSelfProposed(act) ? 'Writing it down is what makes it not happen.' : `${proposer} hears about it before lunch and does not ask again.`}`,
     effects: isDesk ? { compliance: 2, politicalCapital: 1, timeUsed: 0.5 } : { compliance: 2, timeUsed: 0.5 },
     reactionTone: 'responsible',
   };
+}
+
+// The odds-shift predicates the shortcut uses, as the reason the card gives
+// when they are in play today.
+function describeOddsShift(when, journey) {
+  const [key, arg] = String(when).split(':');
+  switch (key) {
+    case 'scrutinyAbove': return 'your file is already under scrutiny';
+    case 'scrutinyBelow': return 'your record is clean';
+    case 'relationshipsAbove': return 'people you deal with rate you';
+    case 'priorShortcuts': {
+      const taken = journey?.temptationMemory?.takenActIds?.length || Number(arg) || 0;
+      return `you have taken ${taken} shortcut${taken === 1 ? '' : 's'} already`;
+    }
+    case 'difficulty': return arg === 'hard' ? 'Old Growth: nobody gives the benefit of the doubt' : 'Greenhorn: people give the benefit of the doubt';
+    case 'hasFlag': return TEMPTATION_FLAG_LABELS[arg] || null;
+    default: return null;
+  }
+}
+
+/**
+ * Which of today's odds shifts are in play, as reasons, so a jump from 60% to
+ * 25% clean between two offers is never unexplained.
+ * @returns {{worse: string[], better: string[]}}
+ */
+function describeOddsShifts(option, journey) {
+  const worse = [];
+  const better = [];
+  for (const modifier of option.oddsModifiers || []) {
+    if (!matchesOddsCondition(modifier.when, journey)) continue;
+    const reason = describeOddsShift(modifier.when, journey);
+    if (!reason) continue;
+    const list = modifier.to === 'good' ? better : worse;
+    if (!list.includes(reason)) list.push(reason);
+  }
+  return { worse, better };
 }
 
 /**
@@ -944,10 +1149,13 @@ function buildReportOption(act, journey) {
  *
  *   clean   - the payoff, and it stays buried (scrutiny creeps anyway)
  *   noticed - the payoff, and a flag that shifts later odds
- *   caught  - no payoff; the institution named in the act does what it does
+ *   caught  - no payoff; the institution named in the act finds it, and its
+ *             determination lands `catch.lagDays` later (scaled to the run)
+ *             as its own card (js/events/fallout.js)
  *
  * Odds move on things the player controls: a clean record and standing buy
  * cover; a run already cutting corners, or already being watched, does not.
+ * The bad band never falls below the act's floor (badBandFloorFor).
  */
 export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPenalty = 0 } = {}) {
   const memory = ensureTemptationMemory(journey);
@@ -956,8 +1164,8 @@ export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPena
   const category = act?.category || 'corporate';
   const clean = act?.cleanOutcome || CATEGORY_CLEAN_OUTCOMES[category] || CATEGORY_CLEAN_OUTCOMES.corporate;
   const watchFlag = watchFlagFor(act);
-  const watchSentence = WATCH_FLAG_SENTENCES[watchFlag] || WATCH_FLAG_SENTENCES.ce_watching;
   const variant = memory.takenActIds.length % 2;
+  const catcher = institutionName(act);
 
   const tierOdds = act?.tier === 'grey'
     ? { chanceSuccess: 0.6, chancePartial: 0.25 }
@@ -968,16 +1176,14 @@ export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPena
 
   const option = {
     label,
-    outcome: `${clean} You get ${payoff.line}, and nobody asks.`,
+    outcome: `${clean} What you get: ${payoff.line}. Nobody asks.`,
     effects: { ...payoff.effects, scrutiny: 3 },
-    partialOutcome: `${clean} You get ${payoff.line}. Somebody also wrote down what they saw — ${watchSentence}.`,
+    partialOutcome: `${clean} What you get: ${payoff.line}. Somebody also wrote down what they saw: ${watchSentenceFor(act)}.`,
     partialEffects: { ...payoff.effects, scrutiny: 8, compliance: -2 },
     partialFlags: [watchFlag],
-    failureOutcome: `It does not hold. ${buildCaughtNarrative(act, variant)}`,
-    failureEffects: buildCaughtEffects(act, journey),
-    failureFlags: caughtFlagsFor(act),
     chanceSuccess,
     chancePartial: tierOdds.chancePartial,
+    badFloor: badBandFloorFor(act),
     oddsModifiers: [
       // A dirty file gets less benefit of the doubt.
       { when: 'scrutinyAbove:55', move: 0.15, from: 'good', to: 'bad' },
@@ -998,13 +1204,77 @@ export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPena
       { when: 'hasFlag:contractor_owns_you', move: 0.05, from: 'good', to: 'partial' },
     ],
     payoffLine: payoff.line,
+    caughtBy: catcher,
+    riskTag: SHORTCUT_TAG,
     reactionTone: 'compromised',
   };
+
+  // The caught band. When the institution takes time to decide, today is
+  // only the finding: no payoff, a first look at the file, and the watch
+  // flag. The determination waits in the fallout queue and lands as its own
+  // card. A same-week catch settles here, as it always did.
+  const determination = buildCaughtEffects(act, journey);
+  const delay = catchDelayFor(act, journey);
+  if (delay >= 1) {
+    const how = String(act?.catch?.how || '').trim();
+    option.failureOutcome = `It does not hold. ${how} ${sentenceStart(catcher)} has it now, and the determination lands in about ${describeSpan(journey, delay)}.`;
+    option.failureEffects = { scrutiny: 5 };
+    option.failureFlags = [watchFlag];
+    option.failureFallout = {
+      actId: act.id,
+      title: act.title,
+      institution: act?.catch?.by || null,
+      dueIn: delay,
+      effects: determination,
+      flags: caughtFlagsFor(act),
+      variant,
+    };
+  } else {
+    option.failureOutcome = `It does not hold. ${buildCaughtNarrative(act, variant)}`;
+    option.failureEffects = determination;
+    option.failureFlags = caughtFlagsFor(act);
+  }
+
   if (!isDesk && category === 'safety') option.riskInjury = 0.15;
   // The odds the player actually faces today, not the authored base — shown on
-  // the option the way risk chips are (js/events/display.js).
+  // the option the way risk chips are (js/events/display.js), with the
+  // reasons they moved.
   option.liveOdds = computeBandOdds(option, journey);
+  option.oddsShifts = describeOddsShifts(option, journey);
   return option;
+}
+
+/**
+ * The stakes, in plain words, under the pitch: what you get, what each band
+ * costs, who catches it and when that lands, and why today's odds are what
+ * they are. Every number comes from the option's own effects, so the stakes,
+ * the chip and the outcome agree.
+ * @param {Object} option - from buildShortcutOption
+ * @param {Object} journey
+ * @returns {string[]}
+ */
+export function describeShortcutStakes(option, journey) {
+  const journeyType = journey?.journeyType || 'field';
+  const { scrutiny: _scrutiny, ...payoffEffects } = option.effects || {};
+  const gain = describeEffectChips(payoffEffects, journeyType).join(', ') || 'nothing you can bank today';
+  const pct = (value) => Math.round((Number(value) || 0) * 100);
+  const odds = option.liveOdds || { good: 1, partial: 0, bad: 0 };
+  const good = pct(odds.good);
+  const bad = pct(odds.bad);
+  const partial = Math.max(0, 100 - good - bad);
+  const noticed = describeEffectChips({ compliance: option.partialEffects?.compliance, scrutiny: option.partialEffects?.scrutiny }, journeyType);
+  const determination = option.failureFallout?.effects || option.failureEffects || {};
+  const caught = describeEffectChips(determination, journeyType).join(', ');
+  const when = option.failureFallout ? `, landing about ${describeSpan(journey, option.failureFallout.dueIn)} later` : '';
+
+  const lines = [
+    `Take it and you get ${gain}. Saying no costs nothing.`,
+    `Odds today: ${good}% it stays buried · ${partial}% somebody notices (${[...noticed, 'and a watch on your file'].join(', ')}) · ${bad}% ${option.caughtBy || 'somebody'} catches it (no payoff; ${caught}${when}).`,
+  ];
+  const shifts = option.oddsShifts || { worse: [], better: [] };
+  if (shifts.worse.length) lines.push(`Worse odds today because ${shifts.worse.join('; ')}.`);
+  if (shifts.better.length) lines.push(`Better odds today because ${shifts.better.join('; ')}.`);
+  return lines;
 }
 
 function buildGoAroundEvent(act, journey) {
@@ -1025,6 +1295,8 @@ function buildGoAroundEvent(act, journey) {
     severity: 'minor',
     probability: 0,
     cardLabel: isDesk ? 'IN THE INBOX' : 'AT THE TAILGATE',
+    cardMarker: 'SHORTCUT',
+    setAsideDescription: SET_ASIDE_DESCRIPTIONS.goaround,
     description: `You set it aside and somebody went around you. ${found} ${proposer} is not answering the radio. The question now is whether you report a thing you did not do.`,
     options: [
       {
@@ -1038,10 +1310,9 @@ function buildGoAroundEvent(act, journey) {
       {
         label: 'Fix it quietly',
         outcome: 'You put it back the way it was and nobody writes anything down. It is fixed. It is also not on file, and the person who did it knows that you know.',
-        effects: isDesk
-          ? { progress: -Math.round((SHIFT_OF_WORK[journey.journeyType] || 4) * 0.5), scrutiny: 4, compliance: -2 }
-          : { progress: -Math.round((SHIFT_OF_WORK[journey.journeyType] || 4) * 0.5), scrutiny: 4, compliance: -2 },
+        effects: { progress: -Math.round((SHIFT_OF_WORK[journey.journeyType] || 4) * 0.5), scrutiny: 4, compliance: -2 },
         flags: ['contractor_owns_you'],
+        riskTag: SHORTCUT_TAG,
         reactionTone: 'compromised',
       },
       letItStand,
@@ -1063,6 +1334,7 @@ export function buildTemptationEvent(act, journey, { stage = 'offer' } = {}) {
     : null;
   const { label, description } = describeTemptation(act, journey, { stage, reofferPitch });
   const prefix = stage === 'reoffer' ? 'temptation_reoffer_' : 'temptation_';
+  const shortcut = buildShortcutOption(act, journey);
 
   return {
     id: `${prefix}${String(act.id || Math.random().toString(36).slice(2))}`,
@@ -1075,12 +1347,60 @@ export function buildTemptationEvent(act, journey, { stage = 'offer' } = {}) {
     severity: 'minor',
     probability: 0,
     cardLabel: label,
+    // What the card is, before who is asking: an offer to break a rule
+    // (js/journey/dayCard.js frames it).
+    cardMarker: 'SHORTCUT',
     description,
+    stakes: describeShortcutStakes(shortcut, journey),
+    setAsideDescription: stage === 'reoffer' ? SET_ASIDE_DESCRIPTIONS.reoffer : SET_ASIDE_DESCRIPTIONS.offer,
     options: [
       buildRefuseOption(act, journey),
-      buildShortcutOption(act, journey),
+      shortcut,
       buildReportOption(act, journey),
     ],
+  };
+}
+
+/**
+ * The determination behind a caught shortcut, as the day's card. It names the
+ * day and the act it comes from, so the cost is visibly the choice's.
+ * @param {Object} entry - from js/events/fallout.js
+ * @param {Object} journey
+ * @returns {Object} event
+ */
+export function buildFalloutEvent(entry, journey) {
+  const act = getActById(entry.actId)
+    || { id: entry.actId, title: entry.title || 'a shortcut', catch: { by: entry.institution } };
+  const isDesk = isDeskTemptationJourney(journey);
+  // A determination carried across a campaign season names the season.
+  const when = entry.takenWhen
+    ? `Back in ${entry.takenWhen},`
+    : `Back on ${describeSpan(journey, 1).replace(/^1 /, '')} ${entry.takenDay}`;
+  const lead = `${when} you took the shortcut on “${act.title}”, and it was found.`;
+  const narrative = buildCaughtNarrative({ ...act, catch: { ...(act.catch || {}), how: lead } }, entry.variant);
+  const effects = { ...(entry.effects || {}) };
+  const costs = describeEffectChips(effects, journey?.journeyType).join(', ');
+
+  return {
+    id: `temptation_fallout_${String(act.id)}`,
+    temptationActId: act.id,
+    temptationStage: 'fallout',
+    title: `Fallout: ${act.title}`,
+    type: 'temptation',
+    severity: 'minor',
+    probability: 0,
+    cardLabel: isDesk ? 'IN THE INBOX' : 'ON THE RADIO',
+    cardMarker: 'FALLOUT',
+    description: narrative,
+    stakes: costs ? [`What it costs: ${costs}.`] : [],
+    setAsideDescription: SET_ASIDE_DESCRIPTIONS.fallout,
+    options: [{
+      label: 'Answer for it',
+      outcome: 'You answer it in writing, on time, and do not argue the facts. It costs what it costs, and the file says you took responsibility.',
+      effects,
+      flags: [...(entry.flags || [])],
+      reactionTone: 'silent',
+    }],
   };
 }
 
@@ -1088,7 +1408,8 @@ export function buildTemptationEvent(act, journey, { stage = 'offer' } = {}) {
  * Declining to answer a proposal is not the same as answering it. Roll what
  * the proposer does with your silence, queue any follow-up, and hand back the
  * line to print. Costs nothing on the meters: not answering a contractor's
- * illegal proposal does not make the district look harder at you.
+ * illegal proposal does not make the district look harder at you. A
+ * determination left unanswered is the exception: it lands anyway.
  * @returns {{kind: string, message: string}}
  */
 export function resolveTemptationSetAside(journey, event, rng = Math.random) {
@@ -1096,6 +1417,29 @@ export function resolveTemptationSetAside(journey, event, rng = Math.random) {
   const act = getActById(event?.temptationActId);
   const proposer = describeProposer(act, journey);
   const day = Number(journey?.day || 1);
+
+  if (event?.temptationStage === 'fallout') {
+    const answer = event.options?.[0] || {};
+    const effects = { ...(answer.effects || {}), scrutiny: (Number(answer.effects?.scrutiny) || 0) + 4 };
+    const messages = [];
+    applyEventEffects(journey, effects, messages);
+    applyConsequenceFlags(journey, answer.flags || [], messages);
+    const outcome = 'You leave it unanswered. It is decided without you, and that reads worse.';
+    if (!journey.log) journey.log = [];
+    journey.log.push({
+      day,
+      type: 'event',
+      eventId: event.id,
+      eventTitle: event.title,
+      optionLabel: 'Set it aside',
+      setAside: true,
+      outcome,
+      consequences: messages,
+      effects,
+      severity: event.severity,
+    });
+    return { kind: 'unanswered', message: [outcome, ...messages].join(' ') };
+  }
 
   if (event?.temptationStage === 'goaround') {
     if (act?.id && !memory.takenActIds.includes(act.id)) memory.takenActIds.push(act.id);
@@ -1135,6 +1479,25 @@ function takePendingTemptation(journey) {
     : buildTemptationEvent(act, journey, { stage: 'reoffer' });
 }
 
+function temptationLane(journey) {
+  if (journey?.journeyType === 'manager') return 'manager';
+  return isDeskJourney(journey?.journeyType) ? 'desk' : 'field';
+}
+
+/**
+ * Today's chance of a fresh offer, given how many eligible days have passed
+ * without one.
+ * @param {Object} journey
+ * @returns {number} 1 once the guarantee is reached
+ */
+export function getTemptationChance(journey) {
+  const lane = temptationLane(journey);
+  const misses = Number(journey?.temptationMemory?.missedEligibleDays || 0);
+  if (misses >= TEMPTATION_GUARANTEE_AFTER[lane]) return 1;
+  const chance = TEMPTATION_BASE_CHANCE[lane] * getDifficultyEventModifier(journey) * (1 + TEMPTATION_CHANCE_RAMP * misses);
+  return Math.min(0.9, chance);
+}
+
 function maybeCreateTemptationEvent(journey, rng = Math.random) {
   if (!Array.isArray(ILLEGAL_ACTS) || ILLEGAL_ACTS.length === 0) {
     return null;
@@ -1144,6 +1507,10 @@ function maybeCreateTemptationEvent(journey, rng = Math.random) {
   reconcileTakenShortcuts(journey);
   settleTemptationFallout(journey);
 
+  // A determination that has come due is the day, ahead of anything else.
+  const due = takeDueFallout(journey);
+  if (due) return buildFalloutEvent(due, journey);
+
   // A proposal you set aside comes back before any new one is drawn.
   const pending = takePendingTemptation(journey);
   if (pending) return pending;
@@ -1152,22 +1519,23 @@ function maybeCreateTemptationEvent(journey, rng = Math.random) {
   // memory has no previous draw, so it must not accidentally impose a four-day
   // opening lockout.
   const day = Number(journey.day || 1);
-  if (day <= 1 || (memory.lastDay > 0 && day - memory.lastDay < TEMPTATION_COOLDOWN_DAYS)) return null;
+  const cooldown = journey.journeyType === 'manager' ? MANAGER_TEMPTATION_COOLDOWN_MONTHS : TEMPTATION_COOLDOWN_DAYS;
+  if (day <= 1 || (memory.lastDay > 0 && day - memory.lastDay < cooldown)) return null;
 
-  const isDesk = isDeskTemptationJourney(journey);
-  const baseChance = isDesk ? 0.08 : 0.1;
-  const chance = Math.min(0.22, baseChance * getDifficultyEventModifier(journey));
-  const guaranteeAfterMisses = 5;
-  if (rng() > chance && Number(memory.missedEligibleDays || 0) < guaranteeAfterMisses) {
+  const chance = getTemptationChance(journey);
+  if (chance < 1 && rng() >= chance) {
     memory.missedEligibleDays = Number(memory.missedEligibleDays || 0) + 1;
     return null;
   }
 
   // Role and phase are hard gates: a GM only ever hears the acts tagged for a
   // GM, and a recce lead is never offered a post-harvest crime. There is no
-  // fallback to the whole library.
+  // fallback to the whole library. An act whose payoff has nothing to land
+  // on today (no permit clock running, a budget at its ceiling) waits.
   const candidates = ILLEGAL_ACTS.filter(
-    (act) => actMatchesTemptationContext(act, journey) && !memory.seenActIds.includes(act.id)
+    (act) => actMatchesTemptationContext(act, journey)
+      && !memory.seenActIds.includes(act.id)
+      && buildTemptationPayoff(act, journey).deliverable
   );
   if (!candidates.length) return null;
 

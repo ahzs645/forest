@@ -20,6 +20,7 @@ import { buildEventReaction } from './reactions.js';
 import { resolveOutcomeBand } from './odds.js';
 import { applyConsequenceFlags, getCrewPrecedentMultiplier } from './consequences.js';
 import { getDayRng } from './dayRng.js';
+import { queueFallout } from './fallout.js';
 /**
  * Ceiling on how much ground a single day's trouble can cost a field crew.
  * Event content still rates delays on the retired eight-hour scale; this
@@ -158,6 +159,10 @@ export function resolveEvent(journey, event, option) {
   if (Array.isArray(resolved.flags) && resolved.flags.length) {
     applyConsequenceFlags(journey, resolved.flags, messages);
   }
+  // A caught shortcut's determination lands later, as its own card.
+  if (resolved.band === 'bad' && option.failureFallout) {
+    queueFallout(journey, option.failureFallout);
+  }
 
   let injuryVictim = null;
   if (option.riskInjury && rng() < option.riskInjury) {
@@ -241,6 +246,7 @@ export function resolveEvent(journey, event, option) {
     eventId: event.id,
     eventTitle: event.title,
     optionLabel: option.label,
+    ...(typeof option.chanceSuccess === 'number' ? { band: resolved.band } : {}),
     outcome: outcome || '',
     consequences: messages.filter((message) => message && message !== outcome),
     effects: effects ? { ...effects } : {},
@@ -265,11 +271,13 @@ export function applyEventEffects(journey, effects, messages) {
       // The field cash ceiling is sized for a crew wallet, not silviculture's
       // program treasury — clamping the latter to it would wipe the budget.
       const budgetCap = journey.journeyType === 'silviculture' ? Infinity : FIELD_RESOURCES.budget.max;
+      const before = journey.resources.budget;
       journey.resources.budget = Math.max(0,
         Math.min(budgetCap, journey.resources.budget + effects.budget));
-      const delta = effects.budget;
+      // What the wallet's ceiling and floor let through, not what was asked.
+      const delta = Math.round(journey.resources.budget - before);
       const label = delta > 0 ? `+$${Math.abs(delta).toLocaleString()}` : `-$${Math.abs(delta).toLocaleString()}`;
-      messages.push(`Cash: ${label}`);
+      if (delta !== 0) messages.push(`Cash: ${label}`);
     }
     if (typeof effects.fuel === 'number' && typeof journey.resources?.fuel === 'number') {
       const litres = Math.round(effects.fuel * FUEL_EFFECT_SCALE);
@@ -296,11 +304,14 @@ export function applyEventEffects(journey, effects, messages) {
   // Resource effects (desk)
   if (isDeskJourney(journey.journeyType)) {
     if (typeof effects.budget === 'number' && typeof journey.resources?.budget === 'number') {
+      const before = journey.resources.budget;
       journey.resources.budget = Math.max(0,
         Math.min(DESK_RESOURCES.budget.max, journey.resources.budget + effects.budget));
-      if (effects.budget !== 0) {
-        const label = effects.budget > 0 ? '+' : '-';
-        messages.push(`Budget: ${label}$${Math.abs(effects.budget).toLocaleString()}`);
+      // Print what the ceiling and the floor let through, not what was asked.
+      const landed = Math.round(journey.resources.budget - before);
+      if (landed !== 0) {
+        const label = landed > 0 ? '+' : '-';
+        messages.push(`Budget: ${label}$${Math.abs(landed).toLocaleString()}`);
       }
     }
     if (typeof effects.politicalCapital === 'number' && typeof journey.resources?.politicalCapital === 'number') {
