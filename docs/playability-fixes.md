@@ -296,3 +296,20 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Campaign review.** A failed season no longer reads "the crew was still delivering" or "production stayed high".
 - **Browser suite.** The campaign spec's bot looped on the new release confirmation, picking "Choose another method — Back to…" every time, and never reached recon travel. Travel itself was fine: it stops at its named destination and says so. A rounding flake (about 1 run in 100) in the 7.5 km arrival-snap unit test is fixed.
 - **Checks.** `npm test` 837/837, Playwright 142/142. Gates: recon, planning, permitting, silviculture and GM 8/8 in every area (72/72 each); silviculture 24/24 at full length; every role 8/8 at campaign scale; GM honest 30/30 on normal. `sim:seasonal` is unchanged from the merge base. `simulate-campaign` good play: 7 Outstanding, 28 Solid, 1 Mixed of 36. The silviculture "release 99% of 260 ha" loss did not reproduce at this head: 270/270 across 9 areas × 30 seeds, and 162/162 in the policy sim.
+
+## 2026-09-29 — Wave 3: planner and permitter residuals (W3-F2)
+
+- **The District Manager's own conditions.** A plan is not signed at scrutiny 75% or more, or while a regulator's open file on one of its shortcuts has not landed. Both show on the mission checklist, in the guidance and in the blocked submission. A District Compliance Review (a day, $900) takes scrutiny down 12.
+- **Closing on conduct.** `summarizeDeskConduct` / `rateDeskConduct` (`js/scoring.js`) read the run's off-book calls, catches, scrutiny, goodwill and report. The epilogue, the approval narratives and a desk integrity charge (noticed -3, caught -8, cap 20) follow them, not stress alone.
+- **Heritage permits.** No District Manager event signs an HCA permit, an issued one releases its CP (no "(Day ?)"), and letters are filtered by permit type (HCA permits get an archaeological-assessment letter, never a VIA).
+- **Desk cards.** No card twice in one run; phone shortcuts are declined by phone; permit-desk chips carry compliance's goodwill; morale chips on a desk read as stress; ten-minute answers do not "cut into the day"; desk copy stops claiming days and crews; cards read ON YOUR DESK; unlawful answers on ordinary cards are OFF-BOOK; the FPB reports, it does not decide penalties; one energy meter.
+- **Set-aside.** On a desk it costs the cheapest lawful answer in full (minor cards too), never the off-book one.
+- **Permit season.** 16 desk days for 15 permits (Greenhorn 19), every permit needed by the deadline; Old Growth reads files harder. `simulate-expeditions.mjs --difficulty all --compare` (new `shortcuts` policy: competent play plus every OFF-BOOK option), 12 seeds × 9 areas, win % before → after:
+
+  | Permitter | Greenhorn | Journeyman | Old Growth |
+  | --- | --- | --- | --- |
+  | competent | 100 → 98 | 100 → 83 | 97 → 65 |
+  | shortcuts | 100 → 99 (grade 97 → 88) | 99 → 84 (97 → 75) | 97 → 66 (96 → 59) |
+  | reckless | 78 → 31 | 44 → 6 | 20 → 5 |
+
+  Planner Journeyman: competent 100 → 100, shortcuts 92 → 89 (grade 91 → 79), reckless 0 → 0.
