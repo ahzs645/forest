@@ -543,16 +543,18 @@ export function ensureProfessionalState(target, options = {}) {
   const area = options.area || target.area || options.areaId || target.areaId || null;
   const base = createProfessionalState(roleId, area);
 
-  target.professional = {
-    ...base,
-    ...(target.professional || {}),
-  };
+  // Normalise in place: callers hold references to the professional file and
+  // its chain states across calls (advancePaperworkChain reads a chain's state
+  // and then writes to it), so re-creating the objects here would orphan their
+  // writes.
+  const existing = target.professional && typeof target.professional === "object" ? target.professional : {};
+  target.professional = Object.assign(existing, { ...base, ...existing });
 
   const chainById = new Map((target.professional.paperworkChains || []).map((chain) => [chain.id, chain]));
-  target.professional.paperworkChains = getPaperworkChainsForRole(roleId, area).map((chain) => ({
-    ...buildChainState(chain),
-    ...(chainById.get(chain.id) || {}),
-  }));
+  target.professional.paperworkChains = getPaperworkChainsForRole(roleId, area).map((chain) => {
+    const saved = chainById.get(chain.id);
+    return saved ? Object.assign(saved, { ...buildChainState(chain), ...saved }) : buildChainState(chain);
+  });
   target.professional.areaBurdenLabel = base.areaBurdenLabel;
   target.professional.areaWatchouts = base.areaWatchouts;
   target.professional.activeHookIds = base.activeHookIds;
@@ -592,11 +594,7 @@ export function advancePaperworkChain(journey, chainId, options = {}) {
     return { completed: true, advanced: false, stage: null, state: progress?.state || null };
   }
 
-  const professional = ensureProfessionalState(journey, {
-    roleId: journey?.roleId || journey?.role?.id || options.roleId,
-    area: journey?.area || journey?.areaId || options.area,
-  });
-
+  const professional = journey.professional;
   professional.paperworkLoad = clampPercent(
     professional.paperworkLoad - (progress.stage.paperworkRelief || 0),
   );

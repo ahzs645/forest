@@ -532,6 +532,7 @@ function buildProcessCandidates(state, context) {
         "If this chain slips, the file gets harder to defend and later work starts stacking on bad assumptions.",
       ),
       paperworkChainId: progress.chain.id,
+      chainStageResponses: CHAIN_STAGE_RESPONSES[progress.chain.id]?.[progress.stage.id] || null,
       failureIssueId: findChainFailureIssueId(progress.chain),
       score: 50 + stageScore,
     }, state));
