@@ -38,3 +38,10 @@ The balance harness drove 24 seeded campaign-length assignments per role using r
 The remaining simulated losses were supply/fuel exhaustion or planning bankruptcy. This is evidence that completion is reachable under a consistent strategy, not a population win-rate estimate or proof that every possible choice succeeds.
 
 The Mac remained locked during this implementation pass, so fresh verification used headless browser interaction and engine tests. The earlier visible manual campaign is documented separately. The updated local game is available at `http://127.0.0.1:5178/` while its development server is running.
+
+## 2026-09-29 — Planning in the southern areas
+
+- **Block data for Vancouver Island Coast, Kootenay Wetbelt and Okanagan/Shuswap Drybelt.** `js/data/json/planning/blockOptions.json` covered only the six northern areas, so the lead block set never locked there and the FOM could not publish. The three areas are now generated from BC OpenMaps like the others (`npm run refresh:planning-blocks -- --areas=vancouver-island-coast,kootenay-wetbelt,okanagan-shuswap-drybelt`), 24 planned cutblocks each, filtered to the South Island, Selkirk and Okanagan Shuswap districts. Each area records its own `generatedAt` and `dataWindow`.
+- **No area can dead-end the block decision.** An area without a snapshot gets four labelled area-profile placeholder blocks instead of an empty pool (`js/data/planningBlocks.js`).
+- **The triage scrutiny shift lands once.** The shift is a standing posture. Re-picking the same triage after an event reopens the block question moves nothing, and switching moves only the difference (`applyTriageScrutinyShift` in `js/modes/planning.js`).
+- **Checks.** `tests/planningFomGate.test.mjs` drives every operating area, plus one with no snapshot, to FOM publication headlessly. `node scripts/simulate-expeditions.mjs --role planning --area all --runs 36` gives 36/36 wins in every area at full length. At campaign scale the southern areas win 36/36 and the northern areas 34–36/36.
