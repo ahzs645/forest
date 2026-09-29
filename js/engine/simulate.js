@@ -220,7 +220,32 @@ export function simulateRun({ roleId, areaId, strategy = "balanced", seed = 1, c
     consequences: uniqueHistoryIds(gs.history, "consequence"),
     seasonHeadlines: (gs.seasonTimeline || []).map((entry) => entry.headline).filter(Boolean),
     issuesSeen: uniqueHistoryIds(gs.history, "issue"),
+    eventsSeen: uniqueHistoryIds(gs.history, "event"),
+    ...describeDealing(gs.history),
     completed: view.mode === "end",
+  };
+}
+
+/** How the year was dealt: issue ids per round, and any card dealt twice. */
+function describeDealing(history = []) {
+  const issuesByRound = {};
+  const counts = { issue: new Map(), event: new Map() };
+  const scheduledIssues = new Set();
+  for (const entry of history) {
+    if (entry?.type !== "issue" && entry?.type !== "event") continue;
+    const seen = counts[entry.type];
+    seen.set(entry.id, (seen.get(entry.id) || 0) + 1);
+    if (entry.type === "issue") {
+      (issuesByRound[entry.round] ||= []).push(entry.id);
+      if (entry.scheduled) scheduledIssues.add(entry.id);
+    }
+  }
+  const repeated = (map) => [...map].filter(([, count]) => count > 1).map(([id]) => id);
+  return {
+    issuesByRound,
+    repeatedIssues: repeated(counts.issue),
+    repeatedEvents: repeated(counts.event),
+    scheduledIssues: [...scheduledIssues],
   };
 }
 

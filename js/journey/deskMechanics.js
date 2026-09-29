@@ -245,7 +245,7 @@ function holdStakeholderMeeting(journey, stakeholder = 'ministry') {
 /**
  * Handle a crisis
  */
-function handleCrisis(journey, crisis = {}) {
+function handleCrisis(journey, _crisis = {}) {
   const messages = [];
 
   spendDay(journey); // A crisis is what the day turned out to be

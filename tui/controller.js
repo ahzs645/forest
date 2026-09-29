@@ -25,6 +25,7 @@ import {
 } from "../js/engine.js";
 import { formatMetricName } from "../js/engine/shared.js";
 import { applyEffects } from "../js/engine/effects.js";
+import { drawCalendarReminder } from "../js/engine/content.js";
 import { riskBandOdds, riskBandPercents } from "../js/risk.js";
 import { ILLEGAL_ACTS } from "../js/data/illegalActs.js";
 import { SEASONAL_SAVE_KEY, validateSeasonalSave } from "../js/game/saveLoad.js";
@@ -257,6 +258,15 @@ const GENERIC_CARD_LABELS = new Set([
   "Seasonal task",
   "Shortcut offer",
 ]);
+
+/** Ids of the cards of one type (issue, event) already answered this year. */
+export function collectDealtIds(gs, type) {
+  const ids = new Set();
+  for (const entry of gs?.history || []) {
+    if (entry?.type === type && entry.id) ids.add(entry.id);
+  }
+  return [...ids];
+}
 
 /**
  * Draw a card whose specific banner is not already on this season's queue.
@@ -1132,7 +1142,13 @@ export class TuiGameController {
     // consume from the main stream (and so the real draw reproduces the peek on
     // a crisis round).
     const previewRng = isForkableRng(this.rng) ? this.rng.fork() : this.rng;
-    const issuePreview = drawIssue(cloneStateForPreview(gs), previewRng);
+    // Issues and events already dealt this year stay out of the draw: a card
+    // answered in spring does not come back in winter. Follow-ups an earlier
+    // choice scheduled resolve from the pending lists before the pool is
+    // read, so they are never held back by this.
+    const dealtIssues = collectDealtIds(gs, "issue");
+    const dealtEvents = collectDealtIds(gs, "event");
+    const issuePreview = drawIssue(cloneStateForPreview(gs), previewRng, { excludeIds: dealtIssues });
     const isCrisisRound = issuePreview?.surfaceSeverity === "danger";
 
     this.queue.push({
@@ -1148,7 +1164,7 @@ export class TuiGameController {
     });
 
     if (isCrisisRound) {
-      const issue = drawIssue(gs, this.rng);
+      const issue = drawIssue(gs, this.rng, { excludeIds: dealtIssues });
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
         gs.lastSeasonCardType = "issue";
@@ -1171,7 +1187,10 @@ export class TuiGameController {
         this.queue.push({ type: "assignment", data: assignment });
       }
 
-      const event = drawSeasonalEvent(gs, this.rng);
+      // A year short of fresh cards falls back to the whole pool rather
+      // than leave the slot empty.
+      const event = drawSeasonalEvent(gs, this.rng, { excludeIds: dealtEvents })
+        || drawSeasonalEvent(gs, this.rng, { advancePending: false });
       if (event) {
         this.queue.push({ type: "event", data: event });
       }
@@ -1180,7 +1199,8 @@ export class TuiGameController {
         (exclude, advancePending) => drawIssue(gs, this.rng, { advancePending, excludeIds: exclude }),
         this.queue,
         seasonCardStart,
-      );
+        dealtIssues,
+      ) || drawIssue(gs, this.rng, { advancePending: false });
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
       }
@@ -1195,7 +1215,7 @@ export class TuiGameController {
           (exclude) => drawSeasonalEvent(gs, this.rng, { advancePending: false, excludeIds: exclude }),
           this.queue,
           seasonCardStart,
-          event ? [event.id] : [],
+          [...dealtEvents, ...(event ? [event.id] : [])],
         );
         if (secondEvent) {
           this.queue.push({ type: "event", data: secondEvent });
@@ -1205,7 +1225,7 @@ export class TuiGameController {
           (exclude) => drawIssue(gs, this.rng, { advancePending: false, excludeIds: exclude }),
           this.queue,
           seasonCardStart,
-          issue ? [issue.id] : [],
+          [...dealtIssues, ...(issue ? [issue.id] : [])],
         );
         if (secondIssue) {
           this.queue.push({ type: "issue", data: secondIssue });
@@ -1217,6 +1237,14 @@ export class TuiGameController {
         seasonCardStart,
         gs.lastSeasonCardType ?? null,
       );
+    }
+
+    // A calendar reminder (the CPD log) comes after the season's own cards,
+    // as an extra card: it never takes one of their slots.
+    const reminder = drawCalendarReminder(gs);
+    if (reminder) {
+      this.queue.push({ type: "issue", data: reminder });
+      gs.lastSeasonCardType = "issue";
     }
 
     this.queue.push({
@@ -1379,6 +1407,8 @@ export class TuiGameController {
             option: option.label,
             round: gs.round,
             stance: option.stance,
+            // A follow-up an earlier choice put on the calendar.
+            ...(item.scheduled ? { scheduled: true } : {}),
           }, this.rng);
 
           gs.lastDecision = buildLastDecision(option, outcomeResult);

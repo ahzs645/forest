@@ -9,6 +9,14 @@ export const BUDGET_ATTRITION_THRESHOLD = 25;
 export const RELATIONSHIP_TRUST_THRESHOLD = 35;
 export const COMPLIANCE_AUDIT_THRESHOLD = 40;
 export const DEFAULT_CPD_TARGET = 30;
+// Hours behind the prorated FPBC year before the CPD log becomes a card: more
+// than a season's worth, so only a log that has actually been let slide
+// draws it.
+export const CPD_CARD_GAP = 10;
+// Cards the year's calendar deals as an extra card at the end of a season,
+// once a year, when the round-end pass sets their flag. They never go through
+// the issue draw, so they cannot take a season's contested call.
+export const CALENDAR_REMINDERS = Object.freeze({ cpdReminderDue: "cpd-log-behind" });
 
 export const ROLE_EVENT_DOMAINS = {
   planner: "desk",

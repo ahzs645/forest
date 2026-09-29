@@ -113,7 +113,7 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Permit pipeline:** outside counter changes act on named files and are refused where the pipeline disallows them: nothing is conjured into `issued`, no file is deleted, setbacks pull the named file back to drafting. HCA permits sit outside the District Manager's 15.
 - **Deficiency letters:** fast-track is decided that night with a higher chance of return. A cleanly answered gap is never the next letter on the same file. A district meeting decides only its own file.
 - **Scoring and debrief:** an undelivered file earns no Time, and its unspent budget is scaled by work done. Resources use the run's own starting budget. Desk roles score the protagonist's wellbeing instead of a flat 50. A failed plan is handed over, not sealed.
-- **Sims:** `node scripts/simulate-expeditions.mjs --role planning --area all --compare` (also for `permitting`). Competent play grades about 98–100; reckless play grades 38–65 in every area. Competent planning still cannot win the three southern areas until they have planning block data.
+- **Sims:** `node scripts/simulate-expeditions.mjs --role planning --area all --compare` (also for `permitting`). Competent play grades about 98–100; reckless play grades 38–65 in every area. The three southern areas have planning block data now, so competent planning wins there too.
 ## 2026-09-29 — General Manager (playtest #12)
 
 - **Cut control decides the year.** 90–110% of the AAC is clean; outside it the year wins with a finding (and a qualified victory text); below 85% or above 115% the board ends the term. The overcut penalty ($60/m³ past 110%) now exceeds any margin. Objectives score reads the statement; the compliance component blends in the compliance meter.
@@ -424,3 +424,15 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
   | reckless | 78 → 31 | 44 → 6 | 20 → 5 |
 
   Planner Journeyman: competent 100 → 100, shortcuts 92 → 89 (grade 91 → 79), reckless 0 → 0.
+## 2026-09-29 — Wave 3: seasonal engine and campaign
+
+- **CPD reminder.** It no longer takes the summer contested call. A season kept to the standards (no aggressive stance on the planned work, no shortcut) logs its share of the 30-hour FPBC year, so careful desk and field years keep pace. The "CPD Log Behind" card comes once a year, only when the log is more than a season behind. It is an extra card after the season's own (`CALENDAR_REMINDERS`), never an issue draw. It was in 100% of years; now it is in 6–9% (the pushed ones). Round 2 now deals 48 distinct issues, up from 2. The summer-only heat dome, herbicide drift, camp flooding and beetle escalation cards are all dealt again. `lint:seasonal` checks calendar cards and that no round-end pass queues into an issue slot, and a matrix test covers every one-season issue.
+- **No repeats in a year.** The seasonal deal keeps a per-year memory of the issues and events already answered. Scheduled follow-ups, including shortcut fallout, are exempt. Years with a repeated issue fell from 16–30% to under 1%.
+- **Recoveries credit what the season did.** The documentation rebound needs compliance work that season. The comeback window says whether the calls went into the meter; in a campaign it pays only for that work. A campaign season that fell short gets no dividend and no steady-program top-up, and neither does any season with a noticed or caught shortcut. A season that fell short earns no thrift credit for unspent allowance.
+- **Hard fall file.** On hard, the fall planning allowance is the normal allowance plus a contingency (`HARD_FALL_ALLOWANCE`). Careful play now clears the hard fall in 93% of runs, up from 48%, and careless play still fails it.
+- **Copy and odds.** The desk "rate you" odds line now names the district goodwill it reads and its value. The joke cards appear in about 3% of field years, down from 7–10%.
+- **Leftovers.**
+  - Evacuated crew are no longer hit by the pace and the weather.
+  - The fish-passage and smoke-hold cards reach the coast and the Okanagan.
+  - The dead seasonal comic gate is gone.
+  - Both eslint warnings are fixed.

@@ -1386,11 +1386,10 @@ export const ISSUE_LIBRARY = [
       },
     ],
   },
-  // The CPD log gets its own card once it falls well behind the share of the
-  // FPBC year that has passed (flag set by js/engine/effects.js). A desk
-  // year's professional assignments are its paperwork chains, which log no
-  // CPD, so before this a planner or permitter could never close the gap
-  // each season charges competence risk for.
+  // The CPD log gets its own card once it falls more than a season behind
+  // the share of the FPBC year that has passed. It is a calendar reminder
+  // (CALENDAR_REMINDERS in js/engine/constants.js): dealt once a year as an
+  // extra card after a season's own cards, never through the issue draw.
   {
     id: "cpd-log-behind",
     title: "CPD Log Behind the FPBC Year",
@@ -1398,10 +1397,7 @@ export const ISSUE_LIBRARY = [
       "Your continuing professional development log is well behind where it should be at this point in the FPBC reporting year, and the year closes with the calendar.",
     roles: ["planner", "permitter", "recce", "silviculture"],
     areaTags: ["bc-wide"],
-    // A log this far behind is the season's own paperwork, not a long shot.
-    baseWeight: 3,
-    priorityFlag: "cpdBehind",
-    requiresAnyFlags: ["cpdBehind"],
+    calendarReminder: true,
     context: {
       operation: "The FPBC reporting year asks for 30 hours of continuing professional development, and the log is short.",
       objective: "Get real hours on the log without letting the season's work slide.",
@@ -1414,7 +1410,6 @@ export const ISSUE_LIBRARY = [
           "Two days of structured learning, a riparian assessment refresher and a FRPA case-law session, go into the log: 15 CPD hours.",
         effects: { progress: -2, compliance: 2, budget: -1 },
         assignmentSideEffects: { professionalShift: { cpdHours: 15 } },
-        clearFlags: ["cpdBehind"],
       },
       {
         label: "Log what fits around the work",
@@ -1422,7 +1417,6 @@ export const ISSUE_LIBRARY = [
           "A webinar and a district field tour fit around the file and go into the log: 8 CPD hours. Closer, not closed.",
         effects: { progress: -1, compliance: 1 },
         assignmentSideEffects: { professionalShift: { cpdHours: 8 } },
-        clearFlags: ["cpdBehind"],
       },
       {
         label: "Leave the log for next year",

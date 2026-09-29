@@ -15,6 +15,7 @@ import {
 } from "../data/illegalActs.js";
 import {
   AUDIT_TEMPTATION_TAGS,
+  CALENDAR_REMINDERS,
   COMMUNITY_TEMPTATION_TAGS,
   ECOLOGICAL_TEMPTATION_TAGS,
   ETHICS_TEMPTATION_TAGS,
@@ -185,6 +186,9 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
       if (typeof pending.delay === "number" && pending.delay > 0) {
         continue;
       }
+      // A calendar reminder queued by an older save is dealt as its own card
+      // (drawCalendarReminder), not in this slot.
+      if (CALENDAR_REMINDER_IDS.has(pending.id)) continue;
       const candidate = resolvePendingIssue(state, pending, { tags, season }, rng);
       if (candidate) {
         state.pendingIssues.splice(i, 1);
@@ -205,7 +209,7 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
 
   const allIssues = [...ISSUE_LIBRARY, ...CHAINED_ISSUES];
   const pool = allIssues
-    .filter((issue) => !excludeIds.includes(issue.id))
+    .filter((issue) => !issue.calendarReminder && !excludeIds.includes(issue.id))
     .filter((issue) => issueMatchesContext(issue, state, tags));
   const freshPool = pool.filter((issue) => !isIssueInCooldown(state, issue.id));
   const selectablePool = freshPool.length ? freshPool : pool;
@@ -232,6 +236,30 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
     }
   }
   return normalizeSeasonalCard(weightedPool[weightedPool.length - 1].issue, state, "issue");
+}
+
+const CALENDAR_REMINDER_IDS = new Set(Object.values(CALENDAR_REMINDERS));
+
+/**
+ * The calendar reminder due this season (CALENDAR_REMINDERS), as an extra
+ * card dealt after the season's own: the round-end pass sets its flag once a
+ * year, and dealing it clears the flag. A reminder an older save queued as a
+ * pending issue is picked up here too.
+ */
+export function drawCalendarReminder(state) {
+  if (!state?.flags) return null;
+  const pending = Array.isArray(state.pendingIssues) ? state.pendingIssues : [];
+  for (const [flag, id] of Object.entries(CALENDAR_REMINDERS)) {
+    const queued = pending.findIndex((entry) => entry?.id === id);
+    if (!state.flags[flag] && queued < 0) continue;
+    delete state.flags[flag];
+    if (queued >= 0) pending.splice(queued, 1);
+    const issue = ISSUE_LIBRARY.find((entry) => entry.id === id);
+    if (issue && issueMatchesContext(issue, state, state.area?.tags || [])) {
+      return normalizeSeasonalCard({ ...issue, scheduled: true }, state, "issue");
+    }
+  }
+  return null;
 }
 
 export function scoreIssueSelection(issue, state, context) {
@@ -989,12 +1017,19 @@ export function getOperationalEventLibrary(state) {
 // rather than retiring them: rare is the brief, not gone.
 const SEASONAL_REFERENCE_PROBABILITY = 0.05;
 const SEASONAL_PROBABILITY_WEIGHT_FLOOR = 0.05;
+// The four joke cards (the legacy deck's "legacy" type: the sasquatch, the
+// alien landing, the celebrity endorsement, the viral post) sit on a lower
+// floor: at the shared one they reached 7-10% of field years once the
+// per-year no-repeat memory thinned the rest of the pool. At this floor a
+// field year sees one about 3% of the time.
+const SEASONAL_JOKE_WEIGHT_FLOOR = 0.015;
 
 function seasonalProbabilityWeight(event) {
   const probability = Number(event?.probability);
   if (!Number.isFinite(probability) || probability <= 0 || probability >= SEASONAL_REFERENCE_PROBABILITY) return 1;
   const ratio = probability / SEASONAL_REFERENCE_PROBABILITY;
-  return Math.max(SEASONAL_PROBABILITY_WEIGHT_FLOOR, ratio * ratio);
+  const floor = event?.type === "legacy" ? SEASONAL_JOKE_WEIGHT_FLOOR : SEASONAL_PROBABILITY_WEIGHT_FLOOR;
+  return Math.max(floor, ratio * ratio);
 }
 
 function findOperationalEventById(eventId, state) {
@@ -1365,7 +1400,7 @@ function seasonIdForRound(round) {
 
 /**
  * Whether an act belongs in front of this seasonal run: role and phase from
- * the library, then season, area, difficulty and scrutiny gates.
+ * the library, then season, area and scrutiny gates.
  */
 export function actMatchesSeasonalTemptationContext(act, state) {
   if (!act || act.retired || !state?.role?.id) {
@@ -1385,9 +1420,9 @@ export function actMatchesSeasonalTemptationContext(act, state) {
   if (Array.isArray(act.areaIds) && act.areaIds.length && !act.areaIds.includes(state.area?.id)) {
     return false;
   }
-  if (act.tier === "comic" && state.difficulty === "hard") {
-    return false;
-  }
+  // No comic-on-hard gate here: seasonal play has no difficulty setting (the
+  // expedition lane's gate lives in js/events/selection.js), and this one
+  // read a state.difficulty the seasonal state never carries.
   // The seasonal year keeps meters, not a program: only a premise it can
   // read gates the act (the deployment lane reads the rest).
   if (actPremises(act).includes("scrutinyHigh") && Number(state.metrics?.compliance ?? 100) > 45) {

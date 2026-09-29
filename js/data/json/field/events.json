@@ -1816,7 +1816,8 @@
    "cwh"
   ],
   "becCodes": [
-   "CWHws1"
+   "CWHws1",
+   "CWHxm2"
   ],
   "terrainTrigger": [
    "river"
@@ -1909,7 +1910,8 @@
    "wildfire"
   ],
   "becCodes": [
-   "SBSdw2"
+   "SBSdw2",
+   "IDFxh1"
   ],
   "description": "Smoke settles over camp and the air quality keeps climbing. The block is still there, but the work window is shrinking by the hour.",
   "options": [

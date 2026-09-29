@@ -165,6 +165,26 @@ const FSP_EXTENSION_HELD_PERMITS = 4;
 const FSP_EXTENSION_SCRUTINY = 8;
 const FSP_EXTENSION_DISTRICT_COOLING = 6;
 
+// The fall planning file pays for the same approval gates and the same
+// authored invoices on every difficulty, and Old Growth deals more of those
+// invoices, so the hard cut to resources left a careful file "Budget
+// exhausted" on half its falls. On hard the fall allowance keeps the normal
+// allowance plus a contingency for the heavier event load; the shorter window
+// and the harsher odds still make it the hard file.
+const HARD_FALL_ALLOWANCE = 1.4;
+
+/**
+ * Campaign-level adjustments to a deployment's allowance, after the
+ * difficulty multipliers.
+ */
+export function applyCampaignAllowance(journey, difficulty) {
+  if (difficulty !== 'hard' || journey?.journeyType !== 'planning') return;
+  const r = journey.resources || {};
+  if (typeof r.budget !== 'number') return;
+  r.budget = Math.round(r.budget * HARD_FALL_ALLOWANCE);
+  if (journey.startingResources) journey.startingResources.budget = r.budget;
+}
+
 function fallFellShort(campaign) {
   const fall = (campaign.seasonLog || []).find((entry) => (entry.id || entry.season?.toLowerCase()) === 'fall');
   return Boolean(fall) && !fall.victory;
@@ -413,7 +433,7 @@ export function computeSeasonBridge(journey, endResult, startBudget) {
     entries.push({ metric: 'compliance', delta: compliance, reason: `The file: ${parts.join('; ')}` });
   }
 
-  const budget = computeBudgetEntry(journey, completion, startBudget);
+  const budget = computeBudgetEntry(journey, completion, startBudget, victory);
   if (budget) entries.push(budget);
 
   // Forest health only moves when the deployment actually touched the land;
@@ -436,10 +456,12 @@ export function sumShortcutCash(journey) {
  * Budget is value for money: the share of the work delivered against the
  * share of the allowance it took. Spending the allowance on the work it was
  * for is on budget, not a loss. Two things are not savings: shortcut cash
- * (it is taken back out before the spend is measured) and an allowance left
- * unspent because the crew went without food.
+ * (it is taken back out before the spend is measured), an allowance left
+ * unspent because the crew went without food, and an allowance left unspent
+ * because the season ended before its work did: a desk pulled off the file
+ * on day 11 spent little because it stopped, not because it was frugal.
  */
-function computeBudgetEntry(journey, completion, startBudget) {
+function computeBudgetEntry(journey, completion, startBudget, victory = true) {
   if (!(startBudget > 0)) return null;
   const shortcutCash = sumShortcutCash(journey);
   const endBudget = Number(journey.resources?.budget ?? 0) - shortcutCash;
@@ -455,6 +477,9 @@ function computeBudgetEntry(journey, completion, startBudget) {
     delta = Math.min(delta, 0) - Math.min(3, hungry);
     if (hungry > 0) parts.push(`the crew went ${hungry} shift${hungry === 1 ? '' : 's'} on an empty food box`);
     if (quits > 0) parts.push(`${quits} crew member${quits === 1 ? '' : 's'} walked off, so the unspent allowance is not a saving`);
+  } else if (!victory && delta > 0) {
+    delta = 0;
+    parts.push('the season fell short, so the unspent allowance is not a saving');
   }
   return { metric: 'budget', delta: clamp(delta, -8, 5), reason: parts.join('; ') };
 }
@@ -825,6 +850,7 @@ async function runCampaignSeason(game, campaign, season) {
     });
     journey.difficulty = campaign.difficulty;
     applyDifficultyMultipliers(journey, campaign.difficulty);
+    applyCampaignAllowance(journey, campaign.difficulty);
     stance.applyPerk(journey);
     journey.campaignStartBudget = Number(journey.resources?.budget ?? 0);
     // Marks the journey as a campaign deployment (js/game/saveLoad.js never
@@ -994,6 +1020,13 @@ async function runCampaignSeason(game, campaign, season) {
     causes.push(`Crisis: ${issue.title} → ${formatMetricDelta(outcome?.effects || {}) || 'no meter change'}`);
   }
 
+  // The round-end rules credit what the season did: a deployment that fell
+  // short, or whose shortcut somebody saw, earns no dividend for a well-run
+  // file (js/engine/effects.js applyRoundRecoveries).
+  gsSeason.seasonOutcome = {
+    fellShort: !endResult.victory,
+    shortcutsSeen: (shortcutReview.counts?.noticed || 0) + (shortcutReview.counts?.caught || 0),
+  };
   const consequences = applyRoundConsequences(gsSeason);
   const explained = describeConsequences(gsSeason, consequences, { fellShort: !endResult.victory });
   // Everything the season moved, briefing to consequences, so the review and

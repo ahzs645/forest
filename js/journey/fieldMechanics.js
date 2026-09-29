@@ -1124,6 +1124,9 @@ export function executeFieldAction(journey, paceId) {
   };
 
   for (const member of journey.crew) {
+    // Someone sent out on the ETV or gone home is not on the hill: the pace
+    // and the weather are not theirs.
+    if (!member.isActive) continue;
     // Apply pace effects
     if (pace.healthBonus !== 0 && !(starving && pace.healthBonus > 0)) {
       member.health = Math.max(0, Math.min(100, member.health + pace.healthBonus));

@@ -61,15 +61,10 @@ test("both professional consequences fire somewhere in the matrix", () => {
   assert.ok(fired.has("professional-audit"), "professional-audit never fired");
 });
 
-// Cards the year's calendar hands everyone who falls behind, not draws: the
-// CPD reminder lands in most years by design (js/engine/effects.js).
-const CALENDAR_REMINDERS = new Set(["cpd-log-behind"]);
-
 test("no single issue dominates the matrix beyond a cap", () => {
   const counts = new Map();
   for (const run of MATRIX) {
     for (const id of run.issuesSeen) {
-      if (CALENDAR_REMINDERS.has(id)) continue;
       counts.set(id, (counts.get(id) || 0) + 1);
     }
   }

@@ -64,12 +64,13 @@ test('a failed campaign season never hears that the crew was delivering', () => 
   const state = makeState('planner');
   state.round = 3;
   Object.assign(state.metrics, { compliance: 30, progress: 70, forestHealth: 60 });
+  state.history.push({ type: 'issue', id: 'file-work', round: 3, effects: { compliance: 3 } });
   const ids = applyRoundConsequences(state);
   assert.ok(ids.includes('field-discipline-rebound'), ids.join(', '));
   assert.ok(ids.includes('ecological-strain'), ids.join(', '));
 
   const delivered = describeConsequences(state, ids);
-  assert.match(delivered.find((entry) => entry.id === 'field-discipline-rebound').cause, /still delivering/);
+  assert.match(delivered.find((entry) => entry.id === 'field-discipline-rebound').cause, /put work back into the file/);
 
   const short = describeConsequences(state, ids, { fellShort: true });
   for (const entry of short) {
@@ -81,6 +82,38 @@ test('a failed campaign season never hears that the crew was delivering', () => 
     short.filter((entry) => !['field-discipline-rebound', 'ecological-strain'].includes(entry.id)),
     delivered.filter((entry) => !['field-discipline-rebound', 'ecological-strain'].includes(entry.id)),
   );
+});
+
+test('recovery rules credit only what the season did', () => {
+  // No documentation work this season: no documentation clean-up to credit.
+  const idle = makeState('planner');
+  idle.round = 3;
+  Object.assign(idle.metrics, { compliance: 30, progress: 70, forestHealth: 60 });
+  idle.history.push({ type: 'issue', id: 'push', round: 3, effects: { progress: 3, compliance: -2 } });
+  assert.ok(!applyRoundConsequences(idle).includes('field-discipline-rebound'));
+
+  // A season that fell short, or whose shortcut somebody noticed, earns no
+  // dividend for a trusted file.
+  const trusted = () => {
+    const state = makeState('planner');
+    state.round = 3;
+    Object.assign(state.metrics, { compliance: 80, relationships: 70, progress: 40, forestHealth: 60, budget: 50 });
+    return state;
+  };
+  const clean = trusted();
+  const cleanIds = applyRoundConsequences(clean);
+  assert.ok(cleanIds.includes('operational-dividend') && cleanIds.includes('delivery-dividend'), cleanIds.join(', '));
+
+  const failed = trusted();
+  failed.seasonOutcome = { fellShort: true };
+  const failedIds = applyRoundConsequences(failed);
+  assert.ok(!failedIds.includes('operational-dividend') && !failedIds.includes('delivery-dividend'), failedIds.join(', '));
+  assert.ok(!failedIds.includes('steady-program'));
+
+  const noticed = trusted();
+  noticed.history.push({ type: 'temptation', id: 'act', round: 3, band: 'noticed', effects: { progress: 6 } });
+  const noticedIds = applyRoundConsequences(noticed);
+  assert.ok(!noticedIds.includes('delivery-dividend'), noticedIds.join(', '));
 });
 
 test('buildSeasonHeadline returns the most impactful decision of a season', () => {

@@ -1413,7 +1413,10 @@ function describeOddsShift(when, journey) {
   switch (key) {
     case 'scrutinyAbove': return 'your file is already under scrutiny';
     case 'scrutinyBelow': return 'your record is clean';
-    case 'relationshipsAbove': return 'people you deal with rate you';
+    // It reads the desk's district goodwill, not the year's Relationships
+    // meter, so it names what it read and the value it read.
+    case 'relationshipsAbove':
+      return `the district office's goodwill on this file is ${Math.round(Number(journey?.resources?.politicalCapital) || 0)}`;
     case 'priorShortcuts': {
       const taken = journey?.temptationMemory?.takenActIds?.length || Number(arg) || 0;
       return `you have taken ${taken} shortcut${taken === 1 ? '' : 's'} already`;

@@ -561,7 +561,7 @@ export const ILLEGAL_ACTS_SOURCE = [
     id: "inventory-data-laundering",
     title: "Launder the Inventory Data",
     description: "Bump the site index on the LiDAR-derived stands three points before the timber supply model runs, so the volume curve rises with every re-run.",
-    pitch: "The model's conservative. Three points of site index on the lidar stands is inside the error bars anyway, and the sustainable cut comes up enough to keep the mill fed through the analysis.",
+    pitch: "The model's conservative. Three points of site index on the lidar stands is inside the error bars, and the cut comes up enough to keep the mill fed.",
     proposer: "the woodlands VP",
     roles: ["planner"],
     phase: "desk",
