@@ -179,6 +179,85 @@ export const HARVEST_PACES = [
   },
 ];
 
+/**
+ * Monthly delivery curves against the plan (each sums to 11.8, so the plan
+ * year is the same size everywhere; only its shape moves). Interior ground
+ * loses March-April to breakup; winter-road country logs hardest on frozen
+ * ground and all but stops in the thaw; the coast has no breakup but loses
+ * winter to snow at elevation and high summer to fire-hazard shutdowns; the
+ * wet transition loses the depth of winter; the dry belt gives up part of
+ * July and August to fire-season restrictions.
+ */
+export const DELIVERY_CURVES = {
+  interior: [1.2, 1.2, 0.6, 0.4, 0.75, 1.05, 1.1, 1.05, 1.15, 1.2, 1.15, 0.95],
+  winterRoad: [1.45, 1.45, 0.85, 0.2, 0.45, 0.8, 1.0, 1.0, 1.05, 1.1, 1.1, 1.35],
+  coast: [0.85, 0.9, 1.05, 1.1, 1.1, 1.05, 0.8, 0.75, 1.05, 1.1, 1.1, 0.95],
+  wetTransition: [0.9, 0.95, 0.95, 0.85, 1.0, 1.1, 1.1, 1.05, 1.1, 1.05, 1.0, 0.75],
+  dryBelt: [1.2, 1.15, 0.65, 0.45, 0.85, 1.05, 0.95, 0.9, 1.15, 1.2, 1.2, 1.05],
+};
+
+/**
+ * What the operating area does to the ledger: the species mix sets the
+ * long-run log price, the Market Pricing System sets stumpage off that
+ * value (so poor wood pays little and fir and cedar pay a lot), the ground
+ * and the haul set logging cost, the market the logs go to sets how hard
+ * the price swings, and the climate sets the shape of the delivery year.
+ * `swing` is the width of a month's random price move in $/m³.
+ */
+export const MANAGER_AREA_ECONOMICS = {
+  'fraser-plateau': {
+    logPrice: 105, stumpage: 27, loggingHaul: 62, swing: 10, curve: 'interior',
+    market: 'Spruce and pine sawlogs, much of the pine beetle-killed, to the Prince George sawmills; aspen to the OSB plant.',
+    gaps: 'spring breakup takes April deliveries to well under half of plan',
+  },
+  'bulkley-valley': {
+    logPrice: 101, stumpage: 23, loggingHaul: 63, swing: 10, curve: 'interior',
+    market: 'Spruce and balsam sawlogs to Houston and Smithers; visual-quality blocks are partial cuts that cost more to log.',
+    gaps: 'spring breakup takes April deliveries to well under half of plan',
+  },
+  'fort-st-john-plateau': {
+    logPrice: 96, stumpage: 17, loggingHaul: 62, swing: 8, curve: 'winterRoad',
+    market: 'White spruce sawlogs to the Peace mills and aspen on a pulp and OSB contract that pays less and moves less.',
+    gaps: 'the muskeg blocks are winter-only, so the thaw takes April to a fifth of plan and May to under half',
+  },
+  'muskwa-foothills': {
+    logPrice: 98, stumpage: 16, loggingHaul: 67, swing: 9, curve: 'winterRoad',
+    market: 'Pine and spruce sawlogs on the longest haul in the licence, from remote camps.',
+    gaps: 'the winter roads carry the year, and the thaw takes April to a fifth of plan and May to under half',
+  },
+  'tahltan-highland': {
+    logPrice: 94, stumpage: 14, loggingHaul: 65, swing: 7, curve: 'winterRoad',
+    market: 'Small spruce and balsam on a remote haul; the Crown prices it near the floor because it is worth little at the mill.',
+    gaps: 'the thaw takes April to a fifth of plan and May to under half',
+  },
+  'skeena-nass': {
+    logPrice: 92, stumpage: 11, loggingHaul: 64, swing: 13, curve: 'wetTransition',
+    market: 'Hemlock and balsam, pulp-heavy, into a thin domestic market and an export market that moves with Asia.',
+    gaps: 'December snow and the April freshet are the thin months',
+  },
+  'vancouver-island-coast': {
+    logPrice: 128, stumpage: 40, loggingHaul: 72, swing: 14, curve: 'coast',
+    market: 'Douglas-fir, hemlock and cedar across the dryland sort to the coastal log market; fir and cedar pay well, and the market swings.',
+    gaps: 'there is no breakup on the coast: snow at elevation thins the winter and fire-hazard shutdowns take part of July and August',
+  },
+  'kootenay-wetbelt': {
+    logPrice: 116, stumpage: 33, loggingHaul: 67, swing: 11, curve: 'interior',
+    market: 'Cedar, hemlock and fir off steep ground; the cedar carries the margin and the cable yarding eats part of it.',
+    gaps: 'spring breakup takes April deliveries to well under half of plan',
+  },
+  'okanagan-shuswap-drybelt': {
+    logPrice: 108, stumpage: 29, loggingHaul: 61, swing: 10, curve: 'dryBelt',
+    market: 'Fir and pine sawlogs on a short haul to the valley mills.',
+    gaps: 'breakup thins March and April, and fire-season restrictions take part of July and August',
+  },
+};
+
+/** The ledger profile for an operating area; unknown areas run on the Fraser Plateau's numbers. */
+export function getAreaEconomics(areaId) {
+  const profile = MANAGER_AREA_ECONOMICS[areaId] || MANAGER_AREA_ECONOMICS['fraser-plateau'];
+  return { ...profile, curveValues: [...(DELIVERY_CURVES[profile.curve] || DELIVERY_CURVES.interior)] };
+}
+
 export function getHarvestPace(idOrFactor) {
   return HARVEST_PACES.find((pace) => pace.id === idOrFactor || pace.factor === Number(idOrFactor))
     || HARVEST_PACES[1];

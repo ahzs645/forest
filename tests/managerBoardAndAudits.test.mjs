@@ -109,9 +109,37 @@ test('the year-end audit restates spun weak quarters, and the board hears it fro
   const lucky = await runQ4([1, 3], () => 0.99);
   assert.equal(clean.journey.ledger.cutControlStatus, 'in_band');
   assert.equal(caught.journey.metrics.reputation, clean.journey.metrics.reputation - 16);
-  assert.ok(caught.ui.lines.some((line) => /restates Q1, Q3\. The board learns the quarter from the auditors instead of from you: reputation -16\./.test(line)));
+  assert.ok(caught.ui.lines.some((line) => /restates Q1 and Q3\. The board learns those quarters from the auditors instead of from you: reputation -16\./.test(line)));
   assert.equal(lucky.journey.metrics.reputation, clean.journey.metrics.reputation, 'a spin can survive the audit');
-  assert.ok(lucky.ui.lines.some((line) => /All 2 spun quarters survive, this time\./.test(line)));
+  assert.ok(lucky.ui.lines.some((line) => /Both spun quarters survive, this time\./.test(line)));
+});
+
+test('the board reads an overcut, a runaway projection and an empty treasury as weak quarters, so spinning them goes to the audit', async () => {
+  // December at 123% of the AAC with the C&E penalty emptying the treasury.
+  const december = monthJourney(12, 276000);
+  december.resources.budget = 400000;
+  const decUi = makeUi(answerWith('spin', 'desk', 'set_aside', 'pace:1'));
+  await withRandom(() => 0.5, () => runManagerDay({ ui: decUi, journey: december, gameOver: false, checkpoint() {} }));
+  assert.match(december.ledger.cutControlStatus, /overcut/);
+  const decVerdict = decUi.lines.find((line) => line.startsWith('The directors read it as'));
+  assert.match(decVerdict, /^The directors read it as a weak quarter: .*the cut-control statement goes in overcut 1\d\d\.\d%.*the treasury is empty/);
+  assert.ok(!decUi.lines.includes('The directors read it as a sound quarter.'));
+  assert.deepEqual(december.flags.boardSpunQuarters, [4], 'a spun overcut is on the audit list');
+  assert.ok(decUi.lines.some((line) => /AUDITED YEAR-END STATEMENTS/.test(line)));
+
+  // June, already on course for an overcut: the projection is the finding, even
+  // with the quarter delivered to plan.
+  const june = monthJourney(6, 150000);
+  const juneUi = makeUi(answerWith('transparent', 'plan', 'set_aside', 'pace:1'));
+  await withRandom(() => 0.5, () => runManagerDay({ ui: juneUi, journey: june, gameOver: false, checkpoint() {} }));
+  assert.ok(juneUi.lines.some((line) => /^The directors read it as a weak quarter: .*the cut is heading for 1[1-3]\d\.\d% of the AAC/.test(line)));
+
+  // September in band but with most of the treasury gone.
+  const september = monthJourney(9, 176000);
+  september.resources.budget = 250000;
+  const sepUi = makeUi(answerWith('transparent', 'plan', 'set_aside', 'pace:1'));
+  await withRandom(() => 0.5, () => runManagerDay({ ui: sepUi, journey: september, gameOver: false, checkpoint() {} }));
+  assert.ok(sepUi.lines.some((line) => /^The directors read it as a weak quarter: .*the treasury is down to \$[\d,]+ from \$850,000/.test(line)));
 });
 
 test('a sound quarter honestly reported earns reputation; one bad meter is not a weak quarter', async () => {

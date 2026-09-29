@@ -5,7 +5,9 @@ import { createManagerJourney } from '../js/journey/factory.js';
 import { runManagerDay } from '../js/modes/manager.js';
 import { checkEndConditions } from '../js/modes/shared/endConditions.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
-import { MANAGER_EXECUTIVE_ROLES, OPERATING_POSTURES } from '../js/data/managerRoles.js';
+import { MANAGER_EXECUTIVE_ROLES, OPERATING_POSTURES, MANAGER_AREA_ECONOMICS, getAreaEconomics } from '../js/data/managerRoles.js';
+import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
+import { simulateManagerYear } from '../scripts/simulate-manager.mjs';
 import managerEvents from '../js/data/json/desk/managerEvents.json' with { type: 'json' };
 
 function seededRandomFactory(seed) {
@@ -121,6 +123,47 @@ test('every month closes with a ledger: volume, margin, overhead, net, treasury'
     assert.notEqual(journey.metrics.budget, 50, 'budget health tracks the treasury');
     assert.ok(!lines.some((line) => /Corporate overhead: -\$4,000/.test(line)));
   });
+});
+
+test('the operating area sets the ledger: wood, stumpage, logging cost, price swing and the shape of the year', async () => {
+  const opened = {};
+  for (const area of OPERATING_AREAS) {
+    await withSeededRandom(29, async () => {
+      const journey = createManagerJourney({ areaId: area.id });
+      const ui = makeUi(steadyAnswers);
+      await runManagerDay({ ui, journey, gameOver: false, checkpoint() {} });
+      const economics = getAreaEconomics(area.id);
+      assert.equal(MANAGER_AREA_ECONOMICS[area.id] !== undefined, true, `${area.id} has a profile`);
+      assert.equal(journey.ledger.logPrice, economics.logPrice);
+      assert.equal(journey.ledger.stumpage, economics.stumpage);
+      assert.equal(journey.ledger.loggingHaul, economics.loggingHaul);
+      assert.ok(ui.lines.includes(economics.market), `${area.id}: the wood is on the operating plan`);
+      assert.ok(Math.abs(journey.ledger.seasonalCurve.reduce((sum, value) => sum + value, 0) - 11.8) < 1e-9, `${area.id}: the plan year is the same size`);
+      opened[area.id] = { ui, journey };
+    });
+  }
+  const signature = (id) => JSON.stringify([opened[id].journey.ledger.logPrice, opened[id].journey.ledger.stumpage, opened[id].journey.ledger.loggingHaul, opened[id].journey.ledger.seasonalCurve, opened[id].journey.ledger.priceSwing]);
+  assert.equal(new Set(OPERATING_AREAS.map((area) => signature(area.id))).size, OPERATING_AREAS.length, 'no two areas run the same ledger');
+
+  // The coast has no breakup, and the CFO does not say it does.
+  const coast = opened['vancouver-island-coast'];
+  assert.ok(!coast.ui.lines.some((line) => /(CFO).*spring breakup/.test(line)));
+  assert.ok(coast.ui.lines.some((line) => /\(CFO\) notes that there is no breakup on the coast/.test(line)));
+  assert.ok(coast.journey.ledger.seasonalCurve[3] > 1, 'April logs on the coast');
+  assert.ok(opened['fort-st-john-plateau'].journey.ledger.seasonalCurve[3] < 0.3, 'winter-road country all but stops in the thaw');
+  // January's carry-in follows the area's curve.
+  assert.notEqual(opened['vancouver-island-coast'].journey.ledger.months[0].delivered, opened['fraser-plateau'].journey.ledger.months[0].delivered);
+
+  // Every area stays a winnable year for a competent GM, and they do not all end on the same number.
+  const treasuries = new Set();
+  for (const area of OPERATING_AREAS) {
+    for (const seed of [41, 43]) {
+      const result = await simulateManagerYear(seed, 'competent', { areaId: area.id });
+      assert.equal(result.victory, true, `${area.id} ${seed}: ${result.reason}`);
+      treasuries.add(result.treasury);
+    }
+  }
+  assert.equal(treasuries.size, OPERATING_AREAS.length * 2);
 });
 
 test('board reviews sit quarterly on the calendar and only once each', async () => {
