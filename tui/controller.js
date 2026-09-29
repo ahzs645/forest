@@ -601,7 +601,11 @@ export class TuiGameController {
       {
         type: "confirm",
         heading: "Return to the main menu?",
-        body: "Your seasonal run is autosaved — you can resume it later from the menu.",
+        // Crisis Command never writes the seasonal autosave (see
+        // persistSeasonalSave), so it must not promise one.
+        body: this.gs.gameMode === "crisis-command"
+          ? "Crisis Command isn't saved — returning to the main menu ends this incident."
+          : "Your seasonal run is autosaved — you can resume it later from the menu.",
       },
       ["Continue run", "Main menu"],
       (idx) => {

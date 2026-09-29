@@ -303,7 +303,10 @@ export class TerminalUI {
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (this.isModalOpen() && e.key === 'Tab') this._trapModalFocus(e);
-      const canUseGameplayShortcuts = this._canUseGameplayShortcuts();
+      // Ctrl/Cmd/Alt chords belong to the browser (print, save, find, reload);
+      // Shift stays allowed since '?' needs it.
+      const canUseGameplayShortcuts = !(e.ctrlKey || e.metaKey || e.altKey)
+        && this._canUseGameplayShortcuts();
 
       // Number keys for choices (works in both classic and modern mode).
       // 1-9 map directly; 0 is the accelerator for a 10th option so menus that

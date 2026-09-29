@@ -14,6 +14,7 @@
 import { TuiGameController } from '../../tui/controller.js';
 import { makeRng } from '../engine/rng.js';
 import { formatMetricName } from '../engine/shared.js';
+import { recordTieredRun } from '../career.js';
 
 const METRIC_ORDER = ['progress', 'forestHealth', 'relationships', 'compliance', 'budget'];
 const METRIC_SHORT = {
@@ -330,6 +331,12 @@ async function runSeasonalGameInner(ui, options = {}) {
 
     if (mode === 'end') {
       const summary = contentData;
+      // A finished year (or crisis debrief) plants its tree in the career
+      // forest. Filed on arrival at the summary: the controller has already
+      // cleared its autosave, so a reload here cannot replay and refile it.
+      if (summary?.tier) {
+        recordTieredRun(controller.gs?.gameMode === 'crisis-command' ? 'crisis-command' : 'seasonal', summary);
+      }
       const optionLabels = view.options || [];
       if (optionLabels.length) {
         const index = await promptSummaryCard(ui, contentData, optionLabels, view.gameState);

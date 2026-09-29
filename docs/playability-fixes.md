@@ -123,3 +123,13 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Certification is earned.** May registration audit against stated requirements, one October re-audit, October surveillance with suspension; premium and bonus start at issue.
 - **Executive team and calendar.** The Expedition GM gets the CFO/woodlands/chief forester/IR/HSE team; the month drives the season so seasonal cards are gated; no CEO references.
 - **Economy.** Stumpage tracks the log price, overhead $270k scaled by difficulty, January is a ledger month. `node scripts/simulate-manager.mjs` (40 seeds, normal): competent 40/40, honest 40/40, spin 40/40 at a lower grade, reckless 3/40 (overcut), random 34/40 and no Greenhorn bankruptcies.
+## 2026-09-29 — Saves and UI (playtest audit, ui.md)
+
+- **Saves:** every read is schema-checked (`js/game/saveLoad.js`). A corrupt, partial or older-schema expedition or campaign save is named, discarded and replaced by the hub, so it can no longer blank the app or strand a campaign screen. LOAD DATA only lists saves that load.
+- **Leaving a run:** the prompt leads with Keep Playing (focused), offers Save & return, and puts Abandon last. Escape then Enter no longer deletes the run.
+- **Landing:** the menu scrolls and fits above the footer at 1280×720, 1366×768 and 1024×768 once a career forest exists. Ctrl/Cmd/Alt chords no longer trigger shortcuts. The game shell is inert behind the landing and setup screens.
+- **Themes:** the legacy colour aliases now resolve per theme, so green, amber and ice apply fully, including the Trail View. Dim text meets 4.5:1 in every theme.
+- **Modern and Grid:** Modern keeps about five lines of story under the Trail View, and its phone cards stack. Grid clips on whole words with an ellipsis.
+- **Career forest:** Campaign years, Seasonal years and Crisis debriefs are filed to the service record.
+- **Intel and copy:** Intel counts and labels are corrected, the manifest reflects the province-wide game, and several copy nits are fixed.
+- **Tests:** unit coverage is `tests/saveValidation.test.mjs` and `tests/careerTieredRuns.test.mjs`. Browser coverage is `tests/e2e/saves-ui.spec.js`.

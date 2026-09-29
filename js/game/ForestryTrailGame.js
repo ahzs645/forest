@@ -34,7 +34,7 @@ import { theme } from '../theme.js';
 import { showJourneyIntro } from './intro.js';
 import { runFinalDebrief } from './debrief.js';
 import { handleEvent } from '../modes/shared/handleEvent.js';
-import { saveActiveRun, loadActiveRun, clearActiveRun } from './saveLoad.js';
+import { saveActiveRun, loadActiveRun, clearActiveRun, findUnreadableSaves } from './saveLoad.js';
 
 /**
  * Apply difficulty multipliers to journey resources
@@ -137,20 +137,40 @@ export class ForestryTrailGame {
     if (!this.journey) return;
     this._restartConfirmOpen = true;
 
+    // Keep Playing leads (and takes focus) so a stray Escape-then-Enter
+    // resumes the shift instead of deleting the run; the destructive choice
+    // comes last.
     this.ui.openModal({
-      title: 'Abandon Expedition?',
+      title: 'Leave the Expedition?',
       dismissible: true,
       onClose: () => { this._restartConfirmOpen = false; },
       buildContent: (container) => {
         const msg = document.createElement('p');
-        msg.textContent = 'Abandoning deletes this expedition save and returns you to the district office.';
+        msg.textContent = 'The expedition saves at every decision and stays on file — '
+          + 'resume it from LOAD DATA. Abandoning deletes the save for good.';
         msg.style.marginTop = '0';
         container.appendChild(msg);
       },
       actions: [
         {
-          label: 'Abandon (delete save)',
+          label: 'Keep Playing',
           primary: true,
+          onSelect: () => { this.ui.closeModal(); }
+        },
+        {
+          label: 'Save & return to district office',
+          onSelect: () => {
+            this.ui.closeModal();
+            // The latest checkpoint is already on file; just hand back the hub.
+            this.journey = null;
+            this.gameOver = false;
+            this.victory = false;
+            this.start({ offerResume: false });
+          }
+        },
+        {
+          label: 'Abandon (delete save)',
+          danger: true,
           onSelect: () => {
             this.ui.closeModal();
             clearActiveRun();
@@ -158,10 +178,6 @@ export class ForestryTrailGame {
             this.victory = false;
             this.start();
           }
-        },
-        {
-          label: 'Keep Playing',
-          onSelect: () => { this.ui.closeModal(); }
         }
       ]
     });
@@ -239,7 +255,14 @@ export class ForestryTrailGame {
     });
   }
 
-  async start() {
+  /**
+   * Boot (or return) to the district office hub and run whatever the player
+   * picks there.
+   * @param {Object} [options]
+   * @param {boolean} [options.offerResume=true] - offer the saved expedition
+   *   up front; off when the player has just stepped away from it
+   */
+  async start({ offerResume = true } = {}) {
     this.ui.prepareForNewGame();
     this.ui.clear();
     this.gameOver = false;
@@ -258,13 +281,34 @@ export class ForestryTrailGame {
       return;
     }
 
+    // A save this build cannot resume (damaged, partial, or from an older
+    // schema) must never reach the renderer: say so and clear the slot.
+    const unreadable = findUnreadableSaves();
+    if (unreadable.length) {
+      await this._promptUnreadableSaves(unreadable);
+    }
+
     // A saved run survives refreshes, tab evictions, and crashes
-    const savedRun = loadActiveRun();
+    let savedRun = offerResume ? loadActiveRun() : null;
     if (savedRun) {
       // Keep the dashboard behind the modal truthful instead of showing the
       // landing-page Day 1 placeholders beside a later saved checkpoint.
+      // The schema check cannot foresee every field the panels read, so a
+      // save that still fails to render is treated as unreadable too.
       this.journey = savedRun;
-      this.ui.updateAllStatus(savedRun);
+      try {
+        this.ui.updateAllStatus(savedRun);
+      } catch (error) {
+        console.error('Saved expedition failed to render:', error);
+        this.journey = null;
+        savedRun = null;
+        this.ui.prepareForNewGame();
+        await this._promptUnreadableSaves([
+          { label: 'expedition', reason: 'it no longer matches this version of the game', discard: clearActiveRun },
+        ]);
+      }
+    }
+    if (savedRun) {
       const resume = await this._promptResume(savedRun);
       if (resume === 'resume') {
         await this._resumeSavedRun(savedRun);
@@ -309,7 +353,15 @@ export class ForestryTrailGame {
     // Campaign — the unified year (see docs/unified_campaign.md).
     if (init?.action === 'campaign') {
       const { runCampaign } = await import('./campaign.js');
-      await runCampaign(this);
+      try {
+        await runCampaign(this);
+      } catch (error) {
+        // Deployment days recover inside the campaign; this catches the
+        // briefing, review, and year-end screens so a bad save or a bug there
+        // never strands the player on a screen with no choices.
+        await this._recoverFromCampaignError(error);
+        return;
+      }
       this.start();
       return;
     }
@@ -435,6 +487,70 @@ export class ForestryTrailGame {
       : 'Restored the latest completed-shift checkpoint. Back to work.', 'term-dim');
     this.ui.write('');
     await this._mainLoop();
+  }
+
+  /**
+   * Tell the player which saves cannot be resumed and discard them, so the
+   * hub (and LOAD DATA) only ever offers runs that will actually load.
+   * @param {Array<{label: string, reason: string, discard: Function}>} saves
+   * @private
+   */
+  _promptUnreadableSaves(saves) {
+    return new Promise((resolve) => {
+      const discardAll = () => {
+        for (const save of saves) save.discard();
+        resolve();
+      };
+      const plural = saves.length > 1;
+      const names = saves.map((save) => save.label).join(' and ');
+      this.ui.openModal({
+        title: plural ? 'Saves Can\'t Be Read' : 'Save Can\'t Be Read',
+        dismissible: true,
+        onClose: discardAll,
+        buildContent: (container) => {
+          const msg = document.createElement('p');
+          msg.textContent = `Your ${names} save${plural ? 's are' : ' is'} damaged or from an older version `
+            + `of the game, so ${plural ? 'they' : 'it'} can't be resumed. Discarding clears `
+            + `${plural ? 'them' : 'it'}; nothing else on file is touched.`;
+          msg.style.marginTop = '0';
+          container.appendChild(msg);
+          for (const save of saves) {
+            const detail = document.createElement('p');
+            detail.className = 'term-dim';
+            detail.textContent = `${save.label[0].toUpperCase()}${save.label.slice(1)}: ${save.reason}.`;
+            container.appendChild(detail);
+          }
+        },
+        actions: [
+          {
+            label: 'Discard and continue',
+            primary: true,
+            onSelect: () => { this.ui.closeModal(); }
+          }
+        ]
+      });
+    });
+  }
+
+  /**
+   * A campaign screen outside the deployment loop threw. Explain, then let the
+   * player retry from the saved year or clear it — never a dead screen.
+   * @private
+   */
+  async _recoverFromCampaignError(error) {
+    console.error('Campaign error:', error);
+    const { clearCampaign } = await import('./campaign.js');
+    this.ui.write('');
+    this.ui.writeDanger(`Something broke in the district office: ${error.message}`);
+    this.ui.write('The campaign year is saved to the start of its current day.', 'term-dim');
+    const recovery = await this.ui.promptChoice('', [
+      { label: 'Reload & Resume', value: 'reload' },
+      { label: 'Discard the campaign year', value: 'fresh' }
+    ]);
+    if (recovery.value === 'fresh') {
+      clearCampaign();
+    }
+    window.location.reload();
   }
 
   /**

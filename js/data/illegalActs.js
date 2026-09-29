@@ -3462,7 +3462,6 @@ const ACT_PROVENANCE = {
   },
   "free-rider-rup": {
     "basisCatalogIds": [
-      "watercourse-due-diligence",
       "rationale-gap",
       "road-use-permit-free-rider"
     ],
@@ -3481,7 +3480,6 @@ const ACT_PROVENANCE = {
   },
   "stealth-aia-skip": {
     "basisCatalogIds": [
-      "watercourse-due-diligence",
       "rationale-gap",
       "archaeology-escalation-gap"
     ],

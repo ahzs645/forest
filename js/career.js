@@ -1,6 +1,8 @@
 /**
  * Career Record
- * Persistent service record for the expedition game (written by the debrief).
+ * Persistent service record: every finished expedition (the debrief), campaign
+ * year, seasonal year and crisis debrief folds in here, and the landing hub
+ * grows it into the career forest.
  */
 
 const SERVICE_RECORD_KEY = 'bcft.serviceRecord.v1';
@@ -13,7 +15,15 @@ export const ROLE_LABELS = {
   permitting: 'Permitting Specialist',
   desk: 'Desk Team',
   manager: 'General Manager',
+  campaign: 'Campaign year',
+  seasonal: 'Seasonal Strategy',
+  'crisis-command': 'Crisis Command',
 };
+
+// Tiers that count as a win for the record (full-grown tree). Campaign and
+// seasonal years end outstanding/solid/mixed/stumbled; crisis debriefs end
+// STRONG/MIXED/FRAGILE.
+const WINNING_TIERS = new Set(['outstanding', 'solid', 'strong']);
 
 export const CAREER_LABELS = {
   kmSurveyed: 'Kilometres surveyed',
@@ -73,4 +83,23 @@ export function foldRunIntoRecord(record, bucket, result, careerDeltas = {}) {
   }
 
   return { ...next, isBest };
+}
+
+/**
+ * Fold a finished tiered year (campaign, seasonal, crisis) into the stored
+ * record and save it.
+ * @param {string} bucket - 'campaign', 'seasonal' or 'crisis-command'
+ * @param {{tier: string, score: number}} result
+ * @param {Object} [careerDeltas] - counters to add to record.career
+ * @returns {Object} the updated record
+ */
+export function recordTieredRun(bucket, { tier, score }, careerDeltas = {}) {
+  const tierKey = String(tier || '').toLowerCase();
+  const updated = foldRunIntoRecord(loadServiceRecord(), bucket, {
+    score: Math.max(0, Math.min(100, Math.round(Number(score) || 0))),
+    grade: tierKey ? tierKey[0].toUpperCase() + tierKey.slice(1) : null,
+    victory: WINNING_TIERS.has(tierKey),
+  }, careerDeltas);
+  saveServiceRecord(updated);
+  return updated;
 }

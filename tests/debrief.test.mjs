@@ -268,7 +268,7 @@ test('planning victory: runFinalDebrief renders every stage through to the servi
   // actually folded and saved -- a stronger signal than merely seeing the
   // "SERVICE RECORD" header, which would still print even if the save step
   // were skipped.
-  assert.match(text, /Career expeditions: 1/, 'stage 5 wrote a persisted career line');
+  assert.match(text, /Career runs on record: 1/, 'stage 5 wrote a persisted career line');
 });
 
 test('planning defeat: runFinalDebrief also renders every stage (parity with victory)', async () => {

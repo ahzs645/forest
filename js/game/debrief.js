@@ -354,6 +354,22 @@ export function buildManagerEpilogue(journey, victory) {
  * @returns {Object} Updated record
  */
 export function updateServiceRecord(record, journey, scoreResult, victory) {
+  return foldRunIntoRecord(record, journey.journeyType || 'field', {
+    score: scoreResult.totalScore,
+    grade: scoreResult.grade,
+    victory: Boolean(victory),
+  }, getCareerDeltas(journey, victory));
+}
+
+/**
+ * The lifetime field-record counters one deployment adds (km surveyed,
+ * seedlings planted, ...). Shared with the campaign, whose seasons are
+ * deployments too.
+ * @param {Object} journey
+ * @param {boolean} victory
+ * @returns {Object}
+ */
+export function getCareerDeltas(journey, victory) {
   const type = journey.journeyType || 'field';
 
   const careerDeltas = {};
@@ -376,12 +392,7 @@ export function updateServiceRecord(record, journey, scoreResult, victory) {
       careerDeltas.daysInTheChair = Math.max(0, (journey.day || 1) - 1);
       break;
   }
-
-  return foldRunIntoRecord(record, type, {
-    score: scoreResult.totalScore,
-    grade: scoreResult.grade,
-    victory: Boolean(victory),
-  }, careerDeltas);
+  return careerDeltas;
 }
 
 // ---------------------------------------------------------------------------
@@ -517,7 +528,7 @@ export async function runFinalDebrief(ui, journey, victory) {
     ui.writePositive(`New personal best for ${ROLE_LABELS[journey.journeyType] || journey.journeyType}!`);
     ui.write('');
   }
-  ui.write(`Career expeditions: ${updated.runs}`);
+  ui.write(`Career runs on record: ${updated.runs}`);
   for (const [type, stats] of Object.entries(updated.byRole)) {
     const label = ROLE_LABELS[type] || type;
     ui.write(`  ${label}: ${stats.runs} run${stats.runs > 1 ? 's' : ''}, best ${stats.bestGrade ?? '-'} (${stats.bestScore >= 0 ? stats.bestScore : '-'}/100), ${stats.victories} win${stats.victories === 1 ? '' : 's'}`);
