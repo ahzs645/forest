@@ -312,12 +312,17 @@ test('the playtest premise mismatches stay fixed', () => {
   PREMISE_BROKEN.fomCommentsOpen.breakIt(planner);
   assert.equal(offered('silent-fom-comment-box', planner), false, 'comments logged and answered');
 
-  // A planner gate that is already met pays nothing.
+  // A planner gate that is already met is not paid.
   const analysing = journeyFor('planner');
   analysing.plan.phase = 'analysis';
   assert.equal(offered('inventory-data-laundering', analysing), true);
   analysing.plan.analysisQuality = 100;
-  assert.equal(offered('inventory-data-laundering', analysing), false);
+  // Still offered, but the promised analysis is not paid: it falls to time back
+  // on the file (js/events/selection.js buildTemptationPayoff), never to a gate
+  // that cannot move.
+  const gateFull = buildTemptationPayoff(act('inventory-data-laundering'), analysing).effects;
+  assert.equal(gateFull.analysis, undefined, 'no analysis is promised at a full analysis gate');
+  assert.ok(gateFull.progress > 0, 'the take pays time back on the file instead');
 
   // The blockade act needs a blockade's worth of bad relations.
   const gm = journeyFor('manager');
