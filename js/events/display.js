@@ -40,9 +40,28 @@ export function formatEventForDisplay(event, journeyType = 'field') {
       hint: getOptionHint(opt, journeyType, event),
       // An option can name its own chip: a shortcut is OFF-BOOK, which says
       // more than the RISKY every ordinary gamble carries.
-      tag: opt.riskTag || deriveOptionRiskTag(opt)
+      tag: opt.riskTag || deriveEventOptionTag(opt, event)
     }))
   };
+}
+
+/**
+ * The chip for an option on this particular card. A shortcut's determination
+ * (the fallout card) is already decided: answering it costs exactly what the
+ * card prints, with no roll, so it is a TRADEOFF however steep, never RISKY.
+ * @param {Object} option
+ * @param {Object} [event]
+ * @returns {string}
+ */
+export function deriveEventOptionTag(option, event = null) {
+  const certain = ['chanceSuccess', 'riskInjury', 'riskCompliance', 'riskRejection']
+    .every((key) => typeof option?.[key] !== 'number')
+    && !option?.crewEffect && !option?.schedulesEvent && !option?.gameOver;
+  if (event?.temptationStage === 'fallout' && certain) {
+    const tag = deriveOptionRiskTag(option);
+    return tag === 'RISKY' ? 'TRADEOFF' : tag;
+  }
+  return deriveOptionRiskTag(option);
 }
 
 /**
@@ -334,10 +353,12 @@ function effectChips(effects, journeyType) {
     }
     if (option.effects.budget !== undefined) {
       const amount = option.effects.budget;
-      // One decimal when it matters: $36,600 is "$36.6k", never "$37k".
-      const budgetStr = Math.abs(amount) >= 1000
-        ? `$${Number((Math.abs(amount) / 1000).toFixed(1))}k`
-        : `$${Math.abs(amount)}`;
+      // Short only when short is exact: $36,600 is "$36.6k", but $1,440 is
+      // "$1,440", never a "$1.4k" that the ledger then contradicts.
+      const thousands = Number((Math.abs(amount) / 1000).toFixed(1));
+      const budgetStr = Math.abs(amount) >= 1000 && Math.round(thousands * 1000) === Math.round(Math.abs(amount))
+        ? `$${thousands}k`
+        : `$${Math.round(Math.abs(amount)).toLocaleString('en-CA')}`;
       const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
       hints.push(`${sign}${budgetStr}`);
     }

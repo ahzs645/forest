@@ -436,3 +436,12 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
   - The fish-passage and smoke-hold cards reach the coast and the Okanagan.
   - The dead seasonal comic gate is gone.
   - Both eslint warnings are fixed.
+## 2026-09-29 — Wave 3: UI and renderer residuals
+
+- **Modern budget.** The sidebar reads what is left of the run's own starting budget, not a fixed $10,000 (a GM opened at 8500%).
+- **Grid on a phone.** An OFF-BOOK option takes two taps: the first opens its whole detail with "Tap again to take it." Mission facts and checklist lines wrap instead of losing their tail.
+- **Short log panes.** Every day card anchors the log on its first line, so the event's name is not under the Trail View. While a shortcut or fallout card is up, the picture folds to its bar so the pitch and odds get the room.
+- **Fallout, display side.** "Answer for it" is a TRADEOFF, not RISKY. A late catch states the capped delay the queue applies. Budget chips are abbreviated only when exact. A fine bigger than the purse says what it will actually take.
+- **Leave prompts.** Campaign and Seasonal default to Keep Playing, like the expedition.
+- **Settings in-game.** Classic and Grid have a Settings button and the O key; Help links to it. Crisis from the landing files its career tree, and `tui.html` wears the Settings theme.
+- **Smaller fixes.** Intel role cards no longer repeat, acronym tags are upper case, and the search box no longer autofocuses on touch. Summer has no freeze-up or heavy snow.

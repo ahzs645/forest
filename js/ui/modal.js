@@ -14,6 +14,11 @@ import {
 import { ILLEGAL_ACTS } from '../data/illegalActs.js';
 
 const ROLE_IDS = ['planner', 'permitter', 'recce', 'silviculture'];
+// The obligation an Intel role card leads with, where the most specific one
+// is shared: a permitter's own exposure is the referral that never went out.
+const ROLE_SIGNATURE_OBLIGATION = {
+  permitter: 'referral-and-notification-duty',
+};
 const ROLE_LABELS = {
   planner: 'Planner',
   permitter: 'Permitter',
@@ -90,9 +95,17 @@ function getEntryPattern(entry) {
     .slice(0, 2)
     .map((tag) => String(tag).replace(/[_-]+/g, ' '));
   return subjects.length
-    ? subjects.map((tag) => tag.charAt(0).toUpperCase() + tag.slice(1)).join(' · ')
+    ? subjects.map((tag) => tag.split(' ')
+      .map((word, index) => (TAG_ACRONYMS.has(word) ? word.toUpperCase()
+        : index === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+      .join(' ')).join(' · ')
     : 'General compliance risk';
 }
+
+// Tags that are acronyms read as acronyms: "AAC · Fraud", not "Aac · Fraud".
+const TAG_ACRONYMS = new Set([
+  'aac', 'aoa', 'bwbs', 'cwh', 'fom', 'fsp', 'gis', 'gps', 'ich', 'idf', 'qep', 'rup', 'sbs', 'swb', 'vqo', 'wtp',
+]);
 
 const HIGH_RISK_TAGS = new Set(['fraud', 'forgery', 'bribery', 'illegal-works', 'blatant', 'sabotage', 'coverup', 'laundering', 'noncompliance', 'deception', 'tampering']);
 const ELEVATED_RISK_TAGS = new Set(['compliance', 'records', 'risk', 'ethics', 'paperwork', 'reporting', 'regulatory']);
@@ -316,13 +329,25 @@ export const ModalMixin = {
           <p>[↑]/[↓] or [J]/[K] - Move through options, [ENTER] confirms</p>
           <p>[S] - Status panel &nbsp; [G] - Glossary &nbsp; [L] - Journey log</p>
           <p>[P] - Compliance intel &nbsp; [?] - This screen</p>
+          <p>[O] - Settings: display mode and colour theme</p>
           <p>[R] or [ESC] - Leave the run / close panels</p>
           <br>
           <p><strong>Saving:</strong></p>
-          <p>Every mode saves as you play. Leaving a run keeps it on file; pick it back up from LOAD DATA at the district office. Display mode and colour theme are under SETTINGS there.</p>
+          <p>Every mode saves as you play. Leaving a run keeps it on file; pick it back up from LOAD DATA at the district office.</p>
         `;
       },
-      actions: [{ label: 'Got it!', primary: true, onSelect: () => this.closeModal() }]
+      actions: [
+        { label: 'Got it!', primary: true, onSelect: () => this.closeModal() },
+        // The one route to Settings on a phone grid, whose tap row has no
+        // room for the button.
+        {
+          label: 'Settings',
+          onSelect: () => {
+            this.closeModal();
+            this.showSettingsModal();
+          }
+        }
+      ]
     });
   },
 
@@ -669,6 +694,7 @@ export const ModalMixin = {
           grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
           grid.style.gap = '10px';
 
+          const usedSignatures = new Set();
           for (const roleId of ROLE_IDS) {
             // Full lists, not the one-item preview: the cards compare roles
             // by these counts, and every card used to read "1 obligations".
@@ -682,8 +708,13 @@ export const ModalMixin = {
             const count = (n, noun) => `${n} ${noun}${n === 1 ? '' : 's'}`;
             // Lead with the obligation most specific to this role; the shared
             // ones come first in the catalogue, so every card showed the same.
-            const signature = [...context.obligations]
-              .sort((a, b) => (a.roles?.length || 0) - (b.roles?.length || 0))[0];
+            // A role's own pick comes first, and no two cards lead alike.
+            const ranked = [...context.obligations]
+              .sort((a, b) => (a.roles?.length || 0) - (b.roles?.length || 0));
+            const signature = ranked.find((entry) => entry.id === ROLE_SIGNATURE_OBLIGATION[roleId])
+              || ranked.find((entry) => !usedSignatures.has(entry.id))
+              || ranked[0];
+            if (signature) usedSignatures.add(signature.id);
 
             const card = document.createElement('button');
             card.type = 'button';
@@ -1058,7 +1089,10 @@ export const ModalMixin = {
         render();
         container.appendChild(wrapper);
 
-        setTimeout(() => search.focus(), 0);
+        // As in the glossary: a phone keeps its keyboard down until asked.
+        if (!window.matchMedia?.('(pointer: coarse)').matches) {
+          setTimeout(() => search.focus(), 0);
+        }
       },
       actions: [{ label: 'Close', primary: true, onSelect: () => this.closeModal() }]
     });

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useGameFlow } from "../../tui/useGameFlow";
 import { renderMapsciiFrame } from "../../js/scene/mapscii/index.js";
 import { Overlay, OVERLAY_KEYS } from "./Overlays";
+import { recordTieredRun } from "../../js/career.js";
 
 // Findings are authored as sentence fragments ("peatland edges, ..."), which
 // read fine mid-sentence but look wrong when they lead a line. Capitalize the
@@ -1081,6 +1082,18 @@ export default function App() {
       selectOption(current.options.length - 1);
     }
   }, [state.mode, state.options.length, controller, selectOption]);
+
+  // A finished crisis (or year) plants its tree in the career forest, as the
+  // in-page seasonal adapter does (js/game/seasonalAdapter.js). Filed once,
+  // on arrival at the debrief: re-renders on the same screen do not refile.
+  const lastMode = useRef(state.mode);
+  useEffect(() => {
+    const arrived = state.mode === "end" && lastMode.current !== "end";
+    lastMode.current = state.mode;
+    const summary = state.contentData;
+    if (!arrived || !summary?.tier) return;
+    recordTieredRun(state.gameState?.gameMode === "crisis-command" ? "crisis-command" : "seasonal", summary);
+  }, [state.mode, state.contentData, state.gameState]);
 
   return (
     <main className="tui-app-shell">

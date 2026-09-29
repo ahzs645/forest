@@ -409,6 +409,15 @@ body[data-display-mode="modern"] .terminal-window:has(.trail-view:not([hidden]):
   min-height: min(calc(12rem + 120px), 55dvh);
 }
 
+// A shortcut card's pitch and odds are the decision itself. The picture folds
+// while it is up (components/_trail-view.scss) and the log keeps that room; a
+// tall screen gives it a little more, and the option cards scroll instead.
+@media (min-height: 800px) {
+  body[data-display-mode="modern"] .terminal-window:has(> .terminal .term-shortcut.term-anchor) {
+    min-height: min(22rem, 48dvh);
+  }
+}
+
 body[data-display-mode="modern"] .action-area {
   display: flex;
   flex-direction: column;
@@ -466,9 +475,17 @@ body[data-display-mode="modern"] .choices--modern {
 
 .card-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
+
+  // A narrow card moves the chip to its own row rather than breaking it
+  // ("‹OFF- / BOOK›") beside a wrapped "KEY / [2]".
+  .card-kbd-badge,
+  .choice-tag {
+    white-space: nowrap;
+  }
 }
 
 .card-kbd-badge {

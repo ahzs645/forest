@@ -118,8 +118,12 @@ export async function presentDayCard(ui, card = {}) {
     // The marker and the label share one line, so a phone-height log still
     // shows who is asking under it.
     if (card.marker) ui.write(frameMarker([card.marker, card.label].filter(Boolean).join(' · ')), 'term-shortcut term-anchor');
-    else if (card.label) ui.write(card.label, 'term-dim');
-    if (card.title) ui.writeHeader(card.title);
+    // Every other card anchors on its first line too: a short log (Modern
+    // under the Trail View, a phone) opened on the tail of the event with its
+    // name scrolled away.
+    else if (card.label) ui.write(card.label, 'term-dim term-anchor');
+    if (card.title && !card.marker && !card.label) ui.write(card.title, 'term-header term-anchor');
+    else if (card.title) ui.writeHeader(card.title);
     if (card.body) ui.write(card.body);
     const stakes = (card.stakes || []).filter(Boolean);
     for (const line of stakes) ui.write(line, 'term-stakes');

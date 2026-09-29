@@ -337,6 +337,9 @@ export const InputMixin = {
     }
     this._choiceHandler = null;
     this._currentOptions = null;
+    // A card's anchor holds the log only while its choices are up; once they
+    // are gone, whatever is written next scrolls in as usual.
+    this._scrollAnchor = null;
   },
 
   /**

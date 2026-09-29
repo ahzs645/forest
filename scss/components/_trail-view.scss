@@ -88,3 +88,15 @@ body[data-theme='ice'] {
   .game-screen:has(.trail-view:not(.is-collapsed):not([hidden])) .action-area { flex-shrink: 0; }
   .trail-view { max-height: 65%; min-height: 140px; }
 }
+
+// A shortcut or its fallout is a legal call, and its pitch and odds are the
+// part that must be read. While one is on screen the picture folds to its
+// bar and gives the log its height; the next card brings it back.
+.terminal-window:has(.term-shortcut.term-anchor) .trail-view:not(.is-collapsed):not([hidden]) {
+  flex: 0 0 44px;
+  min-height: 44px;
+
+  .trail-picture,
+  .trail-caption,
+  .trail-progress { display: none; }
+}

@@ -94,3 +94,41 @@ test('ASCII Grid shows the marker and, on focus, the full odds and cost of the s
   const detail = text.slice(text.indexOf('> 2 Take the shortcut'));
   expect(detail.replace(/[│\s]+/g, ' ')).toMatch(/today: \d+% clean · \d+% noticed · \d+% caught by .* offer: /);
 });
+
+test.describe('phone grid', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test('a tap on the shortcut opens its whole detail; only a second tap takes it', async ({ page }) => {
+    await openShortcutCard(page, 'grid');
+    const grid = () => page.evaluate(() => {
+      const r = window.__forestGame.ui.gridView.renderer;
+      const rows = [];
+      for (let y = 0; y < r.rows; y += 1) {
+        let line = '';
+        for (let x = 0; x < r.cols; x += 1) line += r._cells[y * r.cols + x]?.ch || ' ';
+        rows.push(line);
+      }
+      return rows;
+    });
+    const tapRow = async (pattern) => {
+      const rows = await grid();
+      const row = rows.findIndex((line) => pattern.test(line));
+      expect(row, rows.join('\n')).toBeGreaterThan(0);
+      const box = await page.locator('#grid-canvas').boundingBox();
+      const cellH = await page.evaluate(() => window.__forestGame.ui.gridView.renderer.cellH);
+      await page.touchscreen.tap(box.x + 120, box.y + (row + 0.5) * cellH);
+    };
+
+    await expect.poll(async () => (await grid()).join('\n')).toMatch(/2 Take the shortcut/);
+    await tapRow(/2 Take the shortcut/);
+    await expect.poll(async () => (await grid()).join('\n')).toMatch(/Tap again to take it\./);
+    const text = (await grid()).join('\n');
+    const detail = text.slice(text.indexOf('> 2 Take the shortcut'), text.indexOf('Tap again'));
+    expect(detail).not.toContain('…');
+    expect(detail.replace(/[│\s]+/g, ' ')).toMatch(/today: \d+% clean · \d+% noticed · \d+% caught by .* offer: /);
+    await expect(page.locator('#terminal')).not.toContainText('> Take the shortcut');
+
+    await tapRow(/> 2 Take the shortcut/);
+    await expect(page.locator('#terminal')).toContainText('> Take the shortcut');
+  });
+});

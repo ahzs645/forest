@@ -26,6 +26,24 @@ export function getPendingFallout(journey) {
 }
 
 /**
+ * How far off a determination queued today really is: `dueIn` from today,
+ * pulled in to the run's deadline when it would land after it. The card
+ * states this span, so it names the day the letter actually lands.
+ * @param {Object} journey
+ * @param {number} dueIn
+ * @returns {{dueIn: number, capped: boolean}}
+ */
+export function falloutLandsIn(journey, dueIn) {
+  const day = Number(journey?.day) || 1;
+  const asked = Math.max(1, Math.round(Number(dueIn) || 1));
+  const deadline = Number(journey?.deadline);
+  if (Number.isFinite(deadline) && deadline > day && day + asked > deadline) {
+    return { dueIn: deadline - day, capped: true };
+  }
+  return { dueIn: asked, capped: false };
+}
+
+/**
  * Queue a caught shortcut's determination. It lands `dueIn` days (months for
  * a GM) from today, and never after the run's own deadline: a letter that
  * would arrive after the season lands on its last day instead, and one the
@@ -36,9 +54,7 @@ export function getPendingFallout(journey) {
  */
 export function queueFallout(journey, fallout) {
   const day = Number(journey?.day) || 1;
-  let dueDay = day + Math.max(1, Math.round(Number(fallout?.dueIn) || 1));
-  const deadline = Number(journey?.deadline);
-  if (Number.isFinite(deadline) && deadline > day) dueDay = Math.min(dueDay, deadline);
+  const dueDay = day + falloutLandsIn(journey, fallout?.dueIn).dueIn;
   const entry = {
     actId: fallout.actId,
     title: fallout.title,

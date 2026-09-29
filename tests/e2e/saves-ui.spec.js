@@ -95,6 +95,22 @@ test('Escape then Enter keeps playing instead of deleting the expedition', async
   expect(await page.evaluate(() => Boolean(localStorage.getItem('bcft.activeRun.v1')))).toBe(true);
 });
 
+test('the campaign leave prompt also defaults to Keep Playing', async ({ page }) => {
+  await installDeterministicSeed(page, 6101);
+  await page.goto('/');
+  await page.click('#campaign-btn');
+  await expect(page.locator('#choices button').first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#modal-title')).toHaveText('Return to District Office?');
+  await expect(page.locator('#modal-actions button').first()).toHaveText('Keep Playing');
+  await expect(page.locator('#modal-actions button').first()).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(page.locator('#modal')).toBeHidden();
+  await expect(page.locator('#landing-screen')).toBeHidden();
+  await expect(page.locator('#choices button').first()).toBeVisible();
+});
+
 test('Save & return keeps the expedition on file for Load Data', async ({ page }) => {
   await startRecce(page);
   await page.keyboard.press('r');

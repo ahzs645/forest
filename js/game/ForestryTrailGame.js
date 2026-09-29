@@ -210,18 +210,20 @@ export class ForestryTrailGame {
         msg.style.marginTop = '0';
         container.appendChild(msg);
       },
+      // Keep Playing leads and takes focus, as on the expedition prompt: an
+      // Escape-then-Enter never throws away the day's cards.
       actions: [
         {
-          label: 'Save & return to district office',
+          label: 'Keep Playing',
           primary: true,
+          onSelect: () => { this.ui.closeModal(); }
+        },
+        {
+          label: 'Save & return to district office',
           onSelect: () => {
             this.ui.closeModal();
             window.location.reload();
           }
-        },
-        {
-          label: 'Keep Playing',
-          onSelect: () => { this.ui.closeModal(); }
         }
       ]
     });
@@ -245,20 +247,21 @@ export class ForestryTrailGame {
         msg.style.marginTop = '0';
         container.appendChild(msg);
       },
+      // Keep Playing first: Escape-then-Enter must not replay the season.
       actions: [
         {
-          label: 'Save & return to district office',
+          label: 'Keep Playing',
           primary: true,
+          onSelect: () => { this.ui.closeModal(); }
+        },
+        {
+          label: 'Save & return to district office',
           onSelect: () => {
             this.ui.closeModal();
             if (!this._seasonalExitFn?.()) {
               window.location.reload();
             }
           }
-        },
-        {
-          label: 'Keep Playing',
-          onSelect: () => { this.ui.closeModal(); }
         }
       ]
     });
