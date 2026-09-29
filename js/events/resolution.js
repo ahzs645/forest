@@ -332,9 +332,13 @@ export function applyEventEffects(journey, effects, messages) {
       } else if (typeof journey.resources?.energy === 'number') {
         journey.resources.energy = clampPercent(journey.resources.energy - strain);
       }
-      messages.push(effects.timeUsed >= 4
-        ? 'That one ate the day around the edges. You get your work done late and tired.'
-        : 'The interruption cuts into the day you had planned.');
+      // Under an hour is not an interruption worth a line: "Ten minutes" on a
+      // note to file used to be followed by the day it had cut into.
+      if (effects.timeUsed >= 4) {
+        messages.push('That one ate the day around the edges. You get your work done late and tired.');
+      } else if (effects.timeUsed >= 1) {
+        messages.push('The interruption cuts into the day you had planned.');
+      }
     }
   }
 

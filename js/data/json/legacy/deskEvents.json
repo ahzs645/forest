@@ -66,17 +66,17 @@
     "options": [
       {
         "label": "Chase the fast-tracked salvage window",
-        "outcome": "You redirect crews into burned stands on the 25-day clock. Volume moves, but the pace grinds people down.",
+        "outcome": "You chase the district's 25-day salvage clock. Files move, but the pace grinds on you.",
         "effects": {
           "permits_approved": 2,
           "progress": 5,
-          "crew_health": -3,
+          "crew_morale": -3,
           "timeUsed": 4
         }
       },
       {
         "label": "Hold your planned program",
-        "outcome": "You keep crews on the original schedule and let others chase salvage. Steadier work, but volume stays on the table.",
+        "outcome": "You keep the file on its original schedule and let others chase salvage. Steadier work, but volume stays on the table.",
         "effects": {
           "progress": -2,
           "crew_morale": 2
@@ -95,7 +95,7 @@
     "options": [
       {
         "label": "Invite reporters out for a site walk",
-        "outcome": "You answer the hard questions standing on the block. It costs a day, and it buys trust.",
+        "outcome": "You answer the hard questions standing on the block. It costs an afternoon, and it buys trust.",
         "effects": {
           "relationships": 3,
           "compliance": 1,
@@ -103,7 +103,7 @@
         }
       },
       {
-        "label": "Decline interviews and keep crews working",
+        "label": "Decline interviews and keep working",
         "outcome": "The work gets done, but the silence reads as defensiveness in every story that runs.",
         "effects": {
           "progress": 2,
@@ -180,8 +180,8 @@
     "description": "Windstorm damages standing timber - 10-30% volume loss to windthrow",
     "options": [
       {
-        "label": "Divert crews to windthrow salvage",
-        "outcome": "You get the blowdown on the ground to a mill before it degrades. The planned program slips a beat.",
+        "label": "File a windthrow salvage amendment",
+        "outcome": "The district signs the salvage amendment on the spot, and the blowdown gets to a mill before it degrades. The planned program slips a beat.",
         "effects": {
           "budget": -2000,
           "permits_approved": 1,

@@ -138,7 +138,9 @@ export function settleOutstandingFallout(journey) {
     applyEventEffects(journey, entry.effects || {}, messages);
     applyConsequenceFlags(journey, entry.flags || [], messages);
     const costs = describeEffectChips(entry.effects || {}, journey?.journeyType).join(', ');
-    const line = `${capitalize(institutionDisplayName(entry.institution))} decides on “${entry.title}” after the season${costs ? `: ${costs}` : ''}.`;
+    // The Forest Practices Board reports; it has no penalty to decide.
+    const verb = entry.institution === 'FPB' ? 'reports on' : 'decides on';
+    const line = `${capitalize(institutionDisplayName(entry.institution))} ${verb} “${entry.title}” after the season${costs ? `: ${costs}` : ''}.`;
     lines.push(line);
     if (!journey.log) journey.log = [];
     journey.log.push({
