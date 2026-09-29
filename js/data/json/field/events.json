@@ -2369,6 +2369,7 @@
  },
  {
   "id": "helicopter_available",
+  "needsNextLeg": true,
   "title": "Discounted Flight Time",
   "type": "supply",
   "severity": "minor",
@@ -5046,6 +5047,7 @@
  },
  {
   "id": "trade_trapper_intel",
+  "needsNextLeg": true,
   "title": "The Trapper's Price",
   "type": "trade",
   "severity": "minor",
@@ -5078,6 +5080,7 @@
  },
  {
   "id": "trade_grader_operator",
+  "needsNextLeg": true,
   "title": "Grader Operator's Offer",
   "type": "trade",
   "severity": "minor",

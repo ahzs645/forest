@@ -809,6 +809,49 @@ function travelDistanceForDay(journey, paceId) {
   return Math.max(0, distance + bonus);
 }
 
+const EVENT_EFFECT_BANDS = ['effects', 'partialEffects', 'failureEffects'];
+
+/**
+ * Fit a card to the road that is left. At the last stop there is no next leg,
+ * so "+5 km on the next leg" is a promise the season cannot keep and "the
+ * next leg will be slower" a cost it never pays: the km come off every band.
+ * A card about the road ahead (`needsNextLeg`: a trapper's route notes, a
+ * grader for the spur) or with an option that offers nothing but ground is
+ * not dealt there at all. Anywhere else the card is returned untouched.
+ * @param {Object} journey
+ * @param {Object|null} event
+ * @returns {Object|null}
+ */
+export function fitEventToRemainingRoute(journey, event) {
+  if (!event || !Array.isArray(event.options) || getNextBlock(journey)) return event;
+  // A shortcut's payoff is sized and shown by its own builder
+  // (js/events/selection.js buildTemptationPayoff); it is not rewritten here.
+  if (event.type === 'temptation') return event;
+  if (event.needsNextLeg) return null;
+  const kmOnly = event.options.some((option) => {
+    const effects = option?.effects || {};
+    return Number(effects.progress) > 0
+      && Object.entries(effects).every(([key, value]) => key === 'progress' || key === 'progressMode' || !value);
+  });
+  if (kmOnly) return null;
+  let changed = false;
+  const options = event.options.map((option) => {
+    if (!option) return option;
+    // Ground and delay both land on the next leg (a timeUsed is a setback).
+    const bands = EVENT_EFFECT_BANDS.filter((band) => option[band]
+      && ('progress' in option[band] || 'timeUsed' in option[band]));
+    if (!bands.length && !('timeUsed' in option)) return option;
+    changed = true;
+    const { timeUsed: _time, ...fitted } = option;
+    for (const band of bands) {
+      const { progress: _progress, progressMode: _mode, timeUsed: _bandTime, ...rest } = option[band];
+      fitted[band] = rest;
+    }
+    return fitted;
+  });
+  return changed ? { ...event, options } : event;
+}
+
 /**
  * Route an event's "+/- N km traverse" through the travel system instead of
  * moving the crew directly.
@@ -837,6 +880,10 @@ export function applyEventTravelEffect(journey, km, { turnBack = false } = {}) {
     messages.push(`Worth about ${amount} km on the next leg. The crew still stops at ${nextBlock.name} for the road check.`);
     return messages;
   }
+
+  // At the last stop there is no leg left to slow down, and saying there is
+  // tells the player something false about the end of the season.
+  if (!turnBack && !getNextBlock(journey)) return messages;
 
   let setbackKm = amount;
   if (turnBack) {

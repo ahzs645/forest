@@ -117,7 +117,10 @@ for (const { pool, event } of ALL) {
     && (event.needsOpenPackage !== true || !(event.stopKinds || []).includes('block'))) {
     errors.push(`${where}: needsOpenPackage must be true and go with stopKinds ["block"]`);
   }
-  if (event.arrivesAsWeather !== undefined &&!VALID_WEATHER_IDS.has(event.arrivesAsWeather)) {
+  if (event.needsNextLeg !== undefined && event.needsNextLeg !== true) {
+    errors.push(`${where}: needsNextLeg must be true when set`);
+  }
+  if (event.arrivesAsWeather !== undefined && !VALID_WEATHER_IDS.has(event.arrivesAsWeather)) {
     errors.push(`${where}: unknown weather "${event.arrivesAsWeather}" in arrivesAsWeather`);
   }
   if (event.expeditionOnly !== undefined && typeof event.expeditionOnly !== 'boolean') {

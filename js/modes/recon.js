@@ -27,6 +27,7 @@ import { getWeatherTempC } from '../data/blocks.js';
 import {
   executeFieldAction,
   endFieldDay,
+  fitEventToRemainingRoute,
   formatAccessVerdict,
   formatInfrastructureStatus,
   getBlockAccessVerdict,
@@ -586,7 +587,7 @@ async function runFieldDay(game) {
   // The first shift teaches the base loop — nothing fires on day 1.
   let pendingEvent = resumingShift
     ? (journey.activeReconShift.pendingEvent || null)
-    : (journey.day > 1 ? checkForEvent(journey) : null);
+    : (journey.day > 1 ? fitEventToRemainingRoute(journey, checkForEvent(journey)) : null);
   const shiftState = ensureActiveReconShift(journey, pendingEvent);
   checkpointReconShift(game, shiftState, pendingEvent);
 

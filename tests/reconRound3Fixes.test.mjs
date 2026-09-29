@@ -19,6 +19,7 @@ import { formatOptionTimeCost, optionSpendsDay } from '../js/events/timePolicy.j
 import { eventSupportsJourney, eventMatchesJourneyContext } from '../js/events/selection.js';
 import { eventFitsStop } from '../js/journey/packages.js';
 import { formatEventForDisplay } from '../js/events/display.js';
+import { applyEventTravelEffect, fitEventToRemainingRoute } from '../js/journey/fieldMechanics.js';
 
 function withRandom(value, fn) {
   const original = Math.random;
@@ -199,6 +200,37 @@ test('a gamble names what its bad roll charges, including cash', () => {
       assert.ok(shown.options[index].hint.includes(amount), `${event.id} option ${index + 1}: ${shown.options[index].hint}`);
     });
   }
+});
+
+// ── No next leg at the end of the road ─────────────────────────────────────
+
+test('at the last stop a card promises no next-leg km and charges no next-leg setback', () => {
+  const journey = createReconJourney({ areaId: 'vancouver-island-coast' });
+  journey.currentBlockIndex = journey.blocks.length - 1;
+  journey.distanceTraveled = journey.totalDistance;
+
+  // Road-ahead cards are not dealt at the end of the road.
+  for (const id of ['trade_trapper_intel', 'good_road_conditions']) {
+    assert.equal(fitEventToRemainingRoute(journey, FIELD_EVENTS.find((e) => e.id === id)), null, id);
+  }
+  // Anything else loses its km and its delay, and keeps the rest.
+  const locals = fitEventToRemainingRoute(journey, FIELD_EVENTS.find((e) => e.id === 'helpful_locals'));
+  const shown = formatEventForDisplay(locals, 'recon');
+  for (const option of shown.options) {
+    assert.doesNotMatch(option.hint, /next leg|next travel leg/, option.hint);
+  }
+  const fuel = fitEventToRemainingRoute(journey, FIELD_EVENTS.find((e) => e.id === 'fuel_contamination'));
+  assert.equal(fuel.options[0].effects.equipment, -8);
+  assert.ok(!('progress' in fuel.options[0].effects));
+
+  // And the setback copy is not printed when a card still carries one.
+  assert.deepEqual(applyEventTravelEffect(journey, -5), []);
+  assert.equal(journey.travelSetback || 0, 0);
+
+  // One stop earlier the card is untouched.
+  journey.currentBlockIndex -= 1;
+  const card = FIELD_EVENTS.find((e) => e.id === 'good_road_conditions');
+  assert.equal(fitEventToRemainingRoute(journey, card), card);
 });
 
 // ── Block cards stay on open blocks ────────────────────────────────────────
