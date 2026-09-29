@@ -5,7 +5,7 @@
 
 import { isFieldJourney } from './constants.js';
 import { formatOptionTimeCost } from './timePolicy.js';
-import { FUEL_EFFECT_SCALE } from './resolution.js';
+import { FUEL_EFFECT_SCALE, projectAppliedEffects } from './resolution.js';
 
 /**
  * Give field events one consistent radio lead without making the reporter's
@@ -197,7 +197,10 @@ function getOptionHint(option, journeyType, event = null) {
   // per-m³ ledger hooks, js/modes/manager.js), which would otherwise be hidden.
   if (option.ledgerHint) hints.push(option.ledgerHint);
   if (timeHint) hints.push(timeHint);
-  hints.push(...effectChips(option.effects, journeyType));
+  // The chips say what lands, knock-ons included (projectAppliedEffects):
+  // "-4 compliance" on a permitting desk is also -6 scrutiny and -4 goodwill.
+  const projected = option.effects ? projectAppliedEffects(option.effects, journeyType) : option.effects;
+  hints.push(...effectChips(projected, journeyType));
 
   // Only a crew on a traverse has a next leg for ground to land on.
   const traverse = journeyType === 'field' || journeyType === 'recon';
@@ -256,22 +259,24 @@ function getOptionHint(option, journeyType, event = null) {
   if (typeof complianceRisk === 'number') {
     hints.push(`${Math.round(complianceRisk * 100)}% chance it comes back on you`);
   }
-  hints.push(...standingChips(option.effects));
+  hints.push(...standingChips(projected));
 
   return hints.length > 0 ? hints.join(', ') : 'No direct cost';
 }
 
 /**
  * An effects object as the short chips an option hint uses ("+$25k",
- * "-10 compliance", "+15 scrutiny"). The shortcut card uses the same words
- * for its gain and for what each band costs, so the numbers the player reads
+ * "-10 compliance", "+30 scrutiny"). The chips describe the effects as they
+ * land (projectAppliedEffects), knock-on scrutiny and goodwill included, and
+ * the resolver applies the same projection, so the numbers the player reads
  * on the chip, in the stakes and in the outcome are one set of numbers.
- * @param {Object} effects
+ * @param {Object} effects - authored effects
  * @param {string} journeyType
  * @returns {string[]}
  */
 export function describeEffectChips(effects, journeyType = 'field') {
-  return [...effectChips(effects, journeyType), ...standingChips(effects)];
+  const projected = projectAppliedEffects(effects, journeyType);
+  return [...effectChips(projected, journeyType), ...standingChips(projected)];
 }
 
 function standingChips(effects) {

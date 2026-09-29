@@ -121,9 +121,9 @@ test('the card explains why today\'s odds are what they are', () => {
   journey.consequenceFlags = ['ce_watching'];
   const watched = buildShortcutOption(ribbon, journey);
   assert.ok(watched.liveOdds.bad > before.liveOdds.bad);
-  assert.ok(watched.oddsShifts.worse.some((reason) => /regulator is watching/.test(reason)));
+  assert.ok(watched.oddsShifts.worse.some((reason) => /C&E is watching your files/.test(reason)));
   const event = buildTemptationEvent(act('recce-hide-bear-den'), journey);
-  assert.ok(event.stakes.some((line) => /^Worse odds today because .*regulator is watching/.test(line)), event.stakes.join('\n'));
+  assert.ok(event.stakes.some((line) => /^Worse odds today because .*C&E is watching your files/.test(line)), event.stakes.join('\n'));
 });
 
 // ── Payoff: one set of numbers ──────────────────────────────────────────────
@@ -219,7 +219,7 @@ test('a caught band with a lag is the finding today and the determination on its
   assert.match(result.messages[0], new RegExp(`lands in about ${delay} days?`));
   assert.equal(journey.resources.budget, budgetBefore, 'no payoff, and no fine yet');
   assert.equal(journey.regulations?.complianceScore, complianceBefore);
-  assert.ok(journey.consequenceFlags.includes('ce_watching'), 'the finding starts the watch today');
+  assert.ok(journey.consequenceFlags.includes('env_watching'), 'the finding starts the catching institution\'s own watch today');
   const pending = getPendingFallout(journey);
   assert.equal(pending.length, 1);
   assert.equal(pending[0].dueDay, 5 + delay);
@@ -301,12 +301,12 @@ test('watch flags say so when they land, stand on the mission panel, and a pendi
   // Pin the middle band: noticed.
   const noticedRoll = event.options[1].liveOdds.good + 0.01;
   const result = resolveAt(journey, event, event.options[1], noticedRoll);
-  assert.ok(result.messages.some((line) => /On your record now: the regulator is watching your files\. Later shortcuts get worse odds/.test(line)), result.messages.join(' | '));
+  assert.ok(result.messages.some((line) => /On your record now: C&E is watching your files\. Later shortcuts get worse odds/.test(line)), result.messages.join(' | '));
   assert.equal(listShortcutsTaken(journey)[0].band, 'noticed');
 
   queueFallout(journey, { actId: 'x', title: 'Move the Ribbon', institution: 'C&E', dueIn: 3, effects: {}, flags: [] });
   const alerts = describeShortcutWatch(journey);
-  assert.ok(alerts.some((alert) => /^Watched: the regulator is watching your files\. Shortcut odds are worse\./.test(alert.text)));
+  assert.ok(alerts.some((alert) => /^Watched: C&E is watching your files\. Shortcut odds are worse\./.test(alert.text)));
   assert.ok(alerts.some((alert) => alert.level === 'danger' && /^Coming: C&E on “Move the Ribbon”, shift 8\./.test(alert.text)));
 });
 
