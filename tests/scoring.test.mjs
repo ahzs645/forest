@@ -132,3 +132,84 @@ test("the grade display reconciles and names the compliance line", () => {
   assert.match(lines, /Time/);
   assert.doesNotMatch(lines, /events handled/);
 });
+
+// ── Desk roles: planner and permitter ───────────────────────────────────────
+
+function permitterAt({ day, approved, budget = 40000, stress = 30, energy = 70, politicalCapital = 30 }) {
+  return {
+    journeyType: "permitting", day, deadline: 30, budgetStart: 58000,
+    permits: { target: 15, approved },
+    resources: { budget, politicalCapital },
+    protagonist: { stress, energy },
+    log: [], scrutiny: 30, crew: [],
+  };
+}
+
+test("being pulled off the file early never earns more Time than winning", () => {
+  const firedEarly = calculateScore(permitterAt({ day: 12, approved: 11, politicalCapital: 0 }), false);
+  const won = calculateScore(permitterAt({ day: 19, approved: 15 }), true);
+  assert.equal(firedEarly.components.speed.score, 0, "a file that was not delivered earns no Time");
+  assert.match(firedEarly.components.speed.label, /not delivered/);
+  assert.ok(won.components.speed.score > firedEarly.components.speed.score);
+  assert.ok(won.totalScore > firedEarly.totalScore);
+});
+
+test("failing early does not outscore running the clock out with more of the file done", () => {
+  const base = {
+    journeyType: "planning", deadline: 33, budgetStart: 66000, crew: [], log: [], scrutiny: 40,
+    values: { biodiversity: 50, timberSupply: 55, communityNeeds: 50, firstNationsValues: 50 },
+    protagonist: { stress: 40, energy: 60 },
+  };
+  const firedDay19 = calculateScore({
+    ...base, day: 20, resources: { budget: 45000, politicalCapital: 0 },
+    plan: { phase: "ministerial_approval", dataCompleteness: 85, analysisQuality: 80, stakeholderBuyIn: 60, ministerialConfidence: 20 },
+  }, false);
+  const ranOut = calculateScore({
+    ...base, day: 34, resources: { budget: 29900, politicalCapital: 15 },
+    plan: { phase: "ministerial_approval", dataCompleteness: 95, analysisQuality: 90, stakeholderBuyIn: 80, ministerialConfidence: 55 },
+  }, false);
+  assert.ok(ranOut.totalScore > firedDay19.totalScore, `ran out ${ranOut.totalScore} vs fired ${firedDay19.totalScore}`);
+});
+
+test("an idle failed run is not rewarded for the budget it never spent", () => {
+  const idle = calculateScore(permitterAt({ day: 31, approved: 1, budget: 57000, politicalCapital: 60 }), false);
+  const worked = calculateScore(permitterAt({ day: 19, approved: 15, budget: 30000, politicalCapital: 30 }), true);
+  assert.ok(idle.components.resourceEfficiency.score < 20, `idle resources ${idle.components.resourceEfficiency.score}`);
+  assert.ok(worked.components.resourceEfficiency.score > idle.components.resourceEfficiency.score);
+});
+
+test("the desk roles measure spending against the budget they started with", () => {
+  const journey = permitterAt({ day: 19, approved: 15, budget: 12000 });
+  journey.budgetStart = 107000;
+  const lean = calculateScore(journey, true).components.resourceEfficiency.score;
+  journey.budgetStart = 20000;
+  const flush = calculateScore(journey, true).components.resourceEfficiency.score;
+  assert.ok(flush > lean, "$12k left of $107k is thinner than $12k left of $20k");
+});
+
+test("the desk roles' welfare line is the planner's own, not a constant", () => {
+  const calm = calculateScore(permitterAt({ day: 19, approved: 15, stress: 10, energy: 90 }), true);
+  const frayed = calculateScore(permitterAt({ day: 19, approved: 15, stress: 90, energy: 15 }), true);
+  assert.ok(calm.components.crewWelfare.score > frayed.components.crewWelfare.score);
+  assert.notEqual(calm.components.crewWelfare.score, 50);
+  const lines = formatScoreDisplay(calm).join("\n");
+  assert.match(lines, /Wellbeing/);
+  assert.match(lines, /Your stress 10%, energy 90%/);
+});
+
+test("a planner's objectives read the balance of values and the packages sent back unread", () => {
+  const journey = {
+    journeyType: "planning", day: 24, deadline: 34, crew: [], log: [], scrutiny: 30,
+    resources: { budget: 40000, politicalCapital: 50 }, protagonist: { stress: 30, energy: 70 },
+    plan: { phase: "ministerial_approval", dataCompleteness: 90, analysisQuality: 90, stakeholderBuyIn: 80, ministerialConfidence: 82 },
+    values: { biodiversity: 62, timberSupply: 60, communityNeeds: 58, firstNationsValues: 64 },
+  };
+  const balanced = calculateScore(journey, true).components.objectives;
+  const timberFirst = calculateScore({
+    ...journey,
+    values: { biodiversity: 41, timberSupply: 80, communityNeeds: 45, firstNationsValues: 42 },
+    plan: { ...journey.plan, submissionsReturned: 4 },
+  }, true).components.objectives;
+  assert.ok(balanced.score > timberFirst.score);
+  assert.match(timberFirst.label, /4 submissions returned/);
+});

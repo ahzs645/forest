@@ -3,6 +3,8 @@
  * Calculates a letter grade (A-F) based on journey performance
  */
 
+import { PLANNING_DECISION_GATE, PLANNING_VALUES_FLOOR } from './journey/constants.js';
+
 /**
  * Calculate final score for a completed journey
  * @param {Object} journey - Journey state at end of game
@@ -33,18 +35,18 @@ export function calculateScore(journey, victory) {
       break;
 
     case 'planning':
-      components.speed = scorePlanningSpeed(journey);
-      components.crewWelfare = { score: 50, label: 'N/A' }; // No crew
-      components.resourceEfficiency = scoreDeskResourceEfficiency(journey);
+      components.speed = scorePlanningSpeed(journey, victory);
+      components.crewWelfare = scoreProtagonistWelfare(journey);
+      components.resourceEfficiency = scoreDeskResourceEfficiency(journey, victory);
       components.objectives = scorePlanningObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
       break;
 
     case 'permitting':
     case 'desk':
-      components.speed = scorePermittingSpeed(journey);
-      components.crewWelfare = { score: 50, label: 'N/A' };
-      components.resourceEfficiency = scoreDeskResourceEfficiency(journey);
+      components.speed = scorePermittingSpeed(journey, victory);
+      components.crewWelfare = scoreProtagonistWelfare(journey);
+      components.resourceEfficiency = scoreDeskResourceEfficiency(journey, victory);
       components.objectives = scorePermittingObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
       break;
@@ -134,18 +136,29 @@ function scoreSilvicultureSpeed(journey) {
   return { score, label: `${daysUsed} days` };
 }
 
-function scorePlanningSpeed(journey) {
+/**
+ * Days spent only count for something when the file was delivered. Scoring
+ * the unused calendar of a run that failed made being pulled off the file on
+ * day 11 worth more Time than winning on day 18.
+ */
+function undeliveredSpeed(daysUsed, deadline) {
+  return { score: 0, label: `${daysUsed}/${deadline} days used; not delivered` };
+}
+
+function scorePlanningSpeed(journey, victory = true) {
   const daysUsed = journey.day - 1;
   const deadline = journey.deadline || 18;
+  if (!victory) return undeliveredSpeed(daysUsed, deadline);
   const optimalDays = Math.max(8, Math.round(deadline * 0.75));
   const ratio = optimalDays / Math.max(1, daysUsed);
   const score = Math.min(100, Math.round(ratio * 75));
   return { score, label: `${daysUsed}/${deadline} days used` };
 }
 
-function scorePermittingSpeed(journey) {
+function scorePermittingSpeed(journey, victory = true) {
   const daysUsed = journey.day - 1;
   const deadline = journey.deadline || 30;
+  if (!victory) return undeliveredSpeed(daysUsed, deadline);
   const daysRemaining = Math.max(0, deadline - daysUsed);
   const score = Math.min(100, Math.round((daysRemaining / deadline) * 100) + 20);
   return { score: Math.min(100, score), label: `${daysUsed}/${deadline} days used` };
@@ -192,6 +205,36 @@ function scoreCrewWelfare(journey) {
   return { score, label };
 }
 
+/**
+ * The desk roles have no crew; the person carrying the file is the one whose
+ * welfare the season spends. Stress that ends high and energy that ends low
+ * both cost.
+ */
+function scoreProtagonistWelfare(journey) {
+  if (journey.crew?.length) return scoreCrewWelfare(journey);
+  const protagonist = journey.protagonist;
+  if (!protagonist) return { score: 50, label: 'N/A' };
+  const stress = Math.max(0, Math.min(100, Number(protagonist.stress) || 0));
+  const energy = Math.max(0, Math.min(100, Number(protagonist.energy ?? 100)));
+  const score = Math.max(0, Math.min(100, Math.round(100 - stress * 0.6 - Math.max(0, 50 - energy) * 0.6)));
+  return { score, label: `Your stress ${Math.round(stress)}%, energy ${Math.round(energy)}%`, name: 'Wellbeing' };
+}
+
+/** Share of the desk's job that got done, 0-1. */
+function deskDeliveredShare(journey) {
+  if (journey.journeyType === 'planning') {
+    const plan = journey.plan || {};
+    const fomClosed = journey.blockPlanning?.fom?.status === 'closed' ? 1 : 0;
+    return (Math.min(1, (plan.dataCompleteness || 0) / 80)
+      + Math.min(1, (plan.analysisQuality || 0) / 80)
+      + Math.min(1, (plan.stakeholderBuyIn || 0) / 75)
+      + Math.min(1, (plan.ministerialConfidence || 0) / PLANNING_DECISION_GATE)
+      + fomClosed) / 5;
+  }
+  const permits = journey.permits || {};
+  return permits.target > 0 ? Math.min(1, (permits.approved || 0) / permits.target) : 0;
+}
+
 // --- Resource Efficiency Scoring ---
 
 function scoreResourceEfficiency(journey) {
@@ -216,12 +259,13 @@ function scoreResourceEfficiency(journey) {
   return { score, label: `Fuel: ${Math.round(r.fuel || 0)} L, Food: ${Math.round(r.food || 0)} person-days` };
 }
 
-function scoreDeskResourceEfficiency(journey) {
+function scoreDeskResourceEfficiency(journey, victory = true) {
   const r = journey.resources || {};
   let score = 50;
 
-  const budgetStart = journey.journeyType === 'silviculture' ? 100000 :
-                      journey.journeyType === 'planning' ? 50000 : 35000;
+  const budgetStart = Number.isFinite(journey.budgetStart) && journey.budgetStart > 0 ? journey.budgetStart
+    : journey.journeyType === 'silviculture' ? 100000
+      : journey.journeyType === 'planning' ? 50000 : 35000;
   const budgetPct = (r.budget || 0) / budgetStart;
   score += scoreSweetSpot(budgetPct) * 25;
 
@@ -230,6 +274,11 @@ function scoreDeskResourceEfficiency(journey) {
 
   if (r.budget <= 0) score -= 20;
   if (r.politicalCapital <= 0) score -= 20;
+
+  // Money left on a file that was never delivered was not saved, it was
+  // unspent: an idle season kept its whole budget.
+  const deskRole = ['planning', 'permitting', 'desk'].includes(journey.journeyType);
+  if (deskRole && !victory) score *= deskDeliveredShare(journey);
 
   score = Math.max(0, Math.min(100, Math.round(score)));
   return { score, label: `Budget: $${Math.round(r.budget || 0).toLocaleString()}` };
@@ -297,8 +346,18 @@ function scorePlanningObjectives(journey, victory) {
   score += Math.round((plan.analysisQuality || 0) / 10);
   score += Math.round((plan.stakeholderBuyIn || 0) / 10);
   score += Math.round((plan.ministerialConfidence || 0) / 10);
-  score = Math.min(100, score);
-  return { score, label: `Decision-maker readiness: ${plan.ministerialConfidence || 0}%` };
+  // A plan that answers every objective is a better plan than one that
+  // clears the gate on timber alone; a package the District Manager's office
+  // sent back unread is on the file.
+  const values = journey.values || {};
+  const weakest = Math.min(...['biodiversity', 'timberSupply', 'communityNeeds', 'firstNationsValues']
+    .map((key) => Number(values[key] ?? 50)));
+  score += Math.round((weakest - PLANNING_VALUES_FLOOR) / 4);
+  const returned = plan.submissionsReturned || 0;
+  score -= returned * 3;
+  score = Math.max(0, Math.min(100, score));
+  const returnedLabel = returned ? `, ${returned} submission${returned === 1 ? '' : 's'} returned` : '';
+  return { score, label: `DM readiness ${Math.round(plan.ministerialConfidence || 0)}%, weakest value ${Math.round(weakest)}%${returnedLabel}` };
 }
 
 function scorePermittingObjectives(journey, victory) {
@@ -374,7 +433,7 @@ export function formatScoreDisplay(scoreResult) {
   for (const key of Object.keys(labels)) {
     const component = components[key];
     if (!component) continue;
-    const name = labels[key] || key;
+    const name = component.name || labels[key] || key;
     const weight = weights[key] || 0;
     const bar = makeBar(component.score, 10);
     lines.push(`  ${name.padEnd(14)} [${bar}] ${component.score}/100 (${weight}%) - ${component.label}`);

@@ -294,3 +294,44 @@ test('planning defeat: runFinalDebrief also renders every stage (parity with vic
   assert.match(text, /PERFORMANCE REVIEW/, 'stage 4: performance review');
   assert.match(text, /SERVICE RECORD/, 'stage 5: service record');
 });
+
+test('a failed planning or permitting file is handed over, not sealed or archived as a finished year', () => {
+  const planning = getFinalReportPrompt('planning', { victory: false });
+  assert.doesNotMatch(planning.prompt, /seal/i);
+  assert.match(planning.prompt, /did not get through/);
+  assert.ok(planning.options.every((option) => !/\bSeal\b/.test(option.label)));
+  assert.deepEqual(planning.options.map((option) => option.value).sort(), ['integrity', 'people', 'spin']);
+
+  const permitting = getFinalReportPrompt('permitting', { victory: false });
+  assert.match(permitting.prompt, /someone else/);
+  assert.doesNotMatch(permitting.prompt, /archive the year/);
+
+  assert.match(getFinalReportPrompt('planning').prompt, /seal/, 'an approved plan is still sealed');
+  assert.match(getFinalReportPrompt('permitting', { victory: true }).prompt, /archive the year/);
+});
+
+test('desk roles get their own narration for spin and people, not the field season\'s', () => {
+  for (const journeyType of ['planning', 'permitting']) {
+    const journey = { journeyType, crew: [] };
+    const lines = [
+      ...resolveFinalReport('spin', journey, () => 0.99).lines,
+      ...resolveFinalReport('spin', journey, () => 0.0).lines,
+      ...resolveFinalReport('people', journey).lines,
+    ].join(' ');
+    assert.doesNotMatch(lines, /check survey|tidy operation/, journeyType);
+  }
+  assert.doesNotMatch(resolveFinalReport('people', { journeyType: 'planning', crew: [] }).lines[0], /thank-you notes/);
+});
+
+test('the debrief shows a failed planner the hand-over prompt', async () => {
+  const ui = makeStubUi();
+  const journey = makePlanningJourney({
+    day: 34,
+    deadline: 33,
+    plan: { phase: 'ministerial_approval', dataCompleteness: 90, analysisQuality: 85, stakeholderBuyIn: 80, ministerialConfidence: 40 },
+  });
+  await runFinalDebrief(ui, journey, false);
+  const prompts = ui.calls.filter((call) => call.fn === 'promptChoice').map((call) => call.prompt).join('\n');
+  assert.doesNotMatch(prompts, /needs your seal/);
+  assert.match(prompts, /did not get through/);
+});
