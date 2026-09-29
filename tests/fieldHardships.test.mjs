@@ -99,6 +99,9 @@ test('executeFieldDay still advances the day for single-call callers', () => {
 
 test('sustained critical food shortage triggers hardship pressure on the field crew', () => {
   const journey = makeJourney();
+  // Thin but not empty for both shifts: an empty box is the starvation path
+  // (tests/reconPlaytestFixes.test.mjs), not this one.
+  journey.resources.food = 12;
   const startingMorale = journey.crew.reduce((sum, member) => sum + member.morale, 0);
 
   executeFieldDay(journey, 'slow');
@@ -134,7 +137,7 @@ test('route choices apply their narrative consequence and clear for the next day
   assert.equal(journey.crew[0].morale, startingMorale - 2);
 });
 
-test('short rations reduce food use and revert to the normal baseline after the shift', () => {
+test('short rations reduce food use and hold as a standing order across shifts', () => {
   const journey = makeJourney();
   journey.resources.food = 30;
   journey.rationPlan.mode = 'short';
@@ -143,8 +146,8 @@ test('short rations reduce food use and revert to the normal baseline after the 
   executeFieldDay(journey, 'camp_work');
 
   assert.ok(journey.resources.food > 26);
-  assert.equal(journey.rationPlan.mode, 'normal');
-  assert.equal(journey.rationPlan.shortRationStreak, 2);
+  assert.equal(journey.rationPlan.mode, 'short', 'the order holds until the player changes it');
+  assert.equal(journey.rationPlan.shortRationStreak, 3, 'the streak counts days on short rations');
 });
 
 test('field travel surfaces access verdicts when the crew pushes into a bad block', () => {

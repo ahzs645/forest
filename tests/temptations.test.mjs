@@ -209,7 +209,7 @@ test('the take option shows the payoff in the role currency and the odds for thi
   const take = formatted.options[1];
   assert.equal(take.label, 'Take the shortcut');
   assert.match(take.hint, /offer: a day of layout, and a straight mainline/);
-  assert.match(take.hint, /km traverse/);
+  assert.match(take.hint, /km on the next leg/);
   assert.match(take.hint, /\d+% clean, \d+% badly wrong for you today/);
   assert.doesNotMatch(take.hint, /-\d+h/);
   assert.equal(take.tag, 'RISKY');

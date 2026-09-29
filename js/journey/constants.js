@@ -8,6 +8,15 @@ export const FIELD_DISTANCE_SCALE = 0.5;
 // day on the road rather than four hours of it wedged around camp chores.
 export const BASE_DAILY_TRAVEL_KM = 12;
 export const DAILY_TRAVEL_VARIANCE = 0.12;
+// A leg that ends this close to the next stop finishes it. Nobody camps a
+// few hundred metres short of the landing and burns a whole shift, a tank
+// of diesel and a day of food on the last walk in.
+export const ARRIVAL_SNAP_KM = 1.5;
+// The most ground an event can bank toward the next leg: a good road, a
+// sling load flown ahead, a trapper's route notes. One day's travel at most.
+export const MAX_EVENT_TRAVEL_BONUS_KM = BASE_DAILY_TRAVEL_KM;
+// Days on an empty food box before the crew drives itself out.
+export const STARVATION_WALKOFF_DAYS = 6;
 
 // Role to journey type mapping
 export const ROLE_JOURNEY_TYPES = {

@@ -3,7 +3,14 @@
  * Travel calculations and field day execution
  */
 
-import { PACE_OPTIONS, BASE_DAILY_TRAVEL_KM, DAILY_TRAVEL_VARIANCE } from './constants.js';
+import {
+  PACE_OPTIONS,
+  BASE_DAILY_TRAVEL_KM,
+  DAILY_TRAVEL_VARIANCE,
+  ARRIVAL_SNAP_KM,
+  MAX_EVENT_TRAVEL_BONUS_KM,
+  STARVATION_WALKOFF_DAYS
+} from './constants.js';
 import {
   getCurrentBlock,
   getNextBlock,
@@ -795,7 +802,57 @@ function travelDistanceForDay(journey, paceId) {
   const timeModifier = 1 - setback;
   const variance = 1 + (Math.random() * 2 - 1) * DAILY_TRAVEL_VARIANCE;
   const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance * timeModifier * routeMod * crewTravelMod * seasonMod;
-  return Math.max(0, distance);
+  // Ground an event banked for this leg (applyEventTravelEffect). It is added
+  // here, before the leg is clamped to the next stop, so a good road can
+  // never carry the crew past a stop, a crossing or a road check.
+  const bonus = crewTravelMod > 0 ? Math.max(0, Math.min(MAX_EVENT_TRAVEL_BONUS_KM, journey.travelBonusKm || 0)) : 0;
+  return Math.max(0, distance + bonus);
+}
+
+/**
+ * Route an event's "+/- N km traverse" through the travel system instead of
+ * moving the crew directly.
+ *
+ * Moving `distanceTraveled` from an event used to teleport the crew past
+ * stops: no arrival, no road check, no river crossing, and then a penalty on
+ * the next leg for the road check the jump itself skipped. Ground gained is
+ * banked for the next leg, which still stops at the next stop. Ground lost
+ * slows the next leg. A turn-back pulls the crew back along the current
+ * segment only, never behind the stop it last reached.
+ * @param {Object} journey
+ * @param {number} km - authored progress, in km of traverse
+ * @param {Object} [options]
+ * @param {boolean} [options.turnBack] - the authored option drives the crew back
+ * @returns {string[]} messages for the outcome
+ */
+export function applyEventTravelEffect(journey, km, { turnBack = false } = {}) {
+  const amount = Math.round(Math.abs(Number(km) || 0) * 10) / 10;
+  if (!journey || amount === 0) return [];
+  const messages = [];
+
+  if (km > 0) {
+    const nextBlock = getNextBlock(journey);
+    if (!nextBlock) return ['There is no leg left on the traverse for it to shorten.'];
+    journey.travelBonusKm = Math.min(MAX_EVENT_TRAVEL_BONUS_KM, (journey.travelBonusKm || 0) + amount);
+    messages.push(`Worth about ${amount} km on the next leg. The crew still stops at ${nextBlock.name} for the road check.`);
+    return messages;
+  }
+
+  let setbackKm = amount;
+  if (turnBack) {
+    const pulledBack = Math.round(Math.min(amount, getDistanceIntoCurrentSegment(journey)) * 10) / 10;
+    if (pulledBack > 0) {
+      journey.distanceTraveled = Math.max(0, journey.distanceTraveled - pulledBack);
+      messages.push(`The crew pulls back ${pulledBack} km to ${getCurrentBlock(journey)?.name || 'the last stop'}.`);
+    }
+    setbackKm = Math.round((amount - pulledBack) * 10) / 10;
+  }
+  if (setbackKm > 0) {
+    const setback = Math.min(0.75, setbackKm / 16);
+    journey.travelSetback = Math.min(0.75, (journey.travelSetback || 0) + setback);
+    messages.push(`The next leg will be slower (about ${setbackKm} km less ground).`);
+  }
+  return messages;
 }
 
 /**
@@ -821,7 +878,9 @@ export function calculateTravelDistance(journey, paceId) {
   // "Covered 4.399999999999999 km", while a fractional leg still lands on
   // its boundary exactly.
   const remaining = Math.round(Math.max(0, segmentLength - distanceIntoSegment) * 100) / 100;
-  const clampedDistance = remaining > 0 ? Math.min(distance, remaining) : 0;
+  // A leg that runs out within ARRIVAL_SNAP_KM of the stop walks the rest in.
+  const snapsToStop = distance > 0 && remaining > 0 && remaining - distance <= ARRIVAL_SNAP_KM;
+  const clampedDistance = remaining > 0 ? (snapsToStop ? remaining : Math.min(distance, remaining)) : 0;
   const reachesBlock = clampedDistance >= remaining && remaining > 0;
 
   return {
@@ -886,6 +945,7 @@ export function executeFieldAction(journey, paceId) {
     const toward = nextBlockAtStart?.name ? ` toward ${nextBlockAtStart.name}` : '';
     messages.push(`Walked ${travelInfo.distance} km of line and road location${toward} at ${pace.name} pace.`);
     journey.travelSetback = 0;
+    journey.travelBonusKm = 0;
   } else {
     if (effectivePaceId === 'resting') {
       messages.push('The crew stood down and recovered this shift.');
@@ -969,28 +1029,33 @@ export function executeFieldAction(journey, paceId) {
   // Add consumption warnings. Litres print whole; person-days keep a tenth.
   const printStock = (entry) => (entry.unit === 'L' ? Math.round(entry.value) : Math.round(entry.value * 10) / 10);
   for (const warning of consumptionResult.warnings) {
-    messages.push(`Warning: ${warning.resource} is running low (${printStock(warning)} ${warning.unit}).`);
+    messages.push(warning.value <= 0
+      ? `Warning: ${warning.resource} at zero.`
+      : `Warning: ${warning.resource} is running low (${printStock(warning)} ${warning.unit}).`);
   }
   for (const critical of consumptionResult.critical) {
     messages.push(`CRITICAL: ${critical.resource} is almost gone! (${printStock(critical)} ${critical.unit})`);
   }
 
-  // Process crew daily updates
+  // Process crew daily updates. A crew with nothing in the food box does not
+  // recover on a rest day; it just gets hungrier more slowly.
+  const starving = journey.resources.food <= 0;
   const conditions = {
     restDay: effectivePaceId === 'resting',
     gruelingPace: effectivePaceId === 'grueling',
-    shortRations: journey.rationPlan?.mode === 'short',
+    shortRations: journey.rationPlan?.mode === 'short' && !starving,
     lowFood: journey.resources.food <= 5,
+    starving,
     coldWeather: journey.temperature === 'cold' || journey.temperature === 'freezing',
     currentDay: journey.day
   };
 
   for (const member of journey.crew) {
     // Apply pace effects
-    if (pace.healthBonus !== 0) {
+    if (pace.healthBonus !== 0 && !(starving && pace.healthBonus > 0)) {
       member.health = Math.max(0, Math.min(100, member.health + pace.healthBonus));
     }
-    if (pace.moraleBonus !== 0) {
+    if (pace.moraleBonus !== 0 && !(starving && pace.moraleBonus > 0)) {
       member.morale = Math.max(0, Math.min(100, member.morale + pace.moraleBonus));
     }
 
@@ -1017,6 +1082,12 @@ export function executeFieldAction(journey, paceId) {
   // Check for game over conditions
   const resourceStatus = checkResourceStatus(journey.resources, FIELD_RESOURCES);
   applyFieldHardships(journey, resourceStatus, messages);
+
+  if (!journey.isGameOver && Number(journey.resourcePressure?.hungryDays || 0) >= STARVATION_WALKOFF_DAYS) {
+    journey.isGameOver = true;
+    journey.gameOverReason = `NO FOOD - After ${journey.resourcePressure.hungryDays} shifts on an empty food box the crew drove themselves out. Nobody is left in the field to finish the season.`;
+    messages.push(journey.gameOverReason);
+  }
 
   if (resourceStatus.depleted.some(d => d.id === 'fuel') && (PACE_OPTIONS[effectivePaceId]?.distanceMultiplier ?? 1) > 0) {
     journey.isGameOver = true;
@@ -1090,8 +1161,11 @@ export function endFieldDay(journey) {
   journey.travelSetback = Math.min(0.75, Math.max(0, journey.travelSetback || 0) + Math.max(0, journey.pendingTravelSetback || 0));
   journey.pendingTravelSetback = 0;
   journey.routePlan = null;
-  if (journey.rationPlan) {
-    journey.rationPlan.mode = 'normal';
+  // Rations are a standing order, like the pace (Set the tempo): they hold
+  // until the player changes them. The streak counts the days on short
+  // rations, which the event odds and the mission panel read.
+  if (journey.rationPlan?.mode === 'short') {
+    journey.rationPlan.shortRationStreak = Number(journey.rationPlan.shortRationStreak || 0) + 1;
   }
   return journey;
 }
@@ -1170,7 +1244,40 @@ function applyFieldHardships(journey, resourceStatus, messages) {
       : 0;
   }
 
-  if (pressure.food >= 2) {
+  // An empty food box is its own failure path, not a louder version of a
+  // thin one. Each shift on nothing costs more than the last, rest does not
+  // offset it (executeFieldAction), and STARVATION_WALKOFF_DAYS of it ends
+  // the season.
+  const starving = journey.resources.food <= 0;
+  pressure.hungryDays = starving ? Number(pressure.hungryDays || 0) + 1 : 0;
+  if (starving) {
+    const days = pressure.hungryDays;
+    const healthLoss = Math.min(14, 4 + days * 2);
+    const moraleLoss = Math.min(16, 6 + days * 2);
+    for (const member of journey.crew) {
+      if (!member.isActive) continue;
+      member.health = Math.max(0, member.health - healthLoss);
+      member.morale = Math.max(0, member.morale - moraleLoss);
+      if (days >= 2) {
+        // Still on nothing: the exhaustion does not wear off overnight, and it
+        // is announced once rather than every morning.
+        let worn = member.statusEffects?.find((effect) => effect.effectId === 'exhaustion');
+        if (!worn) {
+          const result = applyStatusEffect(member, 'exhaustion');
+          if (result.message) messages.push(result.message);
+          worn = member.statusEffects.find((effect) => effect.effectId === 'exhaustion');
+        }
+        if (worn) worn.daysRemaining = Math.max(worn.daysRemaining || 0, 3);
+      }
+    }
+    messages.push(days === 1
+      ? `Nothing in the food box. The crew goes to bed hungry: health -${healthLoss}, morale -${moraleLoss} each.`
+      : `Shift ${days} with no food. The crew is weakening fast: health -${healthLoss}, morale -${moraleLoss} each.`);
+    const left = STARVATION_WALKOFF_DAYS - days;
+    if (left > 0 && left <= 2) {
+      messages.push(`The crew has said it plainly: ${left === 1 ? 'one more shift' : 'two more shifts'} on nothing and they drive out.`);
+    }
+  } else if (pressure.food >= 2) {
     messages.push('Rationing has set in. The crew is visibly weakening from sustained shortages.');
     for (const member of journey.crew) {
       if (!member.isActive) continue;
