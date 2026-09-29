@@ -109,6 +109,13 @@ export function getRandomWeather(block, day, seasonId = null) {
     weights.heavy_snow += (seasonId === 'summer' ? 0 : 3);
   }
 
+  // A summer pass can take a skiff of snow, never a -12°C freeze-up or a
+  // dump of heavy snow: the alpine bump above must not bring them back.
+  if (seasonId === 'summer') {
+    weights.freezing = 0;
+    weights.heavy_snow = 0;
+  }
+
   // Weighted random selection
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
   let roll = Math.random() * total;
