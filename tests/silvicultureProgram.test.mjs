@@ -273,12 +273,13 @@ test('the free-growing survey prints a stocking-standard result and fails on com
     assert.ok(!menu.options.some((o) => o.value === 'survey'), 'the survey is blocked while the stand is under brush');
     assert.ok(ui.lines.some((line) => new RegExp(`Free-growing surveys wait on the release: ${brushy.id} is still under brush and would fail on competition`).test(line)));
 
-    // Release it manually; the survey reopens and the stand passes.
+    // Release it manually (a few saw-crew days); the survey reopens and the
+    // stand passes.
     ui = makeRecordingUi((prompt, options) => {
       if (prompt.startsWith('Release treatment on ')) return options.find((o) => o.value === 'manual');
       return options.find((o) => o.value === 'brush') || options.find((o) => o.value === 'set_aside') || options.find((o) => o.value === 'end');
     });
-    await runSilvicultureDay({ ui, journey, gameOver: false });
+    for (let day = 0; day < 4 && !brushy.released; day += 1) await runSilvicultureDay({ ui, journey, gameOver: false });
     assert.equal(brushy.released, true);
     assert.ok(ui.lines.some((line) => /by manual release - aspen and willow cut below the seedling leaders/.test(line)));
     assert.ok(ui.lines.some((line) => new RegExp(`Release treatment done on the ${brushy.year} opening ${brushy.id}\\. That stand is back on track for its free-growing survey`).test(line)));
@@ -299,7 +300,9 @@ test('free-growing surveys need an accredited surveyor: no crew surveyor and no 
     const ui = makeRecordingUi((prompt, options) => options.find((o) => o.value === 'set_aside') || options.find((o) => o.value === 'end'));
     await runSilvicultureDay({ ui, journey, gameOver: false });
     const menu = ui.prompts.find((entry) => entry.options.some((o) => o.value === 'end'));
-    assert.ok(!menu.options.some((o) => o.value === 'survey'), 'nobody unaccredited signs a declaration');
+    const survey = menu.options.find((o) => o.value === 'survey');
+    assert.ok(survey?.disabled, 'nobody unaccredited signs a declaration');
+    assert.match(survey.description, /No accredited surveyor on the program/);
   });
 });
 
@@ -316,15 +319,21 @@ test('glyphosate under the PMP is cheaper and faster, and costs standing on inte
     await runSilvicultureDay({ ui, journey, gameOver: false });
     const methodPrompt = ui.prompts.find((entry) => entry.prompt.startsWith('Release treatment on '));
     assert.ok(methodPrompt, 'the brushing day asks manual or glyphosate');
-    assert.deepEqual(methodPrompt.options.map((o) => o.value).slice(0, 3), ['manual', 'glyphosate', 'sheep'], 'interface ground allows sheep grazing');
+    assert.deepEqual(methodPrompt.options.map((o) => o.value).slice(0, 4), ['manual', 'cylinder', 'glyphosate', 'sheep'], 'interface ground allows sheep grazing');
     assert.match(methodPrompt.options[0].label, /Manual brushing \(saw crews, ~\$900\/ha\)/);
-    assert.match(methodPrompt.options[1].label, /Glyphosate under the PMP \(~\$350\/ha\)/);
+    assert.match(methodPrompt.options[1].label, /Cylinder release \(saw crews, ~\$560\/ha\)/);
+    assert.match(methodPrompt.options[2].label, /Glyphosate under the PMP \(~\$350\/ha\)/);
+    // Each method is priced against the queue, and the day is confirmed.
+    assert.match(methodPrompt.options[0].description, /The rest of the queue this way: about \$\d/);
+    assert.ok(ui.prompts.some((entry) => /^Today's release by glyphosate under the PMP: \d+ ha at \$350\/ha, \$[\d,]+ against \$[\d,]+ left\. Send the crews\?$/.test(entry.prompt)));
     const treated = journey.brushing.hectaresComplete;
     assert.ok(treated > 0);
     assert.ok(ui.lines.some((line) => /glyphosate on \d+ ha of [\d/]+ openings under PMP 402-0\d{3}\. 10 m pesticide-free zones flagged on every stream/.test(line)), ui.lines.join('\n'));
     assert.ok(ui.lines.some((line) => /guardian program asks for the spray maps/.test(line)));
     assert.equal(journey.scrutiny, scrutinyBefore + 2, 'spraying interface ground draws scrutiny');
     assert.equal(journey.metrics.relationships, 47);
+    // The slip lands where the campaign's season review reads standing.
+    assert.equal(journey.standingLedger.relationships, -3);
     // Cost: overhead + ha × $350 (+ whatever a contractor call cost, never the manual rate).
     assert.ok(budgetBefore - journey.resources.budget < 550 + treated * 350 + 5000);
     assert.ok(budgetBefore - journey.resources.budget >= 550 + treated * 350);
@@ -343,7 +352,7 @@ test('the release program does not offer glyphosate without an applicator, and r
     await runSilvicultureDay({ ui, journey, gameOver: false });
     const methodPrompt = ui.prompts.find((entry) => entry.prompt.startsWith('Release treatment on '));
     assert.ok(methodPrompt);
-    assert.deepEqual(methodPrompt.options.map((o) => o.value), ['manual', 'cancel']);
+    assert.deepEqual(methodPrompt.options.map((o) => o.value), ['manual', 'cylinder', 'cancel']);
   });
 });
 
@@ -642,22 +651,44 @@ test('the program is delivered only when planting, plots, fill, release and decl
   });
 });
 
-test('fuel and food effects are priced into the program budget, since the program carries neither', () => {
+test('fuel and food costs are priced into the program budget; gains, first-aid counts and traverse time are dropped', () => {
   const event = {
     id: 'trapper',
     title: 'The Trapper\'s Price',
     options: [
       { label: 'Trade food', effects: { food: -8, progress: 5 } },
-      { label: 'Share fuel', effects: { fuel: 20, food: 15 }, failureEffects: { fuel: -5 } },
+      { label: 'Buy smoked meat ($120)', effects: { budget: -120, food: 12 } },
+      { label: 'Share fuel', effects: { fuel: 20, food: 15 }, failureEffects: { fuel: -5, firstAid: -2, timeUsed: 3 } },
       { label: 'Walk on', effects: { crew_morale: -2 } },
     ],
   };
   const adapted = adaptEventForProgram(event);
   assert.deepEqual(adapted.options[0].effects, { progress: 5, budget: -480 });
-  assert.deepEqual(adapted.options[1].effects, { budget: 1400 });
-  assert.deepEqual(adapted.options[1].failureEffects, { budget: -125 });
-  assert.equal(adapted.options[2], event.options[2]);
-  assert.deepEqual(event.options[0].effects, { food: -8, progress: 5 }, 'the authored event is untouched');
+  assert.deepEqual(adapted.options[1].effects, { budget: -120 }, 'buying food costs the label price, it does not earn money');
+  assert.deepEqual(adapted.options[2].effects, {}, 'a stock gain the program does not carry is not paid out');
+  assert.deepEqual(adapted.options[2].failureEffects, { budget: -125 });
+  assert.equal(adapted.options[3], event.options[3]);
+  assert.deepEqual(event.options[1].effects, { budget: -120, food: 12 }, 'the authored event is untouched');
+});
+
+test('the adapter makes a card that says it takes the day spend it, and drops traverse-only cards', () => {
+  const event = {
+    id: 'inspection',
+    title: 'Safety Inspection Notice',
+    options: [
+      { label: 'Spend the day prepping for inspection', effects: { compliance: 5 } },
+      { label: 'Walk her through it', outcome: 'It takes most of the day. She leaves satisfied.', timeUsed: 4, effects: { compliance: 3 } },
+      { label: 'Wing it', effects: { compliance: -2 } },
+      { label: 'Rest day for the sick', spendsDay: false, effects: {} },
+    ],
+  };
+  const adapted = adaptEventForProgram(event);
+  assert.equal(adapted.options[0].spendsDay, true);
+  assert.equal(adapted.options[1].spendsDay, true);
+  assert.equal('timeUsed' in adapted.options[1], false, 'no next leg for a setback to land on');
+  assert.equal(adapted.options[2].spendsDay, undefined);
+  assert.equal(adapted.options[3].spendsDay, false, 'an authored time contract wins');
+  assert.equal(adaptEventForProgram({ id: 'helicopter_available', options: [{ label: 'Aerial recon of the route', effects: {} }] }), null);
 });
 
 test('a contractor call\'s outcome stays on the day card instead of being redrawn away', async () => {

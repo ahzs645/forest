@@ -4,6 +4,7 @@
  */
 
 import { JOURNEY_MILESTONES, MILESTONE_COPY } from './constants.js';
+import { assessSilvicultureProgram } from '../data/silvicultureProgram.js';
 
 export function clampRatio(value) {
   return Math.max(0, Math.min(1, value));
@@ -48,12 +49,10 @@ export function getOperationalProgress(journey) {
       return Math.round(safeProgressRatio(journey.distanceTraveled, journey.totalDistance) * 100);
     }
 
-    case 'silviculture': {
-      const plantingRatio = safeProgressRatio(journey?.planting?.blocksPlanted, journey?.planting?.blocksToPlant);
-      const surveyRatio = safeProgressRatio(journey?.surveys?.freeGrowingComplete, journey?.surveys?.freeGrowingTarget);
-      const brushingRatio = safeProgressRatio(journey?.brushing?.hectaresComplete, journey?.brushing?.hectaresTarget);
-      return Math.round((plantingRatio * 0.65 + surveyRatio * 0.25 + brushingRatio * 0.10) * 100);
-    }
+    case 'silviculture':
+      // The one definition of delivered the win and the grade use, so a
+      // milestone cannot fire on planting alone.
+      return Math.round(assessSilvicultureProgram(journey).delivered * 100);
 
     case 'planning': {
       const plan = journey?.plan || {};

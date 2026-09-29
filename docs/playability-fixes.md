@@ -159,3 +159,17 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - Field events: gains no longer add Progress, gambles land as their expected outcome, medevac is charged. Practice-burden cards log CPD; the CPD gap is prorated across the year.
 - Expedition housekeeping: scrutiny clamped at 100, crew ids unique across reloads, resource scoring uses the run's real starting stores. eslint warnings 31 -> 5.
 - Balance (`npm run sim:seasonal`, 12,600 years): greedy 2.28 -> 2.22, role-optimal 2.05 -> 1.85, cautious 1.80 -> 1.72, balanced 1.47 -> 1.50; greedy Outstanding by role planner 3% -> 15%, silviculture 30% -> 7%.
+
+## 2026-09-29 — Silviculture residuals (round 2)
+
+- **Coast budget.** Day 1 and the binder say what the budget assumes: what planting, fill, surveys and overhead need, and what the release queue costs by each method. Cylinder release (saw crews clear a ring round each crop tree, $560/ha) is a chemical-free route the budget carries on every area and difficulty. Four saw crews brush 30 ha on a normal day, not 48 to 65. Each release day is quoted and confirmed before the crews go out.
+- **Events.** Fuel and food costs are priced into the budget, but gains, first-aid counts and traverse time setbacks are dropped. Buying food no longer earns money. Options that say they take the day now spend it. Traverse-only cards are skipped. The chainsaw partial band evacuates the worker it says was lost.
+- **Crews on days off.** Field tasks stay on the card, disabled, with the day the crew is back. Surveyors never plant, and fill does not call the saw crew in beside the planters.
+- **Standing.** Glyphosate on sensitive ground writes relationships to the standing ledger. After three spray days the Nation asks for no more spraying, and glyphosate is shown off the table.
+- **Copy.** Stand-down reasons follow the season and the ground. Contractor calls fit the outfit, and quality disputes follow short plots. Milestones print the program's real numbers. The panel refreshes after the day's work.
+- **End of run.** A delivered run graded D or F is "EXPEDITION COMPLETE", not "SUCCESSFUL". A pulled or failed program is handed over, not reported, and its narrative follows what was planted. The expedition gets the silviculture crew. The grade reads the difficulty-adjusted budget.
+- **Sims.** `node scripts/simulate-silviculture-policies.mjs` now covers 9 areas x 3 difficulties with a no-spray `honest` policy, 8 seeds each:
+  - competent: 216/216 wins
+  - honest: 216/216 wins, never broke; about $26k left on the hard coast
+  - neglect: 0/216 wins
+  - fraud: 0/216 wins

@@ -32,7 +32,9 @@ import {
   describeBlock,
   summarizeProgram,
   isFreeGrowingSurveyable,
+  estimateProgramCosts,
   BRUSH_RATES,
+  BRUSH_DAILY_HA,
   FILL_PRICE_PREMIUM,
   SURVEY_DAY_RATE,
   SUPERVISOR_OVERHEAD_PER_DAY,
@@ -48,30 +50,90 @@ import {
 
 // Contractor events. Each one is a call from a foreman that needs an answer
 // before the crews go out; answering is brief and never spends the day.
+
+/**
+ * Why a foreman stands a crew down, by season and ground: no Extreme fire
+ * danger in a wet coast spring, no humidex outside summer, no grizzlies on
+ * Vancouver Island. The wind and snag call can come anywhere.
+ */
 const STAND_DOWN_REASONS = [
-  'the danger rating went to Extreme at noon yesterday and the block is a hazard abatement file waiting to happen',
-  'lightning is forecast on the ridge all afternoon and the crew is carrying steel',
-  'smoke from the fire to the west has the air quality index past the crew\'s WorkSafeBC limit',
-  'a grizzly with cubs is working the cache on the landing and nobody wants to be the second person to find her',
-  'the heat warning has the humidex past 40 by mid-morning and two planters went down with heat stress yesterday',
+  { text: 'the danger rating went to Extreme at noon yesterday and the block is a hazard abatement file waiting to happen', seasons: ['summer', 'fall'] },
+  { text: 'lightning is forecast on the ridge all afternoon and the crew is carrying steel', seasons: ['spring', 'summer'], ground: 'interior' },
+  { text: 'smoke from the fire to the west has the air quality index past the crew\'s WorkSafeBC limit', seasons: ['summer', 'fall'] },
+  { text: 'the heat warning has the humidex past 40 by mid-morning and two of the crew went down with heat stress yesterday', seasons: ['summer'] },
+  { text: 'a grizzly with cubs is working the cache on the landing and nobody wants to be the second person to find her', seasons: ['spring', 'summer', 'fall'], ground: 'mainland' },
+  { text: 'a black bear sow with cubs is working the cache on the landing and nobody wants to be the second person to find her', seasons: ['spring', 'summer', 'fall'], ground: 'island' },
+  { text: 'the freezing level dropped overnight and the block is under wet snow to the boot tops', seasons: ['spring', 'fall'], ground: 'interior' },
+  { text: 'the cutslope above the spur let go in the night and the road engineer wants eyes on it before anyone drives under it', ground: 'coast' },
+  { text: 'the wind warning has gusts to 80 on the ridge and the block edge is lined with snags' },
 ];
 
-const CONTRACTOR_EVENTS = [
+/**
+ * A stand-down reason that fits today's season and this ground.
+ * @param {Object} journey
+ * @returns {string}
+ */
+export function pickStandDownReason(journey) {
+  const season = (journey?.season ? getCurrentSeasonInfo(journey.season)?.id : null) || 'spring';
+  const coast = String(journey?.program?.becCode || journey?.area?.becCode || '').toUpperCase().startsWith('CWH');
+  const mainland = areaHasTag(journey, 'mainland');
+  const fits = (reason) => {
+    if (reason.seasons && !reason.seasons.includes(season)) return false;
+    if (reason.ground === 'coast') return coast;
+    if (reason.ground === 'interior') return !coast;
+    if (reason.ground === 'mainland') return mainland;
+    if (reason.ground === 'island') return !mainland;
+    return true;
+  };
+  const pool = STAND_DOWN_REASONS.filter(fits);
+  return pool[Math.floor(Math.random() * pool.length)].text;
+}
+
+/** "Cedar Draw Planters'" and "Wetbelt Brushing Co's". */
+function possessive(name) {
+  return /s$/i.test(String(name)) ? `${name}'` : `${name}'s`;
+}
+
+/** The people an outfit sends onto the block. */
+const CREW_NOUNS = { planting: 'planters', brushing: 'cutters', survey: 'surveyors' };
+function crewNoun(contractor) {
+  return CREW_NOUNS[contractor?.specialty] || 'crew';
+}
+
+/** A block whose plots came in under a clean pass in the last two days. */
+function getDisputedBlock(journey) {
+  return (journey?.program?.blocks || [])
+    .filter((block) => block.status === 'inspected' && block.quality < 90 && block.holdback > 0
+      && Number.isFinite(block.inspectedDay) && journey.day - block.inspectedDay <= 2)
+    .sort((a, b) => b.inspectedDay - a.inspectedDay)[0] || null;
+}
+
+/** Where a planting outfit's other contract is. */
+function otherContract(journey) {
+  return String(journey?.program?.becCode || '').toUpperCase().startsWith('CWH') ? 'up the coast' : 'on the coast';
+}
+
+export const CONTRACTOR_EVENTS = [
   {
     id: 'camp_demand',
     trigger: (c) => c.morale < 60,
     title: 'Camp Conditions',
-    getText: (c) => `${c.name}'s foreman calls from the camp: the cook shack water test came back cloudy, the drying tent leaks, and the crew is talking about it. They want the camp brought up before the next shift.`,
+    getText: (c) => `${possessive(c.name)} foreman calls from the camp: the cook shack water test came back cloudy, the drying tent leaks, and the crew is talking about it. They want the camp brought up before the next shift.`,
     options: [
       { label: 'Upgrade the camp ($3,000)', description: 'Water, a real drying tent, a second hand-wash station', value: 'pay', cost: 3000, moraleGain: 15, prodGain: 5 },
       { label: 'Tell them the camp meets the standard', description: 'It does, on paper', value: 'deny', cost: 0, moraleGain: -15, prodGain: -5 },
     ],
   },
   {
+    // Only when the plots really did come in short: a dispute over a block
+    // that passed clean, or one planted a week ago, contradicts the file.
     id: 'quality_dispute',
-    trigger: (c) => c.specialty === 'planting',
+    trigger: (c, journey) => c.specialty === 'planting' && Boolean(getDisputedBlock(journey)),
     title: 'Planting Quality Dispute',
-    getText: (c) => `Your checker's plots on yesterday's block came in wide on spacing with J-roots in the wet ground. ${c.name}'s foreman says the plots are wrong, the ground is wrong, and the holdback should be released today.`,
+    getText: (c, journey) => {
+      const block = getDisputedBlock(journey);
+      return `Your checker's plots on ${block.id} came in at ${block.quality}%: wide on spacing, with J-roots and shallow plugs. ${possessive(c.name)} foreman says the plots are wrong, the ground is wrong, and the $${block.holdback.toLocaleString()} holdback should be released today.`;
+    },
     options: [
       { label: 'Re-plot with the foreman and retrain the crew', description: 'A morning of quality plots; the crew fixes what the plots find', value: 'inspect', cost: 0, moraleGain: -5, prodGain: 10, qualityLift: 3 },
       { label: 'Sign the foreman\'s numbers and release the holdback', description: 'Signing plot cards you did not walk is a false record; scrutiny climbs and the next inspection reads it', value: 'slide', cost: 0, moraleGain: 5, prodGain: 0, fraud: true },
@@ -81,18 +143,20 @@ const CONTRACTOR_EVENTS = [
     id: 'crew_illness',
     trigger: () => Math.random() < 0.3,
     title: 'Sickness in Camp',
-    getText: (c) => `Several planters from ${c.name} are down with a stomach bug and the rest are eating standing up. The foreman thinks it is the water; the cook thinks it is the foreman.`,
+    getText: (c) => (c.specialty === 'survey'
+      ? `One of ${possessive(c.name)} surveyors is down with a stomach bug and the other is eating standing up. The foreman thinks it is the water; the cook thinks it is the foreman.`
+      : `Several ${crewNoun(c)} from ${c.name} are down with a stomach bug and the rest are eating standing up. The foreman thinks it is the water; the cook thinks it is the foreman.`),
     options: [
       { label: 'Call a camp inspection ($800)', description: 'Water test, kitchen, hand-wash stations; the crew works a short day', value: 'inspect_camp', cost: 800, moraleGain: 5, prodGain: 0 },
-      { label: 'Stand the camp down for a day', description: 'No planting; the bug runs its course', value: 'rest', cost: 0, moraleGain: 8, prodGain: 0 },
-      { label: 'Push through', description: 'Trees in the ground either way', value: 'push', cost: 0, moraleGain: -10, prodGain: -10 },
+      { label: 'Stand the camp down for a day', description: (c) => `${{ planting: 'No planting', brushing: 'No saws on the block', survey: 'No plots walked' }[c.specialty] || 'No work'} today; the bug runs its course`, value: 'rest', cost: 0, moraleGain: 8, prodGain: 0 },
+      { label: 'Push through', description: (c) => `${{ planting: 'Trees in the ground', brushing: 'Brush cut', survey: 'Plots walked' }[c.specialty] || 'Work done'} either way`, value: 'push', cost: 0, moraleGain: -10, prodGain: -10 },
     ],
   },
   {
     id: 'stand_down',
     trigger: (c) => c.specialty === 'planting' || c.specialty === 'brushing',
     title: 'Stand-Down Call',
-    getText: (c) => `${c.name}'s foreman calls a stand-down: ${STAND_DOWN_REASONS[Math.floor(Math.random() * STAND_DOWN_REASONS.length)]}. ${c.specialty === 'planting' ? 'Planters plant in rain' : 'Saw crews work in rain'}; this is not rain.`,
+    getText: (c, journey) => `${possessive(c.name)} foreman calls a stand-down: ${pickStandDownReason(journey)}. ${c.specialty === 'planting' ? 'Planters plant in rain' : 'Saw crews work in rain'}; this is not rain.`,
     options: [
       { label: 'Back the stand-down', description: 'Crew off the block today; the tailgate meeting covers it tomorrow', value: 'rest', cost: 0, moraleGain: 10, prodGain: 0 },
       { label: 'Keep them on the block', description: 'Production today; a WorkSafeBC prevention officer would call it differently', value: 'push', cost: 0, moraleGain: -8, prodGain: -5, scrutiny: 1 },
@@ -102,10 +166,10 @@ const CONTRACTOR_EVENTS = [
     id: 'reprice',
     trigger: (c) => c.productivity > 85 && c.specialty === 'planting',
     title: 'Contractor Wants to Split the Crew',
-    getText: (c) => `${c.name} has a coastal contract starting early. They want to release half the crew to it and re-price the remaining trees on your program at +$0.04/tree for a smaller crew that stays.`,
+    getText: (c, journey) => `${c.name} has another contract ${otherContract(journey)} starting early. They want to release half the crew to it and re-price the remaining trees on your program at +$0.04/tree for a smaller crew that stays.`,
     options: [
       { label: 'Accept the re-price (+$0.04/tree)', description: 'Full crew stays; every tree left in the program costs four cents more', value: 'pay', cost: 0, moraleGain: 10, prodGain: 5, priceLift: 0.04 },
-      { label: 'Hold them to the contract price', description: 'Half the crew leaves for the coast; daily output drops', value: 'wait', cost: 0, moraleGain: -5, prodGain: -10, plantersLost: 0.4 },
+      { label: 'Hold them to the contract price', description: 'Half the crew leaves for the other contract; daily output drops', value: 'wait', cost: 0, moraleGain: -5, prodGain: -10, plantersLost: 0.4 },
     ],
   },
 ];
@@ -189,11 +253,12 @@ export async function runSilvicultureDay(game) {
     }
   }
 
+  // What the program opened with, after the difficulty and any campaign
+  // stance moved it: the grade reads the season against this.
+  if (journey.day === 1) program.budgetStart = Math.round(Number(journey.resources.budget) || 0) || program.budgetStart;
+
   // Supervisor overhead: truck, camp, radio, your time.
   journey.resources.budget -= SUPERVISOR_OVERHEAD_PER_DAY;
-  if (journey.day === 1) {
-    ui.write(`Supervisor overhead runs $${SUPERVISOR_OVERHEAD_PER_DAY}/day against the program budget (truck, camp, radio, your time). Contractors invoice per tree and per hectare on top of it.`);
-  }
 
   // Contractor call before the crews go out (never on day 1).
   const activeContractors = journey.contractors.filter(c => c.isActive);
@@ -203,7 +268,7 @@ export async function runSilvicultureDay(game) {
   if (journey.day > 1 && Math.random() < (contractorStress ? 0.35 : 0.25)) {
     if (activeContractors.length > 0) {
       const targetContractor = activeContractors[Math.floor(Math.random() * activeContractors.length)];
-      const applicableEvents = CONTRACTOR_EVENTS.filter(e => e.trigger(targetContractor));
+      const applicableEvents = CONTRACTOR_EVENTS.filter(e => e.trigger(targetContractor, journey));
       if (applicableEvents.length > 0) {
         const cEvent = applicableEvents[Math.floor(Math.random() * applicableEvents.length)];
         await handleContractorEvent(game, cEvent, targetContractor);
@@ -233,7 +298,7 @@ export async function runSilvicultureDay(game) {
       const scrutinyRise = Math.round((Number(journey.scrutiny) || 0) - scrutinyBefore);
       silvicultureState.dayNotes.push(`You set aside "${event.title}"${scrutinyRise > 0 ? `; scrutiny +${scrutinyRise}` : ''}.`);
     }
-    if (settleShortcut(journey, event, ui)) return;
+    if (settleShortcut(journey, event)) return;
   }
 
   const seasonMods = journey.season
@@ -244,7 +309,7 @@ export async function runSilvicultureDay(game) {
   // of the five tracks counts toward calling an unwinnable run.
   const advancingActionValues = new Set(['plant', 'fill', 'brush', 'survey', 'inspect']);
   const dayOpeningOptions = buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultureState, zoneProfile);
-  const hasAdvancingAction = dayOpeningOptions.some((option) => advancingActionValues.has(option.value));
+  const hasAdvancingAction = dayOpeningOptions.some((option) => !option.disabled && advancingActionValues.has(option.value));
   silvicultureState.zombieDays = hasAdvancingAction ? 0 : (silvicultureState.zombieDays || 0) + 1;
 
   const freeChoices = { count: 0 };
@@ -275,6 +340,9 @@ export async function runSilvicultureDay(game) {
     ui.updateAllStatus(journey);
     settleDayPass(journey, freeChoices, ui);
   }
+  // The day's result screen shows the program after the day's work, not
+  // the panel from before it.
+  updateSilvicultureMissionStatus(ui, journey, seasonInfo, zoneProfile);
 
   // End of day
   journey.day++;
@@ -319,23 +387,60 @@ export async function runSilvicultureDay(game) {
   }
 
   ui.updateAllStatus(journey);
+  updateSilvicultureMissionStatus(ui, journey, nextSeasonInfoOf(journey), zoneProfile);
 
   // Milestones read oddly on the winning day ("last declaration in sight"
   // after the last declaration), so they are recorded but not printed then.
-  const milestoneMessages = [];
-  recordProgressMilestones(journey, progressBeforeDay, milestoneMessages, Math.max(1, journey.day - 1));
+  // The line says what is actually done, not what the threshold hoped for.
+  const reached = recordProgressMilestones(journey, progressBeforeDay, [], Math.max(1, journey.day - 1));
   if (!journey.isComplete) {
-    for (const message of milestoneMessages) {
-      ui.writePositive(message);
+    for (const threshold of reached) {
+      ui.writePositive(describeSilvicultureMilestone(journey, threshold));
     }
   }
 
-  const nextSeasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
+  const nextSeasonInfo = nextSeasonInfoOf(journey);
   const contractorHint = journey.contractors.filter(c => c.isActive && c.morale < 40).length;
-  const continueLabel = contractorHint > 0
-    ? `Continue... (Day ${journey.day}, ${nextSeasonInfo?.name || ''}, ${contractorHint} unhappy contractor${contractorHint > 1 ? 's' : ''})`
-    : `Continue... (Day ${journey.day}, ${nextSeasonInfo?.name || ''})`;
+  const seasonOver = Boolean(endResult) || journey.isComplete || journey.isGameOver;
+  const continueLabel = seasonOver
+    ? 'Close out the season'
+    : contractorHint > 0
+      ? `Continue... (Day ${journey.day}, ${nextSeasonInfo?.name || ''}, ${contractorHint} unhappy contractor${contractorHint > 1 ? 's' : ''})`
+      : `Continue... (Day ${journey.day}, ${nextSeasonInfo?.name || ''})`;
   await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
+}
+
+function nextSeasonInfoOf(journey) {
+  return journey.season ? getCurrentSeasonInfo(journey.season) : null;
+}
+
+const MILESTONE_LEADS = {
+  25: 'A quarter of the program delivered',
+  50: 'Half the program delivered',
+  75: 'Three-quarters of the program delivered',
+  90: 'The program is nearly delivered',
+};
+
+/**
+ * A progress milestone in the program's own numbers, so it can never claim
+ * release is moving at 0 ha or blocks inspected before the plots are walked.
+ * @param {Object} journey
+ * @param {number} threshold - 25, 50, 75 or 90
+ * @returns {string}
+ */
+export function describeSilvicultureMilestone(journey, threshold) {
+  const summary = summarizeProgram(journey.program);
+  const blocksToPlant = journey.planting?.blocksToPlant || 0;
+  const release = Math.round(journey.brushing?.hectaresComplete || 0);
+  const releaseTarget = journey.brushing?.hectaresTarget || 0;
+  const fg = Math.min(journey.surveys?.freeGrowingComplete || 0, journey.surveys?.freeGrowingTarget || 0);
+  const parts = [
+    `${summary.blocksInspected}/${blocksToPlant} blocks planted and inspected`,
+    summary.fillTotal ? `fill ${summary.fillDone}/${summary.fillTotal}` : null,
+    release > 0 ? `release ${release}/${releaseTarget} ha` : `release not started (${releaseTarget} ha)`,
+    `${fg}/${journey.surveys?.freeGrowingTarget || 0} free-growing declarations`,
+  ].filter(Boolean);
+  return `*** MILESTONE: ${MILESTONE_LEADS[threshold] || `${threshold}% of the program delivered`}: ${parts.join(', ')}. ***`;
 }
 
 // ── Day card ────────────────────────────────────────────────────────────────
@@ -361,8 +466,65 @@ function buildSilvicultureStatusLine(journey) {
     `brush ${Math.round(journey.brushing?.hectaresComplete || 0)}/${journey.brushing?.hectaresTarget || 0} ha`,
     `FG ${Math.min(journey.surveys?.freeGrowingComplete || 0, journey.surveys?.freeGrowingTarget || 0)}/${journey.surveys?.freeGrowingTarget || 0}`,
     daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
-    `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
+    `budget ${formatMoneyK(journey.resources.budget || 0)}`,
   ]);
+}
+
+/** "$212k", "-$1k": the sign goes before the dollar. */
+function formatMoneyK(amount) {
+  const value = Math.round((Number(amount) || 0) / 1000);
+  return `${value < 0 ? '-' : ''}$${Math.abs(value)}k`;
+}
+
+/** "$21,600", "-$858". */
+function formatMoney(amount) {
+  const value = Math.round(Number(amount) || 0);
+  return `${value < 0 ? '-' : ''}$${Math.abs(value).toLocaleString()}`;
+}
+
+/**
+ * What the program budget assumes, in one line: what the committed work
+ * costs, what is left for the release queue, and which release methods that
+ * pays for. On hard, manual release of the whole queue does not fit on the
+ * coast; the player needs to hear that on day 1, not on day 28.
+ * @param {Object} journey
+ * @param {Object} [options]
+ * @param {boolean} [options.sheepAllowed]
+ * @param {boolean} [options.sprayAllowed]
+ * @returns {string|null}
+ */
+export function describeBudgetPlan(journey, { sheepAllowed = false, sprayAllowed = true } = {}) {
+  const costs = estimateProgramCosts(journey);
+  if (costs.releaseHa <= 0) {
+    return `${formatMoney(costs.budget)} left; the rest of the program needs about ${formatMoney(roundTo(costs.committed, 1000))}.`;
+  }
+  const methods = [
+    ['manual', 'manual release'],
+    ['cylinder', 'cylinder release'],
+    sheepAllowed ? ['sheep', 'sheep'] : null,
+    sprayAllowed ? ['glyphosate', 'glyphosate'] : null,
+  ].filter(Boolean);
+  const short = methods.filter(([method]) => costs.release[method] > costs.freeForRelease).map(([, label]) => label);
+  const priced = methods.map(([method, label]) => `${label} ${formatMoney(roundTo(costs.release[method], 1000))}`).join(', ');
+  const verdict = short.length === 0
+    ? 'Any of them fits.'
+    : short.length < methods.length
+      ? `${capitalize(formatList(short, 'or'))} for all of it would run the program out of money.`
+      : 'No method pays for all of it: the program runs out of money before the queue is done.';
+  return `${formatMoney(costs.budget)} left. Planting, fill, surveys and overhead need about ${formatMoney(roundTo(costs.committed, 1000))}, leaving about ${formatMoney(roundTo(costs.freeForRelease, 1000))} for ${Math.round(costs.releaseHa)} ha of release: ${priced}. ${verdict}`;
+}
+
+function roundTo(value, step) {
+  return Math.round((Number(value) || 0) / step) * step;
+}
+
+function formatList(items, conjunction = 'and') {
+  if (items.length <= 1) return items[0] || '';
+  return `${items.slice(0, -1).join(', ')} ${conjunction} ${items[items.length - 1]}`;
+}
+
+function capitalize(text) {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 }
 
 function buildSilvicultureQuietTitle(journey, seasonInfo) {
@@ -372,7 +534,10 @@ function buildSilvicultureQuietTitle(journey, seasonInfo) {
     return !c.isActive && state.status === 'ready';
   });
   if (seasonInfo?.id === 'winter') return 'FROZEN GROUND';
-  if (getBlockAwaitingInspection(journey.program)) return 'PLOT CARDS BEFORE PLANTING';
+  if (journey.day === 1) return 'THE PROGRAM BINDER';
+  if (getBlockAwaitingInspection(journey.program)) {
+    return getCurrentPlantingBlock(journey.program) ? 'PLOT CARDS BEFORE PLANTING' : 'PLOT CARDS ON THE LAST BLOCK';
+  }
   if (activeContractors.length === 0 && readyContractors.length > 0) return 'CREWS AVAILABLE';
   if (activeContractors.length === 0) return 'NOBODY ON THE GROUND';
   if (activeContractors.some((c) => c.morale < 40)) return 'A SHORT-TEMPERED CHECK-IN';
@@ -388,7 +553,10 @@ function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState, curr
   const notes = silvicultureState?.dayNotes || [];
   if (notes.length) parts.push(`Earlier today: ${notes.join(' ')}`);
 
-  if (seasonInfo?.id === 'winter') {
+  if (journey.day === 1) {
+    // The budget's assumptions, before the first dollar goes out.
+    parts.push(`Budget: ${describeBudgetPlan(journey, getReleaseAccess(journey, silvicultureState))} Supervisor overhead runs $${SUPERVISOR_OVERHEAD_PER_DAY}/day on top of the contractors' invoices.`);
+  } else if (seasonInfo?.id === 'winter') {
     parts.push('The ground is frozen through and nothing plants until spring. What moves today is the roster, the RESULTS submissions and next year\'s seedling order.');
   } else if (activeContractors.length === 0) {
     const readyCount = (journey.contractors || []).filter((c) => {
@@ -488,13 +656,16 @@ function buildSilvicultureContextLines(journey, seasonInfo, silvicultureState, z
   lines.push(`Four vintages, one crew: this year's blocks (plant, inspect), last year's openings (fill), the ${journey.program.year - 5}–${journey.program.year - 2} stands (release), the ${describeFgYears(journey.program)} openings (free-growing survey). New seedlings do not become free-growing this season.`);
   lines.push(`Stocking standard ${describeStockingStandard(standard)}.`);
   lines.push(`Program: ${describeProgramLine(journey)} | ${zoneProfile.summary}`);
+  lines.push(`Budget: ${describeBudgetPlan(journey, getReleaseAccess(journey, silvicultureState))}`);
   const roster = getSilvicultureContractorRoster(journey, zoneProfile);
   lines.push(`Roster: ${roster.summary}`);
 
   const scrutinyPressure = getScrutinyPressure(journey);
   if (scrutinyPressure > 0) {
-    lines.push(`${getScrutinyLabel(journey)}: ${scrutinyPressure}`);
+    lines.push(`${getScrutinyLabel(journey)}: ${Math.round(scrutinyPressure)}%`);
   }
+  const standing = describeSprayStanding(journey, silvicultureState);
+  if (standing) lines.push(standing);
   const areaSituation = getAreaSituationSummary(journey);
   if (areaSituation) lines.push(`Area: ${areaSituation}`);
   const discoveryNotes = getDiscoveryTagNotes(journey, journey.roleId || 'silviculture', 2);
@@ -586,6 +757,7 @@ function displaySilvicultureBriefing(ui, journey, silvicultureState, zoneProfile
 
   ui.write(`Stocking standard ${describeStockingStandard(standard)}.`);
   ui.write(`Program: ${describeProgramLine(journey)} | ${zoneProfile.summary}`);
+  ui.write(`Budget: ${describeBudgetPlan(journey, getReleaseAccess(journey, silvicultureState))}`);
   ui.write('');
   ui.write(`This year's blocks (${program.year}):`);
   for (const block of program.blocks) {
@@ -607,7 +779,8 @@ function displaySilvicultureBriefing(ui, journey, silvicultureState, zoneProfile
   ui.write('Release program:');
   for (const opening of program.brush) {
     const tag = opening.fgId ? ' [free-growing candidate, must be released first]' : '';
-    ui.write(`  ${opening.id} (${opening.year}, ${opening.ha} ha)${tag}: ${Math.round(opening.treated)}/${opening.ha} ha${opening.method ? ` by ${describeBrushMethod(opening.method)}` : ''}`);
+    const size = opening.openingHa > opening.ha ? `${opening.ha} of ${opening.openingHa} ha` : `${opening.ha} ha`;
+    ui.write(`  ${opening.id} (${opening.year}, ${size})${tag}: ${Math.round(opening.treated)}/${opening.ha} ha${opening.method ? ` by ${describeBrushMethod(opening.method)}` : ''}`);
   }
   ui.write('Free-growing survey candidates:');
   for (const opening of program.freeGrowing) {
@@ -628,8 +801,10 @@ function displaySilvicultureBriefing(ui, journey, silvicultureState, zoneProfile
   }
   const scrutinyPressure = getScrutinyPressure(journey);
   if (scrutinyPressure > 0) {
-    ui.write(`${getScrutinyLabel(journey)}: ${scrutinyPressure}`);
+    ui.write(`${getScrutinyLabel(journey)}: ${Math.round(scrutinyPressure)}%`);
   }
+  const standing = describeSprayStanding(journey, silvicultureState);
+  if (standing) ui.write(standing);
   const areaSituation = getAreaSituationSummary(journey);
   if (areaSituation) {
     ui.write(`Area Situation: ${areaSituation}`);
@@ -774,14 +949,46 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
     value: 'end'
   });
 
+  // A field task whose crew is on days off stays on the card, disabled, with
+  // the day the crew is back. It used to vanish with no reason given.
   const fieldTasks = { plant: 'plant', fill: 'fill', brush: 'brush', survey: 'survey' };
   const hasAccreditedSurveyor = crewHasRole(journey.crew || [], 'surveyor');
-  return actionOptions.filter((option) => {
+  return actionOptions.map((option) => {
     const task = fieldTasks[option.value];
-    if (!task) return true;
-    if (task === 'survey' && hasAccreditedSurveyor) return true;
-    return getSilvicultureTaskContractors(journey, zoneProfile, task, false).length > 0;
+    if (!task) return option;
+    if (task === 'survey' && hasAccreditedSurveyor) return option;
+    if (getSilvicultureTaskContractors(journey, zoneProfile, task, false).length > 0) return option;
+    return { ...option, disabled: true, description: describeCrewWait(journey, zoneProfile, task) };
   });
+}
+
+const TASK_CREWS = {
+  plant: 'planting crew',
+  fill: 'planting crew',
+  brush: 'saw crew',
+  survey: 'accredited surveyor',
+};
+
+/**
+ * Why a field task cannot go out today: "Waits for Wetbelt Brushing Co, on
+ * days off until day 25."
+ * @param {Object} journey
+ * @param {Object} zoneProfile
+ * @param {string} task - plant | fill | brush | survey
+ * @returns {string}
+ */
+export function describeCrewWait(journey, zoneProfile, task) {
+  const outfits = (journey.contractors || []).filter((contractor) => matchesSilvicultureTask(contractor, task));
+  const resting = outfits.filter((contractor) => {
+    const state = ensureSilvicultureContractorState(contractor, journey, zoneProfile);
+    return state.status === 'recovering' || state.cooldownDays > 0;
+  });
+  const ownSurveyorGone = task === 'survey' && (journey.crew || []).some((member) => member.role === 'surveyor' && !member.isActive);
+  const tail = ownSurveyorGone ? ' Your own accredited surveyor is off the crew.' : '';
+  if (!outfits.length) return `No ${TASK_CREWS[task] || 'crew'} on the program.${tail}`;
+  if (!resting.length) return `Waits: no ${TASK_CREWS[task] || 'crew'} is available today.${tail}`;
+  const back = Math.max(...resting.map((contractor) => journey.day + Math.max(1, contractor.silvicultureState?.cooldownDays || 1)));
+  return `Waits for ${formatList(resting.map((contractor) => contractor.name))}, on days off until day ${back}.${tail}`;
 }
 
 function getSurveyableOpening(journey) {
@@ -956,7 +1163,9 @@ function estimatePlantingOutput(crew, pressure, plantingEff) {
   for (const contractor of crew) {
     const fit = getSilvicultureContractorFit(contractor, pressure, 'plant');
     const planters = Number(contractor.planters) || Number(contractor.crewSize) || 10;
-    const perPlanter = contractor.specialty === 'planting' ? 950 : 600;
+    // Cutters planting out of their trade put in about a third of what a
+    // production planter does.
+    const perPlanter = contractor.specialty === 'planting' ? 950 : 320;
     total += planters * perPlanter * (contractor.productivity / 100) * fit;
   }
   const zoneDrag = Math.min(0.15, pressure.survivalPenalty + pressure.accessPressure * 0.4);
@@ -1106,6 +1315,7 @@ async function handleFillPlanting(game, seasonMods, silvicultureState, zoneProfi
 
 const BRUSH_METHOD_LABELS = {
   manual: 'manual release',
+  cylinder: 'cylinder release',
   glyphosate: 'glyphosate under the PMP',
   sheep: 'sheep grazing',
 };
@@ -1120,9 +1330,54 @@ function areaHasTag(journey, ...tags) {
 }
 
 /**
+ * Spray days on interface or watershed ground before the Nation asks,
+ * through the referral, for no more spraying this season.
+ */
+export const SENSITIVE_SPRAY_DAYS = 3;
+/** Relationship standing a spray day on sensitive ground costs. */
+const SPRAY_RELATIONSHIP_COST = 3;
+
+/**
+ * Which release methods this program can use today. Sheep are an interior
+ * practice where the road and the ground allow a herder; glyphosate needs
+ * the applicator ticket, and on interface or watershed ground it stops
+ * after the Nation objects.
+ * @param {Object} journey
+ * @param {Object} [silvicultureState]
+ */
+function getReleaseAccess(journey, silvicultureState = journey?.silvicultureState) {
+  const standard = getStockingStandard(journey?.program?.becCode || journey?.area?.becCode);
+  const brushers = (journey?.contractors || []).find((c) => c.specialty === 'brushing');
+  const sensitive = areaHasTag(journey, 'community-interface', 'watershed', 'community-water', 'salmon', 'visuals');
+  const sprayDays = Number(silvicultureState?.sensitiveSprayDays) || 0;
+  const hasApplicator = contractorHasCert(brushers, 'PMP-applicator');
+  const sprayClosed = sensitive && sprayDays >= SENSITIVE_SPRAY_DAYS;
+  return {
+    sensitive,
+    sprayDays,
+    hasApplicator,
+    sprayClosed,
+    sprayAllowed: hasApplicator && !sprayClosed,
+    sheepAllowed: standard.sheepGrazing !== false
+      && areaHasTag(journey, 'community-interface', 'watershed', 'community-water', 'visuals')
+      && !areaHasTag(journey, 'remote-camps', 'glacial', 'winter-road'),
+  };
+}
+
+/** The spray days' cost to the Nation and the watershed group, for the binder. */
+function describeSprayStanding(journey, silvicultureState) {
+  const days = Number(silvicultureState?.sensitiveSprayDays) || 0;
+  if (!days) return null;
+  const closed = days >= SENSITIVE_SPRAY_DAYS;
+  return `Spray maps: ${days} spray day${days === 1 ? '' : 's'} on interface and watershed ground, relationships -${days * SPRAY_RELATIONSHIP_COST}${closed ? '; the Nation has asked for no more spraying this season' : `; ${SENSITIVE_SPRAY_DAYS - days} more before the Nation asks for no more`}.`;
+}
+
+/**
  * Release treatment on the older stands. The choice is the real one: saw
- * crews, glyphosate under the pest management plan, or sheep where the
- * ground and the road allow it.
+ * crews on the whole opening or round each crop tree, glyphosate under the
+ * pest management plan, or sheep where the ground and the road allow it.
+ * Each method is priced against what the budget has free, and the day's
+ * area and invoice are confirmed before the crews go out.
  */
 async function handleBrushTreatment(game, seasonMods, silvicultureState, zoneProfile) {
   const { ui, journey } = game;
@@ -1141,55 +1396,95 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
     return false;
   }
   const contractor = crew.find((c) => c.specialty === 'brushing') || crew[0];
-  const sensitive = areaHasTag(journey, 'community-interface', 'watershed', 'community-water', 'salmon', 'visuals');
+  const access = getReleaseAccess(journey, silvicultureState);
   const hasApplicator = contractorHasCert(contractor, 'PMP-applicator');
   const standard = getStockingStandard(program.becCode || journey.area?.becCode);
-  const sheepAllowed = standard.sheepGrazing !== false
-    && areaHasTag(journey, 'community-interface', 'watershed', 'community-water', 'visuals')
-    && !areaHasTag(journey, 'remote-camps', 'glacial', 'winter-road');
+  const costs = estimateProgramCosts(journey);
+  const queueCost = (method) => ` The rest of the queue this way: about ${formatMoney(roundTo(costs.release[method], 1000))}.`;
+
+  ui.write(`Release budget: ${Math.round(costs.releaseHa)} ha left in the queue and about ${formatMoney(roundTo(costs.freeForRelease, 1000))} free once planting, fill, surveys and overhead are paid.`);
 
   const options = [
     {
       label: `Manual brushing (saw crews, ~$${BRUSH_RATES.manual}/ha)`,
-      description: `Slower, no PMP, nothing in the water. ${standard.manualRelease || `The crews cut ${describeBrush(journey)} below the seedling leaders.`}`,
+      description: `The whole opening, no PMP, nothing in the water. ${standard.manualRelease || `The crews cut ${describeBrush(journey)} below the seedling leaders.`}${queueCost('manual')}`,
       value: 'manual',
+    },
+    {
+      label: `Cylinder release (saw crews, ~$${BRUSH_RATES.cylinder}/ha)`,
+      description: `The crews clear a ring round each crop tree instead of the whole opening: cheaper, slower going, no chemicals. The ring is the competition a free-growing surveyor reads.${queueCost('cylinder')}`,
+      value: 'cylinder',
     },
   ];
   if (hasApplicator) {
-    options.push({
+    const sprayOption = {
       label: `Glyphosate under the PMP (~$${BRUSH_RATES.glyphosate}/ha)`,
-      description: `Backpack or aerial; faster and cheaper per hectare. 10 m pesticide-free zones on every stream${sensitive ? '; this is interface/watershed ground and the community and the Nation will read the spray maps' : ''}.`,
+      description: `Backpack or aerial; fastest and cheapest per hectare. 10 m pesticide-free zones on every stream${access.sensitive ? `; this is interface/watershed ground, the community and the Nation read the spray maps, and each spray day here costs relationships (${Math.max(0, SENSITIVE_SPRAY_DAYS - access.sprayDays)} before the Nation asks for no more)` : ''}.${queueCost('glyphosate')}`,
       value: 'glyphosate',
-    });
+    };
+    if (access.sprayClosed) {
+      sprayOption.disabled = true;
+      sprayOption.description = `Off the table: after ${SENSITIVE_SPRAY_DAYS} spray days on this ground the Nation asked, through the referral, for no more spraying this season, and the licensee agreed.`;
+    }
+    options.push(sprayOption);
   }
-  if (sheepAllowed) {
+  if (access.sheepAllowed) {
     options.push({
       label: `Sheep grazing (herder contract, ~$${BRUSH_RATES.sheep}/ha)`,
-      description: 'No chemicals, no saws; slow, needs the road open and a herder with dogs. Reads well on interface ground.',
+      description: `No chemicals, no saws; slow, needs the road open and a herder with dogs. Reads well on interface ground.${queueCost('sheep')}`,
       value: 'sheep',
     });
   }
   options.push({ label: 'Never mind', description: 'Leave the release program for another day.', value: 'cancel' });
 
-  const choice = await ui.promptChoice(`Release treatment on ${queue[0].id} (${queue[0].year}, ${queue[0].ha} ha): how?`, options);
-  const method = choice.value;
-  if (method === 'cancel') {
-    ui.write('The brushing crew waits for a call.');
-    return false;
-  }
-
   const avgProductivity = crew.reduce((sum, c) => sum + (c.productivity * getSilvicultureContractorFit(c, pressure, 'brush')), 0) / crew.length;
-  const baseHectares = method === 'glyphosate' ? 80 : method === 'sheep' ? 30 : 48;
-  const pfzLoss = method === 'glyphosate' && areaHasTag(journey, 'salmon', 'watershed', 'community-water') ? 0.92 : 1;
   const remaining = queue.reduce((sum, opening) => sum + (opening.ha - opening.treated), 0);
-  let hectares = Math.min(
-    remaining,
-    Math.round(baseHectares * (avgProductivity / 100) * brushingEff * pfzLoss * (0.8 + Math.random() * 0.4))
-  );
-  if (hectares <= 0) {
-    ui.write('No release hectares remain on the program map.');
-    return false;
+  // The day's ground is set by the crews and the weather before the method
+  // is chosen, so the confirmation can quote the real area and invoice.
+  const dayFactor = 0.8 + Math.random() * 0.4;
+  const hectaresFor = (method) => {
+    const pfzLoss = method === 'glyphosate' && areaHasTag(journey, 'salmon', 'watershed', 'community-water') ? 0.92 : 1;
+    const base = BRUSH_DAILY_HA[method] || BRUSH_DAILY_HA.manual;
+    // A strong crew on a good day beats the base by a quarter at most.
+    return Math.min(remaining, Math.round(Math.min(base * 1.25, base * (avgProductivity / 100) * brushingEff * pfzLoss * dayFactor)));
+  };
+
+  let method = null;
+  while (!method) {
+    const choice = await ui.promptChoice(`Release treatment on ${queue[0].id} (${queue[0].year}, ${queue[0].ha} ha): how?`, options);
+    if (!choice || choice.value === 'cancel' || choice.disabled) {
+      ui.write('The brushing crew waits for a call.');
+      return false;
+    }
+    const ha = hectaresFor(choice.value);
+    if (ha <= 0) {
+      ui.write('No release hectares remain on the program map.');
+      return false;
+    }
+    const rate = BRUSH_RATES[choice.value] || BRUSH_RATES.manual;
+    const invoice = Math.round(ha * rate);
+    const budget = Number(journey.resources.budget) || 0;
+    const confirm = await ui.promptChoice(
+      `Today's release by ${describeBrushMethod(choice.value)}: ${ha} ha at $${rate}/ha, ${formatMoney(invoice)} against ${formatMoney(budget)} left. Send the crews?`,
+      [
+        {
+          label: `Send the crews (${formatMoney(invoice)})`,
+          description: invoice > budget
+            ? 'More than the program has left: the invoice goes unpaid and the program is cancelled.'
+            : `${ha} ha of the ${Math.round(remaining)} ha queue; ${formatMoney(budget - invoice)} left after it.`,
+          value: 'confirm',
+        },
+        { label: 'Choose another method', description: 'Back to the release options.', value: 'back' },
+        { label: 'Not today', description: 'Leave the release program for another day.', value: 'cancel' },
+      ],
+    );
+    if (confirm?.value === 'confirm') method = choice.value;
+    else if (confirm?.value !== 'back') {
+      ui.write('The brushing crew waits for a call.');
+      return false;
+    }
   }
+  let hectares = hectaresFor(method);
 
   // Walk the queue: the free-growing candidate under brush sits at the head.
   const treated = [];
@@ -1224,14 +1519,21 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   const yearsText = [...new Set(treated.map((entry) => entry.opening.year))].sort().join('/');
   if (method === 'manual') {
     ui.write(`Treated ${Math.round(hectares)} ha of ${yearsText} openings by manual release - ${formatReleaseTargets(standard)} cut below the seedling leaders.`);
+  } else if (method === 'cylinder') {
+    ui.write(`Treated ${Math.round(hectares)} ha of ${yearsText} openings by cylinder release - ${formatReleaseTargets(standard)} cut back in a ring round every crop tree.`);
   } else if (method === 'glyphosate') {
     const pmp = silvicultureState.pmpNumber ||= `402-0${700 + Math.floor(Math.random() * 90)}`;
+    silvicultureState.sprayDays = (Number(silvicultureState.sprayDays) || 0) + 1;
     ui.write(`${hectares >= 60 ? 'Aerial' : 'Backpack'} glyphosate on ${Math.round(hectares)} ha of ${yearsText} openings under PMP ${pmp}. 10 m pesticide-free zones flagged on every stream.`);
-    if (sensitive) {
-      ui.writeWarning('The First Nation\'s guardian program asks for the spray maps, and so does the community watershed group. Relationships slip; scrutiny climbs.');
-      adjustRelationships(journey, -3);
+    if (access.sensitive) {
+      silvicultureState.sensitiveSprayDays = (Number(silvicultureState.sensitiveSprayDays) || 0) + 1;
+      ui.writeWarning(`The First Nation's guardian program asks for the spray maps, and so does the community watershed group. Relationships -${SPRAY_RELATIONSHIP_COST}; scrutiny climbs.`);
+      adjustRelationships(journey, -SPRAY_RELATIONSHIP_COST);
       adjustScrutiny(journey, 2);
       program.notes.push(`Spray maps for PMP ${pmp} sent to the Guardians and the watershed group.`);
+      if (silvicultureState.sensitiveSprayDays >= SENSITIVE_SPRAY_DAYS) {
+        ui.writeWarning('The Nation writes through the referral asking for no more spraying on this ground this season. The licensee agrees: the rest of the release goes by saw or sheep.');
+      }
     } else {
       ui.write('The Nation\'s guardian program asks for the spray maps; the RPF signs the treatment record.');
     }
@@ -1359,7 +1661,7 @@ async function handleFreeGrowingSurvey(game, seasonMods, silvicultureState, zone
       opening.released = false;
       opening.releaseReadyDay = null;
       if (!program.brush.some((entry) => entry.fgId === opening.id && entry.treated < entry.ha)) {
-        program.brush.unshift({ id: opening.id, year: opening.year, ha, treated: 0, method: null, fgId: opening.id });
+        program.brush.unshift({ id: opening.id, year: opening.year, ha, openingHa: opening.ha, treated: 0, method: null, fgId: opening.id });
         journey.brushing.hectaresTarget += ha;
       }
     }
@@ -1475,14 +1777,16 @@ async function handleContractorEvent(game, cEvent, contractor) {
   const silvicultureState = ensureSilvicultureState(journey);
 
   ui.clear();
+  // The panel beside the call shows today's program, not yesterday's.
+  updateSilvicultureMissionStatus(ui, journey, nextSeasonInfoOf(journey), zoneProfile);
   ui.writeHeader(`CONTRACTOR CALL: ${cEvent.title}`);
-  ui.write(cEvent.getText(contractor));
+  ui.write(cEvent.getText(contractor, journey));
   ui.write('Brief response; the day\'s work continues.');
   ui.write('');
 
   const options = cEvent.options.map(opt => ({
     label: opt.label,
-    description: opt.description || '',
+    description: (typeof opt.description === 'function' ? opt.description(contractor) : opt.description) || '',
     value: opt.value
   }));
 
@@ -1532,7 +1836,7 @@ async function handleContractorEvent(game, cEvent, contractor) {
   }
   if (selected.plantersLost) {
     contractor.planters = Math.max(4, Math.round((contractor.planters || 12) * (1 - selected.plantersLost)));
-    ui.writeWarning(`${contractor.name} sends half the crew to the coast: ${contractor.planters} planters stay on your program.`);
+    ui.writeWarning(`${contractor.name} sends half the crew to the other contract: ${contractor.planters} planters stay on your program.`);
   }
   if (selected.scrutiny) adjustScrutiny(journey, selected.scrutiny);
 
@@ -1657,12 +1961,18 @@ function settleProgramSchedule(journey, ui) {
   while (schedule.days >= 1) {
     schedule.days -= 1;
     journey.resources.contractorCapacity += 2;
-    const bonus = Math.min(6, Math.max(0, journey.brushing.hectaresTarget - journey.brushing.hectaresComplete));
-    if (bonus > 0) {
-      journey.brushing.hectaresComplete += bonus;
-      const opening = (journey.program?.brush || []).find((entry) => entry.treated < entry.ha);
-      if (opening) opening.treated = Math.min(opening.ha, opening.treated + bonus);
+    // The extra shift goes onto the young stands in the queue, and only what
+    // it actually treats is counted: crediting the counter with hectares no
+    // opening took left the meter at 100% with a stand still open. A
+    // free-growing candidate's release is left for a deliberate treatment.
+    let bonus = 0;
+    for (const opening of journey.program?.brush || []) {
+      if (bonus >= 6 || opening.fgId) continue;
+      const put = Math.min(6 - bonus, Math.max(0, opening.ha - opening.treated));
+      opening.treated += put;
+      bonus += put;
     }
+    journey.brushing.hectaresComplete = Math.min(journey.brushing.hectaresTarget, journey.brushing.hectaresComplete + bonus);
     ui.writePositive(`A day ahead of schedule: the release crew squeezes in an extra shift${bonus ? ` (+${bonus} ha)` : ''} and the roster gains two crew-days.`);
   }
   while (schedule.days <= -1) {
@@ -1677,33 +1987,76 @@ function settleProgramSchedule(journey, ui) {
   }
 }
 
-// The program runs on a budget, not a fuel cache and a grub box. An event
-// that trades in fuel or food moves money here instead (crummy and reefer
-// fuel, camp groceries), so its preview and its effect say the same thing.
+// The program runs on a budget, not a fuel cache, a grub box or a first-aid
+// kit count. An event that spends fuel or food spends money here instead
+// (crummy and reefer fuel, camp groceries). A fuel or food *gain* is stock
+// the program does not carry, so it is dropped rather than paid out: buying
+// smoked meat costs the $120 on the label, it does not earn $600. The card's
+// preview and the outcome read the same adapted numbers.
 const FUEL_UNIT_COST = 25;  // $ per authored fuel unit
 const FOOD_UNIT_COST = 60;  // $ per person-day of camp groceries
 const EVENT_EFFECT_BANDS = ['effects', 'partialEffects', 'failureEffects'];
+/** Stocks the program does not track; their effects are dropped. */
+const UNTRACKED_STOCKS = ['firstAid'];
+
+// Cards written for a crew on a traverse: slinging supplies to the next
+// block, flying the route, relocating a block. There is no route here.
+const TRAVERSE_ONLY_EVENTS = new Set(['helicopter_available', 'sasquatch_sighting']);
+
+// An option whose own words take the day ("Spend the day prepping", "Rest
+// day for the sick", a tour that "takes most of the day") spends it here,
+// rather than reading "brief response; work continues".
+const TAKES_THE_DAY = /\b(spend|take|use) the day\b|\brest day\b|\btakes (most of|the rest of) the day\b|\btakes the day\b/i;
+
+function adaptEffects(effects) {
+  const hasStock = typeof effects.fuel === 'number' || typeof effects.food === 'number';
+  const hasUntracked = UNTRACKED_STOCKS.some((key) => key in effects);
+  if (!hasStock && !hasUntracked && !('timeUsed' in effects)) return effects;
+  const rest = { ...effects };
+  const cost = Math.min(0, Number(rest.fuel) || 0) * FUEL_UNIT_COST + Math.min(0, Number(rest.food) || 0) * FOOD_UNIT_COST;
+  for (const key of ['fuel', 'food', 'timeUsed', ...UNTRACKED_STOCKS]) delete rest[key];
+  const budget = (Number(rest.budget) || 0) + cost;
+  if (budget) rest.budget = budget;
+  else delete rest.budget;
+  return rest;
+}
 
 /**
- * A copy of the day's event with fuel and food effects priced into the
- * program budget. The authored event is left alone.
+ * A copy of the day's event fitted to the program: fuel and food costs
+ * priced into the budget, stock gains and first-aid counts dropped, the
+ * traverse's time setback removed (there is no next leg), and an option
+ * that says it takes the day marked as spending it. Traverse-only cards
+ * return null. The authored event is left alone.
  * @param {Object} event
- * @returns {Object}
+ * @returns {Object|null}
  */
 export function adaptEventForProgram(event) {
+  if (TRAVERSE_ONLY_EVENTS.has(event?.id)) return null;
   if (!Array.isArray(event?.options)) return event;
   let changed = false;
   const options = event.options.map((option) => {
     if (!option) return option;
     let adapted = option;
+    const copy = () => {
+      if (adapted === option) adapted = { ...option };
+      changed = true;
+    };
     for (const band of EVENT_EFFECT_BANDS) {
       const effects = option[band];
-      if (!effects || (typeof effects.fuel !== 'number' && typeof effects.food !== 'number')) continue;
-      const { fuel, food, ...rest } = effects;
-      const budget = (Number(rest.budget) || 0) + (Number(fuel) || 0) * FUEL_UNIT_COST + (Number(food) || 0) * FOOD_UNIT_COST;
-      if (adapted === option) adapted = { ...option };
-      adapted[band] = budget ? { ...rest, budget } : rest;
-      changed = true;
+      if (!effects) continue;
+      const fitted = adaptEffects(effects);
+      if (fitted === effects) continue;
+      copy();
+      adapted[band] = fitted;
+    }
+    if ('timeUsed' in option) {
+      copy();
+      delete adapted.timeUsed;
+    }
+    if (typeof option.spendsDay !== 'boolean' && !option.timeCost
+        && (TAKES_THE_DAY.test(option.label || '') || TAKES_THE_DAY.test(option.outcome || ''))) {
+      copy();
+      adapted.spendsDay = true;
     }
     return adapted;
   });
@@ -1715,9 +2068,9 @@ export function adaptEventForProgram(event) {
  * Two falsifications on file and the licensee pulls you off the program.
  * @returns {boolean} whether the run ended
  */
-function settleShortcut(journey, event, ui) {
+function settleShortcut(journey, event) {
   if (!recordTemptationOutcome(journey, event)) return false;
-  return pullProgramIfFalsified(journey, ui);
+  return pullProgramIfFalsified(journey);
 }
 
 /**
@@ -1725,14 +2078,15 @@ function settleShortcut(journey, event, ui) {
  * much of it is in the ground: the declarations it rests on are under review.
  * @returns {boolean} whether the program was pulled
  */
-function pullProgramIfFalsified(journey, ui) {
+function pullProgramIfFalsified(journey) {
   if (!summarizeIntegrity(journey).programPulled) return false;
   if (journey.isGameOver && !journey.isComplete) return true;
   journey.isComplete = false;
   journey.endReason = null;
   journey.isGameOver = true;
+  // The debrief opens with this reason; printing it here as well put it on
+  // screen twice.
   journey.gameOverReason = 'C&E has falsified records with your signature on them. The licensee pulls you off the program and your declarations go under review.';
-  ui.writeDanger(journey.gameOverReason);
   return true;
 }
 
@@ -1743,7 +2097,7 @@ function closeOutSeason(journey, ui) {
   ui.write('');
   ui.writeHeader('SEASON CLOSE: DISTRICT CHECK');
   for (const line of lines) ui.writeWarning(line);
-  pullProgramIfFalsified(journey, ui);
+  if (pullProgramIfFalsified(journey)) ui.writeDanger('The district now holds falsified records with your signature on them.');
 }
 
 /**
@@ -1928,11 +2282,18 @@ function adjustCompliance(journey, delta) {
   }
 }
 
+/**
+ * Relationship standing lands where the campaign's season review reads it
+ * (the same ledger event outcomes write, js/events/resolution.js), and on
+ * the relationship meter when the journey carries one.
+ */
 function adjustRelationships(journey, delta) {
-  if (journey?.metrics && Number.isFinite(Number(journey.metrics.relationships))) {
+  if (!journey || !Number.isFinite(delta) || delta === 0) return;
+  if (journey.metrics && Number.isFinite(Number(journey.metrics.relationships))) {
     journey.metrics.relationships = Math.max(0, Math.min(100, Number(journey.metrics.relationships) + delta));
   }
-  journey.communityStanding = Math.max(-20, Math.min(20, (Number(journey.communityStanding) || 0) + delta));
+  journey.standingLedger ||= { relationships: 0, compliance: 0 };
+  journey.standingLedger.relationships = (Number(journey.standingLedger.relationships) || 0) + delta;
 }
 
 // ── Contractors ─────────────────────────────────────────────────────────────
@@ -1945,7 +2306,7 @@ function describeContractorEconomics(contractor) {
     return `${contractor.planters || contractor.crewSize} planters · $${(Number(contractor.pricePerTree) || 0).toFixed(2)}/tree · quality ${contractor.qualityPct}% (${contractor.holdbackPct}% holdback)`;
   }
   if (specialty === 'brushing') {
-    return `${contractor.sawCrews || 3} saw crews · $${contractor.ratePerHa}/ha manual, $${contractor.herbicideRatePerHa}/ha glyphosate · ${contractorHasCert(contractor, 'PMP-applicator') ? 'PMP applicator' : 'no applicator ticket'}`;
+    return `${contractor.sawCrews || 4} saw crews · $${contractor.ratePerHa}/ha manual, $${BRUSH_RATES.cylinder}/ha cylinder, $${contractor.herbicideRatePerHa}/ha glyphosate · ${contractorHasCert(contractor, 'PMP-applicator') ? 'PMP applicator' : 'no applicator ticket'}`;
   }
   return `${contractor.surveyors || 2} surveyors · $${(contractor.dayRate || SURVEY_DAY_RATE).toLocaleString()}/day · ${contractorHasCert(contractor, 'surveyor-accredited') ? 'accredited' : 'not accredited'}`;
 }
@@ -2030,10 +2391,10 @@ function getSilvicultureTaskContractors(journey, zoneProfile, task, deployMissin
       continue;
     }
 
-    // A crew on the block can pick up planting or fill outside its
+    // A saw crew on the block can pick up planting or fill outside its
     // specialty; brushing and surveys wait for the outfit with the saws or
-    // the accreditation.
-    if (contractor.isActive && (task === 'plant' || task === 'fill')) {
+    // the accreditation, and two surveyors are not a planting crew.
+    if (contractor.isActive && (task === 'plant' || task === 'fill') && contractor.specialty !== 'survey' && contractor.specialty !== 'surveyor') {
       fallback.push({ contractor, fit });
     }
   }
@@ -2063,10 +2424,9 @@ function matchesSilvicultureTask(contractor, task) {
     return false;
   }
 
-  if (task === 'fill') {
-    return contractor.specialty === 'planting' || contractor.specialty === 'brushing';
-  }
-
+  // Fill is the planters' work; a saw crew already on the block can take it
+  // as a fallback (getSilvicultureTaskContractors), but it is not called in
+  // alongside the planters.
   if (task === 'survey') {
     return (contractor.specialty === 'survey' || contractor.specialty === 'surveyor') && contractorHasCert(contractor, 'surveyor-accredited');
   }
