@@ -159,3 +159,34 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - Field events: gains no longer add Progress, gambles land as their expected outcome, medevac is charged. Practice-burden cards log CPD; the CPD gap is prorated across the year.
 - Expedition housekeeping: scrutiny clamped at 100, crew ids unique across reloads, resource scoring uses the run's real starting stores. eslint warnings 31 -> 5.
 - Balance (`npm run sim:seasonal`, 12,600 years): greedy 2.28 -> 2.22, role-optimal 2.05 -> 1.85, cautious 1.80 -> 1.72, balanced 1.47 -> 1.50; greedy Outstanding by role planner 3% -> 15%, silviculture 30% -> 7%.
+## 2026-09-29 — Campaign tiers and seasonal balance (wave 2, F4)
+
+- **One tier decision.** `gradeTier()` in `js/engine/scoring.js` reads one gate table per mode (`SEASONAL_TIER_GATES`, `CAMPAIGN_TIER_GATES`). The seasonal ending, the score cap, the "held back" line, the Year in Review and the service record all use it. The campaign grades the year once (`gradeCampaignYear`) and files that grade, so a capped Mixed year is no longer recorded as a Solid victory.
+- **Campaign Outstanding is reachable.** It needs all four deployments delivered and one of two excellence paths. Forest Health now answers the work:
+  - planting quality counts only for blocks actually planted;
+  - a treated release queue earns +2, and an untreated one costs Forest Health;
+  - recon sweeps count against the package target;
+  - an approved plan earns credit for its biodiversity.
+- **Solid names what fell short**, for example: "Outstanding needs Budget 40+ (you have 36), Compliance 85+ (you have 83)."
+- **Budget is value for money.** Each season compares the work delivered with the allowance spent. Spending the allowance on its work is on budget. Shortcut cash is not counted as a saving, and shifts on an empty food box cancel any thrift credit.
+- **Completion.** A planning file that clears every gate reads 100%, not 85%. A spring that skipped its fill no longer reads 100%.
+- **Reviews add up.**
+  - Every "Why this happened" line shows its amount.
+  - A meter moved by two causes shows each one.
+  - Crisis cards are listed.
+  - Each review ends with a season total, and the Year in Review's season lines sum to the trendlines.
+  - A save at year end resumes as "Year in Review".
+- **Seasonal content.**
+  - The FPB audit card now arrives only after a year that gave it something to find, and its copy fits every role and area.
+  - Desk roles can log CPD: a "CPD Log Behind" card lands once a year when the log falls behind.
+- **Harness.** `js/engine/simulate.js` now scrambles seeds and gives each role and area its own policy stream. Before this, one seed decided the random policy's picks in all 36 combos. The stock silviculture policy in `scripts/simulate-expeditions.mjs` is now the competent policy from `simulate-silviculture-policies.mjs`: 24/24 full length and 12/12 at campaign scale, up from 12/24 and 5/12.
+- **Balance.** The comeback window repairs slipping standing from the second season, the steady program pays from a weakest meter of 35, and the Mixed floors sit just above the trust and audit lines. Results from `sim:seasonal` (12,600 years, same harness before and after):
+
+  | Style | Stumbled before → after | Mean tier before → after |
+  | --- | --- | --- |
+  | random | 54% → 39% | 0.59 → 0.73 |
+  | weakest-metric | 18% → 6% | — |
+  | greedy | — | 2.13 → 2.06 |
+  | aggressive | 100% → 99% | — |
+
+  In `simulate-campaign.mjs` (normal, 9 areas × 6 seeds), careful play reaches Outstanding in 7/54 years and average play in 0/54.
