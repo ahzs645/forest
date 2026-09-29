@@ -28,6 +28,7 @@ function makeStubUi({ pickIndex = () => 0 } = {}) {
     writeDivider(text) { calls.push({ fn: 'writeDivider', text }); },
     writePositive(text) { calls.push({ fn: 'writePositive', text }); },
     writeWarning(text) { calls.push({ fn: 'writeWarning', text }); },
+    writeDanger(text) { calls.push({ fn: 'writeDanger', text }); },
     async promptChoice(prompt, options) {
       calls.push({ fn: 'promptChoice', prompt, options: options.map((o) => o.value) });
       return options[pickIndex(options)] || options[0];
@@ -37,7 +38,7 @@ function makeStubUi({ pickIndex = () => 0 } = {}) {
 
 function textOf(ui) {
   return ui.calls
-    .filter((c) => ['writeHeader', 'write', 'writeDivider', 'writePositive', 'writeWarning'].includes(c.fn))
+    .filter((c) => ['writeHeader', 'write', 'writeDivider', 'writePositive', 'writeWarning', 'writeDanger'].includes(c.fn))
     .map((c) => c.text)
     .join('\n');
 }
@@ -289,6 +290,11 @@ test('planning defeat: runFinalDebrief also renders every stage (parity with vic
 
   const text = textOf(ui);
   assert.match(text, /THE WORK STOPS HERE/, 'stage 1: defeat sign-off framing');
+  // The reason the run ended is the first thing said, before the archive
+  // prompt - not two screens later.
+  const reasonAt = ui.calls.findIndex((c) => c.fn === 'writeDanger' && c.text === 'Budget exhausted');
+  const promptAt = ui.calls.findIndex((c) => c.fn === 'promptChoice');
+  assert.ok(reasonAt !== -1 && reasonAt < promptAt, 'the loss reason is shown before the first prompt');
   assert.match(text, /EXPEDITION FAILED/, 'stage 2: defeat screen');
   assert.match(text, /FINAL STATISTICS/, 'stage 2: final statistics');
   assert.match(text, /PERFORMANCE REVIEW/, 'stage 4: performance review');

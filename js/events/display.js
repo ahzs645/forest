@@ -212,7 +212,10 @@ function getOptionHint(option, journeyType, event = null) {
       hints.push(option.effects.compliance > 0 ? `+${option.effects.compliance} compliance` : `${option.effects.compliance} compliance`);
     }
     if (option.effects.politicalCapital !== undefined) {
-      hints.push(option.effects.politicalCapital > 0 ? `+${option.effects.politicalCapital} capital` : `${option.effects.politicalCapital} capital`);
+      // The outcome line calls it district goodwill on a desk file
+      // (js/events/resolution.js describeGoodwillChange); the hint should too.
+      const unit = journeyType === 'manager' ? 'capital' : 'goodwill';
+      hints.push(option.effects.politicalCapital > 0 ? `+${option.effects.politicalCapital} ${unit}` : `${option.effects.politicalCapital} ${unit}`);
     }
 
     if (option.effects.data !== undefined && option.effects.data !== 0) {

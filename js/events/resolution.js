@@ -50,6 +50,41 @@ function clampScrutiny(value) {
 }
 
 /**
+ * Goodwill at or below this after a loss gets a warning, because zero ends a
+ * desk run (js/modes/shared/endConditions.js) and nothing else on the card
+ * says so.
+ */
+const GOODWILL_WARNING_THRESHOLD = 15;
+
+function readGoodwill(journey) {
+  const value = journey?.resources?.politicalCapital;
+  return typeof value === 'number' ? value : null;
+}
+
+/**
+ * Say what an event did to the district's goodwill. Compliance hits, capital
+ * effects and band fallout all drain the same meter, and until now none of
+ * them said so - the run ended from a "start next day" button.
+ */
+function describeGoodwillChange(journey, before) {
+  const after = readGoodwill(journey);
+  if (before === null || after === null) return [];
+  const delta = Math.round(after - before);
+  if (delta === 0) return [];
+
+  const label = journey.journeyType === 'manager' ? 'Political capital' : 'District goodwill';
+  const lines = [`${label} ${delta > 0 ? '+' : ''}${delta} → ${Math.round(after)}.`];
+  if (delta < 0 && journey.journeyType !== 'manager' && after <= GOODWILL_WARNING_THRESHOLD) {
+    lines.push(after <= 0
+      ? 'The district\'s goodwill is gone. The file stops here.'
+      : journey.journeyType === 'planning'
+        ? `Goodwill is nearly spent: at zero the district stops reading the file (${Math.round(after)} left).`
+        : `Goodwill is nearly spent: at zero the licensee pulls you off the file (${Math.round(after)} left).`);
+  }
+  return lines;
+}
+
+/**
  * Pick a random active crew member
  */
 function pickRandomCrewMember(crew) {
@@ -84,6 +119,7 @@ function pickMultipleCrewMembers(crew, count) {
 export function resolveEvent(journey, event, option) {
   const messages = [];
   const scrutinyBefore = Number(journey.scrutiny || 0);
+  const goodwillBefore = readGoodwill(journey);
 
   // Gamble options: roll once against odds shifted by the state the player has
   // actually built (js/events/odds.js), then use the resolved band throughout.
@@ -186,6 +222,8 @@ export function resolveEvent(journey, event, option) {
     const direction = scrutinyDelta > 0 ? 'rose' : 'eased';
     messages.push(`Scrutiny ${direction} to ${Math.round(journey.scrutiny)}%.`);
   }
+
+  messages.push(...describeGoodwillChange(journey, goodwillBefore));
 
   const reaction = buildEventReaction(journey, option);
   if (reaction) {

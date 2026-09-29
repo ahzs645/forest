@@ -867,3 +867,68 @@ test('selected events can seed carry-forward discovery tags', () => {
   assert.ok(journey.discoveryTags.some((tag) => tag.id === 'community_visibility'));
   assert.ok(result.messages.some((message) => /Carry-forward intel/i.test(message)));
 });
+
+test('every change to district goodwill is surfaced, with a warning before the fatal threshold', () => {
+  const permitting = {
+    journeyType: 'permitting',
+    day: 11,
+    log: [],
+    permits: { target: 15, backlog: 0, drafting: 0, submitted: 0, inReferral: 0, inReview: 0, needsRevision: 0, approved: 11 },
+    resources: { budget: 30000, politicalCapital: 16 },
+    relationships: { ministry: 50, nations: 50, agencies: 50 },
+    regulations: { complianceScore: 60 }
+  };
+  // A compliance hit on a permit file drains goodwill; it used to do so silently.
+  const hit = resolveEvent(permitting, { id: 'archaeology_gap', title: 'Archaeology Screening Gap' }, {
+    label: 'Submit and hope',
+    effects: { compliance: -10 }
+  });
+  assert.equal(permitting.resources.politicalCapital, 6);
+  assert.ok(hit.messages.some((message) => message === 'District goodwill -10 → 6.'), hit.messages.join(' | '));
+  assert.ok(hit.messages.some((message) => /licensee pulls you off the file \(6 left\)/.test(message)));
+
+  const gone = resolveEvent(permitting, { id: 'complaint', title: 'Complaint' }, {
+    label: 'Redirect to PR',
+    effects: { politicalCapital: -6 }
+  });
+  assert.equal(permitting.resources.politicalCapital, 0);
+  assert.ok(gone.messages.some((message) => /goodwill is gone/.test(message)));
+
+  const planning = {
+    journeyType: 'planning',
+    day: 18,
+    log: [],
+    resources: { budget: 40000, politicalCapital: 23 },
+    protagonist: { reputation: 50, energy: 60, stress: 30 },
+    plan: { phase: 'analysis', dataCompleteness: 80, analysisQuality: 40, stakeholderBuyIn: 55, ministerialConfidence: 48 }
+  };
+  const quiet = resolveEvent(planning, { id: 'media', title: 'Media Inquiry' }, {
+    label: 'Redirect to PR department',
+    effects: { politicalCapital: -6, relationships: -3 }
+  });
+  assert.equal(planning.resources.politicalCapital, 17);
+  assert.ok(quiet.messages.some((message) => message === 'District goodwill -6 → 17.'));
+  assert.ok(!quiet.messages.some((message) => /nearly spent/.test(message)), 'no warning while goodwill is above the threshold');
+
+  const low = resolveEvent(planning, { id: 'elder', title: 'Elder Offers Traditional Knowledge' }, {
+    label: 'Decline',
+    effects: { politicalCapital: -8 }
+  });
+  assert.ok(low.messages.some((message) => /district stops reading the file \(9 left\)/.test(message)));
+
+  const back = resolveEvent(planning, { id: 'grant', title: 'Grant' }, {
+    label: 'Apply',
+    effects: { politicalCapital: 4 }
+  });
+  assert.ok(back.messages.some((message) => message === 'District goodwill +4 → 13.'));
+});
+
+test('the option hint names goodwill on a desk file and capital only in the boardroom', () => {
+  const event = {
+    id: 'hint', title: 'Hint', description: 'x',
+    options: [{ label: 'Lean on the district', outcome: 'x', effects: { politicalCapital: -6 } }]
+  };
+  assert.match(formatEventForDisplay(event, 'planning').options[0].hint, /-6 goodwill/);
+  assert.match(formatEventForDisplay(event, 'permitting').options[0].hint, /-6 goodwill/);
+  assert.match(formatEventForDisplay(event, 'manager').options[0].hint, /-6 capital/);
+});
