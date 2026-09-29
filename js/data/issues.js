@@ -321,7 +321,7 @@ export const ISSUE_LIBRARY = [
     description:
       "North American lumber prices tank overnight, forcing difficult decisions about volume commitments.",
     roles: ["planner", "permitter"],
-    areaTags: ["market", "bc-wide"],
+    areaTags: ["bc-wide"],
     seasonBias: ["Winter Operations"],
     options: [
       {
@@ -352,6 +352,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce", "silviculture"],
     areaTags: ["wildfire", "sbs", "swb"],
     seasonBias: ["Summer Field"],
+    seasonLock: true,
     options: [
       {
         label: "Suspend operations and cut fuel breaks with Nations",
@@ -409,7 +410,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A regional Nation proposes co-managing a drone program to monitor block performance and wildlife sightings.",
     roles: ["recce", "planner"],
-    areaTags: ["sbs", "cwh", "technology"],
+    areaTags: ["sbs", "cwh"],
     seasonBias: ["Spring Planning"],
     options: [
       {
@@ -439,7 +440,7 @@ export const ISSUE_LIBRARY = [
     description:
       "FESBC claws back part of your stewardship grant mid-year after a provincial budget update, and the funded fuel treatments and rehab work have to be reprioritized.",
     roles: ["planner", "permitter"],
-    areaTags: ["policy", "bc-wide"],
+    areaTags: ["bc-wide"],
     seasonBias: ["Winter Operations"],
     options: [
       {
@@ -468,7 +469,7 @@ export const ISSUE_LIBRARY = [
     description:
       "Your aerial LiDAR platform glitches mid-flight, corrupting data for critical road designs.",
     roles: ["recce"],
-    areaTags: ["technology", "steep", "bwbs"],
+    areaTags: ["steep", "bwbs"],
     seasonBias: ["Summer Field"],
     options: [
       {
@@ -524,15 +525,16 @@ export const ISSUE_LIBRARY = [
     id: "pine-beetle-scouts",
     title: "Mountain Pine Beetle Scouts Detected",
     description:
-      "Beetles are surfacing on the fringe of your salvage recovery units. The district's forest health staff warn an outbreak could reignite.",
+      "Spring bark checks find live broods that came through the winter on the fringe of your salvage recovery units. The district's forest health staff warn an outbreak could reignite at the summer flight.",
     roles: ["planner", "recce", "silviculture"],
     areaTags: ["sbs", "beetle-recovery"],
     seasonBias: ["Spring Planning"],
+    seasonLock: true,
     options: [
       {
         label: "Launch sanitation crews immediately",
         outcome:
-          "You fall and burn the green-attack trees and chip the hotspots, buying valuable time against the beetles.",
+          "Crews fall and burn the infested trees before the summer flight, buying valuable time against the beetles.",
         effects: { progress: -2, forestHealth: 5, compliance: 3, relationships: 2, budget: -3 },
         clearFlags: ["pineBeetleMonitor", "pineBeetleUnchecked"],
       },
@@ -562,6 +564,7 @@ export const ISSUE_LIBRARY = [
     roles: ["planner", "silviculture"],
     areaTags: ["sbs", "beetle-recovery"],
     seasonBias: ["Summer Field"],
+    seasonLock: true,
     requiresAnyFlags: ["pineBeetleMonitor", "pineBeetleUnchecked"],
     options: [
       {
@@ -597,6 +600,7 @@ export const ISSUE_LIBRARY = [
     roles: ["planner", "permitter"],
     areaTags: ["sbs", "beetle-recovery"],
     seasonBias: ["Fall Close-out"],
+    seasonLock: true,
     requiresFlags: ["pineBeetleUnchecked"],
     options: [
       {
@@ -937,6 +941,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce"],
     areaTags: ["remote-camps", "glacial", "northern-bc"],
     seasonBias: ["Fall Close-out"],
+    seasonLock: true,
     description:
       "Fog, early snow, and short daylight keep collapsing the last workable access window for one unfinished ridge traverse.",
     options: [
@@ -966,6 +971,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce"],
     areaTags: ["winter-road", "remote-camps", "northern-bc"],
     seasonBias: ["Winter Operations"],
+    seasonLock: true,
     description:
       "A whiteout closes both the road and aviation window with one field crew still beyond the camp line during your final winter push.",
     options: [
@@ -1170,7 +1176,7 @@ export const ISSUE_LIBRARY = [
     description:
       "An independent audit reveals your old-growth retention is dipping toward provincial minimums.",
     roles: ["planner", "permitter"],
-    areaTags: ["bc-wide", "forest-legacy"],
+    areaTags: ["bc-wide"],
     seasonBias: ["Winter Operations"],
     options: [
       {
@@ -1197,7 +1203,7 @@ export const ISSUE_LIBRARY = [
     id: "wildlife-collar-drop",
     title: "Caribou GPS Collar Drop",
     description:
-      "A collared caribou loses signal near your winter block, and the regional biologist reads it as a possible mortality signal.",
+      "A collared caribou loses signal near your block, and the regional biologist reads it as a possible mortality signal.",
     roles: ["recce", "silviculture"],
     areaTags: ["caribou", "winter-road"],
     seasonBias: ["Winter Operations"],
@@ -1259,6 +1265,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce", "silviculture"],
     areaTags: ["remote-camps", "bwbs", "watershed"],
     seasonBias: ["Spring Planning", "Summer Field"],
+    seasonLock: true,
     options: [
       {
         label: "Evacuate via helicopter and rebuild on higher ground",
@@ -1286,7 +1293,7 @@ export const ISSUE_LIBRARY = [
     description:
       "Compliance and Enforcement starts flying unannounced drone inspections over your harvest blocks.",
     roles: ["planner", "permitter", "recce"],
-    areaTags: ["technology", "bc-wide"],
+    areaTags: ["bc-wide"],
     seasonBias: ["Summer Field"],
     options: [
       {
@@ -1572,7 +1579,7 @@ export const ISSUE_LIBRARY = [
     description:
       "The road crew wants the culvert spec today. The desktop signal says the creek is probably non-classified, but no one has walked it and the block boundary is three days out.",
     roles: ["recce", "planner", "permitter"],
-    areaTags: ["riparian", "fish-bearing"],
+    areaTags: ["salmon", "watershed", "bc-wide"],
     seasonBias: ["Spring Planning", "Summer Field"],
     options: [
       {
@@ -1601,7 +1608,7 @@ export const ISSUE_LIBRARY = [
     description:
       "Your site plan sits over a Mule Deer Winter Range. Someone on the team is pretty sure there is a blanket GAR exemption from last year's salvage push. The harvest window closes in a week.",
     roles: ["planner", "permitter"],
-    areaTags: ["wildlife", "salvage"],
+    areaTags: ["wildfire", "beetle-recovery"],
     seasonBias: ["Winter Operations", "Spring Planning"],
     options: [
       {
@@ -1630,7 +1637,7 @@ export const ISSUE_LIBRARY = [
     description:
       "The fabricator is staging a reused Bailey span tomorrow. You have a pre-work inspection form in your bag and a contractor already moving trucks to the approach.",
     roles: ["permitter", "recce", "planner"],
-    areaTags: ["bridges", "access"],
+    areaTags: ["steep", "salmon", "watershed", "bc-wide"],
     seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
@@ -1660,7 +1667,7 @@ export const ISSUE_LIBRARY = [
     description:
       "Two homesteads hold domestic water licences on the creek that drains your proposed cutblock. They have heard rumours and want to know whether you plan to tell them before trucks roll.",
     roles: ["planner", "permitter", "silviculture"],
-    areaTags: ["community-water", "riparian"],
+    areaTags: ["community-water", "watershed"],
     seasonBias: ["Spring Planning"],
     options: [
       {
@@ -1690,7 +1697,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A side-file from your consulting practice: A regional district bylaw requires a Qualified Environmental Professional to assess the foreshore work on your private lake lot. You happen to be an RPF with riparian training.",
     roles: ["planner", "silviculture", "recce"],
-    areaTags: ["riparian", "conflict"],
+    areaTags: ["community-interface", "watershed"],
     seasonBias: ["Summer Field"],
     options: [
       {
@@ -1719,7 +1726,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A side-file from your consulting practice: Your client's private lot abuts a resort municipality's treed highway buffer, and the realtor now wants harvesting for a new driveway. The tree-cutting bylaw is not one you usually work with.",
     roles: ["planner", "permitter"],
-    areaTags: ["community-interface", "private-land", "municipal"],
+    areaTags: ["community-interface"],
     seasonBias: ["Spring Planning", "Summer Field"],
     options: [
       {
@@ -1747,7 +1754,7 @@ export const ISSUE_LIBRARY = [
     description:
       "Your contractor accidentally cut 0.03 ha inside a wildlife tree retention area that was also buffering a neighbour's domestic water intake, and nobody has told the water licensee yet.",
     roles: ["recce", "permitter"],
-    areaTags: ["community-water", "watershed", "private-land"],
+    areaTags: ["community-water", "watershed"],
     seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
@@ -1775,7 +1782,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A scaler in your yard emails that they feel pressured by your supervisor to downgrade loads beyond what the scaling manual supports, and has attached a week of examples.",
     roles: ["recce", "planner"],
-    areaTags: ["yard", "bc-wide"],
+    areaTags: ["bc-wide"],
     seasonBias: ["Fall Close-out", "Winter Operations"],
     options: [
       {
@@ -1803,7 +1810,7 @@ export const ISSUE_LIBRARY = [
     description:
       "Your nursery confirms that the seedlings lined up for spring planting are from a seedlot one zone south of the cutblocks. Forty-some blocks are already in the order.",
     roles: ["silviculture", "planner"],
-    areaTags: ["reforestation", "coast", "community-forest"],
+    areaTags: ["sbs", "cwh", "bc-wide"],
     seasonBias: ["Winter Operations", "Spring Planning"],
     options: [
       {
@@ -1812,13 +1819,13 @@ export const ISSUE_LIBRARY = [
         effects: { progress: -4, forestHealth: 5, compliance: 6, budget: -5 },
       },
       {
-        label: "Swap seedlots only on the coastal-aspect blocks and plant the rest",
+        label: "Swap seedlots on the coldest, highest blocks and plant the rest",
         outcome: "The compromise thins the exposure but still leaves a chunk of ground with mismatched stock, and the district's check survey marks it.",
         effects: { progress: -1, forestHealth: 1, compliance: -2, budget: -2 },
       },
       {
         label: "Plant the existing stock and let nature sort out the mismatches",
-        outcome: "The first hot summer hammers survival rates and the community forest partner demands to know how half a million seedlings ended up wrong.",
+        outcome: "The first hot summer hammers survival rates and the licensee demands to know how half a million seedlings ended up wrong.",
         effects: { progress: 2, forestHealth: -6, compliance: -6, relationships: -5 },
         setFlags: { wrongSeedzonePlanted: true },
       },
@@ -1860,7 +1867,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A side-file from your consulting practice: Your cruise of four small expropriation parcels is behind schedule, and the Cruising Manual allows a 100 by 100 grid that waives the sampling error requirement. Two parcels look low volume from the road.",
     roles: ["planner", "recce"],
-    areaTags: ["private-land", "cruise", "bc-wide"],
+    areaTags: ["bc-wide"],
     seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {
@@ -1888,7 +1895,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A side-file from your consulting practice: You are the prescribing RPF on a fuel-management project for a small village, and last week you were elected to council. The prescription is not yet implemented.",
     roles: ["planner", "silviculture"],
-    areaTags: ["community-interface", "wildfire", "municipal"],
+    areaTags: ["community-interface", "wildfire"],
     seasonBias: ["Fall Close-out", "Winter Operations"],
     options: [
       {
@@ -1916,7 +1923,7 @@ export const ISSUE_LIBRARY = [
     description:
       "An internal audit finds the same First Nation was missed on referrals for several fuel-management site plans, and both the planning forester and the forest manager signed pieces of the stack.",
     roles: ["planner", "permitter"],
-    areaTags: ["community-forest", "first-nations", "wildfire"],
+    areaTags: ["wildfire", "community-interface"],
     seasonBias: ["Spring Planning", "Summer Field"],
     options: [
       {
@@ -1944,7 +1951,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A side-file from your consulting practice: A Forest Practices Board audit of your community forest lands ten findings at once: vague road mapping, drifting OGMA boundaries, unclear contractor obligations, and six more items.",
     roles: ["planner", "permitter", "recce", "silviculture"],
-    areaTags: ["community-forest", "audit"],
+    areaTags: ["bc-wide"],
     seasonBias: ["Winter Operations", "Spring Planning"],
     options: [
       {
@@ -1972,7 +1979,7 @@ export const ISSUE_LIBRARY = [
     description:
       "A side-file from your consulting practice: Your small-scale salvage client has been logging Douglas-fir for thirty years and already has dead-and-down and green-attacked volume estimates ready for you. Your field day is booked elsewhere.",
     roles: ["planner", "recce"],
-    areaTags: ["salvage", "interior", "private-land"],
+    areaTags: ["wildfire", "beetle-recovery", "sbs"],
     seasonBias: ["Summer Field", "Fall Close-out"],
     options: [
       {

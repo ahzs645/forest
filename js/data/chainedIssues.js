@@ -289,7 +289,7 @@ export const CHAINED_ISSUES = [
     description:
       "The neighbour whose water intake sits below your block has filed a joint complaint with the regulator citing both the trespass and a pattern of being kept in the dark.",
     roles: ["planner", "permitter", "recce"],
-    areaTags: ["community-water", "private-land"],
+    areaTags: ["community-water", "watershed"],
     requiresAnyFlags: ["waterLicenseeComplaint", "trespassHiddenFromNeighbour"],
     excludeFlags: ["licenseeComplaintResolved"],
     baseWeight: 2,
@@ -323,7 +323,7 @@ export const CHAINED_ISSUES = [
     description:
       "The district stewardship officer wants a block-by-block seedlot traceback against RESULTS for last spring's planting, and your cutblock list has forty-some suspect lines.",
     roles: ["silviculture", "planner"],
-    areaTags: ["reforestation", "community-forest"],
+    areaTags: ["sbs", "cwh", "bc-wide"],
     requiresFlags: ["wrongSeedzonePlanted"],
     excludeFlags: ["seedlotTracebackResolved"],
     baseWeight: 2,
@@ -357,7 +357,7 @@ export const CHAINED_ISSUES = [
     description:
       "The community forest board has called a special meeting to discuss the unresolved FPB audit findings, and council members have been reading the file all week.",
     roles: ["planner", "permitter"],
-    areaTags: ["community-forest", "audit"],
+    areaTags: ["bc-wide"],
     requiresFlags: ["auditDisputeStance"],
     excludeFlags: ["boardShowdownResolved"],
     baseWeight: 2,
@@ -391,7 +391,7 @@ export const CHAINED_ISSUES = [
     description:
       "The First Nation whose referral was missed has invited you to present at their next general meeting, with elders, youth, and community members in the room.",
     roles: ["planner", "permitter", "silviculture"],
-    areaTags: ["first-nations", "community-forest"],
+    areaTags: ["bc-wide"],
     requiresFlags: ["firstNationReferralHidden"],
     excludeFlags: ["nationMeetingResolved"],
     baseWeight: 2,
@@ -425,7 +425,7 @@ export const CHAINED_ISSUES = [
     description:
       "The private landowner has hired an independent analyst, produced satellite and orthophoto evidence of merchantable volume on the parcels you excluded, and copied the regulator on their letter.",
     roles: ["planner", "recce"],
-    areaTags: ["private-land", "cruise"],
+    areaTags: ["bc-wide"],
     requiresAnyFlags: ["cruiseExcludedParcels", "missingCruiseFieldNotes"],
     excludeFlags: ["satelliteRebuttalResolved"],
     baseWeight: 2,

@@ -9,7 +9,6 @@ import { createFieldResources, createDeskResources } from "../resources.js";
 import {
   getBlocksForArea,
   getRandomWeather,
-  getTemperature,
 } from "../data/blocks.js";
 import { getPlanningCadenceDays } from "../data/planningBlocks.js";
 import { createSeasonState } from "../season.js";
@@ -183,6 +182,13 @@ function applyCampaignScale(journey, journeyType) {
  * @returns {Object} Journey state for the appropriate type
  */
 export function createJourney(options = {}) {
+  const journey = createJourneyForRole(options);
+  // End-of-run scoring compares what is left against what the run started with.
+  journey.startingResources = { ...(journey.resources || {}) };
+  return journey;
+}
+
+function createJourneyForRole(options) {
   const roleId = options.roleId || options.role?.id;
   const journeyType = ROLE_JOURNEY_TYPES[roleId];
 

@@ -486,8 +486,6 @@ function getDisplayedAccessVerdict(journey, block) {
  * @param {Object} game - Game instance
  */
 export async function runReconDay(game) {
-  const { ui, journey } = game;
-
   // Run the field day mechanics
   await runFieldDay(game);
 }
@@ -1289,7 +1287,7 @@ async function runRiverCrossingBeat(game, block) {
  * versus supplies. Tracks celebrations on the journey so saves stay honest.
  */
 async function celebrateNewMilestones(game) {
-  const { ui, journey } = game;
+  const { journey } = game;
   const reached = journey.milestonesReached || [];
   if (!journey.milestonesCelebrated) journey.milestonesCelebrated = [];
   for (const threshold of reached) {

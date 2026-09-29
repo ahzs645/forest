@@ -592,7 +592,7 @@ async function setupCampaign(ui) {
 }
 
 function serializeCampaign(campaign) {
-  const { rng, ...rest } = campaign;
+  const { rng: _rng, ...rest } = campaign;
   return rest;
 }
 

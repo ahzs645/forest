@@ -1913,12 +1913,12 @@ function adjustScrutiny(journey, delta) {
   }
 
   if (Number.isFinite(Number(journey?.scrutiny))) {
-    journey.scrutiny = Math.max(0, Number(journey.scrutiny) + delta);
+    journey.scrutiny = Math.max(0, Math.min(100, Number(journey.scrutiny) + delta));
     return;
   }
 
   if (Number.isFinite(Number(journey?.heat))) {
-    journey.heat = Math.max(0, Number(journey.heat) + delta);
+    journey.heat = Math.max(0, Math.min(100, Number(journey.heat) + delta));
   }
 }
 

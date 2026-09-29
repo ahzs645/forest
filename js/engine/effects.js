@@ -127,6 +127,20 @@ function buildCausedBy(state, source) {
   };
 }
 
+// Widest gap between the strongest and weakest meter that still counts as a
+// program run on all fronts (see applyRoundRecoveries).
+const STEADY_PROGRAM_SPREAD = 30;
+
+// Flags the end-of-season pass sets, for the content lint's reachability check.
+export const ROUND_CONSEQUENCE_FLAGS = Object.freeze([
+  "lowBudgetStreak",
+  "lowComplianceStreak",
+  "trustDeficitActive",
+  "contractorAttritionActive",
+  "auditEscalationActive",
+  "budgetEmergencyScheduled",
+]);
+
 export function applyRoundConsequences(state) {
   if (!state?.metrics || !state?.flags) {
     return [];
@@ -141,6 +155,14 @@ export function applyRoundConsequences(state) {
     flags.lowBudgetStreak = Number(flags.lowBudgetStreak || 0) + 1;
   } else {
     flags.lowBudgetStreak = 0;
+  }
+
+  // A budget run into the ground puts finance's emergency-loan offer on the
+  // desk (issue "budget-emergency-loan"); a recovered budget takes it back off.
+  if (metrics.budget < BUDGET_ATTRITION_THRESHOLD && !flags.budgetLoanActive) {
+    flags.budgetEmergencyScheduled = true;
+  } else if (metrics.budget >= BUDGET_ATTRITION_THRESHOLD + 10) {
+    delete flags.budgetEmergencyScheduled;
   }
 
   if (metrics.compliance < COMPLIANCE_AUDIT_THRESHOLD) {
@@ -209,7 +231,11 @@ export function applyRoundConsequences(state) {
 
   if (professional) {
     const complianceLow = metrics.compliance < COMPLIANCE_AUDIT_THRESHOLD;
-    const cpdGap = Math.max(0, Math.round((professional.cpdTarget || DEFAULT_CPD_TARGET) - professional.cpdHours));
+    // CPD is a year-long target: judge the log against the share of the year
+    // that has passed, not the full 30 hours from the first season.
+    const yearShare = Math.min(1, Math.max(0, round) / Math.max(1, Number(state.totalRounds) || 4));
+    const cpdExpected = (professional.cpdTarget || DEFAULT_CPD_TARGET) * yearShare;
+    const cpdGap = Math.max(0, Math.round(cpdExpected - professional.cpdHours));
 
     if (cpdGap > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk + 1 + Math.floor(cpdGap / 15), 0, 100);
@@ -313,7 +339,10 @@ function applyEcologyDrift(state, round, consequences) {
   // the land responds to a track record, not to week one.
   if (round < 2) return;
 
-  if (metrics.compliance >= 65 && metrics.forestHealth < 72) {
+  // Regeneration is the silviculture program's own work, so a disciplined
+  // silviculture year carries stands further than the others can.
+  const recoveryCeiling = state.role?.id === "silviculture" ? 80 : 72;
+  if (metrics.compliance >= 65 && metrics.forestHealth < recoveryCeiling) {
     applyEffects(
       state,
       { forestHealth: 3 },
@@ -351,11 +380,12 @@ function applyEcologyDrift(state, round, consequences) {
 // the run-scoring risk penalty never counts them against the player.
 function applyRoundRecoveries(state, round, consequences) {
   const { metrics } = state;
+  const firedBefore = consequences.length;
 
   // Operational dividend: a clean, well-trusted file burns far less budget on
   // rework and firefighting, so a strongly-run year recovers some budget. This
   // is the missing budget lever that made Outstanding unreachable.
-  if (metrics.compliance >= 70 && metrics.relationships >= 65 && metrics.budget < 72) {
+  if (metrics.compliance >= 70 && metrics.relationships >= 65 && metrics.progress >= 35 && metrics.budget < 72) {
     applyEffects(
       state,
       { budget: 5 },
@@ -415,6 +445,30 @@ function applyRoundRecoveries(state, round, consequences) {
       },
     );
     consequences.push("field-discipline-rebound");
+  }
+
+  // Steady program: the dividends above pay a file that piles up compliance
+  // and trust, which made turtling the dominant line. A program that kept
+  // every meter in play earns its own return: the weakest meter gets room to
+  // recover. Paid only in a season no dividend already rewarded.
+  if (round >= 2 && consequences.length === firedBefore) {
+    const values = Object.values(metrics).map((value) => Number(value) || 0);
+    const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
+    const spread = Math.max(...values) - Math.min(...values);
+    if (weakest && Number(weakest[1]) >= 40 && Number(weakest[1]) < 60 && spread <= STEADY_PROGRAM_SPREAD) {
+      applyEffects(
+        state,
+        { [weakest[0]]: 3 },
+        {
+          type: "recovery",
+          id: "steady-program",
+          title: "Steady program",
+          option: `No meter was left behind, so ${formatMetricName(weakest[0])} had room to recover`,
+          round,
+        },
+      );
+      consequences.push("steady-program");
+    }
   }
 
   // Comeback window: late in the year a single collapsing meter gets a modest
@@ -492,6 +546,11 @@ function applyAssignmentSideEffects(state, option) {
     );
     professional.auditExposure = clamp(
       Number(professional.auditExposure || 0) + Number(sideEffects.professionalShift.auditExposure || 0),
+      0,
+      100,
+    );
+    professional.cpdHours = clamp(
+      Number(professional.cpdHours || 0) + Number(sideEffects.professionalShift.cpdHours || 0),
       0,
       100,
     );

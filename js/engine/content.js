@@ -250,6 +250,12 @@ export function scoreIssueSelection(issue, state, context) {
   if (issue.priorityFlag && state.flags?.[issue.priorityFlag]) {
     weight += 3;
   }
+  // A card gated on flags is the follow-up to something the player chose; at
+  // base weight it sank in a pool of ~40 eligible cards and the chain rarely
+  // paid off. Once its gate is open it should be a likely draw.
+  if (issue.requiresFlags?.length || issue.requiresAnyFlags?.length) {
+    weight += 3;
+  }
   const roleCount = Array.isArray(issue.roles) && issue.roles.length ? issue.roles.length : 4;
   if (roleCount === 1) {
     weight *= 1.6;
@@ -296,43 +302,58 @@ export function adaptOperationalEventEffects(effects = {}, option = {}) {
     add("compliance", scaleDerivedEffect(effects.politicalCapital, 0.25));
   }
 
-  const timeUsed = Number.isFinite(option?.timeUsed) ? option.timeUsed : effects.timeUsed;
-  if (typeof timeUsed === "number") {
-    add("progress", -Math.max(1, Math.round(Math.abs(timeUsed) * 1.4)));
+  // Public standing reads as relationships on the season's meters.
+  if (typeof effects.reputation === "number") {
+    add("relationships", scaleDerivedEffect(effects.reputation, 0.6));
   }
+
+  const timeUsed = Number.isFinite(option?.timeUsed) ? option.timeUsed : effects.timeUsed;
+  // Hours on an expedition card are a small slice of a season. At 1.4 points
+  // an hour, desk events alone drained ~26 Progress from a planner's year.
+  if (typeof timeUsed === "number") {
+    add("progress", -Math.max(1, Math.round(Math.abs(timeUsed) * 0.8)));
+  }
+
+  // Crew and stock losses slow the work; gains do not speed it up. Mapping
+  // gains onto Progress too turned "knock off early to watch the sunset"
+  // (+morale, -progress) into a net Progress gain, and a maintenance day into
+  // a free one. A stock gain is worth budget (gear you will not have to
+  // replace), never schedule.
+  const slows = (value, multiplier) => (value < 0 ? scaleDerivedEffect(value, multiplier) : 0);
 
   if (typeof effects.crew_morale === "number") {
     add("relationships", scaleDerivedEffect(effects.crew_morale, 0.45));
-    add("progress", scaleDerivedEffect(effects.crew_morale, 0.2));
+    add("progress", slows(effects.crew_morale, 0.2));
   }
 
   if (typeof effects.crew_health === "number") {
-    add("progress", scaleDerivedEffect(effects.crew_health, 0.35));
+    add("progress", slows(effects.crew_health, 0.35));
     add("compliance", scaleDerivedEffect(effects.crew_health, 0.2));
   }
 
   if (typeof effects.equipment === "number") {
-    add("progress", scaleDerivedEffect(effects.equipment, 0.3));
+    add("progress", slows(effects.equipment, 0.3));
     add("budget", scaleDerivedEffect(effects.equipment, 0.15));
   }
 
   if (typeof effects.fuel === "number") {
-    add("progress", scaleDerivedEffect(effects.fuel, 0.2));
+    add("progress", slows(effects.fuel, 0.2));
     add("budget", scaleDerivedEffect(effects.fuel, 0.25));
   }
 
   if (typeof effects.food === "number") {
-    add("progress", scaleDerivedEffect(effects.food, 0.25));
+    add("progress", slows(effects.food, 0.25));
     add("relationships", scaleDerivedEffect(effects.food, 0.2));
+    add("budget", slows(effects.food, 0.15));
   }
 
   if (typeof effects.firstAid === "number") {
     add("compliance", scaleDerivedEffect(effects.firstAid, 0.25));
-    add("progress", scaleDerivedEffect(effects.firstAid, 0.15));
+    add("progress", slows(effects.firstAid, 0.15));
   }
 
   if (typeof effects.permits_approved === "number") {
-    add("progress", Math.round(effects.permits_approved * 4));
+    add("progress", Math.round(effects.permits_approved * 3));
     add("compliance", Math.round(effects.permits_approved * 2));
   }
 
@@ -584,6 +605,25 @@ function getOperationalEventOverride(event) {
   }
 }
 
+// A season card is one decision standing in for weeks of work, so an
+// expedition option's success/failure split lands as its expected outcome.
+// Showing only the success branch made the gamble look free: treating a
+// chainsaw cut on site read cheaper than the medevac.
+function expectedOptionEffects(option) {
+  const effects = option?.effects || {};
+  const failure = option?.failureEffects;
+  const chance = Number(option?.chanceSuccess);
+  if (!failure || !Number.isFinite(chance)) return effects;
+  const blended = {};
+  for (const key of new Set([...Object.keys(effects), ...Object.keys(failure)])) {
+    const success = Number(effects[key] || 0);
+    const fail = Number(failure[key] || 0);
+    if (!Number.isFinite(success) || !Number.isFinite(fail)) continue;
+    blended[key] = Math.round(success * chance + fail * (1 - chance));
+  }
+  return blended;
+}
+
 export function adaptOperationalEvent(event, state) {
   const override = getOperationalEventOverride(event);
   const source = override
@@ -608,7 +648,7 @@ export function adaptOperationalEvent(event, state) {
     options: (source.options || []).map((option) => ({
       label: option.label,
       outcome: option.outcome,
-      effects: adaptOperationalEventEffects(option.effects || {}, option),
+      effects: adaptOperationalEventEffects(expectedOptionEffects(option), option),
       scheduleEvents: option.schedulesEvent
         ? {
             id: option.schedulesEvent,
@@ -926,6 +966,12 @@ function eventMatchesSeasonalContext(event, state) {
   }
 
   if (!matchesAreaIds(event, state.area.id)) {
+    return false;
+  }
+
+  // Same season gate the expedition deck applies (js/events/selection.js): a
+  // -30C cold snap is a winter card, not a summer one.
+  if (Array.isArray(event.seasons) && event.seasons.length > 0 && !event.seasons.includes(seasonIdForRound(state.round))) {
     return false;
   }
 
@@ -1520,6 +1566,9 @@ const FALLOUT_BY_INSTITUTION = {
     add("environmental-audit-fallout", 3.5, { forestHealth: 3, compliance: 2 });
     add("water-licensee-formal-complaint", 2.5, { relationships: 2, compliance: 1.5 });
     add("community-water-warning", 2, { relationships: 2 });
+    // Away from community watersheds the water cards cannot land; enforcement
+    // attention is the fallout that follows a caught spill anywhere.
+    add("compliance-drone-sweep", 1.5, { compliance: 2 });
   },
   DFO: (roleId, category, add) => {
     add("riparian-reclassification-call", 3.5, { forestHealth: 3, compliance: 2 });

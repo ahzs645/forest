@@ -44,7 +44,7 @@ export function loadServiceRecord() {
 
 export function saveServiceRecord(record) {
   try {
-    const { isBest, ...persisted } = record;
+    const { isBest: _isBest, ...persisted } = record;
     window.localStorage?.setItem(SERVICE_RECORD_KEY, JSON.stringify(persisted));
   } catch {
     // Storage unavailable (private mode, node tests) — play continues.

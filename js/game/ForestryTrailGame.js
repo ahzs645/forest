@@ -10,13 +10,10 @@ import { FORESTER_ROLES, OPERATING_AREAS } from '../data/index.js';
 import { generateCrew, getCrewDisplayInfo } from '../crew.js';
 import {
   createJourney,
-  formatJourneyLog,
-  getSurveyedBlockCount
+  formatJourneyLog
 } from '../journey.js';
 import { checkScheduledEvents } from '../events.js';
 import { ensureDaySeed } from '../events/dayRng.js';
-import { getCurrentSeasonInfo } from '../season.js';
-import { calculateScore, formatScoreDisplay } from '../scoring.js';
 import { FIELD_RESOURCES } from '../resources.js';
 
 // Import mode runners
@@ -65,6 +62,7 @@ export function applyDifficultyMultipliers(journey, difficulty) {
   if (journey.journeyType === 'planning' && Number.isFinite(journey.deadline)) {
     journey.deadline += difficulty === 'easy' ? 2 : -1;
   }
+  journey.startingResources = { ...r };
 }
 
 export class ForestryTrailGame {
@@ -80,6 +78,7 @@ export class ForestryTrailGame {
     this._campaignActive = false;
     this._seasonalActive = false;
     this._seasonalExitFn = null;
+    this._seasonalLogFn = null;
 
     this.ui.onRestartRequest(() => this._promptRestart());
     this.ui.onLogRequest(() => this._showLog());
@@ -92,6 +91,10 @@ export class ForestryTrailGame {
   }
 
   _showLog() {
+    if (this._seasonalActive && this._seasonalLogFn) {
+      this.ui.showLog(this._seasonalLogFn());
+      return;
+    }
     if (!this.journey) {
       this.ui.showLog([]);
       return;
@@ -466,11 +469,13 @@ export class ForestryTrailGame {
     this._seasonalExitFn = null;
     try {
       await runSeasonalGame(this.ui, {
-        onExitAvailable: (fn) => { this._seasonalExitFn = fn; }
+        onExitAvailable: (fn) => { this._seasonalExitFn = fn; },
+        onLogAvailable: (fn) => { this._seasonalLogFn = fn; }
       });
     } finally {
       this._seasonalActive = false;
       this._seasonalExitFn = null;
+      this._seasonalLogFn = null;
     }
   }
 

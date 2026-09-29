@@ -185,7 +185,7 @@ export const POLICY_VOCABULARY = {
 
 // ── Role policies ───────────────────────────────────────────────────────────
 
-function reconPolicy(journey, options, prompt) {
+function reconPolicy(journey, options, _prompt) {
   const crew = journey.crew || [];
   const hurting = crew.filter((member) => member.isActive && member.health < 45).length;
   const food = journey.resources?.food ?? 0;

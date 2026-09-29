@@ -15,6 +15,7 @@ import { TuiGameController } from '../../tui/controller.js';
 import { makeRng } from '../engine/rng.js';
 import { formatMetricName } from '../engine/shared.js';
 import { recordTieredRun } from '../career.js';
+import { formatMetricDelta } from '../engine/effects.js';
 
 const METRIC_ORDER = ['progress', 'forestHealth', 'relationships', 'compliance', 'budget'];
 const METRIC_SHORT = {
@@ -53,10 +54,13 @@ export function renderMetricStrip(ui, gameState = {}) {
     if (season) facts.unshift({ label: 'Season', value: season });
     if (role) facts.push({ label: 'Role', value: role });
 
-    const alerts = (strip?.risks || []).map((risk) => ({
-      level: 'warn',
-      text: risk.label || `${formatMetricName(risk.metric)} at risk`
-    }));
+    // The worst risk already reads as the guidance line; listing it again as
+    // an alert chip showed every warning twice.
+    const guidance = strip?.pressure || null;
+    const alerts = (strip?.risks || [])
+      .map((risk) => risk.label || `${formatMetricName(risk.metric)} at risk`)
+      .filter((text) => text !== guidance)
+      .map((text) => ({ level: 'warn', text }));
 
     const goal = strip?.goal
       ? (strip.winCondition ? `${strip.goal} Win: ${strip.winCondition}.` : strip.goal)
@@ -67,7 +71,7 @@ export function renderMetricStrip(ui, gameState = {}) {
         ? { label: 'Progress', value: Math.round(metrics.progress), text: `${Math.round(metrics.progress)}%` }
         : null,
       facts,
-      guidance: strip?.pressure || null,
+      guidance,
       alerts
     });
     return;
@@ -103,6 +107,65 @@ export function collectDetailLines(contentData = {}) {
   if (contentData.surfaceReason) lines.push(contentData.surfaceReason);
   if (contentData.sourceLabel) lines.push(`Source: ${contentData.sourceLabel}`);
   return lines.filter((line, i, all) => line && all.indexOf(line) === i);
+}
+
+// The controller builds multi-line bodies (the "Why This Happened" bullets
+// with their Why: / This season: sub-lines); one ui.write per line keeps them
+// from running together into a single paragraph.
+function writeLines(ui, text, className) {
+  for (const line of String(text).split('\n')) {
+    if (line.trim()) ui.write(line, className);
+  }
+}
+
+// The first card's onboarding brief: the same goal / how to play / role /
+// win the classic view shows in its "Your mission" panel.
+function writeMission(ui, mission) {
+  if (Array.isArray(mission)) {
+    for (const line of mission) ui.write(line, 'term-dim');
+    return;
+  }
+  if (typeof mission === 'string') {
+    if (mission) ui.write(mission, 'term-dim');
+    return;
+  }
+  if (!mission || typeof mission !== 'object') return;
+  ui.write('');
+  ui.writeDivider('YOUR MISSION');
+  if (mission.goal) ui.write(`Goal: ${mission.goal}`);
+  for (const step of mission.steps || []) ui.write(`• ${step}`, 'term-dim');
+  if (mission.mandate) ui.write(`Your role: ${mission.mandate}`);
+  if (mission.win) ui.write(`Win: ${mission.win}`);
+}
+
+/**
+ * The seasonal year as Journey Log rows, for the hub's [L] Log. The log the
+ * modal normally reads belongs to the expedition journey, which a seasonal
+ * run does not have.
+ */
+const LOG_ICONS = {
+  assignment: '●',
+  event: '!',
+  issue: '!',
+  temptation: '$',
+  consequence: '×',
+  recovery: '+',
+};
+
+export function buildSeasonalLogEntries(gameState) {
+  return (gameState?.history || [])
+    .filter((entry) => entry?.title)
+    .map((entry) => {
+      const delta = formatMetricDelta(entry.effects || {});
+      return {
+        day: entry.round ?? '',
+        dayLabel: 'Season',
+        icon: LOG_ICONS[entry.type] || '·',
+        type: entry.type === 'consequence' ? 'event' : 'action',
+        summary: entry.title,
+        detail: [entry.option, delta].filter(Boolean).join(' — '),
+      };
+    });
 }
 
 function writeNotice(ui, notice) {
@@ -143,13 +206,11 @@ export async function promptSeasonalCard(ui, contentData = {}, options = [], gam
     if (contentData.cardLabel) ui.write(contentData.cardLabel, 'term-dim');
     if (title) ui.writeHeader(title);
     if (contentData.headline && contentData.headline !== title) ui.write(contentData.headline);
+    if (contentData.subtitle) ui.write(contentData.subtitle, 'term-dim');
+    if (contentData.note) ui.write(contentData.note, 'term-dim');
     const body = contentData.description || contentData.body || '';
-    if (body) ui.write(body);
-    if (Array.isArray(contentData.mission)) {
-      for (const line of contentData.mission) ui.write(line, 'term-dim');
-    } else if (typeof contentData.mission === 'string' && contentData.mission) {
-      ui.write(contentData.mission, 'term-dim');
-    }
+    if (body) writeLines(ui, body);
+    writeMission(ui, contentData.mission);
 
     if (showDetail && detailLines.length) {
       ui.writeDivider('CONTEXT');
@@ -192,7 +253,7 @@ export async function promptSummaryCard(ui, contentData = {}, options = [], game
     if (contentData.tier) {
       ui.write(`ENDING: ${String(contentData.tier).toUpperCase()}${contentData.score != null ? ` · SCORE ${contentData.score}/100` : ''}`);
     }
-    if (contentData.body) ui.write(contentData.body);
+    if (contentData.body) writeLines(ui, contentData.body);
     for (const reason of contentData.scoreReasons || []) ui.write(`• ${reason}`);
     if (contentData.style?.label) {
       ui.write(`Style: ${contentData.style.label} — ${contentData.style.tendency || ''}`, 'term-dim');
@@ -243,6 +304,8 @@ export async function promptSummaryCard(ui, contentData = {}, options = [], game
  * @param {{companyName: string, roleIndex: number, areaIndex: number}} [options.preset]
  *   - skip the controller's setup cards (used by the campaign)
  * @param {string} [options.saveKey] - override the controller autosave slot
+ * @param {Function} [options.onLogAvailable] - receives a function that returns
+ *   the year so far as Journey Log rows (the hub's [L] Log).
  * @param {Function} [options.onExitAvailable] - receives an exit function the
  *   host can call (the Escape modal's "Save & return"); it unblocks the
  *   pending card and unwinds the run, leaving the boundary autosave on file.
@@ -289,6 +352,10 @@ async function runSeasonalGameInner(ui, options = {}) {
     ...(options.saveKey ? { saveKey: options.saveKey } : {}),
     onExit: () => { exitRequested = true; },
   });
+
+  if (typeof options.onLogAvailable === 'function') {
+    options.onLogAvailable(() => buildSeasonalLogEntries(controller.gs));
+  }
 
   if (typeof options.onExitAvailable === 'function') {
     options.onExitAvailable(() => {

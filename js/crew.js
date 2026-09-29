@@ -14,6 +14,18 @@ import {
 } from './data/crewNames.js';
 
 let crewIdCounter = 0;
+// The counter restarts on every page load, so a resumed run that hires a
+// replacement would mint crew_1 beside the saved crew_1 (and triage or an
+// injury follow-up could land on the wrong person). A per-load prefix keeps
+// ids unique across saves. It deliberately avoids Math.random so seeded runs
+// (tests, replays) draw the same stream as before.
+const CREW_ID_SESSION = makeSessionPrefix();
+
+function makeSessionPrefix() {
+  const stamp = Date.now().toString(36);
+  const bytes = globalThis.crypto?.getRandomValues?.(new Uint16Array(1));
+  return bytes ? `${stamp}${bytes[0].toString(36)}` : stamp;
+}
 const INJURY_EFFECT_IDS = new Set(['broken_leg', 'broken_arm', 'sprained_ankle', 'concussion']);
 const ILLNESS_EFFECT_IDS = new Set(['flu', 'cold', 'food_poisoning', 'dysentery', 'hypothermia', 'exhaustion', 'infection']);
 
@@ -39,7 +51,7 @@ const STATUS_FITNESS_CAPS = {
  * @returns {string} Unique ID
  */
 function generateId() {
-  return `crew_${++crewIdCounter}`;
+  return `crew_${CREW_ID_SESSION}_${++crewIdCounter}`;
 }
 
 /**
@@ -246,7 +258,6 @@ export function removeStatusEffect(member, effectId) {
   const index = member.statusEffects.findIndex(e => e.effectId === effectId);
   if (index === -1) return { member, message: null };
 
-  const effect = STATUS_EFFECTS[effectId];
   member.statusEffects.splice(index, 1);
 
   const messageTemplate = pickRandom(RECOVERY_MESSAGES);
