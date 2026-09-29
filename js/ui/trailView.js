@@ -8,6 +8,29 @@ const COLORS = { sky: '#12242c', stars: '#cde4dc', cloud: '#799ca6', sun: '#edc9
   danger: '#ffac87', water: '#87becf', snow: '#dbe9e6', tent: '#d9b57d',
   fire: '#ffc477', office: '#a7bfc0', paper: '#d3dfcc', seedling: '#b5d88a' };
 
+// The phosphor themes (green, amber, ice) are monochrome terminals: the
+// picture keeps its shape but draws in three intensities of the theme's own
+// text, so a green screen never shows a teal sky and orange trucks.
+const TONE_LEVELS = {
+  bright: ['sun', 'crew', 'truck', 'danger', 'fire', 'sign'],
+  mid: ['stars', 'canopy', 'snow', 'water', 'tent', 'paper', 'office', 'seedling'],
+  low: ['cloud', 'ridge', 'forest', 'trunk', 'ground'],
+};
+
+function themedColors() {
+  const themeId = document.body?.dataset.theme;
+  if (!themeId || themeId === 'dark') return COLORS;
+  const style = getComputedStyle(document.body);
+  const token = (name) => style.getPropertyValue(name).trim();
+  const level = { bright: token('--text-bright'), mid: token('--text'), low: token('--text-muted') };
+  if (!level.mid) return COLORS;
+  const colors = { sky: token('--surface-inset') || COLORS.sky };
+  for (const [name, tones] of Object.entries(TONE_LEVELS)) {
+    for (const tone of tones) colors[tone] = level[name];
+  }
+  return colors;
+}
+
 export class TrailView {
   constructor(terminal) {
     this.root = document.createElement('section');
@@ -105,7 +128,8 @@ export class TrailView {
     }
     const ctx = this.canvas.getContext('2d');
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    ctx.fillStyle = COLORS.sky; ctx.fillRect(0, 0, width, height);
+    const colors = themedColors();
+    ctx.fillStyle = colors.sky; ctx.fillRect(0, 0, width, height);
     const cellH = Math.min(height / this.frame.cells.length, width / (cols * .62));
     const cellW = width / cols;
     const x0 = (width - cols * cellW) / 2;
@@ -118,7 +142,7 @@ export class TrailView {
       for (let x = 0; x < cols; x++) {
         const { ch, tone } = this.frame.cells[y][x];
         if (ch === ' ') continue;
-        ctx.fillStyle = COLORS[tone] || COLORS.crew;
+        ctx.fillStyle = colors[tone] || colors.crew;
         ctx.fillText(ch, x0 + x * cellW, y0 + y * cellH);
       }
     }

@@ -17,30 +17,13 @@
   --text: #c3cedd;            // body text
   --text-bright: #eaf1fa;     // headings, values
   --text-muted: #8494ab;      // secondary text
-  --text-dim: #55637a;        // hints, decorations
+  --text-dim: #738199;        // hints, decorations (4.5:1 on --surface, WCAG AA)
   --accent: #58a6ff;          // selection bar, primary actions
   --accent-contrast: #04121f; // text on top of --accent
   --ok: #3fb950;
   --warn: #d29922;
   --danger: #f85149;
   --selection: rgba(88, 166, 255, 0.18);
-
-  // ---- Legacy aliases (do not add new uses) ----
-  --bg-dark: var(--canvas);
-  --bg-panel: var(--surface);
-  --bg-input: var(--surface-inset);
-  --bg-overlay: var(--canvas);
-  --fg-main: var(--text);
-  --fg-dim: var(--text-dim);
-  --fg-bright: var(--text-bright);
-  --fg-muted: var(--text-muted);
-  --fg-label: var(--text-bright);
-  --fg-warning: var(--warn);
-  --fg-danger: var(--danger);
-  --fg-positive: var(--ok);
-  --border-color: var(--border);
-  --border-bright: var(--border-strong);
-  --accent-2: var(--accent);
   --glow: rgba(88, 166, 255, 0.12);
   --card: rgba(18, 26, 38, 0.85);
   --card-strong: rgba(24, 34, 48, 0.95);
@@ -65,6 +48,30 @@
   --panel-width: 300px;
 }
 
+// ---- Legacy aliases (do not add new uses) ----
+// Declared on body as well as :root: a custom property's var() resolves
+// where it is declared, and the themes redefine the base tokens on
+// body[data-theme]. Declared on :root alone, every alias inherited the
+// TUI-dark values and half of each theme stayed navy and grey.
+:root,
+body {
+  --bg-dark: var(--canvas);
+  --bg-panel: var(--surface);
+  --bg-input: var(--surface-inset);
+  --bg-overlay: var(--canvas);
+  --fg-main: var(--text);
+  --fg-dim: var(--text-dim);
+  --fg-bright: var(--text-bright);
+  --fg-muted: var(--text-muted);
+  --fg-label: var(--text-bright);
+  --fg-warning: var(--warn);
+  --fg-danger: var(--danger);
+  --fg-positive: var(--ok);
+  --border-color: var(--border);
+  --border-bright: var(--border-strong);
+  --accent-2: var(--accent);
+}
+
 // ---- Green phosphor ----
 body[data-theme='green'] {
   --canvas: #050805;
@@ -75,7 +82,7 @@ body[data-theme='green'] {
   --text: #4ddb4d;
   --text-bright: #8cff8c;
   --text-muted: #3f9c3f;
-  --text-dim: #2a6b2a;
+  --text-dim: #3b8d3b;
   --accent: #2fe680;
   --accent-contrast: #04240f;
   --ok: #52e685;
@@ -97,7 +104,7 @@ body[data-theme='amber'] {
   --text: #e6a23c;
   --text-bright: #ffd484;
   --text-muted: #b57e2c;
-  --text-dim: #7a5518;
+  --text-dim: #a3742c;
   --accent: #ffb347;
   --accent-contrast: #241202;
   --ok: #a8d94d;
@@ -119,7 +126,7 @@ body[data-theme='ice'] {
   --text: #6db8e0;
   --text-bright: #b3e2ff;
   --text-muted: #4e8cad;
-  --text-dim: #35617a;
+  --text-dim: #5084a1;
   --accent: #47c2ff;
   --accent-contrast: #04202e;
   --ok: #52e6a4;
