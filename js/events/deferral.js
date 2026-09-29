@@ -19,6 +19,12 @@
  *
  * Every deferral is logged as a situation, so the debrief's compliance tally
  * counts it against the file instead of pretending it never happened.
+ *
+ * On a planner's or permitter's desk a set-aside never comes out cheaper than
+ * answering: the charge is the cheapest lawful answer's expected cost in full,
+ * minor cards included, with only the budget capped. Scaled down by weight it
+ * was the cheapest way through a budget cut or a Nation's engagement request,
+ * well under the "Delay engagement" it amounts to, which paid silence.
  */
 
 import { applyEventEffects, describeGoodwillChange, readGoodwill } from './resolution.js';
@@ -62,15 +68,27 @@ function optionDownside(option, effects) {
   return score;
 }
 
+/** Desk roles whose set-aside is priced at the cheapest lawful answer in full. */
+const FULL_PRICE_JOURNEYS = new Set(['planning', 'permitting']);
+
+/** An unlawful answer on an ordinary card: setting the card aside is not choosing it. */
+function isOffBook(option) {
+  return option?.riskTag === 'OFF-BOOK';
+}
+
 /**
  * Whether the situation is one nobody walks away from for free: moderate or
- * worse, and every authored option carries a cost or a risk.
+ * worse, and every authored option carries a cost or a risk. On a desk a
+ * minor card counts too: "Woodlands Wants Your Budget" cost a point of
+ * scrutiny to ignore when every answer cost money or goodwill.
  * @param {Object} event
  * @param {number} weight - situationWeight(event), 1-3
+ * @param {Object} [context]
+ * @param {boolean} [context.desk] - price it the desk way (see above)
  * @returns {boolean}
  */
-export function isImposedSituation(event, weight) {
-  if (weight < 2) return false;
+export function isImposedSituation(event, weight, { desk = false } = {}) {
+  if (weight < (desk ? 1 : 2)) return false;
   const options = Array.isArray(event?.options) ? event.options : [];
   if (!options.length) return false;
   return options.every((option) => deriveOptionRiskTag(option) !== 'SAFE');
@@ -85,7 +103,7 @@ export function isImposedSituation(event, weight) {
  * because the only certain option on the card was paying the invoice.
  */
 const DEFERRAL_CAP_STEEP_UNITS = { 2: 2, 3: 3 };
-const DEFERRAL_BUDGET_SHARE = { 2: 0.06, 3: 0.1 };
+const DEFERRAL_BUDGET_SHARE = { 1: 0.04, 2: 0.06, 3: 0.1 };
 
 /**
  * What an option costs on average. A certain option costs its effects; a
@@ -112,12 +130,12 @@ function expectedCosts(option) {
  * costs shrink together, so the shape of the hit survives; the budget is
  * capped on its own against the run's starting budget.
  */
-function capDeferredCost(costs, weight, budgetBase) {
+function capDeferredCost(costs, weight, budgetBase, { fullPrice = false } = {}) {
   const capped = {};
   const { budget, ...rest } = costs;
   const units = downsideScore(rest);
   const limit = DEFERRAL_CAP_STEEP_UNITS[weight] ?? DEFERRAL_CAP_STEEP_UNITS[3];
-  const scale = units > limit ? limit / units : 1;
+  const scale = !fullPrice && units > limit ? limit / units : 1;
   for (const [key, value] of Object.entries(rest)) {
     const charged = Math.round(value * scale);
     if (charged < 0) capped[key] = charged;
@@ -149,9 +167,11 @@ function capDeferredCost(costs, weight, budgetBase) {
  * @returns {{option: Object, effects: Object, uncapped: Object}|null}
  */
 export function pickDeferredCost(event, weight, { budgetBase, journey = null } = {}) {
-  if (!isImposedSituation(event, weight)) return null;
-  const payable = journey ? event.options.filter((option) => !getOptionShortfall(journey, option)) : [];
-  const offered = payable.length ? payable : event.options;
+  const fullPrice = FULL_PRICE_JOURNEYS.has(journey?.journeyType);
+  if (!isImposedSituation(event, weight, { desk: fullPrice })) return null;
+  const lawful = event.options.filter((option) => !isOffBook(option));
+  const payable = journey ? lawful.filter((option) => !getOptionShortfall(journey, option)) : [];
+  const offered = payable.length ? payable : lawful.length ? lawful : event.options;
   const candidates = offered.map((option, index) => {
     const costs = expectedCosts(option);
     return {
@@ -164,7 +184,7 @@ export function pickDeferredCost(event, weight, { budgetBase, journey = null } =
   });
   candidates.sort((a, b) => (a.score - b.score) || (a.gamble - b.gamble) || (a.index - b.index));
   const least = candidates[0];
-  const effects = capDeferredCost(least.costs, weight, budgetBase);
+  const effects = capDeferredCost(least.costs, weight, budgetBase, { fullPrice });
   return Object.keys(effects).length ? { option: least.option, effects, uncapped: least.costs } : null;
 }
 
@@ -220,7 +240,10 @@ export function applyDeferredSituation(journey, event, { weight, imposedCost = t
     }
 
     const scrutinyDelta = Math.round(Number(journey.scrutiny || 0) - scrutinyBefore);
-    const tail = `Scrutiny +${scrutinyDelta}${humanLine}.`;
+    // At the ceiling there is no more for the file to notice; "+0" read as free.
+    const tail = scrutinyDelta > 0 || scrutinyBefore < 100
+      ? `Scrutiny +${scrutinyDelta}${humanLine}.`
+      : `Scrutiny is already at 100%${humanLine}.`;
     messages.push(deferred
       ? `You did not decide, and the file notices. ${tail}`
       : weight >= 2

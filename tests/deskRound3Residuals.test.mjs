@@ -6,7 +6,7 @@ import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
 import { resolveEvent } from '../js/events/resolution.js';
-import { formatEventForDisplay, formatOptionEffects } from '../js/events/display.js';
+import { STEEP_EFFECT_THRESHOLDS, formatEventForDisplay, formatOptionEffects } from '../js/events/display.js';
 import { buildShortcutOption, buildTemptationEvent, checkForEvent } from '../js/events/selection.js';
 import { queueFallout } from '../js/events/fallout.js';
 import { settleOutstandingFallout } from '../js/events/shortcutRecord.js';
@@ -22,6 +22,8 @@ import {
   syncPermitCounters,
 } from '../js/journey/permitPipeline.js';
 import { ensurePermittingRevisionState, seedPermitRevisionTickets } from '../js/modes/permitting.js';
+import { applyDeferredSituation, pickDeferredCost } from '../js/events/deferral.js';
+import { situationWeight } from '../js/journey/daySituation.js';
 
 function permitJourney(areaId = 'vancouver-island-coast') {
   const area = OPERATING_AREAS.find((candidate) => candidate.id === areaId);
@@ -185,4 +187,54 @@ test('the Forest Practices Board reports; it does not decide penalties', () => {
   queueFallout(journey, { actId: act.id, title: act.title, institution: 'FPB', dueIn: 40, effects: { compliance: -8, scrutiny: 12 } });
   const [line] = settleOutstandingFallout(journey);
   assert.match(line, /Forest Practices Board reports on/);
+});
+
+// What an option costs on average: a gamble is its bands at the authored odds.
+function expectedCost(option) {
+  if (typeof option.chanceSuccess !== 'number') return option.effects || {};
+  const bad = option.failureEffects || option.effects || {};
+  const out = {};
+  for (const key of new Set([...Object.keys(option.effects || {}), ...Object.keys(bad)])) {
+    out[key] = option.chanceSuccess * Number(option.effects?.[key] || 0) + (1 - option.chanceSuccess) * Number(bad[key] || 0);
+  }
+  return out;
+}
+
+function steepUnits(effects, { budget = true } = {}) {
+  return Object.entries(effects)
+    .filter(([key, value]) => value < 0 && (budget || key !== 'budget') && STEEP_EFFECT_THRESHOLDS[key] !== undefined)
+    .reduce((sum, [key, value]) => sum + Math.abs(value) / Math.abs(STEEP_EFFECT_THRESHOLDS[key]), 0);
+}
+
+test('on a desk, setting a card aside is never cheaper than its cheapest lawful answer', () => {
+  const journey = createPlanningJourney({ roleId: 'planner', areaId: 'fort-st-john-plateau' });
+  const budgetBase = 82000;
+  let priced = 0;
+  for (const event of DESK_EVENTS) {
+    if (event.severity === 'positive') continue;
+    const weight = situationWeight(event);
+    const cost = pickDeferredCost(event, weight, { budgetBase, journey });
+    if (!cost) continue;
+    priced += 1;
+    assert.notEqual(cost.option.riskTag, 'OFF-BOOK', `${event.id}: a set-aside is not the unlawful answer`);
+    const lawful = event.options.filter((option) => option.riskTag !== 'OFF-BOOK');
+    const cheapest = Math.min(...lawful.map((option) => steepUnits(expectedCost(option), { budget: false })));
+    assert.ok(steepUnits(cost.effects, { budget: false }) >= cheapest - 0.35,
+      `${event.id}: set aside ${JSON.stringify(cost.effects)} is cheaper than every answer`);
+  }
+  assert.ok(priced >= 30, `desk cards priced: ${priced}`);
+
+  // A minor card where every answer costs money or goodwill is not free to ignore.
+  const woodlands = DESK_EVENTS.find((event) => event.id === 'competing_budget_claim');
+  const claim = pickDeferredCost(woodlands, situationWeight(woodlands), { budgetBase, journey });
+  assert.ok(claim && claim.effects.budget < 0, JSON.stringify(claim));
+});
+
+test('a set-aside at the scrutiny ceiling says so instead of "Scrutiny +0"', () => {
+  const journey = createPermittingJourney({ roleId: 'permitter', areaId: 'bulkley-valley' });
+  journey.scrutiny = 100;
+  const petition = DESK_EVENTS.find((event) => event.id === 'community_complaint');
+  const { messages } = applyDeferredSituation(journey, petition, { weight: situationWeight(petition) });
+  assert.ok(!messages.some((line) => /Scrutiny \+0/.test(line)), messages.join(' | '));
+  assert.ok(messages.some((line) => /already at 100%/.test(line)), messages.join(' | '));
 });
