@@ -867,3 +867,28 @@ test('risk bands honour authored levels and treat deferred fallout as exposure',
   assert.equal(deriveRiskLevel({ effects: { progress: 5, compliance: -6 } }), 'high');
   assert.equal(deriveRiskLevel({ effects: { progress: 5 }, risk: { chance: 0.5 } }), 'high');
 });
+
+test('a season never deals two cards under the same specific banner, but a scheduled follow-up is always kept', async () => {
+  const { drawDistinctLabel } = await import('../tui/controller.js');
+  const queue = [{ type: 'event', data: { id: 'a', cardLabel: 'Compliance flag' } }];
+  const draws = [];
+  const deal = (cards) => (exclude, advancePending) => {
+    draws.push({ exclude: [...exclude], advancePending });
+    return cards.find((card) => !exclude.includes(card.id)) || null;
+  };
+
+  // A repeated specific banner is redrawn, without ticking the clocks again.
+  const repeated = { id: 'b', cardLabel: 'Compliance flag' };
+  const fresh = { id: 'c', cardLabel: 'Operational issue' };
+  assert.equal(drawDistinctLabel(deal([repeated, fresh]), queue, 0), fresh);
+  assert.equal(draws.at(-1).advancePending, false);
+
+  // A generic banner may repeat.
+  const generic = { id: 'd', cardLabel: 'Operational issue' };
+  queue.push({ type: 'issue', data: generic });
+  assert.equal(drawDistinctLabel(deal([generic]), queue, 0), generic);
+
+  // A caught shortcut's follow-up has already left the pending list: keep it.
+  const followUp = { id: 'e', cardLabel: 'Compliance flag', scheduled: true };
+  assert.equal(drawDistinctLabel(deal([followUp, fresh]), queue, 0), followUp);
+});

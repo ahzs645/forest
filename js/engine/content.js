@@ -177,7 +177,9 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
       const candidate = resolvePendingIssue(state, pending, { tags, season }, rng);
       if (candidate) {
         state.pendingIssues.splice(i, 1);
-        const sourced = pending.causedBy ? { ...candidate, causedBy: pending.causedBy } : candidate;
+        // `scheduled` marks a card an earlier choice put on the calendar, so the
+        // deal (tui/controller.js drawDistinctLabel) never redraws it away.
+        const sourced = { ...candidate, scheduled: true, ...(pending.causedBy ? { causedBy: pending.causedBy } : {}) };
         return normalizeSeasonalCard(sourced, state, "issue");
       }
       state.pendingIssues.splice(i, 1);

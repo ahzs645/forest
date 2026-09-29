@@ -234,9 +234,10 @@ const GENERIC_CARD_LABELS = new Set([
 /**
  * Draw a card whose specific banner is not already on this season's queue.
  * Re-draws (without ticking the pending-event clocks again) a few times, and
- * settles for the last draw when nothing distinct is left in the pool.
+ * settles for the last draw when nothing distinct is left in the pool. Cards
+ * scheduled by an earlier choice (`scheduled`) are always kept.
  */
-function drawDistinctLabel(draw, queue, start, excludeIds = []) {
+export function drawDistinctLabel(draw, queue, start, excludeIds = []) {
   const taken = new Set(
     queue.slice(start)
       .map((entry) => entry?.data?.cardLabel)
@@ -244,7 +245,9 @@ function drawDistinctLabel(draw, queue, start, excludeIds = []) {
   );
   let card = draw(excludeIds, true);
   const skipped = [...excludeIds];
-  for (let attempt = 0; attempt < 4 && card && taken.has(card.cardLabel); attempt += 1) {
+  // A scheduled follow-up (a caught shortcut's fallout, a chain payoff) has
+  // already left the pending list once drawn: it is never redrawn away.
+  for (let attempt = 0; attempt < 4 && card && !card.scheduled && !card.causedBy && taken.has(card.cardLabel); attempt += 1) {
     skipped.push(card.id);
     const next = draw(skipped, false);
     if (!next) break;
