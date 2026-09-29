@@ -3568,7 +3568,7 @@ export const ILLEGAL_ACTS_SOURCE = [
     phase: "any",
     tier: "core",
     category: "results",
-    seasons: ["winter"],
+    seasons: ["fall", "winter"],
     payoff: { kind: "budget", amount: 12000, line: "this year's planting budget for those blocks, deferred" },
     catch: { by: "FPB", how: "The regen dates in the FSP come due with nothing planted, and the Forest Practices Board's audit of the licence notes the pattern.", lagDays: 120 },
     tags: ["silviculture", "planner", "regen-delay", "fsp"],

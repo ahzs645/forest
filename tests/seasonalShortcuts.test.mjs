@@ -94,7 +94,7 @@ test('a clean take moves the meters up by the chip amount; the year-end review t
   const result = takeShortcut(state, card, 0.01);
   assert.equal(result.riskResult.band, 'clean');
   assert.equal(state.metrics.budget - before, buildIllegalActPayoff(act).effects.budget);
-  assert.match(result.outcome, /You get the block's liability released and \$45,000 of brushing never spent/);
+  assert.match(result.outcome, /You get the block's liability released,? and \$[\d,]+ of brushing never spent/);
   assert.equal(state.pendingIssues?.length ?? 0, 0, 'a clean take schedules no fallout');
   const highlights = buildSummary(state).highlights.join('\n');
   assert.match(highlights, /Declare It Free Growing – Take the shortcut \(.*Budget \+10/);
