@@ -187,7 +187,7 @@ test('a heavy field delay never takes the whole shift', () => {
   assert.equal(journey.travelSetback, 0.75, 'the crew always makes some ground');
 });
 
-test('temptation lane guarantees an offer after five eligible misses', () => {
+test('temptation lane guarantees an offer after nine eligible misses', () => {
   const originalRandom = Math.random;
   Math.random = () => 0.99;
   try {
@@ -196,11 +196,11 @@ test('temptation lane guarantees an offer after five eligible misses', () => {
       areaId: 'fort-st-john-plateau',
       crew: []
     });
-    for (const day of [2, 3, 4, 5, 6]) {
+    for (const day of [2, 3, 4, 5, 6, 7, 8, 9, 10]) {
       journey.day = day;
-      checkForEvent(journey);
+      assert.equal(checkForEvent(journey)?.type === 'temptation', false, `no offer on day ${day}`);
     }
-    journey.day = 7;
+    journey.day = 11;
     assert.equal(checkForEvent(journey)?.type, 'temptation');
   } finally {
     Math.random = originalRandom;

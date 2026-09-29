@@ -1917,7 +1917,10 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       });
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 5, stress: 4 });
-      if (didRenewal) {
+      if (didRenewal && professional?.registrationStatus !== 'active') {
+        // An open complaint file is not a lapsed renewal.
+        ui.write('The renewal is filed and the CPD logged, but the FPBC complaint file is still open: your registration stays under review until it is decided.');
+      } else if (didRenewal) {
         ui.write('FPBC registration renewal filed and active status is restored. CPD logged for the season.');
       } else {
         ui.write('Compliance admin logged the season\'s CPD and trimmed the filing backlog.');

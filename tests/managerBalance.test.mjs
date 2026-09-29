@@ -67,7 +67,10 @@ test('a random policy does not go bankrupt on Greenhorn, and difficulty orders t
 });
 
 test('no posture and certificate pair is free: each one gives something up', async () => {
-  const seeds = SEEDS.slice(0, 10);
+  // The whole seed set: lean FSC passes its audit about as often as not
+  // (roughly 45% over 60 fresh seeds), so a ten-seed slice read 5 or 6
+  // depending on nothing but how the month's dice fell.
+  const seeds = SEEDS;
   const pair = async (posture, cert) => {
     MANAGER_STYLES.__pair = (journey, options, prompt) => {
       if (/operating posture/.test(prompt)) return options.find((o) => o.value === posture);

@@ -11,6 +11,7 @@
  */
 
 import { checkForEvent } from '../events.js';
+import { getDayRng } from '../events/dayRng.js';
 import { runDaySituation } from '../journey/daySituation.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
@@ -73,7 +74,7 @@ const STAND_DOWN_REASONS = [
  * @param {Object} journey
  * @returns {string}
  */
-export function pickStandDownReason(journey) {
+export function pickStandDownReason(journey, rng = Math.random) {
   const season = (journey?.season ? getCurrentSeasonInfo(journey.season)?.id : null) || 'spring';
   const coast = String(journey?.program?.becCode || journey?.area?.becCode || '').toUpperCase().startsWith('CWH');
   const mainland = areaHasTag(journey, 'mainland');
@@ -86,7 +87,7 @@ export function pickStandDownReason(journey) {
     return true;
   };
   const pool = STAND_DOWN_REASONS.filter(fits);
-  return pool[Math.floor(Math.random() * pool.length)].text;
+  return pool[Math.floor(rng() * pool.length)].text;
 }
 
 /** "Cedar Draw Planters'" and "Wetbelt Brushing Co's". */
@@ -141,7 +142,7 @@ export const CONTRACTOR_EVENTS = [
   },
   {
     id: 'crew_illness',
-    trigger: () => Math.random() < 0.3,
+    trigger: (c, journey, rng = Math.random) => rng() < 0.3,
     title: 'Sickness in Camp',
     getText: (c) => (c.specialty === 'survey'
       ? `One of ${possessive(c.name)} surveyors is down with a stomach bug and the other is eating standing up. The foreman thinks it is the water; the cook thinks it is the foreman.`
@@ -156,7 +157,7 @@ export const CONTRACTOR_EVENTS = [
     id: 'stand_down',
     trigger: (c) => c.specialty === 'planting' || c.specialty === 'brushing',
     title: 'Stand-Down Call',
-    getText: (c, journey) => `${possessive(c.name)} foreman calls a stand-down: ${pickStandDownReason(journey)}. ${c.specialty === 'planting' ? 'Planters plant in rain' : 'Saw crews work in rain'}; this is not rain.`,
+    getText: (c, journey, rng = Math.random) => `${possessive(c.name)} foreman calls a stand-down: ${pickStandDownReason(journey, rng)}. ${c.specialty === 'planting' ? 'Planters plant in rain' : 'Saw crews work in rain'}; this is not rain.`,
     options: [
       { label: 'Back the stand-down', description: 'Crew off the block today; the tailgate meeting covers it tomorrow', value: 'rest', cost: 0, moraleGain: 10, prodGain: 0 },
       { label: 'Keep them on the block', description: 'Production today; a WorkSafeBC prevention officer would call it differently', value: 'push', cost: 0, moraleGain: -8, prodGain: -5, scrutiny: 1 },
@@ -265,13 +266,16 @@ export async function runSilvicultureDay(game) {
   const contractorStress = activeContractors.some(c => c.morale < 55 || c.productivity < 60);
   // Crews are on the block most mornings now that fatigue clears on days
   // off, so the odds are set for a call every few days, not every other one.
-  if (journey.day > 1 && Math.random() < (contractorStress ? 0.35 : 0.25)) {
+  // Rolled on the day's own dice (js/events/dayRng.js), so a reload replays
+  // the same call, or the same quiet morning, ahead of the day's situation.
+  const callRng = getDayRng(journey, 'contractor-call');
+  if (journey.day > 1 && callRng() < (contractorStress ? 0.35 : 0.25)) {
     if (activeContractors.length > 0) {
-      const targetContractor = activeContractors[Math.floor(Math.random() * activeContractors.length)];
-      const applicableEvents = CONTRACTOR_EVENTS.filter(e => e.trigger(targetContractor, journey));
+      const targetContractor = activeContractors[Math.floor(callRng() * activeContractors.length)];
+      const applicableEvents = CONTRACTOR_EVENTS.filter(e => e.trigger(targetContractor, journey, callRng));
       if (applicableEvents.length > 0) {
-        const cEvent = applicableEvents[Math.floor(Math.random() * applicableEvents.length)];
-        await handleContractorEvent(game, cEvent, targetContractor);
+        const cEvent = applicableEvents[Math.floor(callRng() * applicableEvents.length)];
+        await handleContractorEvent(game, cEvent, targetContractor, callRng);
         if (game.gameOver) return;
         if (journey.isGameOver) return;
       }
@@ -1771,7 +1775,7 @@ function handleTeamBriefing(game) {
   ui.write('Tailgate meeting: the week\'s plot schedule, radio channels, the ETV route and the fire danger rating. Your crew is set for the day.');
 }
 
-async function handleContractorEvent(game, cEvent, contractor) {
+async function handleContractorEvent(game, cEvent, contractor, rng = Math.random) {
   const { ui, journey } = game;
   const zoneProfile = getSilvicultureZoneProfile(journey);
   const silvicultureState = ensureSilvicultureState(journey);
@@ -1780,7 +1784,7 @@ async function handleContractorEvent(game, cEvent, contractor) {
   // The panel beside the call shows today's program, not yesterday's.
   updateSilvicultureMissionStatus(ui, journey, nextSeasonInfoOf(journey), zoneProfile);
   ui.writeHeader(`CONTRACTOR CALL: ${cEvent.title}`);
-  ui.write(cEvent.getText(contractor, journey));
+  ui.write(cEvent.getText(contractor, journey, rng));
   ui.write('Brief response; the day\'s work continues.');
   ui.write('');
 

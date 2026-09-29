@@ -11,6 +11,7 @@ import { ASCII_ART } from '../ascii_art.js';
 import { getCrewDisplayInfo } from '../crew.js';
 import { calculateScore, formatScoreDisplay, getLetterGrade } from '../scoring.js';
 import { resolveSilvicultureFinalReport } from '../modes/silvicultureIntegrity.js';
+import { settleOutstandingFallout } from '../events/shortcutRecord.js';
 import {
   foldRunIntoRecord,
   loadServiceRecord,
@@ -478,6 +479,14 @@ export async function runFinalDebrief(ui, journey, victory) {
   if (journey.endReason) {
     if (victory) ui.write(journey.endReason, 'term-dim');
     else ui.writeDanger(journey.endReason);
+  }
+  // A caught shortcut whose determination had not landed when the run ended
+  // lands now, before anything is scored (js/events/shortcutRecord.js).
+  const lateFallout = settleOutstandingFallout(journey);
+  if (lateFallout.length) {
+    ui.write('');
+    ui.writeDivider('AFTER THE SEASON');
+    for (const line of lateFallout) ui.writeWarning(line);
   }
   ui.write('');
   const report = getFinalReportPrompt(journey.journeyType, { victory });

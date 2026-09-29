@@ -142,12 +142,14 @@ export async function runDaySituation(game, event, options = {}) {
     ...frame,
     extraOptions: [{
       label: options.setAsideLabel || 'Set it aside',
-      description: obstruction
+      // A shortcut card says what silence means on this card (they may go
+      // around you; a determination lands anyway) before the player picks it.
+      description: event?.setAsideDescription || (obstruction
         ? 'Defer the call. The route stays blocked until you clear it or mark a detour.'
         : goAround
           ? 'Say nothing. It stands, and the file will read your silence as consent.'
           : options.setAsideDescription
-        || 'Not today. Take the day back and spend it on your own work.',
+        || 'Not today. Take the day back and spend it on your own work.'),
       tag: 'TRADEOFF',
       value: 'set_aside',
     }],

@@ -244,3 +244,13 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
   - After: 72/72.
   - Matrix of 9 areas × 12 seeds, competent policy, easy/normal/hard: before 0.97/0.84/0.55, after 1.00/1.00/0.90. The policy now manages fuel and supply stops and does not set aside injuries.
   - With the unchanged policy: 1.00/0.97/0.84.
+## 2026-09-29 — Shortcut mechanics and presentation (wave 2, F2b)
+
+- **Odds are honest.** Every shortcut keeps a caught band by severity (serious harm or a criminal/federal catcher 15%, core 10%, grey/comic 5%); the chip names all three bands and the catcher, first on the option, and the card's stakes say why today's odds moved (who is watching, prior shortcuts, a clean record).
+- **One set of numbers.** Chip, stakes and outcome read the same effects: a GM is paid the sum the pitch names, a desk budget only what fits under its ceiling (the outcome prints what landed), a recce crew cash only at wallet scale, a planner the gate the pitch names, a permitter the clock-days the queue can take, silviculture a program day per shift.
+- **Fallout lands later.** `catch.lagDays` is read: the caught band is the finding, and the determination arrives as its own card on its due day, naming the act and the day (`js/events/fallout.js`). Leftovers settle before the debrief scores. Every catcher now costs money or the role's own work.
+- **Consequences stay visible.** Watch flags announce themselves, stand on the mission panel with any determination still due, and worsen later odds on screen. An open FPBC complaint survives a registration renewal. The Campaign carries flags, taken acts and unlanded determinations into the next season and lists the season's shortcuts in its review (`js/events/shortcutRecord.js`).
+- **Tone.** No reaction praises a shortcut; the GM's report goes to the audit committee.
+- **Presentation.** The card opens `== SHORTCUT · PHONE CALL ==` (FALLOUT for a determination) in the theme's warning colour, the log anchors on it in Classic, Modern and Grid at desktop and phone size, shortcut options carry an OFF-BOOK chip, and a focused Grid option shows its full detail.
+- **Cadence and reloads.** The offer chance ramps with quiet days (no more day-7 timer); a GM hears about two offers a year with a four-month cooldown; silviculture contractor calls roll on the day seed.
+- **Tests.** `tests/shortcutMechanics.test.mjs`, `tests/e2e/shortcut-card.spec.js`.

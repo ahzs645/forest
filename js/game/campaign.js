@@ -14,6 +14,12 @@ import { generateCrew } from '../crew.js';
 import { createJourney } from '../journey.js';
 import { checkScheduledEvents } from '../events.js';
 import { ensureDaySeed } from '../events/dayRng.js';
+import {
+  carryShortcutsIntoJourney,
+  collectShortcutsFromJourney,
+  describeSeasonShortcuts,
+  settleOutstandingFallout
+} from '../events/shortcutRecord.js';
 import { checkEndConditions as evaluateEndConditions } from '../modes/shared/endConditions.js';
 import { runReconDay } from '../modes/recon.js';
 import { getFieldThriftContext } from '../journey/fieldMechanics.js';
@@ -689,6 +695,9 @@ async function runCampaignSeason(game, campaign, season) {
       journey.discoveryTags = [...campaign.discoveryTags];
     }
     const carryLines = applySeasonCarryForward(campaign, season, journey);
+    // The year's shortcuts follow the forester into the next seat: watch
+    // flags, open files, taken acts, and any determination still to land.
+    carryLines.push(...carryShortcutsIntoJourney(campaign, journey));
     journey.campaignStartStanding = readStandingSnapshot(journey);
 
     ui.clear();
@@ -762,6 +771,10 @@ async function runCampaignSeason(game, campaign, season) {
   // ── 3. Season review ────────────────────────────────────────────────────
   ui.campaignBanner = null;
   setExpeditionChromeHidden(true);
+  // The year's last deployment settles any determination still owed, so the
+  // review counts it; earlier seasons carry theirs into the next deployment.
+  const settledLines = campaign.seasonIndex + 1 >= CAMPAIGN_SEASONS.length ? settleOutstandingFallout(journey) : [];
+  const shortcutReview = collectShortcutsFromJourney(campaign, journey, season);
   const bridge = computeSeasonBridge(journey, endResult, journey.campaignStartBudget);
   const objectiveDetail = getObjectiveDetail(journey);
   const applied = applyYearEffects(gsSeason, bridge.deltas, {
@@ -853,6 +866,10 @@ async function runCampaignSeason(game, campaign, season) {
   ui.write('');
   ui.writeDivider('WHAT IT DID TO THE YEAR');
   for (const cause of causes) ui.write(`• ${cause}`);
+  if (shortcutReview.lines.length || settledLines.length) {
+    ui.writeDivider('SHORTCUTS');
+    for (const line of [...shortcutReview.lines, ...settledLines]) ui.write(`• ${line}`, 'term-warning');
+  }
   if (explained.length) {
     ui.writeDivider('WHY THIS HAPPENED');
     for (const entry of explained) {
@@ -878,6 +895,7 @@ async function runCampaignSeason(game, campaign, season) {
     completion: Math.round(bridge.completion * 100),
     deltas: seasonDeltas,
     standing: { ...(journey.standingLedger || {}) },
+    shortcuts: shortcutReview.counts,
     metricsAfter: { ...campaign.yearMetrics },
     careerDeltas: getCareerDeltas(journey, endResult.victory === true),
   });
@@ -963,7 +981,7 @@ async function showYearEnd(ui, campaign) {
     body: `${body} The year goes on your service record — look for its tree at the district office.`,
     scoreReasons: reasons,
     seasonSummaries: campaign.seasonLog.map((s) =>
-      `• ${s.season} ${s.title}: ${s.victory ? 'delivered' : 'fell short'} at ${s.completion}% (${s.detail || 'counts unavailable'}) — ${formatMetricDelta(s.deltas) || 'no metric movement'}`),
+      `• ${s.season} ${s.title}: ${s.victory ? 'delivered' : 'fell short'} at ${s.completion}% (${s.detail || 'counts unavailable'}) — ${formatMetricDelta(s.deltas) || 'no metric movement'}${describeSeasonShortcuts(s.shortcuts)}`),
     trendLines: Object.entries(metrics).map(([key, value]) => `${formatMetricName(key)}: ${Math.round(value)}`),
   };
 
