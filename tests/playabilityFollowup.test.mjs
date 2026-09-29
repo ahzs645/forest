@@ -31,10 +31,11 @@ test('road permit choice shows the next real paperwork stage after each complete
   journey.area = { id: 'fraser-plateau', tags: ['road'] };
   journey.professional.chains.roadPermit.stepIndex = 0;
   for (const stage of ['Road screen', 'Road map exhibits', 'Road submission', 'Maintenance conditions']) {
-    const { primary: options } = buildActionOptions(journey);
-    const admin = options.find((option) => option.value === 'professional_admin');
-    assert.ok(admin, 'the road file action should be offered');
-    assert.ok(admin.description.includes(`Stage: ${stage}`), admin.description);
+    const { primary, support } = buildActionOptions(journey);
+    const lane = support.find((option) => option.value === 'lane_file');
+    assert.ok(lane, 'the road file action should be offered');
+    assert.ok(lane.description.includes(`Next step: ${stage}`), lane.description);
+    assert.ok(primary.some((option) => option.value === 'professional_admin'), 'Compliance Admin stays on the menu beside it');
     advanceProfessionalComplianceChain(journey, 'roadPermit');
   }
 });

@@ -274,11 +274,33 @@ function ensurePermitState(journey) {
   return permits;
 }
 
-function nextCatalogueEntry(journey) {
+/**
+ * The next application out of the area's catalogue. With `types`, the next
+ * one of those types is drafted out of order (a road-permit day drafts a
+ * road permit, not whatever cutting permit was next); the skipped-over
+ * entries keep their place, and the ones taken early are not drafted again.
+ */
+function nextCatalogueEntry(journey, { types = null } = {}) {
   const permits = ensurePermitState(journey);
   const catalogue = buildPermitFileCatalogue(journey);
-  const index = permits.catalogueCursor;
-  permits.catalogueCursor = index + 1;
+  const taken = new Set(Array.isArray(permits.catalogueTaken) ? permits.catalogueTaken : []);
+  while (taken.has(permits.catalogueCursor)) {
+    taken.delete(permits.catalogueCursor);
+    permits.catalogueCursor += 1;
+  }
+  let index = permits.catalogueCursor;
+  if (Array.isArray(types) && types.length && catalogue.length) {
+    for (let candidate = index; candidate < index + catalogue.length; candidate += 1) {
+      if (taken.has(candidate)) continue;
+      if (types.includes(catalogue[candidate % catalogue.length].type)) {
+        index = candidate;
+        break;
+      }
+    }
+  }
+  if (index === permits.catalogueCursor) permits.catalogueCursor = index + 1;
+  else taken.add(index);
+  if (taken.size || permits.catalogueTaken) permits.catalogueTaken = [...taken];
   const entry = catalogue.length ? catalogue[index % catalogue.length] : null;
   if (!entry) {
     return { id: `pkg-${index + 1}`, type: 'CP', label: `CP file ${index + 1}`, blockId: '', touchesStream: false, heritageLoad: 0, heritageClass: 'light', needsHca: false };
@@ -311,9 +333,9 @@ function enterLane(file, lane, journey, { clockDays = null } = {}) {
   return file;
 }
 
-function createFile(journey, lane, { clockDays = null } = {}) {
+function createFile(journey, lane, { clockDays = null, types = null } = {}) {
   const permits = ensurePermitState(journey);
-  const entry = nextCatalogueEntry(journey);
+  const entry = nextCatalogueEntry(journey, { types });
   const file = {
     ...entry,
     lane: 'drafted',
@@ -361,9 +383,38 @@ function attachHcaIfNeeded(journey, file) {
     chased: 0,
   };
   permits.files.push(hca);
+  // A cutting permit already filed went in with its HCA application: the
+  // Archaeology Branch has it, not the licensee's drafting stack.
+  if (file.lane !== 'drafted') enterLane(hca, 'screening', journey);
   file.pausedBy = hca.id;
   file.needsHca = false;
   return hca;
+}
+
+/** Who decides a file: the Archaeology Branch for an HCA permit, the District Manager otherwise. */
+export function getDecisionMaker(file) {
+  return file?.type === 'HCA' ? 'the Archaeology Branch' : 'the District Manager';
+}
+
+/**
+ * Why a cutting permit is waiting on its HCA permit, in terms of where the
+ * HCA permit actually is. A drafted HCA permit is the licensee's to file;
+ * saying it was "with the Archaeology Branch" left a CP blocked for ten days
+ * by an application nobody had submitted.
+ * @param {Object} hca
+ * @returns {string}
+ */
+export function describeHcaHold(hca) {
+  switch (hca?.lane) {
+    case 'drafted':
+      return `${hca.label} is drafted but not filed; submit it (Process Permits) to start the Archaeology Branch clock`;
+    case 'deficiency':
+      return `${hca.label} came back from the Archaeology Branch with a letter; answer it`;
+    case 'decision':
+      return `${hca.label} is with the Archaeology Branch for decision (Day ${hca.clockCloses})`;
+    default:
+      return `${hca?.label || 'The HCA permit'} is with the Archaeology Branch (Day ${hca?.clockCloses ?? '?'})`;
+  }
 }
 
 export function getPermitFiles(journey) {
@@ -578,15 +629,17 @@ export function ensurePermitFiles(journey) {
 /**
  * Draft applications out of the backlog. Drafting is where a file gets its
  * name: the block, the road, the camp it is for.
+ * @param {Object} [options]
+ * @param {string[]} [options.types] - draft the next files of these types first
  * @returns {Array} files drafted today
  */
-export function draftPermits(journey, count = DAILY_PERMIT_THROUGHPUT) {
+export function draftPermits(journey, count = DAILY_PERMIT_THROUGHPUT, { types = null } = {}) {
   const permits = ensurePermitFiles(journey);
   const drafted = [];
   const available = Math.min(Math.max(0, permits.backlog), Math.max(0, count));
   for (let index = 0; index < available; index += 1) {
     permits.backlog -= 1;
-    const file = createFile(journey, 'drafted');
+    const file = createFile(journey, 'drafted', { types });
     drafted.push(file);
     const hca = attachHcaIfNeeded(journey, file);
     if (hca) drafted.push(hca);
@@ -604,8 +657,11 @@ export function draftPermits(journey, count = DAILY_PERMIT_THROUGHPUT) {
 export function submitPermits(journey, count = DAILY_PERMIT_THROUGHPUT) {
   ensurePermitFiles(journey);
   const submitted = [];
+  // An HCA permit holding a cutting permit goes in first: every day it sits
+  // in the drafting stack is a day the CP waits for it.
   const drafted = getPermitFilesInLane(journey, 'drafted')
-    .sort((a, b) => (a.laneEnteredDay || 0) - (b.laneEnteredDay || 0));
+    .sort((a, b) => (Number(Boolean(b.holdsFileId)) - Number(Boolean(a.holdsFileId)))
+      || (a.laneEnteredDay || 0) - (b.laneEnteredDay || 0));
   for (const file of drafted.slice(0, Math.max(0, count))) {
     enterLane(file, 'screening', journey);
     if (file.touchesStream && !file.wsaClockCloses) {
@@ -757,7 +813,7 @@ export function advancePermitClocks(journey, options = {}) {
       const hca = getPermitFileById(journey, file.pausedBy);
       if (hca && hca.lane !== 'issued') {
         file.clockCloses = Number.isFinite(file.clockCloses) ? file.clockCloses + 1 : day + 1;
-        result.held.push({ file, reason: `${hca.label} still with the Archaeology Branch` });
+        result.held.push({ file, reason: describeHcaHold(hca) });
         continue;
       }
       file.pausedBy = null;
@@ -825,6 +881,13 @@ export function advancePermitClocks(journey, options = {}) {
  */
 export function planQueueWork(journey) {
   const permits = ensurePermitFiles(journey);
+  // A drafted HCA permit that is holding a cutting permit is filed before
+  // anything else is drafted: the CP cannot move until it is in.
+  const blockingHca = permits.files.find((file) => file.lane === 'drafted' && file.type === 'HCA' && file.holdsFileId);
+  if (blockingHca) {
+    const drafted = permits.files.filter((file) => file.lane === 'drafted').length;
+    return { step: 'submit', count: Math.min(drafted, DAILY_PERMIT_THROUGHPUT), file: blockingHca };
+  }
   if ((permits.backlog || 0) > 0) {
     return { step: 'draft', count: Math.min(permits.backlog, DAILY_PERMIT_THROUGHPUT), file: null };
   }
@@ -850,17 +913,21 @@ export function describeLane(file, journey = null) {
     case 'drafted':
       return 'drafted, not yet submitted';
     case 'screening': {
+      if (file.pausedBy && journey) return `waiting: ${describeHcaHold(getPermitFileById(journey, file.pausedBy))}`;
       const def = PERMIT_TYPES[file.type] || PERMIT_TYPES.CP;
       return `${def.screeningNote} closes Day ${file.clockCloses}`;
     }
     case 'referral':
+      if (file.pausedBy && journey) return `waiting: ${describeHcaHold(getPermitFileById(journey, file.pausedBy))}`;
       return `referral closes Day ${file.clockCloses}`;
     case 'decision': {
-      if (file.pausedBy) return `paused for ${getPermitFileById(journey, file.pausedBy)?.label || 'the HCA permit'}`;
+      if (file.pausedBy) return `waiting: ${describeHcaHold(getPermitFileById(journey, file.pausedBy))}`;
       if (Number.isFinite(file.wsaClockCloses) && file.wsaClockCloses > day) {
         return `WSA s.11 window closes Day ${file.wsaClockCloses}; decision waits`;
       }
-      return `District Manager decision Day ${file.clockCloses}`;
+      return file.type === 'HCA'
+        ? `Archaeology Branch decision Day ${file.clockCloses}`
+        : `District Manager decision Day ${file.clockCloses}`;
     }
     case 'deficiency':
       return 'deficiency letter — answer it to restart the clock';

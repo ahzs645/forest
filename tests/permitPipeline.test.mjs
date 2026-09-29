@@ -7,6 +7,7 @@ import {
   HCA_HERITAGE_LOAD_THRESHOLD,
   advancePermitClocks,
   buildPermitFileCatalogue,
+  describeLane,
   draftPermits,
   ensurePermitFiles,
   formatPermitClockLines,
@@ -574,10 +575,28 @@ test('the opening queue gives a heritage-heavy CP its HCA permit (Tahltan)', () 
   assert.ok(hca, 'the seeded CP on heavy heritage ground has its HCA permit');
   const cp = getPermitFiles(journey).find((file) => file.id === hca.holdsFileId);
   assert.equal(cp.pausedBy, hca.id);
+  assert.notEqual(cp.lane, 'drafted');
+  assert.equal(hca.lane, 'screening', 'a CP already filed went in with its HCA application');
+  assert.match(describeLane(cp, journey), /with the Archaeology Branch/);
+});
+
+test('a drafted HCA permit holding a CP is filed before anything else is drafted, and the hold says so', () => {
+  const journey = freshQueue('tahltan-highland');
+  const hca = getPermitFiles(journey).find((file) => file.type === 'HCA');
+  const cp = getPermitFiles(journey).find((file) => file.id === hca.holdsFileId);
+  hca.lane = 'drafted';
+  hca.clockCloses = null;
+  assert.ok(journey.permits.backlog > 0);
+  assert.match(describeLane(cp, journey), /drafted but not filed; submit it/);
+  const night = advancePermitClocks(journey, { random: () => 0 });
+  const held = night.held.find((entry) => entry.file.id === cp.id);
+  if (held) assert.match(held.reason, /not filed/, 'the nightly hold does not claim the Branch has it');
+
+  assert.equal(planQueueWork(journey).step, 'submit', 'the blocking HCA permit is queue work before the backlog');
+  const submitted = submitPermits(journey, 1);
+  assert.equal(submitted[0].id, hca.id);
+  assert.match(describeLane(cp, journey), /with the Archaeology Branch/);
   assert.equal(planQueueWork(journey).step, 'draft');
-  journey.permits.backlog = 0;
-  syncPermitCounters(journey);
-  assert.equal(planQueueWork(journey).step, 'submit', 'the drafted HCA permit is queue work even though it is off the counters');
 });
 
 test('no area\'s queue repeats a file name or garbles a road name', () => {

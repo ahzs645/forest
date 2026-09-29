@@ -972,6 +972,7 @@ export async function runPlanningDay(game) {
   checkGameOver(game);
 
   ui.updateAllStatus(journey);
+  updatePlanningMissionStatus(ui, journey, seasonInfo);
 
   const milestoneMessages = [];
   recordProgressMilestones(journey, progressBeforeDay, milestoneMessages, Math.max(1, journey.day - 1));
