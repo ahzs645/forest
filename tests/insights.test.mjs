@@ -60,6 +60,29 @@ test('describeConsequences pairs triggered ids with cause and the applied effect
   assert.match(attrition.effectText, /Progress -6/);
 });
 
+test('a failed campaign season never hears that the crew was delivering', () => {
+  const state = makeState('planner');
+  state.round = 3;
+  Object.assign(state.metrics, { compliance: 30, progress: 70, forestHealth: 60 });
+  const ids = applyRoundConsequences(state);
+  assert.ok(ids.includes('field-discipline-rebound'), ids.join(', '));
+  assert.ok(ids.includes('ecological-strain'), ids.join(', '));
+
+  const delivered = describeConsequences(state, ids);
+  assert.match(delivered.find((entry) => entry.id === 'field-discipline-rebound').cause, /still delivering/);
+
+  const short = describeConsequences(state, ids, { fellShort: true });
+  for (const entry of short) {
+    assert.doesNotMatch(entry.cause, /still delivering|Production stayed high/, entry.cause);
+  }
+  assert.match(short.find((entry) => entry.id === 'field-discipline-rebound').cause, /^The season fell short/);
+  // The rest of the copy is unchanged.
+  assert.deepEqual(
+    short.filter((entry) => !['field-discipline-rebound', 'ecological-strain'].includes(entry.id)),
+    delivered.filter((entry) => !['field-discipline-rebound', 'ecological-strain'].includes(entry.id)),
+  );
+});
+
 test('buildSeasonHeadline returns the most impactful decision of a season', () => {
   const state = makeState();
   state.history.push({ type: 'assignment', title: 'Minor Note', option: 'a', effects: { progress: 1 }, round: 1 });

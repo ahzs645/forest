@@ -55,6 +55,7 @@ const CONSEQUENCE_INFO = {
   "field-discipline-rebound": {
     title: "Field-discipline rebound",
     cause: "The crew was still delivering, so pausing to clean up documentation clawed back some compliance.",
+    shortfallCause: "The season fell short, but the year's progress had room to give, so pausing to clean up documentation clawed back some compliance.",
   },
   "stand-recovery": {
     title: "Stands recovering",
@@ -63,6 +64,7 @@ const CONSEQUENCE_INFO = {
   "ecological-strain": {
     title: "Ecological strain",
     cause: "Production stayed high while compliance sat low, and the stands are starting to show it.",
+    shortfallCause: "Compliance sat low against the year's earlier production, and the stands are starting to show it.",
   },
 };
 
@@ -84,8 +86,12 @@ function formatEffectText(effects = {}) {
  * Pair each triggered consequence id with the cause copy and the metric hit the
  * engine actually applied this round, so the UI can show a "why this happened"
  * timeline instead of a list of opaque ids.
+ *
+ * `fellShort`: the campaign season behind these meters failed. The rules read
+ * the year's meters, so a cause that says the crew was delivering would
+ * contradict the review above it; those ids carry a `shortfallCause`.
  */
-export function describeConsequences(state, ids = []) {
+export function describeConsequences(state, ids = [], { fellShort = false } = {}) {
   const round = Number(state?.round || 0);
   const history = Array.isArray(state?.history) ? state.history : [];
 
@@ -105,7 +111,7 @@ export function describeConsequences(state, ids = []) {
     return {
       id,
       title: info?.title || entry?.title || id,
-      cause: info?.cause || entry?.option || "",
+      cause: (fellShort && info?.shortfallCause) || info?.cause || entry?.option || "",
       effectText: formatEffectText(entry?.effects || {}),
     };
   });
