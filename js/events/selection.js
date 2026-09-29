@@ -20,7 +20,8 @@ import {
   CATEGORY_CLEAN_OUTCOMES,
   CATEGORY_GO_AROUND,
   REFUSE_OUTCOMES,
-  REOFFER_PITCHES
+  REOFFER_PITCHES,
+  SELF_SET_ASIDE_OUTCOME
 } from '../data/illegalActs.js';
 import { computeBandOdds } from './odds.js';
 import { OPERATING_AREAS } from '../data/operatingAreas.js';
@@ -851,15 +852,16 @@ function caughtFlagsFor(act) {
 }
 
 // Desk-side proposers voiced at a tailgate: the person who would actually be
-// standing there, or the one on the other end of the radio.
+// standing there. Plain noun phrases, because the card adds ", at the
+// tailgate:" and the refusal and set-aside lines use the name as a subject.
 const FIELD_PROPOSER_VOICE = {
-  'the client': "the client's forester, out for the day",
-  'the woodlands VP': 'the woodlands VP, on the radio',
-  'the appraisal coordinator': 'the appraisal coordinator, on the phone',
-  'the CFO': 'the CFO, on the phone',
-  'the marketing lead': 'the marketing lead, on the phone',
-  'the GIS tech': 'the GIS tech, on the radio',
-  'the mill manager': 'the mill manager, on the radio',
+  'the client': "the client's forester",
+  'the woodlands VP': 'the visiting woodlands VP',
+  'the appraisal coordinator': 'the visiting appraisal coordinator',
+  'the CFO': 'the visiting CFO',
+  'the marketing lead': 'the visiting marketing lead',
+  'the GIS tech': 'the visiting GIS tech',
+  'the mill manager': 'the visiting mill manager',
 };
 
 function describeProposer(act, journey = null) {
@@ -915,7 +917,7 @@ export function describeTemptation(act, journey, { stage = 'offer', reofferPitch
 function buildRefuseOption(act, journey) {
   const memory = ensureTemptationMemory(journey);
   const isDesk = isDeskTemptationJourney(journey);
-  const deck = isDesk ? REFUSE_OUTCOMES.desk : REFUSE_OUTCOMES.field;
+  const deck = isSelfProposed(act) ? REFUSE_OUTCOMES.self : isDesk ? REFUSE_OUTCOMES.desk : REFUSE_OUTCOMES.field;
   const outcome = deck[memory.refuseIndex % deck.length](describeProposer(act, journey));
   memory.refuseIndex += 1;
   return {
@@ -1104,6 +1106,10 @@ export function resolveTemptationSetAside(journey, event, rng = Math.random) {
 
   if (!act) {
     return { kind: 'drop', message: 'You let it sit. By the end of the week nobody mentions it again.' };
+  }
+  // Nobody else proposed it, so nobody asks again or goes around you.
+  if (isSelfProposed(act)) {
+    return { kind: 'drop', message: SELF_SET_ASIDE_OUTCOME };
   }
 
   const roll = rng();
