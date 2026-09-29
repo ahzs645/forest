@@ -106,8 +106,8 @@ export function eventFitsStop(event, block, journey = null) {
   const kinds = Array.isArray(event?.stopKinds) ? event.stopKinds : [];
   const kind = getStopKind(block);
   if (!kind) return true;
-  // A card that only makes sense while the block's package is open (F1's
-  // `needsOpenPackage`) is off bridges, staging lots and closed blocks.
+  // A card that only makes sense while the block's package is open (the
+  // `needsOpenPackage` flag) is off bridges, staging lots and closed blocks.
   if (event?.needsOpenPackage && (kind !== 'block' || isPackageClosed(journey, block))) return false;
   if (!kinds.length) return true;
   if (!kinds.includes(kind)) return false;
