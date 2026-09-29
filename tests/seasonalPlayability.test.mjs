@@ -9,6 +9,7 @@ import { FORESTER_ROLES, OPERATING_AREAS } from '../js/data/index.js';
 import { TuiGameController } from '../tui/controller.js';
 import { makeRng } from '../js/engine/rng.js';
 import {
+  applyOptionOutcome,
   applyRoundConsequences,
   buildAssignmentCandidates,
   buildSeasonContext,
@@ -107,6 +108,32 @@ test('seasonal event effects do not turn time off into progress or hide the fail
   for (const option of cut.options) {
     for (const value of Object.values(option.effects)) assert.ok(Number.isInteger(value));
   }
+});
+
+test('a practice-burden card logs CPD and the CPD gap is judged against the year so far', () => {
+  const state = createInitialState({ companyName: 'T', roleId: 'recce', areaId: 'fraser-plateau' });
+  state.round = 4;
+  const context = buildSeasonContext(state);
+  state.currentSeasonContext = context;
+  const burden = buildAssignmentCandidates(state, context)
+    .find((card) => card.sourceFamily === 'professional' && card.sourceKey.startsWith('burden:'));
+  const byStance = Object.fromEntries(burden.options.map((option) => [option.stance, option]));
+  assert.ok(byStance.cautious.assignmentSideEffects.professionalShift.cpdHours > 0);
+  assert.ok(byStance.balanced.assignmentSideEffects.professionalShift.cpdHours > 0);
+  assert.equal(byStance.aggressive.assignmentSideEffects?.professionalShift?.cpdHours, undefined);
+
+  const before = state.professional.cpdHours;
+  applyOptionOutcome(state, byStance.cautious, { type: 'assignment', id: burden.id, title: burden.title, option: byStance.cautious.label, round: 4 });
+  assert.equal(state.professional.cpdHours, before + byStance.cautious.assignmentSideEffects.professionalShift.cpdHours);
+
+  // First season: a quarter of the year's CPD is due, so an on-pace log adds no competence risk.
+  const early = createInitialState({ companyName: 'T', roleId: 'planner', areaId: 'fraser-plateau' });
+  early.round = 1;
+  buildSeasonContext(early);
+  early.professional.cpdHours = Math.ceil(early.professional.cpdTarget / 4);
+  const risk = early.professional.competenceRisk;
+  applyRoundConsequences(early);
+  assert.ok(early.professional.competenceRisk <= risk);
 });
 
 function makeHubUi() {

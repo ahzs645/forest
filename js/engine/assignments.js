@@ -159,13 +159,13 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
     {
       stance: "cautious",
       label: "Clear the admin burden now",
-      outcome: "You spend the season clearing the professional burden before it turns into a live practice problem.",
+      outcome: "You spend the season clearing the professional burden, CPD log included, before it turns into a live practice problem.",
       effects: { progress: 0, compliance: 5 },
     },
     {
       stance: "balanced",
       label: "Patch only the hot spots",
-      outcome: "You clean the most exposed parts of the practice load and keep enough momentum to avoid a stall.",
+      outcome: "You clean the most exposed parts of the practice load and log the CPD you can fit in, keeping enough momentum to avoid a stall.",
       effects: { progress: 1, compliance: 2 },
     },
     {
@@ -249,6 +249,9 @@ const AGGRESSIVE_FAMILY_FLAGS = {
 const AGGRESSIVE_CHAIN_FLAGS = {
   "archaeology-ladder": { culturalTension: true },
 };
+// CPD hours a practice-burden card logs, against the 30-hour FPBC year.
+const PROFESSIONAL_CPD_HOURS = { cautious: 15, balanced: 8 };
+
 const ROAD_AGGRESSIVE_FLAG_IDS = ["environmentalAudit", "auditTriggered", "regulatoryScrutiny"];
 
 // Every flag a generated assignment option can set, for the content lint's
@@ -470,6 +473,19 @@ function buildAssignmentOptions(candidate) {
       if (candidate.paperworkChainId) {
         option.assignmentSideEffects.advancePaperworkChainId = candidate.paperworkChainId;
       }
+    }
+
+    // A practice-burden card is the one place a seasonal year logs CPD; without
+    // it the gap charged competence risk every season with no way to close it.
+    const cpdHours = candidate.sourceFamily === "professional" && !candidate.paperworkChainId
+      ? PROFESSIONAL_CPD_HOURS[template.stance] || 0
+      : 0;
+    if (cpdHours) {
+      const shift = option.assignmentSideEffects?.professionalShift || {};
+      option.assignmentSideEffects = {
+        ...(option.assignmentSideEffects || {}),
+        professionalShift: { ...shift, cpdHours },
+      };
     }
 
     if (

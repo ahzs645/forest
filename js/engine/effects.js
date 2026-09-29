@@ -227,7 +227,11 @@ export function applyRoundConsequences(state) {
 
   if (professional) {
     const complianceLow = metrics.compliance < COMPLIANCE_AUDIT_THRESHOLD;
-    const cpdGap = Math.max(0, Math.round((professional.cpdTarget || DEFAULT_CPD_TARGET) - professional.cpdHours));
+    // CPD is a year-long target: judge the log against the share of the year
+    // that has passed, not the full 30 hours from the first season.
+    const yearShare = Math.min(1, Math.max(0, round) / Math.max(1, Number(state.totalRounds) || 4));
+    const cpdExpected = (professional.cpdTarget || DEFAULT_CPD_TARGET) * yearShare;
+    const cpdGap = Math.max(0, Math.round(cpdExpected - professional.cpdHours));
 
     if (cpdGap > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk + 1 + Math.floor(cpdGap / 15), 0, 100);
@@ -510,6 +514,11 @@ function applyAssignmentSideEffects(state, option) {
     );
     professional.auditExposure = clamp(
       Number(professional.auditExposure || 0) + Number(sideEffects.professionalShift.auditExposure || 0),
+      0,
+      100,
+    );
+    professional.cpdHours = clamp(
+      Number(professional.cpdHours || 0) + Number(sideEffects.professionalShift.cpdHours || 0),
       0,
       100,
     );
