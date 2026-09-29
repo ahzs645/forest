@@ -27,7 +27,16 @@ export const TerminalMixin = {
     line.className = `term-line ${className}`.trim();
     line.textContent = text;
     this.terminal.appendChild(line);
+    // A line written as an anchor (a shortcut card's frame) holds the view
+    // at the top of the card until the decision is made.
+    if (/\bterm-anchor\b/.test(className)) this._scrollAnchor = line;
     this._capLines();
+    this._scrollToBottom();
+  },
+
+  /** Let the log follow new lines to the bottom again. */
+  releaseScrollAnchor() {
+    this._scrollAnchor = null;
     this._scrollToBottom();
   },
 
@@ -131,6 +140,7 @@ export const TerminalMixin = {
     if (this.terminal) {
       this.terminal.innerHTML = '';
     }
+    this._scrollAnchor = null;
     // A campaign sets a persistent banner (season + year meters) so the
     // campaign layer stays visible inside deployments, whose day headers
     // clear the screen every render.
@@ -220,8 +230,19 @@ export const TerminalMixin = {
    * @private
    */
   _scrollToBottom() {
-    if (this.terminal) {
-      this.terminal.scrollTop = this.terminal.scrollHeight;
+    if (!this.terminal) return;
+    // With an anchor, show from the anchor down; if all of that fits, the
+    // bottom is the same view. A short pane (Modern under the Trail View, a
+    // phone) otherwise opened the card on the tail of the pitch, with who was
+    // asking scrolled away.
+    const anchor = this._scrollAnchor;
+    if (anchor?.isConnected) {
+      const pane = this.terminal.getBoundingClientRect();
+      const top = anchor.getBoundingClientRect().top - pane.top + this.terminal.scrollTop;
+      const bottom = this.terminal.scrollHeight - this.terminal.clientHeight;
+      this.terminal.scrollTop = Math.max(0, Math.min(bottom, top - 4));
+      return;
     }
+    this.terminal.scrollTop = this.terminal.scrollHeight;
   }
 };

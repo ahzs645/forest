@@ -149,7 +149,7 @@ export const InputMixin = {
 
       // Risk-tag chip (parsed from the " [SAFE]"-style suffix some modes
       // append to labels; shown as a chip instead of inline noise).
-      const TAG_RE = /\s*\[(SAFE|RISKY|TRADEOFF)\]\s*/;
+      const TAG_RE = /\s*\[(SAFE|RISKY|TRADEOFF|OFF-BOOK)\]\s*/;
       let labelText = String(option.label ?? '');
       const tagMatch = labelText.match(TAG_RE);
       const tag = tagMatch ? tagMatch[1] : null;

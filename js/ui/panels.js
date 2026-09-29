@@ -7,6 +7,7 @@ import { progressBar, box, PROGRESS } from '../ascii.js';
 import { getCrewDisplayInfo, getActiveCrewCount, getAverageMorale } from '../crew.js';
 import { FIELD_RESOURCES, DESK_RESOURCES, getResourcePercentage } from '../resources.js';
 import { getOperationalProgress } from '../journey.js';
+import { withShortcutWatch } from '../events/shortcutRecord.js';
 
 function escapeHtml(text) {
   return String(text ?? '')
@@ -35,7 +36,9 @@ export const PanelsMixin = {
    * @param {Array}  status.alerts - [{ level: 'ok'|'warn'|'danger', text }]
    */
   setMissionStatus(status) {
-    this._missionStatus = status || null;
+    // What the run's shortcuts left standing (watch flags, open files, a
+    // determination on its way) rides on every mode's panel.
+    this._missionStatus = withShortcutWatch(status || null, this._currentJourney);
     this._renderMissionPanel();
   },
 

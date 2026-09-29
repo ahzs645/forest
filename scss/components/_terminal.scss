@@ -98,6 +98,23 @@
   color: var(--fg-warning);
 }
 
+// A card that is a legal or ethical call (a shortcut offer, its fallout):
+// a plain-character frame in the theme's warning colour, and the stakes
+// under the pitch set off by a rule of the same colour.
+.term-shortcut {
+  color: var(--fg-warning);
+  font-weight: bold;
+  letter-spacing: 1px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.term-stakes {
+  color: var(--fg-bright);
+  border-left: 2px solid var(--fg-warning);
+  padding-left: var(--space-sm);
+}
+
 .term-danger {
   color: var(--fg-danger);
 }

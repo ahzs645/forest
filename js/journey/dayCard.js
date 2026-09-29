@@ -37,7 +37,8 @@ const STATUS_SEGMENT_SEPARATOR = ' · ';
 function formatRiskTag(tag) {
   if (!tag) return '';
   const upper = String(tag).toUpperCase();
-  if (!['SAFE', 'RISKY', 'TRADEOFF'].includes(upper)) return '';
+  // OFF-BOOK marks the options that break a rule on a shortcut card.
+  if (!['SAFE', 'RISKY', 'TRADEOFF', 'OFF-BOOK'].includes(upper)) return '';
   return ` [${upper}]`;
 }
 
@@ -48,6 +49,20 @@ function formatRiskTag(tag) {
  */
 export function formatStatusLine(segments = []) {
   return segments.filter(Boolean).join(STATUS_SEGMENT_SEPARATOR);
+}
+
+/** Width of the closing rule under a marked card; fits a phone's log. */
+const MARKER_RULE_WIDTH = 24;
+
+/**
+ * "== SHORTCUT · PHONE CALL ==" and, with no text, its closing rule. Plain
+ * characters, no icon, so Classic, Modern, Grid and a screen reader all get
+ * the same words.
+ * @param {string} text
+ * @returns {string}
+ */
+export function frameMarker(text) {
+  return text ? `== ${text} ==` : '='.repeat(MARKER_RULE_WIDTH);
 }
 
 /** Sentinel for the free context re-render; never returned to a caller. */
@@ -64,6 +79,9 @@ export const DAY_CARD_CONTEXT = Symbol('day-card-context');
  * @param {Object} card
  * @param {string} [card.dayHeader] - "SHIFT 6 - HIGHWAY CAMP"
  * @param {string} [card.statusLine] - the drumbeat: distance, weather, days left
+ * @param {string} [card.marker] - framed line above the label for a card that
+ *   is a legal or ethical call ("SHORTCUT · OFF THE BOOKS")
+ * @param {string[]} [card.stakes] - what each outcome costs, under the body
  * @param {string} [card.label] - small dim line above the title ("RADIO CHECK")
  * @param {string} card.title
  * @param {string} [card.body]
@@ -93,9 +111,19 @@ export async function presentDayCard(ui, card = {}) {
     if (card.statusLine) ui.write(card.statusLine, 'term-dim');
     if (card.dayHeader || card.statusLine) ui.write('');
 
-    if (card.label) ui.write(card.label, 'term-dim');
+    // A card that is a legal or ethical call says so before anything else,
+    // framed in plain characters so it reads the same in every renderer and
+    // theme. The frame is also the scroll anchor: the log opens on who is
+    // asking, not on the tail of the pitch.
+    // The marker and the label share one line, so a phone-height log still
+    // shows who is asking under it.
+    if (card.marker) ui.write(frameMarker([card.marker, card.label].filter(Boolean).join(' · ')), 'term-shortcut term-anchor');
+    else if (card.label) ui.write(card.label, 'term-dim');
     if (card.title) ui.writeHeader(card.title);
     if (card.body) ui.write(card.body);
+    const stakes = (card.stakes || []).filter(Boolean);
+    for (const line of stakes) ui.write(line, 'term-stakes');
+    if (card.marker) ui.write(frameMarker(''), 'term-shortcut');
     if (card.whyNow) {
       ui.write('');
       ui.write(`Why now: ${card.whyNow}`, 'term-dim');
@@ -126,6 +154,9 @@ export async function presentDayCard(ui, card = {}) {
     }
 
     const picked = await ui.promptChoice(card.prompt || 'What do you do?', choices);
+    // The anchor holds the card in view only while it is being decided; the
+    // outcome that follows scrolls in as usual.
+    ui.releaseScrollAnchor?.();
     if (picked.value === DAY_CARD_CONTEXT) {
       showContext = true;
       continue;
@@ -149,11 +180,14 @@ export async function presentDayCard(ui, card = {}) {
  */
 export function buildEventCardContent(formatted, event, usable) {
   // A temptation is not a radio call: field roles hear it at the tailgate,
-  // desk roles read it or take the phone. The selection lane sets the label.
+  // desk roles read it or take the phone. The selection lane sets the label,
+  // the marker that frames it as a shortcut, and the stakes under the pitch.
   return {
+    marker: event.cardMarker || null,
     label: event.cardLabel || (event.reporter ? 'RADIO CHECK' : 'ON THE RADIO'),
     title: formatted.title,
     body: formatted.description,
+    stakes: Array.isArray(event.stakes) ? event.stakes : [],
     whyNow: event.whyNow || null,
     prompt: 'What do you do?',
     options: usable.map(({ opt, index }) => ({

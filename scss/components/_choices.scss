@@ -168,6 +168,12 @@
   &.tag-risky {
     color: var(--danger);
   }
+
+  // A shortcut option: it breaks a rule, whatever the odds say.
+  &.tag-off-book {
+    color: var(--danger);
+    text-decoration: underline;
+  }
 }
 
 // Keyboard hint row under the options list

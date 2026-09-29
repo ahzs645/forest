@@ -290,7 +290,8 @@ export class GridView {
     if (optionRows.length) {
       const step = this._touch ? Math.ceil(44 / this.renderer.cellH) : 1;
       const cap = Math.max(2 + step * 2, Math.floor(rows * 0.45));
-      optH = Math.min(optionRows.length * step + 2, cap);
+      const detail = this._focusedDetailRows(optionRows, mainW - 4).length;
+      optH = Math.min(optionRows.length * step + 2 + detail, cap);
     } else if (inputVisible) optH = 3;
 
     const logH = bottom - top - optH - (hasSidebar ? 0 : (this.ui._missionStatus ? 1 : 0));
@@ -552,7 +553,9 @@ export class GridView {
       'term-warning': C.warn,
       'term-danger': C.danger,
       'term-positive': C.ok,
-      'term-divider': C.dim
+      'term-divider': C.dim,
+      'term-shortcut': C.warn,
+      'term-stakes': C.bright
     };
   }
 
@@ -565,7 +568,9 @@ export class GridView {
 
     // Flatten the terminal DOM into styled, wrapped lines
     const lines = [];
+    let anchorLine = -1;
     for (const node of this.ui.terminal?.children || []) {
+      if (node === this.ui._scrollAnchor && node.isConnected) anchorLine = lines.length;
       const fg = [...node.classList].map((cls) => styles[cls]).find(Boolean) || C.text;
       const isPre = node.tagName === 'PRE' || node.classList.contains('term-box')
         || node.classList.contains('scene-canvas') || node.classList.contains('ascii-box');
@@ -581,10 +586,14 @@ export class GridView {
       }
     }
 
-    // New content snaps the view back to the bottom
+    // New content snaps the view back to the bottom, or, while a card holds
+    // an anchor (a shortcut's frame), to the top of the card when the whole
+    // card does not fit.
     if (lines.length !== this._logLineCount) {
       this._logLineCount = lines.length;
-      this._scrollOffset = 0;
+      this._scrollOffset = anchorLine >= 0
+        ? Math.max(0, lines.length - innerH - anchorLine)
+        : 0;
     }
     this._logGeom = {
       x: innerX, y: y + 1, w: innerW, h: innerH, totalLines: lines.length,
@@ -613,6 +622,24 @@ export class GridView {
     }));
   }
 
+  /**
+   * The focused option's detail as rows of its own, when its one-line form
+   * would be clipped: at most three, and none on a touch grid (whose rows
+   * already spend their spare height on the detail).
+   * @returns {string[]}
+   */
+  _focusedDetailRows(entries, innerW) {
+    if (this._touch) return [];
+    const entry = entries.find((e) => e.focused);
+    if (!entry?.hint) return [];
+    const tagText = entry.tag ? ` ‹${entry.tag}›` : '';
+    const lead = entry.key ? `${entry.key} ` : '  ';
+    if (`${lead}${entry.label} · ${entry.hint}`.length <= innerW - tagText.length - 3) return [];
+    const rows = wrap(entry.hint, innerW - 4);
+    if (rows.length > 3) rows.splice(2, rows.length - 2, clip(rows.slice(2).join(' '), innerW - 4));
+    return rows;
+  }
+
   _drawOptions(t, C, x, y, w, h, entries) {
     t.drawBox(x, y, w, h, C.borderStrong, 'RESPOND');
     const innerX = x + 2;
@@ -621,8 +648,10 @@ export class GridView {
     // its own hit area; a clipped menu must never require a physical keyboard.
     const inner = h - 2;
     const step = this._touch ? Math.ceil(44 / this.renderer.cellH) : 1;
-    const paged = entries.length * step > inner;
-    const capacity = Math.max(1, Math.floor((inner - (paged ? step : 0)) / step));
+    // The focused row's full detail, on the rows under it (keyboard grids).
+    const focusDetail = step === 1 ? this._focusedDetailRows(entries, innerW) : [];
+    const paged = entries.length * step + focusDetail.length > inner;
+    const capacity = Math.max(1, Math.floor((inner - focusDetail.length - (paged ? step : 0)) / step));
     const focusIndex = entries.findIndex((e) => e.focused);
     const focusElement = entries[focusIndex]?.element;
     if (this._optionMenu !== entries[0]?.element) {
@@ -637,24 +666,28 @@ export class GridView {
     this._optionStart = Math.min(this._optionStart, Math.floor((entries.length - 1) / capacity) * capacity);
     const visible = entries.slice(this._optionStart, this._optionStart + capacity);
 
-    visible.forEach((entry, r) => {
-      const rowY = y + 1 + r * step;
+    let rowY = y + 1;
+    visible.forEach((entry) => {
       const tagText = entry.tag ? ` ‹${entry.tag}›` : '';
       const lead = entry.key ? `${entry.key} ` : '  ';
       const textW = innerW - tagText.length - 3;
       // Touch rows are 44px (two or three cells) tall: spend the spare rows on
-      // the option's detail instead of cutting it off after one line.
+      // the option's detail instead of cutting it off after one line. A
+      // focused keyboard row whose detail does not fit gets rows of its own,
+      // so a shortcut's odds and cost are never the part that is cut.
+      const expanded = entry.focused && focusDetail.length ? focusDetail : null;
       const detailRows = step > 1 && entry.hint ? wrap(entry.hint, innerW - 3) : [];
       let text = `${lead}${entry.label}`;
-      if (entry.hint && !detailRows.length) text += ` · ${entry.hint}`;
+      if (entry.hint && !detailRows.length && !expanded) text += ` · ${entry.hint}`;
       text = clip(text, textW);
-      const extra = detailRows.slice(0, step - 1);
-      if (detailRows.length > extra.length) {
+      const extra = expanded || detailRows.slice(0, step - 1);
+      if (!expanded && detailRows.length > extra.length) {
         extra[extra.length - 1] = clip(`${extra[extra.length - 1]} ${detailRows[extra.length]}`, innerW - 3);
       }
+      const rowH = expanded ? 1 + expanded.length : step;
 
       if (entry.focused) {
-        t.fillRect(x + 1, rowY, w - 2, step, C.accent);
+        t.fillRect(x + 1, rowY, w - 2, rowH, C.accent);
         t.drawText(`> ${text}`, innerX, rowY, C.accentContrast, C.accent);
         if (entry.tag) t.drawText(tagText, x + w - 2 - tagText.length, rowY, C.accentContrast, C.accent);
         extra.forEach((l, i) => t.drawText(l, innerX + 2, rowY + 1 + i, C.accentContrast, C.accent));
@@ -662,12 +695,13 @@ export class GridView {
         t.drawText('  ' + text.slice(2), innerX, rowY, C.text);
         if (entry.key) t.drawText(entry.key, innerX, rowY, C.dim);
         if (entry.tag) {
-          const tone = /SAFE/.test(entry.tag) ? C.ok : /RISKY/.test(entry.tag) ? C.danger : C.warn;
+          const tone = /SAFE/.test(entry.tag) ? C.ok : /RISKY|OFF-BOOK/.test(entry.tag) ? C.danger : C.warn;
           t.drawText(tagText, x + w - 2 - tagText.length, rowY, tone);
         }
         extra.forEach((l, i) => t.drawText(l, innerX + 2, rowY + 1 + i, C.muted));
       }
-      this._regions.push({ x: x + 1, y: rowY, w: w - 2, h: step, label: entry.label, type: 'option', action: entry.click });
+      this._regions.push({ x: x + 1, y: rowY, w: w - 2, h: rowH, label: entry.label, type: 'option', action: entry.click });
+      rowY += rowH;
     });
 
     if (paged) {
