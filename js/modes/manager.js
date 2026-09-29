@@ -413,6 +413,9 @@ async function runOperatingPlan(game) {
     volumeFactor: posture.volumeFactor,
     costPerM3: posture.costPerM3,
     quarterly: { ...posture.quarterly },
+    quarterlyScrutiny: posture.quarterlyScrutiny || 0,
+    quarterlyMorale: posture.quarterlyMorale || 0,
+    deferredSilviculturePerM3: posture.deferredSilviculturePerM3 || 0,
   };
   ui.writeSuccess(`Operating posture set: ${posture.name}. ${woodlands ? `${woodlands.name} takes it to the contractors.` : ''}`);
   ui.write('');
@@ -459,11 +462,17 @@ async function runOperatingPlan(game) {
 
 function describePostureNumbers(posture) {
   const cost = Number(posture.costPerM3) || 0;
-  const quarterly = Object.entries(posture.quarterly || {})
-    .map(([key, delta]) => `${(METRIC_LABELS[key] || key).toLowerCase()} ${delta > 0 ? '+' : ''}${delta}`)
-    .join(', ');
+  const signed = (delta) => `${delta > 0 ? '+' : ''}${delta}`;
+  const quarterly = [
+    ...Object.entries(posture.quarterly || {}).map(([key, delta]) => `${(METRIC_LABELS[key] || key).toLowerCase()} ${signed(delta)}`),
+    posture.quarterlyScrutiny ? `scrutiny ${signed(posture.quarterlyScrutiny)}` : null,
+    posture.quarterlyMorale ? `executive morale ${signed(posture.quarterlyMorale)}` : null,
+  ].filter(Boolean).join(', ');
   const haul = cost ? `logging & haul ${cost > 0 ? '+' : '-'}$${formatRate(Math.abs(cost))}/m³` : 'logging & haul at the contract rate';
-  return `Volume ${Math.round(posture.volumeFactor * 100)}% of plan, ${haul}${quarterly ? `; each quarter ${quarterly}` : ''}.`;
+  const provision = posture.deferredSilviculturePerM3
+    ? ` The deferred silviculture is booked at year end: $${formatRate(posture.deferredSilviculturePerM3)}/m³ delivered.`
+    : '';
+  return `Volume ${Math.round(posture.volumeFactor * 100)}% of plan, ${haul}${quarterly ? `; each quarter ${quarterly}` : ''}.${provision}`;
 }
 
 const REQUIREMENT_LABELS = { compliance: 'compliance', relationships: 'relationships', forestHealth: 'forest health', reputation: 'reputation', progress: 'operations' };
@@ -1120,6 +1129,7 @@ async function endOfManagerDay(game, progressBeforeDay) {
 
   if (journey.day > journey.deadline) {
     runCutControl(ui, journey);
+    bookSilvicultureProvision(ui, journey);
   }
   updateManagerMissionStatus(ui, journey);
 
@@ -1358,16 +1368,50 @@ function runCutControl(ui, journey) {
 }
 
 /**
+ * Year end: a cost-cutting year deferred brushing, surveys and fill-planting
+ * the licence still owes. Basic silviculture is a licensee obligation, so the
+ * auditors book what was deferred as a provision against the year, per m³
+ * delivered: the cash the posture saved partly comes back as a liability.
+ */
+function bookSilvicultureProvision(ui, journey) {
+  const ledger = ensureLedger(journey);
+  if (ledger.silvicultureProvision !== undefined || !journey.ceo) return;
+  const rate = Number(journey.ceo.deferredSilviculturePerM3 ?? getOperatingPosture(journey.ceo.id).deferredSilviculturePerM3) || 0;
+  if (!rate) return;
+  const provision = Math.round(ledger.deliveredYtd * rate);
+  ledger.silvicultureProvision = provision;
+  journey.resources.budget = Math.max(0, journey.resources.budget - provision);
+  adjustMetric(journey, 'forestHealth', -3);
+  const statement = `The auditors book the silviculture the year deferred as a provision: $${provision.toLocaleString()} ($${formatRate(rate)}/m³ on ${Math.round(ledger.deliveredYtd).toLocaleString()} m³). Treasury $${Math.round(journey.resources.budget).toLocaleString()}.`;
+  ui.write('');
+  ui.writeDivider('SILVICULTURE PROVISION');
+  ui.writeWarning(statement);
+  ledger.provisionStatement = statement;
+  journey.log.push({ day: lastLedgerMonth(journey), type: 'provision', summary: `Silviculture provision -$${provision.toLocaleString()}`, detail: statement });
+}
+
+/**
  * The posture's quarterly initiative: what the woodlands team does with it on
  * its own, every third month.
  */
 function applyPostureInitiative(ui, journey) {
   if (!journey.ceo || journey.day % 3 !== 0) return;
-  const quarterly = journey.ceo.quarterly || getOperatingPosture(journey.ceo.id).quarterly || {};
+  const posture = getOperatingPosture(journey.ceo.id);
+  const quarterly = journey.ceo.quarterly || posture.quarterly || {};
   const parts = [];
   for (const [key, delta] of Object.entries(quarterly)) {
     adjustMetric(journey, key, delta);
     parts.push(`${METRIC_LABELS[key] || key} ${delta > 0 ? '+' : ''}${delta}`);
+  }
+  const scrutiny = Number(journey.ceo.quarterlyScrutiny ?? posture.quarterlyScrutiny) || 0;
+  if (scrutiny) {
+    journey.scrutiny = clampPercentValue((journey.scrutiny || 0) + scrutiny);
+    parts.push(`scrutiny ${scrutiny > 0 ? '+' : ''}${scrutiny}`);
+  }
+  const morale = Number(journey.ceo.quarterlyMorale ?? posture.quarterlyMorale) || 0;
+  if (morale) {
+    bumpCrewMorale(journey, morale);
+    parts.push(`executive morale ${morale > 0 ? '+' : ''}${morale}`);
   }
   if (!parts.length) return;
   ui.writeInfo(`${capitalize(journey.ceo.name)} runs the quarter on the ${journey.ceo.posture || 'chosen'} posture: ${parts.join(', ')}.`);
@@ -1462,6 +1506,7 @@ async function runBoardReview(game, monthClosed) {
     ui.write('');
     ui.writeDivider('CUT-CONTROL STATEMENT');
     ui.write(ledger.cutControlStatement);
+    if (ledger.provisionStatement) ui.write(ledger.provisionStatement);
   }
   const reading = readQuarter(journey, baseline, quarterMonths, quarter);
   ui.write('');

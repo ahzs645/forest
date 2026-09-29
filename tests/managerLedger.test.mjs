@@ -199,6 +199,27 @@ test('the posture changes the year: pushing the cut delivers more and thins comp
   assert.ok(results.growth.compliance < results.steady.compliance);
 });
 
+test('each posture says what it costs the file and the team, and the quarter applies it', async () => {
+  const journey = createManagerJourney({ areaId: 'fraser-plateau' });
+  const ui = makeUi((prompt, options) => options.find((o) => o.value === 'lean') || steadyAnswers(prompt, options));
+  await withSeededRandom(3, () => runManagerDay({ ui, journey, gameOver: false, checkpoint() {} }));
+  const hints = Object.fromEntries(ui.prompts.find((entry) => /operating posture/.test(entry.prompt)).options.map((o) => [o.value, o.hint]));
+  assert.match(hints.growth, /each quarter operations \+4, compliance -3, scrutiny \+4, executive morale -2\./);
+  assert.match(hints.lean, /scrutiny \+2, executive morale -3\. The deferred silviculture is booked at year end: \$0\.50\/m³ delivered\./);
+  assert.ok(!/scrutiny|morale|booked/.test(hints.steady));
+
+  // March closes the quarter: the lean posture's initiative lands on the file and the team.
+  journey.day = 3;
+  journey.flags.paceSetMonth = 3;
+  const scrutiny = journey.scrutiny;
+  const morale = journey.crew.map((member) => member.morale);
+  const march = makeUi(steadyAnswers);
+  await withSeededRandom(3, () => runManagerDay({ ui: march, journey, gameOver: false, checkpoint() {} }));
+  assert.ok(march.lines.some((line) => /runs the quarter on the Cost discipline posture: .*scrutiny \+2, executive morale -3\./.test(line)));
+  assert.ok(journey.crew.every((member, index) => member.morale <= morale[index] - 3 || member.morale === 0 || !member.isActive));
+  assert.ok(journey.scrutiny !== scrutiny);
+});
+
 test('cut control at year end reads the delivered volume against the AAC', async () => {
   const cases = [
     { delivered: 212000, expect: /^undercut 8\d\.\d%$/, band: 'undercut', status: 'undercut', victory: true },

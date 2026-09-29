@@ -81,6 +81,7 @@ test('no posture and certificate pair is free: each one gives something up', asy
         compliance: mean(results.map((result) => result.compliance)),
         certified: results.filter((result) => result.certifications.some((entry) => entry.endsWith(':certified'))).length,
         wins: results.filter((result) => result.victory).length,
+        score: mean(results.map((result) => result.score)),
       };
     } finally {
       delete MANAGER_STYLES.__pair;
@@ -101,9 +102,19 @@ test('no posture and certificate pair is free: each one gives something up', asy
   assert.ok(partnershipFsc.certified >= seeds.length - 1, `partnership FSC certified ${partnershipFsc.certified}`);
   // A certificate the year can carry pays for itself.
   assert.ok(steadyCsa.treasury > steadyNone.treasury);
-  for (const result of [steadyCsa, leanCsa, leanFsc, partnershipFsc, steadyNone]) {
+  const growthNone = await pair('growth', 'none');
+  for (const result of [steadyCsa, leanCsa, leanFsc, partnershipFsc, steadyNone, growthNone]) {
     assert.ok(result.wins >= seeds.length - 1);
   }
+
+  // The choice shows in the grade: competent play no longer pads every pair
+  // to 100. Cost discipline is the richer year and the lower grade; pushing
+  // the cut without a certificate is the clearly weaker line.
+  assert.ok(steadyCsa.score >= 98, `steady CSA ${steadyCsa.score}`);
+  assert.ok(leanCsa.score < steadyCsa.score, `lean CSA ${leanCsa.score} vs steady CSA ${steadyCsa.score}`);
+  assert.ok(steadyNone.score < steadyCsa.score);
+  assert.ok(steadyCsa.score - growthNone.score >= 4, `steady CSA ${steadyCsa.score} vs growth none ${growthNone.score}`);
+  assert.ok(growthNone.score >= 85, 'a weaker line is still a winning year');
 });
 
 test('an overcut does not pay: steering Push the cut into the band ends the year richer than riding it to 114%', async () => {
@@ -144,15 +155,16 @@ test('an overcut does not pay: steering Push the cut into the band ends the year
 test('the ledger arithmetic is exact: every printed month reconciles and the treasury closes to the dollar', async () => {
   // A GM who spends nothing and sets every situation aside, so the only money
   // movements are the certificate, the monthly ledgers, the year-end
-  // cut-control penalty and whatever the set-aside situations land. Both a
-  // clean year and an overcut year.
+  // cut-control penalty, a cost-cutting year's silviculture provision and
+  // whatever the set-aside situations land. A clean year, an overcut year
+  // and a cost-discipline year.
   const hands = (posture, pace) => (journey, options, prompt) => {
     if (/operating posture/.test(prompt)) return options.find((o) => o.value === posture);
     if (/Certification/.test(prompt)) return options.find((o) => o.value === 'CSA');
     return options.find((o) => ['hold', 'plan', 'desk', 'rehearse', 'transparent', 'set_aside', pace].includes(o.value))
       || options.find((o) => o.recommended);
   };
-  const cases = [['steady', null], ['growth', 'pace:1']];
+  const cases = [['steady', null], ['growth', 'pace:1'], ['lean', null]];
   for (const [posture, pace] of cases) {
     const lines = [];
     MANAGER_STYLES.__ledger = hands(posture, pace);
@@ -184,7 +196,13 @@ test('the ledger arithmetic is exact: every printed month reconciles and the tre
       .filter((entry) => entry.setAside)
       .reduce((sum, entry) => sum + (Number(entry.effects?.budget) || 0), 0);
     assert.equal(unexplained, deferredSpend, 'every dollar beyond the ledgers is a set-aside charge');
-    assert.equal(journey.resources.budget, treasury - (ledger.overcutPenalty || 0));
+    assert.equal(journey.resources.budget, treasury - (ledger.overcutPenalty || 0) - (ledger.silvicultureProvision || 0));
+    if (posture === 'lean') {
+      assert.equal(ledger.silvicultureProvision, Math.round(ledger.deliveredYtd * 0.5), 'the deferred silviculture is booked');
+      assert.ok(lines.some((line) => line.startsWith(`The auditors book the silviculture the year deferred as a provision: $${ledger.silvicultureProvision.toLocaleString()}`)));
+    } else {
+      assert.equal(ledger.silvicultureProvision, undefined);
+    }
     if (posture === 'growth') {
       assert.ok(ledger.overcutPenalty > 0, 'the overcut year pays its penalty');
       assert.equal(ledger.overcutPenalty, Math.round(ledger.deliveredYtd - ledger.aac * 1.1) * 60);

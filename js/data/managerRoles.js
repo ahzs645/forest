@@ -59,9 +59,16 @@ export const MANAGER_ESSENTIAL_ROLE_IDS = MANAGER_EXECUTIVE_ROLES.map((role) => 
  * against plan, `costPerM3` shifts logging and haul cost, and the quarterly
  * initiative is what the woodlands team does with the posture on its own.
  *
+ * `quarterlyScrutiny` and `quarterlyMorale` are what the posture does to the
+ * file and to the executive team each quarter, and a cost-cutting year's
+ * deferred silviculture is booked as a provision per m³ delivered when the
+ * auditors close the year (`deferredSilviculturePerM3`).
+ *
  * No posture is free: the cheap one thins the file the certification auditors
- * read, the partnership one costs margin, and pushing the cut only pays while
- * the cut schedule keeps the year inside the control band.
+ * read, wears out the executive team fighting the contractors and leaves a
+ * silviculture bill in the year-end statements; the partnership one costs
+ * margin; pushing the cut draws C&E's attention and only pays while the cut
+ * schedule keeps the year inside the control band.
  */
 export const OPERATING_POSTURES = [
   {
@@ -96,6 +103,8 @@ export const OPERATING_POSTURES = [
     volumeFactor: 1.08,
     costPerM3: 2,
     quarterly: { progress: 4, compliance: -3 },
+    quarterlyScrutiny: 4,
+    quarterlyMorale: -2,
   },
   {
     id: 'lean',
@@ -107,6 +116,9 @@ export const OPERATING_POSTURES = [
     volumeFactor: 0.98,
     costPerM3: -2,
     quarterly: { compliance: -3, relationships: -3, progress: -2 },
+    quarterlyScrutiny: 2,
+    quarterlyMorale: -3,
+    deferredSilviculturePerM3: 0.5,
   },
 ];
 
