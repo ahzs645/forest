@@ -232,7 +232,8 @@ const SEVERITY_RANK = { severe: 4, major: 3, moderate: 2, minor: 1, positive: 1 
  * @returns {Array<{day: number, title: string, choice: string, victimName?: string}>}
  */
 export function pickKeyMoments(journey, limit = 3) {
-  const entries = (journey.log || []).filter((e) => e.type === 'event' && e.eventTitle);
+  // A situation set aside is not a moment that mattered; it is one that didn't.
+  const entries = (journey.log || []).filter((e) => e.type === 'event' && e.eventTitle && !e.setAside);
   return entries
     .map((e) => ({
       day: e.day,
@@ -489,7 +490,8 @@ export async function runFinalDebrief(ui, journey, victory) {
   ui.writeDivider('FINAL STATISTICS');
   writeFinalStatistics(ui, journey);
 
-  const moments = pickKeyMoments(journey);
+  // Picked by weight, told in the order they happened.
+  const moments = pickKeyMoments(journey).sort((a, b) => a.day - b.day);
   if (moments.length) {
     ui.write('');
     ui.writeDivider('MOMENTS THAT MATTERED');
@@ -567,7 +569,8 @@ export async function runFinalDebrief(ui, journey, victory) {
   ui.clear();
   ui.writeDivider('SERVICE RECORD');
   ui.write('');
-  if (updated.isBest) {
+  // A failing grade is not a best worth announcing, even on a first run.
+  if (updated.isBest && scoreResult.grade !== 'F') {
     ui.writePositive(`New personal best for ${ROLE_LABELS[journey.journeyType] || journey.journeyType}!`);
     ui.write('');
   }
