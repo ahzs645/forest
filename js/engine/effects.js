@@ -6,11 +6,10 @@ import {
 import {
   BUDGET_ATTRITION_THRESHOLD,
   COMPLIANCE_AUDIT_THRESHOLD,
-  DEFAULT_CPD_TARGET,
   RELATIONSHIP_TRUST_THRESHOLD,
 } from "./constants.js";
 import { buildScheduledIssueTeaser, combineScheduledIssueTeasers } from "./content.js";
-import { ensureProfessionalComplianceState } from "./professional.js";
+import { ensureProfessionalComplianceState, getCpdShortfall } from "./professional.js";
 import {
   applyDiminishingReturns,
   clamp,
@@ -139,7 +138,12 @@ export const ROUND_CONSEQUENCE_FLAGS = Object.freeze([
   "contractorAttritionActive",
   "auditEscalationActive",
   "budgetEmergencyScheduled",
+  "cpdBehind",
 ]);
+
+// Hours behind the prorated FPBC year before the CPD log becomes a card
+// ("cpd-log-behind" in js/data/issues.js).
+const CPD_CARD_GAP = 6;
 
 export function applyRoundConsequences(state) {
   if (!state?.metrics || !state?.flags) {
@@ -233,15 +237,27 @@ export function applyRoundConsequences(state) {
     const complianceLow = metrics.compliance < COMPLIANCE_AUDIT_THRESHOLD;
     // CPD is a year-long target: judge the log against the share of the year
     // that has passed, not the full 30 hours from the first season.
-    const yearShare = Math.min(1, Math.max(0, round) / Math.max(1, Number(state.totalRounds) || 4));
-    const cpdExpected = (professional.cpdTarget || DEFAULT_CPD_TARGET) * yearShare;
-    const cpdGap = Math.max(0, Math.round(cpdExpected - professional.cpdHours));
+    const cpdGap = getCpdShortfall(state, round).gap;
 
     if (cpdGap > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk + 1 + Math.floor(cpdGap / 15), 0, 100);
       professional.auditExposure = clamp(professional.auditExposure + 1, 0, 100);
     } else if (professional.competenceRisk > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk - 1, 0, 100);
+    }
+    // The practice-burden card that logs CPD is an assignment the desk roles'
+    // paperwork chains always outrank, so a planner or permitter could never
+    // close the gap this charges for. A log far enough behind puts its own
+    // card on the desk: the first time in a year it lands next season, and
+    // while the log stays behind it can come back.
+    if (cpdGap >= CPD_CARD_GAP) {
+      flags.cpdBehind = true;
+      if (!flags.cpdReminderSent) {
+        flags.cpdReminderSent = true;
+        scheduleIssueEntries(state, { id: "cpd-log-behind", delay: 1 });
+      }
+    } else {
+      delete flags.cpdBehind;
     }
 
     // Seasonal play barely touched the professional state, so its two

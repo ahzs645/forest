@@ -1386,6 +1386,51 @@ export const ISSUE_LIBRARY = [
       },
     ],
   },
+  // The CPD log gets its own card once it falls well behind the share of the
+  // FPBC year that has passed (flag set by js/engine/effects.js). A desk
+  // year's professional assignments are its paperwork chains, which log no
+  // CPD, so before this a planner or permitter could never close the gap
+  // each season charges competence risk for.
+  {
+    id: "cpd-log-behind",
+    title: "CPD Log Behind the FPBC Year",
+    description:
+      "Your continuing professional development log is well behind where it should be at this point in the FPBC reporting year, and the year closes with the calendar.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    areaTags: ["bc-wide"],
+    // A log this far behind is the season's own paperwork, not a long shot.
+    baseWeight: 3,
+    priorityFlag: "cpdBehind",
+    requiresAnyFlags: ["cpdBehind"],
+    context: {
+      operation: "The FPBC reporting year asks for 30 hours of continuing professional development, and the log is short.",
+      objective: "Get real hours on the log without letting the season's work slide.",
+      stakes: "Every season the log stays behind adds to your competence risk, and a thin log is the first thing a practice review asks for.",
+    },
+    options: [
+      {
+        label: "Book the courses and log the hours",
+        outcome:
+          "Two days of structured learning, a riparian assessment refresher and a FRPA case-law session, go into the log: 15 CPD hours.",
+        effects: { progress: -2, compliance: 2, budget: -1 },
+        assignmentSideEffects: { professionalShift: { cpdHours: 15 } },
+        clearFlags: ["cpdBehind"],
+      },
+      {
+        label: "Log what fits around the work",
+        outcome:
+          "A webinar and a district field tour fit around the file and go into the log: 8 CPD hours. Closer, not closed.",
+        effects: { progress: -1, compliance: 1 },
+        assignmentSideEffects: { professionalShift: { cpdHours: 8 } },
+        clearFlags: ["cpdBehind"],
+      },
+      {
+        label: "Leave the log for next year",
+        outcome: "The work gets the time. The gap stays on your FPBC record, where a practice review looks first.",
+        effects: { progress: 1, compliance: -1 },
+      },
+    ],
+  },
   {
     id: "fsp-comment-surge",
     title: "FSP Comment Surge",
