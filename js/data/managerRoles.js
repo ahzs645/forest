@@ -58,6 +58,10 @@ export const MANAGER_ESSENTIAL_ROLE_IDS = MANAGER_EXECUTIVE_ROLES.map((role) => 
  * Operating postures for the year. `volumeFactor` scales delivered volume
  * against plan, `costPerM3` shifts logging and haul cost, and the quarterly
  * initiative is what the woodlands team does with the posture on its own.
+ *
+ * No posture is free: the cheap one thins the file the certification auditors
+ * read, the partnership one costs margin, and pushing the cut only pays while
+ * the cut schedule keeps the year inside the control band.
  */
 export const OPERATING_POSTURES = [
   {
@@ -67,9 +71,9 @@ export const OPERATING_POSTURES = [
     decision_making_style: 'conservative',
     strengths: ['Cut control on the number', 'Audit-ready file', 'Predictable cash'],
     weaknesses: ['Leaves margin on the table', 'Slow to chase a price run'],
-    volumeFactor: 0.97,
+    volumeFactor: 1,
     costPerM3: 0,
-    quarterly: { compliance: 5 },
+    quarterly: { compliance: 3 },
   },
   {
     id: 'relationship',
@@ -78,9 +82,9 @@ export const OPERATING_POSTURES = [
     decision_making_style: 'relationship-focused',
     strengths: ['Referrals move', 'Community standing', 'Fewer surprises at the FOM stage'],
     weaknesses: ['Some blocks wait', 'Costs a little per m³'],
-    volumeFactor: 0.96,
-    costPerM3: 1.5,
-    quarterly: { relationships: 5 },
+    volumeFactor: 0.97,
+    costPerM3: 1,
+    quarterly: { relationships: 5, forestHealth: 2 },
   },
   {
     id: 'growth',
@@ -101,11 +105,81 @@ export const OPERATING_POSTURES = [
     strengths: ['Lowest cost per m³', 'Cash cushion'],
     weaknesses: ['Contractors push back', 'HSE and silviculture obligations get thin'],
     volumeFactor: 0.98,
-    costPerM3: -3,
-    quarterly: { compliance: -2, relationships: -2 },
+    costPerM3: -2,
+    quarterly: { compliance: -3, relationships: -3, progress: -2 },
   },
 ];
 
 export function getOperatingPosture(id) {
   return OPERATING_POSTURES.find((posture) => posture.id === id) || OPERATING_POSTURES[0];
+}
+
+/**
+ * Cut control for the operating year, as a share of the AAC. Inside the band
+ * the statement goes in clean. Between the band and the limit it goes in with
+ * a finding: an undercut loses the volume, an overcut draws a C&E penalty on
+ * every m³ past the ceiling at a rate that takes back more than the wood
+ * earned. Past the limit the board ends the GM's term.
+ */
+export const CUT_CONTROL = {
+  bandLow: 0.9,
+  bandHigh: 1.1,
+  limitLow: 0.85,
+  limitHigh: 1.15,
+  overcutPenaltyPerM3: 60,
+};
+
+/**
+ * @param {number} ratio - delivered volume over the AAC
+ * @returns {'in_band'|'undercut'|'overcut'|'severe_undercut'|'severe_overcut'}
+ */
+export function classifyCutControl(ratio) {
+  if (!Number.isFinite(ratio)) return 'in_band';
+  if (ratio < CUT_CONTROL.limitLow) return 'severe_undercut';
+  if (ratio < CUT_CONTROL.bandLow) return 'undercut';
+  if (ratio > CUT_CONTROL.limitHigh) return 'severe_overcut';
+  if (ratio > CUT_CONTROL.bandHigh) return 'overcut';
+  return 'in_band';
+}
+
+/** A cut-control ratio as the statement prints it: one decimal, so 110.3% never reads as 110%. */
+export function formatCutPercent(ratio) {
+  return `${(Math.round(ratio * 1000) / 10).toFixed(1)}%`;
+}
+
+/**
+ * The cut schedule the woodlands manager runs between reviews: the in-year
+ * lever on cut control. Parking a side pays the contractor standby; a second
+ * shift pays overtime and night haul on every m³.
+ */
+export const HARVEST_PACES = [
+  {
+    id: 'pace:0.85',
+    factor: 0.85,
+    name: 'Park a side',
+    summary: 'One logging side goes on standby',
+    standbyPerMonth: 12000,
+    costPerM3: 0,
+  },
+  {
+    id: 'pace:1',
+    factor: 1,
+    name: 'Hold the schedule',
+    summary: 'Every side keeps logging the plan',
+    standbyPerMonth: 0,
+    costPerM3: 0,
+  },
+  {
+    id: 'pace:1.1',
+    factor: 1.1,
+    name: 'Add a shift',
+    summary: 'A second shift on the processors and night haul to the mill',
+    standbyPerMonth: 0,
+    costPerM3: 1.5,
+  },
+];
+
+export function getHarvestPace(idOrFactor) {
+  return HARVEST_PACES.find((pace) => pace.id === idOrFactor || pace.factor === Number(idOrFactor))
+    || HARVEST_PACES[1];
 }

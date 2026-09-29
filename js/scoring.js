@@ -58,7 +58,7 @@ export function calculateScore(journey, victory) {
       components.crewWelfare = scoreCrewWelfare(journey);
       components.resourceEfficiency = scoreManagerResources(journey);
       components.objectives = scoreManagerObjectives(journey, victory);
-      components.compliance = scoreSituationsClosedClean(journey);
+      components.compliance = scoreManagerCompliance(journey);
       break;
   }
 
@@ -329,12 +329,16 @@ function scoreSilvicultureResources(journey) {
   };
 }
 
+
+// The treasury against the one the year opened with: a GM who ends the year
+// where they started is average, half again is full marks, half gone is none.
 function scoreManagerResources(journey) {
   const r = journey.resources || {};
   let score = 50;
 
-  const budgetPct = (r.budget || 0) / 500000;
-  score += scoreSweetSpot(budgetPct) * 25;
+  const start = Number(journey.ledger?.startTreasury) || 850000;
+  const ratio = (r.budget || 0) / start;
+  score += Math.max(-25, Math.min(25, Math.round((ratio - 1) * 50)));
 
   const polCapPct = (r.politicalCapital || 0) / 100;
   score += scoreSweetSpot(polCapPct) * 15;
@@ -407,19 +411,48 @@ function scorePermittingObjectives(journey, victory) {
   return { score, label: `${permits.approved}/${permits.target} approved` };
 }
 
+// Cut control is the GM's statutory objective: the band is worth a quarter
+// of the objectives score, a finding a third of that, and a year that broke
+// the limit nothing. Only a certificate the auditors actually issued counts;
+// one that was withdrawn or suspended costs.
+const MANAGER_CUT_POINTS = { in_band: 25, undercut: 8, overcut: 8, severe_undercut: 0, severe_overcut: 0 };
+
 function scoreManagerObjectives(journey, victory) {
-  let score = victory ? 55 : 10;
+  let score = victory ? 45 : 10;
   const reputation = journey.metrics?.reputation ?? 50;
-  score += Math.round((reputation / 100) * 25);
-  score += Math.min(20, (journey.certifications?.length || 0) * 10);
-  score = Math.min(100, score);
-  const certLabel = journey.certifications?.length
-    ? `, ${journey.certifications.length} certification${journey.certifications.length > 1 ? 's' : ''}`
+  score += Math.round((reputation / 100) * 20);
+  const ledger = journey.ledger || {};
+  const cutStatus = ledger.cutControlStatus;
+  score += MANAGER_CUT_POINTS[cutStatus] ?? 0;
+  const certs = journey.certifications || [];
+  const certified = certs.filter((cert) => (cert.status || 'certified') === 'certified');
+  const lost = certs.filter((cert) => ['withdrawn', 'suspended'].includes(cert.status));
+  score += certified.length ? 10 : 0;
+  score -= lost.length * 5;
+  score = Math.max(0, Math.min(100, score));
+  const cutLabel = ledger.cutControl ? `, cut ${ledger.cutControl}` : '';
+  const certLabel = certs.length
+    ? `, ${certs.map((cert) => `${cert.id || cert.name} ${cert.status || 'certified'}`).join(', ')}`
     : '';
-  return { score, label: `Reputation ${Math.round(reputation)}%${certLabel}` };
+  return { score, label: `Reputation ${Math.round(reputation)}%${cutLabel}${certLabel}` };
 }
 
 // --- Compliance Scoring ---
+
+/**
+ * A GM answers for the licensee's file, not only the situations that crossed
+ * the desk: half the component is the compliance meter the auditors and C&E
+ * read, so a clean-looking run of decisions over a caught offence and an
+ * overcut cannot score near the top.
+ */
+function scoreManagerCompliance(journey) {
+  const situations = scoreSituationsClosedClean(journey);
+  const meter = Math.round(Math.max(0, Math.min(100, journey.metrics?.compliance ?? 50)));
+  return {
+    score: Math.round((situations.score + meter) / 2),
+    label: `${situations.label}; compliance ${meter}%`,
+  };
+}
 
 /**
  * A situation is "closed clean" when the way it was handled cost no

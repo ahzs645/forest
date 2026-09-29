@@ -114,3 +114,12 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Deficiency letters:** fast-track is decided that night with a higher chance of return. A cleanly answered gap is never the next letter on the same file. A district meeting decides only its own file.
 - **Scoring and debrief:** an undelivered file earns no Time, and its unspent budget is scaled by work done. Resources use the run's own starting budget. Desk roles score the protagonist's wellbeing instead of a flat 50. A failed plan is handed over, not sealed.
 - **Sims:** `node scripts/simulate-expeditions.mjs --role planning --area all --compare` (also for `permitting`). Competent play grades about 98–100; reckless play grades 38–65 in every area. Competent planning still cannot win the three southern areas until they have planning block data.
+## 2026-09-29 — General Manager (playtest #12)
+
+- **Cut control decides the year.** 90–110% of the AAC is clean; outside it the year wins with a finding (and a qualified victory text); below 85% or above 115% the board ends the term. The overcut penalty ($60/m³ past 110%) now exceeds any margin. Objectives score reads the statement; the compliance component blends in the compliance meter.
+- **Legible and steerable.** The projection follows the seasonal curve and the current run rate. A cut schedule (park a side / hold / add a shift) is set at each board review and raised by the woodlands manager whenever the projection leaves the band.
+- **Nothing is wiped unread.** A Continue prompt holds quarter-end ledgers and the cut-control statement before the board review; the review reprints them; every ledger, audit and the statement go into the Log.
+- **Honesty is viable.** Transparent reports of weak quarters cost no reputation and ease scrutiny; spun weak quarters risk a year-end restatement.
+- **Certification is earned.** May registration audit against stated requirements, one October re-audit, October surveillance with suspension; premium and bonus start at issue.
+- **Executive team and calendar.** The Expedition GM gets the CFO/woodlands/chief forester/IR/HSE team; the month drives the season so seasonal cards are gated; no CEO references.
+- **Economy.** Stumpage tracks the log price, overhead $270k scaled by difficulty, January is a ledger month. `node scripts/simulate-manager.mjs` (40 seeds, normal): competent 40/40, honest 40/40, spin 40/40 at a lower grade, reckless 3/40 (overcut), random 34/40 and no Greenhorn bankruptcies.

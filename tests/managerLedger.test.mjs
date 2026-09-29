@@ -47,7 +47,7 @@ function makeUi(answer) {
 }
 
 const steadyAnswers = (prompt, options) => {
-  for (const want of ['steady', 'none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', 'set_aside']) {
+  for (const want of ['steady', 'none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', 'set_aside', 'pace:1']) {
     const found = options.find((o) => o.value === want);
     if (found) return found;
   }
@@ -85,7 +85,8 @@ test('month 1 sets the operating plan with the woodlands team instead of hiring 
     assert.ok(posturePrompt);
     assert.deepEqual(posturePrompt.options.map((o) => o.value), OPERATING_POSTURES.map((posture) => posture.id));
     assert.ok(!ui.lines.some((line) => /corner office|Select a CEO|Hired/.test(line)));
-    assert.ok(ui.lines.some((line) => /AAC 240,000 m³ · plan 20,000 m³\/month · log price \$105\/m³ · stumpage \$27 · logging & haul \$62/.test(line)));
+    assert.ok(ui.lines.some((line) => /AAC 240,000 m³ · plan 20,000 m³\/month · log price \$105\/m³ · stumpage \$27 \(tracks the market\) · logging & haul \$62/.test(line)));
+    assert.ok(ui.lines.some((line) => /Cut control is judged in December: 90-110% of the AAC goes in clean/.test(line)), 'the thresholds are on the table before the year starts');
     const woodlands = journey.crew.find((member) => member.role === 'woodlands');
     assert.equal(journey.ceo.name, woodlands.name, 'the posture is carried by the woodlands manager for the debrief');
     assert.equal(journey.ceo.decision_making_style, 'conservative');
@@ -104,14 +105,15 @@ test('every month closes with a ledger: volume, margin, overhead, net, treasury'
     const { outcome, lines } = await runYear(journey);
     assert.equal(outcome.victory, true, JSON.stringify(outcome));
     const ledgerLines = lines.filter((line) => /^Delivered: [\d,]+ m³ \(plan [\d,]+.*year to date [\d,]+ \/ 240,000 m³ AAC\)$/.test(line));
-    assert.equal(ledgerLines.length, 11, 'February through December');
-    assert.ok(lines.some((line) => /^Log price \$\d+ - stumpage \$27 - logging & haul \$62 = \$-?\d+\/m³ margin -> [+-]\$[\d,]+$/.test(line)));
-    assert.ok(lines.some((line) => /^Overhead -\$290,000$/.test(line)));
+    assert.equal(ledgerLines.length, 12, 'January (the carry-in) through December');
+    assert.ok(lines.some((line) => /^Log price \$105 - stumpage \$27 - logging & haul \$62 = \$16\/m³ margin -> \+\$376,320$/.test(line)), 'January at the opening price');
+    assert.ok(lines.some((line) => /^Log price \$\d+ - stumpage \$\d+ - logging & haul \$62 = \$-?\d+\/m³ margin -> [+-]\$[\d,]+$/.test(line)));
+    assert.ok(lines.some((line) => /^Overhead -\$270,000$/.test(line)));
     assert.ok(lines.some((line) => /^Net [+-]\$[\d,]+ -> treasury \$[\d,]+$/.test(line)));
-    assert.equal(journey.ledger.months.length, 11);
+    assert.equal(journey.ledger.months.length, 12);
     const delivered = journey.ledger.months.reduce((sum, entry) => sum + entry.delivered, 0);
-    assert.ok(journey.ledger.deliveredYtd > delivered, 'January is on the statement too');
-    assert.ok(/^(within band|undercut|overcut) \d+%$/.test(journey.ledger.cutControl), journey.ledger.cutControl);
+    assert.equal(journey.ledger.deliveredYtd, delivered, 'January is a ledger month like the rest');
+    assert.ok(/^(within band|undercut|overcut) \d+\.\d%$/.test(journey.ledger.cutControl), journey.ledger.cutControl);
     assert.ok(lines.some((line) => /CUT-CONTROL STATEMENT/.test(line)));
     assert.notEqual(journey.metrics.budget, 50, 'budget health tracks the treasury');
     assert.ok(!lines.some((line) => /Corporate overhead: -\$4,000/.test(line)));
@@ -153,11 +155,13 @@ test('the posture changes the year: pushing the cut delivers more and thins comp
 
 test('cut control at year end reads the delivered volume against the AAC', async () => {
   const cases = [
-    { delivered: 200000, expect: /^undercut 8\d%$/, band: 'undercut' },
-    { delivered: 236000, expect: /^within band (9\d|10\d)%$/, band: 'within' },
-    { delivered: 285000, expect: /^overcut 1[12]\d%$/, band: 'overcut' },
+    { delivered: 212000, expect: /^undercut 8\d\.\d%$/, band: 'undercut', status: 'undercut', victory: true },
+    { delivered: 200000, expect: /^undercut 8\d\.\d%$/, band: 'undercut', status: 'severe_undercut', victory: false },
+    { delivered: 236000, expect: /^within band (9\d|10\d)\.\d%$/, band: 'within', status: 'in_band', victory: true },
+    { delivered: 270000, expect: /^overcut 11\d\.\d%$/, band: 'overcut', status: 'overcut', victory: true },
+    { delivered: 285000, expect: /^overcut 11\d\.\d%$/, band: 'overcut', status: 'severe_overcut', victory: false },
   ];
-  for (const { delivered, expect, band } of cases) {
+  for (const { delivered, expect, band, status, victory } of cases) {
     const journey = createManagerJourney({ areaId: 'fraser-plateau' });
     journey.flags.managerInitComplete = true;
     journey.ceo = { id: 'steady', name: 'x', decision_making_style: 'conservative', posture: 'Steady delivery', volumeFactor: 1, costPerM3: 0, quarterly: {} };
@@ -175,16 +179,20 @@ test('cut control at year end reads the delivered volume against the AAC', async
       Math.random = originalRandom;
     }
     assert.match(journey.ledger.cutControl, expect);
+    assert.equal(journey.ledger.cutControlStatus, status);
     if (band === 'overcut') {
       assert.ok(journey.metrics.compliance < compliance, 'an overcut is a C&E file');
-      assert.ok(ui.lines.some((line) => /C&E opens a file; the penalty on [\d,]+ m³ is \$[\d,]+/.test(line)));
+      assert.ok(ui.lines.some((line) => /C&E opens a file; the penalty on [\d,]+ m³ is \$[\d,]+ at \$60\/m³/.test(line)));
     } else if (band === 'undercut') {
       assert.ok(journey.resources.politicalCapital < politicalCapital + 5, 'the board reads an undercut as margin left in the bush');
       assert.ok(ui.lines.some((line) => /Undercut: [\d,]+ of 240,000 m³/.test(line)));
     } else {
-      assert.ok(ui.lines.some((line) => /inside the band\. The statement goes to the District Manager without a covering letter/.test(line)));
+      assert.ok(ui.lines.some((line) => /inside the 90-110% band\. The statement goes to the District Manager without a covering letter/.test(line)));
     }
-    assert.equal(checkEndConditions(journey)?.victory, true);
+    const end = checkEndConditions(journey);
+    assert.equal(Boolean(end?.victory), victory, `${status}: ${JSON.stringify(end)}`);
+    if (victory && status !== 'in_band') assert.match(end.reason, /goes in with a finding/);
+    if (!victory) assert.match(end.reason, /AAC/);
   }
 });
 
