@@ -296,3 +296,33 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Campaign review.** A failed season no longer reads "the crew was still delivering" or "production stayed high".
 - **Browser suite.** The campaign spec's bot looped on the new release confirmation, picking "Choose another method — Back to…" every time, and never reached recon travel. Travel itself was fine: it stops at its named destination and says so. A rounding flake (about 1 run in 100) in the 7.5 km arrival-snap unit test is fixed.
 - **Checks.** `npm test` 837/837, Playwright 142/142. Gates: recon, planning, permitting, silviculture and GM 8/8 in every area (72/72 each); silviculture 24/24 at full length; every role 8/8 at campaign scale; GM honest 30/30 on normal. `sim:seasonal` is unchanged from the merge base. `simulate-campaign` good play: 7 Outstanding, 28 Solid, 1 Mixed of 36. The silviculture "release 99% of 260 ha" loss did not reproduce at this head: 270/270 across 9 areas × 30 seeds, and 162/162 in the policy sim.
+
+## 2026-09-29 — Wave 3: recon residuals (W3-F1)
+
+- **Shop.** A part-load "Full restock" is billed its share of the $700 bundle, not full price, and leaves the shelf when fewer than two of its lines would land. Rows keep their number for the whole visit; an item that stops fitting or that the card can no longer cover stays in place, disabled with the reason.
+- **Storm follow-up.** A card that is weather (`arrivesAsWeather: "storm"`, `js/events/scheduled.js`) sets the day's sky, so "Major Storm Hits" grounds the shift and its options read "storm holds the crew in camp". The warning that schedules it is traverse-only. Sudden Storm stays out of winter. Day 1 rolls the role's season, and a summer pass no longer freezes.
+- **Cards fit the stop.** Layout cards (the Elder's CMTs, old ribbon, eagle nest, unmapped creek, survey pins and others) carry `needsOpenPackage` and fit only a cutblock whose package is open. At the last stop, a card's next-leg km and delay come off (`fitEventToRemainingRoute`), and road-ahead cards (`needsNextLeg`) are not dealt. "Send out your sick crew member" is not offered when nobody is sick.
+- **Gambles.** An option with odds names its bad band on the chip ("if it goes wrong: -100 L fuel, -14% equip, -$300"). A hidden outcome names the money it can cost.
+- **Grade.** Recon Time is measured against the clean run. Crew welfare starts at 100 and takes off evacuations, quits, logged injuries and wear. A crew that drove out when the food ran out counts as gone. An undelivered season is capped: F under half its packages, D otherwise. Results:
+  - Careful 25-shift Tahltan fixture: A 99 → 91.
+  - Flawless: 100.
+  - Idle starve-out: D 50 → F.
+  - `sim:expeditions --role recon --area all --difficulty all --compare --runs 12` (new flags), mean grade before → after:
+
+    | Policy | Easy | Normal | Hard |
+    | --- | --- | --- | --- |
+    | careful | 95 → 93 | 90 → 90 | 78 → 74 |
+    | competent | 85 → 83 | 84 → 81 | 80 → 76 |
+    | idle | 30 → 26 | 31 → 25 | 29 → 26 |
+
+  - Competent hard wins at 24 runs: 199/216 → 202/216.
+- **Epilogues.** Lines come from each member's role, condition and the attendant's call count, and no two crew get the same line. A walked-off crew gets walk-off lines.
+- **Road.** The old spur around a slide is the day's slow leg; before, it covered nothing and also slowed the next leg. "Turn back and report" slows the reopened leg by a quarter, not three quarters.
+- **Copy.**
+  - A road leg is "Covered N km of road".
+  - A hungry stand-down is not recovery, and fog is not a "good road".
+  - Bridge and culvert gauges have their own lines.
+  - Endings say how many shifts were left instead of "as summer settled in".
+  - CMTs are not redcedar in the north, and the fuel dump drains to waste drums.
+  - A fistfight is an incident report.
+  - Assorted title and duration contradictions are fixed.
