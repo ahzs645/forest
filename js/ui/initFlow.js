@@ -204,7 +204,7 @@ export const InitFlowMixin = {
    * @private
    */
   async _showLoadDataModal() {
-    const [{ loadCampaign, CAMPAIGN_SEASONS }, { peekSeasonalSave }] = await Promise.all([
+    const [{ loadCampaign, describeCampaignProgress }, { peekSeasonalSave }] = await Promise.all([
       import('../game/campaign.js'),
       import('../../tui/controller.js'),
     ]);
@@ -245,11 +245,9 @@ export const InitFlowMixin = {
       });
     }
     if (campaign) {
-      const seasonLabel = CAMPAIGN_SEASONS[campaign.seasonIndex]?.label || 'In progress';
       entries.push({
         label: 'Resume Campaign',
-        detail: `${campaign.crewName || 'Your crew'} — ${seasonLabel} `
-          + `(season ${Math.min(campaign.seasonIndex + 1, CAMPAIGN_SEASONS.length)} of ${CAMPAIGN_SEASONS.length}), `
+        detail: `${campaign.crewName || 'Your crew'} — ${describeCampaignProgress(campaign)}, `
           + `${campaign.areaName || 'the district'}`,
         onSelect: () => routeTo({ action: 'campaign' }),
       });

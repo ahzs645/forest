@@ -1249,6 +1249,8 @@ function applyFieldHardships(journey, resourceStatus, messages) {
   // the season.
   const starving = journey.resources.food <= 0;
   pressure.hungryDays = starving ? Number(pressure.hungryDays || 0) + 1 : 0;
+  // The season total, for the campaign review: a box left empty is not thrift.
+  if (starving) pressure.hungryShifts = Number(pressure.hungryShifts || 0) + 1;
   if (starving) {
     const days = pressure.hungryDays;
     const healthLoss = Math.min(14, 4 + days * 2);
