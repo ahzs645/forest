@@ -6,11 +6,10 @@ import {
 import {
   BUDGET_ATTRITION_THRESHOLD,
   COMPLIANCE_AUDIT_THRESHOLD,
-  DEFAULT_CPD_TARGET,
   RELATIONSHIP_TRUST_THRESHOLD,
 } from "./constants.js";
 import { buildScheduledIssueTeaser, combineScheduledIssueTeasers, describePromisedFallout } from "./content.js";
-import { ensureProfessionalComplianceState } from "./professional.js";
+import { ensureProfessionalComplianceState, getCpdShortfall } from "./professional.js";
 import {
   applyDiminishingReturns,
   clamp,
@@ -176,6 +175,9 @@ function settleUnlandedFallout(state, round) {
 // program run on all fronts (see applyRoundRecoveries).
 const STEADY_PROGRAM_SPREAD = 30;
 
+// The meters the tier floors read as the file's standing.
+const STANDING_METERS = ["relationships", "compliance", "forestHealth"];
+
 // Flags the end-of-season pass sets, for the content lint's reachability check.
 export const ROUND_CONSEQUENCE_FLAGS = Object.freeze([
   "lowBudgetStreak",
@@ -184,7 +186,12 @@ export const ROUND_CONSEQUENCE_FLAGS = Object.freeze([
   "contractorAttritionActive",
   "auditEscalationActive",
   "budgetEmergencyScheduled",
+  "cpdBehind",
 ]);
+
+// Hours behind the prorated FPBC year before the CPD log becomes a card
+// ("cpd-log-behind" in js/data/issues.js).
+const CPD_CARD_GAP = 6;
 
 export function applyRoundConsequences(state) {
   if (!state?.metrics || !state?.flags) {
@@ -278,15 +285,27 @@ export function applyRoundConsequences(state) {
     const complianceLow = metrics.compliance < COMPLIANCE_AUDIT_THRESHOLD;
     // CPD is a year-long target: judge the log against the share of the year
     // that has passed, not the full 30 hours from the first season.
-    const yearShare = Math.min(1, Math.max(0, round) / Math.max(1, Number(state.totalRounds) || 4));
-    const cpdExpected = (professional.cpdTarget || DEFAULT_CPD_TARGET) * yearShare;
-    const cpdGap = Math.max(0, Math.round(cpdExpected - professional.cpdHours));
+    const cpdGap = getCpdShortfall(state, round).gap;
 
     if (cpdGap > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk + 1 + Math.floor(cpdGap / 15), 0, 100);
       professional.auditExposure = clamp(professional.auditExposure + 1, 0, 100);
     } else if (professional.competenceRisk > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk - 1, 0, 100);
+    }
+    // The practice-burden card that logs CPD is an assignment the desk roles'
+    // paperwork chains always outrank, so a planner or permitter could never
+    // close the gap this charges for. A log far enough behind puts its own
+    // card on the desk: the first time in a year it lands next season, and
+    // while the log stays behind it can come back.
+    if (cpdGap >= CPD_CARD_GAP) {
+      flags.cpdBehind = true;
+      if (!flags.cpdReminderSent) {
+        flags.cpdReminderSent = true;
+        scheduleIssueEntries(state, { id: "cpd-log-behind", delay: 1 });
+      }
+    } else {
+      delete flags.cpdBehind;
     }
 
     // Seasonal play barely touched the professional state, so its two
@@ -499,12 +518,14 @@ function applyRoundRecoveries(state, round, consequences) {
   // Steady program: the dividends above pay a file that piles up compliance
   // and trust, which made turtling the dominant line. A program that kept
   // every meter in play earns its own return: the weakest meter gets room to
-  // recover. Paid only in a season no dividend already rewarded.
+  // recover. Paid only in a season no dividend already rewarded, and from a
+  // weakest meter of 35 up: a middling year with one thin meter is the file
+  // this is for.
   if (round >= 2 && consequences.length === firedBefore) {
     const values = Object.values(metrics).map((value) => Number(value) || 0);
     const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
     const spread = Math.max(...values) - Math.min(...values);
-    if (weakest && Number(weakest[1]) >= 40 && Number(weakest[1]) < 60 && spread <= STEADY_PROGRAM_SPREAD) {
+    if (weakest && Number(weakest[1]) >= 35 && Number(weakest[1]) < 60 && spread <= STEADY_PROGRAM_SPREAD) {
       applyEffects(
         state,
         { [weakest[0]]: 3 },
@@ -520,14 +541,22 @@ function applyRoundRecoveries(state, round, consequences) {
     }
   }
 
-  // Comeback window: late in the year a single collapsing meter gets a modest
-  // rebound — but only if the overall file is still salvageable, so one rough
-  // stretch doesn't doom an otherwise competent run.
-  if (round >= 3) {
+  // Comeback window: a single collapsing meter gets a modest rebound — but
+  // only if the overall file is still salvageable, so one rough stretch
+  // doesn't doom an otherwise competent run. Standing (relationships,
+  // compliance, forest health) can be repaired from the second season, once it
+  // slips toward the Mixed floors and before it sinks under the trust and
+  // audit lines and compounds; any other meter waits for the back half of the
+  // year. The schedule and the budget keep the later, lower line, so a turtled
+  // file is not refunded.
+  if (round >= 2) {
     const values = Object.values(metrics).map((value) => Number(value) || 0);
     const average = values.reduce((sum, value) => sum + value, 0) / (values.length || 1);
-    const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
-    if (weakest && Number(weakest[1]) < 35 && average >= 42) {
+    const byValue = Object.entries(metrics).sort((a, b) => a[1] - b[1]);
+    const standing = byValue.find(([key, value]) => STANDING_METERS.includes(key) && Number(value) < 43);
+    const late = round >= 3 && Number(byValue[0]?.[1]) < 35 ? byValue[0] : null;
+    const weakest = standing || late;
+    if (weakest && average >= 42) {
       applyEffects(
         state,
         { [weakest[0]]: 5 },

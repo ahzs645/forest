@@ -1146,25 +1146,6 @@ export function executeFieldAction(journey, paceId) {
 }
 
 /**
- * What a field season's money actually bought, for anything that scores its
- * thrift (the campaign's Budget line, js/game/campaign.js). Cash a shortcut
- * paid out is not a saving, and an allowance left unspent because the crew
- * went hungry or walked off was paid for by the crew, not by good management.
- * @param {Object} journey
- * @returns {{illicitCash: number, hungryShifts: number, quits: number}}
- */
-export function getFieldThriftContext(journey) {
-  const illicitCash = (journey?.log || [])
-    .filter((entry) => entry?.type === 'event' && /^temptation_/.test(String(entry.eventId || '')))
-    .reduce((sum, entry) => sum + Math.max(0, Number(entry.effects?.budget) || 0), 0);
-  return {
-    illicitCash,
-    hungryShifts: Number(journey?.resourcePressure?.hungryShiftsTotal || 0),
-    quits: (journey?.crew || []).filter((member) => member?.hasQuit).length,
-  };
-}
-
-/**
  * Advance the calendar to the next shift.
  *
  * This is intentionally separate from {@link executeFieldAction}: in the recon
@@ -1283,8 +1264,8 @@ function applyFieldHardships(journey, resourceStatus, messages) {
   // the season.
   const starving = journey.resources.food <= 0;
   pressure.hungryDays = starving ? Number(pressure.hungryDays || 0) + 1 : 0;
-  // The season's total, for whoever later asks what the savings cost.
-  if (starving) pressure.hungryShiftsTotal = Number(pressure.hungryShiftsTotal || 0) + 1;
+  // The season total, for the campaign review: a box left empty is not thrift.
+  if (starving) pressure.hungryShifts = Number(pressure.hungryShifts || 0) + 1;
   if (starving) {
     const days = pressure.hungryDays;
     const healthLoss = Math.min(14, 4 + days * 2);

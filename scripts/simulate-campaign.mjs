@@ -8,7 +8,7 @@
  * how the year was played: a careful year should usually end Solid or better,
  * a year of shortcuts and walked-away situations should never reach Solid.
  *
- *   node scripts/simulate-campaign.mjs                     # 4 styles x 6 areas x 4 seeds
+ *   node scripts/simulate-campaign.mjs                     # 4 styles x 9 areas x 4 seeds
  *   node scripts/simulate-campaign.mjs --seeds 8 --verbose
  *   node scripts/simulate-campaign.mjs --areas bulkley-valley,fraser-plateau --difficulty hard
  *
@@ -27,17 +27,13 @@
  */
 
 import { runCampaign } from '../js/game/campaign.js';
+import { OPERATING_AREAS } from '../js/data/index.js';
 import { handleEvent } from '../js/modes/shared/handleEvent.js';
 import { ROLES } from './simulate-expeditions.mjs';
 
-const DEFAULT_AREAS = [
-  'fort-st-john-plateau',
-  'muskwa-foothills',
-  'bulkley-valley',
-  'fraser-plateau',
-  'skeena-nass',
-  'tahltan-highland',
-];
+// Every operating area: the three southern areas have planning block data
+// now, so their fall files can be delivered like the northern six.
+const DEFAULT_AREAS = OPERATING_AREAS.map((area) => area.id);
 const PROMPT_CAP = 20000;
 const STANCE_PROMPTS = new Set(['How do you brief the crew?', 'How do you set the season up?']);
 const POLICY_BY_JOURNEY = {
@@ -200,7 +196,6 @@ function makeCampaignUi(game, style, areaIndex, difficulty, rng, trace = null) {
 }
 
 export async function simulateCampaign({ style = 'good', areaId = 'fraser-plateau', difficulty = 'normal', seed = 1, trace = null } = {}) {
-  const { OPERATING_AREAS } = await import('../js/data/index.js');
   const areaIndex = Math.max(0, OPERATING_AREAS.findIndex((area) => area.id === areaId));
   const original = Math.random;
   Math.random = seededRandom(seed);

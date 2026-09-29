@@ -38,6 +38,7 @@ import { checkEndConditions } from '../js/modes/shared/endConditions.js';
 import { PLANNING_VALUES_FLOOR } from '../js/journey/constants.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 import { calculateScore } from '../js/scoring.js';
+import { POLICIES as SILVICULTURE_POLICIES } from './simulate-silviculture-policies.mjs';
 
 const DEFAULT_AREA = 'fraser-plateau';
 const HARD_DAY_CAP = 150;
@@ -445,61 +446,16 @@ function permittingPolicy(journey, options, prompt) {
   return pick(options, [...wanted, 'support_menu', 'end_day', 'next', 'continue']);
 }
 
+/**
+ * The silviculture supervisor is the competent player from
+ * scripts/simulate-silviculture-policies.mjs, so the balance gate here and the
+ * policy comparison there measure the same player. This harness used to carry
+ * its own copy that surveyed before it released; once a failed free-growing
+ * survey started waiting out its resurvey interval that copy burned its
+ * declaration candidates and lost most seasons through no engine regression.
+ */
 function silviculturePolicy(journey, options, prompt) {
-  const planting = journey.planting || {};
-  const setAside = maybeSetAside(
-    journey,
-    options,
-    (planting.blocksPlanted || 0) / (planting.blocksToPlant || 1)
-  );
-  if (setAside) return setAside;
-
-  if (prompt.startsWith('Stand down ')) {
-    return pick(options, ['cancel']) || options[0];
-  }
-  if (prompt === 'Adjust which contractor?') {
-    const ready = options.find((option) => /^(ready|available)/.test(option.description || ''));
-    return ready || pick(options, ['cancel']) || options[options.length - 1];
-  }
-  if (prompt === 'Meet with which contractor?') {
-    let best = options[0];
-    let lowest = Infinity;
-    for (const option of options) {
-      const contractor = journey.contractors?.find((candidate) => candidate.id === option.value);
-      if (contractor && contractor.morale < lowest) { lowest = contractor.morale; best = option; }
-    }
-    return best;
-  }
-  if (prompt === 'How do you respond?') {
-    // Contractor calls: retrain on a quality dispute, inspect the camp on a
-    // sickness call, back a stand-down, pay a re-price rather than lose half
-    // the crew. Never sign plot cards you did not walk.
-    return pick(options, ['inspect', 'inspect_camp', 'rest', 'pay']) || options[0];
-  }
-  if (prompt.startsWith('Release treatment on ')) {
-    // Manual release when the budget carries it, glyphosate under the PMP
-    // when it does not - the call a supervisor makes with the ledger open.
-    const remainingHa = Math.max(0, (journey.brushing?.hectaresTarget || 0) - (journey.brushing?.hectaresComplete || 0));
-    const remainingTrees = Math.max(0, (journey.planting?.seedlingsAllocated || 0) - (journey.planting?.seedlingsPlanted || 0));
-    const daysLeft = Math.max(0, (journey.deadline || 42) - (journey.day || 1));
-    const restOfProgram = remainingTrees * 0.36 + daysLeft * 550 + 4 * 1800 + 15000;
-    const manualCost = remainingHa * 900;
-    const budget = journey.resources?.budget || 0;
-    const wanted = budget > manualCost + restOfProgram ? ['manual', 'glyphosate', 'sheep'] : ['glyphosate', 'manual', 'sheep'];
-    return pick(options, wanted) || options[0];
-  }
-
-  const canDeploy = (journey.contractors || []).some((contractor) => {
-    const state = contractor.silvicultureState;
-    return !contractor.isActive && state?.status !== 'recovering' && !(state?.cooldownDays > 0);
-  });
-  // Plots before the planters move on, then this year's blocks, then the
-  // surveyor onto any opening that is ready (the older stands read better
-  // before the brush gets ahead of the calendar), then fill and release.
-  const wanted = ['inspect', 'plant', 'survey', 'fill', 'brush'];
-  if (canDeploy) wanted.push('rotation');
-  wanted.push('meeting', 'team_briefing', 'end', 'next', 'continue');
-  return pick(options, wanted);
+  return SILVICULTURE_POLICIES.competent.choose(journey, options, prompt, {});
 }
 
 /**

@@ -27,10 +27,10 @@ test("a finished campaign year plants one tree and carries its deployments' fiel
   const campaign = {
     yearMetrics: { progress: 70, forestHealth: 66, relationships: 68, compliance: 72, budget: 60 },
     seasonLog: [
-      { season: "Spring", careerDeltas: getCareerDeltas({ journeyType: "silviculture", planting: { seedlingsPlanted: 120000 } }, true) },
-      { season: "Summer", careerDeltas: getCareerDeltas({ journeyType: "recon", distanceTraveled: 41.6 }, true) },
-      { season: "Fall", careerDeltas: getCareerDeltas({ journeyType: "planning" }, false) },
-      { season: "Winter", careerDeltas: getCareerDeltas({ journeyType: "permitting", permits: { approved: 9 } }, true) },
+      { season: "Spring", victory: true, careerDeltas: getCareerDeltas({ journeyType: "silviculture", planting: { seedlingsPlanted: 120000 } }, true) },
+      { season: "Summer", victory: true, careerDeltas: getCareerDeltas({ journeyType: "recon", distanceTraveled: 41.6 }, true) },
+      { season: "Fall", victory: false, careerDeltas: getCareerDeltas({ journeyType: "planning" }, false) },
+      { season: "Winter", victory: true, careerDeltas: getCareerDeltas({ journeyType: "permitting", permits: { approved: 9 } }, true) },
     ],
   };
 

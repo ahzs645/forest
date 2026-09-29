@@ -1386,6 +1386,51 @@ export const ISSUE_LIBRARY = [
       },
     ],
   },
+  // The CPD log gets its own card once it falls well behind the share of the
+  // FPBC year that has passed (flag set by js/engine/effects.js). A desk
+  // year's professional assignments are its paperwork chains, which log no
+  // CPD, so before this a planner or permitter could never close the gap
+  // each season charges competence risk for.
+  {
+    id: "cpd-log-behind",
+    title: "CPD Log Behind the FPBC Year",
+    description:
+      "Your continuing professional development log is well behind where it should be at this point in the FPBC reporting year, and the year closes with the calendar.",
+    roles: ["planner", "permitter", "recce", "silviculture"],
+    areaTags: ["bc-wide"],
+    // A log this far behind is the season's own paperwork, not a long shot.
+    baseWeight: 3,
+    priorityFlag: "cpdBehind",
+    requiresAnyFlags: ["cpdBehind"],
+    context: {
+      operation: "The FPBC reporting year asks for 30 hours of continuing professional development, and the log is short.",
+      objective: "Get real hours on the log without letting the season's work slide.",
+      stakes: "Every season the log stays behind adds to your competence risk, and a thin log is the first thing a practice review asks for.",
+    },
+    options: [
+      {
+        label: "Book the courses and log the hours",
+        outcome:
+          "Two days of structured learning, a riparian assessment refresher and a FRPA case-law session, go into the log: 15 CPD hours.",
+        effects: { progress: -2, compliance: 2, budget: -1 },
+        assignmentSideEffects: { professionalShift: { cpdHours: 15 } },
+        clearFlags: ["cpdBehind"],
+      },
+      {
+        label: "Log what fits around the work",
+        outcome:
+          "A webinar and a district field tour fit around the file and go into the log: 8 CPD hours. Closer, not closed.",
+        effects: { progress: -1, compliance: 1 },
+        assignmentSideEffects: { professionalShift: { cpdHours: 8 } },
+        clearFlags: ["cpdBehind"],
+      },
+      {
+        label: "Leave the log for next year",
+        outcome: "The work gets the time. The gap stays on your FPBC record, where a practice review looks first.",
+        effects: { progress: 1, compliance: -1 },
+      },
+    ],
+  },
   {
     id: "fsp-comment-surge",
     title: "FSP Comment Surge",
@@ -1944,29 +1989,44 @@ export const ISSUE_LIBRARY = [
       },
     ],
   },
-  // source: FPBC 2013-13 (von der Gonna / McBride Community Forest)
+  // source: FPBC 2013-13 (von der Gonna / McBride Community Forest). Retold
+  // as a Board audit of the licence the player works under, so it reads true
+  // for any role in any area. It follows a year that gave an audit something
+  // to find (an escalation, a flagged file, a record signed blind) or a
+  // caught shortcut's fallout; drawn cold at bc-wide weight it was the most
+  // common issue in the game.
   {
     id: "audit-laundry-list",
     title: "FPB Audit Laundry List",
     description:
-      "A side-file from your consulting practice: A Forest Practices Board audit of your community forest lands ten findings at once: vague road mapping, drifting OGMA boundaries, unclear contractor obligations, and six more items.",
+      "A Forest Practices Board audit of the licence you work under lands ten findings at once: vague road mapping, drifting OGMA boundaries, unclear contractor obligations, and seven more. Several of them trace back to your files.",
     roles: ["planner", "permitter", "recce", "silviculture"],
     areaTags: ["bc-wide"],
     seasonBias: ["Winter Operations", "Spring Planning"],
+    requiresAnyFlags: [
+      "auditEscalationActive",
+      "regulatoryScrutiny",
+      "rushJob",
+      "streamMisclassified",
+      "missingCruiseFieldNotes",
+      "crossingAssuranceSignedBlind",
+      "firstNationReferralHidden",
+      "salvageEstimatesUnchecked",
+    ],
     options: [
       {
-        label: "Triage the ten findings and publish a public response plan",
-        outcome: "The board likes the transparency. Community members show up to the plan meeting in good faith and the file starts to heal.",
+        label: "Triage the ten findings and publish a response plan",
+        outcome: "The Board notes the transparency in its report. The Nation and the local stakeholders come to the response meeting in good faith, and the file starts to heal.",
         effects: { progress: -4, compliance: 6, relationships: 5, budget: -3 },
       },
       {
-        label: "Fix the two or three easiest findings and debate the rest",
-        outcome: "The easy wins help, but the unresolved findings follow you into the next annual report and sour the board's tone.",
+        label: "Fix the two or three easiest findings and argue the rest",
+        outcome: "The easy wins help, but the open findings are listed again in the Board's follow-up report, and the district reads it.",
         effects: { progress: 1, compliance: -2, relationships: -2 },
       },
       {
-        label: "Dispute the methodology and keep operating while you litigate it",
-        outcome: "The dispute buys a year but the cumulative publicity damages council's confidence in the forest manager role entirely.",
+        label: "Dispute the methodology and keep operating",
+        outcome: "The dispute buys a season. The Board publishes anyway, and the district manager starts reading every submission from your shop twice.",
         effects: { progress: 3, compliance: -8, relationships: -6 },
         setFlags: { auditDisputeStance: true, regulatoryScrutiny: true },
       },

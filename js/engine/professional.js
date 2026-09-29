@@ -274,3 +274,18 @@ export function applyProfessionalComplianceShift(state, changes = {}) {
 
   return professional;
 }
+
+/**
+ * How far the CPD log is behind the FPBC year. CPD is a year-long target, so
+ * the log is judged against the share of the year that has passed by the end
+ * of `round`, not the full target from the first season.
+ * @returns {{hours: number, target: number, expected: number, gap: number}}
+ */
+export function getCpdShortfall(state, round = state?.round) {
+  const professional = state?.professional || {};
+  const target = Number(professional.cpdTarget) || DEFAULT_CPD_TARGET;
+  const hours = Math.round(Number(professional.cpdHours) || 0);
+  const yearShare = Math.min(1, Math.max(0, Number(round) || 0) / Math.max(1, Number(state?.totalRounds) || 4));
+  const expected = target * yearShare;
+  return { hours, target, expected, gap: Math.max(0, Math.round(expected - hours)) };
+}

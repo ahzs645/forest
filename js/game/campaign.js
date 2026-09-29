@@ -22,7 +22,6 @@ import {
 } from '../events/shortcutRecord.js';
 import { checkEndConditions as evaluateEndConditions } from '../modes/shared/endConditions.js';
 import { runReconDay } from '../modes/recon.js';
-import { getFieldThriftContext } from '../journey/fieldMechanics.js';
 import { runSilvicultureDay } from '../modes/silviculture.js';
 import { runPlanningDay } from '../modes/planning.js';
 import { runPermittingDay } from '../modes/permitting.js';
@@ -30,10 +29,18 @@ import { runManagerDay } from '../modes/manager.js';
 import { createInitialState } from '../engine/state.js';
 import { applyEffects, applyRoundConsequences, applyOptionOutcome, formatMetricDelta } from '../engine/effects.js';
 import { describeConsequences } from '../engine/insights.js';
-import { deriveTier, scoreMetricHealth } from '../engine/scoring.js';
+import {
+  CAMPAIGN_TIER_GATES,
+  formatTierShortfall,
+  gradeTier,
+  scoreMetricHealth,
+  scoreWithinTier,
+} from '../engine/scoring.js';
 import { drawIssue } from '../engine/content.js';
 import { makeRng } from '../engine/rng.js';
 import { clamp, formatMetricName } from '../engine/shared.js';
+import { assessSilvicultureProgram, PROGRAM_TRACK_WEIGHTS } from '../data/silvicultureProgram.js';
+import { PLANNING_DECISION_GATE } from '../journey/constants.js';
 import { applyDifficultyMultipliers } from './ForestryTrailGame.js';
 import { readCampaignSave, saveCampaignState, clearCampaignSave } from './saveLoad.js';
 import { getCareerDeltas } from './debrief.js';
@@ -211,6 +218,21 @@ export function clearCampaign() {
   clearCampaignSave();
 }
 
+// The four gates a planning file must clear before the District Manager
+// signs, with the level each must reach.
+const PLANNING_GATES = [
+  ['dataCompleteness', 'data', 80],
+  ['analysisQuality', 'analysis', 80],
+  ['stakeholderBuyIn', 'buy-in', 75],
+  ['ministerialConfidence', 'DM readiness', PLANNING_DECISION_GATE],
+];
+
+// A silviculture program's delivery, weighted as the program assessment
+// weighs it, less the planting-quality share: quality is read on the stands
+// (Forest Health), not as undelivered work.
+const PROGRAM_DELIVERY_TRACKS = Object.entries(PROGRAM_TRACK_WEIGHTS).filter(([track]) => track !== 'stocking');
+const PROGRAM_DELIVERY_WEIGHT = PROGRAM_DELIVERY_TRACKS.reduce((sum, [, weight]) => sum + weight, 0);
+
 /** Objective completion 0..1, per deployment type. */
 function getObjectiveCompletion(journey) {
   switch (journey.journeyType) {
@@ -220,17 +242,18 @@ function getObjectiveCompletion(journey) {
       return total ? clamp((journey.blocksAssessed || 0) / total, 0, 1) : 0;
     }
     case 'silviculture': {
-      const p = journey.planting || {};
-      const s = journey.surveys || {};
-      const plant = p.blocksToPlant ? (p.blocksPlanted || 0) / p.blocksToPlant : 0;
-      const survey = s.freeGrowingTarget ? (s.freeGrowingComplete || 0) / s.freeGrowingTarget : 0;
-      return clamp(plant * 0.6 + survey * 0.4, 0, 1);
+      // The same assessment that decides victory: fill and release count, so
+      // a program that "fell short" can no longer read 100% complete.
+      const { parts } = assessSilvicultureProgram(journey);
+      const delivered = PROGRAM_DELIVERY_TRACKS.reduce((sum, [track, weight]) => sum + (parts[track] || 0) * weight, 0);
+      return clamp(delivered / PROGRAM_DELIVERY_WEIGHT, 0, 1);
     }
     case 'planning': {
+      // Measured against each gate's target, so a file that clears every gate
+      // reads 100% rather than the raw mean of its gate values.
       const plan = journey.plan || {};
-      const gates = ['dataCompleteness', 'analysisQuality', 'stakeholderBuyIn', 'ministerialConfidence']
-        .map((key) => Number(plan[key]) || 0);
-      return clamp(gates.reduce((sum, v) => sum + v, 0) / (gates.length * 100), 0, 1);
+      const shares = PLANNING_GATES.map(([key, , target]) => Math.min(1, (Number(plan[key]) || 0) / target));
+      return clamp(shares.reduce((sum, share) => sum + share, 0) / shares.length, 0, 1);
     }
     case 'permitting':
     case 'desk': {
@@ -253,22 +276,23 @@ function getObjectiveDetail(journey) {
       const target = journey.packageTarget ?? journey.blocks?.length ?? 0;
       return `${achieved}/${target} block packages finalized`;
     }
-    case 'silviculture': {
-      const p = journey.planting || {};
-      const s = journey.surveys || {};
-      return `${p.blocksPlanted || 0}/${p.blocksToPlant || 0} blocks planted, ${s.freeGrowingComplete || 0}/${s.freeGrowingTarget || 0} free-growing surveys`;
-    }
+    case 'silviculture':
+      return assessSilvicultureProgram(journey).label;
     case 'planning': {
       const plan = journey.plan || {};
-      return `data ${Math.round(plan.dataCompleteness || 0)}/80, analysis ${Math.round(plan.analysisQuality || 0)}/80, buy-in ${Math.round(plan.stakeholderBuyIn || 0)}/75, DM readiness ${Math.round(plan.ministerialConfidence || 0)}/80`;
+      return PLANNING_GATES
+        .map(([key, label, target]) => `${label} ${Math.round(plan[key] || 0)}/${target}`)
+        .join(', ');
     }
     case 'permitting':
     case 'desk': {
       const permits = journey.permits || {};
-      const held = permits.heldForFsp
-        ? `; ${permits.heldForFsp} cutting permits held for a replacement FSP`
-        : '';
-      return `${permits.approved || 0}/${permits.target || 0} permits approved${held}`;
+      // An FSP extension shrinks the queue, not the program: say both.
+      if (permits.heldForFsp) {
+        return `${permits.approved || 0} of ${permits.programTarget || permits.target || 0} permits approved; `
+          + `${permits.heldForFsp} cutting permits held for a replacement FSP`;
+      }
+      return `${permits.approved || 0}/${permits.target || 0} permits approved`;
     }
     default:
       return `${Math.round(getObjectiveCompletion(journey) * 100)}% complete`;
@@ -276,6 +300,25 @@ function getObjectiveDetail(journey) {
 }
 
 const signed = (value) => `${value > 0 ? '+' : ''}${value}`;
+
+// The year opens with every meter at 50.
+const YEAR_START_METRICS = Object.freeze({ progress: 50, forestHealth: 50, relationships: 50, compliance: 50, budget: 50 });
+
+/** The meters as this season opened: where the last one left them. */
+function seasonStartMetrics(campaign) {
+  const last = campaign.seasonLog?.[campaign.seasonLog.length - 1];
+  return last?.metricsAfter || YEAR_START_METRICS;
+}
+
+/** Whole-point movement per meter, leaving out the ones that held. */
+function diffMetrics(before, after) {
+  const deltas = {};
+  for (const [key, value] of Object.entries(after)) {
+    const delta = Math.round(value) - Math.round(before[key] ?? value);
+    if (delta) deltas[key] = delta;
+  }
+  return deltas;
+}
 
 /** Mean of the finite numbers in a map, or null. */
 function averageOf(map) {
@@ -369,40 +412,92 @@ export function computeSeasonBridge(journey, endResult, startBudget) {
     entries.push({ metric: 'compliance', delta: compliance, reason: `The file: ${parts.join('; ')}` });
   }
 
-  // Thrift only counts for work that got done. An allowance left unspent
-  // because the crew starved or the queue sat still is not a saving.
-  // A field crew's shortcut payouts are not savings, and money kept by
-  // starving the crew was paid for by the crew (getFieldThriftContext).
-  const thrift = ['recon', 'field'].includes(journey.journeyType) ? getFieldThriftContext(journey) : null;
-  const endBudget = Number(journey.resources?.budget ?? 0) - (thrift?.illicitCash || 0);
-  if (startBudget > 0) {
-    const spentFraction = clamp(1 - endBudget / startBudget, 0, 1);
-    const raw = 5 - spentFraction * 11;
-    const spent = `Spent ${(spentFraction * 100).toFixed(0)}% of the season allowance`;
-    const crewPaid = raw > 0 && thrift && (thrift.hungryShifts > 0 || thrift.quits > 0);
-    entries.push({
-      metric: 'budget',
-      delta: crewPaid ? 0 : clamp(Math.round(raw > 0 ? raw * completion : raw), -8, 5),
-      reason: crewPaid
-        ? `${spent}, saved by a crew that went hungry or walked off`
-        : raw > 0 && completion < 0.5 ? `${spent}, with the work it was for undone` : spent,
-    });
-  }
+  const budget = computeBudgetEntry(journey, completion, startBudget);
+  if (budget) entries.push(budget);
 
   // Forest health only moves when the deployment actually touched the land;
   // the ecology drift stays the systemic mover.
-  if (journey.journeyType === 'silviculture') {
-    const quality = Number(journey.planting?.qualityAverage ?? journey.planting?.survivalRate ?? 85);
-    entries.push({ metric: 'forestHealth', delta: quality >= 85 ? 4 : quality < 75 ? -3 : 1, reason: `Planting quality ${quality}%` });
-  } else if (journey.journeyType === 'recon' || journey.journeyType === 'field') {
-    const swept = (journey.blocks || []).filter((block) => journey.reconIntel?.byBlock?.[block.id]?.valuesSwept).length;
-    const fh = clamp(Math.floor(swept / 2), 0, 3);
-    if (fh) entries.push({ metric: 'forestHealth', delta: fh, reason: `${swept} values sweeps on the ground` });
-  }
+  entries.push(...computeForestHealthEntries(journey, victory));
 
   const deltas = {};
   for (const entry of entries) deltas[entry.metric] = (deltas[entry.metric] || 0) + entry.delta;
   return { deltas, entries, completion, victory };
+}
+
+/** Cash the season's shortcuts paid out: money the allowance never saved. */
+export function sumShortcutCash(journey) {
+  return (journey.log || [])
+    .filter((entry) => /^temptation_/.test(String(entry?.eventId || '')))
+    .reduce((sum, entry) => sum + Math.max(0, Number(entry.effects?.budget) || 0), 0);
+}
+
+/**
+ * Budget is value for money: the share of the work delivered against the
+ * share of the allowance it took. Spending the allowance on the work it was
+ * for is on budget, not a loss. Two things are not savings: shortcut cash
+ * (it is taken back out before the spend is measured) and an allowance left
+ * unspent because the crew went without food.
+ */
+function computeBudgetEntry(journey, completion, startBudget) {
+  if (!(startBudget > 0)) return null;
+  const shortcutCash = sumShortcutCash(journey);
+  const endBudget = Number(journey.resources?.budget ?? 0) - shortcutCash;
+  const spentFraction = clamp(1 - endBudget / startBudget, 0, 1);
+  let delta = clamp(Math.round((completion - spentFraction) * 8), -8, 5);
+  const parts = [`Spent ${(spentFraction * 100).toFixed(0)}% of the season allowance for ${(completion * 100).toFixed(0)}% of the work`];
+  if (shortcutCash > 0) {
+    parts.push(`$${Math.round(shortcutCash).toLocaleString('en-CA')} of shortcut cash is not a saving`);
+  }
+  const hungry = Number(journey.resourcePressure?.hungryShifts) || 0;
+  const quits = (journey.crew || []).filter((member) => member?.hasQuit).length;
+  if (hungry > 0 || quits > 0) {
+    delta = Math.min(delta, 0) - Math.min(3, hungry);
+    if (hungry > 0) parts.push(`the crew went ${hungry} shift${hungry === 1 ? '' : 's'} on an empty food box`);
+    if (quits > 0) parts.push(`${quits} crew member${quits === 1 ? '' : 's'} walked off, so the unspent allowance is not a saving`);
+  }
+  return { metric: 'budget', delta: clamp(delta, -8, 5), reason: parts.join('; ') };
+}
+
+/**
+ * What the season did on the ground. Planting quality counts only for blocks
+ * actually planted, and a release queue left to the brush costs the stands;
+ * recon credits the values sweeps it walked; an approved plan credits the
+ * biodiversity it carries.
+ */
+function computeForestHealthEntries(journey, victory) {
+  const entries = [];
+  if (journey.journeyType === 'silviculture') {
+    const { parts } = assessSilvicultureProgram(journey);
+    const quality = Number(journey.planting?.qualityAverage ?? journey.planting?.survivalRate);
+    if (parts.planting > 0 && Number.isFinite(quality)) {
+      const perBlock = quality >= 85 ? 4 : quality < 75 ? -3 : 1;
+      const planted = `${journey.planting.blocksPlanted}/${journey.planting.blocksToPlant} blocks`;
+      entries.push({
+        metric: 'forestHealth',
+        delta: Math.round(perBlock * parts.planting),
+        reason: `Planting quality ${Math.round(quality)}% on ${planted}`,
+      });
+    }
+    const release = parts.release;
+    const hasReleaseQueue = (journey.program?.brush?.length || 0) > 0 || Number(journey.brushing?.hectaresTarget) > 0;
+    if (hasReleaseQueue) entries.push(release >= 1
+      ? { metric: 'forestHealth', delta: 2, reason: 'Release queue treated: the older stands keep their lead on the brush' }
+      : {
+        metric: 'forestHealth',
+        delta: -Math.max(1, Math.round((1 - release) * 3)),
+        reason: `${Math.round((1 - release) * 100)}% of the release queue left to the brush`,
+      });
+  } else if (journey.journeyType === 'recon' || journey.journeyType === 'field') {
+    const target = journey.packageTarget || journey.blocks?.length || 0;
+    const swept = (journey.blocks || []).filter((block) => journey.reconIntel?.byBlock?.[block.id]?.valuesSwept).length;
+    const fh = target ? clamp(Math.round((3 * swept) / target), 0, 3) : 0;
+    if (fh) entries.push({ metric: 'forestHealth', delta: fh, reason: `${swept} values sweeps on the ground` });
+  } else if (journey.journeyType === 'planning' && victory) {
+    const biodiversity = Math.round(Number(journey.values?.biodiversity) || 0);
+    const fh = biodiversity >= 60 ? 2 : biodiversity >= 50 ? 1 : 0;
+    if (fh) entries.push({ metric: 'forestHealth', delta: fh, reason: `The approved plan carries biodiversity at ${biodiversity}%` });
+  }
+  return entries;
 }
 
 /**
@@ -429,17 +524,43 @@ export function applyYearEffects(gs, effects, source) {
   return { moved, notes };
 }
 
-/** Review lines for the bridge, each naming the change the meter actually took. */
+/**
+ * Review lines for the bridge, each naming the change the meter actually
+ * took. A meter moved by two causes (planting and release both touch Forest
+ * Health) prints each cause's own amount, then the net the meter took when
+ * diminishing returns or a limit cut it.
+ */
 export function formatBridgeCauses(entries, moved = {}, notes = {}) {
-  return entries.map((entry) => {
+  const totals = {};
+  const remaining = {};
+  for (const entry of entries) {
+    totals[entry.metric] = (totals[entry.metric] || 0) + entry.delta;
+    remaining[entry.metric] = (remaining[entry.metric] || 0) + 1;
+  }
+  const lines = [];
+  for (const entry of entries) {
     const name = formatMetricName(entry.metric);
-    const actual = moved[entry.metric] ?? entry.delta;
-    if (!actual && !entry.delta) return `${entry.reason} → no ${name} change`;
+    const shared = entries.filter((other) => other.metric === entry.metric).length > 1;
+    const actual = shared ? entry.delta : (moved[entry.metric] ?? entry.delta);
     const note = notes[entry.metric] ? `; ${notes[entry.metric]}` : '';
-    const earned = actual !== entry.delta ? ` (${signed(entry.delta)} earned${note})` : '';
-    return `${entry.reason} → ${name} ${signed(actual)}${earned}`;
-  });
+    if (!actual && !entry.delta) {
+      lines.push(`${entry.reason} → no ${name} change`);
+    } else {
+      const earned = actual !== entry.delta ? ` (${signed(entry.delta)} earned${note})` : '';
+      lines.push(`${entry.reason} → ${name} ${signed(actual)}${earned}`);
+    }
+    remaining[entry.metric] -= 1;
+    const net = moved[entry.metric];
+    if (shared && remaining[entry.metric] === 0 && net !== undefined && net !== totals[entry.metric]) {
+      lines.push(`${name} took ${signed(net)} of the ${signed(totals[entry.metric])} earned${note}`);
+    }
+  }
+  return lines;
 }
+
+// The seasonal CPD reminder is not a campaign crisis: each deployment keeps
+// its own professional file and logs CPD at the desk (professional_admin).
+const CAMPAIGN_EXCLUDED_ISSUES = ['cpd-log-behind'];
 
 /** Build a fresh seasonal-engine state for this season's role, sharing the year's meters. */
 function buildSeasonState(campaign, season) {
@@ -451,6 +572,8 @@ function buildSeasonState(campaign, season) {
   gs.metrics = campaign.yearMetrics;
   gs.history = campaign.history;
   gs.flags = campaign.flags;
+  // Never schedule the seasonal CPD reminder into the year (see above).
+  gs.flags.cpdReminderSent = true;
   gs.pendingIssues = campaign.pendingIssues;
   gs.round = campaign.seasonIndex + 1;
   gs.totalRounds = CAMPAIGN_SEASONS.length;
@@ -495,8 +618,7 @@ async function runCampaignInner(game) {
   if (saved) {
     ui.clear();
     ui.writeHeader('CAMPAIGN IN PROGRESS');
-    const seasonLabel = CAMPAIGN_SEASONS[saved.seasonIndex]?.label || 'Unknown';
-    ui.write(`${saved.crewName} — ${seasonLabel}, ${saved.areaName || 'the district'}.`);
+    ui.write(`${saved.crewName} — ${describeCampaignProgress(saved)}, ${saved.areaName || 'the district'}.`);
     ui.write('Saves land at the start of each day — resuming replays the saved day from its morning.', 'term-dim');
     const resume = await ui.promptChoice('', [
       { label: 'Resume the year', value: 'resume' },
@@ -528,8 +650,10 @@ async function runCampaignInner(game) {
   }
 
   // One service-record entry per year (docs/unified_campaign.md), filed before
-  // the review so a reload on the year-end card cannot file it twice.
+  // the review so a reload on the year-end card cannot file it twice. The
+  // grade is kept with the save, so the review shows the tier that was filed.
   if (!campaign.recorded) {
+    campaign.grade = gradeCampaignYear(campaign.yearMetrics, countDelivered(campaign));
     recordCampaignYear(campaign);
     campaign.recorded = true;
     saveCampaign(serializeCampaign(campaign));
@@ -540,11 +664,34 @@ async function runCampaignInner(game) {
   return result;
 }
 
+/** Where a saved year stands, for the resume card and LOAD DATA. */
+export function describeCampaignProgress(campaign) {
+  const total = CAMPAIGN_SEASONS.length;
+  const index = Math.max(0, Number(campaign?.seasonIndex) || 0);
+  if (index >= total) return `Year in Review (all ${total} seasons played)`;
+  const day = Number(campaign?.activeJourney?.day) || 0;
+  return `${CAMPAIGN_SEASONS[index].label}${day ? `, day ${day}` : ''} (season ${index + 1} of ${total})`;
+}
+
+/**
+ * The year's grade: the one tier decision (gradeTier in js/engine/scoring.js)
+ * on the campaign's gates, capped by the deployments delivered. The Year in
+ * Review and the service record both read it, so they cannot file different
+ * tiers for the same year.
+ * @returns {{tier, earned, cappedFrom, next, shortfalls, delivered, score}}
+ */
+export function gradeCampaignYear(metrics, delivered) {
+  const grade = gradeTier(metrics, { gates: CAMPAIGN_TIER_GATES, delivered });
+  return { ...grade, delivered, score: scoreWithinTier(scoreMetricHealth(metrics), grade.tier) };
+}
+
+const countDelivered = (campaign) => (campaign.seasonLog || []).filter((season) => season.victory).length;
+
 /**
  * File a finished campaign year to the service record: one tree in the career
  * forest, graded by the year's tier, plus the field counters (km, seedlings,
  * plans, permits) its four deployments earned.
- * @param {Object} campaign
+ * @param {Object} campaign - graded already (campaign.grade), or graded here
  * @returns {Object} the updated service record
  */
 export function recordCampaignYear(campaign) {
@@ -554,10 +701,8 @@ export function recordCampaignYear(campaign) {
       if (Number.isFinite(value)) careerDeltas[key] = (careerDeltas[key] || 0) + value;
     }
   }
-  return recordTieredRun('campaign', {
-    tier: deriveTier(campaign.yearMetrics),
-    score: scoreMetricHealth(campaign.yearMetrics),
-  }, careerDeltas);
+  const grade = campaign.grade || gradeCampaignYear(campaign.yearMetrics, countDelivered(campaign));
+  return recordTieredRun('campaign', { tier: grade.tier, score: grade.score }, careerDeltas);
 }
 
 async function setupCampaign(ui) {
@@ -590,7 +735,7 @@ async function setupCampaign(ui) {
     areaName: area.name,
     difficulty: difficultyChoice.value || 'normal',
     seasonIndex: 0,
-    yearMetrics: { progress: 50, forestHealth: 50, relationships: 50, compliance: 50, budget: 50 },
+    yearMetrics: { ...YEAR_START_METRICS },
     history: [],
     flags: {},
     pendingIssues: [],
@@ -785,7 +930,6 @@ async function runCampaignSeason(game, campaign, season) {
     round: gsSeason.round,
   });
   const causes = formatBridgeCauses(bridge.entries, applied.moved, applied.notes);
-  const seasonDeltas = { ...applied.moved };
   if (stance && Object.keys(stance.yearEffects).length) {
     causes.push(`Briefing stance "${stance.label}" → ${formatMetricDelta(campaign.stanceMoved || stance.yearEffects)}`);
   }
@@ -799,7 +943,6 @@ async function runCampaignSeason(game, campaign, season) {
       option: stance.label,
       round: gsSeason.round,
     }).moved.progress;
-    seasonDeltas.progress = (seasonDeltas.progress || 0) + clawback;
     causes.push(`Pushed for delivery and fell short: the woods manager wanted the numbers → Progress ${clawback}`);
   }
 
@@ -814,7 +957,7 @@ async function runCampaignSeason(game, campaign, season) {
 
   // Crisis interlude: a danger-severity issue interrupts the review — and a
   // failed deployment always draws one, so falling short has a face.
-  const issue = drawIssue(gsSeason, campaign.rng);
+  const issue = drawIssue(gsSeason, campaign.rng, { excludeIds: CAMPAIGN_EXCLUDED_ISSUES });
   const isCrisis = issue && Array.isArray(issue.options) && issue.options.length
     && (issue.surfaceSeverity === 'danger' || !endResult.victory);
   if (isCrisis) {
@@ -847,10 +990,14 @@ async function runCampaignSeason(game, campaign, season) {
       }
       await promptContinue(ui);
     }
+    causes.push(`Crisis: ${issue.title} → ${formatMetricDelta(outcome?.effects || {}) || 'no meter change'}`);
   }
 
   const consequences = applyRoundConsequences(gsSeason);
   const explained = describeConsequences(gsSeason, consequences);
+  // Everything the season moved, briefing to consequences, so the review and
+  // the Year in Review add up to the meters.
+  const seasonDeltas = diffMetrics(seasonStartMetrics(campaign), campaign.yearMetrics);
 
   ui.clear();
   renderMetricStrip(ui, gsSeason);
@@ -873,13 +1020,12 @@ async function runCampaignSeason(game, campaign, season) {
   if (explained.length) {
     ui.writeDivider('WHY THIS HAPPENED');
     for (const entry of explained) {
-      ui.write(`• ${entry.title}`);
+      ui.write(`• ${entry.title}${entry.effectText ? ` → ${entry.effectText}` : ''}`);
       if (entry.cause) ui.write(`  ${entry.cause}`, 'term-dim');
-      if (entry.effects && Object.keys(entry.effects).length) {
-        ui.write(`  ${formatMetricDelta(entry.effects)}`, 'term-dim');
-      }
     }
   }
+  ui.write('');
+  ui.write(`Season total: ${formatMetricDelta(seasonDeltas) || 'no meter moved'}.`);
   ui.write('');
   await promptContinue(ui, campaign.seasonIndex + 1 < CAMPAIGN_SEASONS.length
     ? `On to ${CAMPAIGN_SEASONS[campaign.seasonIndex + 1].label}`
@@ -904,40 +1050,21 @@ async function runCampaignSeason(game, campaign, season) {
   return true;
 }
 
-const TIER_ORDER = ['stumbled', 'mixed', 'solid', 'outstanding'];
-
-// The deployments a year must deliver to earn a tier. The meters alone let a
-// year that delivered one season of four read "The program delivered".
-const MIN_DELIVERIES = { solid: 2, outstanding: 3 };
-
-// The meter floors of the next tier up (js/engine/scoring.js deriveTier),
-// named on the Year in Review so the player can see what held the year back.
-const NEXT_TIER_FLOORS = {
-  stumbled: { tier: 'Mixed', floors: { compliance: 45, relationships: 42, forestHealth: 42 } },
-  mixed: { tier: 'Solid', floors: { compliance: 60, relationships: 52, forestHealth: 48, progress: 35 } },
-};
+const capitalize = (text) => `${text[0].toUpperCase()}${text.slice(1)}`;
 
 /**
- * The year's tier: the meters decide it, and the deployments cap it.
- * @returns {{tier: string, cappedFrom: string|null}}
+ * The Year in Review's verdict, written against what was actually delivered.
+ * The reasons name every gate between the year and the next tier, with the
+ * value the year finished on.
+ * @param {Object} grade - gradeCampaignYear()
  */
-export function deriveCampaignTier(metrics, delivered) {
-  const earned = deriveTier(metrics);
-  let tier = earned;
-  while (MIN_DELIVERIES[tier] && delivered < MIN_DELIVERIES[tier]) {
-    tier = TIER_ORDER[TIER_ORDER.indexOf(tier) - 1];
-  }
-  return { tier, cappedFrom: tier === earned ? null : earned };
-}
-
-/** The Year in Review's verdict, written against what was actually delivered. */
-export function describeYearEnd({ tier, cappedFrom }, delivered, metrics, total = CAMPAIGN_SEASONS.length) {
+export function describeYearEnd(grade, total = CAMPAIGN_SEASONS.length) {
+  const { tier, cappedFrom, next, shortfalls = [] } = grade;
+  const delivered = Number(grade.delivered) || 0;
   const all = delivered === total;
   const most = delivered >= Math.ceil(total / 2);
   const body = {
-    outstanding: all
-      ? 'An exceptional year — the rest of the district will be measured against it.'
-      : 'An exceptional year on the meters, with one season that got away. The district will still measure itself against it.',
+    outstanding: 'An exceptional year — the rest of the district will be measured against it.',
     solid: all
       ? 'A clearly good year. The program delivered and the file holds up.'
       : 'A good year on balance: the file holds up, and the seasons that delivered carried the ones that fell short.',
@@ -951,18 +1078,12 @@ export function describeYearEnd({ tier, cappedFrom }, delivered, metrics, total 
 
   const reasons = [];
   if (cappedFrom) {
-    const need = MIN_DELIVERIES[cappedFrom];
-    reasons.push(`The meters read ${cappedFrom[0].toUpperCase()}${cappedFrom.slice(1)}, but that takes at least ${need} of ${total} deployments delivered.`);
-  } else if (tier === 'solid') {
-    reasons.push('Outstanding needs Compliance 88+ with Relationships 72+, or Forest Health 67+ with Compliance 75+ and Relationships 65+, and no meter under 40.');
-  } else if (NEXT_TIER_FLOORS[tier]) {
-    const next = NEXT_TIER_FLOORS[tier];
-    const missing = Object.entries(next.floors)
-      .filter(([key, floor]) => Number(metrics[key]) < floor)
-      .map(([key, floor]) => `${formatMetricName(key)} ${floor}+ (you have ${Math.round(metrics[key])})`);
-    reasons.push(missing.length
-      ? `${next.tier} needs ${missing.join(', ')}.`
-      : `${next.tier} needs a stronger year across all five meters.`);
+    const need = CAMPAIGN_TIER_GATES.minDeliveries[cappedFrom];
+    reasons.push(`The meters read ${capitalize(cappedFrom)}, but that takes at least ${need} of ${total} deployments delivered.`);
+  } else if (next) {
+    reasons.push(shortfalls.length
+      ? `${capitalize(next)} needs ${shortfalls.map((item) => formatTierShortfall(item, { total })).join(', ')}.`
+      : `${capitalize(next)} needs a stronger year across all five meters.`);
   }
   return { body: `${delivered}/${total} deployments delivered. ${body}`, reasons };
 }
@@ -970,10 +1091,11 @@ export function describeYearEnd({ tier, cappedFrom }, delivered, metrics, total 
 async function showYearEnd(ui, campaign) {
   setExpeditionChromeHidden(true);
   const metrics = campaign.yearMetrics;
-  const wins = campaign.seasonLog.filter((s) => s.victory).length;
-  const verdict = deriveCampaignTier(metrics, wins);
-  const { tier } = verdict;
-  const { body, reasons } = describeYearEnd(verdict, wins, metrics);
+  // The grade filed to the service record; a save from before grades were
+  // kept is graded the same way here.
+  const grade = campaign.grade || gradeCampaignYear(metrics, countDelivered(campaign));
+  const { tier, delivered } = grade;
+  const { body, reasons } = describeYearEnd(grade);
 
   const summary = {
     heading: 'YEAR IN REVIEW',
@@ -985,7 +1107,7 @@ async function showYearEnd(ui, campaign) {
     trendLines: Object.entries(metrics).map(([key, value]) => `${formatMetricName(key)}: ${Math.round(value)}`),
   };
 
-  const gsLike = { metrics, round: 4, totalRounds: 4, roleDisplayName: campaign.crewName };
+  const gsLike = { metrics, round: 4, totalRounds: 4, roleDisplayName: 'Campaign year' };
   await promptSummaryCard(ui, summary, ['Return to the district office'], gsLike);
-  return { tier, yearMetrics: { ...metrics }, seasonLog: campaign.seasonLog, delivered: wins };
+  return { tier, yearMetrics: { ...metrics }, seasonLog: campaign.seasonLog, delivered };
 }

@@ -44,6 +44,10 @@ const CONSEQUENCE_INFO = {
     title: "Delivery dividend",
     cause: "Reviewers trusted the file, so referrals and reviews came back clean and the schedule got room back.",
   },
+  "steady-program": {
+    title: "Steady program",
+    cause: "No meter was left behind, so the weakest one had room to recover.",
+  },
   "comeback-window": {
     title: "Comeback window",
     cause: "The file was still salvageable, so targeted effort steadied your weakest meter.",

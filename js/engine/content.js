@@ -1766,7 +1766,6 @@ const FALLOUT_BY_INSTITUTION = {
   },
   FPBC: (roleId, category, add) => {
     add("fpbc-competence-audit", 4, { compliance: 2 });
-    add("audit-laundry-list", 1.5, { compliance: 1 });
   },
   WorkSafeBC: (roleId, category, add) => {
     add("labour-job-action", 3.5, { relationships: 2, progress: 1.5 });
@@ -1829,13 +1828,12 @@ const FALLOUT_BY_INSTITUTION = {
   },
   "internal audit": (roleId, category, add) => {
     add("budget-freeze", 4, { budget: 2.5, compliance: 2, progress: 1 });
-    add("audit-laundry-list", 2.5, { compliance: 2 });
+    add("audit-laundry-list", 1.5, { compliance: 1.5 });
     add("contractor-bankruptcy", 1.5, { budget: 1.5, progress: 1 });
   },
   "the contractor": (roleId, category, add) => {
     add("labour-job-action", 3, { relationships: 2, progress: 1.5 });
     add("contractor-bankruptcy", 2.5, { budget: 1.5, progress: 1 });
-    add("audit-laundry-list", 1.5, { compliance: 1 });
   },
 };
 

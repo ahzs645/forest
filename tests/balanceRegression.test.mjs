@@ -60,10 +60,15 @@ test("both professional consequences fire somewhere in the matrix", () => {
   assert.ok(fired.has("professional-audit"), "professional-audit never fired");
 });
 
+// Cards the year's calendar hands everyone who falls behind, not draws: the
+// CPD reminder lands in most years by design (js/engine/effects.js).
+const CALENDAR_REMINDERS = new Set(["cpd-log-behind"]);
+
 test("no single issue dominates the matrix beyond a cap", () => {
   const counts = new Map();
   for (const run of MATRIX) {
     for (const id of run.issuesSeen) {
+      if (CALENDAR_REMINDERS.has(id)) continue;
       counts.set(id, (counts.get(id) || 0) + 1);
     }
   }
@@ -78,4 +83,14 @@ test("no single issue dominates the matrix beyond a cap", () => {
     share <= 0.45,
     `top issue ${topId} appeared in ${(100 * share).toFixed(1)}% of runs (cap 45%)`,
   );
+});
+
+test("the harness starts neighbouring seeds on unrelated streams", async () => {
+  const { mixSeed } = await import("../js/engine/simulate.js");
+  const { makeRng } = await import("../js/engine/rng.js");
+  const firstDraws = Array.from({ length: 50 }, (_, i) => makeRng(mixSeed(1000 + i))());
+  assert.ok(Math.min(...firstDraws) < 0.1 && Math.max(...firstDraws) > 0.9, "seeds 1000-1049 should not share an opening draw");
+  // Unscrambled, the same 50 seeds open within a fraction of a percent of each other.
+  const raw = Array.from({ length: 50 }, (_, i) => makeRng(1000 + i)());
+  assert.ok(Math.max(...raw) - Math.min(...raw) < 0.05);
 });
