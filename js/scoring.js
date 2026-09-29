@@ -5,6 +5,9 @@
 
 import { assessSilvicultureProgram } from './data/silvicultureProgram.js';
 import { summarizeIntegrity } from './modes/silvicultureIntegrity.js';
+import { listShortcutsTaken } from './events/shortcutRecord.js';
+import { badBandFloorFor } from './events/selection.js';
+import { ILLEGAL_ACTS } from './data/illegalActs.js';
 import { PLANNING_DECISION_GATE, PLANNING_VALUES_FLOOR } from './journey/constants.js';
 import { getPackageTarget, getPackagesFinalized } from './journey/packages.js';
 import { formatDollars } from './resources.js';
@@ -97,15 +100,35 @@ export function calculateScore(journey, victory) {
 }
 
 /**
- * What a silviculture run's caught shortcuts cost, on top of scrutiny. A
- * falsified plot card or declaration the district has found is not a bad
- * day on the file; it is the file (js/modes/silvicultureIntegrity.js).
+ * Grade points a caught shortcut costs, by how serious the act is
+ * (js/events/selection.js badBandFloorFor: serious harm or a criminal or
+ * federal catcher, a core act, a grey or comic one).
+ */
+const CAUGHT_SHORTCUT_PENALTY = { serious: 12, core: 8, minor: 4 };
+
+/**
+ * What a run's caught shortcuts cost, on top of scrutiny and the
+ * determination's own bill. A silviculture program keeps its own ledger
+ * (js/modes/silvicultureIntegrity.js: a falsified declaration is the file).
+ * Every other role pays per shortcut the institution caught, whether the
+ * determination landed in season or settled at the debrief: on a desk file
+ * closed on day 15 the letter used to arrive after the win and trim a point
+ * or two, so taking every shortcut still graded A.
  * @param {Object} journey
  * @returns {number}
  */
 export function scoreIntegrityPenalty(journey) {
-  if (journey?.journeyType !== 'silviculture') return 0;
-  return summarizeIntegrity(journey).penalty;
+  if (journey?.journeyType === 'silviculture') return summarizeIntegrity(journey).penalty;
+  return listShortcutsTaken(journey)
+    .filter((shortcut) => shortcut.band === 'caught')
+    .reduce((sum, shortcut) => {
+      const act = ILLEGAL_ACTS.find((entry) => entry?.id === shortcut.actId) || null;
+      const floor = badBandFloorFor(act);
+      const points = floor >= 0.15 ? CAUGHT_SHORTCUT_PENALTY.serious
+        : floor >= 0.1 ? CAUGHT_SHORTCUT_PENALTY.core
+          : CAUGHT_SHORTCUT_PENALTY.minor;
+      return sum + points;
+    }, 0);
 }
 
 /**
