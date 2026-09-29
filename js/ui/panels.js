@@ -364,7 +364,7 @@ export const PanelsMixin = {
       ${data.terrain ? `<div class="location-info">Terrain: ${data.terrain}</div>` : ''}
       ${data.weather ? `<div class="location-weather">Weather: ${data.weather}</div>` : ''}
       ${data.phase ? `<div class="location-info">Phase: ${data.phase}</div>` : ''}
-      ${data.hazards?.length ? `<div class="location-info">Hazards: ${data.hazards.join(', ')}</div>` : ''}
+      ${data.hazards?.length ? `<div class="location-info">Hazards: ${data.hazards.map((hazard) => String(hazard).replace(/_/g, ' ')).join(', ')}</div>` : ''}
     `;
   },
 

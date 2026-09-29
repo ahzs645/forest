@@ -11,9 +11,10 @@ import {
   getCrewDisplayInfo,
   hasActiveFirstAidAttendant,
   healCrewMember,
+  needsTreatment,
   treatCrewCondition
 } from '../crew.js';
-import { FIELD_ROLES } from '../data/crewNames.js';
+import { FIELD_ROLES, STATUS_EFFECTS } from '../data/crewNames.js';
 import { getFieldProgressInfo } from '../journey.js';
 import {
   getPackageBlocks,
@@ -605,7 +606,7 @@ async function runFieldDay(game) {
     return;
   }
 
-  if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.warning) {
+  if (foodBeatDue(journey)) {
     displayDayHeader(ui, journey);
     await maybeHandleFoodDecision(game);
     ui.updateAllStatus(journey);
@@ -781,7 +782,7 @@ async function runFieldDay(game) {
         value: 'maintain'
       }
     ];
-    const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
+    const hasAnyInjured = journey.crew.some(needsTreatment);
     if (hasAnyInjured && journey.resources.firstAid > 0) {
       campOptions.push({
         label: 'Patch up the crew',
@@ -830,11 +831,15 @@ async function runFieldDay(game) {
         description: 'Burn the grease, move the food to the truck cab and the bear cache, wash the camp down — uses this shift',
         value: 'bear_cleanup'
       });
-      campOptions.push({
-        label: 'Report the habituated bear (RAPP)',
-        description: 'Call it in to the Conservation Officer Service — brief response; work continues',
-        value: 'bear_report'
-      });
+      // One call per bear. The CO Service logs it once; ringing the RAPP
+      // line again about the same animal is not another finding.
+      if (!journey.bearReported) {
+        campOptions.push({
+          label: 'Report the habituated bear (RAPP)',
+          description: 'Call it in to the Conservation Officer Service — brief response; work continues',
+          value: 'bear_report'
+        });
+      }
     }
 
     let actionId = await presentDayCard(ui, {
@@ -921,7 +926,7 @@ async function runFieldDay(game) {
       ui.write('The crew burns the grease pit, scrubs the cook tent, and moves every scrap of food into the truck cab and the bear cache on the far side of the landing.');
       ui.writePositive('Nothing to come back for. It will test the camp once more and move on.');
       logReconAction(journey, 'Cleaned up the camp attractants');
-    } else if (actionId === 'bear_report') {
+    } else if (actionId === 'bear_report' && !journey.bearReported) {
       ui.writeHeader('RAPP CALL');
       ui.write('You call the habituated bear in to the Conservation Officer Service on the RAPP line with the camp location and what it has been into.');
       journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
@@ -1475,6 +1480,10 @@ async function runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent 
 
   ui.writeHeader('TRAVEL RESULTS');
   writeFieldMessages(ui, result.messages);
+  // The panel has to agree with the results on screen, not catch up after
+  // the next Continue.
+  ui.updateAllStatus(journey);
+  updateReconMissionStatus(ui, journey);
   shiftState.hasTraveled = true;
   shiftState.dayResolved = true;
 
@@ -1551,8 +1560,8 @@ async function handleSetTempo(ui, journey) {
 
   if (rationChoice.value === 'short' && rations.mode !== 'short') {
     rations.mode = 'short';
-    rations.shortRationStreak = Number(rations.shortRationStreak || 0) + 1;
-    ui.writeWarning('Short rations ordered.');
+    rations.shortRationStreak = 1;
+    ui.writeWarning('Short rations ordered. They hold until you change them.');
   } else if (rationChoice.value === 'normal' && rations.mode === 'short') {
     rations.mode = 'normal';
     rations.shortRationStreak = 0;
@@ -1808,6 +1817,11 @@ function formatTerrainLabel(terrainId) {
     .join(' ');
 }
 
+/** "glacial_current" reads as "glacial current" to the player. */
+function formatHazardLabel(hazardId) {
+  return String(hazardId || '').replace(/_/g, ' ');
+}
+
 function getRouteHazardSummary(currentBlock, nextBlock, weather) {
   const hazardSet = new Set(nextBlock?.hazards || []);
   const details = [];
@@ -1816,7 +1830,7 @@ function getRouteHazardSummary(currentBlock, nextBlock, weather) {
     details.push(`${formatTerrainLabel(nextBlock.terrain)} terrain`);
   }
   if (hazardSet.size > 0) {
-    details.push(`hazards: ${Array.from(hazardSet).slice(0, 2).join(', ')}`);
+    details.push(`hazards: ${Array.from(hazardSet).slice(0, 2).map(formatHazardLabel).join(', ')}`);
   }
   if (weather?.dangerous) {
     details.push(weather.name.toLowerCase());
@@ -1875,7 +1889,11 @@ function buildRoutePlan(choiceId, journey, currentBlock, nextBlock) {
 }
 
 function chooseTreatmentEffect(member) {
-  const activeEffects = (member.statusEffects || []).map((effect) => effect.effectId);
+  // A splinted arm needs time, not a second kit; treat whatever else is wrong.
+  const activeEffects = (member.statusEffects || [])
+    .filter((effect) => !(effect.treated && STATUS_EFFECTS[effect.effectId]?.healsWithTime))
+    .map((effect) => effect.effectId);
+  if (!activeEffects.length) return null;
 
   for (const effectId of TREATMENT_PRIORITY) {
     if (activeEffects.includes(effectId)) {
@@ -1886,46 +1904,59 @@ function chooseTreatmentEffect(member) {
   return activeEffects[0] || null;
 }
 
+/**
+ * Whether this morning opens on the food box. Once a day, and only when there
+ * is something to say: an empty box, a crew already on short rations running
+ * critically low, or a thin box on full rations that wants a decision.
+ */
+function foodBeatDue(journey) {
+  const rations = ensureRationPlan(journey);
+  const food = journey.resources.food || 0;
+  if (rations.lastDecisionDay === journey.day) return false;
+  if (food > FIELD_RESOURCES.food.warning) return false;
+  if (food <= 0) return true;
+  // Short rations are a carried standing order (Set the tempo). A crew
+  // already on them is not asked again every morning; it hears about it
+  // again only when the box is nearly empty.
+  if (rations.mode === 'short') return food <= FIELD_RESOURCES.food.critical;
+  return true;
+}
+
 async function maybeHandleFoodDecision(game) {
   const { ui, journey } = game;
   const rations = ensureRationPlan(journey);
 
-  if (rations.lastDecisionDay === journey.day) {
+  if (!foodBeatDue(journey)) {
     return;
   }
-
-  if ((journey.resources.food || 0) > FIELD_RESOURCES.food.warning) {
-    // Food came back. A standing order to stretch the meals has to lift by
-    // itself once it no longer applies, or short rations become a one-way door
-    // the player is never asked about again — which quietly starves a crew that
-    // is actually well supplied.
-    if (rations.mode === 'short') {
-      rations.mode = 'normal';
-      rations.shortRationStreak = 0;
-      ui.write('Food stores are healthy again. The crew goes back on full rations.');
-    }
-    return;
-  }
-
-  // Rations are a carried standing order now (Set the tempo), so this forced
-  // beat only needs to fire when the player has not already made the call.
-  // A crew already on short rations does not need to be asked again every
-  // single morning for the rest of the season — that was a dozen-plus prompts
-  // and acknowledgements per run saying nothing new.
-  if (rations.mode === 'short' && (journey.resources.food || 0) > FIELD_RESOURCES.food.critical) {
-    return;
-  }
-
-
+  rations.lastDecisionDay = journey.day;
   const foodLevel = journey.resources.food || 0;
+
+  // An empty box is not a rationing decision; full or short of nothing is
+  // nothing. Say what the day costs and what fixes it.
+  if (foodLevel <= 0) {
+    const hungryDays = Number(journey.resourcePressure?.hungryDays || 0);
+    ui.writeDanger(hungryDays > 0
+      ? `The food box has been empty for ${hungryDays} shift${hungryDays === 1 ? '' : 's'}. The crew is working on nothing, and it shows.`
+      : 'The food box is empty. Nobody eats today unless you get food in.');
+    ui.write('A grocery run, the supply point or a ration cache (Camp & crew) is the only fix. Rest does not heal a crew with nothing to eat.');
+    ui.write('');
+    return;
+  }
+
+  if (rations.mode === 'short') {
+    ui.writeWarning(`Food is down to ${Math.round(foodLevel * 10) / 10} person-days, and the crew is ${rations.shortRationStreak || 1} day${rations.shortRationStreak === 1 ? '' : 's'} into short rations. Get food in before the box is empty.`);
+    ui.write('');
+    return;
+  }
+
   const prompt = foodLevel <= FIELD_RESOURCES.food.critical
     ? 'Food stores are critically low. Decide how to handle the crew\'s meals.'
-    : 'Food stores are running thin. Decide how to handle rations today.';
-  const options = [];
+    : 'Food stores are running thin. Decide how to handle rations.';
 
-  // Setting the day's ration policy is a call, not a job. Actually going out
-  // to the cache is a shift's work and lives on the shift menu instead.
-  options.push(
+  // Setting the ration policy is a call, not a job. Actually going out to
+  // the cache is a shift's work and lives on the shift menu instead.
+  const choice = await ui.promptChoice(prompt, [
     {
       label: 'Keep Full Rations',
       description: 'Normal food use; keeps the crew steadier if you can afford it',
@@ -1933,18 +1964,15 @@ async function maybeHandleFoodDecision(game) {
     },
     {
       label: 'Short Rations and Push On',
-      description: 'Use 65% portions today; the crew will feel it',
+      description: '65% portions until you change the order; the crew will feel it',
       value: 'short'
     }
-  );
-
-  const choice = await ui.promptChoice(prompt, options);
-  rations.lastDecisionDay = journey.day;
+  ]);
 
   if (choice.value === 'short') {
     rations.mode = 'short';
-    rations.shortRationStreak = Number(rations.shortRationStreak || 0) + 1;
-    ui.writeWarning(`Short rations ordered. This makes ${rations.shortRationStreak} reduced-meal day${rations.shortRationStreak === 1 ? '' : 's'} in a row.`);
+    rations.shortRationStreak = 1;
+    ui.writeWarning('Short rations ordered. They stay in force until you change them under Set the tempo.');
     ui.write('');
     return;
   }
@@ -2258,7 +2286,7 @@ function handleScoutAhead(ui, journey) {
   ui.write(`Description: ${nextBlock.description}`);
 
   if (nextBlock.hazards && nextBlock.hazards.length > 0) {
-    ui.writeWarning(`Hazards: ${nextBlock.hazards.join(', ')}`);
+    ui.writeWarning(`Hazards: ${nextBlock.hazards.map(formatHazardLabel).join(', ')}`);
   }
 
   const accessVerdict = recordAccessVerdict(
@@ -2335,17 +2363,44 @@ export async function handleResupply(game, block) {
     if (!def) return value;
     return Math.max(0, Math.min(def.max ?? value, value));
   };
+  const FLAGGING_MAX = 60;
+  const roomFor = (resourceId) => {
+    const max = resourceId === 'flaggingTape' ? FLAGGING_MAX : FIELD_RESOURCES[resourceId]?.max;
+    return Math.max(0, (max ?? Infinity) - (Number(journey.resources[resourceId]) || 0));
+  };
 
-  const offers = [
-    { id: 'fuel_drum', label: 'Fuel drum (+200 L)', description: 'A 205 L drum of diesel, pumped into the tanks and the cans', cost: priced(360), apply: () => { journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 200); } },
-    { id: 'rations', label: 'Rations crate (+20 person-days)', description: 'Four days of camp food for five', cost: priced(160), apply: () => { journey.resources.food = clampToMax('food', journey.resources.food + 20); } },
-    { id: 'first_aid', label: 'First aid kit (+1 kit)', description: 'Level 3 kit restock', cost: priced(120), apply: () => { journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 1); } },
-    { id: 'flagging', label: 'Flagging (+12 rolls)', description: 'Ribbon for the next four boundaries', cost: priced(60), apply: () => { journey.resources.flaggingTape = Math.min(60, (journey.resources.flaggingTape || 0) + 12); } },
-    { id: 'field_repair', label: 'Field repair (+15% equipment)', description: 'Tires, a fuel filter, a chain and bar', cost: priced(220), apply: () => { journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 15); } },
-    {
+  // A single item sells only what the truck can hold, at a pro-rated price;
+  // paying $180 for a crate that does not fit used to print "Purchased" and
+  // change nothing.
+  const single = (id, resourceId, amount, unit, name, description, baseCost) => () => {
+    const qty = Math.min(amount, Math.floor(roomFor(resourceId)));
+    if (qty <= 0) return null;
+    const cost = qty === amount
+      ? priced(baseCost)
+      : Math.max(10, Math.round((priced(baseCost) * qty / amount) / 10) * 10);
+    return {
+      id,
+      label: qty === amount ? `${name} (+${amount}${unit})` : `${name}, part (+${qty}${unit}, all that fits)`,
+      description,
+      cost,
+      apply: () => {
+        journey.resources[resourceId] = resourceId === 'flaggingTape'
+          ? Math.min(FLAGGING_MAX, (journey.resources.flaggingTape || 0) + qty)
+          : clampToMax(resourceId, journey.resources[resourceId] + qty);
+      }
+    };
+  };
+
+  const offerBuilders = [
+    single('fuel_drum', 'fuel', 200, ' L', 'Fuel drum', 'A 205 L drum of diesel, pumped into the tanks and the cans', 360),
+    single('rations', 'food', 20, ' person-days', 'Rations crate', 'Four days of camp food for five', 160),
+    single('first_aid', 'firstAid', 1, ' kit', 'First aid kit', 'Level 3 kit restock', 120),
+    single('flagging', 'flaggingTape', 12, ' rolls', 'Flagging', 'Ribbon for the next four boundaries', 60),
+    single('field_repair', 'equipment', 15, '% equipment', 'Field repair', 'Tires, a fuel filter, a chain and bar', 220),
+    () => (['fuel', 'food', 'equipment', 'firstAid'].some((id) => roomFor(id) >= 1) ? {
       id: 'full_restock',
       label: 'Full restock',
-      description: '+200 L fuel, +25 person-days food, +20% equipment, +2 kits',
+      description: '+200 L fuel, +25 person-days food, +20% equipment, +2 kits (up to what the truck holds)',
       cost: priced(700),
       apply: () => {
         journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 200);
@@ -2353,13 +2408,18 @@ export async function handleResupply(game, block) {
         journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 20);
         journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 2);
       }
-    }
+    } : null)
   ];
 
   while (true) {
     const money = journey.resources.budget || 0;
+    const offers = offerBuilders.map((build) => build()).filter(Boolean);
     const affordableOffers = offers.filter((offer) => money >= offer.cost);
 
+    if (offers.length === 0) {
+      ui.write('The truck is full. Nothing here it can carry.');
+      break;
+    }
     if (affordableOffers.length === 0) {
       ui.writeWarning('You cannot afford anything at this stop. Better keep moving.');
       break;
@@ -2402,7 +2462,7 @@ export async function handleTriage(game) {
     return;
   }
 
-  const candidates = journey.crew.filter(m => m.isActive && (m.health < 100 || (m.statusEffects?.length || 0) > 0));
+  const candidates = journey.crew.filter(m => m.isActive && (m.health < 100 || needsTreatment(m)));
   if (candidates.length === 0) {
     ui.write('Nobody needs treatment today.');
     return;
@@ -2422,20 +2482,24 @@ export async function handleTriage(game) {
   const target = journey.crew.find(m => m.id === choice.value);
   if (!target || !target.isActive) return;
 
-  journey.resources.firstAid = Math.max(0, (journey.resources.firstAid || 0) - 1);
-
-  if ((target.statusEffects?.length || 0) > 0) {
-    const effectId = chooseTreatmentEffect(target);
+  const effectId = chooseTreatmentEffect(target);
+  if (effectId) {
     const treated = treatCrewCondition(target, effectId, journey.day);
+    if (treated.kitUsed === false) {
+      // Nothing a kit can do; it stays in the box.
+      if (treated.message) ui.write(treated.message);
+      return;
+    }
+    journey.resources.firstAid = Math.max(0, (journey.resources.firstAid || 0) - 1);
     if (treated.message) ui.writePositive(treated.message);
+    const healthBefore = target.health;
     const healed = healCrewMember(target, treated.cleared ? 14 : 8);
-    if (healed.message) ui.writePositive(healed.message);
-    if (!treated.cleared) {
-      ui.write(effectId === 'broken_arm'
-        ? 'Splinted and slung. They ride in the truck and do the paperwork until it is cleared; another treatment day or a rest shift finishes it.'
-        : 'They are stabilized for now, but this will take another treatment day or a rest shift to finish.');
+    if (healed.message && target.health > healthBefore) ui.writePositive(healed.message);
+    if (!treated.cleared && !treated.healsWithTime) {
+      ui.write('They are stabilized for now, but this will take another treatment day or a rest shift to finish.');
     }
   } else {
+    journey.resources.firstAid = Math.max(0, (journey.resources.firstAid || 0) - 1);
     const healed = healCrewMember(target, 25);
     if (healed.message) ui.writePositive(healed.message);
   }
