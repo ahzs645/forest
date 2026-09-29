@@ -1,6 +1,7 @@
 /**
  * Forest Block Definitions
- * 12 blocks per operating area for the field journey
+ * 11-12 stops per operating area for the field journey. Every operating area
+ * in js/data/operatingAreas.js has its own route (tests/regionalContent.test.mjs).
  */
 
 // Import data from JSON files (Vite handles JSON imports natively)
@@ -19,6 +20,9 @@ export const BULKLEY_BLOCKS = blocksData['bulkley-valley'];
 export const FRASER_BLOCKS = blocksData['fraser-plateau'];
 export const SKEENA_BLOCKS = blocksData['skeena-nass'];
 export const TAHLTAN_BLOCKS = blocksData['tahltan-highland'];
+export const VANCOUVER_ISLAND_BLOCKS = blocksData['vancouver-island-coast'];
+export const KOOTENAY_BLOCKS = blocksData['kootenay-wetbelt'];
+export const OKANAGAN_BLOCKS = blocksData['okanagan-shuswap-drybelt'];
 
 // Map area IDs to block sets
 export const AREA_BLOCKS = {
@@ -27,11 +31,15 @@ export const AREA_BLOCKS = {
   'bulkley-valley': BULKLEY_BLOCKS,
   'fraser-plateau': FRASER_BLOCKS,
   'skeena-nass': SKEENA_BLOCKS,
-  'tahltan-highland': TAHLTAN_BLOCKS
+  'tahltan-highland': TAHLTAN_BLOCKS,
+  'vancouver-island-coast': VANCOUVER_ISLAND_BLOCKS,
+  'kootenay-wetbelt': KOOTENAY_BLOCKS,
+  'okanagan-shuswap-drybelt': OKANAGAN_BLOCKS
 };
 
 /**
- * Get blocks for an operating area
+ * Get blocks for an operating area. Only an unknown or missing area id falls
+ * back to the Fort St. John route (bare test fixtures and pre-area saves).
  * @param {string} areaId - Operating area ID
  * @returns {Object[]} Array of block definitions
  */

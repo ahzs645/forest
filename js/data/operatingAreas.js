@@ -1,3 +1,10 @@
+// Area tags gate content by region. Besides the BEC and landscape tags:
+//   "mainland"    - moose, grizzly and caribou range; Vancouver Island has none
+//                   of the three, so wildlife cards written for them carry it.
+//   "freeze-thaw" - real winters: frozen ground, spring breakup and road bans.
+//                   The maritime coast gets rain instead.
+//   "northern-bc" - the six northern areas; a card tagged only with it stays
+//                   north (js/engine/seasonalContract.js). "bc-wide" is on all.
 export const OPERATING_AREAS = [
   {
     id: "fort-st-john-plateau",
@@ -17,7 +24,7 @@ export const OPERATING_AREAS = [
     ],
     indigenousPartners: ["Doig River First Nation", "Blueberry River First Nations"],
     communities: ["Fort St. John", "Charlie Lake"],
-    tags: ["bwbs", "peace-region", "peatland", "gas-interface", "winter-road", "northern-bc", "bc-wide"],
+    tags: ["bwbs", "peace-region", "peatland", "gas-interface", "winter-road", "mainland", "freeze-thaw", "northern-bc", "bc-wide"],
   },
   {
     id: "muskwa-foothills",
@@ -37,7 +44,7 @@ export const OPERATING_AREAS = [
     ],
     indigenousPartners: ["Fort Nelson First Nation", "Prophet River First Nation"],
     communities: ["Fort Nelson", "Toad River"],
-    tags: ["bwbs", "caribou", "steep", "remote-camps", "winter-road", "northern-bc", "bc-wide"],
+    tags: ["bwbs", "caribou", "steep", "remote-camps", "winter-road", "mainland", "freeze-thaw", "northern-bc", "bc-wide"],
   },
   {
     id: "bulkley-valley",
@@ -57,7 +64,7 @@ export const OPERATING_AREAS = [
     ],
     indigenousPartners: ["Wet'suwet'en", "Gitxsan"],
     communities: ["Smithers", "Telkwa"],
-    tags: ["sbs", "community-interface", "visuals", "watershed", "northern-bc", "bc-wide"],
+    tags: ["sbs", "community-interface", "visuals", "watershed", "mainland", "freeze-thaw", "northern-bc", "bc-wide"],
   },
   {
     id: "fraser-plateau",
@@ -77,7 +84,7 @@ export const OPERATING_AREAS = [
     ],
     indigenousPartners: ["Lheidli T'enneh First Nation", "Nazko First Nation"],
     communities: ["Prince George", "Hixon"],
-    tags: ["sbs", "wildfire", "beetle-recovery", "evac-route", "northern-bc", "bc-wide"],
+    tags: ["sbs", "wildfire", "beetle-recovery", "evac-route", "mainland", "freeze-thaw", "northern-bc", "bc-wide"],
   },
   {
     id: "skeena-nass",
@@ -97,7 +104,7 @@ export const OPERATING_AREAS = [
     ],
     indigenousPartners: ["Nisga'a Nation", "Gitanyow"],
     communities: ["Terrace", "Gitlax̱t'aamiks (New Aiyansh)"],
-    tags: ["cwh", "karst", "salmon", "community-water", "northern-bc", "bc-wide"],
+    tags: ["cwh", "karst", "salmon", "community-water", "mainland", "freeze-thaw", "northern-bc", "bc-wide"],
   },
   {
     id: "tahltan-highland",
@@ -117,7 +124,7 @@ export const OPERATING_AREAS = [
     ],
     indigenousPartners: ["Tahltan Nation"],
     communities: ["Iskut", "Dease Lake"],
-    tags: ["swb", "glacial", "remote-camps", "caribou", "northern-bc", "bc-wide"],
+    tags: ["swb", "glacial", "remote-camps", "caribou", "mainland", "freeze-thaw", "northern-bc", "bc-wide"],
   },
   {
     id: "vancouver-island-coast",
@@ -157,7 +164,7 @@ export const OPERATING_AREAS = [
     ],
     indigenousPartners: ["Ktunaxa Nation (yaqan nuʔkiy)", "Sinixt Confederacy"],
     communities: ["Nelson", "Creston"],
-    tags: ["watershed", "community-interface", "steep", "karst", "bc-wide"],
+    tags: ["ich", "watershed", "community-interface", "steep", "karst", "mainland", "freeze-thaw", "bc-wide"],
   },
   {
     id: "okanagan-shuswap-drybelt",
@@ -177,6 +184,6 @@ export const OPERATING_AREAS = [
     ],
     indigenousPartners: ["Okanagan Indian Band", "Splatsin"],
     communities: ["Vernon", "Salmon Arm"],
-    tags: ["wildfire", "community-interface", "visuals", "watershed", "bc-wide"],
+    tags: ["idf", "wildfire", "community-interface", "visuals", "watershed", "mainland", "freeze-thaw", "bc-wide"],
   },
 ];
