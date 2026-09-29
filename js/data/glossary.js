@@ -47,7 +47,7 @@ export const GLOSSARY_TERMS = [
   {
     term: "Riparian Reserve",
     description:
-      "Under the FPPR, streams are classed S1–S6 (fish-bearing S1–S4 by width; non-fish-bearing S5–S6). Each class sets a riparian management area (RMA) made of a riparian reserve zone (RRZ), where no harvesting occurs, and a riparian management zone (RMZ), where retention is managed. S5 and S6 streams carry no reserve zone.",
+      "Under the FPPR, streams are classed S1–S6 (fish-bearing S1–S4 by width; non-fish-bearing S5–S6). Each class sets a riparian management area (RMA) made of a riparian reserve zone (RRZ), where no harvesting occurs, and a riparian management zone (RMZ), where retention is managed. S4, S5 and S6 streams carry no reserve zone, only a management zone.",
   },
   {
     term: "Annual Allowable Cut (AAC)",
