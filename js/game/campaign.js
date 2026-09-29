@@ -123,6 +123,51 @@ function getSeasonJourneyType(season) {
   return FORESTER_ROLES.find((r) => r.id === season.roleId)?.journeyType || 'field';
 }
 
+// A winter push after a fall file that never got its FSP approved: the old
+// plan's term was extended, so only blocks already consistent with it can go
+// out. The cutting permits for the new blocks wait for a replacement plan.
+const FSP_EXTENSION_HELD_PERMITS = 4;
+const FSP_EXTENSION_SCRUTINY = 8;
+const FSP_EXTENSION_DISTRICT_COOLING = 6;
+
+function fallFellShort(campaign) {
+  const fall = (campaign.seasonLog || []).find((entry) => (entry.id || entry.season?.toLowerCase()) === 'fall');
+  return Boolean(fall) && !fall.victory;
+}
+
+/** The briefing's situation line, told against what the year already did. */
+export function describeSeasonSituation(campaign, season) {
+  if (season.id === 'winter' && fallFellShort(campaign)) {
+    return 'The fall plan never got its approval. The district extended the old FSP\'s term, so only blocks already consistent with it can go: the cutting permits for the new blocks wait for a replacement plan. Push what the extension covers through before breakup.';
+  }
+  return season.situation;
+}
+
+/**
+ * Carry an earlier season's outcome into the deployment about to start.
+ * Winter used to issue cutting permits for a plan the District Manager never
+ * approved. Mutates the journey before its standing is snapshotted, so the
+ * review measures the season from where it actually opened.
+ * @returns {string[]} lines for the deployment screen
+ */
+export function applySeasonCarryForward(campaign, season, journey) {
+  if (season.id !== 'winter' || !fallFellShort(campaign) || !journey.permits) return [];
+  const permits = journey.permits;
+  const held = Math.min(FSP_EXTENSION_HELD_PERMITS, Math.max(0, (permits.target || 0) - 1));
+  permits.programTarget = permits.target;
+  permits.target -= held;
+  permits.heldForFsp = held;
+  permits.backlog = Math.max(0, (permits.backlog || 0) - held);
+  journey.scrutiny = Math.min(100, Number(journey.scrutiny || 0) + FSP_EXTENSION_SCRUTINY);
+  if (typeof journey.relationships?.ministry === 'number') {
+    journey.relationships.ministry = Math.max(0, journey.relationships.ministry - FSP_EXTENSION_DISTRICT_COOLING);
+  }
+  return [
+    `No approved FSP from the fall: ${held} cutting permits are held until a replacement plan is approved.`,
+    `The season's queue is ${permits.target} permits under the extended plan, and the district is reading every one of them closely.`,
+  ];
+}
+
 function saveCampaign(state) {
   try {
     localStorage.setItem(CAMPAIGN_SAVE_KEY, JSON.stringify(state));
@@ -169,8 +214,11 @@ function getObjectiveCompletion(journey) {
     }
     case 'permitting':
     case 'desk': {
+      // Measured against the program the year needed, not the queue an FSP
+      // extension left: permits held for a replacement plan are not delivered.
       const permits = journey.permits || {};
-      return permits.target ? clamp((permits.approved || 0) / permits.target, 0, 1) : 0;
+      const target = permits.programTarget || permits.target;
+      return target ? clamp((permits.approved || 0) / target, 0, 1) : 0;
     }
     default:
       return 0;
@@ -197,79 +245,174 @@ function getObjectiveDetail(journey) {
     case 'permitting':
     case 'desk': {
       const permits = journey.permits || {};
-      return `${permits.approved || 0}/${permits.target || 0} permits approved`;
+      const held = permits.heldForFsp
+        ? `; ${permits.heldForFsp} cutting permits held for a replacement FSP`
+        : '';
+      return `${permits.approved || 0}/${permits.target || 0} permits approved${held}`;
     }
     default:
       return `${Math.round(getObjectiveCompletion(journey) * 100)}% complete`;
   }
 }
 
+const signed = (value) => `${value > 0 ? '+' : ''}${value}`;
+
+/** Mean of the finite numbers in a map, or null. */
+function averageOf(map) {
+  const values = Object.values(map || {}).filter((value) => Number.isFinite(value));
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
 /**
- * The metric bridge: what the deployment did to the year's five meters,
- * each delta paired with a plain-language cause for the review card.
+ * Where the deployment's own standing opens, so the review measures the
+ * season against its start rather than a flat baseline: a permitting desk
+ * opens at scrutiny 38, a planting program at 12.
  */
-function computeSeasonBridge(journey, endResult, startBudget) {
+export function readStandingSnapshot(journey) {
+  return {
+    scrutiny: Number(journey.scrutiny ?? 22),
+    working: journey.journeyType === 'permitting' ? averageOf(journey.relationships) : null,
+  };
+}
+
+/**
+ * The metric bridge: what the deployment did to the year's five meters. Each
+ * entry pairs a raw delta with a plain-language cause; the review prints what
+ * actually landed on the meter (formatBridgeCauses).
+ *
+ * Relationships and compliance read what the player did in-season: the
+ * relationship and compliance effects the season's events announced
+ * (journey.standingLedger, js/events/resolution.js), the mode's own
+ * relationship work — crew morale in the field, the engagement record on a
+ * planning file, the working relationships on a permitting desk — and how far
+ * scrutiny moved from where the deployment opened. Only manager journeys
+ * carry `metrics`, so reading those left both meters inert.
+ */
+export function computeSeasonBridge(journey, endResult, startBudget) {
   const completion = getObjectiveCompletion(journey);
   const victory = Boolean(endResult?.victory);
-  const starts = journey.campaignStartMetrics || {};
-  const deltas = {};
-  const causes = [];
+  const start = journey.campaignStartStanding || {};
+  const ledger = journey.standingLedger || {};
+  const entries = [];
 
-  let progress = Math.round(-4 + completion * 16) + (victory ? 2 : 0);
-  deltas.progress = clamp(progress, -6, 14);
-  causes.push(`Objective ${(completion * 100).toFixed(0)}% ${victory ? 'and delivered' : 'complete'} → Progress ${deltas.progress >= 0 ? '+' : ''}${deltas.progress}`);
+  // A season that delivered nothing costs real ground. It used to cost four
+  // points, which a Push stance's +3 all but paid back.
+  entries.push({
+    metric: 'progress',
+    delta: clamp(Math.round(-8 + completion * 20) + (victory ? 2 : 0), -8, 14),
+    reason: `Objective ${(completion * 100).toFixed(0)}% ${victory ? 'and delivered' : 'complete'}`,
+  });
 
-  // Stakeholder signal: how the run moved its own relationships AND
-  // reputation meters, plus a small read from crew morale for field modes —
-  // otherwise a clean-but-quiet season leaves the year meter inert.
-  const relMoved = Number(journey.metrics?.relationships ?? 50) - Number(starts.relationships ?? 50);
-  const repMoved = Number(journey.metrics?.reputation ?? 50) - Number(starts.reputation ?? 50);
-  const crew = Array.isArray(journey.crew) ? journey.crew.filter((m) => m.isActive) : [];
-  const morale = crew.length
-    ? crew.reduce((sum, m) => sum + (Number(m.morale) || 0), 0) / crew.length
-    : null;
-  const moraleSignal = morale === null ? 0 : clamp(Math.round((morale - 70) / 10), -2, 2);
-  deltas.relationships = clamp(Math.round((relMoved + repMoved) / 5) + moraleSignal, -8, 8);
-  if (deltas.relationships) {
-    causes.push(`Stakeholders and crew ${deltas.relationships > 0 ? 'came along' : 'were strained'} → Relationships ${deltas.relationships > 0 ? '+' : ''}${deltas.relationships}`);
+  const relEvents = Math.round(Number(ledger.relationships) || 0);
+  const relParts = relEvents ? [`in-season calls ${signed(relEvents)}`] : [];
+  let relWork = 0;
+  const crew = Array.isArray(journey.crew) ? journey.crew : [];
+  if (crew.length) {
+    const active = crew.filter((m) => m.isActive);
+    if (!active.length) {
+      relWork = -3;
+      relParts.push('the crew walked off the job');
+    } else {
+      const morale = active.reduce((sum, m) => sum + (Number(m.morale) || 0), 0) / active.length;
+      relWork = clamp(Math.round((morale - 70) / 10), -2, 2);
+      if (relWork) relParts.push(`crew morale ${Math.round(morale)}`);
+    }
+  } else if (journey.journeyType === 'planning' && journey.plan) {
+    const buyIn = Math.round(Number(journey.plan.stakeholderBuyIn) || 0);
+    relWork = clamp(Math.round((buyIn - 60) / 12), -2, 3);
+    if (relWork) relParts.push(`engagement record at ${buyIn}% buy-in`);
+  } else if (journey.journeyType === 'permitting' && Number.isFinite(start.working)) {
+    // Events shift every working relationship by half their announced amount;
+    // what is left is the meetings, follow-ups and answered letters.
+    const moved = (averageOf(journey.relationships) ?? start.working) - start.working - relEvents / 2;
+    relWork = clamp(Math.round(moved / 4), -3, 3);
+    if (relWork) relParts.push(`working relationships with the district, Nation and agencies ${relWork > 0 ? 'warmed' : 'cooled'}`);
+  }
+  const relationships = clamp(Math.round(relEvents / 5) + relWork, -10, 10);
+  if (relationships) {
+    entries.push({ metric: 'relationships', delta: relationships, reason: `Relationships: ${relParts.join('; ')}` });
   }
 
-  const compMoved = Number(journey.metrics?.compliance ?? 50) - Number(starts.compliance ?? 50);
-  const scrutiny = Number(journey.scrutiny ?? 20);
-  deltas.compliance = clamp(
-    Math.round(compMoved / 4) + clamp(Math.round((22 - scrutiny) / 6), -5, 3),
+  const compEvents = Math.round(Number(ledger.compliance) || 0);
+  const scrutinyStart = Math.round(Number(start.scrutiny ?? 22));
+  const scrutinyEnd = Math.round(Number(journey.scrutiny ?? scrutinyStart));
+  const compliance = clamp(
+    Math.round(compEvents / 4) + clamp(Math.round((scrutinyStart - scrutinyEnd) / 5), -5, 4),
     -10,
-    8,
+    10,
   );
-  if (deltas.compliance) {
-    causes.push(`File compliance ${compMoved >= 0 ? 'held' : 'slipped'}, scrutiny ${scrutiny} → Compliance ${deltas.compliance > 0 ? '+' : ''}${deltas.compliance}`);
+  if (compliance) {
+    const parts = compEvents ? [`in-season calls ${signed(compEvents)}`] : [];
+    parts.push(scrutinyEnd === scrutinyStart
+      ? `scrutiny held at ${scrutinyEnd}%`
+      : `scrutiny ${scrutinyEnd > scrutinyStart ? 'rose' : 'eased'} ${scrutinyStart}% → ${scrutinyEnd}%`);
+    entries.push({ metric: 'compliance', delta: compliance, reason: `The file: ${parts.join('; ')}` });
   }
 
+  // Thrift only counts for work that got done. An allowance left unspent
+  // because the crew starved or the queue sat still is not a saving.
   const endBudget = Number(journey.resources?.budget ?? 0);
   if (startBudget > 0) {
     const spentFraction = clamp(1 - endBudget / startBudget, 0, 1);
-    deltas.budget = clamp(Math.round(5 - spentFraction * 11), -8, 5);
-    causes.push(`Spent ${(spentFraction * 100).toFixed(0)}% of the season allowance → Budget ${deltas.budget >= 0 ? '+' : ''}${deltas.budget}`);
+    const raw = 5 - spentFraction * 11;
+    const spent = `Spent ${(spentFraction * 100).toFixed(0)}% of the season allowance`;
+    entries.push({
+      metric: 'budget',
+      delta: clamp(Math.round(raw > 0 ? raw * completion : raw), -8, 5),
+      reason: raw > 0 && completion < 0.5 ? `${spent}, with the work it was for undone` : spent,
+    });
   }
 
   // Forest health only moves when the deployment actually touched the land;
   // the ecology drift stays the systemic mover.
-  let fh = 0;
   if (journey.journeyType === 'silviculture') {
     const quality = Number(journey.planting?.qualityAverage ?? journey.planting?.survivalRate ?? 85);
-    fh = quality >= 85 ? 4 : quality < 75 ? -3 : 1;
-    causes.push(`Planting quality ${quality}% → Forest Health ${fh >= 0 ? '+' : ''}${fh}`);
+    entries.push({ metric: 'forestHealth', delta: quality >= 85 ? 4 : quality < 75 ? -3 : 1, reason: `Planting quality ${quality}%` });
   } else if (journey.journeyType === 'recon' || journey.journeyType === 'field') {
-    const swept = (journey.blocks || []).filter((block) => {
-      const intel = journey.reconIntel?.byBlock?.[block.id];
-      return intel?.valuesSwept;
-    }).length;
-    fh = clamp(Math.floor(swept / 2), 0, 3);
-    if (fh) causes.push(`${swept} values sweeps on the ground → Forest Health +${fh}`);
+    const swept = (journey.blocks || []).filter((block) => journey.reconIntel?.byBlock?.[block.id]?.valuesSwept).length;
+    const fh = clamp(Math.floor(swept / 2), 0, 3);
+    if (fh) entries.push({ metric: 'forestHealth', delta: fh, reason: `${swept} values sweeps on the ground` });
   }
-  if (fh) deltas.forestHealth = fh;
 
-  return { deltas, causes, completion, victory };
+  const deltas = {};
+  for (const entry of entries) deltas[entry.metric] = (deltas[entry.metric] || 0) + entry.delta;
+  return { deltas, entries, completion, victory };
+}
+
+/**
+ * Apply effects to the year and measure what each meter actually moved. The
+ * review used to print the raw bridge (Progress +14) while the meter took +8.
+ * @returns {{moved: Object, notes: Object}} per-metric movement, and why a
+ *   meter took less than it was given
+ */
+export function applyYearEffects(gs, effects, source) {
+  const before = { ...gs.metrics };
+  const flags = gs.flags || {};
+  applyEffects(gs, effects, source);
+  const moved = {};
+  const notes = {};
+  for (const [key, delta] of Object.entries(effects)) {
+    if (gs.metrics[key] === undefined) continue;
+    moved[key] = Math.round(gs.metrics[key] - before[key]);
+    if (moved[key] === Math.round(delta)) continue;
+    if (gs.metrics[key] <= 0 || gs.metrics[key] >= 100) notes[key] = 'the meter is at its limit';
+    else if (key === 'relationships' && flags.trustDeficitActive && delta > 0) notes[key] = 'low trust halves the gain';
+    else if (key === 'budget' && flags.budgetLoanActive && delta > 0) notes[key] = 'the loan takes its cut';
+    else if (delta > 0 && before[key] >= 75) notes[key] = 'harder to gain near the top of the meter';
+  }
+  return { moved, notes };
+}
+
+/** Review lines for the bridge, each naming the change the meter actually took. */
+export function formatBridgeCauses(entries, moved = {}, notes = {}) {
+  return entries.map((entry) => {
+    const name = formatMetricName(entry.metric);
+    const actual = moved[entry.metric] ?? entry.delta;
+    if (!actual && !entry.delta) return `${entry.reason} → no ${name} change`;
+    const note = notes[entry.metric] ? `; ${notes[entry.metric]}` : '';
+    const earned = actual !== entry.delta ? ` (${signed(entry.delta)} earned${note})` : '';
+    return `${entry.reason} → ${name} ${signed(actual)}${earned}`;
+  });
 }
 
 /** Build a fresh seasonal-engine state for this season's role, sharing the year's meters. */
@@ -307,7 +450,7 @@ export async function runCampaign(game) {
   // write the expedition autosave — the year lives in bcft.campaign.v1.
   game._campaignActive = true;
   try {
-    await runCampaignInner(game);
+    return await runCampaignInner(game);
   } finally {
     // Never leak hidden expedition chrome or the campaign banner back to the
     // hub or a quick mode.
@@ -358,8 +501,9 @@ async function runCampaignInner(game) {
     saveCampaign(serializeCampaign(campaign));
   }
 
-  await showYearEnd(ui, campaign);
+  const result = await showYearEnd(ui, campaign);
   clearCampaign();
+  return result;
 }
 
 async function setupCampaign(ui) {
@@ -441,7 +585,7 @@ async function runCampaignSeason(game, campaign, season) {
     const stanceIndex = await promptSeasonalCard(ui, {
       cardLabel: `${season.label} · Season ${campaign.seasonIndex + 1} of 4`,
       title: `${season.label}: ${season.title}`,
-      description: season.situation,
+      description: describeSeasonSituation(campaign, season),
       context: `You take the ${FORESTER_ROLES.find((r) => r.id === season.roleId)?.name || season.roleId} seat this season. The deployment is condensed — a season's worth of work in a tight window — and what it does feeds the year's meters at the season review.`,
       decisionPrompt: isFieldSeason(journeyType) ? 'How do you brief the crew?' : 'How do you set the season up?',
       optionDetails: BRIEFING_STANCES.map((s) => ({ preview: s.preview(journeyType), riskLevel: s.riskLevel })),
@@ -449,14 +593,15 @@ async function runCampaignSeason(game, campaign, season) {
 
     stance = BRIEFING_STANCES[stanceIndex];
     campaign.stanceIndex = stanceIndex;
+    campaign.stanceMoved = null;
     if (Object.keys(stance.yearEffects).length) {
-      applyEffects(gsSeason, stance.yearEffects, {
+      campaign.stanceMoved = applyYearEffects(gsSeason, stance.yearEffects, {
         type: 'assignment',
         id: `campaign-briefing-${season.id}`,
         title: `${season.label} briefing: ${stance.label}`,
         option: stance.label,
         round: gsSeason.round,
-      });
+      }).moved;
     }
   }
 
@@ -482,6 +627,8 @@ async function runCampaignSeason(game, campaign, season) {
     applyDifficultyMultipliers(journey, campaign.difficulty);
     stance.applyPerk(journey);
     journey.campaignStartBudget = Number(journey.resources?.budget ?? 0);
+    // Marks the journey as a campaign deployment (js/game/saveLoad.js never
+    // offers one as a standalone expedition).
     journey.campaignStartMetrics = { ...(journey.metrics || {}) };
     // The deployment's internal calendar matches the campaign season, so a
     // winter permitting push doesn't display "Spring Y1" in the sidebar.
@@ -493,9 +640,12 @@ async function runCampaignSeason(game, campaign, season) {
     if (Array.isArray(campaign.discoveryTags) && campaign.discoveryTags.length) {
       journey.discoveryTags = [...campaign.discoveryTags];
     }
+    const carryLines = applySeasonCarryForward(campaign, season, journey);
+    journey.campaignStartStanding = readStandingSnapshot(journey);
 
     ui.clear();
     ui.writeHeader(`DEPLOYMENT: ${season.title.toUpperCase()}`);
+    for (const line of carryLines) ui.writeWarning(line);
     ui.write(stance.perkLine(journey.journeyType), 'term-dim');
     ui.write('');
     await promptContinue(ui, 'Move out');
@@ -562,16 +712,31 @@ async function runCampaignSeason(game, campaign, season) {
   setExpeditionChromeHidden(true);
   const bridge = computeSeasonBridge(journey, endResult, journey.campaignStartBudget);
   const objectiveDetail = getObjectiveDetail(journey);
-  if (stance && Object.keys(stance.yearEffects).length) {
-    bridge.causes.push(`Briefing stance "${stance.label}" → ${formatMetricDelta(stance.yearEffects)}`);
-  }
-  applyEffects(gsSeason, bridge.deltas, {
+  const applied = applyYearEffects(gsSeason, bridge.deltas, {
     type: 'event',
     id: `campaign-season-${season.id}`,
     title: `${season.label} deployment: ${season.title}`,
     option: endResult.victory ? 'Delivered' : 'Fell short',
     round: gsSeason.round,
   });
+  const causes = formatBridgeCauses(bridge.entries, applied.moved, applied.notes);
+  const seasonDeltas = { ...applied.moved };
+  if (stance && Object.keys(stance.yearEffects).length) {
+    causes.push(`Briefing stance "${stance.label}" → ${formatMetricDelta(campaign.stanceMoved || stance.yearEffects)}`);
+  }
+  // The Push stance banked Progress up front on the promise of delivery; a
+  // season that fell short gives it back.
+  if (stance?.yearEffects.progress > 0 && !endResult.victory) {
+    const clawback = applyYearEffects(gsSeason, { progress: -stance.yearEffects.progress }, {
+      type: 'event',
+      id: `campaign-push-shortfall-${season.id}`,
+      title: `${season.label}: pushed for delivery and fell short`,
+      option: stance.label,
+      round: gsSeason.round,
+    }).moved.progress;
+    seasonDeltas.progress = (seasonDeltas.progress || 0) + clawback;
+    causes.push(`Pushed for delivery and fell short: the woods manager wanted the numbers → Progress ${clawback}`);
+  }
 
   // Pull the deployment's discoveries into the year.
   if (Array.isArray(journey.discoveryTags)) {
@@ -626,12 +791,16 @@ async function runCampaignSeason(game, campaign, season) {
   renderMetricStrip(ui, gsSeason);
   ui.write('');
   ui.writeHeader(`${season.label.toUpperCase()} REVIEW`);
-  ui.write(endResult.victory
-    ? `${season.title} delivered: ${objectiveDetail}. ${endResult.reason || ''}`
-    : `${season.title} fell short: ${objectiveDetail}. ${endResult.reason || ''}`);
+  // The recon end check is shared with standalone expeditions, whose win line
+  // reads "Expedition completed!" — not something a campaign season says.
+  const endReason = endResult.reason === 'Expedition completed!' ? '' : (endResult.reason || '');
+  ui.write([
+    `${season.title} ${endResult.victory ? 'delivered' : 'fell short'}: ${objectiveDetail}.`,
+    endReason,
+  ].filter(Boolean).join(' '));
   ui.write('');
   ui.writeDivider('WHAT IT DID TO THE YEAR');
-  for (const cause of bridge.causes) ui.write(`• ${cause}`);
+  for (const cause of causes) ui.write(`• ${cause}`);
   if (explained.length) {
     ui.writeDivider('WHY THIS HAPPENED');
     for (const entry of explained) {
@@ -648,13 +817,15 @@ async function runCampaignSeason(game, campaign, season) {
     : 'Close out the year');
 
   campaign.seasonLog.push({
+    id: season.id,
     season: season.label,
     title: season.title,
     victory: endResult.victory === true,
-    reason: endResult.reason || '',
+    reason: endReason,
     detail: objectiveDetail,
     completion: Math.round(bridge.completion * 100),
-    deltas: bridge.deltas,
+    deltas: seasonDeltas,
+    standing: { ...(journey.standingLedger || {}) },
     metricsAfter: { ...campaign.yearMetrics },
   });
 
@@ -662,24 +833,82 @@ async function runCampaignSeason(game, campaign, season) {
   return true;
 }
 
-async function showYearEnd(ui, campaign) {
-  setExpeditionChromeHidden(true);
-  const tier = deriveTier(campaign.yearMetrics);
-  const metrics = campaign.yearMetrics;
-  const wins = campaign.seasonLog.filter((s) => s.victory).length;
+const TIER_ORDER = ['stumbled', 'mixed', 'solid', 'outstanding'];
 
-  const tierBody = {
-    outstanding: 'An exceptional year — the rest of the district will be measured against it.',
-    solid: 'A clearly good year. The program delivered and the file holds up.',
-    mixed: 'Mixed outcomes. Some seasons carried the ones that stumbled.',
+// The deployments a year must deliver to earn a tier. The meters alone let a
+// year that delivered one season of four read "The program delivered".
+const MIN_DELIVERIES = { solid: 2, outstanding: 3 };
+
+// The meter floors of the next tier up (js/engine/scoring.js deriveTier),
+// named on the Year in Review so the player can see what held the year back.
+const NEXT_TIER_FLOORS = {
+  stumbled: { tier: 'Mixed', floors: { compliance: 45, relationships: 42, forestHealth: 42 } },
+  mixed: { tier: 'Solid', floors: { compliance: 60, relationships: 52, forestHealth: 48, progress: 35 } },
+};
+
+/**
+ * The year's tier: the meters decide it, and the deployments cap it.
+ * @returns {{tier: string, cappedFrom: string|null}}
+ */
+export function deriveCampaignTier(metrics, delivered) {
+  const earned = deriveTier(metrics);
+  let tier = earned;
+  while (MIN_DELIVERIES[tier] && delivered < MIN_DELIVERIES[tier]) {
+    tier = TIER_ORDER[TIER_ORDER.indexOf(tier) - 1];
+  }
+  return { tier, cappedFrom: tier === earned ? null : earned };
+}
+
+/** The Year in Review's verdict, written against what was actually delivered. */
+export function describeYearEnd({ tier, cappedFrom }, delivered, metrics, total = CAMPAIGN_SEASONS.length) {
+  const all = delivered === total;
+  const most = delivered >= Math.ceil(total / 2);
+  const body = {
+    outstanding: all
+      ? 'An exceptional year — the rest of the district will be measured against it.'
+      : 'An exceptional year on the meters, with one season that got away. The district will still measure itself against it.',
+    solid: all
+      ? 'A clearly good year. The program delivered and the file holds up.'
+      : 'A good year on balance: the file holds up, and the seasons that delivered carried the ones that fell short.',
+    mixed: delivered === 0
+      ? 'Mixed on paper, but nothing the year set out to deliver got delivered.'
+      : most
+        ? 'The work mostly got done, but the meters show what it cost.'
+        : 'Mixed outcomes. Some seasons carried the ones that stumbled.',
     stumbled: 'A hard year. The meters tell the story, and so will the review.',
   }[tier] || '';
+
+  const reasons = [];
+  if (cappedFrom) {
+    const need = MIN_DELIVERIES[cappedFrom];
+    reasons.push(`The meters read ${cappedFrom[0].toUpperCase()}${cappedFrom.slice(1)}, but that takes at least ${need} of ${total} deployments delivered.`);
+  } else if (tier === 'solid') {
+    reasons.push('Outstanding needs Compliance 88+ with Relationships 72+, or Forest Health 67+ with Compliance 75+ and Relationships 65+, and no meter under 40.');
+  } else if (NEXT_TIER_FLOORS[tier]) {
+    const next = NEXT_TIER_FLOORS[tier];
+    const missing = Object.entries(next.floors)
+      .filter(([key, floor]) => Number(metrics[key]) < floor)
+      .map(([key, floor]) => `${formatMetricName(key)} ${floor}+ (you have ${Math.round(metrics[key])})`);
+    reasons.push(missing.length
+      ? `${next.tier} needs ${missing.join(', ')}.`
+      : `${next.tier} needs a stronger year across all five meters.`);
+  }
+  return { body: `${delivered}/${total} deployments delivered. ${body}`, reasons };
+}
+
+async function showYearEnd(ui, campaign) {
+  setExpeditionChromeHidden(true);
+  const metrics = campaign.yearMetrics;
+  const wins = campaign.seasonLog.filter((s) => s.victory).length;
+  const verdict = deriveCampaignTier(metrics, wins);
+  const { tier } = verdict;
+  const { body, reasons } = describeYearEnd(verdict, wins, metrics);
 
   const summary = {
     heading: 'YEAR IN REVIEW',
     tier,
-    body: `${wins}/${CAMPAIGN_SEASONS.length} deployments delivered. ${tierBody}`,
-    scoreReasons: [],
+    body,
+    scoreReasons: reasons,
     seasonSummaries: campaign.seasonLog.map((s) =>
       `• ${s.season} ${s.title}: ${s.victory ? 'delivered' : 'fell short'} at ${s.completion}% (${s.detail || 'counts unavailable'}) — ${formatMetricDelta(s.deltas) || 'no metric movement'}`),
     trendLines: Object.entries(metrics).map(([key, value]) => `${formatMetricName(key)}: ${Math.round(value)}`),
@@ -687,4 +916,5 @@ async function showYearEnd(ui, campaign) {
 
   const gsLike = { metrics, round: 4, totalRounds: 4, roleDisplayName: campaign.crewName };
   await promptSummaryCard(ui, summary, ['Return to the district office'], gsLike);
+  return { tier, yearMetrics: { ...metrics }, seasonLog: campaign.seasonLog, delivered: wins };
 }
