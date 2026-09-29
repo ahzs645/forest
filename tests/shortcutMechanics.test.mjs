@@ -160,14 +160,15 @@ test('what the chip and the stakes promise is what the outcome applies', () => {
 
 test('a desk budget near its ceiling is offered only what fits, and the outcome prints what landed', () => {
   const journey = journeyFor('permitter');
-  journey.resources.budget = 63400;
+  // The act pays more than the room left under the $100,000 ceiling.
+  journey.resources.budget = 95000;
   const spill = act('permitter-hide-spill-report');
   const { effects } = buildTemptationPayoff(spill, journey);
-  assert.equal(effects.budget, 36600);
+  assert.equal(effects.budget, 5000);
   const event = buildTemptationEvent(spill, journey);
   const result = resolveAt(journey, event, event.options[1], 0);
   assert.equal(journey.resources.budget, 100000);
-  assert.ok(result.messages.includes('Budget: +$36,600'), result.messages.join(' | '));
+  assert.ok(result.messages.includes('Budget: +$5,000'), result.messages.join(' | '));
 });
 
 test('each role is paid in its own currency', () => {
@@ -333,7 +334,7 @@ test('a campaign carries the season\'s shortcuts, flags and unlanded determinati
   spring.consequenceFlags = ['ce_watching', 'camp_bear'];
   spring.temptationMemory = { seenActIds: ['dont-report-the-spill', 'silvi-fake-site-prep'], takenActIds: ['dont-report-the-spill', 'silvi-fake-site-prep'] };
   spring.day = 9;
-  queueFallout(spring, { actId: 'silvi-fake-site-prep', title: 'Mound the Ten Hectares by the Road', institution: 'C&E', dueIn: 5, effects: { compliance: -10, scrutiny: 15 }, flags: ['ce_watching'] });
+  queueFallout(spring, { actId: 'silvi-fake-site-prep', title: 'Mound Ten Hectares and Report Forty', institution: 'C&E', dueIn: 5, effects: { compliance: -10, scrutiny: 15 }, flags: ['ce_watching'] });
 
   const review = collectShortcutsFromJourney(campaign, spring, { label: 'Spring' });
   assert.deepEqual(review.counts, { taken: 2, noticed: 1, caught: 1 });
@@ -347,13 +348,13 @@ test('a campaign carries the season\'s shortcuts, flags and unlanded determinati
   assert.ok(summer.consequenceFlags.includes('ce_watching'));
   assert.deepEqual(summer.temptationMemory.takenActIds, ['dont-report-the-spill', 'silvi-fake-site-prep']);
   assert.ok(carryLines.some((line) => /Shortcut odds start worse/.test(line)));
-  assert.ok(carryLines.some((line) => /has not decided on “Mound the Ten Hectares by the Road” yet/.test(line)));
+  assert.ok(carryLines.some((line) => /has not decided on “Mound Ten Hectares and Report Forty” yet/.test(line)));
 
   // The spring determination lands early in the summer, naming the spring.
   summer.day = 2;
   const fallout = checkForEvent(summer);
   assert.equal(fallout?.temptationStage, 'fallout');
-  assert.match(fallout.description, /^Back in spring, on day 9, you took the shortcut on “Mound the Ten Hectares by the Road”/);
+  assert.match(fallout.description, /^Back in spring, on day 9, you took the shortcut on “Mound Ten Hectares and Report Forty”/);
 });
 
 // ── Tone ────────────────────────────────────────────────────────────────────
