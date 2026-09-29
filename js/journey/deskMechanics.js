@@ -365,3 +365,39 @@ function endDeskDay(journey) {
 
   return { journey, messages };
 }
+
+/**
+ * Mid-day checkpoints for the desk roles.
+ *
+ * A desk day used to be saved only at its boundary, so a reload after the
+ * morning's situation replayed the day from the top: same situation, same
+ * dice, and the player could try an option, read its outcome, reload and
+ * pick another. The runner checkpoints once the situation is settled and
+ * again once the day's action is taken; resuming picks the day up after the
+ * last one instead of replaying it.
+ *
+ * @param {Object} game - { journey, checkpoint? }
+ * @param {Object} fields - what the runner needs to pick the day back up
+ */
+export function checkpointDeskDay(game, fields = {}) {
+  const { journey } = game;
+  if (!journey) return;
+  const current = resumingDeskDay(journey) || { day: journey.day };
+  journey.activeDeskDay = { ...current, ...fields, day: journey.day };
+  game.checkpoint?.();
+}
+
+/**
+ * The checkpoint for the day in progress, or null for a fresh day.
+ * @param {Object} journey
+ * @returns {Object|null}
+ */
+export function resumingDeskDay(journey) {
+  const active = journey?.activeDeskDay;
+  return active && active.day === journey.day ? active : null;
+}
+
+/** The day is over; the boundary save takes it from here. */
+export function closeDeskDay(journey) {
+  if (journey) journey.activeDeskDay = null;
+}

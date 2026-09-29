@@ -157,6 +157,7 @@ export async function runDaySituation(game, event, options = {}) {
       title: event?.title || 'the situation',
       setAside: true,
     };
+    frame.onResolved?.({ spendsDay: false, setAside: true });
     ui.updateAllStatus?.(journey);
     frame.onRender?.();
     // Keep the cost on screen until the player has read it; the quiet card

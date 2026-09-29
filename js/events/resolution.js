@@ -229,7 +229,7 @@ export function resolveEvent(journey, event, option) {
 
   messages.push(...describeGoodwillChange(journey, goodwillBefore));
 
-  const reaction = buildEventReaction(journey, option, rng);
+  const reaction = buildEventReaction(journey, option, rng, { band: resolved.band });
   if (reaction) {
     messages.push(reaction);
   }

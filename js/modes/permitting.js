@@ -16,6 +16,8 @@ import { getOperationalProgress, recordProgressMilestones } from '../journey.js'
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
+import { checkPermittingEndConditions } from './shared/endConditions.js';
+import { checkpointDeskDay, closeDeskDay, resumingDeskDay } from '../journey/deskMechanics.js';
 import {
   DAILY_PERMIT_THROUGHPUT,
   PERMIT_TYPES,
@@ -1125,37 +1127,59 @@ export async function runPermittingDay(game) {
   ensurePermittingProfessionalState(journey);
   // The debrief measures spending against what the desk started with.
   if (!Number.isFinite(journey.budgetStart)) journey.budgetStart = journey.resources?.budget || 0;
+  // A follow-up that fired before the day opened can spend the last of it.
+  if (endRunIfSpent(journey)) return;
+
+  // A reload mid-day picks up after the last settled decision instead of
+  // replaying the morning (js/journey/deskMechanics.js).
+  const resumed = resumingDeskDay(journey);
 
   // Morning at the office: the season outside the window, coffee inside.
-  if (typeof ui.playScene === 'function') {
+  if (!resumed && typeof ui.playScene === 'function') {
     await ui.playScene(buildOfficeWindowFrames({
       weatherId: journey.weather?.id,
       season: journey.season?.currentSeason,
       seed: journey.day,
     }), { delay: 140, holdLastFrame: false, ambient: 'work' });
   }
+  if (resumed) {
+    startDay(journey, { resuming: true });
+    if (resumed.situation) journey.recentSituationContext = { day: journey.day, ...resumed.situation };
+  }
 
   const daysRemaining = journey.deadline - journey.day;
-  const progressBeforeDay = getOperationalProgress(journey);
-  let meetingsToday = 0;
-  let crisisMode = daysRemaining <= 5;
+  const progressBeforeDay = resumed?.progressBeforeDay ?? getOperationalProgress(journey);
+  let meetingsToday = resumed?.meetingsToday || 0;
+  let crisisMode = Boolean(resumed?.crisisMode) || daysRemaining <= 5;
 
   // Check for random event at start of day. Day 1 is event-free onboarding so
   // the player sees the normal permitting loop before any exception arrives.
-  const event = journey.day > 1 ? checkForEvent(journey) : null;
+  const event = !resumed && journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     const outcome = await runDaySituation(game, event, {
       frame: {
         dayHeader: buildPermittingDayHeader(journey),
         statusLine: buildPermittingStatusLine(journey),
         onRender: () => updatePermittingMissionStatus(ui, journey),
+        onResolved: ({ spendsDay, setAside }) => {
+          if (spendsDay) spendDay(journey);
+          reconcilePermitFiles(journey);
+          checkpointDeskDay(game, {
+            progressBeforeDay,
+            situation: { title: event.title || 'the situation', setAside },
+          });
+        },
       },
       setAsideDescription: 'Not today. Keep the day for the queue.',
     });
     if (outcome.gameOver) return;
-    if (outcome.spendsDay) spendDay(journey);
-    // An authored situation may have moved the counters; bring the files up.
-    reconcilePermitFiles(journey);
+    // A situation that spends the last of the goodwill or the budget ends the
+    // run there. The outcome has already said "the file stops here"; a day's
+    // work after it (and a district meeting that won the goodwill back) made
+    // that a lie.
+    if (endRunIfSpent(journey)) return;
+    // The day was spent and the counters reconciled as the situation resolved,
+    // so the checkpoint holds the settled queue.
     ensurePermittingRevisionState(journey);
   }
 
@@ -1224,6 +1248,8 @@ export async function runPermittingDay(game) {
       crisisMode = true;
     }
 
+    if (dayIsSpent(journey)) checkpointDeskDay(game, { progressBeforeDay, meetingsToday, crisisMode });
+
     // Update status panels
     ui.updateAllStatus(journey);
     settleDayPass(journey, freeChoices, ui);
@@ -1231,6 +1257,18 @@ export async function runPermittingDay(game) {
 
   // End of day processing
   await endOfDayProcessing(game, meetingsToday, crisisMode, progressBeforeDay);
+}
+
+/**
+ * End the run on the spot when goodwill, budget or the specialist is spent.
+ * @returns {boolean} true when the run has ended
+ */
+function endRunIfSpent(journey) {
+  const ended = checkPermittingEndConditions(journey);
+  if (!ended?.gameOver) return false;
+  journey.isGameOver = true;
+  journey.gameOverReason = ended.reason;
+  return true;
 }
 
 /**
@@ -1930,6 +1968,7 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
 
     // Advance to next day
     journey.day++;
+    closeDeskDay(journey);
     startDay(journey);
     journey.currentPhase = getDeskPhase(journey);
 
@@ -1950,9 +1989,12 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
   const daysLeft = journey.deadline - journey.day;
   const permitPct = journey.permits.target > 0
     ? Math.round((journey.permits.approved / journey.permits.target) * 100) : 0;
-  const continueLabel = daysLeft > 0
-    ? `Start next day... (${daysLeft} days left, ${permitPct}% issued)`
-    : 'Start next day... (DEADLINE)';
+  // The night the run ends, the button says so instead of promising a day.
+  const continueLabel = checkPermittingEndConditions(journey)?.gameOver
+    ? 'The work stops here...'
+    : daysLeft > 0
+      ? `Start next day... (${daysLeft} day${daysLeft === 1 ? '' : 's'} left, ${permitPct}% issued)`
+      : 'Start next day... (DEADLINE)';
   await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
 }
 

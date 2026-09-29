@@ -39,6 +39,7 @@ import { getOperationalProgress, recordProgressMilestones } from '../journey.js'
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
+import { checkpointDeskDay, closeDeskDay, resumingDeskDay } from '../journey/deskMechanics.js';
 
 /**
  * What a day on each track of the planning file is worth.
@@ -790,13 +791,18 @@ function actionNeedsReceipt(actionValue) {
 export async function runPlanningDay(game) {
   const { ui, journey } = game;
   const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
-  const progressBeforeDay = getOperationalProgress(journey);
+  // A reload mid-day picks up after the last settled decision instead of
+  // replaying the morning (js/journey/deskMechanics.js).
+  const resumed = resumingDeskDay(journey);
+  const progressBeforeDay = resumed?.progressBeforeDay ?? getOperationalProgress(journey);
   ensurePlanningProfessionalState(journey);
   // The debrief measures spending against what the file started with.
   if (!Number.isFinite(journey.budgetStart)) journey.budgetStart = journey.resources?.budget || 0;
+  // A follow-up that fired before the day opened can spend the last of it.
+  if (endsFileNow(game)) return;
 
   // Morning at the office: the season outside the window, coffee inside.
-  if (typeof ui.playScene === 'function') {
+  if (!resumed && typeof ui.playScene === 'function') {
     await ui.playScene(buildOfficeWindowFrames({
       weatherId: journey.weather?.id,
       season: journey.season?.currentSeason,
@@ -804,17 +810,21 @@ export async function runPlanningDay(game) {
     }), { delay: 140, holdLastFrame: false, ambient: 'work' });
   }
 
-  startDay(journey);
+  startDay(journey, { resuming: Boolean(resumed) });
 
-  // Periodic real-data block decision: selected block influences events and values.
-  await maybePromptForBlockSelection(game, seasonInfo);
+  if (!resumed) {
+    // Periodic real-data block decision: selected block influences events and values.
+    await maybePromptForBlockSelection(game, seasonInfo);
 
-  // Apply daily values consequences (Phase 4.1)
-  applyValuesConsequences(journey);
+    // Apply daily values consequences (Phase 4.1)
+    applyValuesConsequences(journey);
+  } else if (resumed.situation) {
+    journey.recentSituationContext = { day: journey.day, ...resumed.situation };
+  }
 
   // Check for event at start of day. Day 1 stays event-free so the player meets
   // the normal planning loop before the game starts throwing disruptions.
-  const event = journey.day > 1 ? checkForEvent(journey) : null;
+  const event = !resumed && journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     const daysLeft = Number.isFinite(journey.deadline)
       ? Math.max(0, journey.deadline - journey.day)
@@ -831,12 +841,24 @@ export async function runPlanningDay(game) {
           `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
         ]),
         onRender: () => updatePlanningMissionStatus(ui, journey, seasonInfo),
+        onResolved: ({ spendsDay, setAside }) => {
+          if (spendsDay) spendDay(journey);
+          checkpointDeskDay(game, {
+            progressBeforeDay,
+            situation: { title: event.title || 'the situation', setAside },
+          });
+        },
       },
       setAsideDescription: 'Not today. Keep the day for the file.',
     });
     if (outcome.gameOver) return;
+    // A situation that spends the last of the goodwill or the budget ends the
+    // file there. The outcome has already said "the file stops here"; a full
+    // day's work after it (and a meeting that won the goodwill back) made
+    // that a lie.
+    if (endsFileNow(game)) return;
     // A situation worth a day is the day — the action menu below never opens.
-    if (outcome.spendsDay) spendDay(journey);
+    // (Spent as it resolved, so the checkpoint already knows.)
   }
 
   // Check protagonist energy
@@ -914,6 +936,7 @@ export async function runPlanningDay(game) {
       if (settleDayPass(journey, freeChoices, ui)) break;
       continue;
     }
+    if (dayIsSpent(journey)) checkpointDeskDay(game, { progressBeforeDay });
 
     ui.updateAllStatus(journey);
     updatePlanningMissionStatus(ui, journey, seasonInfo);
@@ -956,8 +979,11 @@ export async function runPlanningDay(game) {
     ui.writePositive(message);
   }
 
-  // Contextual continue (Phase 6.1)
-  const continueLabel = `Continue... (Phase: ${getPlanningPhaseLabel(journey.plan.phase)}, Day ${journey.day})`;
+  // Contextual continue (Phase 6.1). On the night the file closes, the
+  // button says so instead of promising another day.
+  const continueLabel = journey.isGameOver
+    ? 'The work stops here...'
+    : `Continue... (Phase: ${getPlanningPhaseLabel(journey.plan.phase)}, Day ${journey.day})`;
   await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
 }
 
@@ -2106,6 +2132,7 @@ async function advanceToNextDay(game) {
   }
 
   journey.day++;
+  closeDeskDay(journey);
   startDay(journey);
 
   // Protagonist recovery
@@ -2145,6 +2172,15 @@ async function advanceToNextDay(game) {
   }
 
   ui.write(`Planning team burn: -$${PLANNING_DAILY_BURN}.`);
+}
+
+/**
+ * Close the file on the spot if what it runs on is gone.
+ * @returns {boolean} true when the run has ended
+ */
+function endsFileNow(game) {
+  checkGameOver(game);
+  return Boolean(game.journey.isGameOver);
 }
 
 function checkGameOver(game) {

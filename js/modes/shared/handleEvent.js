@@ -23,6 +23,8 @@ import { getOptionShortfall, formatShortfall } from '../../events/affordability.
  * @param {string} [frame.dayHeader] - "SHIFT 6 - HIGHWAY CAMP"
  * @param {string} [frame.statusLine] - the day's drumbeat line
  * @param {string[]} [frame.context] - free background behind "More context"
+ * @param {Function} [frame.onResolved] - called once the chosen option's
+ *   effects are applied, before the outcome is acknowledged
  * @param {Array} [frame.extraOptions] - mode-supplied ways out of the situation
  *   that are not authored event options (recon's "leave it and keep moving").
  *   Their values must not be numbers, which is how they are told apart from
@@ -91,7 +93,10 @@ export async function handleEvent(game, event, frame = {}) {
   const result = resolveEvent(journey, event, selectedOption);
   // The outcome acknowledgement is still inside the current decision. Saving
   // its effects here would replay them on reload (or repeat a manager's
-  // strategic spending). The runner saves after finishing the decision or day.
+  // strategic spending). The runner saves after finishing the decision or day;
+  // a runner that can resume past the situation checkpoints here instead, so
+  // a reload cannot take the choice back once its outcome is known.
+  frame.onResolved?.({ spendsDay, setAside: false });
   ui.updateAllStatus?.(journey);
   frame.onRender?.();
 
