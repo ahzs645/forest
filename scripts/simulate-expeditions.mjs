@@ -11,6 +11,7 @@
  *   node scripts/simulate-expeditions.mjs                  # all roles, full length
  *   node scripts/simulate-expeditions.mjs --scale campaign # campaign-season deployments
  *   node scripts/simulate-expeditions.mjs --role recon --runs 12 --verbose
+ *   node scripts/simulate-expeditions.mjs --role planning --area all  # every operating area
  *
  * Exits non-zero when a role's win rate falls under --min-win-rate, so it can
  * gate a rebalance.
@@ -29,17 +30,19 @@ import { runPermittingDay } from '../js/modes/permitting.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
 import { runManagerDay } from '../js/modes/manager.js';
 import { checkEndConditions } from '../js/modes/shared/endConditions.js';
+import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 
 const DEFAULT_AREA = 'fraser-plateau';
 const HARD_DAY_CAP = 150;
 
 function parseArgs(argv) {
-  const args = { runs: 8, scale: undefined, role: null, verbose: false, minWinRate: 0 };
+  const args = { runs: 8, scale: undefined, role: null, area: DEFAULT_AREA, verbose: false, minWinRate: 0 };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--runs') args.runs = Number(argv[++i]);
     else if (flag === '--scale') args.scale = argv[++i];
     else if (flag === '--role') args.role = argv[++i];
+    else if (flag === '--area') args.area = argv[++i];
     else if (flag === '--verbose') args.verbose = true;
     else if (flag === '--transcript') args.transcript = true;
     else if (flag === '--min-win-rate') args.minWinRate = Number(argv[++i]);
@@ -504,10 +507,11 @@ function summarizeState(journey) {
   return '';
 }
 
-export async function simulateRun(roleName, seed, scale, trace = null) {
+export async function simulateRun(roleName, seed, scale, trace = null, areaId = DEFAULT_AREA) {
   const role = ROLES[roleName];
+  const area = OPERATING_AREAS.find((candidate) => candidate.id === areaId) || null;
   return withSeed(seed, async () => {
-    const journey = role.create({ areaId: DEFAULT_AREA, roleId: role.roleId, scale });
+    const journey = role.create({ areaId, area, roleId: role.roleId, scale });
     const tally = {};
     const game = {
       ui: makeUi(journey, role.policy, tally, trace),
@@ -552,7 +556,16 @@ async function main() {
     : Object.keys(ROLES).filter((name) => !(args.scale === 'campaign' && ROLES[name].fullLengthOnly));
   let failed = false;
 
-  for (const roleName of roleNames) {
+  const areaIds = args.area === 'all' ? OPERATING_AREAS.map((area) => area.id) : [args.area];
+  const unknownArea = areaIds.find((areaId) => !OPERATING_AREAS.some((area) => area.id === areaId));
+  if (unknownArea) {
+    console.error(`unknown area: ${unknownArea}`);
+    process.exitCode = 2;
+    return;
+  }
+
+  const runs = roleNames.flatMap((roleName) => areaIds.map((areaId) => [roleName, areaId]));
+  for (const [roleName, areaId] of runs) {
     if (!ROLES[roleName]) {
       console.error(`unknown role: ${roleName}`);
       process.exitCode = 2;
@@ -564,14 +577,14 @@ async function main() {
     }
     const results = [];
     for (let i = 0; i < args.runs; i += 1) {
-      results.push(await simulateRun(roleName, 1000 + i * 37, args.scale, args.transcript ? console.log : null));
+      results.push(await simulateRun(roleName, 1000 + i * 37, args.scale, args.transcript ? console.log : null, areaId));
     }
 
     const wins = results.filter((result) => result.won);
     const winRate = wins.length / results.length;
     const winDays = wins.map((result) => result.days).sort((a, b) => a - b);
     const median = winDays.length ? winDays[Math.floor(winDays.length / 2)] : null;
-    const label = `${roleName}${args.scale ? ` (${args.scale})` : ''}`;
+    const label = `${roleName}${args.scale ? ` (${args.scale})` : ''}${areaIds.length > 1 || areaId !== DEFAULT_AREA ? ` ${areaId}` : ''}`;
 
     console.log(
       `${label.padEnd(26)} win ${String(wins.length).padStart(2)}/${results.length}`

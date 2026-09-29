@@ -1122,14 +1122,18 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
   ui.write('');
 
   const triageChoice = await ui.promptChoice('Constraint triage:', triage.options);
-  const triageDelta = getPlanningTriageScrutinyDelta(triageChoice.value);
+  const triageDelta = applyTriageScrutinyShift(journey, triageChoice.value);
   if (triageDelta !== 0) {
-    journey.scrutiny = clampValue((journey.scrutiny || 0) + triageDelta);
     const direction = triageDelta > 0 ? 'rises' : 'eases';
     ui.write(`Scrutiny ${direction} to ${Math.round(journey.scrutiny)}% as you choose ${getPlanningTriageLabel(triageChoice.value)}.`);
+  } else if (reopened && getPlanningTriageScrutinyDelta(triageChoice.value) !== 0) {
+    ui.write(`Scrutiny holds at ${Math.round(journey.scrutiny)}%: the file already carries the ${getPlanningTriageLabel(triageChoice.value)} posture.`);
   }
   ui.write('');
 
+  // The pool is never empty (areas without a block snapshot get area-profile
+  // placeholders), so the set always locks here and the question does not
+  // come back the next morning.
   const options = pickPlanningBlockOptions(journey.areaId, plannerState.history, 3, triageChoice.value, journey.area, seasonInfo);
   if (!options.length) return;
 
@@ -1156,6 +1160,26 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
   if (water.block) {
     ui.write(`Water gate for the set: ${water.gateLabel} — ${water.note}`);
   }
+}
+
+/**
+ * Apply the triage posture's scrutiny shift and return the change. The shift
+ * is a standing position, not a reward for answering: it lands once, and when
+ * an event reopens the block question only the difference between the old
+ * posture and the new one moves scrutiny. Re-picking the same posture moves
+ * nothing, so the triage cannot be farmed.
+ */
+export function applyTriageScrutinyShift(journey, triageKey) {
+  const state = journey?.blockPlanning;
+  if (!state) return 0;
+  // Saves from before this field recorded the posture only on the locked set.
+  const previous = state.scrutinyTriage ?? state.activeTriage ?? null;
+  const delta = getPlanningTriageScrutinyDelta(triageKey) - getPlanningTriageScrutinyDelta(previous);
+  state.scrutinyTriage = triageKey;
+  if (delta === 0) return 0;
+  const before = journey.scrutiny || 0;
+  journey.scrutiny = clampValue(before + delta);
+  return journey.scrutiny - before;
 }
 
 /**
