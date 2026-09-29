@@ -38,3 +38,13 @@ The balance harness drove 24 seeded campaign-length assignments per role using r
 The remaining simulated losses were supply/fuel exhaustion or planning bankruptcy. This is evidence that completion is reachable under a consistent strategy, not a population win-rate estimate or proof that every possible choice succeeds.
 
 The Mac remained locked during this implementation pass, so fresh verification used headless browser interaction and engine tests. The earlier visible manual campaign is documented separately. The updated local game is available at `http://127.0.0.1:5178/` while its development server is running.
+
+## 2026-09-29 — General Manager (playtest #12)
+
+- **Cut control decides the year.** 90–110% of the AAC is clean; outside it the year wins with a finding (and a qualified victory text); below 85% or above 115% the board ends the term. The overcut penalty ($60/m³ past 110%) now exceeds any margin. Objectives score reads the statement; the compliance component blends in the compliance meter.
+- **Legible and steerable.** The projection follows the seasonal curve and the current run rate. A cut schedule (park a side / hold / add a shift) is set at each board review and raised by the woodlands manager whenever the projection leaves the band.
+- **Nothing is wiped unread.** A Continue prompt holds quarter-end ledgers and the cut-control statement before the board review; the review reprints them; every ledger, audit and the statement go into the Log.
+- **Honesty is viable.** Transparent reports of weak quarters cost no reputation and ease scrutiny; spun weak quarters risk a year-end restatement.
+- **Certification is earned.** May registration audit against stated requirements, one October re-audit, October surveillance with suspension; premium and bonus start at issue.
+- **Executive team and calendar.** The Expedition GM gets the CFO/woodlands/chief forester/IR/HSE team; the month drives the season so seasonal cards are gated; no CEO references.
+- **Economy.** Stumpage tracks the log price, overhead $270k scaled by difficulty, January is a ledger month. `node scripts/simulate-manager.mjs` (40 seeds, normal): competent 40/40, honest 40/40, spin 40/40 at a lower grade, reckless 3/40 (overcut), random 34/40 and no Greenhorn bankruptcies.
