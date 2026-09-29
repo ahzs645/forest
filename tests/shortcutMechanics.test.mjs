@@ -130,7 +130,7 @@ test('the card explains why today\'s odds are what they are', () => {
 
 test('what the chip and the stakes promise is what the outcome applies', () => {
   const cases = [
-    { roleId: 'manager', id: 'recce-bribe-scaler' },
+    { roleId: 'manager', id: 'bribe-the-scaler' },
     { roleId: 'manager', id: 'hush-fee-surcharge' },
     { roleId: 'silviculture', id: 'seedling-switcheroo' },
     { roleId: 'permitter', id: 'permitter-hide-spill-report' },

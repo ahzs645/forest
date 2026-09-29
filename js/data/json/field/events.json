@@ -4157,6 +4157,7 @@
   "title": "An Elder Visits Camp",
   "type": "social",
   "severity": "moderate",
+  "stopKinds": ["block"],
   "managerEscalation": true,
   "probability": 0.04,
   "managerVariant": {

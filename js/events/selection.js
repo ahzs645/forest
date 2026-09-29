@@ -15,6 +15,8 @@ import { getApplicableDeskEvents, selectRandomDeskEvent } from '../data/deskEven
 import {
   ILLEGAL_ACTS,
   actFitsRole,
+  actPremises,
+  findIllegalAct,
   buildCaughtNarrative,
   capitalizeProposer,
   CATEGORY_CLEAN_OUTCOMES,
@@ -30,7 +32,7 @@ import { getAreaSituationMultipliers } from '../data/areaSituations.js';
 import { describeEffectChips, formatRadioReport } from './display.js';
 import { getDayRng } from './dayRng.js';
 import { getSignableFiles } from '../journey/permitPipeline.js';
-import { actFitsStop, eventFitsStop } from '../journey/packages.js';
+import { actFitsStop, eventFitsStop, isPackageBlock, isPackageClosed } from '../journey/packages.js';
 import { getPendingFallout, takeDueFallout } from './fallout.js';
 import { applyEventEffects } from './resolution.js';
 import { applyConsequenceFlags } from './consequences.js';
@@ -397,8 +399,9 @@ export function eventMatchesJourneyContext(event, journey, options = {}) {
     }
   }
 
-  // A card about the block's own ground stays off bridges and staging lots.
-  if (!eventFitsStop(event, options.currentBlock)) return false;
+  // A card about the block's own ground stays off bridges and staging lots,
+  // and off a block whose package is already closed.
+  if (!eventFitsStop(event, options.currentBlock, journey)) return false;
 
   return true;
 }
@@ -708,7 +711,7 @@ function isDeskTemptationJourney(journey) {
 }
 
 function getActById(actId) {
-  return ILLEGAL_ACTS.find((act) => act?.id === actId) || null;
+  return findIllegalAct(actId);
 }
 
 function institutionName(act) {
@@ -772,9 +775,134 @@ function settleTemptationFallout(journey) {
   }
 }
 
+// ── Premises: the thing the pitch is about has to still exist ──────────────
+//
+// Each check reads a deployment and answers true, false, or null when the
+// run does not keep that subject (a desk has no planters, a seasonal fixture
+// has no program); null does not gate. Names are the library's ACT_PREMISES.
+
+function silvicultureRun(journey) {
+  return journey?.journeyType === 'silviculture' && journey?.planting ? journey : null;
+}
+
+function plantingBlocksLeft(journey) {
+  return Math.max(0, (Number(journey.planting.blocksToPlant) || 0) - (Number(journey.planting.blocksPlanted) || 0));
+}
+
+function permitFileState(journey) {
+  return journey?.journeyType === 'permitting' && journey?.permits ? journey.permits : null;
+}
+
+const REFERRAL_TYPES = new Set(['CP', 'RP', 'SUP']);
+
+export const ACT_PREMISE_CHECKS = {
+  scrutinyHigh: (journey) => Number(journey?.scrutiny || 0) >= 55,
+  plantingPending: (journey) => (silvicultureRun(journey) ? plantingBlocksLeft(journey) > 0 : null),
+  stockToPlant: (journey) => {
+    if (!silvicultureRun(journey)) return null;
+    const fillLeft = (Number(journey.planting.fillTarget) || 0) - (Number(journey.planting.fillComplete) || 0);
+    return plantingBlocksLeft(journey) > 0 || fillLeft > 0;
+  },
+  plantersOnHand: (journey) => {
+    if (!silvicultureRun(journey) || !Array.isArray(journey.contractors)) return null;
+    return journey.contractors.some((contractor) => contractor?.specialty === 'planting'
+      && !((Number(contractor.silvicultureState?.cooldownDays) || 0) > 0)
+      && contractor.silvicultureState?.status !== 'recovering');
+  },
+  plantedSome: (journey) => (silvicultureRun(journey)
+    ? (Number(journey.planting.blocksPlanted) || 0) > 0 || (Number(journey.planting.seedlingsPlanted) || 0) > 0
+    : null),
+  plotsDue: (journey) => {
+    if (!silvicultureRun(journey) || !Array.isArray(journey.program?.blocks)) return null;
+    return journey.program.blocks.some((block) => block?.status === 'planted');
+  },
+  releaseQueued: (journey) => (silvicultureRun(journey) && journey.brushing
+    ? (Number(journey.brushing.hectaresComplete) || 0) < (Number(journey.brushing.hectaresTarget) || 0)
+    : null),
+  freeGrowingDue: (journey) => (silvicultureRun(journey) && journey.surveys
+    ? (Number(journey.surveys.freeGrowingComplete) || 0) < (Number(journey.surveys.freeGrowingTarget) || 0)
+    : null),
+  fomCommentsOpen: (journey) => {
+    if (journey?.journeyType !== 'planning') return null;
+    const fom = journey.blockPlanning?.fom;
+    return ['public_review', 'revision_required'].includes(fom?.status) && (Number(fom?.commentLoad) || 0) > 0;
+  },
+  referralAhead: (journey) => {
+    const permits = permitFileState(journey);
+    if (!permits) return null;
+    const files = Array.isArray(permits.files) ? permits.files : [];
+    return (Number(permits.backlog) || 0) > 0
+      || files.some((file) => ['drafted', 'screening'].includes(file?.lane) && REFERRAL_TYPES.has(file?.type));
+  },
+  referralOut: (journey) => {
+    const permits = permitFileState(journey);
+    if (!permits) return null;
+    const files = Array.isArray(permits.files) ? permits.files : [];
+    return files.some((file) => file?.lane === 'referral') || (Number(permits.inReferral) || 0) > 0;
+  },
+  // A road blockade comes out of a relationship that has already gone bad.
+  relationsStrained: (journey) => {
+    if (journey?.journeyType !== 'manager') return null;
+    const flags = Array.isArray(journey.consequenceFlags) ? journey.consequenceFlags : [];
+    return Number(journey.metrics?.relationships ?? 50) < 45 || flags.includes('locals_soured');
+  },
+};
+
+/**
+ * Whether every premise the act names holds on this run today.
+ * @param {Object} act
+ * @param {Object} journey
+ * @returns {boolean}
+ */
+export function actPremisesHold(act, journey) {
+  return actPremises(act).every((name) => {
+    const check = ACT_PREMISE_CHECKS[name];
+    return !check || check(journey) !== false;
+  });
+}
+
+// The planning gates a payoff can land on, and the level at which the
+// District Manager counts the gate as met (js/modes/shared/endConditions.js).
+const PLANNING_GATE_LEVELS = {
+  data: { metric: 'dataCompleteness', met: 80 },
+  analysis: { metric: 'analysisQuality', met: 80 },
+  buyIn: { metric: 'stakeholderBuyIn', met: 75 },
+};
+
+/**
+ * Whether the payoff has something to land on today. Ground on the next leg
+ * is worth nothing at the last open block, where there is no next leg that
+ * matters; a planning gate that is already met, or too full to take the whole
+ * payoff, is not a temptation.
+ */
+function payoffLandsToday(act, journey) {
+  const journeyType = journey?.journeyType;
+  if (!['recon', 'field', 'planning'].includes(journeyType)) return true;
+  const { effects } = buildTemptationPayoff(act, journey);
+  if (journeyType === 'planning') {
+    return Object.entries(PLANNING_GATE_LEVELS).every(([key, { metric, met }]) => {
+      const gain = Number(effects[key]) || 0;
+      const level = Number(journey.plan?.[metric]);
+      if (gain <= 0 || !Number.isFinite(level)) return true;
+      return level < met && level + gain <= 100;
+    });
+  }
+  if (!(Number(effects.progress) > 0)) return true;
+  const blocks = Array.isArray(journey.blocks) ? journey.blocks : [];
+  if (!blocks.length) return true;
+  return blocks.some((block, index) => index !== journey.currentBlockIndex
+    && isPackageBlock(block) && !isPackageClosed(journey, block));
+}
+
+/** A journey that travels between stops: the crew's current stop matters. */
+function isTraverseJourney(journey) {
+  return journey?.journeyType === 'recon' || journey?.journeyType === 'field';
+}
+
 /**
  * Whether an act can be offered to this run today. Role and phase come from
- * the library; season, area, difficulty and scrutiny gates are checked here.
+ * the library; season, area, difficulty, premise, stop and payoff gates are
+ * checked here.
  */
 export function actMatchesTemptationContext(act, journey) {
   if (!act || act.retired) return false;
@@ -793,9 +921,10 @@ export function actMatchesTemptationContext(act, journey) {
     if (!areaId || !act.areaIds.includes(areaId)) return false;
   }
   if (act.tier === 'comic' && journey?.difficulty === 'hard') return false;
-  if (act.onlyWhen === 'scrutinyHigh' && Number(journey?.scrutiny || 0) < 55) return false;
-  const stop = Array.isArray(journey?.blocks) ? journey.blocks[journey.currentBlockIndex] : null;
-  if (!actFitsStop(act, stop)) return false;
+  if (!actPremisesHold(act, journey)) return false;
+  const stop = isTraverseJourney(journey) && Array.isArray(journey?.blocks) ? journey.blocks[journey.currentBlockIndex] : null;
+  if (!actFitsStop(act, stop, journey)) return false;
+  if (!payoffLandsToday(act, journey)) return false;
   return true;
 }
 
@@ -803,12 +932,14 @@ export function actMatchesTemptationContext(act, journey) {
 // planting and carries the release and survey work with it (js/season.js
 // SEASONAL_MODIFIERS, js/modes/silviculture.js), so an act written for the
 // brushing or survey window belongs in front of that supervisor too. Winter
-// acts stay winter acts.
+// acts stay winter acts, and so does an act that is also a winter act: that
+// is desk-calendar work (next year's regen plan), not the field season.
 const GROWING_SEASONS = ['spring', 'summer', 'fall'];
 function actSeasonFits(act, journey, season) {
   if (act.seasons.includes(season)) return true;
   return journey?.journeyType === 'silviculture'
     && GROWING_SEASONS.includes(season)
+    && !act.seasons.includes('winter')
     && act.seasons.some((entry) => GROWING_SEASONS.includes(entry));
 }
 
@@ -1524,6 +1655,9 @@ function takePendingTemptation(journey) {
   const [entry] = memory.pending.splice(index, 1);
   const act = getActById(entry.actId);
   if (!act) return null;
+  // Nobody asks again about planting that is finished or comments that were
+  // answered. A go-around is about what was already done, so it still lands.
+  if (entry.kind !== 'goaround' && !actPremisesHold(act, journey)) return null;
   memory.lastDay = day;
   return entry.kind === 'goaround'
     ? buildGoAroundEvent(act, journey)
@@ -1586,6 +1720,7 @@ function maybeCreateTemptationEvent(journey, rng = Math.random) {
   const candidates = ILLEGAL_ACTS.filter(
     (act) => actMatchesTemptationContext(act, journey)
       && !memory.seenActIds.includes(act.id)
+      && !(act.formerIds || []).some((id) => memory.seenActIds.includes(id))
       && buildTemptationPayoff(act, journey).deliverable
   );
   if (!candidates.length) return null;

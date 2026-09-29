@@ -1,4 +1,5 @@
-import { getStopKind } from '../js/journey/packages.js';
+import { getStopKind, isBlockGroundAct } from '../js/journey/packages.js';
+import { ensurePermitFiles } from '../js/journey/permitPipeline.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -6,6 +7,9 @@ import { readFileSync } from 'node:fs';
 import {
   ILLEGAL_ACTS,
   ACTIVE_ILLEGAL_ACTS,
+  ACT_PREMISES,
+  actPremises,
+  findIllegalAct,
   CATCH_INSTITUTIONS,
   CAUGHT_TEMPLATES,
   CATEGORY_CLEAN_OUTCOMES,
@@ -14,11 +18,14 @@ import {
   isSelfProposedAct,
 } from '../js/data/illegalActs.js';
 import { MISCHIEF_OPTIONS } from '../js/data/mischief.js';
-import { FORESTER_ROLES, ISSUE_LIBRARY, CHAINED_ISSUES } from '../js/data/index.js';
+import { FORESTER_ROLES, ISSUE_LIBRARY, CHAINED_ISSUES, FIELD_EVENTS } from '../js/data/index.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 import {
+  ACT_PREMISE_CHECKS,
   actMatchesTemptationContext,
   buildCaughtEffects,
+  checkForEvent,
+  eventMatchesJourneyContext,
   buildTemptationEvent,
   buildTemptationPayoff,
   resolveTemptationSetAside,
@@ -36,10 +43,31 @@ const ROLES = ['recce', 'silviculture', 'planner', 'permitter', 'manager'];
 const FIELD_ROLES = new Set(['recce', 'silviculture']);
 const SEASONS = ['spring', 'summer', 'fall', 'winter'];
 
+// A run where every premise an act can name holds (ACT_PREMISES): the file is
+// under a microscope, planting and release are still owed with the planters
+// on the block and a planted block waiting on its plots, the FOM is out for
+// comment, a permit is out on referral with more to follow, and the GM's
+// community relations have gone bad enough for a blockade.
+function meetPremises(journey) {
+  journey.scrutiny = 60;
+  if (journey.journeyType === 'silviculture') {
+    journey.planting.seedlingsPlanted = 4000;
+    journey.program.blocks[0].status = 'planted';
+  }
+  if (journey.journeyType === 'planning') {
+    Object.assign(journey.blockPlanning.fom, { status: 'public_review', commentLoad: 3, reviewDaysRemaining: 20 });
+  }
+  if (journey.journeyType === 'permitting') {
+    ensurePermitFiles(journey);
+    journey.permits.files[0].lane = 'referral';
+  }
+  if (journey.journeyType === 'manager') journey.metrics.relationships = 30;
+  return journey;
+}
+
 function journeyFor(roleId, areaId = 'bulkley-valley', season = null) {
-  const journey = createJourney({ roleId, areaId });
+  const journey = meetPremises(createJourney({ roleId, areaId }));
   journey.day = 5;
-  journey.scrutiny = 60; // onlyWhen: scrutinyHigh acts count as reachable
   // A recce crew is offered block-ground shortcuts on a block, not at a
   // waypoint (js/journey/packages.js actFitsStop): stand it on a block.
   if (Array.isArray(journey.blocks)) {
@@ -175,6 +203,244 @@ test('every role an act names can actually be offered it somewhere, in some seas
     }
   }
   assert.deepEqual(dead, []);
+});
+
+// ── Premises: the thing the pitch is about has to still exist ───────────────
+
+test('every premise an act names is one the gate can read', () => {
+  assert.deepEqual(Object.keys(ACT_PREMISE_CHECKS).sort(), Object.keys(ACT_PREMISES).sort());
+  const unknown = ILLEGAL_ACTS.flatMap((act) => actPremises(act)
+    .filter((name) => !ACT_PREMISES[name]).map((name) => `${act.id}: ${name}`));
+  assert.deepEqual(unknown, []);
+});
+
+// How to make each premise false on a run that keeps its subject.
+const PREMISE_BROKEN = {
+  scrutinyHigh: { roles: ROLES, breakIt: (j) => { j.scrutiny = 10; } },
+  plantingPending: { roles: ['silviculture'], breakIt: (j) => { j.planting.blocksPlanted = j.planting.blocksToPlant; } },
+  stockToPlant: {
+    roles: ['silviculture'],
+    breakIt: (j) => { j.planting.blocksPlanted = j.planting.blocksToPlant; j.planting.fillComplete = j.planting.fillTarget; },
+  },
+  plantersOnHand: {
+    roles: ['silviculture'],
+    breakIt: (j) => {
+      for (const contractor of j.contractors.filter((c) => c.specialty === 'planting')) {
+        contractor.silvicultureState = { ...(contractor.silvicultureState || {}), status: 'recovering', cooldownDays: 2 };
+      }
+    },
+  },
+  plantedSome: { roles: ['silviculture'], breakIt: (j) => { j.planting.blocksPlanted = 0; j.planting.seedlingsPlanted = 0; } },
+  plotsDue: {
+    roles: ['silviculture'],
+    breakIt: (j) => { for (const block of j.program.blocks) if (block.status === 'planted') block.status = 'inspected'; },
+  },
+  releaseQueued: { roles: ['silviculture'], breakIt: (j) => { j.brushing.hectaresComplete = j.brushing.hectaresTarget; } },
+  freeGrowingDue: { roles: ['silviculture'], breakIt: (j) => { j.surveys.freeGrowingComplete = j.surveys.freeGrowingTarget; } },
+  fomCommentsOpen: { roles: ['planner'], breakIt: (j) => { Object.assign(j.blockPlanning.fom, { status: 'closed', commentLoad: 0 }); } },
+  referralAhead: {
+    roles: ['permitter'],
+    breakIt: (j) => { j.permits.backlog = 0; for (const file of j.permits.files) if (file.lane !== 'referral') file.lane = 'issued'; },
+  },
+  referralOut: {
+    roles: ['permitter'],
+    breakIt: (j) => { j.permits.inReferral = 0; for (const file of j.permits.files) if (file.lane === 'referral') file.lane = 'decision'; },
+  },
+  relationsStrained: { roles: ['manager'], breakIt: (j) => { j.metrics.relationships = 70; j.consequenceFlags = []; } },
+};
+
+test('each premise holds on the premise-met run and fails when its subject is gone; other runs are not gated', () => {
+  assert.deepEqual(Object.keys(PREMISE_BROKEN).sort(), Object.keys(ACT_PREMISES).sort());
+  for (const [name, { roles, breakIt }] of Object.entries(PREMISE_BROKEN)) {
+    for (const roleId of ROLES) {
+      const journey = journeyFor(roleId);
+      const tracked = roles.includes(roleId);
+      assert.equal(ACT_PREMISE_CHECKS[name](journey), tracked ? true : null, `${name} for ${roleId}`);
+      if (!tracked) continue;
+      breakIt(journey);
+      assert.equal(ACT_PREMISE_CHECKS[name](journey), false, `${name} still holds for ${roleId} once broken`);
+    }
+  }
+});
+
+test('no act is offered while its premise is false, in any area or season', () => {
+  const offenders = [];
+  for (const [name, { roles, breakIt }] of Object.entries(PREMISE_BROKEN)) {
+    const acts = ACTIVE_ILLEGAL_ACTS.filter((act) => actPremises(act).includes(name));
+    assert.ok(acts.length > 0, `${name} gates no act`);
+    for (const roleId of roles) {
+      const actsForRole = acts.filter((act) => act.roles.includes(roleId));
+      if (!actsForRole.length) continue;
+      assert.ok(actsForRole.some((act) => REACH.get(act.id).includes(roleId)), `${name}: no ${roleId} act is reachable when it holds`);
+      for (const area of OPERATING_AREAS) {
+        for (const season of SEASONS) {
+          const journey = journeyFor(roleId, area.id, season);
+          breakIt(journey);
+          for (const act of actsForRole) {
+            if (actMatchesTemptationContext(act, journey)) offenders.push(`${act.id} (${roleId}, ${area.id}, ${season}) without ${name}`);
+          }
+        }
+      }
+    }
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test('the playtest premise mismatches stay fixed', () => {
+  const act = (id) => findIllegalAct(id);
+  const silvi = () => journeyFor('silviculture', 'kootenay-wetbelt', 'spring');
+  const offered = (id, journey) => actMatchesTemptationContext(act(id), journey);
+
+  // Cash for planters and buried boxes once the planting is done.
+  const planted = silvi();
+  assert.equal(offered('silvi-hire-undocumented', planted), true);
+  PREMISE_BROKEN.stockToPlant.breakIt(planted);
+  assert.equal(offered('silvi-hire-undocumented', planted), false, 'no planting contract left to pay in cash');
+  assert.equal(offered('silvi-fake-snow-cache', planted), false, 'no stock left to cache');
+  // Planting acts while the planters are on days off.
+  const resting = silvi();
+  PREMISE_BROKEN.plantersOnHand.breakIt(resting);
+  assert.equal(offered('silvi-falsify-planting-quality', resting), false);
+  assert.equal(offered('silvi-misreport-planting', resting), false);
+
+  // The FOM comments, once the period closed, or once buy-in no longer needs them.
+  const planner = journeyFor('planner', 'okanagan-shuswap-drybelt', 'fall');
+  assert.equal(offered('silent-fom-comment-box', planner), true);
+  planner.plan.stakeholderBuyIn = 79;
+  assert.equal(offered('silent-fom-comment-box', planner), false, 'buy-in 79/75 has nothing to gain');
+  planner.plan.stakeholderBuyIn = 40;
+  PREMISE_BROKEN.fomCommentsOpen.breakIt(planner);
+  assert.equal(offered('silent-fom-comment-box', planner), false, 'comments logged and answered');
+
+  // A planner gate that is already met pays nothing.
+  const analysing = journeyFor('planner');
+  analysing.plan.phase = 'analysis';
+  assert.equal(offered('inventory-data-laundering', analysing), true);
+  analysing.plan.analysisQuality = 100;
+  assert.equal(offered('inventory-data-laundering', analysing), false);
+
+  // The blockade act needs a blockade's worth of bad relations.
+  const gm = journeyFor('manager');
+  assert.equal(offered('drop-a-tree-near-the-blockade', gm), true);
+  PREMISE_BROKEN.relationsStrained.breakIt(gm);
+  assert.equal(offered('drop-a-tree-near-the-blockade', gm), false);
+});
+
+test('a take pays in something that fits the act: no cash for poaching, and a bribe card names no payment it does not charge', () => {
+  const poach = findIllegalAct('recce-hunt-on-shift');
+  assert.notEqual(poach.payoff.kind, 'budget', 'camp meat is not cash');
+  for (const roleId of poach.roles) {
+    assert.equal(buildTemptationPayoff(poach, journeyFor(roleId)).effects.budget, undefined, roleId);
+  }
+  const wtp = findIllegalAct('bribed-hazard-flags');
+  assert.doesNotMatch(`${wtp.title} ${wtp.description} ${wtp.pitch}`, /\bpay\b|bonus/i, 'the take charges nothing, so the card offers no payment');
+  const blockade = findIllegalAct('drop-a-tree-near-the-blockade');
+  assert.doesNotMatch(blockade.cleanOutcome, /filmed|posted|camera/i, 'the band that stays buried is not on everyone\'s phone');
+});
+
+// ── Where on the traverse ───────────────────────────────────────────────────
+
+test('a recce crew is offered block-ground shortcuts only on a block whose package is still open', () => {
+  const recceActs = ACTIVE_ILLEGAL_ACTS.filter((act) => REACH.get(act.id).includes('recce'));
+  const ground = recceActs.filter(isBlockGroundAct);
+  assert.ok(ground.length >= 30, `${ground.length} block-ground recce acts`);
+  for (const id of ['planner-skip-goshawk-survey', 'cruise-the-client-estimates', 'planner-fake-cruiser-creds', 'planner-hide-invasive-plants', 'call-the-s3-an-s4', 'drive-by-stream-class']) {
+    assert.ok(ground.some((act) => act.id === id), `${id} is about a block's ground`);
+  }
+  const leaks = [];
+  let waypointOffers = 0;
+  for (const area of OPERATING_AREAS) {
+    for (const season of SEASONS) {
+      const journey = journeyFor('recce', area.id, season);
+      const block = journey.blocks[journey.currentBlockIndex];
+      // At a waypoint.
+      const waypoint = journey.blocks.findIndex((stop) => getStopKind(stop) === 'waypoint');
+      journey.currentBlockIndex = waypoint;
+      for (const act of recceActs) {
+        const fits = actMatchesTemptationContext(act, journey);
+        if (fits && isBlockGroundAct(act)) leaks.push(`${act.id} at a waypoint (${area.id})`);
+        if (fits) waypointOffers += 1;
+      }
+      // Back on the block, after its package is finalized.
+      journey.currentBlockIndex = journey.blocks.indexOf(block);
+      journey.reconIntel = { byBlock: { [block.id]: { assessmentComplete: true } } };
+      for (const act of ground) {
+        if (actMatchesTemptationContext(act, journey)) leaks.push(`${act.id} on a closed package (${area.id})`);
+      }
+    }
+  }
+  assert.deepEqual(leaks, []);
+  assert.ok(waypointOffers > 0, 'road, crossing and safety shortcuts still belong at a waypoint');
+});
+
+test('ground on the next leg is not offered at the last open block', () => {
+  const offers = [];
+  for (const area of OPERATING_AREAS) {
+    const journey = journeyFor('recce', area.id, 'summer');
+    const here = journey.blocks[journey.currentBlockIndex];
+    journey.reconIntel = { byBlock: {} };
+    for (const stop of journey.blocks) {
+      if (stop !== here && getStopKind(stop) === 'block') journey.reconIntel.byBlock[stop.id] = { assessmentComplete: true };
+    }
+    for (const act of ACTIVE_ILLEGAL_ACTS) {
+      if (!actMatchesTemptationContext(act, journey)) continue;
+      const { effects } = buildTemptationPayoff(act, journey);
+      if (effects.progress > 0) offers.push(`${act.id} (${area.id}) pays ${effects.progress} km with no leg left`);
+    }
+  }
+  assert.deepEqual(offers, []);
+});
+
+test('block-ground field cards stay off waypoints and closed packages', () => {
+  const journey = journeyFor('recce', 'tahltan-highland', 'summer');
+  const block = journey.blocks[journey.currentBlockIndex];
+  const waypoint = journey.blocks.find((stop) => getStopKind(stop) === 'waypoint');
+  const elder = FIELD_EVENTS.find((event) => event.id === 'first_nations_consultation_field');
+  const ribbon = FIELD_EVENTS.find((event) => event.id === 'boundary_dispute');
+  for (const event of [elder, ribbon]) {
+    assert.equal(eventMatchesJourneyContext(event, journey, { currentBlock: block }), true, `${event.id} on an open block`);
+    assert.equal(eventMatchesJourneyContext(event, journey, { currentBlock: waypoint }), false, `${event.id} at a waypoint`);
+  }
+  journey.reconIntel = { byBlock: { [block.id]: { assessmentComplete: true } } };
+  for (const event of [elder, ribbon]) {
+    assert.equal(eventMatchesJourneyContext(event, journey, { currentBlock: block }), false, `${event.id} after the package closed`);
+  }
+});
+
+test('a proposal set aside is not asked again once its premise is gone', () => {
+  const journey = journeyFor('silviculture', 'kootenay-wetbelt', 'spring');
+  const act = findIllegalAct('silvi-hire-undocumented');
+  PREMISE_BROKEN.plantingPending.breakIt(journey);
+  journey.temptationMemory = { lastDay: journey.day, seenActIds: [act.id], takenActIds: [], pending: [{ actId: act.id, day: journey.day, kind: 'reoffer' }] };
+  const event = checkForEvent(journey);
+  assert.notEqual(event?.temptationActId, act.id, 'no second asking about a planting contract that is finished');
+  assert.equal(journey.temptationMemory.pending.length, 0);
+});
+
+// ── Who is asked ────────────────────────────────────────────────────────────
+
+test('the GM hears corporate, harvest and haul shortcuts, never a registrant\'s or a consultant\'s', () => {
+  const managerOnly = ACTIVE_ILLEGAL_ACTS.filter((act) => act.roles.length === 1 && act.roles[0] === 'manager');
+  for (const act of managerOnly) {
+    assert.ok(['corporate', 'harvest', 'haul'].includes(act.phase), `${act.id} is ${act.phase}`);
+    assert.doesNotMatch(act.id, /^(recce|permitter|planner|silvi)-/, `${act.id} carries another role's prefix`);
+  }
+  for (const id of ['wear-every-hat', 'drop-the-ret-from-the-signature', 'phantom-cpd-log', 'retire-mid-investigation-dodge',
+    'annual-declaration-perjury', 'woodlot-overcut-gambit', 'community-forest-coasting', 'bigfoot-haulage', 'permitter-falsify-timber-mark']) {
+    assert.ok(!REACH.get(id)?.includes('manager'), `${id} reaches the GM`);
+  }
+  // A renamed act is still found by the id an older save remembers.
+  assert.equal(findIllegalAct('recce-bribe-scaler')?.id, 'bribe-the-scaler');
+  assert.equal(findIllegalAct('recce-harass-protesters')?.id, 'drop-a-tree-near-the-blockade');
+});
+
+test('planners are not handed a woodlot, an appraisal or a board dashboard', () => {
+  for (const id of ['woodlot-overcut-gambit', 'post-review-sloppy-data', 'illicit-carbon-spreadsheet']) {
+    assert.ok(!REACH.get(id)?.includes('planner'), `${id} reaches the planner`);
+  }
+  // A silviculture fall/winter act does not leak into a spring field season.
+  const spring = journeyFor('silviculture', 'fraser-plateau', 'spring');
+  assert.equal(actMatchesTemptationContext(findIllegalAct('extend-the-regen-delay-quietly'), spring), false);
 });
 
 // Planting, camps and bears are not winter work (js/modes/silviculture.js
