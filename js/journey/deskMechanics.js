@@ -212,7 +212,9 @@ function holdStakeholderMeeting(journey, stakeholder = 'ministry') {
     if (due.length > 0 && Math.random() < 0.6) {
       const file = due[0];
       file.clockCloses = journey.day || 1;
-      const result = advancePermitClocks(journey, { approvalRate: 1, completenessReturnRate: 0 });
+      // The meeting is about this one file; the rest of the queue waits for
+      // tonight's pass and its ordinary odds.
+      const result = advancePermitClocks(journey, { approvalRate: 1, completenessReturnRate: 0, fileIds: [file.id] });
       const issued = result.issued.find((entry) => entry.file.id === file.id);
       if (issued) messages.push(`The district confirms the file is complete and ${file.label} is issued.`);
     } else {

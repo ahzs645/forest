@@ -33,10 +33,14 @@ import {
  *   integrity — file it straight; the file holds if anyone ever pulls it
  *   spin      — dress it up; small score gamble in keeping with risk plays
  *   people    — put the crew/partners first; warms the epilogues
+ * A desk file that failed is not sealed or archived as a finished year; it is
+ * handed over, and the same three stances apply to the hand-over.
  * @param {string} journeyType
+ * @param {{victory?: boolean}} [context]
  * @returns {{prompt: string, options: Array}}
  */
-export function getFinalReportPrompt(journeyType) {
+export function getFinalReportPrompt(journeyType, { victory = true } = {}) {
+  if (!victory && HANDOVER_PROMPTS[journeyType]) return HANDOVER_PROMPTS[journeyType];
   switch (journeyType) {
     case 'recon':
     case 'field':
@@ -89,6 +93,50 @@ export function getFinalReportPrompt(journeyType) {
   }
 }
 
+const PLANNING_HANDOVER = {
+  prompt: 'The FSP did not get through. The file goes to whoever picks it up next. How do you hand it over?',
+  options: [
+    { label: 'Write the hand-over memo with every open gap and comment on the record', hint: 'The next planner starts from the truth, and so does the District Manager.', value: 'integrity' },
+    { label: 'Tell the licensee the district sat on it', hint: 'Risky. The district’s file shows what was filed and when.', value: 'spin' },
+    { label: 'Walk the Nation’s referral staff through where the file stands', hint: 'The next planner inherits the relationship, not just the binder.', value: 'people' },
+  ],
+};
+
+const PERMITTING_HANDOVER = {
+  prompt: 'The queue is someone else’s now. How do you hand it over?',
+  options: [
+    { label: 'Hand over every file with its clock, letter and referral record', hint: 'Whoever sits at this desk next knows exactly where each permit stands.', value: 'integrity' },
+    { label: 'Close out the stragglers with minimal notes', hint: 'Risky. Thin files have a way of resurfacing.', value: 'spin' },
+    { label: 'Call each agency contact to say who has the files now', hint: 'The referrals keep moving when the name on the desk changes.', value: 'people' },
+  ],
+};
+
+const HANDOVER_PROMPTS = {
+  planning: PLANNING_HANDOVER,
+  permitting: PERMITTING_HANDOVER,
+  desk: PERMITTING_HANDOVER,
+};
+
+/**
+ * What the spin and people stances read like for the desk roles; the default
+ * lines are written for a field season.
+ */
+const PLANNING_REPORT_LINES = {
+  spinWin: 'The licensee takes your version. The district’s own file says what it says.',
+  spinBust: 'District staff set your account beside their own file. The gap is noted, and your name is on it.',
+  people: 'The Nation’s referral staff hear it from you first. The next referral starts warmer.',
+};
+const PERMITTING_REPORT_LINES = {
+  spinWin: 'The files close. On paper, the queue was tidy.',
+  spinBust: 'A complaint to the Forest Practices Board pulls one of the thin files. The gaps show, and your name is on it.',
+  people: 'The thank-you notes cost nothing, and next year’s referrals come back a little faster.',
+};
+const DESK_REPORT_LINES = {
+  planning: PLANNING_REPORT_LINES,
+  permitting: PERMITTING_REPORT_LINES,
+  desk: PERMITTING_REPORT_LINES,
+};
+
 /**
  * Resolve the final report stance into a score adjustment and narration.
  * Pure aside from the injectable rng (for the 'spin' gamble).
@@ -102,17 +150,18 @@ export function resolveFinalReport(style, journey, rng = Math.random) {
   // survey, so its odds come from the run (js/modes/silvicultureIntegrity.js).
   if (journey?.journeyType === 'silviculture') return resolveSilvicultureFinalReport(style, journey, rng);
   const hasCrew = Boolean(journey.crew?.length);
+  const deskLines = DESK_REPORT_LINES[journey?.journeyType] || null;
   switch (style) {
     case 'spin': {
       if (rng() < 0.65) {
         return {
           delta: 6,
-          lines: ['The framing lands. On paper, this was a tidy operation.'],
+          lines: [deskLines?.spinWin || 'The framing lands. On paper, this was a tidy operation.'],
         };
       }
       return {
         delta: -10,
-        lines: ['A check survey unpicks the framing line by line. The file gets flagged, and your name is on it.'],
+        lines: [deskLines?.spinBust || 'A check survey unpicks the framing line by line. The file gets flagged, and your name is on it.'],
       };
     }
     case 'people':
@@ -121,7 +170,7 @@ export function resolveFinalReport(style, journey, rng = Math.random) {
         lines: [
           hasCrew
             ? 'Word gets around that you put your people first. Next season’s signup sheet fills fast.'
-            : 'The thank-you notes cost nothing and buy goodwill money can’t.',
+            : deskLines?.people || 'The thank-you notes cost nothing and buy goodwill money can’t.',
         ],
       };
     case 'integrity':
@@ -343,7 +392,7 @@ export async function runFinalDebrief(ui, journey, victory) {
   ui.clear();
   ui.writeHeader(victory ? 'THE WORK IS DONE' : 'THE WORK STOPS HERE');
   ui.write('');
-  const report = getFinalReportPrompt(journey.journeyType);
+  const report = getFinalReportPrompt(journey.journeyType, { victory });
   const choice = await ui.promptChoice(report.prompt, report.options);
   const reportStyle = choice.value || 'integrity';
   const reportResult = resolveFinalReport(reportStyle, journey);

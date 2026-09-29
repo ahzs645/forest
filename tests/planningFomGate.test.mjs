@@ -324,5 +324,37 @@ test('an event reopening the block question does not ease scrutiny again for the
     assert.equal(prompts.filter((prompt) => prompt === 'Constraint triage:').length, 2);
     assert.ok(!reopenedLines.some((line) => /Scrutiny eases to .* as you choose/.test(line)), 'the same triage eased scrutiny twice');
     assert.ok(reopenedLines.some((line) => /Scrutiny holds at \d+%: the file already carries the Water and ecology first posture/.test(line)));
+test('filing over and over neither skips the comment period nor wears it down', async () => {
+  await withSeededRandom(778, async () => {
+    const journey = makeJourneyWithArea();
+    const pool = getPlanningAreaBlockPool(journey.areaId);
+    journey.blockPlanning.activeBlock = pool[0];
+    journey.blockPlanning.activeBlockId = pool[0].id;
+    journey.plan.phase = 'ministerial_approval';
+    journey.plan.dataCompleteness = 85;
+    journey.plan.analysisQuality = 85;
+    journey.plan.stakeholderBuyIn = 80;
+    journey.plan.ministerialConfidence = 70;
+    journey.resources.budget = 100000;
+    journey.resources.politicalCapital = 100;
+    journey.professional.registrationStatus = 'active';
+    const fom = syncFomStateFromActiveBlock(journey, null);
+    fom.status = 'public_review';
+    fom.reviewDaysRemaining = 30;
+    fom.commentLoad = 2;
+
+    const ui = makeCaptureUi();
+    const game = { ui, journey, gameOver: false };
+    for (let filing = 0; filing < 4; filing += 1) {
+      startDay(journey);
+      await processAction(game, 'submit', null);
+      assert.equal(journey.actionsRemaining, 1, 'a filing the gate refuses does not take the day');
+    }
+    assert.equal(journey.isComplete, false);
+    assert.equal(journey.plan.ministerialConfidence, 70);
+    assert.equal(journey.blockPlanning.fom.status, 'public_review');
+    assert.equal(journey.blockPlanning.fom.reviewDaysRemaining, 30, 'only the calendar closes a comment period');
+    assert.equal(journey.blockPlanning.fom.commentLoad, 2, 'only FOM work answers comments');
+    assert.ok(ui.lines.every((line) => !/returns the package unread/.test(line)), 'the gate refuses it before the district sees it');
   });
 });

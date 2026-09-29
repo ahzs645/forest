@@ -20,6 +20,10 @@
  *
  *   drafted    ↔ drafting      screening ↔ submitted    referral ↔ inReferral
  *   decision   ↔ inReview      deficiency ↔ needsRevision   issued ↔ approved
+ *
+ * HCA permits ride alongside their cutting permits but sit outside the
+ * counters: the Archaeology Branch issues them, not the District Manager, so
+ * they never count toward the season's target and no counter can move them.
  */
 
 import { getPlanningAreaBlockPool, getPlanningBlockHeritageLoad, getPlanningBlockWaterContext } from '../data/planningBlocks.js';
@@ -35,6 +39,12 @@ export const DAILY_PERMIT_THROUGHPUT = 3;
 export const HCA_HERITAGE_LOAD_THRESHOLD = 36;
 /** How much each clean deficiency response lifts that file's odds at decision. */
 export const CLEAN_RESPONSE_APPROVAL_LIFT = 0.25;
+/**
+ * How much likelier a fast-tracked answer is to come back. A quick refile is
+ * decided that night instead of the next, but the thin answer is what the
+ * decision-maker reads.
+ */
+export const FAST_TRACK_RETURN_RISK = 0.2;
 
 export const PERMIT_LANES = ['drafted', 'screening', 'referral', 'decision', 'deficiency', 'issued'];
 
@@ -116,9 +126,16 @@ function getAreaRoadNames(areaId) {
   for (const block of getBlocksForArea(areaId) || []) {
     const name = String(block?.name || '');
     const match = name.match(/^(.*?)\s+(Road|FSR|Main)\b/i);
-    if (match && !names.includes(match[1])) names.push(match[1]);
+    // "Block A-12 - End of Road" names a block, not a road.
+    if (!match || /^Block\b|\s-\s|\b(of|to|the|at)$/i.test(match[1])) continue;
+    if (!names.includes(match[1])) names.push(match[1]);
   }
   return names;
+}
+
+/** Whether a file is one of the District Manager's, and so on the counters. */
+function countsInQueue(file) {
+  return file?.type !== 'HCA';
 }
 
 /**
@@ -153,11 +170,17 @@ export function buildPermitFileCatalogue(journey) {
   const roads = getAreaRoadNames(areaId);
   const catalogue = [];
   const roadUses = new Map();
+  const labelUses = new Map();
   let hcaAssigned = false;
+  let cuttingPermits = 0;
 
   for (let index = 0; index < TYPE_SEQUENCE.length; index += 1) {
     const type = TYPE_SEQUENCE[index];
-    const block = blocks.length ? blocks[index % blocks.length] : null;
+    // Cutting permits walk the block pool in order so a small pool is used
+    // up before any block carries a second CP; the rest take the block at
+    // their slot.
+    const blockIndex = type === 'CP' ? cuttingPermits++ : index;
+    const block = blocks.length ? blocks[blockIndex % blocks.length] : null;
     const blockId = compactBlockId(block) || `${String(areaId || 'area').slice(0, 4).toUpperCase()}-${index + 1}`;
     const road = roads.length ? roads[index % roads.length] : null;
     const water = block ? getPlanningBlockWaterContext(block, area, null) : { gate: 'clear', hydrologyLabel: 'water timing' };
@@ -184,6 +207,11 @@ export function buildPermitFileCatalogue(journey) {
         label = `CP ${blockId}`;
         break;
     }
+    // Two files with one name make the queue unreadable ("X ISSUED" and "X
+    // returned" the same night), so a repeat gets a sequence number.
+    const uses = (labelUses.get(label) || 0) + 1;
+    labelUses.set(label, uses);
+    if (uses > 1) label = `${label} (${uses})`;
     const needsHca = type === 'CP' && !hcaAssigned && heritage.score >= HCA_HERITAGE_LOAD_THRESHOLD;
     if (needsHca) hcaAssigned = true;
     catalogue.push({
@@ -263,6 +291,8 @@ function createFile(journey, lane, { clockDays = null } = {}) {
     holdsFileId: null,
     deficiencyProfileId: null,
     deficiencyCount: 0,
+    resolvedDeficiencies: [],
+    fastTracked: false,
     issuedDay: null,
     chased: 0,
   };
@@ -322,55 +352,158 @@ export function getPermitFileById(journey, fileId) {
 export function syncPermitCounters(journey) {
   const permits = ensurePermitState(journey);
   for (const [lane, counter] of Object.entries(LANE_COUNTER)) {
-    permits[counter] = permits.files.filter((file) => file.lane === lane).length;
+    permits[counter] = permits.files.filter((file) => file.lane === lane && countsInQueue(file)).length;
   }
+  // The backlog as the files last left it, so a reconcile can tell what an
+  // outside change did to it.
+  permits.syncedBacklog = Math.max(0, Math.round(permits.backlog || 0));
   return permits;
+}
+
+/** The lane a file goes to next on its own path through the district. */
+function nextLane(file) {
+  const def = PERMIT_TYPES[file.type] || PERMIT_TYPES.CP;
+  switch (file.lane) {
+    case 'drafted':
+      return 'screening';
+    case 'screening':
+      return def.referral ? 'referral' : 'decision';
+    case 'referral':
+      return 'decision';
+    case 'decision':
+      return 'issued';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Whether a counter change may move this file into `lane`. Only the
+ * decision-maker issues, so nothing reaches 'issued' except an unheld file at
+ * the decision; a file moves forward one lane on its own path at most; a
+ * letter can land on anything in motion; a submission can be pulled back to
+ * drafting. An issued permit is a decision already made and never moves.
+ */
+function canCounterMove(file, lane, journey) {
+  if (!countsInQueue(file) || file.lane === lane || file.lane === 'issued') return false;
+  if (lane === 'issued') return file.lane === 'decision' && !isHeldAtDecision(file, journey).held;
+  if (lane === 'deficiency') return ['screening', 'referral', 'decision'].includes(file.lane);
+  if (lane === 'drafted') return file.lane === 'screening';
+  return nextLane(file) === lane;
+}
+
+function newFileFromBacklog(journey, lane) {
+  const file = createFile(journey, lane);
+  attachHcaIfNeeded(journey, file);
+  return file;
+}
+
+/**
+ * An empty queue with counters on it (a save from before files had names, or
+ * a journey built by hand) gets files straight into its lanes.
+ */
+function seedFilesFromCounters(journey) {
+  const permits = ensurePermitState(journey);
+  for (const lane of ['issued', 'deficiency', 'decision', 'referral', 'screening', 'drafted']) {
+    const counter = Math.max(0, Math.round(permits[LANE_COUNTER[lane]] || 0));
+    let inLane = permits.files.filter((file) => file.lane === lane && countsInQueue(file)).length;
+    while (inLane < counter) {
+      const file = createFile(journey, lane);
+      if (lane === 'deficiency') file.deficiencyCount = (file.deficiencyCount || 0) + 1;
+      inLane += 1;
+    }
+  }
+  return syncPermitCounters(journey);
 }
 
 /**
  * Make the files match the counters. Authored events and the generic progress
  * effect move counters directly (an early approval, a distracted week that
- * slips a review back to revision); after any of those the files are behind,
- * so pull files between lanes until each lane holds exactly its counter.
+ * slips a review back to revision); after any of those the files are behind.
+ *
+ * The counters are a request, and the files are what is real. Each request is
+ * carried out on a named file where the pipeline allows it (see
+ * canCounterMove) and refused where it does not: a counter cannot issue a
+ * permit nobody drafted, skip the referral, or wave a file past a WSA window
+ * or an HCA hold. A setback that sends work back to the backlog pulls the
+ * named submission back to drafting instead of deleting it, so the file keeps
+ * its name, its HCA permit and its history. The backlog only shrinks when a
+ * new file is actually drafted out of it.
  */
 export function reconcilePermitFiles(journey) {
   const permits = ensurePermitState(journey);
-  const loose = [];
-
-  const lanesByPriority = ['issued', 'deficiency', 'decision', 'referral', 'screening', 'drafted'];
-  for (const lane of lanesByPriority) {
-    const counter = Math.max(0, Math.round(permits[LANE_COUNTER[lane]] || 0));
-    const inLane = permits.files.filter((file) => file.lane === lane)
-      .sort((a, b) => (b.laneEnteredDay || 0) - (a.laneEnteredDay || 0));
-    while (inLane.length > counter) {
-      loose.push(inLane.shift());
-    }
+  const counted = () => permits.files.filter(countsInQueue);
+  if (!Number.isFinite(permits.syncedBacklog) || counted().length === 0) {
+    return counted().length === 0 ? seedFilesFromCounters(journey) : syncPermitCounters(journey);
   }
 
-  for (const lane of lanesByPriority) {
+  const delta = {};
+  for (const lane of PERMIT_LANES) {
     const counter = Math.max(0, Math.round(permits[LANE_COUNTER[lane]] || 0));
-    let inLane = permits.files.filter((file) => file.lane === lane).length;
-    while (inLane < counter) {
-      const file = loose.length
-        ? loose.sort((a, b) => PERMIT_LANES.indexOf(b.lane) - PERMIT_LANES.indexOf(a.lane)).shift()
-        : createFile(journey, 'drafted');
-      if (lane === 'deficiency') {
-        file.deficiencyCount = (file.deficiencyCount || 0) + 1;
+    delta[lane] = counter - counted().filter((file) => file.lane === lane).length;
+  }
+  let backlog = permits.syncedBacklog;
+  let backlogDelta = Math.max(0, Math.round(permits.backlog || 0)) - backlog;
+  // A backlog that shrank with nothing asked of the lanes lost applications
+  // (withdrawn, dropped by the licensee); that part stands.
+  const requested = PERMIT_LANES.reduce((sum, lane) => sum + Math.max(0, delta[lane]), 0);
+  if (backlogDelta < 0) {
+    const withdrawn = Math.max(0, -backlogDelta - requested);
+    backlog -= withdrawn;
+    backlogDelta += withdrawn;
+  }
+
+  const laneOrder = (file) => PERMIT_LANES.indexOf(file.lane);
+  for (const lane of ['issued', 'deficiency', 'decision', 'referral', 'screening']) {
+    while (delta[lane] > 0) {
+      // Prefer the lane the counter change took a file from, then the file
+      // furthest along, then the one that has waited longest.
+      const [donor] = counted()
+        .filter((file) => canCounterMove(file, lane, journey))
+        .sort((a, b) => (delta[b.lane] < 0) - (delta[a.lane] < 0)
+          || laneOrder(b) - laneOrder(a)
+          || (a.laneEnteredDay || 0) - (b.laneEnteredDay || 0));
+      if (donor) {
+        if (delta[donor.lane] < 0) delta[donor.lane] += 1;
+        if (lane === 'deficiency') {
+          donor.deficiencyCount = (donor.deficiencyCount || 0) + 1;
+          donor.deficiencyProfileId = null;
+        }
+        enterLane(donor, lane, journey);
+        delta[lane] -= 1;
+        continue;
       }
-      enterLane(file, lane, journey);
-      inLane += 1;
+      if (lane === 'screening' && backlogDelta < 0 && backlog > 0) {
+        newFileFromBacklog(journey, 'screening');
+        backlog -= 1;
+        backlogDelta += 1;
+        delta[lane] -= 1;
+        continue;
+      }
+      break;
     }
   }
-
-  // Whatever the counters no longer account for has left the queue.
-  if (loose.length) {
-    const gone = new Set(loose.map((file) => file.id));
-    permits.files = permits.files.filter((file) => !gone.has(file.id));
-    for (const file of permits.files) {
-      if (file.pausedBy && gone.has(file.pausedBy)) file.pausedBy = null;
-    }
+  while (delta.drafted > 0 && backlogDelta < 0 && backlog > 0) {
+    newFileFromBacklog(journey, 'drafted');
+    backlog -= 1;
+    backlogDelta += 1;
+    delta.drafted -= 1;
   }
 
+  // Work the counters sent back to the backlog: a draft stays a draft, and a
+  // submission is pulled back to drafting under its own name.
+  let setbacks = Math.max(0, backlogDelta);
+  const draftsReturned = Math.min(setbacks, Math.max(0, -delta.drafted));
+  setbacks -= draftsReturned;
+  const pulled = counted()
+    .filter((file) => file.lane === 'screening')
+    .sort((a, b) => (b.laneEnteredDay || 0) - (a.laneEnteredDay || 0));
+  while (setbacks > 0 && pulled.length) {
+    enterLane(pulled.shift(), 'drafted', journey);
+    setbacks -= 1;
+  }
+
+  permits.backlog = backlog;
   return syncPermitCounters(journey);
 }
 
@@ -401,6 +534,8 @@ export function ensurePermitFiles(journey) {
         if (lane === 'screening' && file.touchesStream) {
           file.wsaClockCloses = day + getWsaWindowDeskDays();
         }
+        // A heritage-heavy CP already in the queue still needs its HCA permit.
+        if (lane !== 'issued') attachHcaIfNeeded(journey, file);
       }
     }
   }
@@ -485,15 +620,29 @@ export function shortenPermitClock(journey, lanes, days = 1) {
  * the same letter about a gap the licensee has already closed, and a clean
  * response makes the next decision more likely to issue (advancePermitClocks).
  */
-export function resubmitPermitFile(journey, fileId, { completeness = false, clockDays = null, clean = false } = {}) {
+export function resubmitPermitFile(journey, fileId, {
+  completeness = false,
+  clockDays = null,
+  clean = false,
+  fastTracked = false,
+  answeredProfileId = null,
+} = {}) {
   const file = getPermitFileById(journey, fileId);
   if (!file || file.lane !== 'deficiency') return null;
-  if (file.deficiencyProfileId && clean) {
-    file.answeredProfiles = [...new Set([...(file.answeredProfiles || []), file.deficiencyProfileId])];
+  // A gap answered properly is closed: the next letter on this file, if there
+  // is one, is about something else. A thin answer closes nothing.
+  const answered = answeredProfileId || file.deficiencyProfileId;
+  if (answered && !fastTracked) {
+    const resolved = Array.isArray(file.resolvedDeficiencies) ? file.resolvedDeficiencies : [];
+    if (!resolved.includes(answered)) resolved.push(answered);
+    file.resolvedDeficiencies = resolved;
   }
   if (clean) file.cleanResponses = (file.cleanResponses || 0) + 1;
   file.deficiencyProfileId = null;
-  enterLane(file, completeness ? 'screening' : 'decision', journey, { clockDays });
+  // A fast-track goes back on tonight's pile instead of tomorrow's.
+  file.fastTracked = Boolean(fastTracked);
+  const clock = clockDays !== null ? clockDays : (fastTracked ? 0 : null);
+  enterLane(file, completeness ? 'screening' : 'decision', journey, { clockDays: clock });
   syncPermitCounters(journey);
   return file;
 }
@@ -516,6 +665,7 @@ function isHeldAtDecision(file, journey) {
  * @param {number} [options.approvalRate] - share of decided files issued rather than returned
  * @param {number} [options.completenessReturnRate] - share of screened files returned as incomplete
  * @param {Function} [options.random]
+ * @param {string[]} [options.fileIds] - decide only these files (a meeting about one file is not a nightly pass)
  * @returns {{issued: Array, returned: Array, advanced: Array, held: Array}}
  */
 export function advancePermitClocks(journey, options = {}) {
@@ -524,11 +674,13 @@ export function advancePermitClocks(journey, options = {}) {
   const random = typeof options.random === 'function' ? options.random : Math.random;
   const approvalRate = Number.isFinite(options.approvalRate) ? options.approvalRate : 0.7;
   const completenessReturnRate = Number.isFinite(options.completenessReturnRate) ? options.completenessReturnRate : 0.12;
+  const only = Array.isArray(options.fileIds) ? new Set(options.fileIds) : null;
   const result = { issued: [], returned: [], advanced: [], held: [] };
 
   const files = [...permits.files].sort((a, b) => (a.clockCloses ?? Infinity) - (b.clockCloses ?? Infinity));
   for (const file of files) {
     if (!['screening', 'referral', 'decision'].includes(file.lane)) continue;
+    if (only && !only.has(file.id)) continue;
 
     // A CP behind an HCA permit waits for the archaeologist, not the calendar.
     if (file.pausedBy) {
@@ -544,9 +696,12 @@ export function advancePermitClocks(journey, options = {}) {
     if (!Number.isFinite(file.clockCloses) || file.clockCloses > day) continue;
 
     if (file.lane === 'screening') {
-      // A package the licensee has already made whole is not bounced again.
-      const madeWhole = (file.answeredProfiles || []).includes('package-completeness');
-      if (!madeWhole && random() < completenessReturnRate) {
+      // A package made whole by a clean response is not bounced as incomplete
+      // again; one refiled with the bare minimum is likelier to be.
+      const completed = !file.fastTracked && (file.resolvedDeficiencies || []).includes('package-completeness');
+      const returnRate = completed ? 0 : completenessReturnRate + (file.fastTracked ? FAST_TRACK_RETURN_RISK : 0);
+      file.fastTracked = false;
+      if (random() < returnRate) {
         file.deficiencyCount = (file.deficiencyCount || 0) + 1;
         file.deficiencyProfileId = 'package-completeness';
         enterLane(file, 'deficiency', journey);
@@ -573,8 +728,11 @@ export function advancePermitClocks(journey, options = {}) {
       continue;
     }
     // Each clean answer on this file closes a gap the decision-maker would
-    // otherwise find; a flat roll sent one file back eight times running.
-    const fileRate = Math.min(0.95, approvalRate + CLEAN_RESPONSE_APPROVAL_LIFT * (file.cleanResponses || 0));
+    // otherwise find (a flat roll sent one file back eight times running); a
+    // fast-tracked answer is the thin one the decision-maker reads.
+    const cleanLift = CLEAN_RESPONSE_APPROVAL_LIFT * (file.cleanResponses || 0);
+    const fileRate = Math.max(0, Math.min(0.95, approvalRate + cleanLift - (file.fastTracked ? FAST_TRACK_RETURN_RISK : 0)));
+    file.fastTracked = false;
     if (random() < fileRate) {
       enterLane(file, 'issued', journey);
       result.issued.push({ file });
@@ -600,8 +758,11 @@ export function planQueueWork(journey) {
   if ((permits.backlog || 0) > 0) {
     return { step: 'draft', count: Math.min(permits.backlog, DAILY_PERMIT_THROUGHPUT), file: null };
   }
-  if ((permits.drafting || 0) > 0) {
-    return { step: 'submit', count: Math.min(permits.drafting, DAILY_PERMIT_THROUGHPUT), file: null };
+  // Counted off the files: an HCA permit waiting to go in is not on the
+  // counters but still has to be filed.
+  const drafted = permits.files.filter((file) => file.lane === 'drafted').length;
+  if (drafted > 0) {
+    return { step: 'submit', count: Math.min(drafted, DAILY_PERMIT_THROUGHPUT), file: null };
   }
   const [file] = getChaseableFiles(journey, ['screening', 'decision']);
   if (file) return { step: 'chase', count: 1, file };

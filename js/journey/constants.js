@@ -177,3 +177,9 @@ export const DESK_ACTIONS = {
  */
 export const PLANNING_DECISION_GATE = 80;
 export const PLANNING_PRE_SUBMISSION_CAP = 66;
+/**
+ * Every value the plan balances (biodiversity, timber, community, First
+ * Nations) has to clear this before the engagement and the submission go
+ * ahead: an FSP answers every objective government has set, not only timber.
+ */
+export const PLANNING_VALUES_FLOOR = 40;

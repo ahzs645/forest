@@ -29,6 +29,7 @@ import {
   workPermitQueue,
 } from '../js/modes/permitting.js';
 import { resolveEvent } from '../js/events/resolution.js';
+import { executeDeskDay } from '../js/journey/deskMechanics.js';
 
 function makeJourney(areaId = 'fraser-plateau') {
   const area = OPERATING_AREAS.find((candidate) => candidate.id === areaId);
@@ -347,4 +348,235 @@ test('a full permitting day runs end to end with named files, issued stamps and 
     assert.ok(!lines.some((line) => /APPROVED!/.test(line)));
     assert.ok(lines.some((line) => /referred to /.test(line)));
   });
+});
+
+// ── Pipeline validity under outside counter changes ────────────────────────
+// These move the counters by hand, the way any outside effect does, so they
+// hold whatever the event layer ends up writing.
+
+function freshQueue(areaId = 'fraser-plateau') {
+  const journey = makeJourney(areaId);
+  journey.day = 3;
+  ensurePermitFiles(journey);
+  return journey;
+}
+
+function heldCpWithHca(journey) {
+  const catalogue = buildPermitFileCatalogue(journey);
+  const heavy = catalogue.find((file) => file.needsHca);
+  journey.permits.catalogueCursor = catalogue.indexOf(heavy);
+  const drafted = draftPermits(journey, 1);
+  submitPermits(journey, 3);
+  const cp = drafted.find((file) => file.type === 'CP');
+  const hca = drafted.find((file) => file.type === 'HCA');
+  return { cp, hca };
+}
+
+test('a setback that sends a submission back to the backlog keeps the named file and its HCA permit', () => {
+  const journey = freshQueue();
+  const { cp, hca } = heldCpWithHca(journey);
+  assert.equal(cp.lane, 'screening');
+  const namedBefore = getPermitFiles(journey).length;
+  const backlogBefore = journey.permits.backlog;
+
+  // A distracted week: one submission slips back to the backlog.
+  journey.permits.submitted -= 1;
+  journey.permits.backlog += 1;
+  reconcilePermitFiles(journey);
+
+  assert.equal(getPermitFiles(journey).length, namedBefore, 'no file leaves the queue');
+  assert.ok(getPermitFiles(journey).includes(cp), 'the heritage CP is still on file');
+  assert.equal(journey.permits.backlog, backlogBefore, 'the slip is a named draft, not an anonymous application');
+  const pulledBack = getPermitFilesInLane(journey, 'drafted').filter((file) => file.type !== 'HCA');
+  assert.equal(pulledBack.length, 1, 'one submission was pulled back to drafting');
+  assert.equal(cp.pausedBy === hca.id || hca.lane === 'issued', true, 'the CP still waits on its HCA permit');
+  assert.equal(hca.holdsFileId, cp.id);
+});
+
+test('a counter cannot issue a permit that is not at the decision', () => {
+  const journey = freshQueue();
+  for (const file of getPermitFilesInLane(journey, 'decision')) {
+    file.lane = 'referral';
+  }
+  syncPermitCounters(journey);
+  const before = getPermitFiles(journey).length;
+
+  journey.permits.approved += 1;
+  reconcilePermitFiles(journey);
+
+  assert.equal(journey.permits.approved, 0, 'nothing was at the decision-maker, so nothing is issued');
+  assert.equal(getPermitFiles(journey).length, before, 'no permit is conjured out of nothing');
+  assert.equal(getPermitFilesInLane(journey, 'issued').length, 0);
+});
+
+test('a counter issue lands on a real, unheld file at the decision and never on one a WSA window holds', () => {
+  const journey = freshQueue();
+  const [held, free] = getPermitFilesInLane(journey, 'decision');
+  held.wsaClockCloses = journey.day + 3;
+  free.wsaClockCloses = null;
+  free.pausedBy = null;
+  const before = getPermitFiles(journey).length;
+
+  journey.permits.inReview -= 1;
+  journey.permits.approved += 1;
+  reconcilePermitFiles(journey);
+  assert.equal(free.lane, 'issued');
+  assert.equal(held.lane, 'decision', 'the WSA s.11 window still holds it');
+  assert.equal(getPermitFiles(journey).length, before);
+
+  journey.permits.inReview -= 1;
+  journey.permits.approved += 1;
+  reconcilePermitFiles(journey);
+  assert.equal(held.lane, 'decision');
+  assert.equal(journey.permits.approved, 1, 'the second request is refused');
+  assert.equal(journey.permits.inReview, 1);
+});
+
+test('a counter can move a file one lane on its own path, not past the referral', () => {
+  const journey = freshQueue();
+  const screening = getPermitFilesInLane(journey, 'screening');
+  const cp = screening.find((file) => file.type === 'CP');
+  for (const file of screening) if (file !== cp) file.lane = 'drafted';
+  for (const file of getPermitFilesInLane(journey, 'decision')) file.lane = 'drafted';
+  syncPermitCounters(journey);
+
+  journey.permits.submitted -= 1;
+  journey.permits.inReview += 1;
+  reconcilePermitFiles(journey);
+  assert.equal(cp.lane, 'screening', 'a cutting permit does not skip the First Nations referral');
+  assert.equal(journey.permits.inReview, 0);
+});
+
+test('an HCA permit is the Archaeology Branch\'s: it never counts toward the District Manager\'s target', () => {
+  const journey = freshQueue();
+  const { hca } = heldCpWithHca(journey);
+  hca.lane = 'decision';
+  hca.clockCloses = journey.day;
+  hca.wsaClockCloses = null;
+  const result = advancePermitClocks(journey, { approvalRate: 1, completenessReturnRate: 0, random: () => 0.5 });
+  assert.ok(result.issued.some((entry) => entry.file === hca));
+  assert.equal(hca.lane, 'issued');
+  const districtIssued = getPermitFilesInLane(journey, 'issued').filter((file) => file.type !== 'HCA').length;
+  assert.equal(journey.permits.approved, districtIssued, 'the HCA permit is not in the 15');
+
+  // And no counter can pull it about.
+  journey.permits.approved = 0;
+  journey.permits.inReview = 0;
+  reconcilePermitFiles(journey);
+  assert.equal(hca.lane, 'issued');
+});
+
+test('applications withdrawn from the backlog stay withdrawn', () => {
+  const journey = freshQueue();
+  const before = getPermitFiles(journey).length;
+  journey.permits.backlog = 0;
+  reconcilePermitFiles(journey);
+  assert.equal(journey.permits.backlog, 0);
+  assert.equal(getPermitFiles(journey).length, before);
+  assert.notEqual(planQueueWork(journey).step, 'draft');
+});
+
+test('the opening queue gives a heritage-heavy CP its HCA permit (Tahltan)', () => {
+  const journey = freshQueue('tahltan-highland');
+  const hca = getPermitFiles(journey).find((file) => file.type === 'HCA');
+  assert.ok(hca, 'the seeded CP on heavy heritage ground has its HCA permit');
+  const cp = getPermitFiles(journey).find((file) => file.id === hca.holdsFileId);
+  assert.equal(cp.pausedBy, hca.id);
+  assert.equal(planQueueWork(journey).step, 'draft');
+  journey.permits.backlog = 0;
+  syncPermitCounters(journey);
+  assert.equal(planQueueWork(journey).step, 'submit', 'the drafted HCA permit is queue work even though it is off the counters');
+});
+
+test('no area\'s queue repeats a file name or garbles a road name', () => {
+  for (const area of OPERATING_AREAS) {
+    const journey = makeJourney(area.id);
+    const labels = buildPermitFileCatalogue(journey).map((file) => file.label);
+    assert.equal(new Set(labels).size, labels.length, `${area.id}: ${labels.join(', ')}`);
+    assert.ok(!labels.some((label) => /\bBlock\b.* - |\bEnd of\b/.test(label)), `${area.id}: ${labels.join(', ')}`);
+  }
+});
+
+// ── Fast-track against a clean response ────────────────────────────────────
+
+function returnedFile(journey) {
+  const [file] = getPermitFilesInLane(journey, 'decision');
+  file.wsaClockCloses = null;
+  file.pausedBy = null;
+  file.clockCloses = journey.day;
+  advancePermitClocks(journey, { approvalRate: 0, completenessReturnRate: 0, random: () => 0.5 });
+  assert.equal(file.lane, 'deficiency');
+  return file;
+}
+
+test('a fast-track goes on tonight\'s pile; a clean response waits for tomorrow\'s', () => {
+  const fastJourney = freshQueue();
+  const fast = returnedFile(fastJourney);
+  const fastTicket = ensurePermittingRevisionState(fastJourney).find((ticket) => ticket.fileId === fast.id);
+  fastJourney.actionsRemaining = 1;
+  resolvePermitRevisionResponse(fastJourney, fastTicket.id, 'fast');
+  assert.equal(fast.clockCloses, fastJourney.day, 'decided tonight');
+
+  const cleanJourney = freshQueue();
+  const clean = returnedFile(cleanJourney);
+  const cleanTicket = ensurePermittingRevisionState(cleanJourney).find((ticket) => ticket.fileId === clean.id);
+  cleanJourney.actionsRemaining = 1;
+  resolvePermitRevisionResponse(cleanJourney, cleanTicket.id, 'clean');
+  assert.equal(clean.clockCloses, cleanJourney.day + 1, 'decided tomorrow night');
+
+  // The same roll that issues the clean file sends the thin one back.
+  const roll = () => 0.6;
+  advancePermitClocks(fastJourney, { approvalRate: 0.7, completenessReturnRate: 0, random: roll });
+  assert.equal(fast.lane, 'deficiency', 'a thin answer is likelier to come back');
+  cleanJourney.day += 1;
+  advancePermitClocks(cleanJourney, { approvalRate: 0.7, completenessReturnRate: 0, random: roll });
+  assert.equal(clean.lane, 'issued');
+});
+
+test('a gap answered cleanly is not the next letter on the same file, whatever the seed', () => {
+  for (const areaId of ['fraser-plateau', 'bulkley-valley', 'skeena-nass']) {
+    const journey = freshQueue(areaId);
+    const file = returnedFile(journey);
+    const first = ensurePermittingRevisionState(journey).find((ticket) => ticket.fileId === file.id);
+    journey.actionsRemaining = 1;
+    resolvePermitRevisionResponse(journey, first.id, 'clean');
+    journey.day += 1;
+    file.clockCloses = journey.day;
+    file.wsaClockCloses = null;
+    advancePermitClocks(journey, { approvalRate: 0, completenessReturnRate: 0, random: () => 0.5 });
+    const second = ensurePermittingRevisionState(journey).find((ticket) => ticket.fileId === file.id);
+    assert.ok(second, `${areaId}: returned again`);
+    assert.notEqual(second.profileId, first.profileId, `${areaId}: the ${first.title} letter came back after it was answered`);
+    assert.deepEqual(file.resolvedDeficiencies, [first.profileId]);
+  }
+});
+
+test('a package made whole is not bounced as incomplete again; a bare-minimum refile can be', () => {
+  const journey = freshQueue();
+  const [file] = getPermitFilesInLane(journey, 'screening');
+  file.clockCloses = journey.day;
+  advancePermitClocks(journey, { completenessReturnRate: 1, random: () => 0.5 });
+  const ticket = ensurePermittingRevisionState(journey).find((entry) => entry.fileId === file.id);
+  assert.equal(ticket.profileId, 'package-completeness');
+  journey.actionsRemaining = 1;
+  resolvePermitRevisionResponse(journey, ticket.id, 'clean');
+  assert.equal(file.lane, 'screening');
+  file.clockCloses = journey.day;
+  advancePermitClocks(journey, { completenessReturnRate: 1, random: () => 0.5 });
+  assert.notEqual(file.lane, 'deficiency', 'the completed package passes the screen');
+});
+
+test('a district meeting decides the one file it was about, not the whole night\'s queue', () => {
+  const journey = freshQueue();
+  const [met, other] = getPermitFilesInLane(journey, 'decision');
+  for (const file of [met, other]) {
+    file.wsaClockCloses = null;
+    file.pausedBy = null;
+  }
+  met.clockCloses = journey.day + 1;
+  other.clockCloses = journey.day;
+  journey.actionsRemaining = 1;
+  withRandom(0.1, () => executeDeskDay(journey, 'stakeholder_meeting', { stakeholder: 'ministry' }));
+  assert.equal(met.lane, 'issued');
+  assert.equal(other.lane, 'decision', 'the other file waits for tonight\'s pass and its odds');
 });

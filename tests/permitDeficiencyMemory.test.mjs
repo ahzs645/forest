@@ -28,7 +28,7 @@ test('a clean response to a deficiency is not answered with the same letter agai
   const file = getPermitFiles(journey).find((candidate) => candidate.id === ticket.fileId);
 
   resolvePermitRevisionResponse(journey, ticket.id, 'clean');
-  assert.ok(file.answeredProfiles.includes(ticket.profileId));
+  assert.ok(file.resolvedDeficiencies.includes(ticket.profileId));
   assert.equal(file.cleanResponses, 1);
 
   // Force the same file back through a failed decision.
@@ -63,7 +63,7 @@ test('a package made whole is not bounced from the completeness screen again', (
   journey.day = 3;
   ensurePermitFiles(journey);
   const [file] = getPermitFilesInLane(journey, 'screening');
-  file.answeredProfiles = ['package-completeness'];
+  file.resolvedDeficiencies = ['package-completeness'];
   file.clockCloses = journey.day;
   const result = advancePermitClocks(journey, { completenessReturnRate: 1, random: () => 0.5 });
   assert.ok(!result.returned.some((entry) => entry.file.id === file.id));
