@@ -155,6 +155,38 @@ test('a sound quarter honestly reported earns reputation; one bad meter is not a
 
 // --- certification ---
 
+test('the audit bar stays on the pane all year and is read against the meters before the audit', async () => {
+  const run = async (day, relationships) => {
+    const journey = monthJourney(day, 20000 * day);
+    journey.certifications = [cert('FSC', 'certified')];
+    journey.metrics.relationships = relationships;
+    journey.metrics.compliance = 60;
+    const statuses = [];
+    const ui = makeUi(answerWith('plan', 'set_aside', 'hold', 'rehearse', 'desk', 'transparent', 'pace:1'));
+    ui.setMissionStatus = (status) => statuses.push(structuredClone(status));
+    await withRandom(() => 0.5, () => runManagerDay({ ui, journey, gameOver: false, checkpoint() {} }));
+    return { ui, statuses };
+  };
+
+  // July: no audit this month or next, but the pane still carries the October bar.
+  const july = await run(7, 54);
+  const fact = july.statuses[0].facts.find((entry) => entry.label === 'FSC');
+  assert.match(fact.value, /^certified · October surveillance audit: compliance 60\/55, relationships 54\/55$/);
+  assert.equal(fact.tone, 'warn');
+  assert.ok(!july.ui.lines.includes('CERTIFICATION WATCH'), 'no watch three months out');
+
+  // September: the month before, the month opens with the readout and the pane raises it.
+  const september = await run(9, 54);
+  assert.ok(september.ui.lines.includes('CERTIFICATION WATCH'));
+  assert.ok(september.ui.lines.includes('FSC surveillance audit at the end of October: compliance 60% (needs 55%) · relationships 54% (needs 55%) SHORT.'));
+  assert.ok(september.statuses[0].alerts.some((alert) => alert.text === 'FSC surveillance audit in October: relationships 54/55.'));
+
+  // October, meters clear: the readout is there, without an alarm.
+  const october = await run(10, 58);
+  assert.ok(october.ui.lines.includes('FSC surveillance audit at the end of this month: compliance 60% (needs 55%) · relationships 58% (needs 55%).'));
+  assert.ok(!october.statuses[0].alerts.some((alert) => /FSC/.test(alert.text)));
+});
+
 test('certification is booked in January and earned at the May registration audit', async () => {
   await withRandom(seededRandomFactory(7), async () => {
     const journey = createManagerJourney({ areaId: 'fraser-plateau' });

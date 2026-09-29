@@ -243,6 +243,8 @@ export async function runManagerDay(game) {
 
   displayManagerHeader(ui, journey);
 
+  writeCertificationWatch(ui, journey);
+
   await maybeFlagCutProjection(game);
 
   await runStrategicDecision(game);
@@ -525,6 +527,46 @@ function earningCertifications(journey) {
   return (journey.certifications || []).filter((cert) => certificationStatus(cert) === 'certified');
 }
 
+/** The certificate's next audit this year, or null when none is coming. */
+function nextCertificationAudit(journey, cert) {
+  const status = certificationStatus(cert);
+  const month = Number(journey.day) || 1;
+  if (status === 'pending' && month <= REGISTRATION_AUDIT_MONTH) return { month: REGISTRATION_AUDIT_MONTH, kind: 'registration audit' };
+  if (status === 'corrective' && month <= SURVEILLANCE_AUDIT_MONTH) return { month: SURVEILLANCE_AUDIT_MONTH, kind: 're-audit' };
+  if (status === 'certified' && month <= SURVEILLANCE_AUDIT_MONTH) return { month: SURVEILLANCE_AUDIT_MONTH, kind: 'surveillance audit' };
+  return null;
+}
+
+/** Each requirement the auditors read, against today's meter. */
+function auditReadiness(journey, cert) {
+  return certificationRequirements(cert).map(([metric, minimum]) => {
+    const value = Math.round(journey.metrics?.[metric] ?? 50);
+    return { label: REQUIREMENT_LABELS[metric], value, minimum: Number(minimum), pass: value >= Number(minimum) };
+  });
+}
+
+/**
+ * The requirements stay on the pane all year, and in the audit month and
+ * the month before, the month opens with them read against the meters. They
+ * used to be shown once, in January, and a relationships meter could slide
+ * under the October bar without a word.
+ */
+function writeCertificationWatch(ui, journey) {
+  for (const cert of journey.certifications || []) {
+    const audit = nextCertificationAudit(journey, cert);
+    if (!audit || audit.month - journey.day > 1) continue;
+    const checks = auditReadiness(journey, cert);
+    if (!checks.length) continue;
+    const when = audit.month === journey.day ? 'at the end of this month' : `at the end of ${monthName(audit.month)}`;
+    const readout = checks.map((check) => `${check.label} ${check.value}% (needs ${check.minimum}%)${check.pass ? '' : ' SHORT'}`).join(' · ');
+    ui.writeDivider('CERTIFICATION WATCH');
+    const line = `${cert.id} ${audit.kind} ${when}: ${readout}.`;
+    if (checks.every((check) => check.pass)) ui.writeInfo(line);
+    else ui.writeWarning(line);
+    ui.write('');
+  }
+}
+
 /** Dollars per m³ as the ledger prints them: whole where whole, cents otherwise. */
 function formatRate(value) {
   const rounded = Math.round(Number(value) * 100) / 100;
@@ -587,6 +629,24 @@ function plannedToDate(ledger, throughMonth) {
   return planned;
 }
 
+/** One pane fact per certificate: its status and, while an audit is coming, the bar against the meters. */
+function certificationFacts(journey) {
+  const certs = journey.certifications || [];
+  if (!certs.length) return [{ label: 'Certification', value: 'None' }];
+  return certs.map((cert) => {
+    const audit = nextCertificationAudit(journey, cert);
+    const checks = audit ? auditReadiness(journey, cert) : [];
+    const readout = checks.map((check) => `${check.label} ${check.value}/${check.minimum}`).join(', ');
+    return {
+      label: `${cert.id || cert.name}`,
+      value: audit && readout
+        ? `${certificationStatus(cert)} · ${monthName(audit.month)} ${audit.kind}: ${readout}`
+        : certificationStatus(cert),
+      tone: checks.some((check) => !check.pass) ? 'warn' : ['suspended', 'withdrawn'].includes(certificationStatus(cert)) ? 'danger' : undefined,
+    };
+  });
+}
+
 function updateManagerMissionStatus(ui, journey) {
   const budgetOk = journey.resources.budget > 0;
   const repOk = (journey.metrics.reputation ?? 50) > 40;
@@ -611,7 +671,7 @@ function updateManagerMissionStatus(ui, journey) {
       tone: inBand ? undefined : cutStatus.startsWith('severe') ? 'danger' : 'warn',
     },
     { label: 'Cut schedule', value: getHarvestPace(ledger.pace).name },
-    { label: 'Certifications', value: (journey.certifications || []).map((cert) => `${cert.id || cert.name} (${certificationStatus(cert)})`).join(', ') || 'None' },
+    ...certificationFacts(journey),
     { label: 'Ops', value: `${Math.round(journey.metrics.progress)}%` },
     { label: 'Forest', value: `${Math.round(journey.metrics.forestHealth)}%` },
     { label: 'Relations', value: `${Math.round(journey.metrics.relationships)}%` },
@@ -632,6 +692,16 @@ function updateManagerMissionStatus(ui, journey) {
     alerts.push({
       level: cutStatus.startsWith('severe') ? 'danger' : 'warn',
       text: `Cut projected at ${formatCutPercent(cut.ratio)} of the AAC by December - ${cut.ratio > 1 ? 'slow' : 'speed up'} the cut schedule.`,
+    });
+  }
+  for (const cert of journey.certifications || []) {
+    const audit = yearOver ? null : nextCertificationAudit(journey, cert);
+    if (!audit || audit.month - journey.day > 1) continue;
+    const short = auditReadiness(journey, cert).filter((check) => !check.pass);
+    if (!short.length) continue;
+    alerts.push({
+      level: audit.month === journey.day ? 'danger' : 'warn',
+      text: `${cert.id} ${audit.kind} ${audit.month === journey.day ? 'this month' : `in ${monthName(audit.month)}`}: ${short.map((check) => `${check.label} ${check.value}/${check.minimum}`).join(', ')}.`,
     });
   }
   if (ledger.curtailmentFactor && ledger.curtailmentFactor < 1) {
