@@ -326,7 +326,10 @@ export const PanelsMixin = {
       row.className = 'resource-row';
 
       const displayLabel = key === 'food' ? 'FOOD (PD)' : def.shortLabel;
-      const displayValue = key === 'food' ? `${Math.round(value)} pd` : Math.round(value);
+      const rounded = Math.round(value);
+      const displayValue = key === 'food' ? `${rounded} pd`
+        : key === 'budget' ? `${rounded < 0 ? '-' : ''}$${Math.abs(rounded).toLocaleString('en-CA')}`
+          : rounded;
       row.innerHTML = `
         <span class="resource-label">${displayLabel}</span>
         <span class="resource-bar-text ${fillClass}">${progressBar(percentage, 10, false)}</span>

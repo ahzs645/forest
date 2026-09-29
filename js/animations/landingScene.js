@@ -20,9 +20,9 @@ const TREES = [
 ];
 
 const TITLE = [
-  { x: 28, y: 2, text: 'BRITISH COLUMBIA' },
-  { x: 28, y: 3, text: 'FORESTRY OPERATIONS' },
-  { x: 28, y: 4, text: 'SIMULATOR v1.0.4' },
+  { x: 28, y: 2, text: 'BC FORESTRY TRAIL' },
+  { x: 28, y: 3, text: 'DISTRICT TERMINAL' },
+  { x: 28, y: 4, text: 'v1.0.4' },
   { x: 28, y: 6, text: '"SUSTAINABILITY' },
   { x: 29, y: 7, text: 'THROUGH DATA"' }
 ];
