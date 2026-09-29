@@ -771,9 +771,34 @@ export function getOperationalEventLibrary(state) {
     // A chain stage ("the protest reaches the road") only makes sense after
     // the card that schedules it; drawn cold it references a choice never made.
     if (scheduledTargets.has(event.id)) return false;
+    // The expedition deck never rolls a probability-0 card cold; neither
+    // does the seasonal draw. Pending follow-ups still resolve by id.
+    if (Number(event.probability) === 0) return false;
     if (EXPEDITION_TRAVEL_EVENT_TYPES.has(event.type)) return false;
     return true;
   });
+}
+
+// The authored per-day probability the expedition deck rolls each card at.
+// The seasonal draw is a weighted pick, not a per-card roll, so the deck's
+// rarity has to be folded into the weight. This is the deck's median: a card
+// at or above it keeps its context-scored weight, and a rarer card is damped
+// by the square of the ratio. Squared, because the context bonuses above are
+// additive and a rare card earns them as readily as a common one - a linear
+// factor left a 1-in-10 card at a third of a normal card's share in a small
+// regional pool. The four legacy joke cards sit at 0.005 and the legacy desk
+// cards at 0.003-0.03; drawn with the same weight as everything else, an
+// alien landing showed up in six seasonal years out of ten.
+// The floor keeps the rarest cards alive at about one year in a hundred
+// rather than retiring them: rare is the brief, not gone.
+const SEASONAL_REFERENCE_PROBABILITY = 0.05;
+const SEASONAL_PROBABILITY_WEIGHT_FLOOR = 0.05;
+
+function seasonalProbabilityWeight(event) {
+  const probability = Number(event?.probability);
+  if (!Number.isFinite(probability) || probability <= 0 || probability >= SEASONAL_REFERENCE_PROBABILITY) return 1;
+  const ratio = probability / SEASONAL_REFERENCE_PROBABILITY;
+  return Math.max(SEASONAL_PROBABILITY_WEIGHT_FLOOR, ratio * ratio);
 }
 
 function findOperationalEventById(eventId, state) {
@@ -1125,7 +1150,8 @@ function scoreOperationalEventSelection(event, state) {
   }
 
   weight = applyEventContextWeight(event, state, weight);
-  return Math.max(0.25, weight);
+  // Rarity last, so a rare card stays rare whatever context bonuses it earned.
+  return Math.max(0.01, Math.max(0.25, weight) * seasonalProbabilityWeight(event));
 }
 
 const SEASONAL_ROUND_SEASON_IDS = ["spring", "summer", "fall", "winter"];

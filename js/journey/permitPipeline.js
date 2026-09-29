@@ -611,6 +611,43 @@ export function shortenPermitClock(journey, lanes, days = 1) {
 }
 
 /**
+ * Push the soonest live clock in those lanes back by a day: a distracted
+ * week at the desk. Returns the file, or null when nothing was on a clock.
+ */
+export function slipPermitClock(journey, lanes, days = 1) {
+  ensurePermitFiles(journey);
+  const [file] = getPermitFiles(journey)
+    .filter((entry) => lanes.includes(entry.lane) && Number.isFinite(entry.clockCloses) && !entry.pausedBy)
+    .sort((a, b) => a.clockCloses - b.clockCloses);
+  if (!file) return null;
+  file.clockCloses += Math.max(1, days);
+  return file;
+}
+
+/**
+ * Files the District Manager could sign today: at decision, with nothing
+ * holding them. Due files first, then the soonest clock.
+ */
+export function getSignableFiles(journey) {
+  ensurePermitFiles(journey);
+  return getPermitFiles(journey)
+    .filter((file) => file.lane === 'decision' && !isHeldAtDecision(file, journey).held)
+    .sort((a, b) => (a.clockCloses ?? Infinity) - (b.clockCloses ?? Infinity));
+}
+
+/**
+ * Issue a file that is already at decision. Anything not on the District
+ * Manager's desk cannot be signed, whatever an event says.
+ */
+export function issuePermitFile(journey, fileId) {
+  const file = getPermitFileById(journey, fileId);
+  if (!file || file.lane !== 'decision') return null;
+  enterLane(file, 'issued', journey);
+  syncPermitCounters(journey);
+  return file;
+}
+
+/**
  * Answer a deficiency letter on a file. A completeness letter sends the file
  * back to the completeness screen (the district will not start the referral
  * clock until the package is whole); a substantive letter goes back to the

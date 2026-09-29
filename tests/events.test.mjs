@@ -255,7 +255,11 @@ test('permitting events update relationship and compliance tracks without legacy
   assert.equal(journey.relationships.agencies, 50);
   assert.equal(journey.regulations.complianceScore, 83);
   assert.equal(journey.resources.politicalCapital, 43);
-  assert.equal(journey.permits.approved, 1);
+  // Generic progress brings a clock forward; it never signs a permit.
+  assert.equal(journey.permits.approved, 0);
+  assert.equal(journey.permits.inReview, 2);
+  assert.equal(journey.permits.files.length, 3, 'no file is conjured or lost');
+  assert.ok(result.messages.some((message) => /The queue moves faster: .+District Manager decision Day 4/.test(message)));
   assert.ok(result.messages.some((message) => message.includes('Relationships improved')));
 });
 
@@ -300,12 +304,15 @@ test('a generic negative-progress event slips reviews back but never revokes an 
 
   const result = resolveEvent(journey, event, option);
 
-  // "Approved 2/5" must stay "Approved 2/5" — a setback can knock the file
-  // in review back to needing revision, but it cannot un-approve a permit.
+  // "Approved 2/5" must stay "Approved 2/5" — a setback pushes the clock on
+  // the file in review back a day, but it cannot un-approve a permit, and the
+  // file stays exactly where it was in the queue.
   assert.equal(journey.permits.approved, 2);
-  assert.equal(journey.permits.inReview, 0);
-  assert.equal(journey.permits.needsRevision, 1);
-  assert.ok(result.messages.some((message) => message.includes('Permit pipeline slowed')));
+  assert.equal(journey.permits.inReview, 1);
+  assert.equal(journey.permits.needsRevision, 0);
+  const inReview = journey.permits.files.find((file) => file.lane === 'decision');
+  assert.equal(inReview.clockCloses, 11, 'the decision slips a day');
+  assert.ok(result.messages.some((message) => /The queue slips: .+District Manager decision Day 11/.test(message)));
 });
 
 test('a negative-progress event with nothing left to slip leaves approved permits untouched', () => {
@@ -346,10 +353,12 @@ test('a negative-progress event with nothing left to slip leaves approved permit
 
   assert.equal(journey.permits.approved, 3);
   assert.equal(journey.permits.needsRevision, 0);
-  assert.ok(!result.messages.some((message) => message.includes('Permit pipeline slowed')));
+  assert.equal(journey.permits.files.length, 3, 'the issued files are the only files, before and after');
+  assert.ok(!result.messages.some((message) => /queue slips/.test(message)));
+  assert.ok(result.messages.some((message) => /already stalled/.test(message)));
 });
 
-test('planning events advance the active phase instead of no-oping against permit state', () => {
+test('generic progress on a planning file is the planner\'s time, never a gate or a phase', () => {
   const journey = {
     journeyType: 'planning',
     day: 7,
@@ -360,7 +369,9 @@ test('planning events advance the active phase instead of no-oping against permi
       politicalCapital: 40
     },
     protagonist: {
-      reputation: 50
+      reputation: 50,
+      energy: 70,
+      stress: 30
     },
     plan: {
       phase: 'analysis',
@@ -377,7 +388,7 @@ test('planning events advance the active phase instead of no-oping against permi
     }
   };
 
-  resolveEvent(journey, { id: 'model-boost', title: 'Model Boost' }, {
+  const gained = resolveEvent(journey, { id: 'model-boost', title: 'Model Boost' }, {
     label: 'Use the new outputs',
     effects: {
       progress: 10,
@@ -386,8 +397,15 @@ test('planning events advance the active phase instead of no-oping against permi
     }
   });
 
-  assert.equal(journey.plan.phase, 'stakeholder_review');
-  assert.equal(journey.plan.analysisQuality, 81);
+  // Generic progress is the planner's own time: it buys energy and eases
+  // stress. The gates and the phase move only on the planner's own actions
+  // or an explicit data/analysis/buyIn key.
+  assert.equal(journey.plan.phase, 'analysis');
+  assert.equal(journey.plan.analysisQuality, 66);
+  assert.equal(journey.plan.dataCompleteness, 82);
+  assert.equal(journey.protagonist.energy, 76);
+  assert.equal(journey.protagonist.stress, 24);
+  assert.ok(gained.messages.some((message) => /Time back on the file/.test(message)));
   // Relationships land on stakeholder moods and the planner's reputation,
   // compliance on reputation and scrutiny; neither writes the engagement
   // record or the District Manager's readiness (only the planner's own work does).
@@ -395,6 +413,20 @@ test('planning events advance the active phase instead of no-oping against permi
   assert.equal(journey.plan.ministerialConfidence, 44);
   assert.equal(journey.stakeholders.nations.mood, 53);
   assert.equal(journey.protagonist.reputation, 56);
+
+  // A lost week in the decision phase costs the planner, not the DM.
+  journey.plan.phase = 'ministerial_approval';
+  journey.plan.ministerialConfidence = 29;
+  const lost = resolveEvent(journey, { id: 'wildfire_evacuation', title: 'Wildfire Approaching' }, {
+    label: 'Preemptively shut down operations and evacuate',
+    effects: { progress: -10 }
+  });
+  assert.equal(journey.plan.ministerialConfidence, 29, 'evacuating ahead of a fire is not the DM losing confidence');
+  assert.equal(journey.plan.phase, 'ministerial_approval');
+  assert.equal(journey.protagonist.energy, 70);
+  assert.equal(journey.protagonist.stress, 30);
+  assert.ok(lost.messages.some((message) => /Lost time on the file: energy -6, stress \+6/.test(message)));
+  assert.ok(!lost.messages.some((message) => /readiness|buy-in/i.test(message)));
 });
 
 test('planning mode ignores permit-only approval effects instead of crashing on missing permit data', () => {
@@ -408,7 +440,9 @@ test('planning mode ignores permit-only approval effects instead of crashing on 
       politicalCapital: 44
     },
     protagonist: {
-      reputation: 50
+      reputation: 50,
+      energy: 60,
+      stress: 40
     },
     plan: {
       phase: 'analysis',
@@ -428,9 +462,10 @@ test('planning mode ignores permit-only approval effects instead of crashing on 
     }
   });
 
-  assert.equal(journey.plan.analysisQuality, 48);
+  assert.equal(journey.plan.analysisQuality, 40);
   assert.equal(journey.resources.politicalCapital, 47);
-  assert.ok(result.messages.some((message) => message.includes('Analysis quality improved')));
+  assert.equal(journey.protagonist.energy, 63);
+  assert.ok(result.messages.some((message) => message.includes('Time back on the file')));
 });
 
 test('silviculture random-event check stays safe without recon block data', () => {
@@ -831,4 +866,69 @@ test('selected events can seed carry-forward discovery tags', () => {
 
   assert.ok(journey.discoveryTags.some((tag) => tag.id === 'community_visibility'));
   assert.ok(result.messages.some((message) => /Carry-forward intel/i.test(message)));
+});
+
+test('every change to district goodwill is surfaced, with a warning before the fatal threshold', () => {
+  const permitting = {
+    journeyType: 'permitting',
+    day: 11,
+    log: [],
+    permits: { target: 15, backlog: 0, drafting: 0, submitted: 0, inReferral: 0, inReview: 0, needsRevision: 0, approved: 11 },
+    resources: { budget: 30000, politicalCapital: 16 },
+    relationships: { ministry: 50, nations: 50, agencies: 50 },
+    regulations: { complianceScore: 60 }
+  };
+  // A compliance hit on a permit file drains goodwill; it used to do so silently.
+  const hit = resolveEvent(permitting, { id: 'archaeology_gap', title: 'Archaeology Screening Gap' }, {
+    label: 'Submit and hope',
+    effects: { compliance: -10 }
+  });
+  assert.equal(permitting.resources.politicalCapital, 6);
+  assert.ok(hit.messages.some((message) => message === 'District goodwill -10 → 6.'), hit.messages.join(' | '));
+  assert.ok(hit.messages.some((message) => /licensee pulls you off the file \(6 left\)/.test(message)));
+
+  const gone = resolveEvent(permitting, { id: 'complaint', title: 'Complaint' }, {
+    label: 'Redirect to PR',
+    effects: { politicalCapital: -6 }
+  });
+  assert.equal(permitting.resources.politicalCapital, 0);
+  assert.ok(gone.messages.some((message) => /goodwill is gone/.test(message)));
+
+  const planning = {
+    journeyType: 'planning',
+    day: 18,
+    log: [],
+    resources: { budget: 40000, politicalCapital: 23 },
+    protagonist: { reputation: 50, energy: 60, stress: 30 },
+    plan: { phase: 'analysis', dataCompleteness: 80, analysisQuality: 40, stakeholderBuyIn: 55, ministerialConfidence: 48 }
+  };
+  const quiet = resolveEvent(planning, { id: 'media', title: 'Media Inquiry' }, {
+    label: 'Redirect to PR department',
+    effects: { politicalCapital: -6, relationships: -3 }
+  });
+  assert.equal(planning.resources.politicalCapital, 17);
+  assert.ok(quiet.messages.some((message) => message === 'District goodwill -6 → 17.'));
+  assert.ok(!quiet.messages.some((message) => /nearly spent/.test(message)), 'no warning while goodwill is above the threshold');
+
+  const low = resolveEvent(planning, { id: 'elder', title: 'Elder Offers Traditional Knowledge' }, {
+    label: 'Decline',
+    effects: { politicalCapital: -8 }
+  });
+  assert.ok(low.messages.some((message) => /district stops reading the file \(9 left\)/.test(message)));
+
+  const back = resolveEvent(planning, { id: 'grant', title: 'Grant' }, {
+    label: 'Apply',
+    effects: { politicalCapital: 4 }
+  });
+  assert.ok(back.messages.some((message) => message === 'District goodwill +4 → 13.'));
+});
+
+test('the option hint names goodwill on a desk file and capital only in the boardroom', () => {
+  const event = {
+    id: 'hint', title: 'Hint', description: 'x',
+    options: [{ label: 'Lean on the district', outcome: 'x', effects: { politicalCapital: -6 } }]
+  };
+  assert.match(formatEventForDisplay(event, 'planning').options[0].hint, /-6 goodwill/);
+  assert.match(formatEventForDisplay(event, 'permitting').options[0].hint, /-6 goodwill/);
+  assert.match(formatEventForDisplay(event, 'manager').options[0].hint, /-6 capital/);
 });

@@ -46,8 +46,11 @@ function makeUi(answer) {
   };
 }
 
+// A steady year answers what lands on the desk (first authored option);
+// delegating everything is no longer free, since an imposed situation lands
+// its default cost when set aside (js/events/deferral.js).
 const steadyAnswers = (prompt, options) => {
-  for (const want of ['steady', 'none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', 'set_aside', 'pace:1']) {
+  for (const want of ['steady', 'none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', 'pace:1']) {
     const found = options.find((o) => o.value === want);
     if (found) return found;
   }

@@ -4,14 +4,22 @@
  */
 
 import { isFieldJourney, isDeskJourney } from './constants.js';
-import { PLANNING_PRE_SUBMISSION_CAP } from '../journey/constants.js';
 import { applyRandomInjury, applyStatusEffect, evacuateCrewMember } from '../crew.js';
 import { applyEventTravelEffect } from '../journey/fieldMechanics.js';
+import {
+  describeLane,
+  ensurePermitFiles,
+  getSignableFiles,
+  issuePermitFile,
+  shortenPermitClock,
+  slipPermitClock
+} from '../journey/permitPipeline.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
 import { buildEventReaction } from './reactions.js';
 import { resolveOutcomeBand } from './odds.js';
 import { applyConsequenceFlags, getCrewPrecedentMultiplier } from './consequences.js';
+import { getDayRng } from './dayRng.js';
 /**
  * Ceiling on how much ground a single day's trouble can cost a field crew.
  * Event content still rates delays on the retired eight-hour scale; this
@@ -43,24 +51,59 @@ function clampScrutiny(value) {
 }
 
 /**
+ * Goodwill at or below this after a loss gets a warning, because zero ends a
+ * desk run (js/modes/shared/endConditions.js) and nothing else on the card
+ * says so.
+ */
+const GOODWILL_WARNING_THRESHOLD = 15;
+
+export function readGoodwill(journey) {
+  const value = journey?.resources?.politicalCapital;
+  return typeof value === 'number' ? value : null;
+}
+
+/**
+ * Say what an event did to the district's goodwill. Compliance hits, capital
+ * effects and band fallout all drain the same meter, and until now none of
+ * them said so - the run ended from a "start next day" button.
+ */
+export function describeGoodwillChange(journey, before) {
+  const after = readGoodwill(journey);
+  if (before === null || after === null) return [];
+  const delta = Math.round(after - before);
+  if (delta === 0) return [];
+
+  const label = journey.journeyType === 'manager' ? 'Political capital' : 'District goodwill';
+  const lines = [`${label} ${delta > 0 ? '+' : ''}${delta} → ${Math.round(after)}.`];
+  if (delta < 0 && journey.journeyType !== 'manager' && after <= GOODWILL_WARNING_THRESHOLD) {
+    lines.push(after <= 0
+      ? 'The district\'s goodwill is gone. The file stops here.'
+      : journey.journeyType === 'planning'
+        ? `Goodwill is nearly spent: at zero the district stops reading the file (${Math.round(after)} left).`
+        : `Goodwill is nearly spent: at zero the licensee pulls you off the file (${Math.round(after)} left).`);
+  }
+  return lines;
+}
+
+/**
  * Pick a random active crew member
  */
-function pickRandomCrewMember(crew) {
+function pickRandomCrewMember(crew, rng = Math.random) {
   const active = crew.filter(m => m.isActive);
   if (active.length === 0) return null;
-  return active[Math.floor(Math.random() * active.length)];
+  return active[Math.floor(rng() * active.length)];
 }
 
 /**
  * Pick multiple random active crew members
  */
-function pickMultipleCrewMembers(crew, count) {
+function pickMultipleCrewMembers(crew, count, rng = Math.random) {
   const active = crew.filter(m => m.isActive);
   const selected = [];
   const pool = [...active];
 
   while (selected.length < count && pool.length > 0) {
-    const index = Math.floor(Math.random() * pool.length);
+    const index = Math.floor(rng() * pool.length);
     selected.push(pool.splice(index, 1)[0]);
   }
 
@@ -77,12 +120,16 @@ function pickMultipleCrewMembers(crew, count) {
 export function resolveEvent(journey, event, option) {
   const messages = [];
   const scrutinyBefore = Number(journey.scrutiny || 0);
+  const goodwillBefore = readGoodwill(journey);
+  // Today's dice for this situation (js/events/dayRng.js): the same choice
+  // on the same day resolves the same way after a reload.
+  const rng = getDayRng(journey, `resolve:${event?.id || 'event'}`);
 
   // Gamble options: roll once against odds shifted by the state the player has
   // actually built (js/events/odds.js), then use the resolved band throughout.
   // Options with no chanceSuccess resolve to the good band, which is exactly
   // what they did before this existed.
-  const resolved = resolveOutcomeBand(option, journey);
+  const resolved = resolveOutcomeBand(option, journey, rng);
   const outcome = resolved.outcome;
   const effects = resolved.effects;
 
@@ -103,7 +150,7 @@ export function resolveEvent(journey, event, option) {
     : (resolved.crewEffect || null);
   journey.lastEventVictimId = null;
   if (bandCrewEffect) {
-    handleCrewEffect(journey, bandCrewEffect, messages);
+    handleCrewEffect(journey, bandCrewEffect, messages, rng);
   }
 
   // What the band leaves behind. This is what stops a bad outcome from being
@@ -113,11 +160,11 @@ export function resolveEvent(journey, event, option) {
   }
 
   let injuryVictim = null;
-  if (option.riskInjury && Math.random() < option.riskInjury) {
-    const victim = pickRandomCrewMember(journey.crew);
+  if (option.riskInjury && rng() < option.riskInjury) {
+    const victim = pickRandomCrewMember(journey.crew, rng);
     if (victim) {
       const severity = option.riskInjury > 0.2 ? 'moderate' : 'minor';
-      const result = applyRandomInjury(victim, severity);
+      const result = applyRandomInjury(victim, severity, rng);
       messages.push(`Accident! ${result.message}`);
       injuryVictim = victim;
     }
@@ -125,7 +172,7 @@ export function resolveEvent(journey, event, option) {
 
   // A risky call can come back as a compliance/permitting problem later
   const complianceRisk = option.riskCompliance ?? option.riskRejection;
-  if (typeof complianceRisk === 'number' && Math.random() < complianceRisk) {
+  if (typeof complianceRisk === 'number' && rng() < complianceRisk) {
     applyEventEffects(journey, { compliance: -5 }, messages);
     messages.push('That call comes back on you.');
   }
@@ -145,12 +192,8 @@ export function resolveEvent(journey, event, option) {
     }
   }
 
-  if (typeof effects?.permits_approved === 'number' && journey.permits) {
-    journey.permits.approved = Math.min(
-      journey.permits.target,
-      journey.permits.approved + effects.permits_approved
-    );
-    messages.push(`Permits approved: ${journey.permits.approved}/${journey.permits.target}`);
+  if (typeof effects?.permits_approved === 'number' && effects.permits_approved > 0 && journey.permits) {
+    applyPermitsApproved(journey, effects.permits_approved, messages);
   }
 
   // A consequence on a timer has to belong to the band that earned it. An
@@ -184,7 +227,9 @@ export function resolveEvent(journey, event, option) {
     messages.push(`Scrutiny ${direction} to ${Math.round(journey.scrutiny)}%.`);
   }
 
-  const reaction = buildEventReaction(journey, option);
+  messages.push(...describeGoodwillChange(journey, goodwillBefore));
+
+  const reaction = buildEventReaction(journey, option, rng);
   if (reaction) {
     messages.push(reaction);
   }
@@ -207,9 +252,11 @@ export function resolveEvent(journey, event, option) {
 }
 
 /**
- * Apply effects from an event option
+ * Apply effects from an event option. Exported for the deferral path
+ * (js/events/deferral.js), which lands an imposed situation's cost without
+ * an option having been chosen.
  */
-function applyEventEffects(journey, effects, messages) {
+export function applyEventEffects(journey, effects, messages) {
   journey.scrutiny = clampScrutiny(Number(journey.scrutiny || 0));
 
   // Resource effects (field)
@@ -531,67 +578,38 @@ function applyPlanningMetricEffects(journey, effects, messages) {
 }
 
 /**
- * Generic progress on a planning file lands on the metric of the phase the
- * file is in. It is the fallback for decks that do not say which track
- * moved; an option that carries an explicit data/analysis/buyIn key has said
- * so, and the generic amount is not applied on top.
+ * Strain (energy down, stress up) per point of generic progress lost on a
+ * planning file, and the floor and ceiling on one event's charge.
+ */
+const PLANNING_PROGRESS_STRAIN = 0.6;
+const PLANNING_PROGRESS_STRAIN_MIN = 2;
+const PLANNING_PROGRESS_STRAIN_MAX = 12;
+
+/**
+ * Generic progress on a planning file is the planner's own working time,
+ * never the file's gates. Data, analysis, buy-in and DM readiness move only
+ * on the planner's own actions or an explicit data/analysis/buyIn key: a
+ * wildfire evacuation or a grant application costs the week, not the
+ * District Manager's confidence or the engagement record. It used to land
+ * on whichever gate the current phase was tracking, which is how evacuating
+ * ahead of a fire read as "DM readiness slipped (-29%)".
  */
 function applyPlanningProgress(journey, progressPoints, messages, effects = {}) {
-  if (!journey.plan) return;
+  if (!journey.plan || !journey.protagonist) return;
   if (hasExplicitPlanningKey(effects)) return;
 
-  // A generic setback is time lost, not a gate unwound: evacuating for a fire
-  // or fixing a print job used to wipe whichever gate was current (DM
-  // readiness 29% -> 0%, buy-in -15%). The planner absorbs it as strain, the
-  // way any other desk delay lands. Only explicit data/analysis/buyIn keys
-  // move a gate down.
+  const strain = Math.max(PLANNING_PROGRESS_STRAIN_MIN,
+    Math.min(PLANNING_PROGRESS_STRAIN_MAX, Math.round(Math.abs(progressPoints) * PLANNING_PROGRESS_STRAIN)));
+  const protagonist = journey.protagonist;
   if (progressPoints < 0) {
-    const strain = Math.max(1, Math.round(Math.abs(progressPoints) * DESK_DELAY_STRAIN / 2));
-    if (journey.protagonist) {
-      journey.protagonist.stress = clampPercent((journey.protagonist.stress || 0) + strain);
-      journey.protagonist.energy = clampPercent((journey.protagonist.energy || 0) - strain);
-    }
-    messages.push('It costs the file time, not ground: you catch up late and tired.');
-    return;
+    protagonist.energy = clampPercent((protagonist.energy || 0) - strain);
+    protagonist.stress = clampPercent((protagonist.stress || 0) + strain);
+    messages.push(`Lost time on the file: energy -${strain}, stress +${strain}.`);
+  } else {
+    protagonist.energy = clampPercent((protagonist.energy || 0) + strain);
+    protagonist.stress = clampPercent((protagonist.stress || 0) - strain);
+    messages.push(`Time back on the file: energy +${strain}, stress -${strain}.`);
   }
-
-  const amount = Math.max(3, Math.round(Math.abs(progressPoints) * 1.5));
-  let metricKey = 'dataCompleteness';
-  let metricLabel = 'Data readiness';
-  let ceiling = 100;
-
-  switch (journey.plan.phase) {
-    case 'analysis':
-      metricKey = 'analysisQuality';
-      metricLabel = 'Analysis quality';
-      break;
-    case 'stakeholder_review':
-      metricKey = 'stakeholderBuyIn';
-      metricLabel = 'Stakeholder buy-in';
-      break;
-    case 'ministerial_approval':
-      // A good week at the district can lift readiness, but never past the
-      // point where only Prepare Submission crosses the decision gate.
-      metricKey = 'ministerialConfidence';
-      metricLabel = 'DM readiness';
-      ceiling = PLANNING_PRE_SUBMISSION_CAP;
-      break;
-    default:
-      break;
-  }
-
-  const signedAmount = progressPoints > 0 ? amount : -amount;
-  const current = journey.plan[metricKey] || 0;
-  const next = signedAmount > 0
-    ? Math.max(current, Math.min(ceiling, current + signedAmount))
-    : clampPercent(current + signedAmount);
-  journey.plan[metricKey] = next;
-
-  const applied = Math.round(next - current);
-  if (applied === 0) return;
-  const direction = applied > 0 ? 'improved' : 'slipped';
-  messages.push(`${metricLabel} ${direction} (${applied > 0 ? '+' : ''}${applied}%).`);
-  advancePlanningPhaseIfReady(journey, messages);
 }
 
 /**
@@ -669,32 +687,12 @@ function applyRelationshipEffects(journey, delta, messages) {
 }
 
 /**
- * The technical phases can close on the back of an event; the engagement
- * phase closes only on a Stakeholder Session, and the District Manager's
- * decision only on Prepare Submission (js/modes/planning.js).
- */
-function advancePlanningPhaseIfReady(journey, messages) {
-  if (!journey.plan) return;
-
-  if (journey.plan.phase === 'data_gathering' && journey.plan.dataCompleteness >= 80) {
-    journey.plan.phase = 'analysis';
-    messages.push('Inventory complete. The analysis opens with the cutblock priority decision.');
-    return;
-  }
-
-  if (journey.plan.phase === 'analysis' && journey.plan.analysisQuality >= 80) {
-    journey.plan.phase = 'stakeholder_review';
-    messages.push('Draft plan complete. Moving to Engagement & Public Review.');
-  }
-}
-
-/**
  * Handle crew-specific effects
  */
-function handleCrewEffect(journey, crewEffect, messages) {
+function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
   let injured = null;
   if (crewEffect.injury) {
-    const victim = pickRandomCrewMember(journey.crew);
+    const victim = pickRandomCrewMember(journey.crew, rng);
     if (victim) {
       const result = applyStatusEffect(victim, crewEffect.injury);
       if (result.message) messages.push(result.message);
@@ -706,10 +704,10 @@ function handleCrewEffect(journey, crewEffect, messages) {
   if (crewEffect.illness) {
     // riskWorsen gates whether the condition actually sets in
     const setsIn = typeof crewEffect.riskWorsen === 'number'
-      ? Math.random() < crewEffect.riskWorsen
+      ? rng() < crewEffect.riskWorsen
       : true;
     if (setsIn) {
-      const victims = pickMultipleCrewMembers(journey.crew, crewEffect.count || 1);
+      const victims = pickMultipleCrewMembers(journey.crew, crewEffect.count || 1, rng);
       for (const victim of victims) {
         const result = applyStatusEffect(victim, crewEffect.illness);
         if (result.message) messages.push(result.message);
@@ -718,7 +716,7 @@ function handleCrewEffect(journey, crewEffect, messages) {
   }
 
   if (crewEffect.lose_member || crewEffect.leave) {
-    const victim = pickRandomCrewMember(journey.crew);
+    const victim = pickRandomCrewMember(journey.crew, rng);
     if (victim) {
       victim.isActive = false;
       victim.hasQuit = true;
@@ -744,7 +742,7 @@ function handleCrewEffect(journey, crewEffect, messages) {
       || (crewEffect.injury && crew.find(m => m.isActive && m.statusEffects?.some(e => e.effectId === crewEffect.injury)))
       || (journey.lastEventVictimId && crew.find(m => m.isActive && m.id === journey.lastEventVictimId))
       || crew.find(m => m.isActive && (m.statusEffects?.length || 0) > 0)
-      || pickRandomCrewMember(crew);
+      || pickRandomCrewMember(crew, rng);
     if (victim) {
       if (crewEffect.injury && !victim.statusEffects?.some(e => e.effectId === crewEffect.injury)) {
         applyStatusEffect(victim, crewEffect.injury);
@@ -759,81 +757,85 @@ function handleCrewEffect(journey, crewEffect, messages) {
   }
 }
 
+/** Points of generic desk progress per clock-day moved, and the most files one event moves. */
+const DESK_PROGRESS_POINTS_PER_CLOCK_DAY = 5;
+const DESK_PROGRESS_MAX_FILES = 4;
+const PERMIT_CLOCK_LANES = ['screening', 'referral', 'decision'];
+
+function describeMovedFiles(journey, files) {
+  const seen = new Set();
+  return files
+    .filter((file) => !seen.has(file.id) && seen.add(file.id))
+    .map((file) => `${file.label} (${describeLane(file, journey)})`)
+    .join(', ');
+}
+
+/**
+ * Generic progress on a permit queue moves clocks, never lanes. A good week
+ * brings the soonest clocks forward a day, the way a follow-up call does; a
+ * distracted week pushes them back. Nothing here issues a permit, skips a
+ * referral, or walks past a WSA or HCA hold - the District Manager's roll
+ * stays the only way a file gets signed, and a file that exists keeps
+ * existing. This used to edit the lane counters directly, which conjured
+ * issued files out of nothing and deleted named ones (with their HCA holds)
+ * once the files were reconciled back to the counters.
+ */
 function applyDeskProgress(journey, progressPoints, messages) {
   if (!journey.permits) return;
+  ensurePermitFiles(journey);
 
-  const target = journey.permits.target || 0;
-  const magnitude = Math.round(Math.abs(progressPoints) / 10);
-  if (magnitude <= 0) return;
-
-  let remaining = magnitude;
-  let moved = 0;
-
-  if (progressPoints > 0) {
-    while (remaining > 0 && journey.permits.inReview > 0 && (target <= 0 || journey.permits.approved < target)) {
-      journey.permits.inReview--;
-      journey.permits.approved = target > 0
-        ? Math.min(target, journey.permits.approved + 1)
-        : journey.permits.approved + 1;
-      remaining--;
-      moved++;
-    }
-
-    while (remaining > 0) {
-      if (journey.permits.submitted === 0 && journey.permits.backlog > 0) {
-        journey.permits.backlog--;
-        journey.permits.submitted++;
-      }
-      if (journey.permits.submitted > 0) {
-        journey.permits.submitted--;
-        journey.permits.inReview++;
-        remaining--;
-        moved++;
-        continue;
-      }
-      break;
-    }
-
-    if (moved > 0) {
-      messages.push(`Permit pipeline accelerated (+${moved}).`);
-    }
-  } else {
-    // A negative progress effect is a generic setback (a distracted week,
-    // a scheduling slip, ...), not a regulator revoking a decision. It can
-    // only slip work that is still in motion - drafts and reviews - back a
-    // stage. An approved permit is a legal decision that has already been
-    // granted, so it is deliberately excluded from every bucket below and
-    // can never be decremented here.
-    while (remaining > 0 && journey.permits.inReview > 0) {
-      journey.permits.inReview--;
-      journey.permits.needsRevision++;
-      remaining--;
-      moved++;
-    }
-
-    while (remaining > 0 && (journey.permits.inReferral || 0) > 0) {
-      journey.permits.inReferral--;
-      journey.permits.needsRevision++;
-      remaining--;
-      moved++;
-    }
-
-    while (remaining > 0 && journey.permits.submitted > 0) {
-      journey.permits.submitted--;
-      journey.permits.backlog = (journey.permits.backlog || 0) + 1;
-      remaining--;
-      moved++;
-    }
-
-    while (remaining > 0 && (journey.permits.drafting || 0) > 0) {
-      journey.permits.drafting--;
-      journey.permits.backlog = (journey.permits.backlog || 0) + 1;
-      remaining--;
-      moved++;
-    }
-
-    if (moved > 0) {
-      messages.push(`Permit pipeline slowed (-${moved}).`);
-    }
+  const steps = Math.min(DESK_PROGRESS_MAX_FILES,
+    Math.max(1, Math.round(Math.abs(progressPoints) / DESK_PROGRESS_POINTS_PER_CLOCK_DAY)));
+  const moved = [];
+  for (let step = 0; step < steps; step += 1) {
+    const file = progressPoints > 0
+      ? shortenPermitClock(journey, PERMIT_CLOCK_LANES)
+      : slipPermitClock(journey, PERMIT_CLOCK_LANES);
+    if (!file) break;
+    moved.push(file);
   }
+
+  if (!moved.length) {
+    messages.push(progressPoints > 0
+      ? 'Nothing in the queue is on a clock to bring forward.'
+      : 'The queue was already stalled; nothing slips further.');
+    return;
+  }
+  messages.push(progressPoints > 0
+    ? `The queue moves faster: ${describeMovedFiles(journey, moved)}.`
+    : `The queue slips: ${describeMovedFiles(journey, moved)}.`);
+}
+
+/**
+ * An authored early approval signs files that are already on the District
+ * Manager's desk and not held. When fewer are there than the event promised,
+ * the rest of the momentum goes into the queue's clocks - it never invents an
+ * issued file that was never drafted, screened or referred.
+ */
+function applyPermitsApproved(journey, count, messages) {
+  ensurePermitFiles(journey);
+  const signed = [];
+  for (let index = 0; index < count; index += 1) {
+    const [file] = getSignableFiles(journey);
+    if (!file) break;
+    issuePermitFile(journey, file.id);
+    signed.push(file);
+  }
+  if (signed.length) {
+    const target = journey.permits.target || 0;
+    const tally = target > 0 ? ` ${journey.permits.approved}/${target} issued.` : '';
+    messages.push(`${signed.map((file) => file.label).join(' and ')} ISSUED by the District Manager.${tally}`);
+  }
+
+  const short = count - signed.length;
+  if (short <= 0) return;
+  const moved = [];
+  for (let step = 0; step < short; step += 1) {
+    const file = shortenPermitClock(journey, PERMIT_CLOCK_LANES);
+    if (!file) break;
+    moved.push(file);
+  }
+  messages.push(moved.length
+    ? `Nothing else is on the District Manager's desk to sign; the momentum goes into the queue instead: ${describeMovedFiles(journey, moved)}.`
+    : 'Nothing is on the District Manager\'s desk to sign, and nothing in the queue is on a clock to bring forward.');
 }

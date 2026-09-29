@@ -13,6 +13,7 @@ import { FORESTER_ROLES, OPERATING_AREAS } from '../data/index.js';
 import { generateCrew } from '../crew.js';
 import { createJourney } from '../journey.js';
 import { checkScheduledEvents } from '../events.js';
+import { ensureDaySeed } from '../events/dayRng.js';
 import { checkEndConditions as evaluateEndConditions } from '../modes/shared/endConditions.js';
 import { runReconDay } from '../modes/recon.js';
 import { runSilvicultureDay } from '../modes/silviculture.js';
@@ -686,6 +687,7 @@ async function runCampaignSeason(game, campaign, season) {
         + `Progress ${Math.round(m.progress)} · Forest ${Math.round(m.forestHealth)} · Relations ${Math.round(m.relationships)} `
         + `· Compliance ${Math.round(m.compliance)} · Budget ${Math.round(m.budget)}`;
       ui.updateAllStatus(journey);
+      ensureDaySeed(journey);
 
       const scheduledEvent = checkScheduledEvents(journey);
       if (scheduledEvent) {
@@ -712,6 +714,9 @@ async function runCampaignSeason(game, campaign, season) {
 
       endResult = evaluateEndConditions(journey) || null;
       if (!endResult) {
+        // Roll the next day's dice before the save, as the expedition loop
+        // does, so resuming replays the day rather than re-rolling it.
+        ensureDaySeed(journey);
         campaign.activeJourney = journey;
         campaign.rngState = campaign.rng.state();
         saveCampaign(serializeCampaign(campaign));

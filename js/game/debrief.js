@@ -423,6 +423,12 @@ export async function runFinalDebrief(ui, journey, victory) {
   // --- Stage 1: Final report decision ---
   ui.clear();
   ui.writeHeader(victory ? 'THE WORK IS DONE' : 'THE WORK STOPS HERE');
+  // Why the run ended, before anything else is asked. A goodwill loss used
+  // to surface only after the archive prompt, two screens later.
+  if (journey.endReason) {
+    if (victory) ui.write(journey.endReason, 'term-dim');
+    else ui.writeDanger(journey.endReason);
+  }
   ui.write('');
   const report = getFinalReportPrompt(journey.journeyType, { victory });
   const choice = await ui.promptChoice(report.prompt, report.options);

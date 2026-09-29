@@ -19,6 +19,8 @@
 import { handleEvent } from '../modes/shared/handleEvent.js';
 import { optionSpendsDay } from '../events/timePolicy.js';
 import { resolveTemptationSetAside } from '../events/selection.js';
+import { applyDeferredSituation } from '../events/deferral.js';
+import { getDayRng } from '../events/dayRng.js';
 import {
   addRouteConstraintFromEvent,
   isRouteObstructionEvent
@@ -53,47 +55,56 @@ export function situationWeight(event) {
 /**
  * Charge the player for a situation they declined to handle.
  *
- * Scrutiny always — the file notices what you did not do. The human cost lands
- * on whoever is actually carrying the run: a field crew's morale, or a desk
- * protagonist's stress. Only for things that mattered, though: a player
- * triaging well declines a dozen-plus situations in a season, and charging for
- * every deferred phone call turns judgement into an attrition spiral.
+ * Scrutiny always — the file notices what you did not do — and, sized to the
+ * situation, the people carrying the run and whatever an imposed situation
+ * lands regardless (js/events/deferral.js). The deferral is logged as a
+ * situation so the compliance tally counts it.
  *
  * @param {Object} ui
  * @param {Object} journey
  * @param {Object} event
+ * @param {Object} [options]
+ * @param {boolean} [options.imposedCost=true] - false when the mode carries
+ *   the deferral forward itself (a recon obstruction stays on the route)
  */
-export function applySetAsideCost(ui, journey, event) {
+export function applySetAsideCost(ui, journey, event, { imposedCost = true } = {}) {
   // A temptation is somebody else's proposal, not a situation the file will
   // notice you ignored. Setting it aside costs nothing on the meters; what it
   // costs is that the proposer decides what your silence meant (they drop it,
   // ask again with a deadline, or go around you).
   if (event?.type === 'temptation') {
-    const reply = resolveTemptationSetAside(journey, event);
+    const reply = resolveTemptationSetAside(journey, event, getDayRng(journey, `set-aside:${event.id || 'event'}`));
     ui.write('');
     ui.write(reply.message, 'term-dim');
     return;
   }
 
-  const weight = situationWeight(event);
-  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + weight);
-
-  const humanCost = weight >= 2 ? weight : 0;
-  if (humanCost > 0) {
-    const crew = Array.isArray(journey.crew) ? journey.crew.filter((m) => m.isActive) : [];
-    if (crew.length > 0) {
-      for (const member of crew) {
-        member.morale = Math.max(0, member.morale - humanCost);
-      }
-    } else if (journey.protagonist) {
-      journey.protagonist.stress = Math.min(100, (journey.protagonist.stress || 0) + humanCost);
-    }
-  }
-
+  const { messages } = applyDeferredSituation(journey, event, {
+    weight: situationWeight(event),
+    imposedCost,
+  });
   ui.write('');
-  ui.writeWarning(humanCost > 0
-    ? `You leave it. Scrutiny +${weight}, and it costs you something to do it.`
-    : `You leave it for another day. Scrutiny +${weight}.`);
+  for (const [index, message] of messages.entries()) {
+    if (index === 0 || index === messages.length - 1) ui.writeWarning(message);
+    else ui.write(message);
+  }
+}
+
+/**
+ * The button that closes a deferral. Without it the next card's redraw wiped
+ * the cost line before anyone could read it.
+ */
+function setAsideAcknowledgement(journey) {
+  const label = ['recon', 'field'].includes(journey.journeyType)
+    ? 'Take the shift back'
+    : journey.journeyType === 'manager'
+      ? 'Back to the month'
+      : 'Take the day back';
+  return [{
+    label,
+    description: 'Leave it where it is and get on with your own work.',
+    value: 'continue',
+  }];
 }
 
 /**
@@ -134,7 +145,7 @@ export async function runDaySituation(game, event, options = {}) {
   }
 
   if (!outcome.resolved) {
-    applySetAsideCost(ui, journey, event);
+    applySetAsideCost(ui, journey, event, { imposedCost: !obstruction });
     if (obstruction) {
       const constraint = addRouteConstraintFromEvent(journey, event);
       if (constraint) {
@@ -148,6 +159,9 @@ export async function runDaySituation(game, event, options = {}) {
     };
     ui.updateAllStatus?.(journey);
     frame.onRender?.();
+    // Keep the cost on screen until the player has read it; the quiet card
+    // that follows clears the terminal.
+    await ui.promptChoice('', setAsideAcknowledgement(journey));
     return { setAside: true, spendsDay: false, gameOver: false };
   }
 

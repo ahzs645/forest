@@ -100,7 +100,7 @@ export function deriveOptionRiskTag(option) {
 }
 
 /** Effect keys where a negative number is a good thing for the player. */
-const INVERTED_EFFECT_KEYS = new Set(['scrutiny', 'heat', 'paperwork', 'stress', 'backlog']);
+export const INVERTED_EFFECT_KEYS = new Set(['scrutiny', 'heat', 'paperwork', 'stress', 'backlog']);
 
 /**
  * What counts as a steep single hit, per effect key. Sized against the actual
@@ -108,7 +108,7 @@ const INVERTED_EFFECT_KEYS = new Set(['scrutiny', 'heat', 'paperwork', 'stress',
  * starting stockpiles in js/resources.js — a number here should mean "this one
  * line hurts", not "this line is nonzero".
  */
-const STEEP_EFFECT_THRESHOLDS = {
+export const STEEP_EFFECT_THRESHOLDS = {
   budget: -800,
   fuel: -15,
   food: -12,
@@ -220,7 +220,10 @@ function getOptionHint(option, journeyType, event = null) {
       hints.push(option.effects.compliance > 0 ? `+${option.effects.compliance} compliance` : `${option.effects.compliance} compliance`);
     }
     if (option.effects.politicalCapital !== undefined) {
-      hints.push(option.effects.politicalCapital > 0 ? `+${option.effects.politicalCapital} capital` : `${option.effects.politicalCapital} capital`);
+      // The outcome line calls it district goodwill on a desk file
+      // (js/events/resolution.js describeGoodwillChange); the hint should too.
+      const unit = journeyType === 'manager' ? 'capital' : 'goodwill';
+      hints.push(option.effects.politicalCapital > 0 ? `+${option.effects.politicalCapital} ${unit}` : `${option.effects.politicalCapital} ${unit}`);
     }
 
     if (option.effects.data !== undefined && option.effects.data !== 0) {
@@ -233,10 +236,10 @@ function getOptionHint(option, journeyType, event = null) {
         hints.push('turn back; slower next travel leg');
       } else if (traverse && option.effects.progress < 0) {
         hints.push('slower next travel leg');
-      } else if (journeyType === 'planning' && option.effects.progress < 0) {
-        // A planning setback is strain, not a gate, and an explicit data /
-        // analysis / buy-in key replaces it (js/events/resolution.js).
-        if (!['data', 'analysis', 'buyIn'].some((key) => option.effects[key])) hints.push('costs the file time');
+      } else if (journeyType === 'planning') {
+        // On a planning file generic progress is the planner's own time
+        // (js/events/resolution.js applyPlanningProgress), never a gate.
+        hints.push(option.effects.progress > 0 ? 'time back on the file' : 'lost time on the file');
       } else if (traverse) {
         hints.push(`up to +${option.effects.progress} km on the next leg`);
       } else {
