@@ -31,10 +31,10 @@ import { describeEffectChips, formatRadioReport } from './display.js';
 import { getDayRng } from './dayRng.js';
 import { getSignableFiles } from '../journey/permitPipeline.js';
 import { actFitsStop, eventFitsStop } from '../journey/packages.js';
-import { getPendingFallout, takeDueFallout } from './fallout.js';
+import { falloutLandsIn, getPendingFallout, takeDueFallout } from './fallout.js';
 import { applyEventEffects } from './resolution.js';
 import { applyConsequenceFlags } from './consequences.js';
-import { DESK_RESOURCES } from '../resources.js';
+import { DESK_RESOURCES, formatDollars } from '../resources.js';
 import { getChaseableFiles } from '../journey/permitPipeline.js';
 
 /**
@@ -738,6 +738,16 @@ function describeSpan(journey, count) {
   return `${count} ${unit}${count === 1 ? '' : 's'}`;
 }
 
+// When a caught shortcut's determination lands, as the queue will land it: a
+// letter due after the deadline arrives on the run's last day, so a GM caught
+// in month 10 is told two months, not four.
+function describeLanding(journey, dueIn, suffix = '') {
+  const lands = falloutLandsIn(journey, dueIn);
+  const span = `${describeSpan(journey, lands.dueIn)}${suffix ? ` ${suffix}` : ''}`;
+  if (!lands.capped) return `about ${span}`;
+  return `${span}, in the last ${describeSpan(journey, 1).replace(/^1 /, '')} of the run`;
+}
+
 /**
  * Reconcile the run's log into `takenActIds`: every temptation the player took
  * (or let stand) counts against them in later odds (priorShortcuts in
@@ -1251,7 +1261,7 @@ export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPena
   const delay = catchDelayFor(act, journey);
   if (delay >= 1) {
     const how = String(act?.catch?.how || '').trim();
-    option.failureOutcome = `It does not hold. ${how} ${sentenceStart(catcher)} has it now, and the determination lands in about ${describeSpan(journey, delay)}.`;
+    option.failureOutcome = `It does not hold. ${how} ${sentenceStart(catcher)} has it now, and the determination lands in ${describeLanding(journey, delay)}.`;
     option.failureEffects = { scrutiny: 5 };
     option.failureFlags = [watchFlag];
     option.failureFallout = {
@@ -1299,7 +1309,7 @@ export function describeShortcutStakes(option, journey) {
   const noticed = describeEffectChips({ compliance: option.partialEffects?.compliance, scrutiny: option.partialEffects?.scrutiny }, journeyType);
   const determination = option.failureFallout?.effects || option.failureEffects || {};
   const caught = describeEffectChips(determination, journeyType).join(', ');
-  const when = option.failureFallout ? `, landing about ${describeSpan(journey, option.failureFallout.dueIn)} later` : '';
+  const when = option.failureFallout ? `, landing ${describeLanding(journey, option.failureFallout.dueIn, 'later')}` : '';
 
   const lines = [
     `Take it and you get ${gain}. Saying no costs nothing.`,
@@ -1418,6 +1428,13 @@ export function buildFalloutEvent(entry, journey) {
   const narrative = buildCaughtNarrative({ ...act, catch: { ...(act.catch || {}), how: lead } }, entry.variant);
   const effects = { ...(entry.effects || {}) };
   const costs = describeEffectChips(effects, journey?.journeyType).join(', ');
+  // A purse too thin for the fine gives up what it has, so say so rather than
+  // print a figure the ledger then does not charge.
+  const purse = Number(journey?.resources?.budget);
+  const fine = -Number(effects.budget);
+  const shortfall = fine > 0 && Number.isFinite(purse) && purse < fine
+    ? ` You have ${formatDollars(Math.max(0, purse))}; it takes all of it.`
+    : '';
 
   return {
     id: `temptation_fallout_${String(act.id)}`,
@@ -1430,7 +1447,7 @@ export function buildFalloutEvent(entry, journey) {
     cardLabel: isDesk ? 'IN THE INBOX' : 'ON THE RADIO',
     cardMarker: 'FALLOUT',
     description: narrative,
-    stakes: costs ? [`What it costs: ${costs}.`] : [],
+    stakes: costs ? [`What it costs: ${costs}.${shortfall}`] : [],
     setAsideDescription: SET_ASIDE_DESCRIPTIONS.fallout,
     options: [{
       label: 'Answer for it',
