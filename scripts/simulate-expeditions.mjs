@@ -533,8 +533,18 @@ function idleReconPolicy(_journey, options) {
   return pick(options, ['set_aside', 'normal', 'full', 'done', 'cancel', 'keep', 'next', 'continue']) || options[0];
 }
 
+// ── Careful policy (recon) ─────────────────────────────────────────────────
+// The competent crew lead who answers every card instead of setting the
+// behind-schedule ones aside: the run the grade should put in the high 80s
+// and low 90s, below a flawless season but well above the competent one.
+function carefulReconPolicy(journey, options, prompt) {
+  const answered = options.filter((option) => option.value !== 'set_aside');
+  return reconPolicy(journey, answered.length ? answered : options, prompt);
+}
+
 const ALT_POLICIES = {
   reckless: RECKLESS_POLICIES,
+  careful: { recon: carefulReconPolicy },
   idle: { recon: idleReconPolicy },
 };
 

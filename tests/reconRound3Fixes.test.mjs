@@ -19,7 +19,9 @@ import { formatOptionTimeCost, optionSpendsDay } from '../js/events/timePolicy.j
 import { eventSupportsJourney, eventMatchesJourneyContext } from '../js/events/selection.js';
 import { eventFitsStop } from '../js/journey/packages.js';
 import { formatEventForDisplay } from '../js/events/display.js';
-import { applyEventTravelEffect, fitEventToRemainingRoute } from '../js/journey/fieldMechanics.js';
+import { applyEventTravelEffect, executeFieldAction, fitEventToRemainingRoute } from '../js/journey/fieldMechanics.js';
+import { calculateScore, formatScoreDisplay } from '../js/scoring.js';
+import { buildCrewEpilogue } from '../js/game/debrief.js';
 
 function withRandom(value, fn) {
   const original = Math.random;
@@ -231,6 +233,88 @@ test('at the last stop a card promises no next-leg km and charges no next-leg se
   journey.currentBlockIndex -= 1;
   const card = FIELD_EVENTS.find((e) => e.id === 'good_road_conditions');
   assert.equal(fitEventToRemainingRoute(journey, card), card);
+});
+
+// ── The grade separates careful from flawless, and idling from both ────────
+
+/** A Tahltan season as the retest played it: 4 packages, 11 stops, clean run ~18 shifts. */
+function tahltanSeason({ shiftsUsed, health = 100, morale = 100, injuries = 0, clean = 7, won = true } = {}) {
+  const journey = createReconJourney({ areaId: 'tahltan-highland' });
+  journey.day = shiftsUsed + 1;
+  journey.blocksAssessed = won ? journey.packageTarget : 0;
+  journey.distanceTraveled = won ? journey.totalDistance : 0;
+  journey.currentBlockIndex = won ? journey.blocks.length - 1 : 0;
+  journey.scrutiny = 18;
+  for (const member of journey.crew) Object.assign(member, { isActive: true, hasQuit: false, health, morale });
+  journey.log = [
+    ...Array.from({ length: clean }, () => ({ type: 'event', effects: { compliance: 2 } })),
+    ...Array.from({ length: injuries }, (_, i) => ({ type: 'event', effects: {}, victimId: journey.crew[i].id, victimName: journey.crew[i].name })),
+  ];
+  return journey;
+}
+
+test('careful play grades high 80s to low 90s; only a flawless season reaches 100', () => {
+  const flawless = calculateScore(tahltanSeason({ shiftsUsed: 18 }), true);
+  assert.equal(flawless.totalScore, 100);
+
+  // The retest's careful Tahltan run: 25 shifts, every card answered clean, one
+  // sprain on the way, the crew a little worn at the end. It used to grade A 99.
+  const careful = calculateScore(tahltanSeason({ shiftsUsed: 25, health: 90, morale: 85, injuries: 1 }), true);
+  assert.ok(careful.totalScore >= 85 && careful.totalScore <= 95, `careful season scored ${careful.totalScore}`);
+  assert.ok(flawless.totalScore - careful.totalScore >= 5, `${flawless.totalScore} vs ${careful.totalScore}`);
+
+  // A rougher delivered season sits below the careful one.
+  const rough = calculateScore(tahltanSeason({ shiftsUsed: 33, health: 70, morale: 60, injuries: 3 }), true);
+  assert.ok(rough.totalScore < careful.totalScore - 5, `rough ${rough.totalScore} vs careful ${careful.totalScore}`);
+});
+
+test('standing down until the food runs out grades F, and the crew is not "5/5 active"', () => {
+  const idle = tahltanSeason({ shiftsUsed: 18, won: false, health: 45, morale: 20 });
+  idle.resources.food = 0;
+  idle.crewWalkedOff = true;
+  idle.isGameOver = true;
+  const score = calculateScore(idle, false);
+  assert.equal(score.grade, 'F', `idle season scored ${score.totalScore}`);
+  assert.ok(score.totalScore <= 40);
+  assert.match(score.components.crewWelfare.label, /drove out when the food ran out/);
+  assert.ok(score.components.crewWelfare.score <= 25, `welfare ${score.components.crewWelfare.score}`);
+  assert.match(formatScoreDisplay(score).join('\n'), /a season that missed its obligations grades no higher than F/);
+
+  // A season that closed most of its packages and then lost the crew is not an F.
+  const nearly = tahltanSeason({ shiftsUsed: 30, won: false, health: 70, morale: 60 });
+  nearly.blocksAssessed = 3;
+  const near = calculateScore(nearly, false);
+  assert.ok(near.totalScore > score.totalScore && near.totalScore <= 54, `nearly ${near.totalScore}`);
+});
+
+// ── Where are they now ─────────────────────────────────────────────────────
+
+test('a strong crew gets five different epilogues, and a walk-off crew is not told it won', () => {
+  const journey = tahltanSeason({ shiftsUsed: 18 });
+  for (const member of journey.crew) member.traits = [];
+  const used = new Set();
+  const lines = journey.crew.map((member) => buildCrewEpilogue(member, { victory: true, used }).split(': ').slice(1).join(': '));
+  assert.equal(new Set(lines).size, lines.length, lines.join('\n'));
+
+  const walked = new Set();
+  const walkOff = journey.crew.map((member) => buildCrewEpilogue(member, { victory: false, used: walked, walkedOff: true }));
+  assert.ok(walkOff.every((line) => !/stronger|run point|Banks the season/.test(line)), walkOff.join('\n'));
+  assert.ok(walkOff.some((line) => /food|hungry|grub|feed|ate/.test(line)), walkOff.join('\n'));
+});
+
+test('the starvation walk-off marks the crew as gone', () => {
+  const journey = createReconJourney({ areaId: 'tahltan-highland' });
+  journey.resources.food = 0;
+  journey.resourcePressure = { ...(journey.resourcePressure || {}), hungryDays: 5 };
+  withRandom(0.5, () => executeFieldAction(journey, 'resting'));
+  if (journey.isGameOver && /^NO FOOD/.test(journey.gameOverReason || '')) {
+    assert.equal(journey.crewWalkedOff, true);
+  } else {
+    // One more hungry shift and they go.
+    withRandom(0.5, () => executeFieldAction(journey, 'resting'));
+    assert.match(journey.gameOverReason || '', /^NO FOOD/);
+    assert.equal(journey.crewWalkedOff, true);
+  }
 });
 
 // ── Block cards stay on open blocks ────────────────────────────────────────

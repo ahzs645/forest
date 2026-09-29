@@ -1136,6 +1136,9 @@ export function executeFieldAction(journey, paceId) {
 
   if (!journey.isGameOver && Number(journey.resourcePressure?.hungryDays || 0) >= STARVATION_WALKOFF_DAYS) {
     journey.isGameOver = true;
+    // Whoever was still on the roster left with the trucks: the review and
+    // the epilogues read this rather than a crew that looks "5/5 active".
+    journey.crewWalkedOff = true;
     journey.gameOverReason = `NO FOOD - After ${journey.resourcePressure.hungryDays} shifts on an empty food box the crew drove themselves out. Nobody is left in the field to finish the season.`;
     messages.push(journey.gameOverReason);
   }
