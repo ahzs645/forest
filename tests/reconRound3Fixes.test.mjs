@@ -18,6 +18,7 @@ import { checkScheduledEvents } from '../js/events.js';
 import { formatOptionTimeCost, optionSpendsDay } from '../js/events/timePolicy.js';
 import { eventSupportsJourney, eventMatchesJourneyContext } from '../js/events/selection.js';
 import { eventFitsStop } from '../js/journey/packages.js';
+import { formatEventForDisplay } from '../js/events/display.js';
 
 function withRandom(value, fn) {
   const original = Math.random;
@@ -169,6 +170,35 @@ test('a sudden storm is not lightning over a winter ridge, and sheltering does n
   const shelter = storm.options.find((o) => /Take shelter/.test(o.label));
   assert.equal(optionSpendsDay(storm, shelter, 'recon'), false);
   assert.doesNotMatch(shelter.outcome, /no work gets done/i);
+});
+
+// ── A failed gamble shows what it can charge ───────────────────────────────
+
+test('a gamble names what its bad roll charges, including cash', () => {
+  const hintFor = (eventId, label) => {
+    const event = FIELD_EVENTS.find((e) => e.id === eventId);
+    const shown = formatEventForDisplay(event, 'recon');
+    return shown.options.find((o) => o.label.startsWith(label)).hint;
+  };
+  // The bad band of "Drain and filter" bills $300 and 100 L.
+  const drain = hintFor('fuel_contamination', 'Drain and filter');
+  assert.match(drain, /if it goes wrong: -100 L fuel, -14% equip, -\$300/);
+  // A hidden outcome keeps its meters hidden, but not the money.
+  assert.match(hintFor('boundary_dispute', 'Trust the old ribbon'), /up to \$1\.5k if it goes wrong/);
+  assert.match(hintFor('fuel_contamination', 'Use it anyway'), /up to \$400 if it goes wrong/);
+  // A charge made in every band is simply the price.
+  assert.match(hintFor('crew_threatens_quit', 'Negotiate'), /badly wrong, -\$400,/);
+
+  // Every bad band's cash, anywhere in the field deck, is on its card.
+  for (const event of FIELD_EVENTS) {
+    const shown = formatEventForDisplay(event, 'recon');
+    event.options.forEach((option, index) => {
+      const cash = Number(option.failureEffects?.budget) || 0;
+      if (cash >= 0 || option.liveOdds) return;
+      const amount = Math.abs(cash) >= 1000 ? `$${Number((Math.abs(cash) / 1000).toFixed(1))}k` : `$${Math.abs(cash)}`;
+      assert.ok(shown.options[index].hint.includes(amount), `${event.id} option ${index + 1}: ${shown.options[index].hint}`);
+    });
+  }
 });
 
 // ── Block cards stay on open blocks ────────────────────────────────────────

@@ -174,7 +174,15 @@ function getOptionHint(option, journeyType, event = null) {
   // whole corpus carrying chanceSuccess are also hiddenOutcome, the "% success
   // odds" hint was unreachable: the game rolled a number it could not show.
   if (option.hiddenOutcome) {
-    return [formatOddsHint(option) || 'Outcome uncertain', timeHint].filter(Boolean).join(', ');
+    // The meters stay close to the chest, but money the card can charge is
+    // named: a bad roll billed cash the chip never showed.
+    const bands = ['effects', 'partialEffects', 'failureEffects'].filter((band) => option[band]);
+    const charges = bands.map((band) => Number(option[band].budget) || 0);
+    const cash = Math.min(0, ...charges);
+    const every = charges.every((charge) => charge === cash);
+    const amount = effectChips({ budget: cash }, journeyType)[0];
+    const cashHint = cash >= 0 ? '' : every ? amount : `up to ${amount.slice(1)} if it goes wrong`;
+    return [formatOddsHint(option) || 'Outcome uncertain', cashHint, timeHint].filter(Boolean).join(', ');
   }
 
   // A shortcut leads with what decides it: today's odds, then what you get.
@@ -217,6 +225,10 @@ function getOptionHint(option, journeyType, event = null) {
   const oddsHint = formatOddsHint(option);
   if (oddsHint) {
     hints.push(oddsHint);
+    // What the bad roll applies, in the same words as the chips above. A
+    // failed gamble used to charge cash and fuel the card never mentioned.
+    const worst = describeEffectChips(option.failureEffects, journeyType);
+    if (worst.length) hints.push(`if it goes wrong: ${worst.join(', ')}`);
   }
 
   // There is no hour clock any more (js/journey/dayPlan.js): a timeUsed is

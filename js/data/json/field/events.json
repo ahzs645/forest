@@ -3419,8 +3419,8 @@
     ]
    },
    {
-    "label": "Dump it all and order fresh fuel",
-    "outcome": "The safe choice but you're grounded until the delivery arrives.",
+    "label": "Drain it to waste drums and order fresh fuel",
+    "outcome": "The bad diesel goes into drums for the hauler to take out; on the ground it would be a reportable spill. The fresh load is ordered, and the trucks run on what is left in the tanks until it comes.",
     "effects": {
      "fuel": -30,
      "budget": -300,
