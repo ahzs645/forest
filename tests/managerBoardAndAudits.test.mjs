@@ -109,9 +109,37 @@ test('the year-end audit restates spun weak quarters, and the board hears it fro
   const lucky = await runQ4([1, 3], () => 0.99);
   assert.equal(clean.journey.ledger.cutControlStatus, 'in_band');
   assert.equal(caught.journey.metrics.reputation, clean.journey.metrics.reputation - 16);
-  assert.ok(caught.ui.lines.some((line) => /restates Q1, Q3\. The board learns the quarter from the auditors instead of from you: reputation -16\./.test(line)));
+  assert.ok(caught.ui.lines.some((line) => /restates Q1 and Q3\. The board learns those quarters from the auditors instead of from you: reputation -16\./.test(line)));
   assert.equal(lucky.journey.metrics.reputation, clean.journey.metrics.reputation, 'a spin can survive the audit');
-  assert.ok(lucky.ui.lines.some((line) => /All 2 spun quarters survive, this time\./.test(line)));
+  assert.ok(lucky.ui.lines.some((line) => /Both spun quarters survive, this time\./.test(line)));
+});
+
+test('the board reads an overcut, a runaway projection and an empty treasury as weak quarters, so spinning them goes to the audit', async () => {
+  // December at 123% of the AAC with the C&E penalty emptying the treasury.
+  const december = monthJourney(12, 276000);
+  december.resources.budget = 400000;
+  const decUi = makeUi(answerWith('spin', 'desk', 'set_aside', 'pace:1'));
+  await withRandom(() => 0.5, () => runManagerDay({ ui: decUi, journey: december, gameOver: false, checkpoint() {} }));
+  assert.match(december.ledger.cutControlStatus, /overcut/);
+  const decVerdict = decUi.lines.find((line) => line.startsWith('The directors read it as'));
+  assert.match(decVerdict, /^The directors read it as a weak quarter: .*the cut-control statement goes in overcut 1\d\d\.\d%.*the treasury is empty/);
+  assert.ok(!decUi.lines.includes('The directors read it as a sound quarter.'));
+  assert.deepEqual(december.flags.boardSpunQuarters, [4], 'a spun overcut is on the audit list');
+  assert.ok(decUi.lines.some((line) => /AUDITED YEAR-END STATEMENTS/.test(line)));
+
+  // June, already on course for an overcut: the projection is the finding, even
+  // with the quarter delivered to plan.
+  const june = monthJourney(6, 150000);
+  const juneUi = makeUi(answerWith('transparent', 'plan', 'set_aside', 'pace:1'));
+  await withRandom(() => 0.5, () => runManagerDay({ ui: juneUi, journey: june, gameOver: false, checkpoint() {} }));
+  assert.ok(juneUi.lines.some((line) => /^The directors read it as a weak quarter: .*the cut is heading for 1[1-3]\d\.\d% of the AAC/.test(line)));
+
+  // September in band but with most of the treasury gone.
+  const september = monthJourney(9, 176000);
+  september.resources.budget = 250000;
+  const sepUi = makeUi(answerWith('transparent', 'plan', 'set_aside', 'pace:1'));
+  await withRandom(() => 0.5, () => runManagerDay({ ui: sepUi, journey: september, gameOver: false, checkpoint() {} }));
+  assert.ok(sepUi.lines.some((line) => /^The directors read it as a weak quarter: .*the treasury is down to \$[\d,]+ from \$850,000/.test(line)));
 });
 
 test('a sound quarter honestly reported earns reputation; one bad meter is not a weak quarter', async () => {
@@ -126,6 +154,38 @@ test('a sound quarter honestly reported earns reputation; one bad meter is not a
 });
 
 // --- certification ---
+
+test('the audit bar stays on the pane all year and is read against the meters before the audit', async () => {
+  const run = async (day, relationships) => {
+    const journey = monthJourney(day, 20000 * day);
+    journey.certifications = [cert('FSC', 'certified')];
+    journey.metrics.relationships = relationships;
+    journey.metrics.compliance = 60;
+    const statuses = [];
+    const ui = makeUi(answerWith('plan', 'set_aside', 'hold', 'rehearse', 'desk', 'transparent', 'pace:1'));
+    ui.setMissionStatus = (status) => statuses.push(structuredClone(status));
+    await withRandom(() => 0.5, () => runManagerDay({ ui, journey, gameOver: false, checkpoint() {} }));
+    return { ui, statuses };
+  };
+
+  // July: no audit this month or next, but the pane still carries the October bar.
+  const july = await run(7, 54);
+  const fact = july.statuses[0].facts.find((entry) => entry.label === 'FSC');
+  assert.match(fact.value, /^certified · October surveillance audit: compliance 60\/55, relationships 54\/55$/);
+  assert.equal(fact.tone, 'warn');
+  assert.ok(!july.ui.lines.includes('CERTIFICATION WATCH'), 'no watch three months out');
+
+  // September: the month before, the month opens with the readout and the pane raises it.
+  const september = await run(9, 54);
+  assert.ok(september.ui.lines.includes('CERTIFICATION WATCH'));
+  assert.ok(september.ui.lines.includes('FSC surveillance audit at the end of October: compliance 60% (needs 55%) · relationships 54% (needs 55%) SHORT.'));
+  assert.ok(september.statuses[0].alerts.some((alert) => alert.text === 'FSC surveillance audit in October: relationships 54/55.'));
+
+  // October, meters clear: the readout is there, without an alarm.
+  const october = await run(10, 58);
+  assert.ok(october.ui.lines.includes('FSC surveillance audit at the end of this month: compliance 60% (needs 55%) · relationships 58% (needs 55%).'));
+  assert.ok(!october.statuses[0].alerts.some((alert) => /FSC/.test(alert.text)));
+});
 
 test('certification is booked in January and earned at the May registration audit', async () => {
   await withRandom(seededRandomFactory(7), async () => {

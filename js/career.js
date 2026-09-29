@@ -30,7 +30,8 @@ export const CAREER_LABELS = {
   seedlingsPlanted: 'Seedlings planted',
   plansApproved: 'Plans approved',
   permitsApproved: 'Permits approved',
-  daysInTheChair: 'Days in the chair',
+  // The GM's counter: the key predates the monthly year, the label does not.
+  daysInTheChair: 'Months in the chair',
 };
 
 export function loadServiceRecord() {

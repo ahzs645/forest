@@ -5,7 +5,9 @@ import { createManagerJourney } from '../js/journey/factory.js';
 import { runManagerDay } from '../js/modes/manager.js';
 import { checkEndConditions } from '../js/modes/shared/endConditions.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
-import { MANAGER_EXECUTIVE_ROLES, OPERATING_POSTURES } from '../js/data/managerRoles.js';
+import { MANAGER_EXECUTIVE_ROLES, OPERATING_POSTURES, MANAGER_AREA_ECONOMICS, getAreaEconomics } from '../js/data/managerRoles.js';
+import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
+import { simulateManagerYear } from '../scripts/simulate-manager.mjs';
 import managerEvents from '../js/data/json/desk/managerEvents.json' with { type: 'json' };
 
 function seededRandomFactory(seed) {
@@ -123,6 +125,68 @@ test('every month closes with a ledger: volume, margin, overhead, net, treasury'
   });
 });
 
+test('the operating area sets the ledger: wood, stumpage, logging cost, price swing and the shape of the year', async () => {
+  const opened = {};
+  for (const area of OPERATING_AREAS) {
+    await withSeededRandom(29, async () => {
+      const journey = createManagerJourney({ areaId: area.id });
+      const ui = makeUi(steadyAnswers);
+      await runManagerDay({ ui, journey, gameOver: false, checkpoint() {} });
+      const economics = getAreaEconomics(area.id);
+      assert.equal(MANAGER_AREA_ECONOMICS[area.id] !== undefined, true, `${area.id} has a profile`);
+      assert.equal(journey.ledger.logPrice, economics.logPrice);
+      assert.equal(journey.ledger.stumpage, economics.stumpage);
+      assert.equal(journey.ledger.loggingHaul, economics.loggingHaul);
+      assert.ok(ui.lines.includes(economics.market), `${area.id}: the wood is on the operating plan`);
+      assert.ok(Math.abs(journey.ledger.seasonalCurve.reduce((sum, value) => sum + value, 0) - 11.8) < 1e-9, `${area.id}: the plan year is the same size`);
+      opened[area.id] = { ui, journey };
+    });
+  }
+  const signature = (id) => JSON.stringify([opened[id].journey.ledger.logPrice, opened[id].journey.ledger.stumpage, opened[id].journey.ledger.loggingHaul, opened[id].journey.ledger.seasonalCurve, opened[id].journey.ledger.priceSwing]);
+  assert.equal(new Set(OPERATING_AREAS.map((area) => signature(area.id))).size, OPERATING_AREAS.length, 'no two areas run the same ledger');
+
+  // The coast has no breakup, and the CFO does not say it does.
+  const coast = opened['vancouver-island-coast'];
+  assert.ok(!coast.ui.lines.some((line) => /(CFO).*spring breakup/.test(line)));
+  assert.ok(coast.ui.lines.some((line) => /\(CFO\) notes that there is no breakup on the coast/.test(line)));
+  assert.ok(coast.journey.ledger.seasonalCurve[3] > 1, 'April logs on the coast');
+  assert.ok(opened['fort-st-john-plateau'].journey.ledger.seasonalCurve[3] < 0.3, 'winter-road country all but stops in the thaw');
+  // January's carry-in follows the area's curve.
+  assert.notEqual(opened['vancouver-island-coast'].journey.ledger.months[0].delivered, opened['fraser-plateau'].journey.ledger.months[0].delivered);
+
+  // Every area stays a winnable year for a competent GM, and they do not all end on the same number.
+  const treasuries = new Set();
+  for (const area of OPERATING_AREAS) {
+    for (const seed of [41, 43]) {
+      const result = await simulateManagerYear(seed, 'competent', { areaId: area.id });
+      assert.equal(result.victory, true, `${area.id} ${seed}: ${result.reason}`);
+      treasuries.add(result.treasury);
+    }
+  }
+  assert.equal(treasuries.size, OPERATING_AREAS.length * 2);
+});
+
+test('a thin treasury changes the CFO\'s offer, and a month it cannot cover says by how much', async () => {
+  const journey = createManagerJourney({ areaId: 'fraser-plateau' });
+  journey.flags.managerInitComplete = true;
+  journey.ceo = { id: 'steady', name: 'x', decision_making_style: 'conservative', posture: 'Steady delivery', volumeFactor: 1, costPerM3: 0, quarterly: {} };
+  journey.day = 2; // the discretionary-spend month
+  journey.flags.paceSetMonth = 2;
+  journey.resources.budget = 60000;
+  journey.ledger.curtailmentFactor = 0.2; // a mill curtailment on a thin treasury
+  const ui = makeUi(steadyAnswers);
+  await withSeededRandom(4, () => runManagerDay({ ui, journey, gameOver: false, checkpoint() {} }));
+  assert.ok(ui.lines.some((line) => /your CFO, would rather nothing went out this month: the treasury is at \$60,000\./.test(line)));
+  assert.ok(!ui.lines.some((line) => /freed up discretionary room/.test(line)));
+  const month = journey.ledger.months.at(-1);
+  assert.ok(month.net < -60000, `net ${month.net}`);
+  const netLine = ui.lines.find((line) => /^Net /.test(line));
+  const match = netLine.match(/^Net -\$([\d,]+) -> treasury \$0 \(\$([\d,]+) it could not cover\)$/);
+  assert.ok(match, netLine);
+  assert.equal(Number(match[1].replaceAll(',', '')), -month.net);
+  assert.ok(Number(match[2].replaceAll(',', '')) < -month.net, 'the shortfall is what the treasury did not have');
+});
+
 test('board reviews sit quarterly on the calendar and only once each', async () => {
   await withSeededRandom(13, async () => {
     const journey = createManagerJourney({ areaId: 'fraser-plateau' });
@@ -154,6 +218,27 @@ test('the posture changes the year: pushing the cut delivers more and thins comp
   }
   assert.ok(results.growth.delivered > results.steady.delivered, `growth ${results.growth.delivered} vs steady ${results.steady.delivered}`);
   assert.ok(results.growth.compliance < results.steady.compliance);
+});
+
+test('each posture says what it costs the file and the team, and the quarter applies it', async () => {
+  const journey = createManagerJourney({ areaId: 'fraser-plateau' });
+  const ui = makeUi((prompt, options) => options.find((o) => o.value === 'lean') || steadyAnswers(prompt, options));
+  await withSeededRandom(3, () => runManagerDay({ ui, journey, gameOver: false, checkpoint() {} }));
+  const hints = Object.fromEntries(ui.prompts.find((entry) => /operating posture/.test(entry.prompt)).options.map((o) => [o.value, o.hint]));
+  assert.match(hints.growth, /each quarter operations \+4, compliance -3, scrutiny \+4, executive morale -2\./);
+  assert.match(hints.lean, /scrutiny \+2, executive morale -3\. The deferred silviculture is booked at year end: \$0\.50\/m³ delivered\./);
+  assert.ok(!/scrutiny|morale|booked/.test(hints.steady));
+
+  // March closes the quarter: the lean posture's initiative lands on the file and the team.
+  journey.day = 3;
+  journey.flags.paceSetMonth = 3;
+  const scrutiny = journey.scrutiny;
+  const morale = journey.crew.map((member) => member.morale);
+  const march = makeUi(steadyAnswers);
+  await withSeededRandom(3, () => runManagerDay({ ui: march, journey, gameOver: false, checkpoint() {} }));
+  assert.ok(march.lines.some((line) => /runs the quarter on the Cost discipline posture: .*scrutiny \+2, executive morale -3\./.test(line)));
+  assert.ok(journey.crew.every((member, index) => member.morale <= morale[index] - 3 || member.morale === 0 || !member.isActive));
+  assert.ok(journey.scrutiny !== scrutiny);
 });
 
 test('cut control at year end reads the delivered volume against the AAC', async () => {

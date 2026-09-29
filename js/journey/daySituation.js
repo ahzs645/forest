@@ -171,7 +171,8 @@ export async function runDaySituation(game, event, options = {}) {
     journey.travelSetback = travelSetbackBefore;
     journey.pendingTravelSetback = Math.min(0.75, (journey.pendingTravelSetback || 0) + setbackDelta);
   }
-  if (!spendsDay) {
+  // A GM's month runs whatever lands on the desk; there is no day to lose.
+  if (!spendsDay && journey.journeyType !== 'manager') {
     ui.write('Handled without losing the day.', 'term-dim');
   }
   journey.recentSituationContext = {

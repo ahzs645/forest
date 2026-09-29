@@ -75,7 +75,12 @@ export function calculateScore(journey, victory) {
   // reconciles with the total (a silent +10 made "A (100/100)" contradict
   // components that summed to ~94).
   const baseScore = Math.round(weighted);
-  const victoryBonus = victory ? Math.min(10, 100 - baseScore) : 0;
+  // A GM's win is already scored inside the components (the cut-control
+  // band, the issued certificate, the reputation bar), so the flat bonus is
+  // half: at ten it padded every competent year to 100, and the operating
+  // posture and the certificate never showed in the grade.
+  const victoryBonusCap = journey.journeyType === 'manager' ? 5 : 10;
+  const victoryBonus = victory ? Math.min(victoryBonusCap, 100 - baseScore) : 0;
   const scrutinyPenalty = scoreScrutinyPenalty(journey);
   const integrityPenalty = scoreIntegrityPenalty(journey);
   const scoreCap = scoreFailureCap(journey, victory);

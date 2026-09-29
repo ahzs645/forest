@@ -348,7 +348,11 @@ export function applyEventEffects(journey, effects, messages) {
         Math.min(FIELD_RESOURCES[stock].max, journey.resources[stock] + effects[stock]));
     }
     if (typeof effects.reputation === 'number' && journey.metrics) {
-      journey.metrics.reputation = clampPercent((journey.metrics.reputation || 0) + effects.reputation);
+      const before = journey.metrics.reputation || 0;
+      journey.metrics.reputation = clampPercent(before + effects.reputation);
+      // Reputation is the GM's win bar: a move on it is said, like capital's.
+      const moved = Math.round(journey.metrics.reputation - before);
+      if (moved !== 0) messages.push(`Reputation ${moved > 0 ? '+' : ''}${moved} → ${Math.round(journey.metrics.reputation)}.`);
     }
   }
 
