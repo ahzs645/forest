@@ -341,3 +341,27 @@ test('the debrief shows a failed planner the hand-over prompt', async () => {
   assert.doesNotMatch(prompts, /needs your seal/);
   assert.match(prompts, /did not get through/);
 });
+
+test('on a desk the straight record beats the thank-you notes, and spin loses on average', () => {
+  const rolls = Array.from({ length: 100 }, (_, index) => (index + 0.5) / 100);
+  for (const journeyType of ['planning', 'permitting']) {
+    for (const scrutiny of [0, 30, 70]) {
+      const journey = { journeyType, crew: [], scrutiny };
+      const integrity = resolveFinalReport('integrity', journey).delta;
+      const people = resolveFinalReport('people', journey).delta;
+      const spin = rolls.reduce((sum, roll) => sum + resolveFinalReport('spin', journey, () => roll).delta, 0) / rolls.length;
+      assert.ok(integrity > people, `${journeyType} at ${scrutiny}: integrity ${integrity} vs people ${people}`);
+      assert.ok(spin < 0, `${journeyType} at ${scrutiny}: spin EV ${spin}`);
+    }
+  }
+});
+
+test('spinning an approved plan is not narrated as a failed file', () => {
+  const journey = { journeyType: 'planning', crew: [], scrutiny: 10 };
+  const bust = resolveFinalReport('spin', journey, () => 0.99, { victory: true }).lines.join(' ');
+  assert.doesNotMatch(bust, /beside their own file/);
+  const failed = resolveFinalReport('spin', journey, () => 0.99, { victory: false }).lines.join(' ');
+  assert.match(failed, /beside their own file/);
+  const archive = getFinalReportPrompt('permitting', { victory: true }).options.map((option) => option.label).join(' ');
+  assert.doesNotMatch(archive, /stragglers/, 'a finished queue has no stragglers to fast-close');
+});

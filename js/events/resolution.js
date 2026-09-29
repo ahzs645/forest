@@ -8,11 +8,13 @@ import { applyRandomInjury, applyStatusEffect, evacuateCrewMember } from '../cre
 import { applyEventTravelEffect } from '../journey/fieldMechanics.js';
 import {
   describeLane,
+  draftPermits,
   ensurePermitFiles,
   getSignableFiles,
   issuePermitFile,
   shortenPermitClock,
-  slipPermitClock
+  slipPermitClock,
+  submitPermits
 } from '../journey/permitPipeline.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
@@ -418,12 +420,14 @@ export function applyEventEffects(journey, effects, messages) {
 
   // Reputation outside manager mode lands on standing: relationships for desk
   // journeys, compliance/scrutiny for field crews (the manager branch above
-  // routes it to metrics.reputation directly).
+  // routes it to metrics.reputation directly). On a desk it joins the
+  // relationship effect as one line, not two "Relationships frayed" in a row.
+  let relationshipDelta = typeof effects.relationships === 'number' ? effects.relationships : 0;
   if (typeof effects.reputation === 'number' && effects.reputation !== 0 && journey.journeyType !== 'manager') {
     if (isFieldJourney(journey.journeyType)) {
       applyComplianceEffects(journey, effects.reputation, messages);
     } else {
-      applyRelationshipEffects(journey, effects.reputation, messages);
+      relationshipDelta += effects.reputation;
     }
   }
 
@@ -432,8 +436,8 @@ export function applyEventEffects(journey, effects, messages) {
     applyComplianceEffects(journey, effects.compliance, messages);
   }
 
-  if (typeof effects.relationships === 'number' && effects.relationships !== 0) {
-    applyRelationshipEffects(journey, effects.relationships, messages);
+  if (relationshipDelta !== 0) {
+    applyRelationshipEffects(journey, relationshipDelta, messages);
   }
 
   applyScrutinyEffects(journey, effects);
@@ -683,7 +687,15 @@ function applyRelationshipEffects(journey, delta, messages) {
     journey.metrics.relationships = clampPercent((journey.metrics.relationships || 0) + delta);
   }
 
-  messages.push(`Relationships ${delta > 0 ? 'improved' : 'frayed'} (${delta > 0 ? '+' : ''}${delta}).`);
+  // Say what moved. A desk spreads the effect over everyone it works with, at
+  // half strength each; announcing the whole number read as one relationship
+  // moving by that much.
+  const spread = (journey.relationships && typeof journey.relationships === 'object')
+    || (journey.stakeholders && typeof journey.stakeholders === 'object');
+  const word = delta > 0 ? 'improved' : 'frayed';
+  messages.push(spread && journey.journeyType !== 'manager'
+    ? `Relationships ${word}: ${relationshipShift > 0 ? '+' : ''}${relationshipShift} with everyone on the file.`
+    : `Relationships ${word} (${delta > 0 ? '+' : ''}${delta}).`);
 }
 
 /**
@@ -796,9 +808,25 @@ function applyDeskProgress(journey, progressPoints, messages) {
   }
 
   if (!moved.length) {
-    messages.push(progressPoints > 0
-      ? 'Nothing in the queue is on a clock to bring forward.'
-      : 'The queue was already stalled; nothing slips further.');
+    if (progressPoints > 0) {
+      // Time saved with no clock to spend it on goes into the desk's own
+      // work, or the line says it bought nothing - a shortcut used to
+      // promise weeks off the timeline and deliver only the scrutiny.
+      const count = Math.min(2, steps);
+      const drafted = draftPermits(journey, count);
+      if (drafted.length) {
+        messages.push(`No clock in the queue can be brought forward, so the time goes into the backlog: drafted ${drafted.map((file) => file.label).join(', ')}.`);
+        return;
+      }
+      const filed = submitPermits(journey, count);
+      if (filed.length) {
+        messages.push(`No clock in the queue can be brought forward, so the time goes into filing: ${describeMovedFiles(journey, filed)}.`);
+        return;
+      }
+      messages.push('Nothing in the queue is on a clock to bring forward or waiting to be drafted or filed; the time saved buys nothing.');
+      return;
+    }
+    messages.push('The queue was already stalled; nothing slips further.');
     return;
   }
   messages.push(progressPoints > 0

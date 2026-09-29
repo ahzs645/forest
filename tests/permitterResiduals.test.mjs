@@ -3,11 +3,15 @@ import assert from 'node:assert/strict';
 
 import { createPermittingJourney } from '../js/journey/factory.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
+import { DESK_EVENTS } from '../js/data/deskEvents.js';
+import { resolveEvent } from '../js/events/resolution.js';
+import { eventSupportsJourney } from '../js/events/selection.js';
 import {
   ensurePermitFiles,
   getChaseableFiles,
   getPermitFiles,
   getPermitFilesInLane,
+  syncPermitCounters,
 } from '../js/journey/permitPipeline.js';
 import {
   buildActionOptions,
@@ -129,4 +133,45 @@ test('the referral follow-up names the file it actually moves', async () => {
   await runPermittingDay(game);
   const said = lines.find((line) => /referral coordinator/.test(line));
   assert.ok(said?.includes(movable.label), said);
+});
+
+test('time an event saves on a queue with no clock to move pays into the desk\'s own work, or says it bought nothing', () => {
+  const journey = makeJourney('bulkley-valley');
+  for (const file of getPermitFiles(journey)) {
+    if (Number.isFinite(file.clockCloses)) file.clockCloses = journey.day;
+  }
+  const shortcut = { id: 'shortcut', title: 'Shortcut' };
+  const option = { label: 'Take it', effects: { progress: 10 } };
+
+  const backlog = journey.permits.backlog;
+  assert.ok(backlog > 0);
+  const drafted = resolveEvent(journey, shortcut, option);
+  assert.ok(drafted.messages.some((line) => /time goes into the backlog: drafted /.test(line)), drafted.messages.join('\n'));
+  assert.ok(journey.permits.backlog < backlog);
+
+  journey.permits.backlog = 0;
+  const filed = resolveEvent(journey, shortcut, option);
+  assert.ok(filed.messages.some((line) => /time goes into filing: /.test(line)), filed.messages.join('\n'));
+
+  for (const file of getPermitFilesInLane(journey, 'drafted')) file.lane = 'issued';
+  for (const file of getPermitFiles(journey)) {
+    if (Number.isFinite(file.clockCloses)) file.clockCloses = journey.day;
+  }
+  const nothing = resolveEvent(journey, shortcut, option);
+  assert.ok(nothing.messages.some((line) => /the time saved buys nothing/.test(line)), nothing.messages.join('\n'));
+});
+
+test('"Permit Issued Early" only turns up when a file is on the District Manager\'s desk to sign', () => {
+  const event = DESK_EVENTS.find((entry) => entry.id === 'permit_approved_early');
+  const journey = makeJourney('fraser-plateau');
+  for (const file of getPermitFiles(journey)) {
+    if (file.lane === 'decision') file.lane = 'referral';
+  }
+  syncPermitCounters(journey);
+  assert.equal(eventSupportsJourney(event, journey), false);
+  const [file] = getPermitFiles(journey).filter((entry) => entry.lane === 'referral' && !entry.pausedBy);
+  file.lane = 'decision';
+  file.wsaClockCloses = null;
+  syncPermitCounters(journey);
+  assert.equal(eventSupportsJourney(event, journey), true);
 });

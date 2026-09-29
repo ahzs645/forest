@@ -1131,7 +1131,7 @@
  },
  {
   "id": "permit_approved_early",
-  "title": "CP Issued Early",
+  "title": "Permit Issued Early",
   "type": "positive",
   "severity": "positive",
   "probability": 0.08,
@@ -1139,7 +1139,7 @@
    "permitting",
    "desk"
   ],
-  "description": "The district issued the salvage cutting permit inside the 25-day target. Approved ahead of schedule!",
+  "description": "A file on the District Manager's desk comes back signed inside the 25-day target. Approved ahead of schedule!",
   "options": [
    {
     "label": "Celebrate with the team",

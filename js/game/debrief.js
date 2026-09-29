@@ -76,7 +76,7 @@ export function getFinalReportPrompt(journeyType, { victory = true } = {}) {
         prompt: 'Time to close out the files. How do you archive the year?',
         options: [
           { label: 'Archive everything with full referral records attached', hint: 'Future you — or the Forest Practices Board — will find exactly what happened.', value: 'integrity' },
-          { label: 'Fast-close the stragglers with minimal documentation', hint: 'Risky. Thin files have a way of resurfacing.', value: 'spin' },
+          { label: 'Archive summaries only; leave the referral records in your inbox', hint: 'Risky. Thin files have a way of resurfacing.', value: 'spin' },
           { label: 'Send personal thanks to every agency contact who moved a file', hint: 'Next year’s referrals will move faster.', value: 'people' },
         ],
       };
@@ -124,6 +124,10 @@ const HANDOVER_PROMPTS = {
 const PLANNING_REPORT_LINES = {
   spinWin: 'The licensee takes your version. The district’s own file says what it says.',
   spinBust: 'District staff set your account beside their own file. The gap is noted, and your name is on it.',
+  // An approved plan has no gap with the district's file; what the spin
+  // leaves behind is a sealed rationale that says less than the plan does.
+  approvedSpinWin: 'The summary reads the way the licensee wanted. The conditions are still in the plan, if anyone reads that far.',
+  approvedSpinBust: 'The first FPB complaint pulls the summary and the plan side by side. The caveats you left out are in the plan, and your seal is on both.',
   people: 'The Nation’s referral staff hear it from you first. The next referral starts warmer.',
 };
 const PERMITTING_REPORT_LINES = {
@@ -145,12 +149,13 @@ const DESK_REPORT_LINES = {
  * @param {Function} rng - random source, defaults to Math.random
  * @returns {{delta: number, lines: string[]}}
  */
-export function resolveFinalReport(style, journey, rng = Math.random) {
+export function resolveFinalReport(style, journey, rng = Math.random, { victory = true } = {}) {
   // Silviculture's report is read against the plot cards and the check
   // survey, so its odds come from the run (js/modes/silvicultureIntegrity.js).
   if (journey?.journeyType === 'silviculture') return resolveSilvicultureFinalReport(style, journey, rng);
-  const hasCrew = Boolean(journey.crew?.length);
   const deskLines = DESK_REPORT_LINES[journey?.journeyType] || null;
+  if (deskLines) return resolveDeskFinalReport(style, journey, rng, deskLines, victory);
+  const hasCrew = Boolean(journey.crew?.length);
   switch (style) {
     case 'spin': {
       if (rng() < 0.65) {
@@ -177,6 +182,38 @@ export function resolveFinalReport(style, journey, rng = Math.random) {
     default:
       return {
         delta: 2,
+        lines: ['Nothing comes of it, which is the point. If anyone ever pulls the file, it holds.'],
+      };
+  }
+}
+
+/** What the desk's report stances are worth: see resolveDeskFinalReport. */
+export const DESK_REPORT_DELTAS = { integrity: 4, people: 2, spinWin: 4, spinBust: -10 };
+
+/**
+ * The desk roles' closing report. The straight record is worth the most for
+ * certain; thanks are worth something; a thin record is a gamble whose odds
+ * shrink with the scrutiny already on the file, and it loses on average
+ * even on a clean one. The old flat odds made spin a small positive bet and
+ * a thank-you note worth more than an honest file.
+ */
+function resolveDeskFinalReport(style, journey, rng, lines, victory) {
+  const planningApproved = journey?.journeyType === 'planning' && victory;
+  switch (style) {
+    case 'spin': {
+      const scrutiny = Math.max(0, Math.min(100, Number(journey?.scrutiny) || 0));
+      const odds = Math.max(0.2, 0.55 - scrutiny / 150);
+      if (rng() < odds) {
+        return { delta: DESK_REPORT_DELTAS.spinWin, lines: [planningApproved ? lines.approvedSpinWin : lines.spinWin] };
+      }
+      return { delta: DESK_REPORT_DELTAS.spinBust, lines: [planningApproved ? lines.approvedSpinBust : lines.spinBust] };
+    }
+    case 'people':
+      return { delta: DESK_REPORT_DELTAS.people, lines: [lines.people] };
+    case 'integrity':
+    default:
+      return {
+        delta: DESK_REPORT_DELTAS.integrity,
         lines: ['Nothing comes of it, which is the point. If anyone ever pulls the file, it holds.'],
       };
   }
@@ -433,7 +470,7 @@ export async function runFinalDebrief(ui, journey, victory) {
   const report = getFinalReportPrompt(journey.journeyType, { victory });
   const choice = await ui.promptChoice(report.prompt, report.options);
   const reportStyle = choice.value || 'integrity';
-  const reportResult = resolveFinalReport(reportStyle, journey);
+  const reportResult = resolveFinalReport(reportStyle, journey, Math.random, { victory });
   ui.write('');
   for (const line of reportResult.lines) {
     ui.write(line);
