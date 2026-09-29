@@ -20,6 +20,7 @@ import { handleEvent } from '../modes/shared/handleEvent.js';
 import { optionSpendsDay } from '../events/timePolicy.js';
 import { resolveTemptationSetAside } from '../events/selection.js';
 import { applyDeferredSituation } from '../events/deferral.js';
+import { getDayRng } from '../events/dayRng.js';
 import {
   addRouteConstraintFromEvent,
   isRouteObstructionEvent
@@ -72,7 +73,7 @@ export function applySetAsideCost(ui, journey, event, { imposedCost = true } = {
   // costs is that the proposer decides what your silence meant (they drop it,
   // ask again with a deadline, or go around you).
   if (event?.type === 'temptation') {
-    const reply = resolveTemptationSetAside(journey, event);
+    const reply = resolveTemptationSetAside(journey, event, getDayRng(journey, `set-aside:${event.id || 'event'}`));
     ui.write('');
     ui.write(reply.message, 'term-dim');
     return;

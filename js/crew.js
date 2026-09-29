@@ -510,7 +510,7 @@ export function crewHasRole(crew, roleId) {
  * @param {string} severity - 'minor', 'moderate', or 'severe'
  * @returns {Object} Result with member and message
  */
-export function applyRandomInjury(member, severity = 'moderate') {
+export function applyRandomInjury(member, severity = 'moderate', rng = Math.random) {
   const injuries = {
     minor: ['sprained_ankle', 'cold'],
     moderate: ['broken_arm', 'flu', 'exhaustion'],
@@ -518,7 +518,9 @@ export function applyRandomInjury(member, severity = 'moderate') {
   };
 
   const options = injuries[severity] || injuries.moderate;
-  const injuryId = pickRandom(options);
+  // The day's dice when an event rolls this (js/events/dayRng.js), so a
+  // reloaded day breaks the same arm.
+  const injuryId = options[Math.floor(rng() * options.length)];
 
   return applyStatusEffect(member, injuryId);
 }

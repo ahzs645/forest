@@ -19,6 +19,7 @@ import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discovery
 import { buildEventReaction } from './reactions.js';
 import { resolveOutcomeBand } from './odds.js';
 import { applyConsequenceFlags, getCrewPrecedentMultiplier } from './consequences.js';
+import { getDayRng } from './dayRng.js';
 /**
  * Ceiling on how much ground a single day's trouble can cost a field crew.
  * Event content still rates delays on the retired eight-hour scale; this
@@ -87,22 +88,22 @@ export function describeGoodwillChange(journey, before) {
 /**
  * Pick a random active crew member
  */
-function pickRandomCrewMember(crew) {
+function pickRandomCrewMember(crew, rng = Math.random) {
   const active = crew.filter(m => m.isActive);
   if (active.length === 0) return null;
-  return active[Math.floor(Math.random() * active.length)];
+  return active[Math.floor(rng() * active.length)];
 }
 
 /**
  * Pick multiple random active crew members
  */
-function pickMultipleCrewMembers(crew, count) {
+function pickMultipleCrewMembers(crew, count, rng = Math.random) {
   const active = crew.filter(m => m.isActive);
   const selected = [];
   const pool = [...active];
 
   while (selected.length < count && pool.length > 0) {
-    const index = Math.floor(Math.random() * pool.length);
+    const index = Math.floor(rng() * pool.length);
     selected.push(pool.splice(index, 1)[0]);
   }
 
@@ -120,12 +121,15 @@ export function resolveEvent(journey, event, option) {
   const messages = [];
   const scrutinyBefore = Number(journey.scrutiny || 0);
   const goodwillBefore = readGoodwill(journey);
+  // Today's dice for this situation (js/events/dayRng.js): the same choice
+  // on the same day resolves the same way after a reload.
+  const rng = getDayRng(journey, `resolve:${event?.id || 'event'}`);
 
   // Gamble options: roll once against odds shifted by the state the player has
   // actually built (js/events/odds.js), then use the resolved band throughout.
   // Options with no chanceSuccess resolve to the good band, which is exactly
   // what they did before this existed.
-  const resolved = resolveOutcomeBand(option, journey);
+  const resolved = resolveOutcomeBand(option, journey, rng);
   const outcome = resolved.outcome;
   const effects = resolved.effects;
 
@@ -146,7 +150,7 @@ export function resolveEvent(journey, event, option) {
     : (resolved.crewEffect || null);
   journey.lastEventVictimId = null;
   if (bandCrewEffect) {
-    handleCrewEffect(journey, bandCrewEffect, messages);
+    handleCrewEffect(journey, bandCrewEffect, messages, rng);
   }
 
   // What the band leaves behind. This is what stops a bad outcome from being
@@ -156,11 +160,11 @@ export function resolveEvent(journey, event, option) {
   }
 
   let injuryVictim = null;
-  if (option.riskInjury && Math.random() < option.riskInjury) {
-    const victim = pickRandomCrewMember(journey.crew);
+  if (option.riskInjury && rng() < option.riskInjury) {
+    const victim = pickRandomCrewMember(journey.crew, rng);
     if (victim) {
       const severity = option.riskInjury > 0.2 ? 'moderate' : 'minor';
-      const result = applyRandomInjury(victim, severity);
+      const result = applyRandomInjury(victim, severity, rng);
       messages.push(`Accident! ${result.message}`);
       injuryVictim = victim;
     }
@@ -168,7 +172,7 @@ export function resolveEvent(journey, event, option) {
 
   // A risky call can come back as a compliance/permitting problem later
   const complianceRisk = option.riskCompliance ?? option.riskRejection;
-  if (typeof complianceRisk === 'number' && Math.random() < complianceRisk) {
+  if (typeof complianceRisk === 'number' && rng() < complianceRisk) {
     applyEventEffects(journey, { compliance: -5 }, messages);
     messages.push('That call comes back on you.');
   }
@@ -225,7 +229,7 @@ export function resolveEvent(journey, event, option) {
 
   messages.push(...describeGoodwillChange(journey, goodwillBefore));
 
-  const reaction = buildEventReaction(journey, option);
+  const reaction = buildEventReaction(journey, option, rng);
   if (reaction) {
     messages.push(reaction);
   }
@@ -675,10 +679,10 @@ function applyRelationshipEffects(journey, delta, messages) {
 /**
  * Handle crew-specific effects
  */
-function handleCrewEffect(journey, crewEffect, messages) {
+function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
   let injured = null;
   if (crewEffect.injury) {
-    const victim = pickRandomCrewMember(journey.crew);
+    const victim = pickRandomCrewMember(journey.crew, rng);
     if (victim) {
       const result = applyStatusEffect(victim, crewEffect.injury);
       if (result.message) messages.push(result.message);
@@ -690,10 +694,10 @@ function handleCrewEffect(journey, crewEffect, messages) {
   if (crewEffect.illness) {
     // riskWorsen gates whether the condition actually sets in
     const setsIn = typeof crewEffect.riskWorsen === 'number'
-      ? Math.random() < crewEffect.riskWorsen
+      ? rng() < crewEffect.riskWorsen
       : true;
     if (setsIn) {
-      const victims = pickMultipleCrewMembers(journey.crew, crewEffect.count || 1);
+      const victims = pickMultipleCrewMembers(journey.crew, crewEffect.count || 1, rng);
       for (const victim of victims) {
         const result = applyStatusEffect(victim, crewEffect.illness);
         if (result.message) messages.push(result.message);
@@ -702,7 +706,7 @@ function handleCrewEffect(journey, crewEffect, messages) {
   }
 
   if (crewEffect.lose_member || crewEffect.leave) {
-    const victim = pickRandomCrewMember(journey.crew);
+    const victim = pickRandomCrewMember(journey.crew, rng);
     if (victim) {
       victim.isActive = false;
       victim.hasQuit = true;
@@ -728,7 +732,7 @@ function handleCrewEffect(journey, crewEffect, messages) {
       || (crewEffect.injury && crew.find(m => m.isActive && m.statusEffects?.some(e => e.effectId === crewEffect.injury)))
       || (journey.lastEventVictimId && crew.find(m => m.isActive && m.id === journey.lastEventVictimId))
       || crew.find(m => m.isActive && (m.statusEffects?.length || 0) > 0)
-      || pickRandomCrewMember(crew);
+      || pickRandomCrewMember(crew, rng);
     if (victim) {
       if (crewEffect.injury && !victim.statusEffects?.some(e => e.effectId === crewEffect.injury)) {
         applyStatusEffect(victim, crewEffect.injury);

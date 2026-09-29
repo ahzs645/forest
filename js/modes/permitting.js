@@ -6,6 +6,7 @@
  */
 
 import { checkForEvent } from '../events.js';
+import { getDayRng } from '../events/dayRng.js';
 import { runDaySituation } from '../journey/daySituation.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { buildOfficeWindowFrames, buildStampFrames } from '../scene/textmode/scenes.js';
@@ -1943,6 +1944,9 @@ function processPermitPipeline(ui, journey) {
   const result = advancePermitClocks(journey, {
     approvalRate: getPermitApprovalRate(journey),
     completenessReturnRate: getPermitCompletenessReturnRate(journey),
+    // The night rolls on the day's dice, so a reload at the "start next
+    // day" prompt replays the same decisions (js/events/dayRng.js).
+    random: getDayRng(journey, 'night'),
   });
 
   for (const entry of result.advanced) {

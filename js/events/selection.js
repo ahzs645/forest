@@ -10,8 +10,8 @@ import {
   GENERIC_RADIO_TASKS,
   RADIO_TASKS_BY_ROLE
 } from './constants.js';
-import { FIELD_EVENTS, getApplicableFieldEvents, selectRandomFieldEvent } from '../data/fieldEvents.js';
-import { DESK_EVENTS, getApplicableDeskEvents, selectRandomDeskEvent } from '../data/deskEvents.js';
+import { getApplicableFieldEvents, selectRandomFieldEvent } from '../data/fieldEvents.js';
+import { getApplicableDeskEvents, selectRandomDeskEvent } from '../data/deskEvents.js';
 import {
   ILLEGAL_ACTS,
   actFitsRole,
@@ -24,10 +24,10 @@ import {
 } from '../data/illegalActs.js';
 import { computeBandOdds } from './odds.js';
 import { OPERATING_AREAS } from '../data/operatingAreas.js';
-import { PACE_OPTIONS } from '../journey/constants.js';
 import { getDiscoveryEventTypeMultipliers } from '../data/discoveryTags.js';
 import { getAreaSituationMultipliers } from '../data/areaSituations.js';
 import { formatRadioReport } from './display.js';
+import { getDayRng } from './dayRng.js';
 
 /**
  * Chance that an ordinary day carries an event at all.
@@ -65,37 +65,42 @@ const DAY_HAS_EVENT_CHANCE = 0.65;
  * @param {Object} journey
  * @returns {boolean}
  */
-function dayCarriesEvent(journey) {
+function dayCarriesEvent(journey, rng = Math.random) {
   const chance = Math.min(0.85, DAY_HAS_EVENT_CHANCE * getDifficultyEventModifier(journey));
-  return Math.random() < chance;
+  return rng() < chance;
 }
 
 /**
- * Check if a random event should occur
+ * Check if a random event should occur.
+ *
+ * The draw rolls on the day's own dice (js/events/dayRng.js), so a reload
+ * that replays the morning draws the same situation - or the same quiet day.
  * @param {Object} journey - Current journey state
  * @returns {Object|null} Event to resolve or null
  */
 export function checkForEvent(journey) {
+  const rng = getDayRng(journey, 'draw');
+
   // Temptations need their own draw lane. When they were only attempted after
   // the large ordinary-event deck missed, their advertised chance collapsed
   // to a few percent and the added illegal-act library was almost invisible.
-  const temptation = maybeCreateTemptationEvent(journey);
+  const temptation = maybeCreateTemptationEvent(journey, rng);
   if (temptation) {
     return temptation;
   }
 
-  if (!dayCarriesEvent(journey)) {
+  if (!dayCarriesEvent(journey, rng)) {
     return null;
   }
 
   if (journey.journeyType === 'manager') {
-    return checkManagerEvent(journey);
+    return checkManagerEvent(journey, rng);
   }
 
   const isField = isFieldJourney(journey.journeyType);
-  const event = isField ? checkFieldEvent(journey) : checkDeskEvent(journey);
+  const event = isField ? checkFieldEvent(journey, { rng }) : checkDeskEvent(journey, rng);
   if (event) {
-    return isField ? attachFieldReporter(event, journey) : event;
+    return isField ? attachFieldReporter(event, journey, rng) : event;
   }
   return null;
 }
@@ -110,11 +115,11 @@ const MANAGER_DESK_EVENT_RATIO = 0.6;
  * dedicated modes use. The field lane is gated and reframed so what reaches
  * the GM is a division escalating a decision upward, not a tailgate call.
  */
-function checkManagerEvent(journey) {
-  const wantsDesk = Math.random() < MANAGER_DESK_EVENT_RATIO;
-  const event = wantsDesk ? checkDeskEvent(journey) : checkFieldEvent(journey, { managerLane: true });
+function checkManagerEvent(journey, rng = Math.random) {
+  const wantsDesk = rng() < MANAGER_DESK_EVENT_RATIO;
+  const event = wantsDesk ? checkDeskEvent(journey, rng) : checkFieldEvent(journey, { managerLane: true, rng });
   if (!event) return null;
-  return wantsDesk ? event : escalateFieldEventForManager(event);
+  return wantsDesk ? event : escalateFieldEventForManager(event, rng);
 }
 
 /**
@@ -187,10 +192,10 @@ const MANAGER_ESCALATION_CALLERS = [
   { name: 'Castillo', role: 'Camp Supervisor', types: ['injury', 'illness', 'social'] }
 ];
 
-function pickManagerEscalationCaller(event) {
+function pickManagerEscalationCaller(event, rng = Math.random) {
   const matched = MANAGER_ESCALATION_CALLERS.filter((caller) => caller.types.includes(event?.type));
   const pool = matched.length ? matched : MANAGER_ESCALATION_CALLERS;
-  return pool[Math.floor(Math.random() * pool.length)];
+  return pool[Math.floor(rng() * pool.length)];
 }
 
 /**
@@ -264,10 +269,10 @@ function escalateManagerOption(option, variantOption) {
  * copy — the `issue` pool is already written to the licensee — and get an
  * explicit escalation tail instead.
  */
-export function escalateFieldEventForManager(event) {
+export function escalateFieldEventForManager(event, rng = Math.random) {
   const variant = event.managerVariant || {};
   const variantOptions = Array.isArray(variant.options) ? variant.options : [];
-  const caller = pickManagerEscalationCaller(event);
+  const caller = pickManagerEscalationCaller(event, rng);
   const description = variant.description || event.description;
   const tail = variant.description ? '' : ' The division wants head office to make the call.';
 
@@ -382,7 +387,7 @@ export function eventMatchesJourneyContext(event, journey, options = {}) {
 /**
  * Check for field events
  */
-function checkFieldEvent(journey, { managerLane = false } = {}) {
+function checkFieldEvent(journey, { managerLane = false, rng = Math.random } = {}) {
   const currentBlock = Array.isArray(journey.blocks)
     ? (journey.blocks[journey.currentBlockIndex] || journey.blocks[0] || null)
     : null;
@@ -402,8 +407,8 @@ function checkFieldEvent(journey, { managerLane = false } = {}) {
   if (managerLane) {
     const pool = applicableEvents.filter(isManagerFieldEscalation);
     if (!pool.length) return null;
-    if (Math.random() >= getManagerEscalationChance(journey)) return null;
-    return pool[Math.floor(Math.random() * pool.length)];
+    if (rng() >= getManagerEscalationChance(journey)) return null;
+    return pool[Math.floor(rng() * pool.length)];
   }
 
   const paceModifier = getPaceEventModifier(journey.pace);
@@ -423,14 +428,15 @@ function checkFieldEvent(journey, { managerLane = false } = {}) {
   return selectRandomFieldEvent(applicableEvents, {
     paceModifier: totalModifier,
     terrainModifier: 1,
-    typeMultipliers: mergeTypeMultipliers(areaSituation.typeMultipliers, discoveryTypeMultipliers)
+    typeMultipliers: mergeTypeMultipliers(areaSituation.typeMultipliers, discoveryTypeMultipliers),
+    rng
   });
 }
 
 /**
  * Check for desk events
  */
-function checkDeskEvent(journey) {
+function checkDeskEvent(journey, rng = Math.random) {
   const applicableEvents = filterRecentEvents(
     journey,
     getApplicableDeskEvents(journey.currentPhase).filter(
@@ -463,7 +469,8 @@ function checkDeskEvent(journey) {
   return selectRandomDeskEvent(applicableEvents, {
     stressModifier: stressModifier * moraleModifier * difficultyModifier * scrutinyModifier * areaSituation.eventMultiplier,
     crisisMode: daysRemaining < 3,
-    typeMultipliers: mergeTypeMultipliers(typeMultipliers, areaSituation.typeMultipliers, discoveryTypeMultipliers)
+    typeMultipliers: mergeTypeMultipliers(typeMultipliers, areaSituation.typeMultipliers, discoveryTypeMultipliers),
+    rng
   });
 }
 
@@ -500,9 +507,9 @@ function getDeskEventTypeMultipliers(journey) {
   return multipliers;
 }
 
-function attachFieldReporter(event, journey) {
+function attachFieldReporter(event, journey, rng = Math.random) {
   if (!event || event.type === 'temptation') return event;
-  const reporter = pickRandomCrewMember(journey.crew);
+  const reporter = pickRandomCrewMember(journey.crew, rng);
   if (!reporter) return event;
 
   return {
@@ -514,21 +521,21 @@ function attachFieldReporter(event, journey) {
       roleId: reporter.role,
       // Keep this context for logs/future event-aware copy, but the display
       // intentionally omits a random task that may not match the incident.
-      task: getRadioTask(reporter)
+      task: getRadioTask(reporter, rng)
     }
   };
 }
 
-function getRadioTask(member) {
+function getRadioTask(member, rng = Math.random) {
   const roleId = member.role || member.roleId;
   const tasks = RADIO_TASKS_BY_ROLE[roleId] || GENERIC_RADIO_TASKS;
-  return tasks[Math.floor(Math.random() * tasks.length)];
+  return tasks[Math.floor(rng() * tasks.length)];
 }
 
-function pickRandomCrewMember(crew) {
+function pickRandomCrewMember(crew, rng = Math.random) {
   const active = crew.filter(m => m.isActive);
   if (active.length === 0) return null;
-  return active[Math.floor(Math.random() * active.length)];
+  return active[Math.floor(rng() * active.length)];
 }
 
 // ── Temptations ─────────────────────────────────────────────────────────────
@@ -1128,7 +1135,7 @@ function takePendingTemptation(journey) {
     : buildTemptationEvent(act, journey, { stage: 'reoffer' });
 }
 
-function maybeCreateTemptationEvent(journey) {
+function maybeCreateTemptationEvent(journey, rng = Math.random) {
   if (!Array.isArray(ILLEGAL_ACTS) || ILLEGAL_ACTS.length === 0) {
     return null;
   }
@@ -1151,7 +1158,7 @@ function maybeCreateTemptationEvent(journey) {
   const baseChance = isDesk ? 0.08 : 0.1;
   const chance = Math.min(0.22, baseChance * getDifficultyEventModifier(journey));
   const guaranteeAfterMisses = 5;
-  if (Math.random() > chance && Number(memory.missedEligibleDays || 0) < guaranteeAfterMisses) {
+  if (rng() > chance && Number(memory.missedEligibleDays || 0) < guaranteeAfterMisses) {
     memory.missedEligibleDays = Number(memory.missedEligibleDays || 0) + 1;
     return null;
   }
@@ -1164,7 +1171,7 @@ function maybeCreateTemptationEvent(journey) {
   );
   if (!candidates.length) return null;
 
-  const act = pickWeightedAct(candidates);
+  const act = pickWeightedAct(candidates, rng);
   if (!act) return null;
   memory.lastDay = day;
   memory.missedEligibleDays = 0;

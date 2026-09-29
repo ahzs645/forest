@@ -14,6 +14,7 @@ import {
   getSurveyedBlockCount
 } from '../journey.js';
 import { checkScheduledEvents } from '../events.js';
+import { ensureDaySeed } from '../events/dayRng.js';
 import { getCurrentSeasonInfo } from '../season.js';
 import { calculateScore, formatScoreDisplay } from '../scoring.js';
 import { FIELD_RESOURCES } from '../resources.js';
@@ -394,6 +395,7 @@ export class ForestryTrailGame {
 
     showJourneyIntro(this.ui, this.journey);
 
+    ensureDaySeed(this.journey);
     saveActiveRun(this.journey);
     await this._mainLoop();
   }
@@ -483,6 +485,9 @@ export class ForestryTrailGame {
     while (!this.gameOver && !this.victory) {
       try {
         this.ui.updateAllStatus(this.journey);
+        // A save from before day seeds existed gets one now; a seeded day
+        // keeps its dice (js/events/dayRng.js).
+        ensureDaySeed(this.journey);
 
         const scheduledEvent = checkScheduledEvents(this.journey);
         if (scheduledEvent) {
@@ -517,8 +522,11 @@ export class ForestryTrailGame {
 
         this._checkEndConditions();
 
-        // Day boundary: persist so refresh/eviction never loses the run
+        // Day boundary: persist so refresh/eviction never loses the run. The
+        // next day's dice are rolled first, so a reload replays that day
+        // with the same draw and the same outcomes.
         if (!this.gameOver && !this.victory) {
+          ensureDaySeed(this.journey);
           saveActiveRun(this.journey);
         }
       } catch (error) {
