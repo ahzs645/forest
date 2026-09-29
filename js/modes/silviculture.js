@@ -11,6 +11,7 @@
  */
 
 import { checkForEvent } from '../events.js';
+import { getDayRng } from '../events/dayRng.js';
 import { runDaySituation } from '../journey/daySituation.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
@@ -79,7 +80,7 @@ const CONTRACTOR_EVENTS = [
   },
   {
     id: 'crew_illness',
-    trigger: () => Math.random() < 0.3,
+    trigger: (c, rng = Math.random) => rng() < 0.3,
     title: 'Sickness in Camp',
     getText: (c) => `Several planters from ${c.name} are down with a stomach bug and the rest are eating standing up. The foreman thinks it is the water; the cook thinks it is the foreman.`,
     options: [
@@ -92,7 +93,7 @@ const CONTRACTOR_EVENTS = [
     id: 'stand_down',
     trigger: (c) => c.specialty === 'planting' || c.specialty === 'brushing',
     title: 'Stand-Down Call',
-    getText: (c) => `${c.name}'s foreman calls a stand-down: ${STAND_DOWN_REASONS[Math.floor(Math.random() * STAND_DOWN_REASONS.length)]}. ${c.specialty === 'planting' ? 'Planters plant in rain' : 'Saw crews work in rain'}; this is not rain.`,
+    getText: (c, rng = Math.random) => `${c.name}'s foreman calls a stand-down: ${STAND_DOWN_REASONS[Math.floor(rng() * STAND_DOWN_REASONS.length)]}. ${c.specialty === 'planting' ? 'Planters plant in rain' : 'Saw crews work in rain'}; this is not rain.`,
     options: [
       { label: 'Back the stand-down', description: 'Crew off the block today; the tailgate meeting covers it tomorrow', value: 'rest', cost: 0, moraleGain: 10, prodGain: 0 },
       { label: 'Keep them on the block', description: 'Production today; a WorkSafeBC prevention officer would call it differently', value: 'push', cost: 0, moraleGain: -8, prodGain: -5, scrutiny: 1 },
@@ -200,13 +201,16 @@ export async function runSilvicultureDay(game) {
   const contractorStress = activeContractors.some(c => c.morale < 55 || c.productivity < 60);
   // Crews are on the block most mornings now that fatigue clears on days
   // off, so the odds are set for a call every few days, not every other one.
-  if (journey.day > 1 && Math.random() < (contractorStress ? 0.35 : 0.25)) {
+  // Rolled on the day's own dice (js/events/dayRng.js), so a reload replays
+  // the same call, or the same quiet morning, ahead of the day's situation.
+  const callRng = getDayRng(journey, 'contractor-call');
+  if (journey.day > 1 && callRng() < (contractorStress ? 0.35 : 0.25)) {
     if (activeContractors.length > 0) {
-      const targetContractor = activeContractors[Math.floor(Math.random() * activeContractors.length)];
-      const applicableEvents = CONTRACTOR_EVENTS.filter(e => e.trigger(targetContractor));
+      const targetContractor = activeContractors[Math.floor(callRng() * activeContractors.length)];
+      const applicableEvents = CONTRACTOR_EVENTS.filter(e => e.trigger(targetContractor, callRng));
       if (applicableEvents.length > 0) {
-        const cEvent = applicableEvents[Math.floor(Math.random() * applicableEvents.length)];
-        await handleContractorEvent(game, cEvent, targetContractor);
+        const cEvent = applicableEvents[Math.floor(callRng() * applicableEvents.length)];
+        await handleContractorEvent(game, cEvent, targetContractor, callRng);
         if (game.gameOver) return;
         if (journey.isGameOver) return;
       }
@@ -1469,14 +1473,14 @@ function handleTeamBriefing(game) {
   ui.write('Tailgate meeting: the week\'s plot schedule, radio channels, the ETV route and the fire danger rating. Your crew is set for the day.');
 }
 
-async function handleContractorEvent(game, cEvent, contractor) {
+async function handleContractorEvent(game, cEvent, contractor, rng = Math.random) {
   const { ui, journey } = game;
   const zoneProfile = getSilvicultureZoneProfile(journey);
   const silvicultureState = ensureSilvicultureState(journey);
 
   ui.clear();
   ui.writeHeader(`CONTRACTOR CALL: ${cEvent.title}`);
-  ui.write(cEvent.getText(contractor));
+  ui.write(cEvent.getText(contractor, rng));
   ui.write('Brief response; the day\'s work continues.');
   ui.write('');
 
