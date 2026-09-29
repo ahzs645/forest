@@ -395,9 +395,13 @@ test('headless years: the tier tracks how the year was played', async () => {
     }
   }
 
+  // Terrible play no longer pays for a documentation rebound it never earned
+  // (the rebound's own -2 Progress went with it), so its Progress is read
+  // against what careful play earns rather than a fixed line.
+  const goodProgress = Math.min(...runs.good.map((run) => run.yearMetrics.progress));
   for (const run of runs.terrible) {
     assert.ok(!['solid', 'outstanding'].includes(run.tier), `terrible play reached ${run.tier} (${run.areaId} ${run.seed})`);
-    assert.ok(run.yearMetrics.progress < 75, `terrible play kept Progress ${run.yearMetrics.progress}`);
+    assert.ok(run.yearMetrics.progress < goodProgress, `terrible play kept Progress ${run.yearMetrics.progress} (careful floor ${goodProgress})`);
   }
   const goodSolid = runs.good.filter((run) => ['solid', 'outstanding'].includes(run.tier)).length;
   assert.ok(goodSolid >= runs.good.length - 1, `careful play reached Solid in only ${goodSolid}/${runs.good.length}`);
@@ -418,6 +422,25 @@ test('headless years: the tier tracks how the year was played', async () => {
     }
     assert.deepEqual(before, run.yearMetrics);
   }
+});
+
+test('headless years: a season that fell short is not paid a dividend or a rebound it did not earn', async () => {
+  const lines = [];
+  await simulateCampaign({ style: 'terrible', areaId: 'bulkley-valley', seed: 4000, trace: (line) => lines.push(line) });
+  let fellShort = false;
+  let reviews = 0;
+  for (const line of lines) {
+    if (/ (delivered|fell short): /.test(line)) {
+      fellShort = / fell short: /.test(line);
+      reviews += 1;
+    } else if (/^Season total:/.test(line)) {
+      fellShort = false;
+    } else if (fellShort) {
+      assert.doesNotMatch(line, /Operational dividend|Delivery dividend|Steady program|allowance.* → Budget \+/, line);
+      assert.doesNotMatch(line, /targeted effort|pausing to clean up documentation/i, line);
+    }
+  }
+  assert.ok(reviews >= 3, `read ${reviews} season reviews`);
 });
 
 test('headless years: the review prints an amount for every meter it moves, and the seasons add up', async () => {

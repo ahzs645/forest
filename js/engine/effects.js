@@ -201,6 +201,28 @@ function seasonKeptToStandards(state, round) {
     && (entry.stance === "aggressive" || (entry.type === "temptation" && entry.band)));
 }
 
+/** A shortcut taken this season that somebody noticed or caught. */
+function shortcutSeenThisRound(state, round) {
+  return (state.history || []).some((entry) => Number(entry?.round) === round
+    && entry.type === "temptation" && (entry.band === "noticed" || entry.band === "caught"));
+}
+
+/**
+ * What the season's own calls moved, per meter: every card answered this
+ * round (and in a campaign the deployment's review), before the round-end
+ * pass adds its consequences and recoveries.
+ */
+function roundDecisionEffects(state, round) {
+  const totals = {};
+  for (const entry of state.history || []) {
+    if (Number(entry?.round) !== round || entry.type === "consequence" || entry.type === "recovery") continue;
+    for (const [key, value] of Object.entries(entry.effects || {})) {
+      totals[key] = (totals[key] || 0) + (Number(value) || 0);
+    }
+  }
+  return totals;
+}
+
 export function applyRoundConsequences(state) {
   if (!state?.metrics || !state?.flags) {
     return [];
@@ -462,11 +484,19 @@ function applyEcologyDrift(state, round, consequences) {
 function applyRoundRecoveries(state, round, consequences) {
   const { metrics } = state;
   const firedBefore = consequences.length;
+  // The rules read the year's meters, but each one credits something the
+  // season did, so each pays only when the season did it. `effort` is what
+  // the season's own calls moved (in a campaign, the deployment's review
+  // too); a campaign season that fell short (`seasonOutcome`), or a season
+  // whose shortcut somebody saw, earns no dividend for a well-run file.
+  const effort = roundDecisionEffects(state, round);
+  const outcome = state.seasonOutcome || {};
+  const fileTrusted = !outcome.fellShort && !outcome.shortcutsSeen && !shortcutSeenThisRound(state, round);
 
   // Operational dividend: a clean, well-trusted file burns far less budget on
   // rework and firefighting, so a strongly-run year recovers some budget. This
   // is the missing budget lever that made Outstanding unreachable.
-  if (metrics.compliance >= 70 && metrics.relationships >= 65 && metrics.progress >= 35 && metrics.budget < 72) {
+  if (fileTrusted && metrics.compliance >= 70 && metrics.relationships >= 65 && metrics.progress >= 35 && metrics.budget < 72) {
     applyEffects(
       state,
       { budget: 5 },
@@ -491,7 +521,7 @@ function applyRoundRecoveries(state, round, consequences) {
   // recoveries: dividends respond to a track record, not to week one.
   // Sized so it keeps a careful year deliverable without powering the sprint
   // to Outstanding: it only tops progress up toward 50, never past it.
-  if (round >= 2 && metrics.compliance >= 70 && metrics.relationships >= 60 && metrics.progress < 50) {
+  if (fileTrusted && round >= 2 && metrics.compliance >= 70 && metrics.relationships >= 60 && metrics.progress < 50) {
     applyEffects(
       state,
       { progress: 6 },
@@ -513,7 +543,8 @@ function applyRoundRecoveries(state, round, consequences) {
   // that wants to course-correct — it eases a compliance collapse on an
   // actively-producing file without, on its own, rescuing the run to a good
   // ending (relationships and budget still have to be earned elsewhere).
-  if (round >= 2 && metrics.compliance < 35 && metrics.progress >= 55) {
+  // It pays only a season whose own calls put work into the file.
+  if (round >= 2 && metrics.compliance < 35 && metrics.progress >= 55 && Number(effort.compliance) > 0) {
     applyEffects(
       state,
       { compliance: 5, progress: -2 },
@@ -521,7 +552,7 @@ function applyRoundRecoveries(state, round, consequences) {
         type: "recovery",
         id: "field-discipline-rebound",
         title: "Field-discipline rebound",
-        option: "Crew paused production to catch up documentation and clean the file",
+        option: "This season's calls went into the file, and the clean-up held",
         round,
       },
     );
@@ -533,8 +564,9 @@ function applyRoundRecoveries(state, round, consequences) {
   // every meter in play earns its own return: the weakest meter gets room to
   // recover. Paid only in a season no dividend already rewarded, and from a
   // weakest meter of 35 up: a middling year with one thin meter is the file
-  // this is for.
-  if (round >= 2 && consequences.length === firedBefore) {
+  // this is for. Not a campaign season that fell short: that meter was left
+  // behind.
+  if (round >= 2 && consequences.length === firedBefore && !outcome.fellShort) {
     const values = Object.values(metrics).map((value) => Number(value) || 0);
     const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
     const spread = Math.max(...values) - Math.min(...values);
@@ -561,7 +593,10 @@ function applyRoundRecoveries(state, round, consequences) {
   // slips toward the Mixed floors and before it sinks under the trust and
   // audit lines and compounds; any other meter waits for the back half of the
   // year. The schedule and the budget keep the later, lower line, so a turtled
-  // file is not refunded.
+  // file is not refunded. It says what happened: effort only when the
+  // season's own calls moved that meter up. A campaign review reports what
+  // the deployment did, so there the rebound pays only for that effort; the
+  // seasonal year keeps it as the catch-up that holds careful play in reach.
   if (round >= 2) {
     const values = Object.values(metrics).map((value) => Number(value) || 0);
     const average = values.reduce((sum, value) => sum + value, 0) / (values.length || 1);
@@ -569,7 +604,9 @@ function applyRoundRecoveries(state, round, consequences) {
     const standing = byValue.find(([key, value]) => STANDING_METERS.includes(key) && Number(value) < 43);
     const late = round >= 3 && Number(byValue[0]?.[1]) < 35 ? byValue[0] : null;
     const weakest = standing || late;
-    if (weakest && average >= 42) {
+    const worked = Boolean(weakest) && Number(effort[weakest[0]] || 0) > 0;
+    if (weakest && average >= 42 && (worked || !state.seasonOutcome)) {
+      const meter = formatMetricName(weakest[0]);
       applyEffects(
         state,
         { [weakest[0]]: 5 },
@@ -577,7 +614,9 @@ function applyRoundRecoveries(state, round, consequences) {
           type: "recovery",
           id: "comeback-window",
           title: "Comeback window",
-          option: `Targeted effort steadied ${formatMetricName(weakest[0])}`,
+          option: worked
+            ? `The file was still salvageable, and this season's calls went into ${meter}, so it steadied`
+            : `The file was still salvageable, so ${meter} had room to recover`,
           round,
         },
       );

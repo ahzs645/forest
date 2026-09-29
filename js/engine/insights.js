@@ -48,18 +48,20 @@ const CONSEQUENCE_INFO = {
     title: "Steady program",
     cause: "No meter was left behind, so the weakest one had room to recover.",
   },
+  // Its cause is the engine's own line, which says whether the season's
+  // calls worked on the meter or it only had room to recover.
   "comeback-window": {
     title: "Comeback window",
-    cause: "The file was still salvageable, so targeted effort steadied your weakest meter.",
   },
   "field-discipline-rebound": {
     title: "Field-discipline rebound",
-    cause: "The crew was still delivering, so pausing to clean up documentation clawed back some compliance.",
-    shortfallCause: "The season fell short, but the year's progress had room to give, so pausing to clean up documentation clawed back some compliance.",
+    cause: "This season's calls put work back into the file while the program kept producing, so the clean-up clawed back some compliance.",
+    shortfallCause: "The season fell short, but its calls put work back into the file, so the clean-up clawed back some compliance.",
   },
   "stand-recovery": {
     title: "Stands recovering",
     cause: "Compliance stayed strong, so retention, riparian buffers, and regeneration had room to work.",
+    shortfallCause: "The season fell short, but the year's compliance record held, so retention, riparian buffers, and regeneration kept working.",
   },
   "ecological-strain": {
     title: "Ecological strain",
@@ -73,6 +75,12 @@ const CONSEQUENCE_INFO = {
 function humanizeConsequenceId(id) {
   const words = String(id || "").replace(/[-_]+/g, " ").trim();
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Season consequence";
+}
+
+// The engine logs an option as a fragment; as a cause it reads as a sentence.
+function asSentence(text) {
+  const trimmed = String(text || "").trim();
+  return !trimmed || /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 
 function formatEffectText(effects = {}) {
@@ -111,7 +119,7 @@ export function describeConsequences(state, ids = [], { fellShort = false } = {}
     return {
       id,
       title: info?.title || entry?.title || id,
-      cause: (fellShort && info?.shortfallCause) || info?.cause || entry?.option || "",
+      cause: (fellShort && info?.shortfallCause) || info?.cause || asSentence(entry?.option),
       effectText: formatEffectText(entry?.effects || {}),
     };
   });

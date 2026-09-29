@@ -1020,6 +1020,13 @@ async function runCampaignSeason(game, campaign, season) {
     causes.push(`Crisis: ${issue.title} → ${formatMetricDelta(outcome?.effects || {}) || 'no meter change'}`);
   }
 
+  // The round-end rules credit what the season did: a deployment that fell
+  // short, or whose shortcut somebody saw, earns no dividend for a well-run
+  // file (js/engine/effects.js applyRoundRecoveries).
+  gsSeason.seasonOutcome = {
+    fellShort: !endResult.victory,
+    shortcutsSeen: (shortcutReview.counts?.noticed || 0) + (shortcutReview.counts?.caught || 0),
+  };
   const consequences = applyRoundConsequences(gsSeason);
   const explained = describeConsequences(gsSeason, consequences, { fellShort: !endResult.victory });
   // Everything the season moved, briefing to consequences, so the review and
