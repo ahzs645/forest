@@ -97,11 +97,22 @@
   align-items: center;
   gap: var(--space-lg);
 
+  // Centred when the menu fits; once the career forest makes it taller than
+  // a laptop screen, it scrolls from the top instead of clipping the menu
+  // (auto margins centre without pushing content above the scroll origin,
+  // which justify-content: center would).
   &.compact {
     padding: var(--space-md);
     gap: var(--space-md);
-    justify-content: center;
-    overflow: hidden;
+    overflow-y: auto;
+
+    > :first-child {
+      margin-top: auto;
+    }
+
+    > :last-child {
+      margin-bottom: auto;
+    }
   }
 
   @include mobile-down {
@@ -471,5 +482,36 @@
   @include mobile-down {
     font-size: 10px;
     padding: var(--space-xs) var(--space-sm);
+  }
+}
+
+// Laptop screens (720-900px tall) cannot hold the hero, a career forest and
+// the whole menu at full size. Once the forest is showing, tighten the
+// decoration so the menu fits; the body still scrolls if it doesn't.
+@media (min-width: 701px) and (min-height: 501px) and (max-height: 920px) {
+  .terminal-body.compact:has(.career-forest-block:not([hidden])) {
+    .ascii-tree {
+      font-size: 11px;
+    }
+
+    .career-forest {
+      font-size: 8px;
+    }
+
+    .system-checks-inline {
+      display: none;
+    }
+  }
+}
+
+// 720p/768p laptops: the welcome copy goes too (the career forest already
+// says "welcome back"), which keeps the full menu above the footer.
+@media (min-width: 701px) and (min-height: 501px) and (max-height: 800px) {
+  .terminal-body.compact:has(.career-forest-block:not([hidden])) {
+    gap: var(--space-sm);
+
+    .welcome-checks-combined {
+      display: none;
+    }
   }
 }

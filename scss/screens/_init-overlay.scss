@@ -67,6 +67,12 @@
     display: flex;
     animation: pageSlide 0.45s ease;
   }
+
+  // Focus lands on the step itself on each transition; its controls carry
+  // the visible focus ring.
+  &:focus {
+    outline: none;
+  }
 }
 
 .init-content {
