@@ -4,6 +4,7 @@
  */
 
 import blockOptionsData from "./json/planning/blockOptions.json" with { type: "json" };
+import { OPERATING_AREAS } from "./operatingAreas.js";
 
 const DEFAULT_CADENCE_DAYS = 3;
 const WATER_TIMING_SEASONS = new Set(["spring", "fall"]);
@@ -106,31 +107,132 @@ function getArea(areaId, area = null) {
   return blockOptionsData?.areas?.[areaId] || null;
 }
 
+/**
+ * Profiles for the placeholder blocks an area gets when the snapshot carries
+ * no blocks for it. Four distinct shapes, so every triage still has a real
+ * choice to make: a volume block, a clean-access block, a wet or
+ * habitat-sensitive block, and a steep one.
+ */
+const FALLBACK_BLOCK_PROFILES = [
+  {
+    suffix: "A",
+    areaHa: 48,
+    note: "volume block on the main haul road",
+    indicators: {},
+    metrics: { timberOpportunity: 70, biodiversitySensitivity: 22, firstNationsSensitivity: 14, technicalComplexity: 30 },
+  },
+  {
+    suffix: "B",
+    areaHa: 31,
+    note: "short spur off an existing road",
+    indicators: {},
+    metrics: { timberOpportunity: 54, biodiversitySensitivity: 28, firstNationsSensitivity: 18, technicalComplexity: 20 },
+  },
+  {
+    suffix: "C",
+    areaHa: 26,
+    note: "stream-adjacent block with a species-at-risk record nearby",
+    indicators: { speciesAtRiskNearby: true },
+    metrics: { timberOpportunity: 44, biodiversitySensitivity: 58, firstNationsSensitivity: 24, technicalComplexity: 32 },
+  },
+  {
+    suffix: "D",
+    areaHa: 37,
+    note: "steep side-slope block that needs new road",
+    indicators: {},
+    metrics: { timberOpportunity: 62, biodiversitySensitivity: 36, firstNationsSensitivity: 20, technicalComplexity: 48 },
+  },
+];
+
+function fallbackBlockPrefix(areaId) {
+  return String(areaId || "area").slice(0, 4).toUpperCase();
+}
+
+/**
+ * Placeholder blocks built from the operating-area profile. They exist so an
+ * area without a block snapshot can never strand the cutblock decision (and
+ * with it the FOM); they are labelled as area-profile placeholders, not as
+ * licensee records.
+ */
+function buildFallbackPlanningBlocks(areaId) {
+  const resolvedArea = OPERATING_AREAS.find((candidate) => candidate.id === areaId) || null;
+  const areaName = resolvedArea?.name || "Operating area";
+  const prefix = fallbackBlockPrefix(areaId);
+  return FALLBACK_BLOCK_PROFILES.map((profile, index) => {
+    const { timberOpportunity, biodiversitySensitivity, firstNationsSensitivity, technicalComplexity } = profile.metrics;
+    return {
+      id: `${areaId || "area"}-fallback-${index + 1}`,
+      source: "area-profile-fallback",
+      sourceType: "planned-cutblock",
+      label: `Cutblock ${prefix}-${profile.suffix}`,
+      mapLabel: `${prefix}-${profile.suffix}`,
+      adminDistrict: areaName,
+      cutBlockId: `${prefix}-${profile.suffix}`,
+      openingId: null,
+      timberMark: null,
+      areaHa: profile.areaHa,
+      plannedHarvestDate: null,
+      plannedHarvestYear: null,
+      approveDate: null,
+      approveYear: null,
+      centroid: null,
+      indicators: {
+        ogmaNearby: false,
+        whaNoHarvestNearby: false,
+        speciesAtRiskNearby: false,
+        firstNationsReserveNearby: false,
+        ...profile.indicators,
+      },
+      forestData: null,
+      metrics: { ...profile.metrics },
+      // Same derivations as scripts/generate-planning-block-options.mjs.
+      valueEffects: {
+        biodiversity: clamp(Math.round((45 - biodiversitySensitivity) / 10), -8, 4),
+        timberSupply: clamp(Math.round((timberOpportunity - 45) / 8), -4, 8),
+        communityNeeds: 0,
+        firstNationsValues: clamp(Math.round((40 - firstNationsSensitivity) / 10), -7, 4),
+      },
+      eventBias: {
+        stakeholder: Number(clamp(1 + firstNationsSensitivity / 170, 0.8, 2.2).toFixed(3)),
+        compliance: Number(clamp(1 + biodiversitySensitivity / 180, 0.85, 2.3).toFixed(3)),
+        technical: Number(clamp(1 + technicalComplexity / 240, 0.9, 1.9).toFixed(3)),
+        political: Number(clamp(0.95 + timberOpportunity / 260, 0.8, 1.8).toFixed(3)),
+        policy: Number(clamp(1 + (biodiversitySensitivity + firstNationsSensitivity) / 280, 0.9, 2.3).toFixed(3)),
+        issue: Number(clamp(1 + (biodiversitySensitivity + technicalComplexity) / 300, 0.9, 2.1).toFixed(3)),
+      },
+      summary: `Area-profile placeholder in ${areaName}: ${profile.note} | ${profile.areaHa} ha`,
+    };
+  });
+}
+
+const fallbackPoolCache = new Map();
+
+function getFallbackPlanningBlocks(areaId) {
+  const key = areaId || "";
+  if (!fallbackPoolCache.has(key)) {
+    fallbackPoolCache.set(key, buildFallbackPlanningBlocks(areaId));
+  }
+  return fallbackPoolCache.get(key);
+}
+
+function getAuthoredPlanningBlocks(areaId) {
+  const options = blockOptionsData?.areas?.[areaId]?.options;
+  return Array.isArray(options) ? options : [];
+}
+
 function buildFallbackPlanningSnapshot(areaId, area = null) {
   const resolvedArea = area || null;
   const districts = resolvedArea?.communities?.length ? resolvedArea.communities : [resolvedArea?.name || "BC district"];
-  const sampleBlocks = [
-    {
-      id: `${areaId}-fallback-1`,
-      label: `Cutblock ${String(resolvedArea?.name || "Regional")} A`,
-      compactId: `${String(areaId || "area").slice(0, 4).toUpperCase()}-A`,
-      district: districts[0],
-      sourceType: "planned-cutblock",
-      areaHa: 48,
-      species: (resolvedArea?.dominantTrees || []).slice(0, 2).join("/"),
-      summary: "Fallback regional block sample used until a richer planning-block snapshot is generated for this area.",
-    },
-    {
-      id: `${areaId}-fallback-2`,
-      label: `Cutblock ${String(resolvedArea?.name || "Regional")} B`,
-      compactId: `${String(areaId || "area").slice(0, 4).toUpperCase()}-B`,
-      district: districts[1] || districts[0],
-      sourceType: "planned-cutblock",
-      areaHa: 36,
-      species: (resolvedArea?.dominantTrees || []).slice(1, 3).join("/"),
-      summary: "Fallback planning option emphasizing local road, water, and community constraints from the area profile.",
-    },
-  ];
+  const sampleBlocks = getFallbackPlanningBlocks(areaId).slice(0, 2).map((block, index) => ({
+    id: block.id,
+    label: formatPlanningBlockLabel(block),
+    compactId: compactBlockIdentifier(block),
+    district: districts[index] || districts[0],
+    sourceType: block.sourceType,
+    areaHa: block.areaHa,
+    species: (resolvedArea?.dominantTrees || []).slice(index, index + 2).join("/"),
+    summary: block.summary,
+  }));
 
   return {
     areaId,
@@ -597,15 +699,26 @@ export function getPlanningCadenceDays() {
   return Number.isFinite(cadence) && cadence > 0 ? cadence : DEFAULT_CADENCE_DAYS;
 }
 
+/**
+ * The candidate blocks for an area. Never empty: an area the snapshot does
+ * not cover gets area-profile placeholder blocks, because an empty pool means
+ * no lead block set, no FOM and no way to win the file.
+ */
 export function getPlanningAreaBlockPool(areaId) {
-  return blockOptionsData?.areas?.[areaId]?.options || [];
+  const authored = getAuthoredPlanningBlocks(areaId);
+  return authored.length ? authored : getFallbackPlanningBlocks(areaId);
+}
+
+/** Whether the area's blocks come from the generated snapshot rather than placeholders. */
+export function hasPlanningAreaBlockSnapshot(areaId) {
+  return getAuthoredPlanningBlocks(areaId).length > 0;
 }
 
 export function getPlanningAreaSnapshot(areaId, area = null, options = {}) {
   const pool = getPlanningAreaBlockPool(areaId);
   const sampleCount = clamp(Number(options.sampleCount) || 3, 1, 5);
   const resolvedArea = getArea(areaId, area);
-  if (!pool.length && resolvedArea) {
+  if (!hasPlanningAreaBlockSnapshot(areaId) && resolvedArea) {
     return buildFallbackPlanningSnapshot(areaId, resolvedArea);
   }
   const triage = buildPlanningConstraintTriage(areaId, resolvedArea, pool);
@@ -649,7 +762,8 @@ export function getPlanningAreaSnapshot(areaId, area = null, options = {}) {
       summary: block?.summary || "",
     }));
 
-  const generatedAt = blockOptionsData?.generatedAt || null;
+  // Areas added in a later refresh carry their own snapshot date.
+  const generatedAt = blockOptionsData?.areas?.[areaId]?.generatedAt || blockOptionsData?.generatedAt || null;
 
   return {
     areaId,
@@ -690,7 +804,6 @@ export function rankPlanningBlockOptions(blocks = [], triageKey = null, area = n
  */
 export function pickPlanningBlockOptions(areaId, historyIds = [], count = 3, triageKey = null, area = null, seasonInfo = null) {
   const pool = getPlanningAreaBlockPool(areaId);
-  if (!pool.length) return [];
 
   const historySet = new Set(historyIds);
   const unseen = pool.filter((block) => !historySet.has(block.id));
