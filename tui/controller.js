@@ -168,13 +168,15 @@ function outcomeAcknowledgement(cardType, round) {
 }
 
 // A teaser names fallout for a later season. In the last season there is no
-// later season, so the promise could never land; it is only shown when the
-// engine says the fallout does land (a teaser carrying `lands: true`).
-function landingTeaser(teaser, gs) {
+// later season, so a "likely fallout" guess could never land; it is only
+// shown when the engine commits to the card (a teaser naming the `issueId`
+// it will deliver, or carrying `lands: true`).
+export function landingTeaser(teaser, gs) {
   if (!teaser?.text) return null;
   if (teaser.lands === false || teaser.willLand === false) return null;
   const finalSeason = gs && Number(gs.round || 0) >= Number(gs.totalRounds || SEASONS.length);
-  if (finalSeason && teaser.lands !== true && teaser.willLand !== true) return null;
+  const committed = teaser.lands === true || teaser.willLand === true || Boolean(teaser.issueId);
+  if (finalSeason && !committed) return null;
   // "…Ministry Data Audit. schedule strain made…": sentence-case the joins.
   return { ...teaser, text: teaser.text.replace(/([.!?]\s+)([a-z])/g, (_, stop, letter) => stop + letter.toUpperCase()) };
 }
@@ -502,7 +504,7 @@ const SHORTCUT_CATCHERS = {
 const ILLEGAL_ACTS_BY_ID = new Map(ILLEGAL_ACTS.map((act) => [act.id, act]));
 
 function findShortcutAct(item) {
-  const id = item?.actId || String(item?.id || "").replace(/^temptation:/, "");
+  const id = item?.shortcut?.actId || item?.actId || String(item?.id || "").replace(/^temptation:/, "");
   return ILLEGAL_ACTS_BY_ID.get(id) || null;
 }
 
@@ -512,51 +514,64 @@ function toPercent(value) {
   return Math.round(numeric <= 1 ? numeric * 100 : numeric);
 }
 
-// Odds the engine already put on the card, in any of the shapes the lanes
-// use ({clean, caught, bad}, {good, partial, bad}, a live-odds block).
+// Odds the engine already put on the card: the three shortcut bands
+// ({clean, noticed, caught}) or a deployment's live odds ({good, bad}).
+// Returned as whole percentages; `noticed` is 0 on a two-band roll.
 function readCardOdds(item, option) {
   const source = option?.odds || option?.risk?.odds || option?.liveOdds || item?.odds;
   if (!source || typeof source !== "object") return null;
-  const clean = toPercent(source.clean ?? source.good ?? source.success ?? source.holds);
+  const clean = toPercent(source.clean ?? source.good);
   if (clean === null) return null;
-  const bad = toPercent(source.bad ?? source.badlyWrong ?? source.severe ?? source.serious) ?? 0;
-  const caught = toPercent(source.caught ?? source.partial ?? source.mixed) ?? Math.max(0, 100 - clean - bad);
-  return { clean, caught, bad };
+  const caught = toPercent(source.caught ?? source.bad);
+  const noticed = toPercent(source.noticed ?? source.partial)
+    ?? (caught === null ? 0 : Math.max(0, 100 - clean - caught));
+  return { clean, noticed, caught: caught ?? Math.max(0, 100 - clean - noticed) };
 }
 
-/**
- * The chance a risk roll succeeds on this file, read from resolveRisk itself:
- * it succeeds when the roll lands under its threshold, so bisecting on the
- * roll recovers the threshold without restating the compliance and
- * relationship modifiers here.
- */
-export function riskHoldChance(gs, risk) {
-  if (!risk || !Number.isFinite(Number(risk.baseSuccess)) || !gs?.metrics) return null;
+// Where resolveRisk's roll crosses from `test` holding to not: rolls under
+// the returned value pass.
+function rollThreshold(gs, risk, test) {
   const state = { metrics: { ...gs.metrics }, flags: { ...(gs.flags || {}) } };
   let low = 0;
   let high = 1;
   for (let i = 0; i < 24; i += 1) {
     const mid = (low + high) / 2;
-    if (resolveRisk(state, risk, () => mid).success) low = mid;
+    if (test(resolveRisk(state, risk, () => mid))) low = mid;
     else high = mid;
   }
   return Math.round(((low + high) / 2) * 1e4) / 1e4;
 }
 
+/**
+ * The chance a risk roll lands (the payoff arrives) on this file, read from
+ * resolveRisk itself: bisecting on the roll recovers its threshold without
+ * restating the compliance and relationship modifiers here.
+ */
+export function riskHoldChance(gs, risk) {
+  if (!risk || !Number.isFinite(Number(risk.baseSuccess)) || !gs?.metrics) return null;
+  return rollThreshold(gs, risk, (result) => result.success);
+}
+
 function readShortcutOdds(gs, item, option) {
   const carried = readCardOdds(item, option);
   if (carried) return carried;
-  const chance = riskHoldChance(gs, option?.risk);
-  if (chance === null) return null;
-  const clean = Math.round(chance * 100);
-  return { clean, caught: 100 - clean, bad: 0 };
+  const holds = riskHoldChance(gs, option?.risk);
+  if (holds === null) return null;
+  // A three-band roll reports its band: the clean share ends where "noticed"
+  // begins. A two-band roll has none, and holds is all clean.
+  const clean = option.risk.chancePartial
+    ? rollThreshold(gs, option.risk, (result) => (result.band ? result.band === "clean" : result.success))
+    : holds;
+  const cleanPct = Math.round(clean * 100);
+  const holdsPct = Math.round(holds * 100);
+  return { clean: cleanPct, noticed: holdsPct - cleanPct, caught: 100 - holdsPct };
 }
 
 export function formatShortcutOdds(odds) {
   if (!odds) return "";
-  const parts = [`holds ${odds.clean}%`, `caught ${odds.caught}%`];
-  if (odds.bad) parts.push(`badly wrong ${odds.bad}%`);
-  return parts.join(" · ");
+  return odds.noticed
+    ? `clean ${odds.clean}% · noticed ${odds.noticed}% · caught ${odds.caught}%`
+    : `holds ${odds.clean}% · caught ${odds.caught}%`;
 }
 
 function isFreeRefusal(option) {
@@ -576,25 +591,35 @@ export function buildShortcutBrief(gs, item) {
   const take = options[takeIndex];
   const act = findShortcutAct(item);
   const odds = readShortcutOdds(gs, item, take);
-  const catcherKey = take.risk?.institution || item?.institution || act?.catch?.by || null;
+  const catcherKey = take.institution || take.risk?.institution || item?.institution || act?.catch?.by || null;
   const catcher = catcherKey ? SHORTCUT_CATCHERS[catcherKey] || catcherKey : null;
   const payoffLine = take.payoffLine || take.payoff?.line || item?.payoffLine || act?.payoff?.line || "";
   const payoffChip = take.payoffChip || item?.payoffChip || "";
   const finalSeason = Number(gs?.round || 0) >= Number(gs?.totalRounds || SEASONS.length);
-  // Fallout scheduled in the last season has no season left to land in.
-  const followUp = take.risk?.failScheduleIssues && !finalSeason ? "follow-up review" : "";
-  const holdEffects = summarizeProjectedEffects(gs, take.risk?.successEffects || {}) || "no meter change";
-  const caughtEffects = [summarizeProjectedEffects(gs, take.risk?.failEffects || {}), followUp]
+  // Fallout scheduled in the last season has no season left to land in,
+  // unless the engine promises where it lands (next year's file).
+  const promised = take.bands?.caught?.fallout || item?.promisedFallout;
+  const followUp = !take.risk?.failScheduleIssues
+    ? ""
+    : !finalSeason ? "follow-up review" : promised ? "follow-up on next year's file" : "";
+  // Each band's effects: the engine's own band map when the card has one,
+  // else the risk's branches.
+  const bandEffects = (band, fallback) => take.bands?.[band]?.effects || fallback || {};
+  const describe = (effects) => summarizeProjectedEffects(gs, effects) || "no meter change";
+  const cleanText = describe(bandEffects("clean", take.risk?.successEffects));
+  const caughtText = [summarizeProjectedEffects(gs, bandEffects("caught", take.risk?.failEffects)), followUp]
     .filter(Boolean).join(" · ") || "no meter change";
-  const badEffects = summarizeProjectedEffects(gs, take.risk?.badEffects || take.risk?.severeEffects || {});
   const bands = [];
-  if (odds) {
-    bands.push({ tone: "positive", text: `Holds ${odds.clean}%: ${holdEffects}` });
-    bands.push({ tone: "danger", text: `Caught ${odds.caught}%: ${caughtEffects}` });
-    if (odds.bad) bands.push({ tone: "danger", text: `Badly wrong ${odds.bad}%: ${badEffects || "worse than caught"}` });
+  if (odds?.noticed) {
+    bands.push({ tone: "positive", text: `Clean ${odds.clean}%: ${cleanText}` });
+    bands.push({ tone: "warning", text: `Noticed ${odds.noticed}%: ${describe(bandEffects("noticed", take.risk?.partialEffects || take.risk?.successEffects))}` });
+    bands.push({ tone: "danger", text: `Caught ${odds.caught}%: ${caughtText}` });
+  } else if (odds) {
+    bands.push({ tone: "positive", text: `Holds ${odds.clean}%: ${cleanText}` });
+    bands.push({ tone: "danger", text: `Caught ${odds.caught}%: ${caughtText}` });
   } else {
-    bands.push({ tone: "positive", text: `If it holds: ${holdEffects}` });
-    bands.push({ tone: "danger", text: `If caught: ${caughtEffects}` });
+    bands.push({ tone: "positive", text: `If it holds: ${cleanText}` });
+    bands.push({ tone: "danger", text: `If caught: ${caughtText}` });
   }
   const declineIndex = options.findIndex((option, index) => index !== takeIndex && /^(decline|say no)\b/i.test(option?.label || ""));
 
@@ -607,9 +632,10 @@ export function buildShortcutBrief(gs, item) {
     catcherText: catcher ? `Who checks: ${catcher}` : "",
     payoffLine,
     payoffChip,
-    offerText: payoffLine || payoffChip
-      ? `On offer: ${[payoffChip, payoffLine].filter(Boolean).join(" — ")}`
-      : "",
+    // "On offer: $8,000 out of the planters' cheques (Budget +6)".
+    offerText: payoffLine
+      ? `On offer: ${payoffLine}${payoffChip ? ` (${payoffChip})` : ""}`
+      : payoffChip ? `On offer: ${payoffChip}` : "",
     declineText: declineIndex >= 0 && isFreeRefusal(options[declineIndex]) ? "Saying no costs nothing." : "",
     bands,
     preview: bands.map((band) => band.text).join(" | "),

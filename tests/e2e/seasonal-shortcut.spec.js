@@ -86,6 +86,14 @@ async function readableWithoutScrolling(page, panelSelector, fromSelector, toSel
   }, [panelSelector, fromSelector, toSelector]);
 }
 
+// "holds 20% · caught 80%" (two bands) or "clean 45% · noticed 20% · caught
+// 35%" (three): the first band and the caught band, as the card prints them.
+function readOdds(text) {
+  const first = text.match(/\b(holds|clean) (\d+)%/);
+  const caught = text.match(/\bcaught (\d+)%/);
+  return first && caught ? { lead: first[1], clean: first[2], caught: caught[1] } : null;
+}
+
 for (const theme of THEMES) {
   test(`hub: the offer is priced and styled as a legal call in the ${theme} theme`, async ({ page }) => {
     const errors = attachRuntimeErrorCollector(page);
@@ -95,13 +103,14 @@ for (const theme of THEMES) {
     const banner = page.locator('#terminal .term-shortcut-banner');
     await expect(banner).toContainText(/Shortcut offer/i);
     await expect(page.locator('#terminal .term-header').last()).toHaveText(OFFER.title);
-    const odds = (await page.locator('#terminal .term-shortcut-odds').innerText()).match(/holds (\d+)% · caught (\d+)%/);
-    expect(odds, 'the odds line states both bands').not.toBeNull();
+    const odds = readOdds(await page.locator('#terminal .term-shortcut-odds').innerText());
+    expect(odds, 'the odds line states its bands').not.toBeNull();
 
     const options = page.locator('#choices button');
     await expect(options.first()).toContainText(/Decline|Say no/);
-    await expect(options.filter({ hasText: 'Take the shortcut' })).toContainText(`Holds ${odds[1]}%`);
-    await expect(options.filter({ hasText: 'Take the shortcut' })).toContainText(`Caught ${odds[2]}%`);
+    const take = options.filter({ hasText: 'Take the shortcut' });
+    await expect(take).toContainText(new RegExp(`${odds.lead} ${odds.clean}%`, 'i'));
+    await expect(take).toContainText(`Caught ${odds.caught}%`);
     await expect(options.filter({ hasText: 'More context' })).toHaveCount(0);
 
     const fit = await readableWithoutScrolling(page, '#terminal', '#terminal .term-shortcut-banner', '#terminal .term-shortcut-odds');
@@ -136,11 +145,11 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
     const fit = await readableWithoutScrolling(page, '.tui-field-main', '.tui-shortcut-banner', '.tui-shortcut-terms');
     expect(fit.ok, JSON.stringify(fit)).toBe(true);
 
-    const odds = (await page.locator('.tui-shortcut-odds').innerText()).match(/holds (\d+)% · caught (\d+)%/);
+    const odds = readOdds(await page.locator('.tui-shortcut-odds').innerText());
     expect(odds).not.toBeNull();
     const take = page.locator('.tui-option').filter({ hasText: 'Take the shortcut' });
-    await expect(take.locator('.tui-option-band').first()).toContainText(`Holds ${odds[1]}%`);
-    await expect(take.locator('.tui-option-band').nth(1)).toContainText(`Caught ${odds[2]}%`);
+    await expect(take.locator('.tui-option-band').first()).toContainText(new RegExp(`${odds.lead} ${odds.clean}%`, 'i'));
+    await expect(take.locator('.tui-option-band').last()).toContainText(`Caught ${odds.caught}%`);
     await expect(page.locator('.tui-field-main')).not.toContainText('Pressure points');
     await expect(page.locator('.tui-field-main')).not.toContainText('The upside here is');
 

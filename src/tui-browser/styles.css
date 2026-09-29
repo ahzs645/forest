@@ -1209,11 +1209,15 @@ body {
   white-space: nowrap;
 }
 
-.tui-option-band.band-holds {
+.tui-option-band.band-positive {
   color: #56d364;
 }
 
-.tui-option-band.band-caught {
+.tui-option-band.band-warning {
+  color: #e3b341;
+}
+
+.tui-option-band.band-danger {
   color: #ff7b72;
 }
 

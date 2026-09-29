@@ -807,14 +807,17 @@ function ShortcutCard({ data }) {
 }
 
 // Ten cells, one per ten percent: the share of seasons this shortcut holds
-// against the share it is caught.
+// clean, is noticed, and is caught.
 function OddsMeter({ odds }) {
   if (!odds) return null;
-  const clean = Math.max(0, Math.min(10, Math.round(odds.clean / 10)));
+  const cells = (pct) => Math.max(0, Math.min(10, Math.round(pct / 10)));
+  const clean = cells(odds.clean);
+  const noticed = Math.min(10 - clean, cells(odds.noticed || 0));
   return (
     <span className="tui-odds-meter" aria-hidden="true">
       <span className="tone-green">{"■".repeat(clean)}</span>
-      <span className="tone-red">{"■".repeat(10 - clean)}</span>
+      <span className="tone-yellow">{"■".repeat(noticed)}</span>
+      <span className="tone-red">{"■".repeat(10 - clean - noticed)}</span>
     </span>
   );
 }
@@ -941,7 +944,7 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
                 {bands
                   ? bands.map((band, bandIndex) => (
                     <span
-                      className={`tui-option-preview tui-option-band ${band.tone === "positive" ? "band-holds" : "band-caught"}`}
+                      className={`tui-option-preview tui-option-band band-${band.tone}`}
                       key={`band-${bandIndex}`}
                     >
                       {band.text}

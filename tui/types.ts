@@ -7,12 +7,12 @@ export type NoticeData = {
 /** A shortcut offer's terms, built by the controller (buildShortcutBrief). */
 export type ShortcutBrief = {
   banner: string;
-  odds: { clean: number; caught: number; bad: number } | null;
+  odds: { clean: number; noticed: number; caught: number } | null;
   oddsText: string;
   catcher: string | null;
   offerText: string;
   declineText: string;
-  bands: { tone: "positive" | "danger"; text: string }[];
+  bands: { tone: "positive" | "warning" | "danger"; text: string }[];
 };
 
 /** Structured content for the Field Radio display. */
@@ -56,7 +56,7 @@ export type ContentData =
         preview?: string;
         outcome?: string;
         riskLevel?: "low" | "medium" | "high";
-        bands?: { tone: "positive" | "danger"; text: string }[];
+        bands?: { tone: "positive" | "warning" | "danger"; text: string }[];
       }[];
       notice?: NoticeData;
     }

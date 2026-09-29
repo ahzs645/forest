@@ -131,7 +131,9 @@ export function describeCardCause(card) {
   if (!causedBy) return "";
   // Fallout from a shortcut names the act itself ("Fudge the Species
   // Composition"), not the generic option label every offer shares.
-  const shortcutTitle = isTakenShortcut(causedBy) ? causedBy.sourceTitle || causedBy.title : "";
+  const shortcutTitle = isTakenShortcut(causedBy)
+    ? card.sourceTitle || causedBy.sourceTitle || causedBy.title
+    : "";
   if (shortcutTitle) {
     const seasonWord = String(causedBy.season || "").split(" ")[0];
     return `Because you took: ${shortcutTitle}${seasonWord ? ` — your ${seasonWord} shortcut` : ""}.`;

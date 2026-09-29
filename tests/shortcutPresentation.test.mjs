@@ -15,6 +15,7 @@ import { resolveRisk } from "../js/risk.js";
 import {
   TuiGameController,
   buildShortcutBrief,
+  landingTeaser,
   projectAppliedEffects,
   riskHoldChance,
 } from "../tui/controller.js";
@@ -61,7 +62,7 @@ test("an offer card carries its odds, its catcher, and bands that match the appl
   assert.equal(data.type, "temptation");
   assert.ok(data.shortcut, "the card ships a shortcut brief");
   const { odds } = data.shortcut;
-  assert.equal(odds.clean + odds.caught + odds.bad, 100);
+  assert.equal(odds.clean + odds.noticed + odds.caught, 100);
   assert.equal(odds.clean, Math.round(riskHoldChance(gs, take.risk) * 100));
   assert.match(data.shortcut.oddsText, new RegExp(`holds ${odds.clean}% · caught ${odds.caught}%`));
   assert.match(data.shortcut.offerText, /the CP package goes in this month/);
@@ -97,20 +98,47 @@ test("offer framing names the act and who checks, not a metric swing or tag soup
   assert.doesNotMatch(data.decisionPrompt, /\bfile\b/);
 });
 
-test("odds and payoff the engine puts on the card win over the local read", () => {
+test("the three bands, payoff and catcher the engine puts on the card win over the local read", () => {
   const gs = plannerState();
   const card = adaptIllegalActTemptation(ACT, gs, () => 0.5);
   const takeIndex = card.options.findIndex((option) => option.risk);
+  // The shape the engine's three-band offer carries on its take option.
   card.options[takeIndex] = {
     ...card.options[takeIndex],
-    odds: { clean: 0.3, caught: 0.5, bad: 0.2 },
+    odds: { clean: 0.45, noticed: 0.2, caught: 0.35 },
     payoffChip: "+$8k",
+    payoffLine: "the CP package goes in this month",
+    institution: "FPBC",
+    bands: {
+      clean: { effects: { progress: 4, budget: 3 } },
+      noticed: { effects: { progress: 4, budget: 3, compliance: -2 } },
+      caught: { effects: { compliance: -12, relationships: -6 }, fallout: { title: "FPBC Competence Audit" } },
+    },
   };
   const brief = buildShortcutBrief(gs, card);
-  assert.deepEqual(brief.odds, { clean: 30, caught: 50, bad: 20 });
-  assert.equal(brief.bands.length, 3);
-  assert.match(brief.bands[2].text, /^Badly wrong 20%/);
-  assert.match(brief.offerText, /^On offer: \+\$8k — /);
+  assert.deepEqual(brief.odds, { clean: 45, noticed: 20, caught: 35 });
+  assert.equal(brief.oddsText, "Odds this season: clean 45% · noticed 20% · caught 35%");
+  assert.deepEqual(brief.bands.map((band) => band.tone), ["positive", "warning", "danger"]);
+  assert.equal(brief.bands[0].text, "Clean 45%: Progress +4 · Budget +3");
+  assert.equal(brief.bands[1].text, "Noticed 20%: Progress +4 · Budget +3 · Compliance -2");
+  assert.equal(brief.bands[2].text, "Caught 35%: Compliance -12 · Relationships -6 · follow-up review");
+  assert.equal(brief.catcher, "Forest Professionals BC");
+  assert.equal(brief.offerText, "On offer: the CP package goes in this month (+$8k)");
+
+  // A promised card lands on next year's file even from the last season.
+  gs.round = gs.totalRounds;
+  assert.match(buildShortcutBrief(gs, card).bands[2].text, /follow-up on next year's file$/);
+});
+
+test("a final-season teaser shows only when the engine commits to the card", () => {
+  const gs = plannerState();
+  const guess = { text: "Likely fallout (manageable): Ministry Data Audit. schedule strain made it likely.", severity: "warning" };
+  assert.equal(landingTeaser(guess, gs).text, "Likely fallout (manageable): Ministry Data Audit. Schedule strain made it likely.");
+  gs.round = gs.totalRounds;
+  assert.equal(landingTeaser(guess, gs), null);
+  const promise = { text: "Fallout (manageable): Ministry Data Audit. It lands after the year closes.", issueId: "ministry-data-audit" };
+  assert.equal(landingTeaser(promise, gs).text, promise.text);
+  assert.equal(landingTeaser({ ...promise, lands: false }, gs), null);
 });
 
 test("previews show the gain a high meter will actually take", () => {
@@ -171,8 +199,8 @@ test("fallout from a shortcut names the shortcut it came from", () => {
     describeCardCause({ causedBy: pending.causedBy }),
     "Because you took: Claim an Amendment Nobody Submitted — your summer shortcut.",
   );
-  // A title the engine stamps separately wins.
-  assert.match(describeCardCause({ causedBy: { ...pending.causedBy, sourceTitle: "Other Act" } }), /^Because you took: Other Act/);
+  // A title the engine stamps on the card wins.
+  assert.match(describeCardCause({ causedBy: pending.causedBy, sourceTitle: "Other Act" }), /^Because you took: Other Act/);
   // Other scheduled cards keep the decision line.
   assert.match(
     describeCardCause({ causedBy: { sourceType: "issue", season: "Fall", option: "Defer" } }),
