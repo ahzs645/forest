@@ -95,6 +95,7 @@ export class TerminalUI {
     this.glossaryBtn = document.getElementById('glossary-btn');
     this.intelBtn = document.getElementById('intel-btn');
     this.restartBtn = document.getElementById('restart-btn');
+    this.gameSettingsBtn = document.getElementById('game-settings-btn');
     this.closePanel = document.getElementById('close-panel');
 
     // Modal elements
@@ -249,6 +250,9 @@ export class TerminalUI {
       this.intelBtn.addEventListener('click', () => this.showProfessionalComplianceIntel());
     }
 
+    // Display mode and theme mid-run, from Classic and Grid (Modern has ≡)
+    this.gameSettingsBtn?.addEventListener('click', () => this.showSettingsModal());
+
     if (this.complianceIntelLandingBtn) {
       this.complianceIntelLandingBtn.addEventListener('click', () => this.showProfessionalComplianceIntel());
     }
@@ -348,6 +352,12 @@ export class TerminalUI {
       if (canUseGameplayShortcuts && !this.isModalOpen() && e.key === '?' && !this._isInputFocused()) {
         e.preventDefault();
         this.showHelp();
+      }
+
+      // O for options: display mode and theme
+      if (canUseGameplayShortcuts && e.key === 'o' && !this._isInputFocused()) {
+        e.preventDefault();
+        this.showSettingsModal();
       }
 
       // R for restart — same context-aware prompt as the header button
