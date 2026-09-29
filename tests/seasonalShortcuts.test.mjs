@@ -118,7 +118,8 @@ test('the shortcut is a three-band gamble whose caught band never drops below 15
   const noticed = takeShortcut(state, card, odds.clean + 0.01);
   assert.equal(noticed.riskResult.band, 'noticed');
   assert.ok(noticed.effects.progress > 0);
-  assert.equal(state.flags.professionalAuditActive, true);
+  assert.equal(state.flags['watched:FPBC'], true, 'the institution\'s watch, which moves the next offer\'s odds');
+  assert.equal(state.flags.professionalAuditActive, undefined, 'the catch flag that opens chained fallout belongs to the caught band');
   assert.equal(state.pendingIssues?.length ?? 0, 0);
   assert.match(noticed.outcome, /Somebody also wrote down what they saw/);
 });

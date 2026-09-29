@@ -599,7 +599,11 @@ export function buildShortcutBrief(gs, item) {
     takeIndex,
     banner: "Shortcut offer · off the books",
     odds,
-    oddsText: odds ? `Odds this season: ${formatShortcutOdds(odds)}` : "",
+    // Why the odds moved from the tier's usual line (js/engine/content.js
+    // describeIllegalActOddsShifts), so a 32% clean never goes unexplained.
+    oddsText: odds
+      ? `Odds this season: ${formatShortcutOdds(odds)}${take.oddsReason || item?.oddsReason ? ` — ${take.oddsReason || item.oddsReason}` : ""}`
+      : "",
     catcher,
     catcherText: catcher ? `Who checks: ${catcher}` : "",
     payoffLine,
