@@ -132,3 +132,24 @@ test("the grade display reconciles and names the compliance line", () => {
   assert.match(lines, /Time/);
   assert.doesNotMatch(lines, /events handled/);
 });
+
+test("the seasonal ending tier is read off the displayed score", async () => {
+  const { tierForScore } = await import("../js/engine/scoring.js");
+  const { simulateMatrix } = await import("../js/engine/simulate.js");
+  // The playtest pair: an Outstanding 69 beside a Solid 70.
+  const permitter = scoreRun(stateWith({ progress: 54, forestHealth: 73, relationships: 76, compliance: 79, budget: 48 }, "permitter"));
+  assert.equal(permitter.tier, tierForScore(permitter.score));
+
+  const runs = simulateMatrix({ areas: ["fraser-plateau", "kootenay-wetbelt"], runs: 2, seedBase: 40 });
+  for (const run of runs) {
+    assert.equal(run.endingTier, tierForScore(run.score), `${run.role}/${run.area}/${run.strategy}: ${run.endingTier} at ${run.score}`);
+  }
+});
+
+test("a meter gate caps the score below the next band and says why", () => {
+  // A strong score with Progress under the Solid floor stays Mixed.
+  const result = scoreRun(stateWith({ progress: 20, forestHealth: 80, relationships: 85, compliance: 90, budget: 70 }));
+  assert.equal(result.tier, "mixed");
+  assert.equal(result.score, 59);
+  assert.match(result.reasons[0], /^Held to Mixed: Progress finished under 35\.$/);
+});

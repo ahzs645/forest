@@ -122,10 +122,68 @@ export function deriveTier(metrics = {}) {
   return "stumbled";
 }
 
-function buildReasons(state, { metricScore, roleScore, riskPenalty }) {
+// The ending tier is read straight off the displayed score, so a lower tier
+// can never show a higher number than a better one.
+export const TIER_SCORE_FLOORS = Object.freeze({ outstanding: 72, solid: 60, mixed: 45 });
+const TIER_ORDER = ["stumbled", "mixed", "solid", "outstanding"];
+
+/** The ending tier a score earns. */
+export function tierForScore(score) {
+  const value = Number(score) || 0;
+  if (value >= TIER_SCORE_FLOORS.outstanding) return "outstanding";
+  if (value >= TIER_SCORE_FLOORS.solid) return "solid";
+  if (value >= TIER_SCORE_FLOORS.mixed) return "mixed";
+  return "stumbled";
+}
+
+// The meter gates in deriveTier still decide how high a year can go (no
+// Outstanding with a collapsed meter, no Solid without delivery). They cap the
+// score just under the next band instead of overriding it, so the number and
+// the tier always agree and the reasons can say what held the year back.
+function scoreCapForTier(tier) {
+  const next = TIER_ORDER[TIER_ORDER.indexOf(tier) + 1];
+  return next ? TIER_SCORE_FLOORS[next] - 1 : 100;
+}
+
+// The first gate that kept the year out of the next tier, in player terms.
+function describeTierGate(metrics, gateTier) {
+  const value = (key) => Number(metrics[key] ?? 0);
+  const below = (key, floor) => (value(key) < floor ? `${formatMetricName(key)} finished under ${floor}` : null);
+  const average = weightedMetricAverage(metrics);
+
+  if (gateTier === "solid") {
+    const collapsed = Object.keys(metrics).filter((key) => value(key) < 40).map(formatMetricName);
+    return (collapsed.length ? `${collapsed.join(" and ")} finished under 40` : null)
+      || below("progress", 45)
+      || (average < 67 ? "the meters averaged under 67" : null)
+      || (value("forestHealth") >= 67
+        ? below("compliance", 75) || below("relationships", 65)
+        : below("compliance", 88) || below("relationships", 72));
+  }
+  if (gateTier === "mixed") {
+    return below("progress", 35)
+      || below("compliance", 60)
+      || below("relationships", 52)
+      || below("forestHealth", 48)
+      || (average < 55 ? "the meters averaged under 55" : null);
+  }
+  if (gateTier === "stumbled") {
+    return below("compliance", 45)
+      || below("relationships", 42)
+      || below("forestHealth", 42)
+      || (average < 45 ? "the meters averaged under 45" : null);
+  }
+  return null;
+}
+
+function buildReasons(state, { metricScore, roleScore, heldBack }) {
   const metrics = state?.metrics || {};
   const objective = getRoleObjective(state?.role?.id);
   const reasons = [];
+
+  if (heldBack) {
+    reasons.push(heldBack);
+  }
 
   if (objective) {
     const primaryValue = Number(metrics[objective.primary] ?? 50);
@@ -139,8 +197,9 @@ function buildReasons(state, { metricScore, roleScore, riskPenalty }) {
     );
   }
 
+  // The primary metric already has its own line above.
   const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
-  if (weakest && Number(weakest[1]) < 40) {
+  if (weakest && Number(weakest[1]) < 40 && weakest[0] !== objective?.primary) {
     reasons.push(`${formatMetricName(weakest[0])} finished thin.`);
   }
 
@@ -164,15 +223,22 @@ export function scoreRun(state) {
   const roleScore = scoreRolePerformance(state);
   const riskPenalty = scoreRiskLoad(state);
   const styleBonus = scoreStyleFit(state);
-  const score = Math.round(clamp(metricScore * 0.6 + roleScore * 0.4 + riskPenalty + styleBonus, 0, 100));
+  const earned = Math.round(clamp(metricScore * 0.6 + roleScore * 0.4 + riskPenalty + styleBonus, 0, 100));
+  const score = Math.min(earned, scoreCapForTier(deriveTier(metrics)));
+  const tier = tierForScore(score);
+  const gate = score < earned ? describeTierGate(metrics, tier) : null;
 
   return {
-    tier: deriveTier(metrics),
+    tier,
     score,
     metricScore,
     roleScore,
     riskPenalty,
     styleBonus,
-    reasons: buildReasons(state, { metricScore, roleScore, riskPenalty }),
+    reasons: buildReasons(state, {
+      metricScore,
+      roleScore,
+      heldBack: gate ? `Held to ${tier.charAt(0).toUpperCase()}${tier.slice(1)}: ${gate}.` : null,
+    }),
   };
 }
