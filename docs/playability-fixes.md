@@ -296,3 +296,13 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Campaign review.** A failed season no longer reads "the crew was still delivering" or "production stayed high".
 - **Browser suite.** The campaign spec's bot looped on the new release confirmation, picking "Choose another method — Back to…" every time, and never reached recon travel. Travel itself was fine: it stops at its named destination and says so. A rounding flake (about 1 run in 100) in the 7.5 km arrival-snap unit test is fixed.
 - **Checks.** `npm test` 837/837, Playwright 142/142. Gates: recon, planning, permitting, silviculture and GM 8/8 in every area (72/72 each); silviculture 24/24 at full length; every role 8/8 at campaign scale; GM honest 30/30 on normal. `sim:seasonal` is unchanged from the merge base. `simulate-campaign` good play: 7 Outstanding, 28 Solid, 1 Mixed of 36. The silviculture "release 99% of 260 ha" loss did not reproduce at this head: 270/270 across 9 areas × 30 seeds, and 162/162 in the policy sim.
+
+## 2026-09-29 — Wave 3: UI and renderer residuals
+
+- **Modern budget.** The sidebar reads what is left of the run's own starting budget, not a fixed $10,000 (a GM opened at 8500%).
+- **Grid on a phone.** An OFF-BOOK option takes two taps: the first opens its whole detail with "Tap again to take it." Mission facts and checklist lines wrap instead of losing their tail.
+- **Short log panes.** Every day card anchors the log on its first line, so the event's name is not under the Trail View. While a shortcut or fallout card is up, the picture folds to its bar so the pitch and odds get the room.
+- **Fallout, display side.** "Answer for it" is a TRADEOFF, not RISKY. A late catch states the capped delay the queue applies. Budget chips are abbreviated only when exact. A fine bigger than the purse says what it will actually take.
+- **Leave prompts.** Campaign and Seasonal default to Keep Playing, like the expedition.
+- **Settings in-game.** Classic and Grid have a Settings button and the O key; Help links to it. Crisis from the landing files its career tree, and `tui.html` wears the Settings theme.
+- **Smaller fixes.** Intel role cards no longer repeat, acronym tags are upper case, and the search box no longer autofocuses on touch. Summer has no freeze-up or heavy snow.
