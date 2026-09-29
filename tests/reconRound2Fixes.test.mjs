@@ -405,7 +405,7 @@ test('a set-aside never lands a cost the card could not have paid', () => {
   const chainsaw = FIELD_EVENTS.find((e) => e.id === 'chainsaw_cut');
   const journey = routeJourney();
   journey.resources.budget = 400;
-  const deferred = pickDeferredCost(chainsaw, 3, journey);
+  const deferred = pickDeferredCost(chainsaw, 3, { journey });
   assert.ok(!deferred || !(Number(deferred.effects.budget) < -400), JSON.stringify(deferred));
 });
 

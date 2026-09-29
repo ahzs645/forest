@@ -1,3 +1,4 @@
+import { getStopKind } from '../js/journey/packages.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -39,6 +40,12 @@ function journeyFor(roleId, areaId = 'bulkley-valley', season = null) {
   const journey = createJourney({ roleId, areaId });
   journey.day = 5;
   journey.scrutiny = 60; // onlyWhen: scrutinyHigh acts count as reachable
+  // A recce crew is offered block-ground shortcuts on a block, not at a
+  // waypoint (js/journey/packages.js actFitsStop): stand it on a block.
+  if (Array.isArray(journey.blocks)) {
+    const blockIndex = journey.blocks.findIndex((block) => getStopKind(block) === 'block');
+    if (blockIndex >= 0) journey.currentBlockIndex = blockIndex;
+  }
   if (season) {
     if (journey.season) journey.season.currentSeason = season;
     else journey.season = { currentSeason: season };
