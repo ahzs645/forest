@@ -3827,7 +3827,7 @@
   "type": "technical",
   "severity": "minor",
   "probability": 0.06,
-  "description": "Facilities just announced they're replacing the HVAC system. Your floor will be without climate control for a week. It's July. Temperatures are forecast to hit 35 degrees.",
+  "description": "Facilities just announced they're replacing the HVAC system. Your floor will be without climate control for a week. It's midsummer. Temperatures are forecast to hit 35 degrees.",
   "options": [
    {
     "label": "Set up temporary workspace in the field office",
@@ -4306,22 +4306,26 @@
     }
    }
   ],
-  "expeditionOnly": true
+  "expeditionOnly": true,
+  "seasons": [
+   "winter",
+   "spring"
+  ]
  },
  {
   "id": "gm_executive_poaching",
-  "title": "A Competitor Courts Your CEO",
+  "title": "A Competitor Courts Your Woodlands Manager",
   "type": "political",
   "severity": "major",
   "probability": 0.05,
   "roles": [
    "manager"
   ],
-  "description": "An Alberta outfit with deeper pockets and shallower cutblocks has taken your CEO to dinner twice this month. Your executive assistant noticed the second reservation was for the good steakhouse.",
+  "description": "An Alberta outfit with deeper pockets and shallower cutblocks has taken your woodlands manager to dinner twice this month. Your executive assistant noticed the second reservation was for the good steakhouse.",
   "options": [
    {
     "label": "Counter with money and a longer leash",
-    "outcome": "The retention package stings, but the CEO stays — and now knows exactly what staying is worth.",
+    "outcome": "The retention package stings, but your woodlands manager stays — and now knows exactly what staying is worth.",
     "effects": {
      "budget": -20000,
      "politicalCapital": 3
@@ -4381,7 +4385,7 @@
    },
    {
     "label": "Quietly start shortlisting successors",
-    "outcome": "Word gets out that you're shopping, because word always gets out. The CEO's lawyer calls your lawyer. Productive quarter all around.",
+    "outcome": "Word gets out that you're shopping, because word always gets out. Your woodlands manager's lawyer calls the company's lawyer. Productive quarter all around.",
     "effects": {
      "politicalCapital": -5,
      "crew_morale": -4,
