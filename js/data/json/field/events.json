@@ -367,7 +367,8 @@
     "label": "Set up emergency camp",
     "outcome": "Tarps go up fast. You wait out the worst. Morale holds.",
     "effects": {
-     "food": -3
+     "food": -3,
+     "timeUsed": 2
     }
    }
   ]
@@ -1010,7 +1011,8 @@
     "outcome": "The OFA 3 has the bleed controlled and the air ambulance is on the ground within the hour. The bill is steep, but the crew sees that people come before the line.",
     "effects": {
      "crew_morale": 6,
-     "compliance": 2
+     "compliance": 2,
+     "budget": -3000
     },
     "crewEffect": {
      "evacuate": true
@@ -1622,7 +1624,8 @@
     "outcome": "They point out a shortcut, warn about a washout ahead, and tell you which crossing the map lies about.",
     "effects": {
      "crew_morale": 10,
-     "progress": 5
+     "progress": 5,
+     "timeUsed": 2
     }
    },
    {
@@ -1653,9 +1656,11 @@
    },
    {
     "label": "Do preventive maintenance",
-    "outcome": "With things running well, you take time to check everything over.",
+    "outcome": "With things running well, you take time to check everything over and log the pre-use inspections.",
     "effects": {
-     "equipment": 10
+     "equipment": 10,
+     "compliance": 2,
+     "timeUsed": 2
     }
    }
   ]

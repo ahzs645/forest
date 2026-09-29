@@ -84,6 +84,31 @@ test('a balanced answer on a seasonal chain card brings the next stage with its 
   assert.ok(chain.stageIndex >= 1);
 });
 
+test('seasonal event effects do not turn time off into progress or hide the failure branch', async () => {
+  const { adaptOperationalEvent, adaptOperationalEventEffects } = await import('../js/engine/content.js');
+  const { FIELD_EVENTS } = await import('../js/data/index.js');
+  const state = createInitialState({ companyName: 'T', roleId: 'recce', areaId: 'fraser-plateau' });
+  state.round = 2;
+
+  // Beautiful Sunset: knocking off early costs a little line, never gains it.
+  const sunset = adaptOperationalEvent(FIELD_EVENTS.find((event) => event.id === 'crew_morale_boost'), state);
+  assert.ok((sunset.options[0].effects.progress || 0) < 0, JSON.stringify(sunset.options[0].effects));
+  assert.ok(sunset.options[0].effects.relationships > 0);
+
+  // Losses still slow the work.
+  assert.ok(adaptOperationalEventEffects({ crew_morale: -10 }).progress < 0);
+  assert.equal(adaptOperationalEventEffects({ equipment: 10 }).progress, undefined);
+
+  // Treating a chainsaw cut on site is a gamble; its expected cost shows.
+  const cut = adaptOperationalEvent(FIELD_EVENTS.find((event) => event.id === 'chainsaw_cut'), state);
+  const [medevac, , onSite] = cut.options;
+  assert.ok(onSite.effects.compliance < 0, JSON.stringify(onSite.effects));
+  assert.ok(medevac.effects.budget < 0, 'the medevac bill is charged');
+  for (const option of cut.options) {
+    for (const value of Object.values(option.effects)) assert.ok(Number.isInteger(value));
+  }
+});
+
 function makeHubUi() {
   const lines = [];
   const ui = {

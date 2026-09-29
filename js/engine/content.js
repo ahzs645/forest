@@ -302,39 +302,52 @@ export function adaptOperationalEventEffects(effects = {}, option = {}) {
     add("compliance", scaleDerivedEffect(effects.politicalCapital, 0.25));
   }
 
+  // Public standing reads as relationships on the season's meters.
+  if (typeof effects.reputation === "number") {
+    add("relationships", scaleDerivedEffect(effects.reputation, 0.6));
+  }
+
   const timeUsed = Number.isFinite(option?.timeUsed) ? option.timeUsed : effects.timeUsed;
   if (typeof timeUsed === "number") {
     add("progress", -Math.max(1, Math.round(Math.abs(timeUsed) * 1.4)));
   }
 
+  // Crew and stock losses slow the work; gains do not speed it up. Mapping
+  // gains onto Progress too turned "knock off early to watch the sunset"
+  // (+morale, -progress) into a net Progress gain, and a maintenance day into
+  // a free one. A stock gain is worth budget (gear you will not have to
+  // replace), never schedule.
+  const slows = (value, multiplier) => (value < 0 ? scaleDerivedEffect(value, multiplier) : 0);
+
   if (typeof effects.crew_morale === "number") {
     add("relationships", scaleDerivedEffect(effects.crew_morale, 0.45));
-    add("progress", scaleDerivedEffect(effects.crew_morale, 0.2));
+    add("progress", slows(effects.crew_morale, 0.2));
   }
 
   if (typeof effects.crew_health === "number") {
-    add("progress", scaleDerivedEffect(effects.crew_health, 0.35));
+    add("progress", slows(effects.crew_health, 0.35));
     add("compliance", scaleDerivedEffect(effects.crew_health, 0.2));
   }
 
   if (typeof effects.equipment === "number") {
-    add("progress", scaleDerivedEffect(effects.equipment, 0.3));
+    add("progress", slows(effects.equipment, 0.3));
     add("budget", scaleDerivedEffect(effects.equipment, 0.15));
   }
 
   if (typeof effects.fuel === "number") {
-    add("progress", scaleDerivedEffect(effects.fuel, 0.2));
+    add("progress", slows(effects.fuel, 0.2));
     add("budget", scaleDerivedEffect(effects.fuel, 0.25));
   }
 
   if (typeof effects.food === "number") {
-    add("progress", scaleDerivedEffect(effects.food, 0.25));
+    add("progress", slows(effects.food, 0.25));
     add("relationships", scaleDerivedEffect(effects.food, 0.2));
+    add("budget", slows(effects.food, 0.15));
   }
 
   if (typeof effects.firstAid === "number") {
     add("compliance", scaleDerivedEffect(effects.firstAid, 0.25));
-    add("progress", scaleDerivedEffect(effects.firstAid, 0.15));
+    add("progress", slows(effects.firstAid, 0.15));
   }
 
   if (typeof effects.permits_approved === "number") {
@@ -590,6 +603,25 @@ function getOperationalEventOverride(event) {
   }
 }
 
+// A season card is one decision standing in for weeks of work, so an
+// expedition option's success/failure split lands as its expected outcome.
+// Showing only the success branch made the gamble look free: treating a
+// chainsaw cut on site read cheaper than the medevac.
+function expectedOptionEffects(option) {
+  const effects = option?.effects || {};
+  const failure = option?.failureEffects;
+  const chance = Number(option?.chanceSuccess);
+  if (!failure || !Number.isFinite(chance)) return effects;
+  const blended = {};
+  for (const key of new Set([...Object.keys(effects), ...Object.keys(failure)])) {
+    const success = Number(effects[key] || 0);
+    const fail = Number(failure[key] || 0);
+    if (!Number.isFinite(success) || !Number.isFinite(fail)) continue;
+    blended[key] = Math.round(success * chance + fail * (1 - chance));
+  }
+  return blended;
+}
+
 export function adaptOperationalEvent(event, state) {
   const override = getOperationalEventOverride(event);
   const source = override
@@ -614,7 +646,7 @@ export function adaptOperationalEvent(event, state) {
     options: (source.options || []).map((option) => ({
       label: option.label,
       outcome: option.outcome,
-      effects: adaptOperationalEventEffects(option.effects || {}, option),
+      effects: adaptOperationalEventEffects(expectedOptionEffects(option), option),
       scheduleEvents: option.schedulesEvent
         ? {
             id: option.schedulesEvent,

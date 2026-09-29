@@ -322,7 +322,7 @@ const AREA_SITUATIONS = [
         stance: 'cautious',
         label: 'Suspend interface operations during high fire danger',
         outcome: 'Homes stay safe and the public sees caution; the schedule takes a hit.',
-        effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 }
+        effects: { progress: -2, compliance: 3, relationships: 1, budget: -1 }
       },
       {
         stance: 'balanced',
