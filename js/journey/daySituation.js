@@ -20,6 +20,8 @@ import { handleEvent } from '../modes/shared/handleEvent.js';
 import { optionSpendsDay } from '../events/timePolicy.js';
 import { resolveTemptationSetAside } from '../events/selection.js';
 import { applyDeferredSituation } from '../events/deferral.js';
+import { applyEventEffects } from '../events/resolution.js';
+import { applyConsequenceFlags } from '../events/consequences.js';
 import { getDayRng } from '../events/dayRng.js';
 import {
   addRouteConstraintFromEvent,
@@ -71,11 +73,19 @@ export function applySetAsideCost(ui, journey, event, { imposedCost = true } = {
   // A temptation is somebody else's proposal, not a situation the file will
   // notice you ignored. Setting it aside costs nothing on the meters; what it
   // costs is that the proposer decides what your silence meant (they drop it,
-  // ask again with a deadline, or go around you).
+  // ask again with a deadline, or go around you). The exception is a thing
+  // already done: silence about a go-around is condoning it, and that costs
+  // the file (js/events/selection.js GO_AROUND_SILENCE_COST).
   if (event?.type === 'temptation') {
     const reply = resolveTemptationSetAside(journey, event, getDayRng(journey, `set-aside:${event.id || 'event'}`));
     ui.write('');
     ui.write(reply.message, 'term-dim');
+    if (reply.effects || reply.flags) {
+      const messages = [];
+      if (reply.effects) applyEventEffects(journey, reply.effects, messages);
+      if (reply.flags) applyConsequenceFlags(journey, reply.flags, messages);
+      for (const message of messages) ui.writeWarning(message);
+    }
     return;
   }
 
@@ -127,13 +137,16 @@ export async function runDaySituation(game, event, options = {}) {
     && isRouteObstructionEvent(event);
   const travelSetbackBefore = Number(journey.travelSetback || 0);
 
+  const goAround = event?.type === 'temptation' && event?.temptationStage === 'goaround';
   const outcome = await handleEvent(game, event, {
     ...frame,
     extraOptions: [{
       label: options.setAsideLabel || 'Set it aside',
       description: obstruction
         ? 'Defer the call. The route stays blocked until you clear it or mark a detour.'
-        : options.setAsideDescription
+        : goAround
+          ? 'Say nothing. It stands, and the file will read your silence as consent.'
+          : options.setAsideDescription
         || 'Not today. Take the day back and spend it on your own work.',
       tag: 'TRADEOFF',
       value: 'set_aside',

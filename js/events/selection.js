@@ -602,6 +602,10 @@ const CAUGHT_FLAG_BY_INSTITUTION = {
 const TAKE_LABEL = 'Take the shortcut';
 const LET_IT_STAND_LABEL = 'Let it stand';
 const SET_ASIDE_ODDS = { drop: 0.55, reoffer: 0.30, goaround: 0.15 };
+// What staying silent about a go-around costs the file (js/journey/daySituation.js
+// applies it): less than reporting costs in time and goodwill, more than
+// reporting costs the record.
+export const GO_AROUND_SILENCE_COST = Object.freeze({ compliance: -2, scrutiny: 3 });
 
 function ensureTemptationMemory(journey) {
   const memory = journey.temptationMemory || (journey.temptationMemory = {});
@@ -669,7 +673,7 @@ export function actMatchesTemptationContext(act, journey) {
   if (!actFitsRole(act, roleId)) return false;
 
   const season = journey?.season?.currentSeason;
-  if (Array.isArray(act.seasons) && act.seasons.length && season && !act.seasons.includes(season)) {
+  if (Array.isArray(act.seasons) && act.seasons.length && season && !actSeasonFits(act, journey, season)) {
     return false;
   }
   const { areaId, areaTags } = resolveJourneyArea(journey);
@@ -682,6 +686,19 @@ export function actMatchesTemptationContext(act, journey) {
   if (act.tier === 'comic' && journey?.difficulty === 'hard') return false;
   if (act.onlyWhen === 'scrutinyHigh' && Number(journey?.scrutiny || 0) < 55) return false;
   return true;
+}
+
+// A silviculture deployment is the growing season in one run: it opens at
+// planting and carries the release and survey work with it (js/season.js
+// SEASONAL_MODIFIERS, js/modes/silviculture.js), so an act written for the
+// brushing or survey window belongs in front of that supervisor too. Winter
+// acts stay winter acts.
+const GROWING_SEASONS = ['spring', 'summer', 'fall'];
+function actSeasonFits(act, journey, season) {
+  if (act.seasons.includes(season)) return true;
+  return journey?.journeyType === 'silviculture'
+    && GROWING_SEASONS.includes(season)
+    && act.seasons.some((entry) => GROWING_SEASONS.includes(entry));
 }
 
 /**
@@ -1028,11 +1045,15 @@ function buildGoAroundEvent(act, journey) {
     description: `You set it aside and somebody went around you. ${found} ${proposer} is not answering the radio. The question now is whether you report a thing you did not do.`,
     options: [
       {
+        // Reporting a thing you did not do costs the morning and some
+        // goodwill, never scrutiny: a self-reported contravention is the one
+        // the district reads as a clean file. Silence is what draws scrutiny
+        // (resolveTemptationSetAside).
         label: 'Report it',
         outcome: `You write it up as found and call it in. It costs you the morning and some goodwill with ${lowerFirst(proposer)}, and it is the only version of this where your name is on the right side.`,
         effects: isDesk
-          ? { compliance: 4, politicalCapital: -2, scrutiny: 3, timeUsed: 1 }
-          : { compliance: 4, crew_morale: -2, scrutiny: 3, timeUsed: 1 },
+          ? { compliance: 4, politicalCapital: -2, timeUsed: 1 }
+          : { compliance: 4, crew_morale: -2, timeUsed: 1 },
         reactionTone: 'responsible',
       },
       {
@@ -1097,9 +1118,18 @@ export function resolveTemptationSetAside(journey, event, rng = Math.random) {
   const proposer = describeProposer(act, journey);
   const day = Number(journey?.day || 1);
 
+  // Setting aside a thing already done is condoning it: it counts as a prior
+  // shortcut for later odds, and it costs the file what silence costs — the
+  // record now has a contravention in it that you knew about and did not
+  // report. Letting it stand (the gamble) is the only way it pays.
   if (event?.temptationStage === 'goaround') {
     if (act?.id && !memory.takenActIds.includes(act.id)) memory.takenActIds.push(act.id);
-    return { kind: 'condone', message: 'You say nothing. It stands, and so does your silence.' };
+    return {
+      kind: 'condone',
+      message: 'You say nothing. It stands, and so does your silence. The file has a contravention in it now, and your name is the one that knew.',
+      effects: { ...GO_AROUND_SILENCE_COST },
+      flags: ['contractor_owns_you'],
+    };
   }
 
   if (!act) {
