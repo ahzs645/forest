@@ -4242,7 +4242,7 @@
   "type": "discovery",
   "severity": "minor",
   "probability": 0.05,
-  "description": "You find a natural mineral lick heavily used by wildlife. Dozens of tracks — deer, elk, moose, bear — converge on this muddy depression.",
+  "description": "You find a natural mineral lick heavily used by wildlife. Dozens of tracks — deer, elk, bear and more — converge on this muddy depression.",
   "options": [
    {
     "label": "Flag it and establish a buffer",
@@ -5189,7 +5189,7 @@
   "options": [
    {
     "label": "Fix his generator for meat and fuel",
-    "outcome": "An hour of wrenching buys smoked moose and ten litres of fuel. Everyone at the fire agrees this is the correct economy.",
+    "outcome": "An hour of wrenching buys smoked venison and ten litres of fuel. Everyone at the fire agrees this is the correct economy.",
     "effects": {
      "equipment": -3,
      "food": 15,

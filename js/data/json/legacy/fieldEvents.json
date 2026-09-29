@@ -171,7 +171,7 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "The province issues an emergency access restriction (a GAR order) around a caribou maternal pen overlapping your BWBS and SWB tenure.",
+    "description": "The province issues an emergency access restriction (a GAR order) around a caribou maternal pen overlapping your tenure.",
     "options": [
       {
         "label": "Shift development to alternate watersheds",
@@ -288,7 +288,7 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "Wildfires to the south trap smoke over the SBS plateau, pushing particulate levels past safe work thresholds for a week.",
+    "description": "Wildfires to the south trap smoke in the valleys, pushing particulate levels past safe work thresholds for a week.",
     "options": [
       {
         "label": "Move crews to remote sensing and planning tasks",

@@ -244,7 +244,7 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "The province issues an emergency access restriction (a GAR order) around a caribou maternal pen overlapping your BWBS and SWB tenure.",
+    "description": "The province issues an emergency access restriction (a GAR order) around a caribou maternal pen overlapping your tenure.",
     "options": [
       {
         "label": "Shift development to alternate watersheds",
