@@ -301,7 +301,7 @@ test('campaign planning can finish a real file within its funded season', async 
   }
 });
 
-test('campaign scale: permitting tightens permit target and deadline, scales budget', () => {
+test('campaign scale: permitting sets its own target and season, scales budget', () => {
   const normal = createPermittingJourney({ roleId: 'permitter', areaId: 'fort-st-john-plateau' });
   const scaled = createPermittingJourney({
     roleId: 'permitter',
@@ -312,7 +312,9 @@ test('campaign scale: permitting tightens permit target and deadline, scales bud
   assert.equal(normal.permits.target, 15);
   assert.equal(scaled.permits.target, 12);
 
-  assert.equal(normal.deadline, 30);
+  // The full-length season is sized so the calendar binds (sixteen days for
+  // fifteen permits); a campaign deployment keeps its own twenty-day season.
+  assert.equal(normal.deadline, 16);
   assert.equal(scaled.deadline, 20);
 
   assert.equal(scaled.resources.budget, Math.round(58000 * 0.68));
@@ -377,7 +379,7 @@ test('unscaled createJourney remains behaviorally identical to before the campai
   const permitting = createJourney({ roleId: 'permitter', areaId: 'fort-st-john-plateau' });
   assert.equal(permitting.journeyType, 'permitting');
   assert.equal(permitting.permits.target, 15);
-  assert.equal(permitting.deadline, 30);
+  assert.equal(permitting.deadline, 16);
   assert.equal(permitting.resources.budget, 58000);
 
   // Manager

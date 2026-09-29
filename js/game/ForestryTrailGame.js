@@ -62,6 +62,11 @@ export function applyDifficultyMultipliers(journey, difficulty) {
   if (journey.journeyType === 'planning' && Number.isFinite(journey.deadline)) {
     journey.deadline += difficulty === 'easy' ? 2 : -1;
   }
+  // The permit season is sized so the calendar binds (js/modes/permitting.js
+  // getPermitApprovalRate carries the rest of the difficulty).
+  if (journey.journeyType === 'permitting' && Number.isFinite(journey.deadline)) {
+    journey.deadline += difficulty === 'easy' ? 3 : 0;
+  }
   journey.startingResources = { ...r };
 }
 
@@ -588,7 +593,7 @@ export class ForestryTrailGame {
           const roleName = savedRun.role?.name || 'Forester';
           msg.textContent = `${savedRun.companyName || 'Your crew'} — ${roleName}, `
             + `${savedRun.area?.name || 'operating area'}, day ${savedRun.day}`
-            + `${savedRun.activeReconShift || savedRun.activeDeskDay?.day === savedRun.day ? ' — mid-shift' : ''}.`;
+            + `${savedRun.activeReconShift ? ' — mid-shift' : savedRun.activeDeskDay?.day === savedRun.day ? ' — mid-day' : ''}.`;
           msg.style.marginTop = '0';
           container.appendChild(msg);
         },

@@ -19,7 +19,7 @@ import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../jou
 import { checkPermittingEndConditions } from './shared/endConditions.js';
 import { describeGoodwillChange, readGoodwill } from '../events/resolution.js';
 import { fpbcReviewDaysLeft } from '../events/selection.js';
-import { checkpointDeskDay, closeDeskDay, resumingDeskDay } from '../journey/deskMechanics.js';
+import { checkpointDeskDay, closeDeskDay, dropDuplicateDeskEnergy, resumingDeskDay } from '../journey/deskMechanics.js';
 import {
   DAILY_PERMIT_THROUGHPUT,
   PERMIT_TYPES,
@@ -162,6 +162,33 @@ const PERMIT_REVISION_PROFILES = [
       compliance: 1,
       politicalCapital: -2,
       relationships: { nations: -2 }
+    }
+  },
+  {
+    // The Archaeology Branch's own letter: an HCA permit is decided on the
+    // archaeology, not on sightlines or culvert sizing.
+    id: 'heritage-assessment',
+    title: 'Archaeological assessment detail',
+    summary: (file) => `The Archaeology Branch wants the shovel-test results and the site boundaries mapped against ${file?.blockLabel || 'the block'}; the assessment report cites them but does not attach them.`,
+    tags: ['archaeology', 'cultural', 'nations'],
+    types: ['HCA'],
+    pressure: {
+      publicReview: 1
+    },
+    clean: {
+      label: 'Attach the assessment detail',
+      note: 'You attach the shovel-test logs and the site-boundary mapping, and show where the layout stays off the features.',
+      scrutiny: -3,
+      compliance: 4,
+      relationships: { nations: 1, agencies: 1 }
+    },
+    fast: {
+      label: 'Refile with the summary table',
+      note: 'The file moves, but the Branch reads a table where it asked for the data.',
+      scrutiny: 4,
+      compliance: 1,
+      politicalCapital: -1,
+      relationships: { agencies: -1 }
     }
   },
   {
@@ -906,7 +933,11 @@ function pickRevisionProfile(journey, index = 0, file = null) {
   // A gap the licensee has already answered cleanly on this file is closed;
   // the letter has to be about something else.
   const resolved = new Set(file?.resolvedDeficiencies || []);
-  const scored = scoreRevisionProfiles(journey, file);
+  // A letter has to be one this kind of permit can get: scoring only
+  // discouraged the rest, and a heritage permit still drew a visual impact
+  // assessment when the coast's public-review pressure outweighed it.
+  const scored = scoreRevisionProfiles(journey, file)
+    .filter((profile) => !file?.type || !profile.types || profile.types.includes(file.type));
   const open = scored.filter((profile) => !resolved.has(profile.id));
   const profiles = open.length ? open : scored;
   if (!profiles.length) {
@@ -1121,6 +1152,8 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
     messages.push('The watershed response is now lined up with the hydrology concerns on the file.');
   } else if (ticket.profileId === 'access-engineering' && roadIntel.engineering > 0) {
     messages.push('The road package now lines up with the access engineering issues on the file.');
+  } else if (ticket.fileType === 'HCA' && ['consultation', 'heritage-assessment'].includes(ticket.profileId)) {
+    messages.push('The heritage file now shows the Archaeology Branch what it asked for, and the Nation can see where its input went.');
   } else if ((ticket.profileId === 'visual-quality' || ticket.profileId === 'consultation') && pressure.publicReview > 0) {
     messages.push('The public-facing package reads more defensible for the district and for anyone who pulls the FOM.');
   } else if (ticket.profileId === 'fish-passage' && pressure.timing > 0) {
@@ -1145,6 +1178,7 @@ export async function runPermittingDay(game) {
   ensurePermitFiles(journey);
   ensurePermittingRevisionState(journey);
   ensurePermittingProfessionalState(journey);
+  dropDuplicateDeskEnergy(journey);
   // The debrief measures spending against what the desk started with.
   if (!Number.isFinite(journey.budgetStart)) journey.budgetStart = journey.resources?.budget || 0;
   // A follow-up that fired before the day opened can spend the last of it.
@@ -1502,6 +1536,11 @@ function displayPermittingBriefing(ui, journey) {
     const label = key === 'politicalCapital' ? 'District goodwill' : status.label;
     const display = key === 'politicalCapital' ? `${Math.round(journey.resources.politicalCapital || 0)}` : status.display;
     ui.write(`${icon} ${label}: ${display}`);
+  }
+  // Energy and stress are yours, not the office's: the same numbers the
+  // status panel shows.
+  if (journey.protagonist) {
+    ui.write(`  Your energy: ${Math.round(journey.protagonist.energy ?? 0)}% | Your stress: ${Math.round(journey.protagonist.stress ?? 0)}%`);
   }
 
   if (journey.protagonist?.expertise) {
@@ -2102,15 +2141,29 @@ export function getPermitApprovalRate(journey) {
   const professionalPenalty = professional?.registrationActive
     ? Math.min(0.15, (professional.auditExposure / 300) + (professional.competenceRisk / 500))
     : 0.2;
-  return Math.max(0.42, 0.8 - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
+  const difficulty = PERMIT_DIFFICULTY[journey?.difficulty] || PERMIT_DIFFICULTY.normal;
+  return Math.max(0.42, 0.8 + difficulty.approval - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
 }
+
+/**
+ * How hard the district reads a file, by difficulty. Old Growth used to
+ * change only the budget and the event rate, so a competent Old Growth desk
+ * won as surely and as fast as a Journeyman one; the season's length is set
+ * alongside (js/game/ForestryTrailGame.js applyDifficultyMultipliers).
+ */
+const PERMIT_DIFFICULTY = {
+  easy: { approval: 0.05, completeness: -0.03 },
+  normal: { approval: 0, completeness: 0 },
+  hard: { approval: -0.08, completeness: 0.04 },
+};
 
 /** Share of screened files bounced as incomplete. */
 export function getPermitCompletenessReturnRate(journey) {
   const professional = getPermittingProfessionalSnapshot(journey);
   const paperwork = Math.min(0.12, (professional?.paperworkLoad || 0) / 250);
   const registration = professional?.registrationActive ? 0 : 0.1;
-  return Math.min(0.35, 0.08 + paperwork + registration);
+  const difficulty = PERMIT_DIFFICULTY[journey?.difficulty] || PERMIT_DIFFICULTY.normal;
+  return Math.min(0.35, Math.max(0, 0.08 + difficulty.completeness + paperwork + registration));
 }
 
 /**

@@ -8,7 +8,7 @@ import { summarizeIntegrity } from './modes/silvicultureIntegrity.js';
 import { listShortcutsTaken } from './events/shortcutRecord.js';
 import { badBandFloorFor } from './events/selection.js';
 import { ILLEGAL_ACTS } from './data/illegalActs.js';
-import { PLANNING_DECISION_GATE, PLANNING_VALUES_FLOOR } from './journey/constants.js';
+import { PLANNING_DECISION_GATE, PLANNING_SCRUTINY_GATE, PLANNING_VALUES_FLOOR } from './journey/constants.js';
 import { getPackageTarget, getPackagesFinalized } from './journey/packages.js';
 import { formatDollars } from './resources.js';
 
@@ -95,8 +95,9 @@ export function calculateScore(journey, victory) {
   const scoreCap = scoreFailureCap(journey, victory);
   const totalScore = Math.min(scoreCap ?? 100, Math.max(0, baseScore + victoryBonus - scrutinyPenalty - integrityPenalty));
   const grade = getLetterGrade(totalScore);
+  const integrityLabel = DESK_ROLES.has(journey.journeyType) ? 'for shortcuts that were noticed or caught' : null;
 
-  return { totalScore, grade, components, victory, baseScore, victoryBonus, scrutinyPenalty, integrityPenalty, scoreCap };
+  return { totalScore, grade, components, victory, baseScore, victoryBonus, scrutinyPenalty, integrityPenalty, integrityLabel, scoreCap };
 }
 
 /**
@@ -118,17 +119,88 @@ const CAUGHT_SHORTCUT_PENALTY = { serious: 12, core: 8, minor: 4 };
  * @returns {number}
  */
 export function scoreIntegrityPenalty(journey) {
+  if (DESK_ROLES.has(journey?.journeyType)) {
+    // A desk file answers for its off-book calls: a shortcut somebody noticed
+    // is on the record, one that was caught is a finding, and a serious catch
+    // costs more than a minor one. Taking every shortcut on offer used to
+    // grade A 97-98.
+    const conduct = summarizeDeskConduct(journey);
+    const shortcuts = listShortcutsTaken(journey);
+    const caughtShortcuts = shortcuts.filter((shortcut) => shortcut.band === 'caught');
+    // Off-book answers on ordinary cards are caught too, at the flat rate.
+    const otherCaught = Math.max(0, conduct.caught - caughtShortcuts.length);
+    const caughtPoints = caughtShortcuts.reduce((sum, shortcut) => sum + caughtShortcutPoints(shortcut), 0);
+    return Math.min(DESK_INTEGRITY_CAP, conduct.noticed * DESK_INTEGRITY_NOTICED + caughtPoints + otherCaught * DESK_INTEGRITY_CAUGHT);
+  }
   if (journey?.journeyType === 'silviculture') return summarizeIntegrity(journey).penalty;
   return listShortcutsTaken(journey)
     .filter((shortcut) => shortcut.band === 'caught')
-    .reduce((sum, shortcut) => {
-      const act = ILLEGAL_ACTS.find((entry) => entry?.id === shortcut.actId) || null;
-      const floor = badBandFloorFor(act);
-      const points = floor >= 0.15 ? CAUGHT_SHORTCUT_PENALTY.serious
-        : floor >= 0.1 ? CAUGHT_SHORTCUT_PENALTY.core
-          : CAUGHT_SHORTCUT_PENALTY.minor;
-      return sum + points;
-    }, 0);
+    .reduce((sum, shortcut) => sum + caughtShortcutPoints(shortcut), 0);
+}
+
+/** What one caught shortcut costs the grade: serious offences most. */
+function caughtShortcutPoints(shortcut) {
+  const act = ILLEGAL_ACTS.find((entry) => entry?.id === shortcut.actId) || null;
+  const floor = badBandFloorFor(act);
+  return floor >= 0.15 ? CAUGHT_SHORTCUT_PENALTY.serious
+    : floor >= 0.1 ? CAUGHT_SHORTCUT_PENALTY.core
+      : CAUGHT_SHORTCUT_PENALTY.minor;
+}
+
+const DESK_ROLES = new Set(['planning', 'permitting', 'desk']);
+const DESK_INTEGRITY_NOTICED = 3;
+const DESK_INTEGRITY_CAUGHT = 8;
+const DESK_INTEGRITY_CAP = 20;
+const CONDUCT_BANDS = { good: 'clean', partial: 'noticed', bad: 'caught' };
+
+/**
+ * How a desk run was conducted, beyond its meters: the off-book calls it
+ * made and how they landed, what it reported, and where the file ended up.
+ * The closing lines of the debrief and the integrity charge both read this,
+ * so a run that took every shortcut is not remembered as the one the district
+ * calls when something has to be done properly.
+ * @param {Object} journey
+ * @returns {{taken: number, noticed: number, caught: number, reported: number,
+ *   situations: number, clean: number, setAside: number, scrutiny: number,
+ *   goodwillShare: number, spin: boolean}}
+ */
+export function summarizeDeskConduct(journey) {
+  const events = (journey?.log || []).filter((entry) => entry?.type === 'event');
+  // Shortcut cards are read by their take label; an unlawful answer on an
+  // ordinary card is logged off-book with the band it landed in.
+  const bands = listShortcutsTaken(journey).map((shortcut) => shortcut.band);
+  for (const entry of events) {
+    if (entry.offBook && !String(entry.eventId || '').startsWith('temptation_')) {
+      bands.push(CONDUCT_BANDS[entry.band] || 'clean');
+    }
+  }
+  const goodwill = journey?.resources?.politicalCapital;
+  return {
+    taken: bands.length,
+    noticed: bands.filter((band) => band === 'noticed').length,
+    caught: bands.filter((band) => band === 'caught').length,
+    reported: events.filter((entry) => entry.optionLabel === 'Document and report').length,
+    situations: events.length,
+    clean: events.filter(isSituationClosedClean).length,
+    setAside: events.filter((entry) => entry.setAside).length,
+    scrutiny: Math.round(Number(journey?.scrutiny ?? journey?.heat ?? 0)),
+    // A journey with no goodwill meter has spent none of it.
+    goodwillShare: typeof goodwill === 'number' ? goodwill / startingAmount(journey, 'politicalCapital', 50) : 1,
+    spin: journey?.finalReport?.style === 'spin',
+  };
+}
+
+/**
+ * The run's conduct in one word: `clean` took no shortcut and kept the file
+ * defensible, `compromised` was caught, made a habit of it, or left the file
+ * at the District Manager's scrutiny gate, and `mixed` is everything between.
+ * @param {ReturnType<typeof summarizeDeskConduct>} conduct
+ * @returns {'clean'|'mixed'|'compromised'}
+ */
+export function rateDeskConduct(conduct) {
+  if (conduct.caught > 0 || conduct.taken >= 2 || conduct.scrutiny >= PLANNING_SCRUTINY_GATE) return 'compromised';
+  if (conduct.taken > 0 || conduct.spin || conduct.scrutiny >= 55 || conduct.goodwillShare < 0.35) return 'mixed';
+  return 'clean';
 }
 
 /**
@@ -639,7 +711,7 @@ export function formatScoreDisplay(scoreResult) {
   }
 
   if (scoreResult.integrityPenalty > 0) {
-    lines.push(`  ${'Integrity'.padEnd(14)} -${scoreResult.integrityPenalty} for shortcuts the district found`);
+    lines.push(`  ${'Integrity'.padEnd(14)} -${scoreResult.integrityPenalty} ${scoreResult.integrityLabel || 'for shortcuts the district found'}`);
   }
 
   if (Number.isFinite(scoreResult.scoreCap)) {

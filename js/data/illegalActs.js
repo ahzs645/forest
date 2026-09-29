@@ -268,7 +268,8 @@ export const REOFFER_PITCHES = [
 /**
  * Rotating refusal outcomes. `p` is the proposer, capitalized. The self deck
  * is for the Friday-afternoon thoughts nobody else proposed: there is nobody
- * to shrug, call back or laugh it off.
+ * to shrug, call back or laugh it off. A desk card arrives by email or by
+ * phone, and the refusal answers the way it was asked.
  */
 export const REFUSE_OUTCOMES = {
   field: [
@@ -279,9 +280,14 @@ export const REFUSE_OUTCOMES = {
   ],
   desk: [
     () => "You close the email without replying. That is the reply.",
-    (p) => `You say no on the phone and then write a two-line note to file. ${p} does not call back.`,
-    (p) => `${p} laughs it off as a joke. You let it be a joke, and keep the message.`,
+    (p) => `You write back no, then a two-line note to file. ${p} does not write again.`,
+    (p) => `${p} follows up with 'just checking you saw this'. You did. You keep the message.`,
     () => "You reply with one sentence and the name of the regulation. The thread ends there.",
+  ],
+  phone: [
+    (p) => `You say no on the phone and then write a two-line note to file. ${p} does not call back.`,
+    (p) => `${p} laughs it off as a joke. You let it be a joke, and write the call up anyway.`,
+    () => "You say no, and the name of the regulation. The line goes quiet, then the subject changes.",
   ],
   self: [
     () => "You let the thought go past. On Monday it looks like exactly what it was.",

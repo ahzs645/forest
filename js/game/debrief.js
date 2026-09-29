@@ -9,7 +9,7 @@
 
 import { ASCII_ART } from '../ascii_art.js';
 import { getCrewDisplayInfo } from '../crew.js';
-import { calculateScore, formatScoreDisplay, getLetterGrade } from '../scoring.js';
+import { calculateScore, formatScoreDisplay, getLetterGrade, rateDeskConduct, summarizeDeskConduct } from '../scoring.js';
 import { resolveSilvicultureFinalReport } from '../modes/silvicultureIntegrity.js';
 import { settleOutstandingFallout } from '../events/shortcutRecord.js';
 import {
@@ -432,22 +432,43 @@ export function buildCrewEpilogue(member, context = {}) {
 
 /**
  * Epilogue for protagonist (no-crew) journeys: planning & permitting.
+ *
+ * Read from how the run was conducted first (js/scoring.js
+ * summarizeDeskConduct: the off-book calls and how they landed, the scrutiny
+ * left on the file, the goodwill spent, the closing report) and from stress
+ * second. Keyed on stress alone it told a run that took every shortcut its
+ * name came up "when the district needs something done properly", and gave
+ * the clean runs, which file on the last day and end stressed, the flinch.
  * @param {Object} journey
  * @param {boolean} victory
  * @returns {string[]}
  */
 export function buildProtagonistEpilogue(journey, victory) {
   const stress = journey.protagonist?.stress ?? 0;
+  const conduct = summarizeDeskConduct(journey);
+  const rating = rateDeskConduct(conduct);
   const lines = [];
 
-  if (victory && stress < 50) {
-    lines.push('One year later: your name comes up when the district needs something done properly. You let the reputation do the talking.');
-  } else if (victory) {
-    lines.push('One year later: the file closed clean, but you still flinch when the phone rings after 5pm. The win cost something.');
+  if (victory) {
+    if (rating === 'clean') {
+      lines.push(stress < 60
+        ? 'One year later: your name comes up when the district needs something done properly. You let the reputation do the talking.'
+        : 'One year later: your file is the one the district hands new staff as the example. You took two weeks off after it, and you were right to.');
+    } else if (rating === 'mixed') {
+      lines.push(conduct.taken > 0
+        ? 'One year later: the file closed and most of it holds up. There is one folder you hope nobody asks for.'
+        : 'One year later: the file closed, but the district still reads everything with your name on it twice.');
+    } else {
+      lines.push(conduct.caught > 0
+        ? 'One year later: the file closed, and so did the finding with your name on it. You still flinch when the phone rings after 5pm.'
+        : 'One year later: the file closed. Nobody has pulled the folders yet, and you still flinch when the phone rings after 5pm.');
+    }
+  } else if (rating === 'compromised') {
+    lines.push('One year later: the file is someone else’s now, and so is explaining what is in it. Your name still comes up, not the way you wanted.');
   } else if (stress >= 70) {
     lines.push('One year later: you took the winter off. The forest didn’t notice, and that turned out to be the lesson.');
   } else {
-    lines.push('One year later: the file is someone else’s problem now, but you kept your field notes. Next time you’ll see it coming.');
+    lines.push('One year later: the file is someone else’s problem now, but you kept your notes. Next time you’ll see it coming.');
   }
   return lines;
 }

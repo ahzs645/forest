@@ -366,8 +366,8 @@
     ]
    },
    {
-    "label": "Offer to halt operations pending review",
-    "outcome": "A dramatic gesture. It costs production but rebuilds trust.",
+    "label": "Offer to pause the block pending review",
+    "outcome": "A real concession. The block's schedule slips, and the trust starts to come back.",
     "effects": {
      "progress": -15,
      "relationships": 15,
@@ -583,7 +583,7 @@
   "options": [
    {
     "label": "Rebuild from field notes",
-    "outcome": "Painful work, but you reconstruct the data. The file loses the day to technical recovery.",
+    "outcome": "Painful work that runs late into the evening, but you reconstruct the data.",
     "spendsDay": true,
     "effects": {
      "timeUsed": 8
@@ -1262,7 +1262,7 @@
   "type": "stakeholder",
   "severity": "moderate",
   "probability": 0.15,
-  "description": "The plan's operating areas overlap several Nations' territories, and it is time to engage. The Crown will consult; how you engage is yours to decide.",
+  "description": "Your operating areas overlap several Nations' territories, and it is time to engage. The Crown will consult; how you engage is yours to decide.",
   "options": [
    {
     "label": "Comprehensive engagement with every Nation, in community",
@@ -1297,7 +1297,7 @@
      "budget": -3500,
      "timeUsed": 3
     },
-    "failureOutcome": "A Nation writes to the district that engagement was inadequate, and the CP stalls while the Crown's consultation restarts from scratch. Every future file with that Nation now starts from documented distrust, and the harvest plan waits on a process you no longer control.",
+    "failureOutcome": "A Nation writes to the district that engagement was inadequate, and the file stalls while the Crown's consultation restarts from scratch. Every future file with that Nation now starts from documented distrust, and the harvest plan waits on a process you no longer control.",
     "failureEffects": {
      "relationships": -12,
      "reputation": -8,
@@ -1927,7 +1927,7 @@
     ]
    },
    {
-    "label": "Push traffic while the paperwork catches up",
+    "label": "Haul on the FSR without the road use permit while the paperwork catches up",
     "outcome": "The paperwork catches up before anyone drives the road with a clipboard. The trucks never stopped, and the file closes as if it was always in order.",
     "effects": {
      "progress": 4,
@@ -1981,7 +1981,9 @@
       "from": "good",
       "to": "bad"
      }
-    ]
+    ],
+    "riskTag": "OFF-BOOK",
+    "reactionTone": "compromised"
    }
   ],
   "roles": [
@@ -1999,7 +2001,7 @@
   "options": [
    {
     "label": "Build the full permit bundle now",
-    "outcome": "It puts a week of paperwork on the team, but the support infrastructure stops undermining the main file.",
+    "outcome": "It is a long afternoon of paperwork on top of the day's work, but the support infrastructure stops undermining the main file.",
     "effects": {
      "timeUsed": 5,
      "compliance": 6,
@@ -2016,8 +2018,8 @@
     }
    },
    {
-    "label": "Use the sites quietly and hope nobody notices",
-    "outcome": "The season ends before anyone flies over with a question. The camp comes out in October and the occupancy question never gets asked.",
+    "label": "Use the sites without the permit and hope nobody notices",
+    "outcome": "Nobody flies over with a question. The camp and helipad sit on Crown land without an authorization, and the occupancy question never gets asked.",
     "effects": {
      "progress": 3,
      "compliance": -8,
@@ -2066,7 +2068,9 @@
       "from": "good",
       "to": "bad"
      }
-    ]
+    ],
+    "riskTag": "OFF-BOOK",
+    "reactionTone": "compromised"
    }
   ],
   "roles": [
@@ -2154,7 +2158,7 @@
   "type": "political",
   "severity": "major",
   "probability": 0.06,
-  "description": "The woodlands VP wants part of your program budget for interface fuel treatment. He has a compelling case and the general manager's ear.",
+  "description": "The woodlands VP wants part of your file's budget for interface fuel treatment. He has a compelling case and the general manager's ear.",
   "options": [
    {
     "label": "Fight it with data and lobbying",
@@ -2165,7 +2169,7 @@
      "politicalCapital": -12,
      "progress": -3
     },
-    "failureOutcome": "The executive sides with woodlands anyway. The line item transfers, the favours are spent for nothing, and you replan the monitoring season around a hole — remembered as the manager who fought and lost.",
+    "failureOutcome": "The executive sides with woodlands anyway. The line item transfers, the favours are spent for nothing, and you replan the file's work around the hole — remembered as the manager who fought and lost.",
     "failureEffects": {
      "timeUsed": 6,
      "budget": -9000,
@@ -2340,7 +2344,7 @@
     ]
    },
    {
-    "label": "Quietly bury it",
+    "label": "Quietly bury the allegation",
     "outcome": "You file the letter where letters go to be forgotten, and nothing follows. The blocks stay signed off, the contractor keeps planting, and only you know the drawer it lives in.",
     "effects": {
      "compliance": -10,
@@ -2396,7 +2400,9 @@
     ],
     "partialFlags": [
      "reviewer_watching"
-    ]
+    ],
+    "riskTag": "OFF-BOOK",
+    "reactionTone": "compromised"
    },
    {
     "label": "Report it to the district and C&E",
@@ -3008,7 +3014,7 @@
    },
    {
     "label": "Celebrate briefly and refocus on the backlog",
-    "outcome": "You have cake, say congrats, then remind everyone about the 50 referrals still pending. The mood deflates slightly.",
+    "outcome": "You have cake, say congrats, then remind everyone about the referrals still pending. The mood deflates slightly.",
     "effects": {
      "timeUsed": 1,
      "crew_morale": 5,
@@ -3219,11 +3225,11 @@
   "type": "technical",
   "severity": "major",
   "probability": 0.04,
-  "description": "Fire weather is extreme. A wildfire 30 km from your active cutblock is growing. Evacuation hasn't been ordered yet, but the wind forecast is bad.",
+  "description": "Fire weather is extreme. A wildfire 30 km from the licensee's active blocks is growing. Evacuation hasn't been ordered yet, but the wind forecast is bad.",
   "options": [
    {
-    "label": "Preemptively shut down operations and evacuate",
-    "outcome": "You pull everyone out a day before the order comes. The fire turns and misses the block — the call was right, and people will still question it at budget time.",
+    "label": "Get the contractors' crews off the block ahead of the order",
+    "outcome": "The crews are off the block a day before the order comes. The fire turns and misses the block — the call was right, and people will still question it at budget time.",
     "effects": {
      "progress": -15,
      "budget": -3000,
@@ -3286,7 +3292,7 @@
    },
    {
     "label": "Ask BCWS for direction on the work window",
-    "outcome": "By the time the fire centre calls back, you've lost a full day waiting. The direction is to continue under the danger-class restrictions already in force. You could have read that off the DGR board.",
+    "outcome": "You spend the afternoon on hold for the fire centre. The direction, when it comes, is to continue under the danger-class restrictions already in force. You could have read that off the DGR board.",
     "effects": {
      "timeUsed": 8,
      "progress": -5,
@@ -3342,7 +3348,7 @@
   "type": "political",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "The Environmental Assessment Office writes to say the road-and-block package may be a reviewable project under the Reviewable Projects Regulation. The district has paused the road permit until it is settled.",
+  "description": "The Environmental Assessment Office writes to say the road-and-block package may be a reviewable project under the Reviewable Projects Regulation. The district has paused the package until it is settled.",
   "options": [
    {
     "label": "Concede and file the project notification with the EAO",
@@ -3507,11 +3513,11 @@
   "type": "technical",
   "severity": "moderate",
   "probability": 0.07,
-  "description": "The large-format plotter that prints your operational maps just died. Repair estimate: two weeks. A replacement would be faster but costs $12,000. You have permit submissions due in four days.",
+  "description": "The large-format plotter that prints your operational maps just died. Repair estimate: two weeks. A replacement would be faster but costs $12,000. You have map packages due at the district in four days.",
   "options": [
    {
     "label": "Buy a replacement immediately",
-    "outcome": "New plotter arrives in two days. Maps printed, permits submitted on time. Finance asks pointed questions about unbudgeted capital purchases.",
+    "outcome": "New plotter arrives in two days. Maps printed, packages in on time. Finance asks pointed questions about unbudgeted capital purchases.",
     "effects": {
      "budget": -12000,
      "compliance": 5,
@@ -3529,12 +3535,12 @@
    },
    {
     "label": "Submit digital-only and request accommodation",
-    "outcome": "The district accepts digital maps, reluctantly, and notes the precedent they did not want to set. The permits go in on time.",
+    "outcome": "The district accepts digital maps, reluctantly, and notes the precedent they did not want to set. The packages go in on time.",
     "effects": {
      "compliance": -3,
      "politicalCapital": -5
     },
-    "failureOutcome": "Refused — hard copies or nothing. You are now four days from deadline with no plotter, paying the print shop rush rate anyway, and the permits go in late with the delay marked in your file.",
+    "failureOutcome": "Refused — hard copies or nothing. You are now four days from deadline with no plotter, paying the print shop rush rate anyway, and the packages go in late with the delay marked in your file.",
     "failureEffects": {
      "compliance": -8,
      "politicalCapital": -6,
@@ -3579,7 +3585,7 @@
   "type": "compliance",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "A note slipped under your door reports illegal hunting in one of your active cutblocks. The description matches a vehicle belonging to a contractor's crew member.",
+  "description": "A note slipped under your door reports illegal hunting in one of the blocks on your file. The description matches a vehicle belonging to a contractor's crew member.",
   "options": [
    {
     "label": "Report to Conservation Officer Service",
@@ -3947,7 +3953,7 @@
    },
    {
     "label": "Verify the identification before acting",
-    "outcome": "You send a second biologist. The ID and the nest status are confirmed. You've lost three days but now have bulletproof documentation for whatever you decide next.",
+    "outcome": "You send a second biologist. The ID and the nest status are confirmed. The visit costs the block three days, but you now have bulletproof documentation for whatever you decide next.",
     "effects": {
      "timeUsed": 3,
      "budget": -1500,

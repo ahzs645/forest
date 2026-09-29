@@ -38,11 +38,11 @@ import { runPermittingDay } from '../js/modes/permitting.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
 import { runManagerDay } from '../js/modes/manager.js';
 import { checkEndConditions } from '../js/modes/shared/endConditions.js';
-import { PLANNING_VALUES_FLOOR } from '../js/journey/constants.js';
+import { PLANNING_SCRUTINY_GATE, PLANNING_VALUES_FLOOR } from '../js/journey/constants.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
-import { calculateScore } from '../js/scoring.js';
-import { POLICIES as SILVICULTURE_POLICIES } from './simulate-silviculture-policies.mjs';
+import { calculateScore, rateDeskConduct, summarizeDeskConduct } from '../js/scoring.js';
 import { applyDifficultyMultipliers } from '../js/game/ForestryTrailGame.js';
+import { POLICIES as SILVICULTURE_POLICIES } from './simulate-silviculture-policies.mjs';
 
 const DEFAULT_AREA = 'fraser-plateau';
 const HARD_DAY_CAP = 150;
@@ -379,6 +379,12 @@ function planningPolicy(journey, options, prompt) {
     const admin = pick(options, ['professional_admin']);
     if (admin) return admin;
   }
+  // The District Manager does not decide an exposed file: a competent
+  // planner brings scrutiny back under the gate before filing.
+  if (plan.phase === 'ministerial_approval' && (journey.scrutiny || 0) >= PLANNING_SCRUTINY_GATE) {
+    const review = pick(options, ['compliance_review']);
+    if (review) return review;
+  }
   // Prepare Submission is the step that carries the file across the decision
   // gate; filed early it is $2,200 for a partial lift. Meet the district first.
   const readiness = plan.ministerialConfidence || 0;
@@ -515,6 +521,18 @@ function recklessPermittingPolicy(journey, options, prompt) {
   return pick(options, ['end_day', 'next', 'continue']) || options[0];
 }
 
+/**
+ * Competent on the file, unscrupulous on the calls: every option chipped
+ * OFF-BOOK (a shortcut card's take, an unlawful answer on an ordinary card)
+ * is taken; everything else is the competent policy.
+ */
+function shortcutTaker(policy) {
+  return (journey, options, prompt) => {
+    const offBook = options.find((option) => /\[OFF-BOOK\]/.test(String(option?.label || '')));
+    return offBook || policy(journey, options, prompt);
+  };
+}
+
 const RECKLESS_POLICIES = {
   planning: recklessPlanningPolicy,
   permitting: recklessPermittingPolicy,
@@ -544,6 +562,7 @@ function carefulReconPolicy(journey, options, prompt) {
 
 const ALT_POLICIES = {
   reckless: RECKLESS_POLICIES,
+  shortcuts: { planning: shortcutTaker(planningPolicy), permitting: shortcutTaker(permittingPolicy) },
   careful: { recon: carefulReconPolicy },
   idle: { recon: idleReconPolicy },
 };
@@ -587,7 +606,7 @@ function summarizeState(journey) {
   return '';
 }
 
-export async function simulateRun(roleName, seed, scale, trace = null, { areaId = DEFAULT_AREA, policy = 'competent', difficulty = 'normal' } = {}) {
+export async function simulateRun(roleName, seed, scale, trace = null, { areaId = DEFAULT_AREA, policy = 'competent', difficulty = 'normal', onDay = null } = {}) {
   const role = ROLES[roleName];
   const policyFn = policy === 'competent' ? role.policy : ALT_POLICIES[policy]?.[roleName];
   if (!policyFn) throw new Error(`no ${policy} policy for ${roleName}`);
@@ -620,6 +639,7 @@ export async function simulateRun(roleName, seed, scale, trace = null, { areaId 
         break;
       }
       days += 1;
+      onDay?.(journey);
       outcome = checkEndConditions(journey);
     }
 
@@ -635,6 +655,10 @@ export async function simulateRun(roleName, seed, scale, trace = null, { areaId 
         + (graded.scrutinyPenalty ? `; scrutiny -${graded.scrutinyPenalty}` : ''),
       reason: outcome?.reason || (error ? `error: ${error}` : null),
       state: summarizeState(journey),
+      // How the desk roles conducted the file (js/scoring.js), for the
+      // shortcut and epilogue checks.
+      conduct: journey.protagonist ? rateDeskConduct(summarizeDeskConduct(journey)) : null,
+      scrutiny: Math.round(Number(journey.scrutiny) || 0),
       tally
     };
   });

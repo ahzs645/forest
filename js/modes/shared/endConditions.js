@@ -7,6 +7,7 @@ import { getSurveyedBlockCount } from '../../journey.js';
 import { allPackagesFinalized, getPackagesFinalized, getPackageTarget } from '../../journey/packages.js';
 import { assessSilvicultureProgram } from '../../data/silvicultureProgram.js';
 import { CUT_CONTROL } from '../../data/managerRoles.js';
+import { PLANNING_SCRUTINY_GATE } from '../../journey/constants.js';
 
 /**
  * Whether a FOM's public comment period has closed. Older saves recorded the
@@ -29,7 +30,18 @@ export function isPlanningApprovalReady(journey) {
     (plan.analysisQuality || 0) >= 80 &&
     (plan.stakeholderBuyIn || 0) >= 75 &&
     (plan.ministerialConfidence || 0) >= 80 &&
-    isFomCommentPeriodClosed(journey);
+    isFomCommentPeriodClosed(journey) &&
+    !hasPlanningDecisionHold(journey);
+}
+
+/**
+ * Whether the District Manager is holding the decision: the file's scrutiny
+ * is at the gate, or a regulator has an open file on one of its shortcuts
+ * whose finding has not landed yet (js/modes/planning.js names them).
+ */
+export function hasPlanningDecisionHold(journey) {
+  if ((Number(journey?.scrutiny) || 0) >= PLANNING_SCRUTINY_GATE) return true;
+  return (journey?.temptationMemory?.pendingCatches || []).length > 0;
 }
 
 /**
@@ -214,13 +226,11 @@ export function checkPermittingEndConditions(journey) {
     return { victory: true, reason: 'Every permit the season needed is issued.' };
   }
 
-  // Deadline handling
+  // The deadline is the season's: the mill needs every permit by then. A
+  // four-in-five consolation win meant no desk could lose to the calendar -
+  // a competent one always had twelve of fifteen, and so did a reckless one.
   if (journey.day > journey.deadline) {
-    if (journey.permits.approved >= journey.permits.target * 0.8) {
-      return { victory: true, reason: 'Deadline reached with enough permits issued to keep the mill supplied' };
-    } else {
-      return { gameOver: true, reason: 'Failed to meet deadline' };
-    }
+    return { gameOver: true, reason: `Failed to meet deadline: ${journey.permits.approved} of ${journey.permits.target} permits issued.` };
   }
 
   // Game over: Budget depleted

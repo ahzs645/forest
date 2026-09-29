@@ -249,6 +249,9 @@ export function resolveEvent(journey, event, option) {
     eventTitle: event.title,
     optionLabel: option.label,
     ...(typeof option.chanceSuccess === 'number' ? { band: resolved.band } : {}),
+    // An off-book answer stays on the record as one, so the debrief can read
+    // the run's conduct and not only its meters (js/scoring.js).
+    ...(option.riskTag === 'OFF-BOOK' ? { offBook: true } : {}),
     outcome: outcome || '',
     consequences: messages.filter((message) => message && message !== outcome),
     effects: effects ? { ...effects } : {},
@@ -388,9 +391,13 @@ export function applyEventEffects(journey, authored, messages) {
       } else if (typeof journey.resources?.energy === 'number') {
         journey.resources.energy = clampPercent(journey.resources.energy - strain);
       }
-      messages.push(effects.timeUsed >= 4
-        ? 'That one ate the day around the edges. You get your work done late and tired.'
-        : 'The interruption cuts into the day you had planned.');
+      // Under an hour is not an interruption worth a line: "Ten minutes" on a
+      // note to file used to be followed by the day it had cut into.
+      if (effects.timeUsed >= 4) {
+        messages.push('That one ate the day around the edges. You get your work done late and tired.');
+      } else if (effects.timeUsed >= 1) {
+        messages.push('The interruption cuts into the day you had planned.');
+      }
     }
   }
 

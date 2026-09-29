@@ -459,13 +459,13 @@ function checkFieldEvent(journey, { managerLane = false, rng = Math.random } = {
  * Check for desk events
  */
 function checkDeskEvent(journey, rng = Math.random) {
-  const applicableEvents = filterRecentEvents(
+  const applicableEvents = filterSeenDeskEvents(journey, filterRecentEvents(
     journey,
     getApplicableDeskEvents(journey.currentPhase).filter(
       (event) => eventSupportsJourney(event, journey)
         && eventMatchesJourneyContext(event, journey)
     )
-  );
+  ));
 
   const daysRemaining = Number.isFinite(journey.deadline)
     ? journey.deadline - journey.day
@@ -488,12 +488,34 @@ function checkDeskEvent(journey, rng = Math.random) {
   const difficultyModifier = getDifficultyEventModifier(journey);
   const scrutinyModifier = getScrutinyEventModifier(journey);
 
-  return selectRandomDeskEvent(applicableEvents, {
+  const event = selectRandomDeskEvent(applicableEvents, {
     stressModifier: stressModifier * moraleModifier * difficultyModifier * scrutinyModifier * areaSituation.eventMultiplier,
     crisisMode: daysRemaining < 3,
     typeMultipliers: mergeTypeMultipliers(typeMultipliers, areaSituation.typeMultipliers, discoveryTypeMultipliers),
     rng
   });
+  if (event?.id) rememberDeskEvent(journey, event.id);
+  return event;
+}
+
+/**
+ * A desk run meets each card once. The recent-log cooldown alone let the
+ * same audit, court ruling or EAO letter come back ten days later asking a
+ * question the player had already answered. The memory lives on the journey
+ * (it saves and reloads with it) and only gives way when a run has seen the
+ * whole deck.
+ */
+function filterSeenDeskEvents(journey, events = []) {
+  const seen = new Set(journey?.deskEventMemory?.seenIds || []);
+  if (!seen.size) return events;
+  const fresh = events.filter((event) => event?.id && !seen.has(event.id));
+  return fresh.length ? fresh : events;
+}
+
+function rememberDeskEvent(journey, eventId) {
+  const memory = journey.deskEventMemory || (journey.deskEventMemory = {});
+  if (!Array.isArray(memory.seenIds)) memory.seenIds = [];
+  if (!memory.seenIds.includes(eventId)) memory.seenIds.push(eventId);
 }
 
 function filterRecentEvents(journey, events = []) {
@@ -1306,6 +1328,11 @@ function isSelfProposed(act) {
   return /^yourself/i.test(String(act?.proposer || ''));
 }
 
+/** A desk card from someone who picks up the phone rather than writes. */
+function isProposedByPhone(act) {
+  return /super|dispatcher|foreman|contractor|VP|CFO|manager|buyer|rep|engineer|operator/i.test(String(act?.proposer || ''));
+}
+
 function lowerFirst(text) {
   const value = String(text || '').trim();
   return value.charAt(0).toLowerCase() + value.slice(1);
@@ -1328,7 +1355,7 @@ export function describeTemptation(act, journey, { stage = 'offer', reofferPitch
     label = isDesk ? 'AT YOUR DESK' : 'AT THE TAILGATE';
     lead = `It is 4:45 on a Friday and the thought is yours: “${pitch}”`;
   } else if (isDesk) {
-    const byPhone = /super|dispatcher|foreman|contractor|VP|CFO|manager|buyer|rep|engineer|operator/i.test(String(act?.proposer || ''));
+    const byPhone = isProposedByPhone(act);
     label = byPhone ? 'PHONE CALL' : 'IN THE INBOX';
     lead = byPhone
       ? `${proposer}, on the phone: “${pitch}”`
@@ -1349,7 +1376,9 @@ export function describeTemptation(act, journey, { stage = 'offer', reofferPitch
 function buildRefuseOption(act, journey) {
   const memory = ensureTemptationMemory(journey);
   const isDesk = isDeskTemptationJourney(journey);
-  const deck = isSelfProposed(act) ? REFUSE_OUTCOMES.self : isDesk ? REFUSE_OUTCOMES.desk : REFUSE_OUTCOMES.field;
+  // A phone call is not declined by closing an email.
+  const deskDeck = isProposedByPhone(act) ? REFUSE_OUTCOMES.phone : REFUSE_OUTCOMES.desk;
+  const deck = isSelfProposed(act) ? REFUSE_OUTCOMES.self : isDesk ? deskDeck : REFUSE_OUTCOMES.field;
   const outcome = deck[memory.refuseIndex % deck.length](describeProposer(act, journey));
   memory.refuseIndex += 1;
   return {
@@ -1486,7 +1515,10 @@ export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPena
   const delay = catchDelayFor(act, journey);
   if (delay >= 1) {
     const how = String(act?.catch?.how || '').trim();
-    option.failureOutcome = `It does not hold. ${how} ${sentenceStart(catcher)} has it now, and the determination lands in about ${describeSpan(journey, delay)}.`;
+    // The Forest Practices Board audits, investigates and reports; it does
+    // not decide penalties, so what lands from it is a report.
+    const lands = act?.catch?.by === 'FPB' ? 'its report' : 'the determination';
+    option.failureOutcome = `It does not hold. ${how} ${sentenceStart(catcher)} has it now, and ${lands} lands in about ${describeSpan(journey, delay)}.`;
     option.failureEffects = { scrutiny: 5 };
     option.failureFlags = [watchFlag];
     option.failureFallout = {
@@ -1684,7 +1716,7 @@ export function buildFalloutEvent(entry, journey) {
     cardLabel: isDesk ? 'IN THE INBOX' : 'ON THE RADIO',
     cardMarker: 'FALLOUT',
     description: narrative,
-    stakes: costs ? [`What it costs: ${costs}.`] : [],
+    stakes: costs ? [`${act?.catch?.by === 'FPB' ? 'What answering the Board’s report costs' : 'What it costs'}: ${costs}.`] : [],
     setAsideDescription: SET_ASIDE_DESCRIPTIONS.fallout,
     options: [{
       label: 'Answer for it',

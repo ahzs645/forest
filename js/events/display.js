@@ -304,6 +304,11 @@ function standingChips(effects) {
   return chips;
 }
 
+/** Desk roles with no crew: a morale effect is the protagonist's stress. */
+const DESK_PROTAGONIST_TYPES = new Set(['planning', 'permitting']);
+/** Desk journeys where compliance also moves district goodwill. */
+const COMPLIANCE_MOVES_GOODWILL = new Set(['permitting', 'desk']);
+
 function effectChips(effects, journeyType) {
   const hints = [];
   const option = { effects };
@@ -341,7 +346,14 @@ function effectChips(effects, journeyType) {
       hints.push(option.effects.crew_health > 0 ? `+${option.effects.crew_health} health` : `${option.effects.crew_health} health`);
     }
     if (option.effects.crew_morale !== undefined) {
-      hints.push(option.effects.crew_morale > 0 ? `+${option.effects.crew_morale} morale` : `${option.effects.crew_morale} morale`);
+      // A planner or permitter has no crew: morale lands on your own stress
+      // (js/events/resolution.js), so the chip says stress, sign flipped.
+      if (DESK_PROTAGONIST_TYPES.has(journeyType)) {
+        const stress = -option.effects.crew_morale;
+        if (stress !== 0) hints.push(stress > 0 ? `+${stress} stress` : `${stress} stress`);
+      } else {
+        hints.push(option.effects.crew_morale > 0 ? `+${option.effects.crew_morale} morale` : `${option.effects.crew_morale} morale`);
+      }
     }
 
     if (option.effects.relationships !== undefined) {
@@ -350,11 +362,18 @@ function effectChips(effects, journeyType) {
     if (option.effects.compliance !== undefined) {
       hints.push(option.effects.compliance > 0 ? `+${option.effects.compliance} compliance` : `${option.effects.compliance} compliance`);
     }
-    if (option.effects.politicalCapital !== undefined) {
+    // On a permit desk compliance lands on district goodwill one for one
+    // (js/events/resolution.js applyComplianceEffects), so the goodwill chip
+    // carries both: "+8 compliance" alone hid eight points of goodwill.
+    const complianceGoodwill = COMPLIANCE_MOVES_GOODWILL.has(journeyType) ? Number(option.effects.compliance) || 0 : 0;
+    if (option.effects.politicalCapital !== undefined || complianceGoodwill !== 0) {
       // The outcome line calls it district goodwill on a desk file
       // (js/events/resolution.js describeGoodwillChange); the hint should too.
       const unit = journeyType === 'manager' ? 'capital' : 'goodwill';
-      hints.push(option.effects.politicalCapital > 0 ? `+${option.effects.politicalCapital} ${unit}` : `${option.effects.politicalCapital} ${unit}`);
+      const goodwill = (Number(option.effects.politicalCapital) || 0) + complianceGoodwill;
+      if (goodwill !== 0 || complianceGoodwill === 0) {
+        hints.push(goodwill > 0 ? `+${goodwill} ${unit}` : `${goodwill} ${unit}`);
+      }
     }
 
     if (option.effects.data !== undefined && option.effects.data !== 0) {

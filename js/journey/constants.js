@@ -178,6 +178,12 @@ export const DESK_ACTIONS = {
 export const PLANNING_DECISION_GATE = 80;
 export const PLANNING_PRE_SUBMISSION_CAP = 66;
 /**
+ * The District Manager does not sign a plan whose file is this exposed:
+ * scrutiny at or above this, or a regulator's open file on one of the
+ * plan's own shortcuts, holds the decision until it is dealt with.
+ */
+export const PLANNING_SCRUTINY_GATE = 75;
+/**
  * Every value the plan balances (biodiversity, timber, community, First
  * Nations) has to clear this before the engagement and the submission go
  * ahead: an FSP answers every objective government has set, not only timber.

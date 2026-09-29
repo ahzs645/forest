@@ -44,6 +44,9 @@ const VALID_OPTION_KEYS = new Set([
   'goodSchedulesEvent', 'partialSchedulesEvent', 'failureSchedulesEvent',
   // Flavour tone consumed by js/events/reactions.js.
   'reactionTone',
+  // The option's own chip (OFF-BOOK for an unlawful answer), read by
+  // js/events/display.js formatEventForDisplay.
+  'riskTag',
 ]);
 const VALID_EFFECT_KEYS = new Set([
   'budget', 'fuel', 'food', 'equipment', 'firstAid', 'politicalCapital',
@@ -137,6 +140,9 @@ for (const { pool, event } of ALL) {
 
     for (const key of Object.keys(option)) {
       if (!VALID_OPTION_KEYS.has(key)) errors.push(`${optWhere}: unconsumed option key "${key}"`);
+    }
+    if (option.riskTag !== undefined && !['SAFE', 'RISKY', 'TRADEOFF', 'OFF-BOOK'].includes(option.riskTag)) {
+      errors.push(`${optWhere}: riskTag must be SAFE, RISKY, TRADEOFF or OFF-BOOK`);
     }
     for (const key of Object.keys(option.effects || {})) {
       if (!VALID_EFFECT_KEYS.has(key)) errors.push(`${optWhere}: unconsumed effects key "${key}"`);

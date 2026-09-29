@@ -408,3 +408,19 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
   - CMTs are not redcedar in the north, and the fuel dump drains to waste drums.
   - A fistfight is an incident report.
   - Assorted title and duration contradictions are fixed.
+## 2026-09-29 — Wave 3: planner and permitter residuals (W3-F2)
+
+- **The District Manager's own conditions.** A plan is not signed at scrutiny 75% or more, or while a regulator's open file on one of its shortcuts has not landed. Both show on the mission checklist, in the guidance and in the blocked submission. A District Compliance Review (a day, $900) takes scrutiny down 12.
+- **Closing on conduct.** `summarizeDeskConduct` / `rateDeskConduct` (`js/scoring.js`) read the run's off-book calls, catches, scrutiny, goodwill and report. The epilogue, the approval narratives and a desk integrity charge (noticed -3, caught -8, cap 20) follow them, not stress alone.
+- **Heritage permits.** No District Manager event signs an HCA permit, an issued one releases its CP (no "(Day ?)"), and letters are filtered by permit type (HCA permits get an archaeological-assessment letter, never a VIA).
+- **Desk cards.** No card twice in one run; phone shortcuts are declined by phone; permit-desk chips carry compliance's goodwill; morale chips on a desk read as stress; ten-minute answers do not "cut into the day"; desk copy stops claiming days and crews; cards read ON YOUR DESK; unlawful answers on ordinary cards are OFF-BOOK; the FPB reports, it does not decide penalties; one energy meter.
+- **Set-aside.** On a desk it costs the cheapest lawful answer in full (minor cards too), never the off-book one.
+- **Permit season.** 16 desk days for 15 permits (Greenhorn 19), every permit needed by the deadline; Old Growth reads files harder. `simulate-expeditions.mjs --difficulty all --compare` (new `shortcuts` policy: competent play plus every OFF-BOOK option), 12 seeds × 9 areas, win % before → after:
+
+  | Permitter | Greenhorn | Journeyman | Old Growth |
+  | --- | --- | --- | --- |
+  | competent | 100 → 98 | 100 → 83 | 97 → 65 |
+  | shortcuts | 100 → 99 (grade 97 → 88) | 99 → 84 (97 → 75) | 97 → 66 (96 → 59) |
+  | reckless | 78 → 31 | 44 → 6 | 20 → 5 |
+
+  Planner Journeyman: competent 100 → 100, shortcuts 92 → 89 (grade 91 → 79), reckless 0 → 0.

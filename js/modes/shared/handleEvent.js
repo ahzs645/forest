@@ -66,7 +66,10 @@ export async function handleEvent(game, event, frame = {}) {
   const card = {
     ...content,
     notes: unpaid,
-    label: journey.journeyType === 'manager' && event.reporter ? 'OPS ESCALATION' : content.label,
+    // A planner or permitter has no radio: the day's situation lands on the desk.
+    label: journey.journeyType === 'manager' && event.reporter ? 'OPS ESCALATION'
+      : ['planning', 'permitting'].includes(journey.journeyType) && !event.cardLabel ? 'ON YOUR DESK'
+        : content.label,
     options: [...content.options, ...(frame.extraOptions || [])],
     dayHeader: frame.dayHeader || null,
     statusLine: frame.statusLine || null,
