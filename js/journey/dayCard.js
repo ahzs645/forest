@@ -69,6 +69,8 @@ export const DAY_CARD_CONTEXT = Symbol('day-card-context');
  * @param {string} [card.body]
  * @param {string} [card.whyNow] - why this is landing today
  * @param {string[]} [card.context] - free background, behind "More context"
+ * @param {string[]} [card.notes] - why an option is missing (it costs more
+ *   cash than the crew has), shown under the body
  * @param {string} [card.prompt] - the decision prompt
  * @param {Array} card.options - [{ label, description, tag, value }]
  * @param {Function} [card.onRender] - called before each render (scenes, panes)
@@ -97,6 +99,11 @@ export async function presentDayCard(ui, card = {}) {
     if (card.whyNow) {
       ui.write('');
       ui.write(`Why now: ${card.whyNow}`, 'term-dim');
+    }
+    const notes = (card.notes || []).filter(Boolean);
+    if (notes.length) {
+      ui.write('');
+      for (const note of notes) ui.write(note, 'term-dim');
     }
 
     if (showContext && context.length) {
