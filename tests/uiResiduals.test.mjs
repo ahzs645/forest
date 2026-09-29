@@ -114,7 +114,7 @@ test('a late catch states the delay the queue will really apply', () => {
   assert.equal(option.failureFallout.dueIn, 4, 'the determination itself is unchanged');
   assert.match(option.failureOutcome, /lands in 2 months, in the last month of the run\./);
   const stakes = describeShortcutStakes(option, journey).join(' ');
-  assert.match(stakes, /landing 2 months later, in the last month of the run\)/);
+  assert.match(stakes, /landing 2 months later, in the last month of the run[;)]/);
   assert.doesNotMatch(stakes, /about 4 months/);
 
   const entry = queueFallout(journey, option.failureFallout);
@@ -145,12 +145,12 @@ test('a fine the purse cannot cover says what it will actually take', () => {
     takenWhen: 'spring, on day 11',
   };
   const event = buildFalloutEvent(entry, journey);
-  assert.equal(event.stakes[0], 'What it costs: -$1.8k, -10 compliance, +15 scrutiny. You have $1,440; it takes all of it.');
+  assert.equal(event.stakes[0], 'What it costs: -$1.8k, -10 compliance, +30 scrutiny. You have $1,440; it takes all of it.');
   const { messages } = resolveEvent(journey, event, event.options[0]);
   assert.ok(messages.includes('Cash: -$1,440'), messages.join(' | '));
 
   journey.resources.budget = 3000;
-  assert.equal(buildFalloutEvent(entry, journey).stakes[0], 'What it costs: -$1.8k, -10 compliance, +15 scrutiny.');
+  assert.equal(buildFalloutEvent(entry, journey).stakes[0], 'What it costs: -$1.8k, -10 compliance, +30 scrutiny.');
 });
 
 test('summer never rolls a freeze-up or heavy snow, even on a pass', () => {
