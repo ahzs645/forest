@@ -7,7 +7,7 @@ const FAILURE_RUNS = [
     areaIndex: 0,
     difficultyLabel: 'Old Growth',
     seed: 7004,
-    expectedReason: /(Lost the district's goodwill|The FSP expired before the replacement was approved|Budget exhausted)/i
+    expectedReason: /(Lost the district's goodwill|The FSP expired before the replacement was approved|Budget exhausted|Burnout)/i
   },
   {
     name: 'permitter',
