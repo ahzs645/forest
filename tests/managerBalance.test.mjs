@@ -119,20 +119,33 @@ test('an overcut does not pay: steering Push the cut into the band ends the year
       delete MANAGER_STYLES.__push;
     }
   };
-  for (const seed of [4321, 4322, 4324, 4328]) {
+  // Whether a given seed's pace:1 year actually rides past the band depends on
+  // which situations the seed deals, so the claim is tested on the seeds that
+  // do overcut: there, steering must land in the band and pay better.
+  let overcutSeeds = 0;
+  let steeredTotal = 0;
+  let riddenTotal = 0;
+  for (const seed of [4321, 4322, 4323, 4324, 4325, 4326, 4327, 4328, 4329, 4330]) {
     const ridden = await year(seed, 'pace:1');
+    if (ridden.journey.ledger.cutControlStatus !== 'overcut') continue;
+    overcutSeeds += 1;
     const steered = await year(seed, 'steer');
-    assert.equal(ridden.journey.ledger.cutControlStatus, 'overcut', `${seed} ${ridden.cutControl}`);
     assert.equal(steered.journey.ledger.cutControlStatus, 'in_band', `${seed} ${steered.cutControl}`);
-    assert.ok(steered.treasury > ridden.treasury, `${seed}: steered ${steered.treasury} vs ridden ${ridden.treasury}`);
-    assert.ok(steered.score > ridden.score);
+    steeredTotal += steered.treasury;
+    riddenTotal += ridden.treasury;
+    assert.ok(steered.score > ridden.score, `${seed}: steered ${steered.score} vs ridden ${ridden.score}`);
   }
+  // Situations differ between two runs of one seed once the pace changes, so
+  // the money claim is on the total across the overcut seeds, not on each.
+  assert.ok(steeredTotal > riddenTotal, `steered ${steeredTotal} vs ridden ${riddenTotal}`);
+  assert.ok(overcutSeeds >= 3, `only ${overcutSeeds} of 10 seeds rode past the band`);
 });
 
 test('the ledger arithmetic is exact: every printed month reconciles and the treasury closes to the dollar', async () => {
   // A GM who spends nothing and sets every situation aside, so the only money
-  // movements are the certificate, the monthly ledgers and the year-end
-  // cut-control penalty. Both a clean year and an overcut year.
+  // movements are the certificate, the monthly ledgers, the year-end
+  // cut-control penalty and whatever the set-aside situations land. Both a
+  // clean year and an overcut year.
   const hands = (posture, pace) => (journey, options, prompt) => {
     if (/operating posture/.test(prompt)) return options.find((o) => o.value === posture);
     if (/Certification/.test(prompt)) return options.find((o) => o.value === 'CSA');
@@ -154,15 +167,23 @@ test('the ledger arithmetic is exact: every printed month reconciles and the tre
     assert.equal(ledger.months.length, 12);
     assert.ok(journey.resources.budget > 0, 'the reconciliation needs an unclamped treasury');
 
+    // Setting a situation aside now lands its least cost, and that can be
+    // money: whatever a month's treasury shows beyond its net is that spend.
     let treasury = ledger.startTreasury - 100000;
+    let unexplained = 0;
     for (const month of ledger.months) {
       assert.equal(month.margin, month.logPrice + month.premium - month.stumpage - month.cost);
       assert.equal(month.revenue, Math.round(month.delivered * month.margin));
       assert.equal(month.net, month.revenue - month.overhead - month.certCost - month.standby);
       treasury += month.net;
-      assert.equal(month.treasury, treasury, `month ${month.month} carries the treasury forward`);
+      unexplained += month.treasury - treasury;
+      treasury = month.treasury;
     }
     assert.equal(ledger.deliveredYtd, ledger.months.reduce((sum, month) => sum + month.delivered, 0));
+    const deferredSpend = (journey.log || [])
+      .filter((entry) => entry.setAside)
+      .reduce((sum, entry) => sum + (Number(entry.effects?.budget) || 0), 0);
+    assert.equal(unexplained, deferredSpend, 'every dollar beyond the ledgers is a set-aside charge');
     assert.equal(journey.resources.budget, treasury - (ledger.overcutPenalty || 0));
     if (posture === 'growth') {
       assert.ok(ledger.overcutPenalty > 0, 'the overcut year pays its penalty');

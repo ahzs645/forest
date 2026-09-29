@@ -33,10 +33,10 @@ test('a generic planning setback is time lost, not a gate unwound', () => {
   assert.equal(journey.plan.ministerialConfidence, 29, 'evacuating for a fire used to wipe DM readiness');
   assert.equal(journey.plan.stakeholderBuyIn, 80);
   assert.ok(journey.protagonist.stress > stressBefore);
-  assert.ok(messages.some((message) => /costs the file time/.test(message)));
+  assert.ok(messages.some((message) => /Lost time on the file/.test(message)));
 
   const [option] = formatEventForDisplay(event, 'planning').options;
-  assert.match(option.hint, /costs the file time/);
+  assert.match(option.hint, /lost time on the file/);
   assert.doesNotMatch(option.hint, /-10 progress/);
 });
 
