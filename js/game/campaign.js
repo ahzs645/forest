@@ -27,9 +27,8 @@ import { drawIssue } from '../engine/content.js';
 import { makeRng } from '../engine/rng.js';
 import { clamp, formatMetricName } from '../engine/shared.js';
 import { applyDifficultyMultipliers } from './ForestryTrailGame.js';
+import { readCampaignSave, saveCampaignState, clearCampaignSave } from './saveLoad.js';
 import { promptSeasonalCard, promptSummaryCard, renderMetricStrip, setExpeditionChromeHidden } from './seasonalAdapter.js';
-
-const CAMPAIGN_SAVE_KEY = 'bcft.campaign.v1';
 
 // One year, four hats, in the order the work actually happens on a licensee's
 // calendar: the spring plant goes in as soon as breakup ends, recon and layout
@@ -124,26 +123,17 @@ function getSeasonJourneyType(season) {
 }
 
 function saveCampaign(state) {
-  try {
-    localStorage.setItem(CAMPAIGN_SAVE_KEY, JSON.stringify(state));
-  } catch { /* storage full/unavailable: play on without persistence */ }
+  saveCampaignState(state);
 }
 
+/** The saved year, or null — also when the save fails its schema check. */
 export function loadCampaign() {
-  try {
-    const raw = localStorage.getItem(CAMPAIGN_SAVE_KEY);
-    if (!raw) return null;
-    const state = JSON.parse(raw);
-    return state?.version === 1 ? state : null;
-  } catch {
-    return null;
-  }
+  const slot = readCampaignSave();
+  return slot.status === 'ok' ? slot.data : null;
 }
 
 export function clearCampaign() {
-  try {
-    localStorage.removeItem(CAMPAIGN_SAVE_KEY);
-  } catch { /* ignore */ }
+  clearCampaignSave();
 }
 
 /** Objective completion 0..1, per deployment type. */
