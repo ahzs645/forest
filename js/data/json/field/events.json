@@ -2018,6 +2018,8 @@
  {
   "id": "story_arc_ancientGrove_stage0",
   "stopKinds": ["block"],
+  "needsOpenPackage": true,
+  "stopKinds": ["block"],
   "title": "Discovery of the Ancient Grove",
   "type": "narrative",
   "severity": "moderate",
@@ -2949,6 +2951,8 @@
  {
   "id": "old_growth_cedar",
   "stopKinds": ["block"],
+  "needsOpenPackage": true,
+  "stopKinds": ["block"],
   "title": "Old-Growth Cedar Grove",
   "type": "discovery",
   "severity": "positive",
@@ -2992,6 +2996,8 @@
  },
  {
   "id": "unmapped_creek",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "title": "Unmapped Creek Crossing",
   "type": "discovery",
   "severity": "minor",
@@ -3067,6 +3073,8 @@
  },
  {
   "id": "historical_survey_markers",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "stopKinds": ["block"],
   "title": "Historical Survey Markers",
   "type": "discovery",
@@ -3628,6 +3636,8 @@
  {
   "id": "wildlife_nesting_area",
   "stopKinds": ["block"],
+  "needsOpenPackage": true,
+  "stopKinds": ["block"],
   "title": "Eagle Nest in the Block",
   "type": "wildlife",
   "severity": "moderate",
@@ -3943,6 +3953,8 @@
  {
   "id": "drone_flyover",
   "stopKinds": ["block"],
+  "needsOpenPackage": true,
+  "stopKinds": ["block"],
   "title": "Drone Flyover Opportunity",
   "type": "equipment",
   "severity": "positive",
@@ -4157,6 +4169,8 @@
  },
  {
   "id": "first_nations_consultation_field",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "title": "An Elder Visits Camp",
   "type": "social",
   "severity": "moderate",
@@ -4168,7 +4182,7 @@
    "options": [
     {
      "label": "Stand the block down and walk it with her",
-     "outcome": "The stewardship forester spends a day among bark-stripped cedars with centuries of history. The cut plan changes; the relationship doesn't have to."
+     "outcome": "The stewardship forester spends a day among bark-stripped trees with centuries of history. The cut plan changes; the relationship doesn't have to."
     },
     {
      "label": "Log the concern and keep the block moving",
@@ -4184,7 +4198,7 @@
   "options": [
    {
     "label": "Stop work and walk the area with her",
-    "outcome": "She shows you bark-stripped cedars with centuries of history. You move the boundary together and flag the CMTs for the site plan.",
+    "outcome": "She shows you trees stripped for bark and cambium generations ago. You move the boundary together and flag the CMTs for the site plan.",
     "effects": {
      "progress": -8,
      "relationships": 15,
@@ -4199,7 +4213,7 @@
      "relationships": -5
     },
     "hiddenOutcome": true,
-    "failureOutcome": "Wednesday the compassman runs line straight through a stand of bark-stripped cedars nobody flagged, because nobody looked, and blazes two of them for the boundary. A fresh blaze in a CMT is a Heritage Conservation Act problem, not a misunderstanding. The office pulls the crew off the block, the Archaeology Branch opens a file, and the Elder does not come back to talk.",
+    "failureOutcome": "Wednesday the compassman runs line straight through a stand of bark-stripped trees nobody flagged, because nobody looked, and blazes two of them for the boundary. A fresh blaze in a CMT is a Heritage Conservation Act problem, not a misunderstanding. The office pulls the crew off the block, the Archaeology Branch opens a file, and the Elder does not come back to talk.",
     "failureEffects": {
      "relationships": -15,
      "compliance": -12,
@@ -4258,6 +4272,8 @@
  },
  {
   "id": "mineral_lick_discovered",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "title": "Natural Mineral Lick",
   "type": "discovery",
   "severity": "minor",
@@ -4503,6 +4519,8 @@
  },
  {
   "id": "boundary_dispute",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "stopKinds": ["block"],
   "title": "Old Ribbon Doesn't Match the Map",
   "type": "terrain",

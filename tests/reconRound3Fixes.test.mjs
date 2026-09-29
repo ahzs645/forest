@@ -17,6 +17,7 @@ import { WEATHER_CONDITIONS, getRandomWeather } from '../js/data/blocks.js';
 import { checkScheduledEvents } from '../js/events.js';
 import { formatOptionTimeCost, optionSpendsDay } from '../js/events/timePolicy.js';
 import { eventSupportsJourney, eventMatchesJourneyContext } from '../js/events/selection.js';
+import { eventFitsStop } from '../js/journey/packages.js';
 
 function withRandom(value, fn) {
   const original = Math.random;
@@ -168,6 +169,39 @@ test('a sudden storm is not lightning over a winter ridge, and sheltering does n
   const shelter = storm.options.find((o) => /Take shelter/.test(o.label));
   assert.equal(optionSpendsDay(storm, shelter, 'recon'), false);
   assert.doesNotMatch(shelter.outcome, /no work gets done/i);
+});
+
+// ── Block cards stay on open blocks ────────────────────────────────────────
+
+test('layout cards stay off waypoints and off blocks whose package is closed', () => {
+  const journey = createReconJourney({ areaId: 'tahltan-highland' });
+  const waypoint = journey.blocks.find((b) => b.kind === 'waypoint');
+  const block = journey.blocks.find((b) => b.kind !== 'waypoint' && b.distance > 0);
+  const layoutCards = ['first_nations_consultation_field', 'boundary_dispute', 'wildlife_nesting_area',
+    'historical_survey_markers', 'unmapped_creek', 'mineral_lick_discovered'];
+  for (const id of layoutCards) {
+    const event = FIELD_EVENTS.find((e) => e.id === id);
+    assert.equal(eventFitsStop(event, waypoint, journey), false, `${id} at ${waypoint.name}`);
+    assert.equal(eventFitsStop(event, block, journey), true, `${id} on an open block`);
+  }
+  journey.reconIntel = { byBlock: { [block.id]: { assessmentComplete: true } } };
+  for (const id of layoutCards) {
+    const event = FIELD_EVENTS.find((e) => e.id === id);
+    assert.equal(eventFitsStop(event, block, journey), false, `${id} after ${block.name} was finalized`);
+    // The selector reads the same gate.
+    journey.currentBlockIndex = journey.blocks.indexOf(block);
+    assert.equal(eventMatchesJourneyContext(event, journey, { currentBlock: block }), false);
+  }
+  // A road card still fits a closed block and a waypoint.
+  const landslide = FIELD_EVENTS.find((e) => e.id === 'landslide');
+  assert.equal(eventFitsStop(landslide, block, journey), true);
+  assert.equal(eventFitsStop(landslide, waypoint, journey), true);
+});
+
+test('the Elder\'s CMTs are not redcedar in the northern interior', () => {
+  const elder = FIELD_EVENTS.find((e) => e.id === 'first_nations_consultation_field');
+  const text = JSON.stringify(elder);
+  assert.doesNotMatch(text, /cedars/);
 });
 
 test('a summer pass can squall but never freezes, and day 1 rolls the role season', () => {

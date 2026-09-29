@@ -401,6 +401,8 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
+    "stopKinds": ["block"],
+    "needsOpenPackage": true,
     "description": "A reconnaissance crew on the karst plateau uncovers a karst cave with cultural features in the planned cutblock.",
     "options": [
       {

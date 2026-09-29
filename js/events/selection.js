@@ -398,7 +398,7 @@ export function eventMatchesJourneyContext(event, journey, options = {}) {
   }
 
   // A card about the block's own ground stays off bridges and staging lots.
-  if (!eventFitsStop(event, options.currentBlock)) return false;
+  if (!eventFitsStop(event, options.currentBlock, journey)) return false;
 
   return true;
 }

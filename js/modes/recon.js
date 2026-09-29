@@ -366,12 +366,14 @@ export function getReconValueSweepProfile(block, journey) {
     wildlife.push('goat and wolverine sign above tree line — a wildlife feature and a note for the biologist');
   }
   if (wildlife.length === 0) {
-    wildlife.push('raptor nest search on the big cottonwoods and a den search on the south aspect');
+    wildlife.push('raptor nest search in the biggest trees on the block and a den search on the south aspect');
   }
 
   // Cultural heritage.
   if (features.has('culturally_modified_trees') || features.has('cedar_harvest')) {
-    cultural.push('bark-stripped cedar (CMTs) — flag, photograph, GPS, do not disturb; AOA/PFR and a referral before the boundary is final');
+    // Redcedar where it grows; inland the stripped trees are pine and spruce.
+    const stripped = features.has('cedar_stand') || features.has('cedar_harvest') ? 'bark-stripped cedar' : 'bark-stripped trees';
+    cultural.push(`${stripped} (CMTs) — flag, photograph, GPS, do not disturb; AOA/PFR and a referral before the boundary is final`);
     tags.add('cultural_hold');
   }
   if (features.has('first_nation') || hazards.has('cultural_protocol')) {
