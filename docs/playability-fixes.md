@@ -296,3 +296,22 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Campaign review.** A failed season no longer reads "the crew was still delivering" or "production stayed high".
 - **Browser suite.** The campaign spec's bot looped on the new release confirmation, picking "Choose another method — Back to…" every time, and never reached recon travel. Travel itself was fine: it stops at its named destination and says so. A rounding flake (about 1 run in 100) in the 7.5 km arrival-snap unit test is fixed.
 - **Checks.** `npm test` 837/837, Playwright 142/142. Gates: recon, planning, permitting, silviculture and GM 8/8 in every area (72/72 each); silviculture 24/24 at full length; every role 8/8 at campaign scale; GM honest 30/30 on normal. `sim:seasonal` is unchanged from the merge base. `simulate-campaign` good play: 7 Outstanding, 28 Solid, 1 Mixed of 36. The silviculture "release 99% of 260 ha" loss did not reproduce at this head: 270/270 across 9 areas × 30 seeds, and 162/162 in the policy sim.
+
+## 2026-09-29 — Wave 3: General Manager (W3-C)
+
+- **Ledger hooks follow the band.** A hook lands only on the band whose outcome the player read (`js/modes/manager.js` `LEDGER_HOOKS`, `shownBand`). A lost BCTS bid, a refused export permit, a failed surplus test and a counter read as bad faith book nothing. Mediation's curtailment lands only when the processor is pulled. Chips say both sides: "ledger if it lands: …; if not: …".
+- **A card's operations are this month's wood.** Generic `progress` on a GM card no longer moves the ops meter, which scaled the whole licence's run rate (one +8 was +18,424 m³). It becomes ±250 m³ a point on this month's deliveries, capped at 2,500 m³, and shows on the chip, the "Ledger:" line and the Delivered line. A shortcut's operations are paid as margin at today's rate, so the gain chip, the stakes and the applied budget agree, and the resolver's progress-scrutiny coupling no longer fires for the GM. Strategic decisions that move the ops meter print what they do to December's projection, and the discretionary-spend options show their meter numbers.
+- **Resignations.** When the poaching card's text says the woodlands manager leaves, the seat goes to an acting successor, who carries the posture on the pane, in the quarterly lines and in the epilogue. A generic card's "someone leaves" no longer empties a random executive seat.
+- **Shortcuts the GM cannot be asked.** "Wear Every Hat", "Drop the (Ret)" and "Drop a Tree Near the Blockade" are struck from the GM's draw. No blockade exists in a GM year. The act data is untouched.
+- **Honesty margin.** Board answers are tabled and printed (for example "Reputation +4 -> 54, political capital -2 -> 62, scrutiny +12 -> 48%"). Spin costs more scrutiny: +6 on a sound quarter, +12 on a weak one, +3 for a polished deck. A restated quarter also puts compliance -3 and scrutiny +8 on the file.
+- **Certification is a trade-off.** Premiums are now $0.50, $1 and $2/m³, and annual costs $60k, $90k and $120k (the system plus audits) (`certifications.json`, GM-only). A standard costs more than it earns in the year it is booked. Skipping keeps more cash and avoids audits; certifying earns the grade and reputation.
+- **Sims** (`simulate-manager.mjs`, 30 seeds; median score, median treasury; before → after):
+
+  | Style | Normal | Hard |
+  | --- | --- | --- |
+  | competent | 100, $1.50M → 100, $1.27M | 100, $1.14M → 100, $0.97M |
+  | honest | 94 → 95 | 95 → 95 |
+  | spin | 93 → 90 | 93 → 90 |
+  | reckless | 41, 0/30 → 38, 0/30 | 41, 1/30 → 37, 0/30 |
+
+  Competent vs. the same play with every board spun: 100 vs 96 → 100 vs 92 on normal, and 100 vs 97 → 100 vs 94 on hard. Spin still wins 30/30. Competent with no certificate grades 98 against SFI's 100, and ends $60k richer.
