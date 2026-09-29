@@ -7,9 +7,12 @@
  *
  * This script snapshots a practical set of real cutblock/opening candidates
  * per in-game operating area and enriches each with ecological/context signals.
+ *
+ *   node scripts/generate-planning-block-options.mjs                      # every area
+ *   node scripts/generate-planning-block-options.mjs --areas=kootenay-wetbelt  # one area, merged in
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -67,8 +70,45 @@ const AREA_CONFIGS = [
     name: 'Tahltan Highland',
     bbox4326: [-132.8, 56.3, -128.2, 59.5],
     communities: ['Iskut', 'Dease Lake']
+  },
+  {
+    id: 'vancouver-island-coast',
+    name: 'Vancouver Island Coast',
+    bbox4326: [-125.4, 48.95, -124.0, 49.55],
+    communities: ['Port Alberni', 'Nanaimo'],
+    districts: ['South Island Natural Resource District']
+  },
+  {
+    id: 'kootenay-wetbelt',
+    name: 'Kootenay Wetbelt',
+    bbox4326: [-117.9, 49.0, -116.4, 50.3],
+    communities: ['Nelson', 'Creston'],
+    districts: ['Selkirk Natural Resource District']
+  },
+  {
+    id: 'okanagan-shuswap-drybelt',
+    name: 'Okanagan/Shuswap Drybelt',
+    bbox4326: [-119.9, 49.8, -118.9, 50.9],
+    communities: ['Vernon', 'Salmon Arm'],
+    districts: ['Okanagan Shuswap Natural Resource District']
   }
 ];
+
+/**
+ * `--areas=id,id` regenerates only those areas and merges them into the
+ * existing snapshot, so a refresh of one region does not silently re-date
+ * every other area's blocks.
+ */
+function parseAreaFilter(argv) {
+  const arg = argv.find((value) => value.startsWith('--areas='));
+  if (!arg) return null;
+  const ids = arg.slice('--areas='.length).split(',').map((id) => id.trim()).filter(Boolean);
+  const unknown = ids.filter((id) => !AREA_CONFIGS.some((area) => area.id === id));
+  if (unknown.length) {
+    throw new Error(`Unknown area id(s): ${unknown.join(', ')}`);
+  }
+  return new Set(ids);
+}
 
 const WFS = {
   fta: {
@@ -207,6 +247,8 @@ async function fetchText(url) {
 }
 
 async function fetchFeatures({ baseUrl, typeName, bbox, count = 500, cqlFilter, propertyName }) {
+  // GeoServer takes either BBOX or CQL_FILTER, not both, so a filtered query
+  // carries the bounding box inside the CQL instead.
   const url = buildWfsUrl(baseUrl, {
     service: 'WFS',
     version: '2.0.0',
@@ -215,8 +257,10 @@ async function fetchFeatures({ baseUrl, typeName, bbox, count = 500, cqlFilter, 
     outputFormat: 'application/json',
     srsName: 'EPSG:4326',
     count,
-    bbox: `${bbox[0]},${bbox[1]},${bbox[2]},${bbox[3]},EPSG:4326`,
-    CQL_FILTER: cqlFilter,
+    bbox: cqlFilter ? null : `${bbox[0]},${bbox[1]},${bbox[2]},${bbox[3]},EPSG:4326`,
+    CQL_FILTER: cqlFilter
+      ? `BBOX(GEOMETRY,${bbox[0]},${bbox[1]},${bbox[2]},${bbox[3]},'EPSG:4326') AND (${cqlFilter})`
+      : null,
     propertyName
   });
 
@@ -238,6 +282,25 @@ async function hasFeatureHit({ baseUrl, typeName, bbox, cqlFilter }) {
   const xml = await fetchText(url);
   const match = xml.match(/numberMatched="(\d+)"/);
   return match ? Number(match[1]) > 0 : false;
+}
+
+function quoteList(values) {
+  return values.map((value) => `'${String(value).replace(/'/g, "''")}'`).join(',');
+}
+
+/**
+ * Server-side prefilter for areas whose bounding box crosses busy district
+ * lines (the Island box reaches the Sunshine Coast; the Kootenay box reaches
+ * the Rocky Mountain district). Without it the first 400 features in the box
+ * are mostly retired or out-of-window blocks from the wrong district.
+ */
+function ftaDistrictFilter(districts) {
+  return [
+    `ADMIN_DISTRICT_NAME IN (${quoteList(districts)})`,
+    `LIFE_CYCLE_STATUS_CODE <> 'RETIRED'`,
+    `PLANNED_HARVEST_DATE >= '${toIsoDate(ONE_YEAR_AGO)}'`,
+    `PLANNED_HARVEST_DATE <= '${toIsoDate(FIVE_YEARS_AHEAD)}'`
+  ].join(' AND ');
 }
 
 function pointBbox(point, delta) {
@@ -715,13 +778,15 @@ async function buildAreaOptions(area) {
       baseUrl: WFS.fta.url,
       typeName: WFS.fta.typeName,
       bbox: area.bbox4326,
-      count: 400
+      count: 400,
+      cqlFilter: area.districts ? ftaDistrictFilter(area.districts) : null
     }),
     fetchFeatures({
       baseUrl: WFS.results.url,
       typeName: WFS.results.typeName,
       bbox: area.bbox4326,
-      count: 400
+      count: 400,
+      cqlFilter: area.districts ? `DISTRICT_NAME IN (${quoteList(area.districts)})` : null
     })
   ]);
 
@@ -756,13 +821,34 @@ async function buildAreaOptions(area) {
   };
 }
 
+async function readExistingSnapshot() {
+  try {
+    return JSON.parse(await readFile(OUTPUT_PATH, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 async function main() {
+  const areaFilter = parseAreaFilter(process.argv.slice(2));
+  const existing = areaFilter ? await readExistingSnapshot() : null;
+  const generatedAt = new Date().toISOString();
+  const dataWindow = {
+    oneYearAgo: toIsoDate(ONE_YEAR_AGO),
+    fiveYearsAhead: toIsoDate(FIVE_YEARS_AHEAD)
+  };
   const areaOutputs = {};
 
   for (const area of AREA_CONFIGS) {
+    if (areaFilter && !areaFilter.has(area.id)) {
+      if (existing?.areas?.[area.id]) {
+        areaOutputs[area.id] = existing.areas[area.id];
+      }
+      continue;
+    }
     try {
       const output = await buildAreaOptions(area);
-      areaOutputs[area.id] = output;
+      areaOutputs[area.id] = { ...output, generatedAt, dataWindow };
     } catch (error) {
       console.error(`[${area.id}] failed: ${error.message}`);
       areaOutputs[area.id] = {
@@ -776,12 +862,9 @@ async function main() {
   }
 
   const payload = {
-    generatedAt: new Date().toISOString(),
+    generatedAt: areaFilter && existing?.generatedAt ? existing.generatedAt : generatedAt,
     cadenceDays: BLOCK_SELECTION_CADENCE_DAYS,
-    dataWindow: {
-      oneYearAgo: toIsoDate(ONE_YEAR_AGO),
-      fiveYearsAhead: toIsoDate(FIVE_YEARS_AHEAD)
-    },
+    dataWindow: areaFilter && existing?.dataWindow ? existing.dataWindow : dataWindow,
     sources: {
       plannedCutblocks: 'forest-tenure-cutblock-polygons-fta-4-0',
       untreatedOpenings: 'results-openings-svw',
