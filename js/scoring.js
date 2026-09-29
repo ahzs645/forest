@@ -6,6 +6,7 @@
 import { assessSilvicultureProgram } from './data/silvicultureProgram.js';
 import { summarizeIntegrity } from './modes/silvicultureIntegrity.js';
 import { PLANNING_DECISION_GATE, PLANNING_VALUES_FLOOR } from './journey/constants.js';
+import { getPackageTarget, getPackagesFinalized } from './journey/packages.js';
 
 /**
  * Calculate final score for a completed journey
@@ -21,7 +22,7 @@ export function calculateScore(journey, victory) {
   switch (journey.journeyType) {
     case 'recon':
     case 'field':
-      components.speed = scoreReconSpeed(journey);
+      components.speed = scoreReconSpeed(journey, victory);
       components.crewWelfare = scoreCrewWelfare(journey);
       components.resourceEfficiency = scoreResourceEfficiency(journey);
       components.objectives = scoreReconObjectives(journey, victory);
@@ -78,9 +79,13 @@ export function calculateScore(journey, victory) {
   // A GM's win is already scored inside the components (the cut-control
   // band, the issued certificate, the reputation bar), so the flat bonus is
   // half: at ten it padded every competent year to 100, and the operating
-  // posture and the certificate never showed in the grade.
+  // posture and the certificate never showed in the grade. A recon win
+  // already carries its weight in Objectives (a closed file against a partial
+  // one), so it gets no flat bonus at all: +10 on top put every careful
+  // season at 100/100.
+  const bonusless = journey.journeyType === 'recon' || journey.journeyType === 'field';
   const victoryBonusCap = journey.journeyType === 'manager' ? 5 : 10;
-  const victoryBonus = victory ? Math.min(victoryBonusCap, 100 - baseScore) : 0;
+  const victoryBonus = victory && !bonusless ? Math.min(victoryBonusCap, 100 - baseScore) : 0;
   const scrutinyPenalty = scoreScrutinyPenalty(journey);
   const integrityPenalty = scoreIntegrityPenalty(journey);
   const scoreCap = scoreFailureCap(journey, victory);
@@ -148,17 +153,29 @@ export function getLetterGrade(score) {
 
 // --- Speed Scoring ---
 
-function scoreReconSpeed(journey) {
+/**
+ * Recon pace against the season. Two shifts a package and a shift a leg is a
+ * clean run with nothing going wrong: full marks at or under it, half marks
+ * for a file closed on the last day of the window, a straight line between.
+ * A season that was not delivered earns no Time: collapsing on shift 13 used
+ * to read as the fastest season on record.
+ */
+function scoreReconSpeed(journey, victory = true) {
   const daysUsed = journey.day - 1;
-  // Two shifts a block plus the legs between stops is the competent pace.
   const totalBlocks = journey.blocks?.length || 10;
-  const packages = Number.isFinite(journey.packageTarget) ? journey.packageTarget : totalBlocks;
+  const packages = journey.journeyType === 'recon' ? getPackageTarget(journey) : 0;
   const optimalDays = journey.journeyType === 'recon'
-    ? Math.ceil(packages * 2 + Math.max(0, totalBlocks - 1) * 0.8)
+    ? Math.ceil(packages * 2 + Math.max(0, totalBlocks - 1))
     : Math.ceil(totalBlocks * 0.8);
-  const ratio = optimalDays / Math.max(1, daysUsed);
-  const score = Math.min(100, Math.round(ratio * 80));
-  return { score, label: `${daysUsed} shifts (optimal: ~${optimalDays})` };
+  if (!victory) {
+    return { score: 0, label: `${daysUsed} shifts; season not delivered` };
+  }
+  const deadline = Number.isFinite(journey.deadline) && journey.deadline > optimalDays
+    ? journey.deadline
+    : Math.round(optimalDays * 1.6);
+  const over = Math.max(0, Math.min(1, (daysUsed - optimalDays) / Math.max(1, deadline - optimalDays)));
+  const score = Math.round(100 - over * 50);
+  return { score, label: `${daysUsed} shifts (clean run: ~${optimalDays}, window: ${deadline})` };
 }
 
 // Pace only counts for work that got done: a program that ran out the season
@@ -296,7 +313,8 @@ const DESK_BUDGET_FALLBACK = { silviculture: 380000, planning: 82000, permitting
 
 function scoreResourceEfficiency(journey) {
   const r = journey.resources || {};
-  let score = 50;
+  // A crew that comes home with a margin on every store scores full marks.
+  let score = 60;
 
   const fuelPct = (r.fuel || 0) / startingAmount(journey, 'fuel', 520);
   const foodPct = (r.food || 0) / startingAmount(journey, 'food', 80);
@@ -384,14 +402,21 @@ export function scoreSweetSpot(pct) {
 
 // --- Objectives Scoring ---
 
+// The recon file is its packages. Ground covered without them is driving; a
+// season that closed none of them scores nothing here, however far it got.
 function scoreReconObjectives(journey, victory) {
-  let score = victory ? 70 : 20;
   const progress = journey.totalDistance > 0
-    ? journey.distanceTraveled / journey.totalDistance
+    ? Math.min(1, journey.distanceTraveled / journey.totalDistance)
     : 0;
-  score += Math.round(progress * 30);
-  score = Math.min(100, score);
-  return { score, label: `${Math.round(progress * 100)}% traversed` };
+  if (journey.journeyType !== 'recon') {
+    const score = Math.min(100, (victory ? 70 : 20) + Math.round(progress * 30));
+    return { score, label: `${Math.round(progress * 100)}% traversed` };
+  }
+  const target = getPackageTarget(journey);
+  const closed = getPackagesFinalized(journey);
+  const share = target > 0 ? closed / target : 0;
+  const score = victory ? 100 : Math.round(share * 70);
+  return { score, label: `${closed}/${target} packages, ${Math.round(progress * 100)}% traversed` };
 }
 
 // Every obligation on the program counts: planting and its plots, fill,

@@ -24,8 +24,11 @@ const FAILURE_RUNS = [
     difficultyLabel: 'Old Growth',
     seed: 7000,
     // Any of the field collapses: crew gone, fuel gone, or food gone
-    // (js/journey/fieldMechanics.js).
-    expectedReason: /(ALL CREW LOST|OUT OF FUEL|stranded|NO FOOD)/i
+    // (js/journey/fieldMechanics.js). This bot never leaves the Telkwa
+    // bridge and never buys food, so on this seed the box empties and the
+    // crew drives out (NO FOOD, shift 20) - a starvation collapse, not the
+    // short-rations order that used to walk a supplied crew off the job.
+    expectedReason: /(NO CREW LEFT|OUT OF FUEL|stranded|NO FOOD)/i
   },
   {
     name: 'silviculture',

@@ -56,12 +56,12 @@ export function checkReconEndConditions(journey) {
   // Nobody left in the field. Nobody died — they were flown out, driven out,
   // or walked — but the season cannot be finished from town.
   if (crewBasedMode && activeCrewCount === 0) {
-    return { gameOver: true, reason: 'The crew is off the block: nobody left in the field to finish the season' };
+    return { gameOver: true, reason: 'The crew is off the block: nobody left in the field to finish the season.' };
   }
 
   // Game over: Stranded (no fuel, no food)
   if (journey.resources.fuel <= 0 && journey.resources.food <= 0) {
-    return { gameOver: true, reason: 'Stranded with no supplies' };
+    return { gameOver: true, reason: 'Stranded with no supplies.' };
   }
 
   const lastStopIndex = (journey.blocks?.length || 0) - 1;
@@ -70,7 +70,7 @@ export function checkReconEndConditions(journey) {
       journey.currentBlockIndex >= lastStopIndex &&
       surveyedBlocks < totalBlocks &&
       (journey.resources.fuel <= 0 || journey.resources.equipment <= 0)) {
-    return { gameOver: true, reason: 'Recon package stalled on the final block with no mobility left' };
+    return { gameOver: true, reason: 'Recon package stalled on the final block with no mobility left.' };
   }
 
   // The layout deadline. Checked last so a package finished on the final
@@ -79,7 +79,7 @@ export function checkReconEndConditions(journey) {
   // this branch while the mission pane advertised "Days left", which is why
   // no recon day ever competed with any other day.
   if (Number.isFinite(journey.deadline) && journey.day > journey.deadline) {
-    return { gameOver: true, reason: 'The layout deadline passed with blocks still unassessed — the cutting permit goes in without them' };
+    return { gameOver: true, reason: 'The layout deadline passed with blocks still unassessed — the cutting permit goes in without them.' };
   }
 
   return null;

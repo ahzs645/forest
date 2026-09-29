@@ -30,6 +30,7 @@ import { getAreaSituationMultipliers } from '../data/areaSituations.js';
 import { formatRadioReport } from './display.js';
 import { getDayRng } from './dayRng.js';
 import { getSignableFiles } from '../journey/permitPipeline.js';
+import { actFitsStop, eventFitsStop } from '../journey/packages.js';
 
 /**
  * Chance that an ordinary day carries an event at all.
@@ -391,6 +392,9 @@ export function eventMatchesJourneyContext(event, journey, options = {}) {
     }
   }
 
+  // A card about the block's own ground stays off bridges and staging lots.
+  if (!eventFitsStop(event, options.currentBlock)) return false;
+
   return true;
 }
 
@@ -695,6 +699,8 @@ export function actMatchesTemptationContext(act, journey) {
   }
   if (act.tier === 'comic' && journey?.difficulty === 'hard') return false;
   if (act.onlyWhen === 'scrutinyHigh' && Number(journey?.scrutiny || 0) < 55) return false;
+  const stop = Array.isArray(journey?.blocks) ? journey.blocks[journey.currentBlockIndex] : null;
+  if (!actFitsStop(act, stop)) return false;
   return true;
 }
 

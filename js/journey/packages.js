@@ -76,3 +76,49 @@ export function allPackagesFinalized(journey) {
   const target = getPackageTarget(journey);
   return target > 0 && getPackagesFinalized(journey) >= target;
 }
+
+/**
+ * What kind of stop the crew is standing on: a cutblock or a waypoint.
+ * @param {Object} block
+ * @returns {'block'|'waypoint'|null}
+ */
+export function getStopKind(block) {
+  if (!block) return null;
+  return isPackageBlock(block) ? 'block' : 'waypoint';
+}
+
+/**
+ * Whether a situation authored for a kind of stop fits the one the crew is
+ * on. A card that says "inside the boundary you're flagging" has no business
+ * at a bridge or a staging lot. Content opts in with `stopKinds: ["block"]`;
+ * a card without it fits anywhere, and so does a journey with no stop.
+ * @param {Object} event
+ * @param {Object|null} block - the stop the crew is on
+ * @returns {boolean}
+ */
+export function eventFitsStop(event, block) {
+  const kinds = Array.isArray(event?.stopKinds) ? event.stopKinds : [];
+  const kind = getStopKind(block);
+  if (!kinds.length || !kind) return true;
+  return kinds.includes(kind);
+}
+
+// Layout shortcuts that are about a cutblock's own ground: its boundary, its
+// streams and reserves, its wildlife and cultural features, its plots. Road,
+// crossing and safety shortcuts can be offered anywhere on the traverse.
+const BLOCK_GROUND_ACT_CATEGORIES = new Set([
+  'wildlife', 'boundary', 'cruise', 'archaeology', 'riparian', 'timber-mark', 'professional', 'comic'
+]);
+
+/**
+ * Whether an illegal-act offer fits the stop the crew is on. A recon layout
+ * shortcut on a block's own ground ("an active grizzly den in the middle of
+ * the block") is not offered at a bridge, a camp or a staging lot.
+ * @param {Object} act - an entry of js/data/illegalActs.js
+ * @param {Object|null} block - the stop the crew is on
+ * @returns {boolean}
+ */
+export function actFitsStop(act, block) {
+  if (getStopKind(block) !== 'waypoint') return true;
+  return !(act?.phase === 'layout' && BLOCK_GROUND_ACT_CATEGORIES.has(act?.category));
+}

@@ -21,6 +21,8 @@ const VALID_ROLES = new Set(['planner', 'permitter', 'recce', 'silviculture', 'm
 // Season ids as journey.season.currentSeason carries them (js/season.js);
 // events may gate on them with `seasons: [...]` (eventMatchesJourneyContext).
 const VALID_SEASONS = new Set(['spring', 'summer', 'fall', 'winter']);
+const VALID_STOP_KINDS = new Set(['block', 'waypoint']);
+const VALID_WEATHER_IDS = new Set(['clear', 'overcast', 'light_rain', 'heavy_rain', 'fog', 'light_snow', 'heavy_snow', 'freezing', 'storm']);
 const VALID_JOURNEY_TYPES = new Set(['field', 'recon', 'silviculture', 'desk', 'planning', 'permitting', 'manager']);
 
 // Vocabulary the engine actually consumes (js/events/resolution.js,
@@ -104,6 +106,12 @@ for (const { pool, event } of ALL) {
         if (!VALID_SEASONS.has(season)) errors.push(`${where}: unknown season "${season}"`);
       }
     }
+  }
+  for (const kind of event.stopKinds || []) {
+    if (!VALID_STOP_KINDS.has(kind)) errors.push(`${where}: unknown stop kind "${kind}"`);
+  }
+  for (const weatherId of event.notInWeather || []) {
+    if (!VALID_WEATHER_IDS.has(weatherId)) errors.push(`${where}: unknown weather "${weatherId}" in notInWeather`);
   }
   if (event.expeditionOnly !== undefined && typeof event.expeditionOnly !== 'boolean') {
     errors.push(`${where}: expeditionOnly must be a boolean`);

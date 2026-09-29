@@ -1021,11 +1021,11 @@
   "options": [
    {
     "label": "Call helicopter medevac",
-    "outcome": "The OFA 3 has the bleed controlled and the air ambulance is on the ground within the hour. The bill is steep, but the crew sees that people come before the line.",
+    "outcome": "The OFA 3 has the bleed controlled and the air ambulance is on the ground within the hour. WorkSafeBC picks up the flight; the charter's standby time lands on the crew's card. The crew sees that people come before the line.",
     "effects": {
      "crew_morale": 6,
      "compliance": 2,
-     "budget": -3000
+     "budget": -1200
     },
     "crewEffect": {
      "evacuate": true
@@ -1386,7 +1386,7 @@
    },
    {
     "label": "Turn back and report",
-    "outcome": "Safety first. The office will get a qualified geotech to look at it before anyone drives through.",
+    "outcome": "Safety first. You flag the road closed and call it in. The office will get a qualified geotech to look at it before anyone drives through; nobody goes past the slide before tomorrow.",
     "effects": {
      "progress": -12,
      "progressMode": "turn_back",
@@ -1493,6 +1493,7 @@
  },
  {
   "id": "good_road_conditions",
+  "notInWeather": ["storm", "heavy_rain", "heavy_snow", "fog"],
   "title": "Excellent Road Conditions",
   "type": "terrain",
   "severity": "positive",
@@ -1604,6 +1605,7 @@
  },
  {
   "id": "crew_morale_boost",
+  "notInWeather": ["storm", "heavy_rain", "heavy_snow", "fog"],
   "title": "Beautiful Sunset",
   "type": "morale",
   "severity": "positive",
@@ -2014,6 +2016,7 @@
  },
  {
   "id": "story_arc_ancientGrove_stage0",
+  "stopKinds": ["block"],
   "title": "Discovery of the Ancient Grove",
   "type": "narrative",
   "severity": "moderate",
@@ -2942,6 +2945,7 @@
  },
  {
   "id": "old_growth_cedar",
+  "stopKinds": ["block"],
   "title": "Old-Growth Cedar Grove",
   "type": "discovery",
   "severity": "positive",
@@ -3060,6 +3064,7 @@
  },
  {
   "id": "historical_survey_markers",
+  "stopKinds": ["block"],
   "title": "Historical Survey Markers",
   "type": "discovery",
   "severity": "positive",
@@ -3347,6 +3352,7 @@
    {
     "label": "Stand down until comms are restored; drive to the repeater for the check-in",
     "outcome": "Nobody works in the bush without a check-in procedure. The crew stays in camp on maps and plot cards while the driver runs up to the repeater to check in and order the part. A day mostly lost, and nothing to explain.",
+    "spendsDay": true,
     "effects": {
      "progress": -4,
      "fuel": -4,
@@ -3618,6 +3624,7 @@
  },
  {
   "id": "wildlife_nesting_area",
+  "stopKinds": ["block"],
   "title": "Eagle Nest in the Block",
   "type": "wildlife",
   "severity": "moderate",
@@ -3932,6 +3939,7 @@
  },
  {
   "id": "drone_flyover",
+  "stopKinds": ["block"],
   "title": "Drone Flyover Opportunity",
   "type": "equipment",
   "severity": "positive",
@@ -4492,6 +4500,7 @@
  },
  {
   "id": "boundary_dispute",
+  "stopKinds": ["block"],
   "title": "Old Ribbon Doesn't Match the Map",
   "type": "terrain",
   "severity": "moderate",

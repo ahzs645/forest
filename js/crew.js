@@ -217,6 +217,29 @@ export function evacuateCrewMember(member, { day = null, reason = 'injury', mess
 }
 
 /**
+ * Send someone out the moment they carry an injury that is an ETV run (a
+ * fracture, a deep cut: `evacuate` in statusEffects.json), rather than at the
+ * next end-of-shift pass. Returns true when they went.
+ * @param {Object} member
+ * @param {number|null} day
+ * @param {string[]} messages - receives the evacuation line
+ * @returns {boolean}
+ */
+export function evacuateIfInjuryRequires(member, day = null, messages = []) {
+  if (!member?.isActive) return false;
+  const evacuatingEffect = (member.statusEffects || []).find((e) => STATUS_EFFECTS[e.effectId]?.evacuate);
+  if (!evacuatingEffect) return false;
+  const def = STATUS_EFFECTS[evacuatingEffect.effectId];
+  const evac = evacuateCrewMember(member, {
+    day,
+    reason: 'injury',
+    message: `{name}: ${def.description} WorkSafeBC is notified.`
+  });
+  if (evac.message) messages.push(evac.message);
+  return true;
+}
+
+/**
  * Apply a status effect to a crew member
  * @param {Object} member - Crew member
  * @param {string} effectId - Effect ID from STATUS_EFFECTS
@@ -385,15 +408,7 @@ export function processDailyUpdate(member, conditions = {}) {
   }
 
   // A fracture or a deep cut is an ETV run, not a week of rest in camp.
-  const evacuatingEffect = member.statusEffects.find((e) => STATUS_EFFECTS[e.effectId]?.evacuate);
-  if (evacuatingEffect) {
-    const def = STATUS_EFFECTS[evacuatingEffect.effectId];
-    const evac = evacuateCrewMember(member, {
-      day: conditions.currentDay ?? null,
-      reason: 'injury',
-      message: `{name}: ${def.description} WorkSafeBC is notified.`
-    });
-    if (evac.message) messages.push(evac.message);
+  if (evacuateIfInjuryRequires(member, conditions.currentDay ?? null, messages)) {
     return { member, messages };
   }
 

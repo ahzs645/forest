@@ -491,7 +491,7 @@ test('closing the last package on the shift the last hand leaves is still a win'
   for (const member of stalled.crew) evacuateCrewMember(member, { day: 9 });
   withRandom(0.5, () => executeFieldAction(stalled, 'camp_work'));
   assert.equal(stalled.isGameOver, true);
-  assert.match(stalled.gameOverReason, /nobody left in the field/);
+  assert.match(stalled.gameOverReason, /^NO CREW LEFT - 5 were sent out injured or ill\. Nobody is left in the field/);
 });
 
 test('a fed bear is cleaned up from camp and can be reported without losing the shift', async () => {

@@ -209,9 +209,12 @@ export function getCrossingOptions(ctx) {
   if (!ctx) return options;
 
   if (ctx.mode === 'ferry') {
-    options.push(ctx.flood
-      ? { label: 'Radio the ferry operator', description: 'The cable is up in this water. Nobody crosses today.', value: 'ferry' }
-      : { label: 'Wait for the ferry window', description: 'The reaction ferry runs on the current; the trucks go over chained down', value: 'ferry' });
+    // At FLOOD the cable is up (the hold message says so). An option the
+    // operator can only refuse sent the crew round the same prompt forever;
+    // the only move left is to camp on the landing.
+    if (!ctx.flood) {
+      options.push({ label: 'Wait for the ferry window', description: 'The reaction ferry runs on the current; the trucks go over chained down', value: 'ferry' });
+    }
   } else if (ctx.mode === 'bridge') {
     if (ctx.condemned) {
       options.push({ label: 'Look at the bridge', description: 'It is off the list for loaded traffic. Nothing to inspect.', value: 'noop' });

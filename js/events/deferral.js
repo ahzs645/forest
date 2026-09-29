@@ -23,6 +23,7 @@
 
 import { applyEventEffects, describeGoodwillChange, readGoodwill } from './resolution.js';
 import { deriveOptionRiskTag, INVERTED_EFFECT_KEYS, STEEP_EFFECT_THRESHOLDS } from './display.js';
+import { getOptionShortfall } from './affordability.js';
 
 /** Effect keys that are not a cost the day can be charged. */
 const NON_COST_KEYS = new Set(['timeUsed', 'progressMode', 'permits_approved', 'discoveryTags', 'blockSelection']);
@@ -142,11 +143,16 @@ function capDeferredCost(costs, weight, budgetBase) {
  * @param {number} weight
  * @param {Object} [context]
  * @param {number} [context.budgetBase] - the run's starting budget, for the cap
+ * @param {Object} [context.journey] - when given, an option the card left off
+ *   because the crew could not pay for it (js/events/affordability.js) is not
+ *   the cost that lands either: a $3,000 medevac the card never offered
  * @returns {{option: Object, effects: Object, uncapped: Object}|null}
  */
-export function pickDeferredCost(event, weight, { budgetBase } = {}) {
+export function pickDeferredCost(event, weight, { budgetBase, journey = null } = {}) {
   if (!isImposedSituation(event, weight)) return null;
-  const candidates = event.options.map((option, index) => {
+  const payable = journey ? event.options.filter((option) => !getOptionShortfall(journey, option)) : [];
+  const offered = payable.length ? payable : event.options;
+  const candidates = offered.map((option, index) => {
     const costs = expectedCosts(option);
     return {
       option,
@@ -185,7 +191,7 @@ export function applyDeferredSituation(journey, event, { weight, imposedCost = t
     messages.push('You let it pass. Nothing lost but the moment.');
   } else {
     const budgetBase = Number(journey.budgetStart) > 0 ? journey.budgetStart : journey.resources?.budget;
-    const deferred = imposedCost ? pickDeferredCost(event, weight, { budgetBase }) : null;
+    const deferred = imposedCost ? pickDeferredCost(event, weight, { budgetBase, journey }) : null;
     if (deferred) {
       messages.push('You set it aside. It lands anyway — the least of it:');
       applyEventEffects(journey, deferred.effects, messages);

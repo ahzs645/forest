@@ -23,6 +23,11 @@ export function getApplicableFieldEvents(conditions = {}) {
         return false;
       }
     }
+    // A fair-weather card ("the evening sky puts on a show") has no place on
+    // a day the storm grounded.
+    if (Array.isArray(event.notInWeather) && conditions.weather && event.notInWeather.includes(conditions.weather)) {
+      return false;
+    }
     return true;
   });
 }

@@ -48,7 +48,16 @@ export function ensureRouteConstraints(journey) {
   return journey.routeConstraints;
 }
 
-export function addRouteConstraintFromEvent(journey, event) {
+/**
+ * Record an obstruction on the leg ahead.
+ * @param {Object} journey
+ * @param {Object} event - the obstruction situation
+ * @param {Object} [options]
+ * @param {boolean} [options.reported] - the crew already turned back and
+ *   called it in: the road stays shut until the next shift, when the office
+ *   has had it looked at, and there is nothing left to report
+ */
+export function addRouteConstraintFromEvent(journey, event, { reported = false } = {}) {
   if (!journey || !Array.isArray(journey.blocks) || !isRouteObstructionEvent(event)) return null;
   const profile = OBSTRUCTION_EVENT_PROFILES[normalizeEventId(event)];
   const current = getCurrentBlock(journey);
@@ -56,7 +65,13 @@ export function addRouteConstraintFromEvent(journey, event) {
   const constraints = ensureRouteConstraints(journey);
   const id = `${profile.kind}:${current?.id || journey.currentBlockIndex || 0}:${next?.id || 'end'}`;
   const existing = constraints.find((constraint) => constraint.id === id && constraint.status !== 'resolved');
-  if (existing) return existing;
+  if (existing) {
+    if (reported && existing.status === 'active') {
+      existing.status = 'reported';
+      existing.reopensDay = (journey.day || 0) + 1;
+    }
+    return existing;
+  }
 
   const created = {
     id,
@@ -69,20 +84,45 @@ export function addRouteConstraintFromEvent(journey, event) {
     toBlockId: next?.id || null,
     toBlockName: next?.name || 'the next block',
     createdDay: journey.day || 0,
-    status: 'active',
+    status: reported ? 'reported' : 'active',
+    ...(reported ? { reopensDay: (journey.day || 0) + 1 } : {}),
   };
   constraints.push(created);
   return created;
+}
+
+/** Still shut: never dealt with, or reported and not yet reopened. */
+function isBlocking(constraint, journey) {
+  if (constraint?.status === 'active') return true;
+  return constraint?.status === 'reported' && (journey.day || 0) < Number(constraint.reopensDay || 0);
 }
 
 export function getActiveRouteConstraint(journey) {
   const current = getCurrentBlock(journey);
   const next = getNextBlock(journey);
   return ensureRouteConstraints(journey).find((constraint) =>
-    constraint?.status === 'active'
+    isBlocking(constraint, journey)
     && constraint.fromBlockId === (current?.id || null)
     && constraint.toBlockId === (next?.id || null)
   ) || null;
+}
+
+/**
+ * Open the roads the office has now looked at. Returns a line for each, for
+ * the morning the crew hears about it.
+ * @param {Object} journey
+ * @returns {string[]}
+ */
+export function reopenReportedConstraints(journey) {
+  const messages = [];
+  for (const constraint of ensureRouteConstraints(journey)) {
+    if (constraint?.status !== 'reported' || isBlocking(constraint, journey)) continue;
+    constraint.status = 'resolved';
+    constraint.resolvedDay = journey.day || 0;
+    constraint.resolution = 'report';
+    messages.push(`The office has had ${constraint.title.toLowerCase()} looked at. The road to ${constraint.toBlockName} is open again, one lane and slow.`);
+  }
+  return messages;
 }
 
 function applyConstraintEffects(journey, effects = {}) {
@@ -101,7 +141,7 @@ function applyConstraintEffects(journey, effects = {}) {
 
 export function resolveRouteConstraint(journey, constraintId, mode = 'report') {
   const constraint = ensureRouteConstraints(journey).find((entry) =>
-    entry?.id === constraintId && entry.status === 'active'
+    entry?.id === constraintId && isBlocking(entry, journey)
   );
   if (!constraint) {
     return { resolved: false, messages: ['No active route constraint was found.'] };

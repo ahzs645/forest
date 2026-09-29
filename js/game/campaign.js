@@ -16,6 +16,7 @@ import { checkScheduledEvents } from '../events.js';
 import { ensureDaySeed } from '../events/dayRng.js';
 import { checkEndConditions as evaluateEndConditions } from '../modes/shared/endConditions.js';
 import { runReconDay } from '../modes/recon.js';
+import { getFieldThriftContext } from '../journey/fieldMechanics.js';
 import { runSilvicultureDay } from '../modes/silviculture.js';
 import { runPlanningDay } from '../modes/planning.js';
 import { runPermittingDay } from '../modes/permitting.js';
@@ -364,15 +365,21 @@ export function computeSeasonBridge(journey, endResult, startBudget) {
 
   // Thrift only counts for work that got done. An allowance left unspent
   // because the crew starved or the queue sat still is not a saving.
-  const endBudget = Number(journey.resources?.budget ?? 0);
+  // A field crew's shortcut payouts are not savings, and money kept by
+  // starving the crew was paid for by the crew (getFieldThriftContext).
+  const thrift = ['recon', 'field'].includes(journey.journeyType) ? getFieldThriftContext(journey) : null;
+  const endBudget = Number(journey.resources?.budget ?? 0) - (thrift?.illicitCash || 0);
   if (startBudget > 0) {
     const spentFraction = clamp(1 - endBudget / startBudget, 0, 1);
     const raw = 5 - spentFraction * 11;
     const spent = `Spent ${(spentFraction * 100).toFixed(0)}% of the season allowance`;
+    const crewPaid = raw > 0 && thrift && (thrift.hungryShifts > 0 || thrift.quits > 0);
     entries.push({
       metric: 'budget',
-      delta: clamp(Math.round(raw > 0 ? raw * completion : raw), -8, 5),
-      reason: raw > 0 && completion < 0.5 ? `${spent}, with the work it was for undone` : spent,
+      delta: crewPaid ? 0 : clamp(Math.round(raw > 0 ? raw * completion : raw), -8, 5),
+      reason: crewPaid
+        ? `${spent}, saved by a crew that went hungry or walked off`
+        : raw > 0 && completion < 0.5 ? `${spent}, with the work it was for undone` : spent,
     });
   }
 

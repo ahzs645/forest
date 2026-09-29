@@ -118,7 +118,7 @@ export async function handleEvent(game, event, frame = {}) {
     label: 'Acknowledge outcome and continue',
     description: journey.journeyType === 'manager'
       ? 'Back to the month'
-      : spendsDay
+      : (spendsDay || event.heldInCamp)
         ? 'Close the outcome and move to day closeout'
         : 'Return to the day after reviewing the result',
     value: 'continue'
