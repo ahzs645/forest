@@ -12,8 +12,8 @@ import {
 // A modest but representative matrix: every role × every area × every strategy
 // across a handful of seeds. Kept deterministic so the assertions are stable.
 const SEEDS = 8;
-// Re-picked after the Outstanding gate moved to a 67 weighted average.
-const WITNESS_SEED = 1003;
+// Re-picked after dead seasonal issues were made reachable (new draws).
+const WITNESS_SEED = 1006;
 const MATRIX = simulateMatrix({
   roles: listSeasonalRoleIds(),
   areas: listAreaIds(),

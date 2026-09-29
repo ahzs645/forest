@@ -8,6 +8,43 @@ import {
 import { FORESTER_ROLES, OPERATING_AREAS } from '../js/data/index.js';
 import { TuiGameController } from '../tui/controller.js';
 import { makeRng } from '../js/engine/rng.js';
+import {
+  applyRoundConsequences,
+  buildAssignmentCandidates,
+  buildSeasonContext,
+  createInitialState,
+  drawIssue,
+} from '../js/engine.js';
+
+test('pushing a process card through leaves the rushed-package flag for the deficiency notice', () => {
+  const state = createInitialState({ companyName: 'T', roleId: 'permitter', areaId: 'fort-st-john-plateau' });
+  state.round = 2;
+  const context = buildSeasonContext(state);
+  state.currentSeasonContext = context;
+  const processCard = buildAssignmentCandidates(state, context).find((card) => card.sourceFamily === 'process');
+  const aggressive = processCard.options.find((option) => option.stance === 'aggressive');
+  assert.equal(aggressive.setFlags?.rushJob, true);
+
+  state.flags.rushJob = true;
+  const seen = new Set();
+  const rng = makeRng(11);
+  for (let draw = 0; draw < 60; draw += 1) {
+    seen.add(drawIssue(structuredClone(state), rng, { advancePending: false })?.id);
+  }
+  assert.ok(seen.has('permit-deficiency'), 'the deficiency notice should be drawable once its flag is set');
+});
+
+test('a budget run into the ground puts the emergency-loan decision on the desk', () => {
+  const state = createInitialState({ companyName: 'T', roleId: 'planner', areaId: 'kootenay-wetbelt' });
+  state.round = 3;
+  state.metrics.budget = 18;
+  applyRoundConsequences(state);
+  assert.equal(state.flags.budgetEmergencyScheduled, true);
+
+  state.metrics.budget = 60;
+  applyRoundConsequences(state);
+  assert.equal(state.flags.budgetEmergencyScheduled, undefined);
+});
 
 test('advancing a paperwork chain moves the stored stage, not a stale copy', () => {
   const planner = FORESTER_ROLES.find((role) => role.id === 'planner');

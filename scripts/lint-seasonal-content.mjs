@@ -2,8 +2,8 @@
 
 // Seasonal content guardrails. Protects the engine from authored content that
 // would quietly break it: malformed cards/options, unresolved scheduled-issue
-// ids, missing stances on generated assignment options, banned terminology, and
-// thin role/area coverage.
+// ids, missing stances on generated assignment options, banned terminology,
+// thin role/area coverage, and issues or fallout targets that can never surface.
 //
 //   node scripts/lint-seasonal-content.mjs
 //
@@ -19,10 +19,22 @@ import {
   FIELD_EVENTS,
   ILLEGAL_ACTS,
 } from "../js/data/index.js";
-import { createInitialState, buildSeasonContext } from "../js/engine.js";
-import { buildAssignmentCandidates } from "../js/engine/assignments.js";
+import { actFitsRole } from "../js/data/illegalActs.js";
+import {
+  SEASONS,
+  adaptIllegalActTemptation,
+  buildScheduledIssueTeaser,
+  buildSeasonContext,
+  createInitialState,
+} from "../js/engine.js";
+import { ASSIGNMENT_FLAG_PRODUCERS, buildAssignmentCandidates } from "../js/engine/assignments.js";
+import { actMatchesSeasonalTemptationContext } from "../js/engine/content.js";
+import { SEASON_CONTEXT_FLAGS } from "../js/engine/context.js";
+import { ROUND_CONSEQUENCE_FLAGS } from "../js/engine/effects.js";
 import {
   getSeasonalPlayableRoles,
+  matchesAreaContext,
+  matchesAreaIds,
   validateSeasonalCardContract,
   listTerminologyGuardrailViolations,
 } from "../js/engine/seasonalContract.js";
@@ -143,7 +155,118 @@ export function lintSeasonalContent() {
     if (count < MIN_ROLE_ISSUES) warn(`coverage:${role.id}`, `only ${count} eligible issues (< ${MIN_ROLE_ISSUES})`);
   }
 
+  // 6. Reachability: every issue can surface somewhere, and every scheduled or
+  // caught-shortcut fallout target can land. Dead cards used to hide here
+  // (areaTags no operating area carries, flags nothing sets) and a pending
+  // issue whose candidates all fail the area gate is dropped silently.
+  lintReachability(allIssues, err);
+
   return { errors, warnings };
+}
+
+const SEASON_ROUNDS = [1, 2, 3, 4];
+// Shortcut offers start in the second season (content.js calculateTemptationChance).
+const TEMPTATION_ROUNDS = [2, 3, 4];
+
+function issueFitsPlace(issue, roleId, area, round) {
+  if (!issue?.roles?.includes(roleId)) return false;
+  if (issue.seasonLock && issue.seasonBias?.length && !issue.seasonBias.includes(SEASONS[round - 1])) return false;
+  if (!matchesAreaIds(issue, area.id)) return false;
+  return !issue.areaTags?.length || matchesAreaContext(issue.areaTags, area.tags || []);
+}
+
+function issueFitsAnywhere(issue, roleIds) {
+  return roleIds.some((roleId) => OPERATING_AREAS.some((area) => SEASON_ROUNDS.some((round) => issueFitsPlace(issue, roleId, area, round))));
+}
+
+function collectOptionFlags(option, into) {
+  for (const flags of [option?.setFlags, option?.risk?.successFlags, option?.risk?.failFlags]) {
+    for (const [flag, value] of Object.entries(flags || {})) {
+      if (value) into.add(flag);
+    }
+  }
+}
+
+function lintReachability(allIssues, err) {
+  const issueById = new Map(allIssues.map((issue) => [issue.id, issue]));
+  const playableRoleIds = getSeasonalPlayableRoles(FORESTER_ROLES).map((role) => role.id);
+  const knownAreaTags = new Set(OPERATING_AREAS.flatMap((area) => area.tags || []));
+
+  // Flags something in seasonal play can actually set. Legacy role tasks are
+  // left out on purpose: they only surface as a once-a-year fallback card, so
+  // a chain that relies on them is dead in practice.
+  const producedFlags = new Set([...ASSIGNMENT_FLAG_PRODUCERS, ...ROUND_CONSEQUENCE_FLAGS, ...SEASON_CONTEXT_FLAGS]);
+  for (const issue of allIssues) {
+    for (const option of issue.options || []) collectOptionFlags(option, producedFlags);
+  }
+
+  // Caught-shortcut fallout, built exactly as play builds it. Forced candidates
+  // skip flag requirements but not the role/area/season gates.
+  const forcedTargets = new Map();
+  for (const act of ILLEGAL_ACTS) {
+    if (act?.retired) continue;
+    for (const roleId of playableRoleIds.filter((id) => actFitsRole(act, id))) {
+      for (const area of OPERATING_AREAS) {
+        for (const round of TEMPTATION_ROUNDS) {
+          const state = createInitialState({ companyName: "Lint", roleId, areaId: area.id });
+          state.round = round;
+          if (!actMatchesSeasonalTemptationContext(act, state)) continue;
+          const card = adaptIllegalActTemptation(act, state, () => 0.5);
+          const risk = card.options.find((option) => option.risk)?.risk;
+          collectOptionFlags({ risk: { failFlags: risk?.failFlags } }, producedFlags);
+          const schedule = risk?.failScheduleIssues || [];
+          for (const entry of schedule) {
+            for (const candidate of entry.candidates || []) {
+              if (!issueById.has(candidate.id)) {
+                err(`illegal-act:${act.id}`, `caught-band fallout targets unknown issue "${candidate.id}"`);
+                continue;
+              }
+              if (!forcedTargets.has(candidate.id)) forcedTargets.set(candidate.id, new Set());
+              forcedTargets.get(candidate.id).add(roleId);
+            }
+          }
+          if (schedule.length && !buildScheduledIssueTeaser(state, schedule)) {
+            err(`illegal-act:${act.id}`, `caught-band fallout has nowhere to land for ${roleId} in ${area.id} (round ${round})`);
+          }
+        }
+      }
+    }
+  }
+
+  for (const [issueId, roleIds] of forcedTargets) {
+    const issue = issueById.get(issueId);
+    const dead = [...roleIds].filter((roleId) => !issueFitsAnywhere(issue, [roleId]));
+    if (dead.length) err(`issue:${issueId}`, `fallout target can never surface for ${dead.join(", ")}`);
+  }
+
+  for (const issue of allIssues) {
+    const where = `issue:${issue.id}`;
+    const unknownTags = (issue.areaTags || []).filter((tag) => !knownAreaTags.has(tag));
+    if (unknownTags.length) err(where, `areaTags no operating area carries: ${unknownTags.join(", ")}`);
+
+    const roleIds = (issue.roles || []).filter((roleId) => playableRoleIds.includes(roleId));
+    if (!issueFitsAnywhere(issue, roleIds)) {
+      err(where, "can never be drawn: no seasonal role, area and season satisfies its gates");
+      continue;
+    }
+
+    const missingAll = (issue.requiresFlags || []).filter((flag) => !producedFlags.has(flag));
+    const anyFlags = issue.requiresAnyFlags || [];
+    const missingAny = anyFlags.length && !anyFlags.some((flag) => producedFlags.has(flag));
+    if ((missingAll.length || missingAny) && !forcedTargets.has(issue.id)) {
+      const flags = missingAll.length ? missingAll : anyFlags;
+      err(where, `can never be drawn: nothing in seasonal play sets ${flags.join(" / ")}`);
+    }
+
+    for (const [i, option] of (issue.options || []).entries()) {
+      for (const scheduled of collectScheduledIssueIds(option)) {
+        const target = issueById.get(scheduled);
+        if (target && !issueFitsAnywhere(target, roleIds)) {
+          err(where, `option ${i} schedules "${scheduled}", which can never surface for this card's roles`);
+        }
+      }
+    }
+  }
 }
 
 function collectScheduledIssueIds(option) {

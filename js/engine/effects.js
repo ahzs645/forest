@@ -127,6 +127,16 @@ function buildCausedBy(state, source) {
   };
 }
 
+// Flags the end-of-season pass sets, for the content lint's reachability check.
+export const ROUND_CONSEQUENCE_FLAGS = Object.freeze([
+  "lowBudgetStreak",
+  "lowComplianceStreak",
+  "trustDeficitActive",
+  "contractorAttritionActive",
+  "auditEscalationActive",
+  "budgetEmergencyScheduled",
+]);
+
 export function applyRoundConsequences(state) {
   if (!state?.metrics || !state?.flags) {
     return [];
@@ -141,6 +151,14 @@ export function applyRoundConsequences(state) {
     flags.lowBudgetStreak = Number(flags.lowBudgetStreak || 0) + 1;
   } else {
     flags.lowBudgetStreak = 0;
+  }
+
+  // A budget run into the ground puts finance's emergency-loan offer on the
+  // desk (issue "budget-emergency-loan"); a recovered budget takes it back off.
+  if (metrics.budget < BUDGET_ATTRITION_THRESHOLD && !flags.budgetLoanActive) {
+    flags.budgetEmergencyScheduled = true;
+  } else if (metrics.budget >= BUDGET_ATTRITION_THRESHOLD + 10) {
+    delete flags.budgetEmergencyScheduled;
   }
 
   if (metrics.compliance < COMPLIANCE_AUDIT_THRESHOLD) {

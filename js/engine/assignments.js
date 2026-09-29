@@ -238,6 +238,28 @@ const DISCOVERY_FLAG_MAP = {
   regen_gap: { environmentalAudit: true },
 };
 
+// Flags an aggressive generated option leaves behind for the chained issues
+// in js/data/chainedIssues.js: a pushed-through package draws a deficiency
+// notice, a block held against its constraint draws a C&E visit, and laying
+// out past an archaeology screen puts the Nation's checkpoint on the road.
+const AGGRESSIVE_FAMILY_FLAGS = {
+  process: { rushJob: true },
+  planning: { regulatoryScrutiny: true },
+};
+const AGGRESSIVE_CHAIN_FLAGS = {
+  "archaeology-ladder": { culturalTension: true },
+};
+const ROAD_AGGRESSIVE_FLAG_IDS = ["environmentalAudit", "auditTriggered", "regulatoryScrutiny"];
+
+// Every flag a generated assignment option can set, for the content lint's
+// reachability check (scripts/lint-seasonal-content.mjs).
+export const ASSIGNMENT_FLAG_PRODUCERS = Object.freeze([...new Set([
+  ...Object.values(DISCOVERY_FLAG_MAP).flatMap((flags) => Object.keys(flags)),
+  ...Object.values(AGGRESSIVE_FAMILY_FLAGS).flatMap((flags) => Object.keys(flags)),
+  ...Object.values(AGGRESSIVE_CHAIN_FLAGS).flatMap((flags) => Object.keys(flags)),
+  ...ROAD_AGGRESSIVE_FLAG_IDS,
+])]);
+
 // Paperwork chains are real processes with real stages; the generic "Patch
 // only the hot spots" template read as nonsense on an AOA card. Each stage
 // carries its own three labels (cautious / balanced / aggressive) and keeps
@@ -460,6 +482,16 @@ function buildAssignmentOptions(candidate) {
 
     if ((candidate.sourceFamily === "road" || candidate.sourceFamily === "discovery") && template.stance === "aggressive") {
       option.setFlags = { ...(candidate.aggressiveFlags || {}) };
+    }
+
+    if (template.stance === "aggressive") {
+      const flags = {
+        ...(AGGRESSIVE_FAMILY_FLAGS[candidate.sourceFamily] || {}),
+        ...(AGGRESSIVE_CHAIN_FLAGS[candidate.paperworkChainId] || {}),
+      };
+      if (Object.keys(flags).length) {
+        option.setFlags = { ...(option.setFlags || {}), ...flags };
+      }
     }
 
     return option;

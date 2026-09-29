@@ -250,6 +250,12 @@ export function scoreIssueSelection(issue, state, context) {
   if (issue.priorityFlag && state.flags?.[issue.priorityFlag]) {
     weight += 3;
   }
+  // A card gated on flags is the follow-up to something the player chose; at
+  // base weight it sank in a pool of ~40 eligible cards and the chain rarely
+  // paid off. Once its gate is open it should be a likely draw.
+  if (issue.requiresFlags?.length || issue.requiresAnyFlags?.length) {
+    weight += 3;
+  }
   const roleCount = Array.isArray(issue.roles) && issue.roles.length ? issue.roles.length : 4;
   if (roleCount === 1) {
     weight *= 1.6;
@@ -1494,6 +1500,9 @@ const FALLOUT_BY_INSTITUTION = {
     add("environmental-audit-fallout", 3.5, { forestHealth: 3, compliance: 2 });
     add("water-licensee-formal-complaint", 2.5, { relationships: 2, compliance: 1.5 });
     add("community-water-warning", 2, { relationships: 2 });
+    // Away from community watersheds the water cards cannot land; enforcement
+    // attention is the fallout that follows a caught spill anywhere.
+    add("compliance-drone-sweep", 1.5, { compliance: 2 });
   },
   DFO: (roleId, category, add) => {
     add("riparian-reclassification-call", 3.5, { forestHealth: 3, compliance: 2 });
