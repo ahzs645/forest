@@ -11,6 +11,12 @@
  *   node scripts/simulate-expeditions.mjs                  # all roles, full length
  *   node scripts/simulate-expeditions.mjs --scale campaign # campaign-season deployments
  *   node scripts/simulate-expeditions.mjs --role recon --runs 12 --verbose
+ *   node scripts/simulate-expeditions.mjs --role planning --area all --compare
+ *
+ * --area picks the operating area (an id, or `all` for every area). --policy
+ * reckless swaps in a player who cuts every corner (planner and permitter
+ * only), and --compare runs both side by side with the mean grade, which is
+ * how the desk roles are checked to separate good play from bad everywhere.
  *
  * Exits non-zero when a role's win rate falls under --min-win-rate, so it can
  * gate a rebalance.
@@ -29,12 +35,15 @@ import { runPermittingDay } from '../js/modes/permitting.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
 import { runManagerDay } from '../js/modes/manager.js';
 import { checkEndConditions } from '../js/modes/shared/endConditions.js';
+import { PLANNING_VALUES_FLOOR } from '../js/journey/constants.js';
+import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
+import { calculateScore } from '../js/scoring.js';
 
 const DEFAULT_AREA = 'fraser-plateau';
 const HARD_DAY_CAP = 150;
 
 function parseArgs(argv) {
-  const args = { runs: 8, scale: undefined, role: null, verbose: false, minWinRate: 0 };
+  const args = { runs: 8, scale: undefined, role: null, verbose: false, minWinRate: 0, area: DEFAULT_AREA, policy: 'competent', compare: false };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--runs') args.runs = Number(argv[++i]);
@@ -43,6 +52,9 @@ function parseArgs(argv) {
     else if (flag === '--verbose') args.verbose = true;
     else if (flag === '--transcript') args.transcript = true;
     else if (flag === '--min-win-rate') args.minWinRate = Number(argv[++i]);
+    else if (flag === '--area') args.area = argv[++i];
+    else if (flag === '--policy') args.policy = argv[++i];
+    else if (flag === '--compare') args.compare = true;
   }
   return args;
 }
@@ -301,6 +313,19 @@ function planningPolicy(journey, options, prompt) {
       : ['network', 'email', 'rest'];
     return pick(options, wanted) || options[0];
   }
+  // The workshop: write up whichever objective the draft is thinnest on.
+  if (options.some((option) => option.value === 'values_back')) {
+    const focus = { biodiversity: 'bio', timberSupply: 'timber_v', communityNeeds: 'community', firstNationsValues: 'fn' };
+    const [weakest] = Object.entries(journey.values || {}).sort((a, b) => a[1] - b[1]);
+    return pick(options, [focus[weakest?.[0]], 'balanced']) || options[0];
+  }
+  // An objective the draft does not answer blocks the engagement and the
+  // submission, and costs the file every day: answer it first.
+  const values = Object.values(journey.values || {});
+  if (values.length && Math.min(...values) < PLANNING_VALUES_FLOOR) {
+    const workshop = pick(options, ['values']);
+    if (workshop) return workshop;
+  }
   // The FOM comment period is the long pole: publish the map the day it is
   // allowed, keep answering comments while it runs, and republish when the
   // comments come back. Nothing reaches the District Manager without it.
@@ -465,6 +490,43 @@ function managerPolicy(journey, options) {
   ]);
 }
 
+// ── Reckless policies (desk roles) ─────────────────────────────────────────
+// The player the grade has to catch: declines every situation, files before
+// the district is ready, runs the file timber-first, never answers the FOM
+// comments or looks after the professional file, and fast-tracks every letter.
+
+function recklessPlanningPolicy(journey, options, prompt) {
+  if (prompt === 'Constraint triage:') return pick(options, ['timber']) || options[0];
+  if (prompt === 'Select the lead block:') return options[0];
+  const setAside = pick(options, ['set_aside']);
+  if (setAside) return setAside;
+  if (options.some((option) => option.value === 'values_back')) return pick(options, ['timber_v']) || options[0];
+  if (options.some((option) => option.value === 'desk_back')) return pick(options, ['network']) || options[0];
+  const fom = journey.blockPlanning?.fom || {};
+  const wanted = ['submit'];
+  if (fom.status === 'draft') wanted.push('fom_review');
+  if ((journey.day || 1) % 4 === 0) wanted.push('timber');
+  wanted.push('gather_data', 'analyze', 'stakeholder', 'outreach', 'timber', 'end', 'next', 'continue');
+  return pick(options, wanted) || options[0];
+}
+
+function recklessPermittingPolicy(journey, options, prompt) {
+  if (prompt === 'Who do you meet?') return pick(options, ['ministry']) || options[0];
+  const setAside = pick(options, ['set_aside']);
+  if (setAside) return setAside;
+  if (options.some((option) => option.value === 'support_back')) return pick(options, ['support_back']) || options[0];
+  const fastTrack = options.find((option) => /^revise_permit:.*:fast$/.test(String(option.value)));
+  const queue = pick(options, ['process_permits']);
+  if (queue) return queue;
+  if (fastTrack) return fastTrack;
+  return pick(options, ['end_day', 'next', 'continue']) || options[0];
+}
+
+const RECKLESS_POLICIES = {
+  planning: recklessPlanningPolicy,
+  permitting: recklessPermittingPolicy,
+};
+
 const ROLES = {
   recon: { create: createReconJourney, run: runReconDay, policy: reconPolicy, roleId: 'recce' },
   planning: { create: createPlanningJourney, run: runPlanningDay, policy: planningPolicy, roleId: 'planner' },
@@ -504,13 +566,16 @@ function summarizeState(journey) {
   return '';
 }
 
-export async function simulateRun(roleName, seed, scale, trace = null) {
+export async function simulateRun(roleName, seed, scale, trace = null, { areaId = DEFAULT_AREA, policy = 'competent' } = {}) {
   const role = ROLES[roleName];
+  const policyFn = policy === 'reckless' ? RECKLESS_POLICIES[roleName] : role.policy;
+  if (!policyFn) throw new Error(`no ${policy} policy for ${roleName}`);
   return withSeed(seed, async () => {
-    const journey = role.create({ areaId: DEFAULT_AREA, roleId: role.roleId, scale });
+    const area = OPERATING_AREAS.find((candidate) => candidate.id === areaId) || null;
+    const journey = role.create({ areaId, area, roleId: role.roleId, scale });
     const tally = {};
     const game = {
-      ui: makeUi(journey, role.policy, tally, trace),
+      ui: makeUi(journey, policyFn, tally, trace),
       journey,
       gameOver: false,
       checkpoint() {}
@@ -538,11 +603,62 @@ export async function simulateRun(roleName, seed, scale, trace = null) {
       days,
       deadline: Number.isFinite(journey.deadline) ? journey.deadline : null,
       won: Boolean(outcome?.victory),
+      score: calculateScore(journey, Boolean(outcome?.victory)).totalScore,
       reason: outcome?.reason || (error ? `error: ${error}` : null),
       state: summarizeState(journey),
       tally
     };
   });
+}
+
+/** Print one batch of runs; returns its win rate. */
+function reportRuns(label, results, args) {
+  const wins = results.filter((result) => result.won);
+  const winRate = wins.length / results.length;
+  const winDays = wins.map((result) => result.days).sort((a, b) => a - b);
+  const median = winDays.length ? winDays[Math.floor(winDays.length / 2)] : null;
+  const meanScore = Math.round(results.reduce((sum, result) => sum + result.score, 0) / results.length);
+  const width = Math.max(26, label.length + 1);
+
+  console.log(
+    `${label.padEnd(width)} win ${String(wins.length).padStart(2)}/${results.length}`
+    + `  days ${winDays.length ? `${winDays[0]}-${winDays[winDays.length - 1]} (median ${median})` : '—'}`
+    + `  deadline ${results[0].deadline ?? '—'}  mean grade ${meanScore}`
+  );
+
+  if (args.verbose) {
+    for (const result of results) {
+      const top = Object.entries(result.tally)
+        .sort((a, b) => b[1] - a[1]).slice(0, 6)
+        .map(([key, count]) => `${key}:${count}`).join(' ');
+      console.log(`  seed ${result.seed} days=${result.days} won=${result.won} score=${result.score} ${result.reason || ''}`);
+      console.log(`    ${result.state}`);
+      console.log(`    ${top}`);
+    }
+  } else {
+    const losses = results.filter((result) => !result.won);
+    const reasons = [...new Set(losses.map((result) => result.reason || 'ran out of days'))];
+    if (reasons.length) console.log(`${' '.repeat(width)} losses: ${reasons.join(' | ')}`);
+  }
+
+  // A blind policy reads as a balance regression, so say it out loud. Every
+  // decision the policy failed to recognise was answered by taking the first
+  // option on the list, which is not a competent player and not a measurement
+  // of anything.
+  const blind = results.reduce((sum, result) => sum + (result.tally.__fellThrough || 0), 0);
+  const decisions = results.reduce((sum, result) => sum + (result.tally.__namedDecisions || 0), 0);
+  const blindRate = decisions > 0 ? blind / decisions : 0;
+  if (blind > 0) {
+    const pct = (blindRate * 100).toFixed(1);
+    console.log(`${' '.repeat(width)} POLICY BLIND on ${blind}/${decisions} decisions (${pct}%) — option values likely renamed underneath it`);
+    // Reported, not enforced. Some fall-through is legitimate: block-selection
+    // and triage sub-prompts carry dynamic values (block ids, contractor ids)
+    // that no fixed vocabulary can cover, and taking the first option there is
+    // a reasonable default rather than a bug. The hard guard against a
+    // renamed option is tests/policyVocabulary.test.mjs, which drives the real
+    // modes and names the missing value.
+  }
+  return winRate;
 }
 
 async function main() {
@@ -562,57 +678,28 @@ async function main() {
       console.log(`${roleName.padEnd(26)} skipped: runs an operating year, not a campaign season`);
       continue;
     }
-    const results = [];
-    for (let i = 0; i < args.runs; i += 1) {
-      results.push(await simulateRun(roleName, 1000 + i * 37, args.scale, args.transcript ? console.log : null));
-    }
-
-    const wins = results.filter((result) => result.won);
-    const winRate = wins.length / results.length;
-    const winDays = wins.map((result) => result.days).sort((a, b) => a - b);
-    const median = winDays.length ? winDays[Math.floor(winDays.length / 2)] : null;
-    const label = `${roleName}${args.scale ? ` (${args.scale})` : ''}`;
-
-    console.log(
-      `${label.padEnd(26)} win ${String(wins.length).padStart(2)}/${results.length}`
-      + `  days ${winDays.length ? `${winDays[0]}-${winDays[winDays.length - 1]} (median ${median})` : '—'}`
-      + `  deadline ${results[0].deadline ?? '—'}`
-    );
-
-    if (args.verbose) {
-      for (const result of results) {
-        const top = Object.entries(result.tally)
-          .sort((a, b) => b[1] - a[1]).slice(0, 6)
-          .map(([key, count]) => `${key}:${count}`).join(' ');
-        console.log(`  seed ${result.seed} days=${result.days} won=${result.won} ${result.reason || ''}`);
-        console.log(`    ${result.state}`);
-        console.log(`    ${top}`);
+    const areaIds = args.area === 'all' ? OPERATING_AREAS.map((area) => area.id) : [args.area];
+    const policies = args.compare ? ['competent', 'reckless'] : [args.policy];
+    for (const areaId of areaIds) {
+      for (const policy of policies) {
+        if (policy !== 'competent' && !RECKLESS_POLICIES[roleName]) {
+          console.log(`${roleName.padEnd(26)} skipped: no ${policy} policy`);
+          continue;
+        }
+        const results = [];
+        for (let i = 0; i < args.runs; i += 1) {
+          results.push(await simulateRun(roleName, 1000 + i * 37, args.scale, args.transcript ? console.log : null, { areaId, policy }));
+        }
+        const label = [
+          roleName,
+          args.scale ? `(${args.scale})` : null,
+          areaIds.length > 1 || areaId !== DEFAULT_AREA ? areaId : null,
+          policy !== 'competent' || policies.length > 1 ? policy : null,
+        ].filter(Boolean).join(' ');
+        const winRate = reportRuns(label, results, args);
+        if (policy === 'competent' && winRate < args.minWinRate) failed = true;
       }
-    } else {
-      const losses = results.filter((result) => !result.won);
-      const reasons = [...new Set(losses.map((result) => result.reason || 'ran out of days'))];
-      if (reasons.length) console.log(`${' '.repeat(26)} losses: ${reasons.join(' | ')}`);
     }
-
-    // A blind policy reads as a balance regression, so say it out loud. Every
-    // decision the policy failed to recognise was answered by taking the first
-    // option on the list, which is not a competent player and not a measurement
-    // of anything.
-    const blind = results.reduce((sum, result) => sum + (result.tally.__fellThrough || 0), 0);
-    const decisions = results.reduce((sum, result) => sum + (result.tally.__namedDecisions || 0), 0);
-    const blindRate = decisions > 0 ? blind / decisions : 0;
-    if (blind > 0) {
-      const pct = (blindRate * 100).toFixed(1);
-      console.log(`${' '.repeat(26)} POLICY BLIND on ${blind}/${decisions} decisions (${pct}%) — option values likely renamed underneath it`);
-      // Reported, not enforced. Some fall-through is legitimate: block-selection
-      // and triage sub-prompts carry dynamic values (block ids, contractor ids)
-      // that no fixed vocabulary can cover, and taking the first option there is
-      // a reasonable default rather than a bug. The hard guard against a
-      // renamed option is tests/policyVocabulary.test.mjs, which drives the real
-      // modes and names the missing value.
-    }
-
-    if (winRate < args.minWinRate) failed = true;
   }
 
   if (failed) process.exitCode = 1;
