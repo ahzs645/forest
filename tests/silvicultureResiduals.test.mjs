@@ -274,7 +274,7 @@ test('milestones say what is actually delivered', () => {
   for (const block of journey.program.blocks.slice(0, 4)) Object.assign(block, { status: 'inspected', planted: block.trees, quality: 93 });
   journey.planting.blocksPlanted = 4;
   const line = describeSilvicultureMilestone(journey, 50);
-  assert.match(line, /^\*\*\* MILESTONE: Half the program delivered: 4\/8 blocks planted and inspected, fill 0\/2, release not started \(260 ha\), 0\/3 free-growing declarations\. \*\*\*$/);
+  assert.match(line, /^\*\*\* MILESTONE: Half the program delivered, by weight: 4\/8 blocks planted and inspected, fill 0\/2, release not started \(260 ha\), 0\/3 free-growing declarations\. \*\*\*$/);
   assert.doesNotMatch(line, /release moving/);
 });
 

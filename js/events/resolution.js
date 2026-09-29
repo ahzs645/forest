@@ -718,8 +718,13 @@ function applyRelationshipEffects(journey, delta, messages) {
  */
 function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
   let injured = null;
+  // A card fitted to the crew (js/modes/silviculture.js fitEventToCrew) names
+  // who was hurt; the injury and any evacuation land on that person.
+  const named = crewEffect.victimId
+    ? (journey.crew || []).find(m => m.isActive && m.id === crewEffect.victimId) || null
+    : null;
   if (crewEffect.injury) {
-    const victim = pickRandomCrewMember(journey.crew, rng);
+    const victim = named || pickRandomCrewMember(journey.crew, rng);
     if (victim) {
       const result = applyStatusEffect(victim, crewEffect.injury);
       if (result.message) messages.push(result.message);
@@ -766,6 +771,7 @@ function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
     // actually send someone.
     const crew = journey.crew || [];
     const victim = injured
+      || named
       || (crewEffect.injury && crew.find(m => m.isActive && m.statusEffects?.some(e => e.effectId === crewEffect.injury)))
       || (journey.lastEventVictimId && crew.find(m => m.isActive && m.id === journey.lastEventVictimId))
       || crew.find(m => m.isActive && (m.statusEffects?.length || 0) > 0)
@@ -774,7 +780,7 @@ function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
       if (crewEffect.injury && !victim.statusEffects?.some(e => e.effectId === crewEffect.injury)) {
         applyStatusEffect(victim, crewEffect.injury);
       }
-      const evac = evacuateCrewMember(victim, { day: journey.day, reason: 'injury' });
+      const evac = evacuateCrewMember(victim, { day: journey.day, reason: 'injury', message: crewEffect.departure || null });
       if (evac.message) messages.push(evac.message);
     }
   }

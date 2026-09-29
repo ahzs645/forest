@@ -12,10 +12,13 @@
 
 import { checkForEvent } from '../events.js';
 import { getDayRng } from '../events/dayRng.js';
-import { runDaySituation } from '../journey/daySituation.js';
+import { runDaySituation, situationWeight } from '../journey/daySituation.js';
+import { pickDeferredCost } from '../events/deferral.js';
+import { optionSpendsDay } from '../events/timePolicy.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
-import { crewHasRole } from '../crew.js';
+import { crewHasRole, generateCrewMember, hasActiveFirstAidAttendant } from '../crew.js';
+import { SILVICULTURE_CREW_ROLES, SILVICULTURE_REPLACEMENT_COST } from '../data/silvicultureCrewRoles.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
 import { addDiscoveryTags, getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
@@ -114,14 +117,36 @@ function otherContract(journey) {
   return String(journey?.program?.becCode || '').toUpperCase().startsWith('CWH') ? 'up the coast' : 'on the coast';
 }
 
+/**
+ * How long a call stays answered once the fix is paid for: an upgraded camp
+ * stays upgraded, and an inspected kitchen buys ten days before the same bug
+ * can be blamed on it again.
+ */
+const CALL_SETTLED_DAYS = { camp_demand: Infinity, crew_illness: 10 };
+function callSettled(contractor, journey, callId) {
+  const day = contractor?.silvicultureState?.settledCalls?.[callId];
+  return Number.isFinite(day) && journey.day - day < (CALL_SETTLED_DAYS[callId] ?? 0);
+}
+
+/** Whether an outfit still has its own work on the program. */
+function hasWorkLeft(contractor, journey) {
+  const facts = getSilvicultureFacts(journey);
+  if (contractor?.specialty === 'planting') return facts.blocksRemaining > 0 || facts.fillRemaining > 0;
+  if (contractor?.specialty === 'brushing') return facts.releaseQueueRemaining > 0;
+  return facts.surveysRemaining > 0;
+}
+
+/** Odds that keeping a crew on the block through a stand-down hurts someone. */
+export const PUSHED_STAND_DOWN_INCIDENT = 0.25;
+
 export const CONTRACTOR_EVENTS = [
   {
     id: 'camp_demand',
-    trigger: (c) => c.morale < 60,
+    trigger: (c, journey) => c.morale < 60 && !callSettled(c, journey, 'camp_demand'),
     title: 'Camp Conditions',
     getText: (c) => `${possessive(c.name)} foreman calls from the camp: the cook shack water test came back cloudy, the drying tent leaks, and the crew is talking about it. They want the camp brought up before the next shift.`,
     options: [
-      { label: 'Upgrade the camp ($3,000)', description: 'Water, a real drying tent, a second hand-wash station', value: 'pay', cost: 3000, moraleGain: 15, prodGain: 5 },
+      { label: 'Upgrade the camp ($3,000)', description: 'Water, a real drying tent, a second hand-wash station', value: 'pay', cost: 3000, moraleGain: 15, prodGain: 5, settles: ['camp_demand', 'crew_illness'] },
       { label: 'Tell them the camp meets the standard', description: 'It does, on paper', value: 'deny', cost: 0, moraleGain: -15, prodGain: -5 },
     ],
   },
@@ -142,32 +167,32 @@ export const CONTRACTOR_EVENTS = [
   },
   {
     id: 'crew_illness',
-    trigger: (c, journey, rng = Math.random) => rng() < 0.3,
+    trigger: (c, journey, rng = Math.random) => !callSettled(c, journey, 'crew_illness') && rng() < 0.3,
     title: 'Sickness in Camp',
     getText: (c) => (c.specialty === 'survey'
       ? `One of ${possessive(c.name)} surveyors is down with a stomach bug and the other is eating standing up. The foreman thinks it is the water; the cook thinks it is the foreman.`
       : `Several ${crewNoun(c)} from ${c.name} are down with a stomach bug and the rest are eating standing up. The foreman thinks it is the water; the cook thinks it is the foreman.`),
     options: [
-      { label: 'Call a camp inspection ($800)', description: 'Water test, kitchen, hand-wash stations; the crew works a short day', value: 'inspect_camp', cost: 800, moraleGain: 5, prodGain: 0 },
+      { label: 'Call a camp inspection ($800)', description: 'Water test, kitchen, hand-wash stations; the crew works a short day', value: 'inspect_camp', cost: 800, moraleGain: 5, prodGain: 0, settles: ['crew_illness'] },
       { label: 'Stand the camp down for a day', description: (c) => `${{ planting: 'No planting', brushing: 'No saws on the block', survey: 'No plots walked' }[c.specialty] || 'No work'} today; the bug runs its course`, value: 'rest', cost: 0, moraleGain: 8, prodGain: 0 },
       { label: 'Push through', description: (c) => `${{ planting: 'Trees in the ground', brushing: 'Brush cut', survey: 'Plots walked' }[c.specialty] || 'Work done'} either way`, value: 'push', cost: 0, moraleGain: -10, prodGain: -10 },
     ],
   },
   {
     id: 'stand_down',
-    trigger: (c) => c.specialty === 'planting' || c.specialty === 'brushing',
+    trigger: (c, journey) => (c.specialty === 'planting' || c.specialty === 'brushing') && hasWorkLeft(c, journey),
     title: 'Stand-Down Call',
     getText: (c, journey, rng = Math.random) => `${possessive(c.name)} foreman calls a stand-down: ${pickStandDownReason(journey, rng)}. ${c.specialty === 'planting' ? 'Planters plant in rain' : 'Saw crews work in rain'}; this is not rain.`,
     options: [
       { label: 'Back the stand-down', description: 'Crew off the block today; the tailgate meeting covers it tomorrow', value: 'rest', cost: 0, moraleGain: 10, prodGain: 0 },
-      { label: 'Keep them on the block', description: 'Production today; a WorkSafeBC prevention officer would call it differently', value: 'push', cost: 0, moraleGain: -8, prodGain: -5, scrutiny: 1 },
+      { label: 'Keep them on the block', description: `Production today; ${Math.round(PUSHED_STAND_DOWN_INCIDENT * 100)}% someone gets hurt and WorkSafeBC opens a file (scrutiny +6, compliance -4)`, value: 'push', cost: 0, moraleGain: -8, prodGain: -5, scrutiny: 1, incidentRisk: PUSHED_STAND_DOWN_INCIDENT },
     ],
   },
   {
     id: 'reprice',
     trigger: (c) => c.productivity > 85 && c.specialty === 'planting',
     title: 'Contractor Wants to Split the Crew',
-    getText: (c, journey) => `${c.name} has another contract ${otherContract(journey)} starting early. They want to release half the crew to it and re-price the remaining trees on your program at +$0.04/tree for a smaller crew that stays.`,
+    getText: (c, journey) => `${c.name} has another contract ${otherContract(journey)} starting early. They want to release half the crew to it, or keep the whole crew on your program at +$0.04/tree for every tree left.`,
     options: [
       { label: 'Accept the re-price (+$0.04/tree)', description: 'Full crew stays; every tree left in the program costs four cents more', value: 'pay', cost: 0, moraleGain: 10, prodGain: 5, priceLift: 0.04 },
       { label: 'Hold them to the contract price', description: 'Half the crew leaves for the other contract; daily output drops', value: 'wait', cost: 0, moraleGain: -5, prodGain: -10, plantersLost: 0.4 },
@@ -285,22 +310,33 @@ export async function runSilvicultureDay(game) {
   // The day's situation. Day 1 stays event-free so the program loop is
   // legible before disruptions begin.
   const drawn = journey.day > 1 ? checkForEvent(journey) : null;
-  const event = drawn ? adaptEventForProgram(drawn) : null;
+  const event = drawn ? fitEventToCrew(journey, adaptEventForProgram(drawn)) : null;
   if (event) {
     const scrutinyBefore = Number(journey.scrutiny) || 0;
+    const onCrew = (journey.crew || []).filter((member) => member.isActive);
+    const setAsideTakesDay = setAsideCostsTheDay(journey, event);
     const outcome = await runDaySituation(game, event, {
       frame: {
         dayHeader: buildSilvicultureDayHeader(journey),
         statusLine: buildSilvicultureStatusLine(journey),
         onRender: () => updateSilvicultureMissionStatus(ui, journey, seasonInfo, zoneProfile),
       },
-      setAsideDescription: 'Not today. Keep the day for the program.',
+      setAsideDescription: setAsideTakesDay
+        ? 'Not today. It lands anyway: the least of what answering costs, the day included.'
+        : 'Not today. Keep the day for the program.',
     });
     if (outcome.gameOver) return;
     if (outcome.spendsDay) spendDay(journey);
     if (outcome.setAside) {
+      if (setAsideTakesDay) spendDay(journey);
       const scrutinyRise = Math.round((Number(journey.scrutiny) || 0) - scrutinyBefore);
-      silvicultureState.dayNotes.push(`You set aside "${event.title}"${scrutinyRise > 0 ? `; scrutiny +${scrutinyRise}` : ''}.`);
+      silvicultureState.dayNotes.push(`You set aside "${event.title}"${scrutinyRise > 0 ? `; scrutiny +${scrutinyRise}` : ''}${setAsideTakesDay ? '; it took the day anyway' : ''}.`);
+    }
+    const contractorHurt = settleContractorCasualty(journey, event);
+    if (contractorHurt) silvicultureState.dayNotes.push(contractorHurt);
+    for (const member of onCrew) {
+      const lost = member.isActive ? null : describeLostCrewRole(member);
+      if (lost) silvicultureState.dayNotes.push(lost);
     }
     if (settleShortcut(journey, event)) return;
   }
@@ -444,7 +480,9 @@ export function describeSilvicultureMilestone(journey, threshold) {
     release > 0 ? `release ${release}/${releaseTarget} ha` : `release not started (${releaseTarget} ha)`,
     `${fg}/${journey.surveys?.freeGrowingTarget || 0} free-growing declarations`,
   ].filter(Boolean);
-  return `*** MILESTONE: ${MILESTONE_LEADS[threshold] || `${threshold}% of the program delivered`}: ${parts.join(', ')}. ***`;
+  // The threshold is the weighted program (planting counts most), so the
+  // headline says so and the counts beside it say what is done.
+  return `*** MILESTONE: ${MILESTONE_LEADS[threshold] || `${threshold}% of the program delivered`}, by weight: ${parts.join(', ')}. ***`;
 }
 
 // ── Day card ────────────────────────────────────────────────────────────────
@@ -871,15 +909,24 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
 
   // Fill plant (last year's blocks)
   const fillOpening = (program.fill || []).find((opening) => !opening.done);
-  if (fillOpening && !awaitingInspection &&
+  if (fillOpening &&
       plantingEff > 0 &&
       journey.resources.seedlings > 0 &&
       journey.resources.contractorCapacity > 0) {
-    actionOptions.push({
-      label: 'Fill plant (last year\'s blocks)',
-      description: `Top up ${fillOpening.id} (${fillOpening.year}, ${fillOpening.ha} ha) where the year-1 survival survey fell to ${fillOpening.stockedSph} sph against MSS ${fillOpening.mss} - ${fillOpening.trees.toLocaleString()} trees; ${getSilvicultureTaskSummary(journey, zoneProfile, 'fill')}`,
-      value: 'fill'
-    });
+    actionOptions.push(awaitingInspection
+      // The planters wait on the plots before they go anywhere else; the
+      // task stays on the card with the reason instead of vanishing.
+      ? {
+        label: 'Fill plant (last year\'s blocks)',
+        description: `Waits for the quality plots on ${awaitingInspection.id}: the planters go nowhere else until they are walked.`,
+        value: 'fill',
+        disabled: true,
+      }
+      : {
+        label: 'Fill plant (last year\'s blocks)',
+        description: `Top up ${fillOpening.id} (${fillOpening.year}, ${fillOpening.ha} ha) where the year-1 survival survey fell to ${fillOpening.stockedSph} sph against MSS ${fillOpening.mss} - ${fillOpening.trees.toLocaleString()} trees; ${getSilvicultureTaskSummary(journey, zoneProfile, 'fill')}`,
+        value: 'fill'
+      });
   }
 
   // Brush (2–5 year old stands)
@@ -939,6 +986,16 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
     });
   }
 
+  // Someone gone for the season: say what the crew can no longer do, and
+  // offer the way back.
+  for (const role of getVacantCrewRoles(journey)) {
+    actionOptions.push({
+      label: `Bring up a replacement ${role.noun}`,
+      description: `${role.lost} A day on the road to town and ${formatMoney(SILVICULTURE_REPLACEMENT_COST[role.id])}.`,
+      value: `replace:${role.id}`,
+    });
+  }
+
   actionOptions.push({
     label: 'Review the Program Binder',
     description: 'Block records, stocking standard, release queue, contractor economics',
@@ -959,7 +1016,7 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   const hasAccreditedSurveyor = crewHasRole(journey.crew || [], 'surveyor');
   return actionOptions.map((option) => {
     const task = fieldTasks[option.value];
-    if (!task) return option;
+    if (!task || option.disabled) return option;
     if (task === 'survey' && hasAccreditedSurveyor) return option;
     if (getSilvicultureTaskContractors(journey, zoneProfile, task, false).length > 0) return option;
     return { ...option, disabled: true, description: describeCrewWait(journey, zoneProfile, task) };
@@ -1014,6 +1071,11 @@ function describeInspectionTeam(journey) {
 
 async function processAction(game, actionId, currentSeason, seasonMods, silvicultureState, zoneProfile) {
   const { ui, journey } = game;
+
+  if (String(actionId).startsWith('replace:')) {
+    if (handleCrewReplacement(game, String(actionId).slice('replace:'.length))) spendDay(journey);
+    return;
+  }
 
   switch (actionId) {
     case 'plant':
@@ -1082,9 +1144,7 @@ async function handlePlanting(game, seasonMods, silvicultureState, zoneProfile) 
     return false;
   }
 
-  const taskContractors = getSilvicultureTaskContractors(journey, pressure, 'plant', true, ui);
-  const planters = taskContractors.filter((c) => c.specialty === 'planting');
-  const crew = planters.length ? planters : taskContractors;
+  const crew = getSilvicultureTaskContractors(journey, pressure, 'plant', true, ui);
   if (crew.length === 0) {
     ui.writeWarning('No planting contractor is available. Put an available crew on the block first.');
     return false;
@@ -1167,10 +1227,7 @@ function estimatePlantingOutput(crew, pressure, plantingEff) {
   for (const contractor of crew) {
     const fit = getSilvicultureContractorFit(contractor, pressure, 'plant');
     const planters = Number(contractor.planters) || Number(contractor.crewSize) || 10;
-    // Cutters planting out of their trade put in about a third of what a
-    // production planter does.
-    const perPlanter = contractor.specialty === 'planting' ? 950 : 320;
-    total += planters * perPlanter * (contractor.productivity / 100) * fit;
+    total += planters * 950 * (contractor.productivity / 100) * fit;
   }
   const zoneDrag = Math.min(0.15, pressure.survivalPenalty + pressure.accessPressure * 0.4);
   return Math.round(total * plantingEff * (1 - zoneDrag));
@@ -1256,7 +1313,7 @@ async function handleQualityInspection(game, seasonMods, silvicultureState, zone
       note: 'Planting quality on this year\'s blocks will show up in the year-1 survival survey.'
     });
   }
-  if (wetDrag > 0) ui.write(`${SURVIVAL_CAUSE_PLOT_NOTE[pressure.survivalCause] || 'Difficult microsites cost spacing and depth on this ground'}: ${pressure.summary}`);
+  if (wetDrag > 0) ui.write(`${SURVIVAL_CAUSE_PLOT_NOTE[pressure.survivalCause] || 'Difficult microsites cost spacing and depth on this ground'}. ${pressure.summary}`);
   if (getScrutinyPressure(journey) > 0 && quality < 85) adjustScrutiny(journey, 1);
 
   silvicultureState.lastAction = 'inspect';
@@ -1377,6 +1434,22 @@ function describeSprayStanding(journey, silvicultureState) {
 }
 
 /**
+ * How the day's ground and weather sit with the saw crews, 0.8-1.2. Rolled
+ * once a day on the day's own dice and kept, so backing out of the release
+ * menu and opening it again quotes the same hectares instead of a fresh roll.
+ * @param {Object} journey
+ * @param {Object} silvicultureState
+ * @returns {number}
+ */
+export function getReleaseDayFactor(journey, silvicultureState = journey?.silvicultureState) {
+  const kept = silvicultureState?.releaseDay;
+  if (kept && kept.day === journey.day && Number.isFinite(kept.factor)) return kept.factor;
+  const factor = 0.8 + getDayRng(journey, 'release-day')() * 0.4;
+  if (silvicultureState) silvicultureState.releaseDay = { day: journey.day, factor };
+  return factor;
+}
+
+/**
  * Release treatment on the older stands. The choice is the real one: saw
  * crews on the whole opening or round each crop tree, glyphosate under the
  * pest management plan, or sheep where the ground and the road allow it.
@@ -1445,7 +1518,7 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   const remaining = queue.reduce((sum, opening) => sum + (opening.ha - opening.treated), 0);
   // The day's ground is set by the crews and the weather before the method
   // is chosen, so the confirmation can quote the real area and invoice.
-  const dayFactor = 0.8 + Math.random() * 0.4;
+  const dayFactor = getReleaseDayFactor(journey, silvicultureState);
   const hectaresFor = (method) => {
     const pfzLoss = method === 'glyphosate' && areaHasTag(journey, 'salmon', 'watershed', 'community-water') ? 0.92 : 1;
     const base = BRUSH_DAILY_HA[method] || BRUSH_DAILY_HA.manual;
@@ -1475,7 +1548,9 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
           label: `Send the crews (${formatMoney(invoice)})`,
           description: invoice > budget
             ? 'More than the program has left: the invoice goes unpaid and the program is cancelled.'
-            : `${ha} ha of the ${Math.round(remaining)} ha queue; ${formatMoney(budget - invoice)} left after it.`,
+            : invoice > costs.freeForRelease
+              ? `${ha} ha of the ${Math.round(remaining)} ha queue; ${formatMoney(budget - invoice)} left after it. This eats into the money planting, fill and surveys still need: only about ${formatMoney(roundTo(Math.max(0, costs.freeForRelease), 1000))} was free for release.`
+              : `${ha} ha of the ${Math.round(remaining)} ha queue; ${formatMoney(budget - invoice)} left after it.`,
           value: 'confirm',
         },
         { label: 'Choose another method', description: 'Back to the release options.', value: 'back' },
@@ -1519,7 +1594,7 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   journey.resources.contractorCapacity -= 2;
   journey.resources.budget -= invoice;
 
-  const openingsText = treated.map((entry) => `${entry.opening.id} (${entry.opening.year}, ${Math.round(entry.ha)} ha)`).join(' and ');
+  const openingsText = treated.map((entry) => `${entry.opening.id} (${entry.opening.year}): ${Math.round(entry.ha)} of ${Math.round(entry.opening.ha)} ha`).join(' and ');
   const yearsText = [...new Set(treated.map((entry) => entry.opening.year))].sort().join('/');
   if (method === 'manual') {
     ui.write(`Treated ${Math.round(hectares)} ha of ${yearsText} openings by manual release - ${formatReleaseTargets(standard)} cut below the seedling leaders.`);
@@ -1544,7 +1619,7 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   } else {
     ui.write(`Sheep grazing on ${Math.round(hectares)} ha of ${yearsText} openings - the herder camps on the landing, the dogs keep the flock off the seedlings.`);
   }
-  ui.write(`Release treatment: ${openingsText} - ${Math.round(hectares)} ha. ${contractor.name}: $${rate}/ha - invoice $${invoice.toLocaleString()}.`);
+  ui.write(`Release treatment: ${openingsText}. ${contractor.name}: $${rate}/ha - invoice $${invoice.toLocaleString()}.`);
   const releasedFg = treated.map((entry) => entry.opening).filter((opening) => opening.fgId && opening.treated >= opening.ha);
   for (const opening of releasedFg) {
     const fg = (program.freeGrowing || []).find((candidate) => candidate.id === opening.fgId);
@@ -1731,6 +1806,7 @@ async function handleContractorMeeting(game, zoneProfile = null) {
   const choice = await ui.promptChoice('Meet with which contractor?', options);
   const contractor = journey.contractors.find(c => c.id === choice.value);
   if (!contractor) return false;
+  const before = { morale: contractor.morale, productivity: contractor.productivity, quality: contractor.qualityPct };
 
   if (contractor.specialty === 'planting') {
     const retained = (journey.program?.blocks || []).filter((block) => block.status === 'inspected' && block.quality < 90 && block.holdback > 0);
@@ -1759,6 +1835,14 @@ async function handleContractorMeeting(game, zoneProfile = null) {
     contractor.morale = Math.min(100, contractor.morale + 7);
     ui.write(`${contractor.name} appreciated the time as much as the numbers.`);
   }
+  // What the day bought, in the numbers the crew is judged on.
+  const moves = [
+    ['morale', before.morale, contractor.morale],
+    ['productivity', before.productivity, contractor.productivity],
+    ['plot quality', before.quality, contractor.qualityPct],
+  ].filter(([, from, to]) => Number.isFinite(from) && Number.isFinite(to) && from !== to)
+    .map(([label, from, to]) => `${label} ${from}% → ${to}%`);
+  if (moves.length) ui.writePositive(`${contractor.name}: ${moves.join(', ')}.`);
   return true;
 }
 
@@ -1766,16 +1850,25 @@ function handleTeamBriefing(game) {
   const { ui, journey } = game;
   if (!journey.crew) return;
 
-  for (const member of journey.crew) {
-    if (member.isActive) {
-      member.morale = Math.min(100, (member.morale || 50) + 15);
-    }
+  const active = journey.crew.filter((member) => member.isActive);
+  const average = () => Math.round(active.reduce((sum, member) => sum + (member.morale || 0), 0) / Math.max(1, active.length));
+  const before = average();
+  for (const member of active) {
+    member.morale = Math.min(100, (member.morale || 50) + 15);
   }
 
   ui.write('Tailgate meeting: the week\'s plot schedule, radio channels, the ETV route and the fire danger rating. Your crew is set for the day.');
+  if (active.length) ui.writePositive(`Crew morale ${before}% → ${average()}% on average.`);
 }
 
-async function handleContractorEvent(game, cEvent, contractor, rng = Math.random) {
+/**
+ * A foreman's call before the crews go out, answered from the card.
+ * @param {Object} game - { ui, journey }
+ * @param {Object} cEvent - one of CONTRACTOR_EVENTS
+ * @param {Object} contractor - the outfit calling
+ * @param {Function} [rng] - the day's call dice
+ */
+export async function handleContractorEvent(game, cEvent, contractor, rng = Math.random) {
   const { ui, journey } = game;
   const zoneProfile = getSilvicultureZoneProfile(journey);
   const silvicultureState = ensureSilvicultureState(journey);
@@ -1810,6 +1903,11 @@ async function handleContractorEvent(game, cEvent, contractor, rng = Math.random
     }
     journey.resources.budget -= selected.cost;
   }
+  if (selected.settles) {
+    const state = ensureSilvicultureContractorState(contractor, journey, zoneProfile);
+    state.settledCalls = { ...state.settledCalls };
+    for (const callId of selected.settles) state.settledCalls[callId] = journey.day;
+  }
   contractor.morale = Math.max(0, Math.min(100, contractor.morale + selected.moraleGain));
   contractor.productivity = Math.max(20, Math.min(100, contractor.productivity + selected.prodGain));
   note(`${cEvent.title}: ${selected.label.charAt(0).toLowerCase()}${selected.label.slice(1)}; ${contractor.name} morale ${selected.moraleGain >= 0 ? 'up' : 'down'}.`);
@@ -1843,6 +1941,16 @@ async function handleContractorEvent(game, cEvent, contractor, rng = Math.random
     ui.writeWarning(`${contractor.name} sends half the crew to the other contract: ${contractor.planters} planters stay on your program.`);
   }
   if (selected.scrutiny) adjustScrutiny(journey, selected.scrutiny);
+  if (selected.incidentRisk && rng() < selected.incidentRisk) {
+    // The reason for the stand-down was real: someone on the crew gets hurt,
+    // the employer's report goes in, and the prevention officer reads why
+    // the crew was on the block.
+    contractor.productivity = Math.max(20, contractor.productivity - 10);
+    adjustScrutiny(journey, 6);
+    adjustCompliance(journey, -4);
+    ui.writeWarning(`One of ${possessive(contractor.name)} ${crewNoun(contractor)} is hurt on the block. The employer's incident report goes to WorkSafeBC, and the file asks why the crew was out there. Scrutiny +6, compliance -4.`);
+    note(`${contractor.name}: a ${crewNoun(contractor).replace(/s$/, '')} hurt after you kept the crew on the block through the stand-down; WorkSafeBC has the report.`);
+  }
 
   if (selected.moraleGain > 0) {
     ui.writePositive(`${contractor.name}: crew morale up.`);
@@ -2006,11 +2114,17 @@ const UNTRACKED_STOCKS = ['firstAid'];
 // Cards written for a crew on a traverse: slinging supplies to the next
 // block, flying the route, relocating a block. There is no route here.
 const TRAVERSE_ONLY_EVENTS = new Set(['helicopter_available', 'sasquatch_sighting']);
+// Novelty cards from the old deck (a dance trend, a celebrity, first
+// contact) have no place in a supervisor's program either.
+const NOVELTY_EVENTS = new Set(['social_media_viral', 'celebrity_endorsement', 'alien_landing']);
 
 // An option whose own words take the day ("Spend the day prepping", "Rest
 // day for the sick", a tour that "takes most of the day") spends it here,
 // rather than reading "brief response; work continues".
 const TAKES_THE_DAY = /\b(spend|take|use) the day\b|\brest day\b|\btakes (most of|the rest of) the day\b|\btakes the day\b/i;
+// A card whose own setup says the day is gone ("No one's working today")
+// takes it whatever the answer, setting it aside included.
+const DAY_IS_LOST = /\bno one'?s working today\b|\bnobody (works|is working) today\b/i;
 
 function adaptEffects(effects) {
   const hasStock = typeof effects.fuel === 'number' || typeof effects.food === 'number';
@@ -2029,15 +2143,17 @@ function adaptEffects(effects) {
  * A copy of the day's event fitted to the program: fuel and food costs
  * priced into the budget, stock gains and first-aid counts dropped, the
  * traverse's time setback removed (there is no next leg), and an option
- * that says it takes the day marked as spending it. Traverse-only cards
- * return null. The authored event is left alone.
+ * that says it takes the day (or a card that says nobody works today)
+ * marked as spending it. Traverse-only and novelty cards return null. The
+ * authored event is left alone.
  * @param {Object} event
  * @returns {Object|null}
  */
 export function adaptEventForProgram(event) {
-  if (TRAVERSE_ONLY_EVENTS.has(event?.id)) return null;
+  if (TRAVERSE_ONLY_EVENTS.has(event?.id) || NOVELTY_EVENTS.has(event?.id)) return null;
   if (!Array.isArray(event?.options)) return event;
-  let changed = false;
+  const dayLost = DAY_IS_LOST.test(event.description || '');
+  let changed = dayLost;
   const options = event.options.map((option) => {
     if (!option) return option;
     let adapted = option;
@@ -2058,13 +2174,248 @@ export function adaptEventForProgram(event) {
       delete adapted.timeUsed;
     }
     if (typeof option.spendsDay !== 'boolean' && !option.timeCost
-        && (TAKES_THE_DAY.test(option.label || '') || TAKES_THE_DAY.test(option.outcome || ''))) {
+        && (dayLost || TAKES_THE_DAY.test(option.label || '') || TAKES_THE_DAY.test(option.outcome || ''))) {
       copy();
       adapted.spendsDay = true;
     }
     return adapted;
   });
-  return changed ? { ...event, options } : event;
+  if (!changed) return event;
+  return dayLost ? { ...event, options, dayLost } : { ...event, options };
+}
+
+// ── Program facts ───────────────────────────────────────────────────────────
+
+/**
+ * What the program still owes and who is on it, for content that has to fit
+ * the day: a shortcut about the planting contract when every block is in the
+ * ground, or "the surveyor quit" with an accredited surveyor on the crew,
+ * reads as nonsense (js/data/illegalActs.js `onlyWhen`). Plain numbers and
+ * flags, safe to read on any journey; a journey with no program reads as
+ * nothing owed.
+ * @param {Object} journey
+ * @returns {{
+ *   plantingRemaining: number,      // trees still to plant on this year's blocks
+ *   blocksRemaining: number,        // this year's blocks not yet planted out
+ *   fillRemaining: number,          // last year's openings still below MSS
+ *   releaseQueueRemaining: number,  // ha of release still untreated
+ *   surveysRemaining: number,       // free-growing declarations still owed
+ *   seedlingsOnHand: number,        // trees in the reefer
+ *   plantersOnStandDown: boolean,   // no planting crew can work today
+ *   surveyorOnCrew: boolean,        // your own accredited surveyor is active
+ *   accreditedSurveyor: boolean,    // any accredited surveyor, crew or contractor
+ *   firstAidAttendant: boolean,     // your own OFA 3 is active
+ *   sprayClosed: boolean,           // glyphosate is off the table this season
+ * }}
+ */
+export function getSilvicultureFacts(journey) {
+  const program = journey?.program || {};
+  const blocks = Array.isArray(program.blocks) ? program.blocks : [];
+  const crew = journey?.crew || [];
+  const contractors = journey?.contractors || [];
+  const resting = (contractor) => contractor.silvicultureState?.status === 'recovering'
+    || contractor.silvicultureState?.cooldownDays > 0;
+  const planters = contractors.filter((contractor) => contractor.specialty === 'planting');
+  const surveyorOnCrew = crewHasRole(crew, 'surveyor');
+  return {
+    plantingRemaining: blocks.reduce((sum, block) => sum + Math.max(0, (block.trees || 0) - (block.planted || 0)), 0),
+    blocksRemaining: Math.max(0, (journey?.planting?.blocksToPlant || 0) - (journey?.planting?.blocksPlanted || 0)),
+    fillRemaining: (program.fill || []).filter((opening) => !opening.done).length,
+    releaseQueueRemaining: Math.round((program.brush || []).reduce((sum, opening) => sum + Math.max(0, opening.ha - opening.treated), 0)),
+    surveysRemaining: Math.max(0, (journey?.surveys?.freeGrowingTarget || 0) - (journey?.surveys?.freeGrowingComplete || 0)),
+    seedlingsOnHand: Math.max(0, Number(journey?.resources?.seedlings) || 0),
+    plantersOnStandDown: planters.length > 0 && planters.every(resting),
+    surveyorOnCrew,
+    accreditedSurveyor: surveyorOnCrew || contractors.some((contractor) => matchesSilvicultureTask(contractor, 'survey')),
+    firstAidAttendant: hasActiveFirstAidAttendant(crew),
+    sprayClosed: Boolean(journey && getReleaseAccess(journey).sprayClosed),
+  };
+}
+
+// ── Casualties ─────────────────────────────────────────────────────────────
+
+/**
+ * Situations where the one hurt is a contractor's worker. Your crew checks,
+ * surveys, drives and patches; it does not run the saws.
+ */
+const CONTRACTOR_CASUALTY_EVENTS = { chainsaw_cut: 'brushing' };
+
+/** Each band's crew effect, with the text that narrates it. */
+const CREW_EFFECT_BANDS = [
+  ['crewEffect', 'outcome'],
+  ['partialCrewEffect', 'partialOutcome'],
+  ['failureCrewEffect', 'failureOutcome'],
+];
+
+function hurtsSomeone(crewEffect) {
+  return Boolean(crewEffect && (crewEffect.injury || crewEffect.evacuate));
+}
+
+/** How they go out, read from the band's own words rather than drawn at random. */
+function describeDeparture(text, withAttendant) {
+  if (/helicopter|medevac|air ambulance|flown|flight/i.test(text)) return '{name} is flown out. WorkSafeBC is notified and the shift stops.';
+  if (/\bETV\b/.test(text)) {
+    return withAttendant
+      ? '{name} goes out in the ETV with the attendant. WorkSafeBC gets the call from the truck.'
+      : '{name} goes out in the ETV. WorkSafeBC gets the call from the truck.';
+  }
+  if (/supply run|to town|driven|truck/i.test(text)) return '{name} is driven to town. The doctor pulls them for the season.';
+  return '{name} is off the crew for the season. WorkSafeBC is notified.';
+}
+
+function roleOf(member) {
+  return SILVICULTURE_CREW_ROLES.find((role) => role.id === member?.role) || null;
+}
+
+/**
+ * The day's injury card, fitted to who is actually on the block. The one hurt
+ * is named once, on the day's dice, and every band lands on them: a saw
+ * kickback is one of the brushing contractor's cutters, anything else is one
+ * of your own crew (the attendant only when nobody else is out there). The
+ * way they leave follows the option taken: a medevac is flown out, not sent
+ * off in the ETV. With your own attendant gone the options stop calling on
+ * them. The authored event is left alone.
+ * @param {Object} journey
+ * @param {Object|null} event - already fitted by adaptEventForProgram
+ * @returns {Object|null}
+ */
+export function fitEventToCrew(journey, event) {
+  if (!Array.isArray(event?.options)) return event;
+  const crew = journey.crew || [];
+  const attendant = hasActiveFirstAidAttendant(crew);
+  const rename = (text) => (attendant || typeof text !== 'string'
+    ? text
+    : text.replace(/\b([Tt])he OFA 3\b/g, (match, t) => `${t}he contractor's attendant`));
+  const hurts = event.options.some((option) => CREW_EFFECT_BANDS.some(([key]) => hurtsSomeone(option?.[key])));
+  if (!hurts && attendant) return event;
+
+  const rng = getDayRng(journey, `casualty:${event.id || 'event'}`);
+  const outfit = CONTRACTOR_CASUALTY_EVENTS[event.id];
+  const contractor = hurts && outfit
+    ? (journey.contractors || []).filter((c) => c.specialty === outfit).sort((a, b) => Number(b.isActive) - Number(a.isActive))[0] || null
+    : null;
+  const active = crew.filter((member) => member.isActive);
+  const field = active.filter((member) => member.role !== 'medic');
+  const pool = field.length ? field : active;
+  const victim = hurts && !contractor && pool.length ? pool[Math.floor(rng() * pool.length)] : null;
+
+  const fitted = { ...event };
+  if (contractor) {
+    const who = `one of ${possessive(contractor.name)} cutters`;
+    fitted.description = /^A saw kicks back on the block\./.test(event.description || '')
+      ? event.description.replace(/^A saw kicks back on the block\./, `A saw kicks back on the block: ${who}.`)
+      : `${event.description || ''} It is ${who}.`.trim();
+  } else if (victim) {
+    const noun = roleOf(victim)?.noun || 'crew';
+    fitted.description = String(event.description || '').replace(/^A crew member\b/, `${victim.name}, your ${noun},`);
+  }
+  fitted.options = event.options.map((option) => {
+    if (!option) return option;
+    const copy = { ...option };
+    for (const key of ['label', 'outcome', 'partialOutcome', 'failureOutcome', 'description']) {
+      if (typeof option[key] === 'string') copy[key] = rename(option[key]);
+    }
+    for (const [key, textKey] of CREW_EFFECT_BANDS) {
+      const crewEffect = option[key];
+      if (!hurtsSomeone(crewEffect)) continue;
+      if (contractor) {
+        const { injury: _injury, evacuate, ...rest } = crewEffect;
+        copy[key] = { ...rest, contractorCasualty: contractor.id, evacuated: Boolean(evacuate) };
+      } else if (victim) {
+        const withAttendant = attendant && victim.role !== 'medic';
+        copy[key] = { ...crewEffect, victimId: victim.id, departure: describeDeparture(String(option[textKey] || option.outcome || ''), withAttendant) };
+      }
+    }
+    return copy;
+  });
+  return fitted;
+}
+
+/**
+ * A contractor's worker hurt on the day's card: the outfit runs short. Read
+ * from the band the event resolved to (its log line).
+ * @param {Object} journey
+ * @param {Object} event - the card as fitted by fitEventToCrew
+ * @returns {string|null} the day note, or null when no contractor was hurt
+ */
+export function settleContractorCasualty(journey, event) {
+  const entry = (journey.log || []).at(-1);
+  if (!entry || entry.setAside || entry.eventId !== event?.id || entry.day !== journey.day) return null;
+  const option = (event.options || []).find((candidate) => candidate?.label === entry.optionLabel);
+  if (!option) return null;
+  const crewEffect = entry.band === 'partial' ? option.partialCrewEffect
+    : entry.band === 'bad' ? option.failureCrewEffect
+      : option.crewEffect;
+  if (!crewEffect?.contractorCasualty) return null;
+  const contractor = (journey.contractors || []).find((c) => c.id === crewEffect.contractorCasualty);
+  if (!contractor) return null;
+  const loss = crewEffect.evacuated ? 8 : 4;
+  contractor.productivity = Math.max(20, contractor.productivity - loss);
+  contractor.morale = Math.max(0, contractor.morale - 5);
+  return crewEffect.evacuated
+    ? `${possessive(contractor.name)} cutter is out for the season; the saw crews run a hand short (productivity -${loss}, morale -5).`
+    : `${possessive(contractor.name)} cutter is on light duty; the saw crews run light for a while (productivity -${loss}, morale -5).`;
+}
+
+/**
+ * What the crew can no longer do with this person gone, and the way back:
+ * a replacement from town, on the day card.
+ * @param {Object} member - evacuated or quit
+ * @returns {string|null}
+ */
+export function describeLostCrewRole(member) {
+  const role = roleOf(member);
+  if (!role?.lost) return null;
+  const cost = SILVICULTURE_REPLACEMENT_COST[role.id];
+  return `${member.name} was your ${role.noun}. ${role.lost} A replacement can come up from town: a day and ${formatMoney(cost)}.`;
+}
+
+/** Roles on the crew with nobody left to fill them. */
+function getVacantCrewRoles(journey) {
+  const crew = journey.crew || [];
+  return SILVICULTURE_CREW_ROLES.filter((role) => crew.some((member) => member.role === role.id && !member.isActive)
+    && !crewHasRole(crew, role.id));
+}
+
+/** Bring a replacement for a vacant role up from town. Spends the day. */
+function handleCrewReplacement(game, roleId) {
+  const { ui, journey } = game;
+  const role = SILVICULTURE_CREW_ROLES.find((candidate) => candidate.id === roleId);
+  if (!role || crewHasRole(journey.crew || [], roleId)) return false;
+  const cost = SILVICULTURE_REPLACEMENT_COST[roleId];
+  if ((Number(journey.resources.budget) || 0) < cost) {
+    ui.writeWarning(`The program cannot carry a replacement ${role.noun} (${formatMoney(cost)}).`);
+    return false;
+  }
+  journey.resources.budget -= cost;
+  const replacement = generateCrewMember('field', role);
+  const names = new Set(journey.crew.map((member) => member.name));
+  let guard = 0;
+  while (names.has(replacement.name) && guard++ < 20) replacement.name = generateCrewMember('field', role).name;
+  journey.crew.push(replacement);
+  ui.writeHeader('REPLACEMENT');
+  ui.writePositive(`You drive to town and bring ${replacement.name} back up, ${role.noun}. ${formatMoney(cost)} on the program.`);
+  if (roleId === 'medic') ui.write('Your own first aid coverage and the ETV are back on the block.');
+  return true;
+}
+
+/**
+ * Whether setting this situation aside still costs the day. An imposed
+ * situation lands its cheapest answer when it is set aside
+ * (js/events/deferral.js); when that answer is a day's work, keeping the day
+ * made walking away cheaper than dealing with it: a washed-out road set
+ * aside cost the bypass's dollars and equipment and left the day free for
+ * plots. The day now goes with the rest of it.
+ * @param {Object} journey
+ * @param {Object} event - the day's situation, fitted to the program
+ * @returns {boolean}
+ */
+export function setAsideCostsTheDay(journey, event) {
+  if (!event || event.type === 'temptation') return false;
+  if (event.dayLost) return true;
+  const budgetBase = Number(journey.budgetStart) > 0 ? journey.budgetStart : journey.resources?.budget;
+  const deferred = pickDeferredCost(event, situationWeight(event), { budgetBase, journey });
+  return Boolean(deferred && optionSpendsDay(event, deferred.option, journey.journeyType));
 }
 
 /**
@@ -2281,9 +2632,15 @@ function adjustScrutiny(journey, delta) {
 }
 
 function adjustCompliance(journey, delta) {
-  if (journey?.metrics && Number.isFinite(Number(journey.metrics.compliance))) {
+  if (!journey || !Number.isFinite(delta) || delta === 0) return;
+  if (journey.metrics && Number.isFinite(Number(journey.metrics.compliance))) {
     journey.metrics.compliance = Math.max(0, Math.min(100, Number(journey.metrics.compliance) + delta));
   }
+  // A silviculture journey keeps no compliance meter of its own; the loss
+  // lands where event outcomes put it, the standing ledger the season
+  // review reads. It used to land nowhere.
+  journey.standingLedger ||= { relationships: 0, compliance: 0 };
+  journey.standingLedger.compliance = (Number(journey.standingLedger.compliance) || 0) + delta;
 }
 
 /**
@@ -2338,7 +2695,8 @@ function getSilvicultureTaskSummary(journey, zoneProfile, task) {
     : task === 'survey' && crewHasRole(journey.crew || [], 'surveyor')
       ? 'your accredited surveyor'
       : 'no available contractor';
-  return `${fitText} | ${ready.length} available | ${offDays} on days off`;
+  const counts = [ready.length ? `${ready.length} available` : null, offDays ? `${offDays} on days off` : null].filter(Boolean);
+  return [fitText, ...counts].join(' | ');
 }
 
 function getSilvicultureContractorRoster(journey, zoneProfile) {
@@ -2374,7 +2732,6 @@ function getSilvicultureTaskContractors(journey, zoneProfile, task, deployMissin
   const taskTraits = CONTRACTOR_TASK_TRAITS[task] || [];
   const eligible = [];
   const ready = [];
-  const fallback = [];
 
   for (const contractor of contractors) {
     const state = ensureSilvicultureContractorState(contractor, journey, zoneProfile);
@@ -2392,21 +2749,15 @@ function getSilvicultureTaskContractors(journey, zoneProfile, task, deployMissin
 
     if (!contractor.isActive && specialtyMatch) {
       ready.push({ contractor, fit });
-      continue;
     }
-
-    // A saw crew on the block can pick up planting or fill outside its
-    // specialty; brushing and surveys wait for the outfit with the saws or
-    // the accreditation, and two surveyors are not a planting crew.
-    if (contractor.isActive && (task === 'plant' || task === 'fill') && contractor.specialty !== 'survey' && contractor.specialty !== 'surveyor') {
-      fallback.push({ contractor, fit });
-    }
+    // Each outfit works its own contract. A saw crew planting while the
+    // planters were stood down billed at no contract rate, held nothing back
+    // for plots, and broke the "no planting today" the call had just agreed.
   }
 
-  const autoDeployPool = ready.length > 0 ? ready : fallback;
   const selected = eligible.length > 0
     ? eligible.sort((a, b) => b.fit - a.fit)
-    : [...autoDeployPool]
+    : [...ready]
       .sort((a, b) => b.fit - a.fit)
       .slice(0, Math.max(1, Math.min(2, taskTraits.length > 0 ? 2 : 1)));
   if (deployMissing) {
@@ -2428,9 +2779,7 @@ function matchesSilvicultureTask(contractor, task) {
     return false;
   }
 
-  // Fill is the planters' work; a saw crew already on the block can take it
-  // as a fallback (getSilvicultureTaskContractors), but it is not called in
-  // alongside the planters.
+  // Plant and fill are the planters' work alone.
   if (task === 'survey') {
     return (contractor.specialty === 'survey' || contractor.specialty === 'surveyor') && contractorHasCert(contractor, 'surveyor-accredited');
   }

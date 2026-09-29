@@ -296,3 +296,51 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Campaign review.** A failed season no longer reads "the crew was still delivering" or "production stayed high".
 - **Browser suite.** The campaign spec's bot looped on the new release confirmation, picking "Choose another method — Back to…" every time, and never reached recon travel. Travel itself was fine: it stops at its named destination and says so. A rounding flake (about 1 run in 100) in the 7.5 km arrival-snap unit test is fixed.
 - **Checks.** `npm test` 837/837, Playwright 142/142. Gates: recon, planning, permitting, silviculture and GM 8/8 in every area (72/72 each); silviculture 24/24 at full length; every role 8/8 at campaign scale; GM honest 30/30 on normal. `sim:seasonal` is unchanged from the merge base. `simulate-campaign` good play: 7 Outstanding, 28 Solid, 1 Mixed of 36. The silviculture "release 99% of 260 ha" loss did not reproduce at this head: 270/270 across 9 areas × 30 seeds, and 162/162 in the policy sim.
+
+## 2026-09-29 — Silviculture residuals (wave 3, W3-E)
+
+- **Each outfit works its own contract.** The saw crew no longer plants or fills when the planters are off. That includes the day after a "No planting today" stand-down, when it used to bill $0.32/tree with no holdback. Plant and fill wait for the planters and say until when.
+- **Casualties are the person who was hurt** (`fitEventToCrew`).
+  - A saw kickback hurts one of the brushing contractor's cutters. That outfit loses productivity; your crew loses nobody.
+  - Any other injury names one member of your crew, chosen on the day's dice. It is never the attendant doing the treating, and every band lands on that person.
+  - The departure line follows the option: a medevac is flown out, an ETV run goes in the ETV.
+  - `js/events/resolution.js` honours `crewEffect.victimId` and `crewEffect.departure`.
+  - When a crew role leaves, the day card says what the crew can no longer do and offers "Bring up a replacement …" (a day and $600–$1,400).
+  - With your own OFA 3 gone, cards read "the contractor's attendant".
+- **Release quotes hold for the day.** The day's release factor is rolled once on the day seed and kept, so backing out and reopening the brush menu quotes the same hectares.
+- **Set-aside is never the cheap way out.** When the cheapest answer to an imposed situation takes the day (a washed-out road, a WorkSafeBC tour, a dead radio, a boundary re-run), setting it aside takes the day as well, and the option says so. A storm whose card says nobody works today takes the day whatever the answer. The change is local to `js/modes/silviculture.js` (`setAsideCostsTheDay`); `deferral.js` is untouched.
+- **Program facts for shortcut gating.** `getSilvicultureFacts(journey)` in `js/modes/silviculture.js` returns plain values and is safe on any journey:
+  - `plantingRemaining`: trees
+  - `blocksRemaining`
+  - `fillRemaining`
+  - `releaseQueueRemaining`: ha
+  - `surveysRemaining`
+  - `seedlingsOnHand`
+  - `plantersOnStandDown`
+  - `surveyorOnCrew`
+  - `accreditedSurveyor`: your crew or a contractor
+  - `firstAidAttendant`
+  - `sprayClosed`
+
+  Example: `onlyWhen: (j) => getSilvicultureFacts(j).plantingRemaining > 0`.
+- **Contractor calls.**
+  - An upgraded camp stays upgraded.
+  - An inspection or upgrade stops sickness calls for ten days.
+  - Stand-downs come only for an outfit with work left.
+  - "Keep them on the block" states a 25% chance that someone is hurt, and applies it: scrutiny +6 and compliance −4. Compliance now actually lands on the standing ledger; before, it landed nowhere.
+  - The split-crew call and its answer describe the same deal.
+- **Smaller fixes.**
+  - A release that eats into money reserved for planting, fill and surveys says so before you send the crews.
+  - Meetings and briefings print the numbers they move.
+  - Fill stays on the card on plot days, with the reason it waits.
+  - Milestones say "by weight".
+  - The release line reads "VI-34 (2014): 23 of 38 ha".
+  - The doubled colon in the plot line is gone, and so are the "0 available" counts.
+  - Novelty legacy cards (TikTok, a celebrity, first contact) stay out of the program.
+- **Checks.**
+  - `simulate-silviculture-policies` across 9 areas × 3 difficulties × 6 seeds, before → after:
+    - competent 162/162 → 162/162 (mean 99.7)
+    - honest 162/162 → 162/162
+    - neglect 0 → 0
+    - fraud 0 → 0
+  - Tests: `tests/silvicultureRound3.test.mjs`.
