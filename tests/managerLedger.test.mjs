@@ -112,7 +112,7 @@ test('every month closes with a ledger: volume, margin, overhead, net, treasury'
     const ledgerLines = lines.filter((line) => /^Delivered: [\d,]+ m³ \(plan [\d,]+.*year to date [\d,]+ \/ 240,000 m³ AAC\)$/.test(line));
     assert.equal(ledgerLines.length, 12, 'January (the carry-in) through December');
     assert.ok(lines.some((line) => /^Log price \$105 - stumpage \$27 - logging & haul \$62 = \$16\/m³ margin -> \+\$376,320$/.test(line)), 'January at the opening price');
-    assert.ok(lines.some((line) => /^Log price \$\d+ - stumpage \$\d+ - logging & haul \$62 = \$-?\d+\/m³ margin -> [+-]\$[\d,]+$/.test(line)));
+    assert.ok(lines.some((line) => /^Log price \$\d+ - stumpage \$\d+ - logging & haul \$62 = -?\$\d+\/m³ margin -> [+-]\$[\d,]+$/.test(line)));
     assert.ok(lines.some((line) => /^Overhead -\$270,000$/.test(line)));
     assert.ok(lines.some((line) => /^Net [+-]\$[\d,]+ -> treasury \$[\d,]+$/.test(line)));
     assert.equal(journey.ledger.months.length, 12);

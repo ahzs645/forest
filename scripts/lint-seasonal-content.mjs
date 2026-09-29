@@ -251,7 +251,7 @@ function lintReachability(allIssues, err) {
               forcedTargets.get(candidate.id).add(roleId);
             }
           }
-          if (schedule.length && !buildScheduledIssueTeaser(state, schedule)) {
+          if (schedule.length && !buildScheduledIssueTeaser(state, schedule, { settles: true })) {
             err(`illegal-act:${act.id}`, `caught-band fallout has nowhere to land for ${roleId} in ${area.id} (round ${round})`);
           }
         }

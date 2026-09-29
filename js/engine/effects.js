@@ -650,7 +650,7 @@ function applyRiskOutcomeSchedules(state, option, result, causedBy = null) {
       : risk.failScheduleIssues;
   if (scheduleSpec) {
     scheduleIssueEntries(state, scheduleSpec, causedBy);
-    return buildScheduledIssueTeaser(state, scheduleSpec);
+    return buildScheduledIssueTeaser(state, scheduleSpec, { settles: causedBy?.kind === "shortcut" });
   }
   return null;
 }
@@ -662,7 +662,7 @@ function applyScheduledIssues(state, option, causedBy = null) {
   }
 
   scheduleIssueEntries(state, schedule, causedBy);
-  return buildScheduledIssueTeaser(state, schedule);
+  return buildScheduledIssueTeaser(state, schedule, { settles: causedBy?.kind === "shortcut" });
 }
 
 function scheduleIssueEntries(state, scheduleSpec, causedBy = null) {

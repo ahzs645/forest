@@ -5,7 +5,7 @@
 
 import { progressBar, box, PROGRESS } from '../ascii.js';
 import { getCrewDisplayInfo, getActiveCrewCount, getAverageMorale } from '../crew.js';
-import { FIELD_RESOURCES, DESK_RESOURCES, getResourcePercentage } from '../resources.js';
+import { FIELD_RESOURCES, DESK_RESOURCES, formatDollars, getResourcePercentage } from '../resources.js';
 import { getOperationalProgress } from '../journey.js';
 import { withShortcutWatch } from '../events/shortcutRecord.js';
 
@@ -477,7 +477,7 @@ export const PanelsMixin = {
 
     lines.push('');
     lines.push(`Team: ${getActiveCrewCount(journey.crew)}/${journey.crew?.length || 0} active`);
-    lines.push(`Budget: $${Math.round(journey.resources.budget).toLocaleString()}`);
+    lines.push(`Budget: ${formatDollars(journey.resources.budget)}`);
 
     return box(lines, { double: true, title: 'STATUS' });
   },

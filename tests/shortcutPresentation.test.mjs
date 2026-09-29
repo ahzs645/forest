@@ -11,13 +11,12 @@ import {
   createInitialState,
   describeCardCause,
 } from "../js/engine.js";
-import { resolveRisk } from "../js/risk.js";
+import { resolveRisk, riskBandOdds, riskBandPercents } from "../js/risk.js";
 import {
   TuiGameController,
   buildShortcutBrief,
   landingTeaser,
   projectAppliedEffects,
-  riskHoldChance,
 } from "../tui/controller.js";
 import { collectShortcutLines, promptSeasonalCard } from "../js/game/seasonalAdapter.js";
 
@@ -41,15 +40,32 @@ function presentOffer(gs, card, rng = () => 0.5) {
   return controller;
 }
 
-test("the hold chance is read from resolveRisk itself", () => {
-  for (const [compliance, relationships] of [[50, 50], [83, 65], [20, 90], [100, 0]]) {
+test("the printed odds are the roll's own bands, cut where resolveRisk cuts", () => {
+  for (const [compliance, relationships] of [[50, 50], [83, 65], [20, 90], [100, 0], [61, 47]]) {
     const gs = plannerState({ compliance, relationships });
-    const risk = { baseSuccess: 0.34 };
-    const chance = riskHoldChance(gs, risk);
-    assert.ok(chance >= 0.1 && chance <= 0.9, `clamped: ${chance}`);
-    assert.equal(resolveRisk(gs, risk, () => chance - 1e-4).success, true);
-    assert.equal(resolveRisk(gs, risk, () => chance + 1e-4).success, false);
+    const card = adaptIllegalActTemptation(ACT, gs);
+    const take = card.options.find((option) => option.risk);
+    const odds = buildShortcutBrief(gs, card).odds;
+    assert.deepEqual(odds, riskBandPercents(riskBandOdds(gs, take.risk)));
+    assert.equal(odds.clean + odds.noticed + odds.caught, 100);
+    assert.ok(odds.caught >= 15, `a serious offence never reads as safe: ${JSON.stringify(odds)}`);
+    const exact = riskBandOdds(gs, take.risk);
+    assert.equal(resolveRisk(gs, take.risk, () => exact.clean - 1e-6).band, "clean");
+    assert.equal(resolveRisk(gs, take.risk, () => exact.clean + 1e-6).band, "noticed");
+    assert.equal(resolveRisk(gs, take.risk, () => exact.clean + exact.noticed + 1e-6).band, "caught");
   }
+});
+
+test("an offer is priced on the file as it stands when it is shown, not when it was drawn", () => {
+  const gs = plannerState({ compliance: 80, relationships: 70 });
+  const card = adaptIllegalActTemptation(ACT, gs);
+  // The season's earlier cards knock the file down before the offer comes up.
+  Object.assign(gs.metrics, { compliance: 30, relationships: 35 });
+  const data = presentOffer(gs, card).getState().contentData;
+  const fresh = adaptIllegalActTemptation(ACT, gs);
+  const take = fresh.options.find((option) => option.risk);
+  assert.deepEqual(data.shortcut.odds, riskBandPercents(riskBandOdds(gs, take.risk)));
+  assert.notDeepEqual(data.shortcut.odds, riskBandPercents(card.odds));
 });
 
 test("an offer card carries its odds, its catcher, and bands that match the applied effects", () => {
@@ -63,21 +79,32 @@ test("an offer card carries its odds, its catcher, and bands that match the appl
   assert.ok(data.shortcut, "the card ships a shortcut brief");
   const { odds } = data.shortcut;
   assert.equal(odds.clean + odds.noticed + odds.caught, 100);
-  assert.equal(odds.clean, Math.round(riskHoldChance(gs, take.risk) * 100));
-  assert.match(data.shortcut.oddsText, new RegExp(`holds ${odds.clean}% · caught ${odds.caught}%`));
-  assert.match(data.shortcut.offerText, /the CP package goes in this month/);
+  assert.deepEqual(odds, riskBandPercents(card.odds));
+  assert.equal(data.shortcut.oddsText, `Odds this season: clean ${odds.clean}% · noticed ${odds.noticed}% · caught ${odds.caught}%`);
+  // The engine's own odds line prints the same three numbers.
+  assert.match(card.oddsLine, new RegExp(`^${odds.clean}% clean, ${odds.noticed}% noticed, ${odds.caught}% caught by C&E$`));
+  // The payoff line and chip are the engine's, verbatim.
+  assert.equal(data.shortcut.offerText, `On offer: ${card.payoffLine} (${card.payoffChip})`);
   assert.equal(data.shortcut.declineText, "Saying no costs nothing.");
 
   // The take option states the same odds, band by band.
   const takeDetail = data.optionDetails[data.shortcut.takeIndex];
   assert.equal(takeDetail.riskLevel, "high");
-  assert.match(takeDetail.preview, new RegExp(`^Holds ${odds.clean}%: .* \\| Caught ${odds.caught}%: `));
+  assert.match(
+    takeDetail.preview,
+    new RegExp(`^Clean ${odds.clean}%: .* \\| Noticed ${odds.noticed}%: .* \\| Caught ${odds.caught}%: `),
+  );
   // …and each band is what applying that branch would actually move.
-  const { effects: held } = projectAppliedEffects(gs, take.risk.successEffects);
-  for (const [key, value] of Object.entries(held)) {
-    if (!value) continue;
-    assert.ok(takeDetail.bands[0].text.includes(`${value > 0 ? "+" : ""}${value}`), `${key} ${value} in ${takeDetail.bands[0].text}`);
-  }
+  const branches = [take.bands.clean.effects, take.bands.noticed.effects, take.bands.caught.effects];
+  assert.deepEqual(branches, [take.risk.successEffects, take.risk.partialEffects, take.risk.failEffects]);
+  branches.forEach((effects, index) => {
+    const { effects: applied } = projectAppliedEffects(gs, effects);
+    for (const [key, value] of Object.entries(applied)) {
+      if (!value || key === "timeUsed") continue;
+      const text = takeDetail.bands[index].text;
+      assert.ok(text.includes(`${value > 0 ? "+" : ""}${value}`), `${key} ${value} in ${text}`);
+    }
+  });
 
   // Decline stays first, so a stray Enter refuses.
   assert.equal(controller.getState().selected, 0);
@@ -106,7 +133,8 @@ test("the three bands, payoff and catcher the engine puts on the card win over t
   card.options[takeIndex] = {
     ...card.options[takeIndex],
     odds: { clean: 0.45, noticed: 0.2, caught: 0.35 },
-    payoffChip: "+$8k",
+    payoffChip: "Budget +3",
+    payoffEffects: { budget: 3 },
     payoffLine: "the CP package goes in this month",
     institution: "FPBC",
     bands: {
@@ -123,7 +151,7 @@ test("the three bands, payoff and catcher the engine puts on the card win over t
   assert.equal(brief.bands[1].text, "Noticed 20%: Progress +4 · Budget +3 · Compliance -2");
   assert.equal(brief.bands[2].text, "Caught 35%: Compliance -12 · Relationships -6 · follow-up review");
   assert.equal(brief.catcher, "Forest Professionals BC");
-  assert.equal(brief.offerText, "On offer: the CP package goes in this month (+$8k)");
+  assert.equal(brief.offerText, "On offer: the CP package goes in this month (Budget +3)");
 
   // A promised card lands on next year's file even from the last season.
   gs.round = gs.totalRounds;
@@ -141,6 +169,16 @@ test("a final-season teaser shows only when the engine commits to the card", () 
   assert.equal(landingTeaser({ ...promise, lands: false }, gs), null);
 });
 
+test("the offer's payoff chip is the gain the clean band will actually land", () => {
+  const gs = plannerState({ progress: 90 });
+  const card = adaptIllegalActTemptation(ACT, gs);
+  const brief = buildShortcutBrief(gs, card);
+  const { effects } = projectAppliedEffects(gs, card.payoffEffects);
+  assert.ok(effects.progress < card.payoffEffects.progress, "a high meter tapers the payoff");
+  assert.match(brief.offerText, new RegExp(`\\(Progress \\+${effects.progress} \\(tapered: meter high\\)\\)$`));
+  assert.match(brief.bands[0].text, new RegExp(`Progress \\+${effects.progress} \\(tapered`));
+});
+
 test("previews show the gain a high meter will actually take", () => {
   const gs = plannerState({ compliance: 80, relationships: 50 });
   const { effects, tapers } = projectAppliedEffects(gs, { compliance: 3, relationships: 2, progress: -1, timeUsed: 1 });
@@ -156,20 +194,31 @@ test("previews show the gain a high meter will actually take", () => {
   assert.match(report.preview, /Compliance \+1 \(tapered: meter high\)/);
 });
 
-test("a caught shortcut in the final season promises no fallout it cannot deliver", () => {
+test("a caught shortcut in the final season promises only what the year end delivers", () => {
   const gs = plannerState({ compliance: 90 });
   gs.round = gs.totalRounds;
   const card = adaptIllegalActTemptation(ACT, gs, () => 0.5);
   const takeIndex = card.options.findIndex((option) => option.risk);
   assert.ok(card.options[takeIndex].risk.failScheduleIssues, "the act schedules fallout");
+  assert.equal(card.promisedFallout?.afterYear, true, "the engine settles it at the year end");
   const brief = buildShortcutBrief(gs, card);
-  assert.doesNotMatch(brief.preview, /follow-up/);
+  assert.match(brief.preview, /follow-up on next year's file$/);
+  assert.doesNotMatch(brief.preview, /follow-up review/);
 
   const controller = presentOffer(gs, card, () => 0.99);
   controller.selectOption(takeIndex);
   const notice = controller.getState().contentData.notice;
   assert.match(notice.heading, /^Caught:/);
-  assert.doesNotMatch(notice.body, /Likely fallout/);
+  assert.match(notice.body, new RegExp(`${card.promisedFallout.title}\\. It lands after the year closes`));
+  assert.doesNotMatch(notice.body, /Likely fallout|lands next season/);
+});
+
+test("a final-season choice that is not a shortcut promises no fallout past the year", () => {
+  const gs = plannerState();
+  gs.round = gs.totalRounds;
+  const option = { label: "Defer", effects: { progress: 1 }, scheduleIssues: { id: "ministry-data-audit", delay: 1 } };
+  const result = applyOptionOutcome(gs, option, { type: "issue", id: "x", title: "X", option: "Defer", round: gs.round });
+  assert.equal(result.scheduledIssueTeaser, null);
 });
 
 test("an earlier-season catch still says what is coming, sentence-cased", () => {
@@ -180,8 +229,9 @@ test("an earlier-season catch still says what is coming, sentence-cased", () => 
   controller.selectOption(takeIndex);
   const teaser = controller.getState().contentData.notice.body
     .split("\n\n")
-    .find((paragraph) => /Likely fallout/.test(paragraph));
+    .find((paragraph) => /^Fallout \(/.test(paragraph));
   assert.ok(teaser, "the catch names what is coming");
+  assert.match(teaser, new RegExp(`^Fallout \\(\\w+\\): ${card.promisedFallout.title}\\. It lands next season\\.$`));
   assert.doesNotMatch(teaser, /\. [a-z]/, teaser);
 });
 
@@ -242,7 +292,12 @@ test("the hub prints the offer under its banner with its terms, and no More cont
   assert.deepEqual(terms.map((line) => line.className), ["term-shortcut-offer", "term-shortcut-odds"]);
   for (const line of terms) assert.ok(ui.lines.some((written) => written.text === line.text));
   assert.ok(!ui.choices.some((choice) => choice.value === "detail"), "no More context on an offer");
-  assert.match(ui.choices[view.contentData.shortcut.takeIndex].description, /^Holds \d+%/);
+  const { odds } = view.contentData.shortcut;
+  assert.equal(ui.choices[view.contentData.shortcut.takeIndex].description, view.contentData.shortcut.preview);
+  assert.match(
+    ui.choices[view.contentData.shortcut.takeIndex].description,
+    new RegExp(`^Clean ${odds.clean}%: .* \\| Noticed ${odds.noticed}%: .* \\| Caught ${odds.caught}%: `),
+  );
 });
 
 test("the hub shows provenance under the title and clears stale meters on setup cards", async () => {

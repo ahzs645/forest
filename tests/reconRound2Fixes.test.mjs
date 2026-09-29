@@ -299,9 +299,11 @@ test('a leg that prints 7.5 km on a 9 km segment walks the last 1.5 km in', () =
     totalDistance: 64,
   });
   // Slow the day (a setback from the morning's trouble) until the leg is
-  // 7.46 km: it prints as 7.5 and leaves what prints as exactly 1.5 km.
+  // just under 7.5 km: it prints as 7.5 and leaves what prints as exactly
+  // 1.5 km. `full` is itself rounded to the tenth, so the target sits close
+  // enough to 7.5 that the rounding cannot drop the leg to 7.4.
   const full = withRandom(0.5, () => calculateTravelDistance(longSegment(), 'normal')).distance;
-  journey.travelSetback = 1 - 7.46 / full;
+  journey.travelSetback = 1 - 7.49 / full;
   const raw = withRandom(0.5, () => calculateTravelDistance(longSegment(), 'normal'));
   assert.equal(raw.distance, 7.5);
   assert.equal(9 - 7.5, ARRIVAL_SNAP_KM);

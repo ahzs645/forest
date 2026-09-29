@@ -7,6 +7,7 @@ import { assessSilvicultureProgram } from './data/silvicultureProgram.js';
 import { summarizeIntegrity } from './modes/silvicultureIntegrity.js';
 import { PLANNING_DECISION_GATE, PLANNING_VALUES_FLOOR } from './journey/constants.js';
 import { getPackageTarget, getPackagesFinalized } from './journey/packages.js';
+import { formatDollars } from './resources.js';
 
 /**
  * Calculate final score for a completed journey
@@ -355,7 +356,7 @@ function scoreDeskResourceEfficiency(journey, victory = true) {
   if (deskRole && !victory) score *= deskDeliveredShare(journey);
 
   score = Math.max(0, Math.min(100, Math.round(score)));
-  return { score, label: `Budget: $${Math.round(r.budget || 0).toLocaleString()}` };
+  return { score, label: `Budget: ${formatDollars(r.budget || 0)}` };
 }
 
 // The program budget against what it bought. Money left because the work
@@ -367,7 +368,7 @@ function scoreSilvicultureResources(journey) {
   const margin = budget <= 0 ? 0 : 40 + scoreSweetSpot(budget / start) * 60;
   return {
     score: Math.max(0, Math.min(100, Math.round(margin * delivered))),
-    label: `Budget: $${Math.round(budget).toLocaleString()} of $${Math.round(start).toLocaleString()} left`,
+    label: `Budget: ${formatDollars(budget)} of ${formatDollars(start)} left`,
   };
 }
 
@@ -388,7 +389,7 @@ function scoreManagerResources(journey) {
   if (r.budget <= 0) score -= 20;
 
   score = Math.max(0, Math.min(100, Math.round(score)));
-  return { score, label: `Budget: $${Math.round(r.budget || 0).toLocaleString()}` };
+  return { score, label: `Budget: ${formatDollars(r.budget || 0)}` };
 }
 
 // Returns 0-1. Running out is the failure; carrying margin home is good

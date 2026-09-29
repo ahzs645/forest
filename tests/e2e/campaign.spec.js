@@ -22,7 +22,10 @@ test('campaign plays all four seasons through the year-end review', async ({ pag
   await page.waitForLoadState('networkidle');
   await page.click('#campaign-btn');
 
-  const skip = /Glossary|Intel|Status|Help|Restart|Review the|More context|locked|NEEDS|Never mind|Program Binder|Consult|Briefing$|Camp & Support/i;
+  // "Choose another method" backs out of a costed confirmation (the release
+  // invoice); its "Back to the release options" would otherwise win on
+  // /Back to/ below and loop the bot between the two prompts all spring.
+  const skip = /Glossary|Intel|Status|Help|Restart|Review the|More context|locked|NEEDS|Never mind|Program Binder|Consult|Briefing$|Camp & Support|Choose another method/i;
   // Objective-focused priorities keep the bot from wandering: close packages,
   // travel the mainline, and always take flow-advancing prompts.
   const prefer = [

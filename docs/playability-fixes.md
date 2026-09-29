@@ -285,3 +285,14 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
   | aggressive | 100% → 99% | — |
 
   In `simulate-campaign.mjs` (normal, 9 areas × 6 seeds), careful play reaches Outstanding in 7/54 years and average play in 0/54.
+
+## 2026-09-29 — Integration after the wave-2 merge
+
+- **One set of shortcut numbers.** The offer card, the take option's three bands, the hub text and the classic panel print the engine's own odds (`riskBandOdds`), rounded once by `riskBandPercents` (`js/risk.js`) so clean + noticed + caught is always 100 and matches the engine's `oddsLine`. The controller no longer bisects `resolveRisk` for odds.
+- **Priced when shown.** The offer is drawn at the season's start, but the cards before it move the meters. The controller now rebuilds the offer from its act when it comes up, so what the card prints is what the roll applies. The payoff chip shows the tapered gain a high meter actually takes.
+- **Final-season fallout.** Merged teasers keep the card id they deliver, so a final-season catch still shows "It lands after the year closes". A non-shortcut choice in the final season no longer promises fallout past the year, because nothing settles it.
+- **Provenance.** `describeCardCause` has one path for shortcut fallout: "Because you took: X — your fall shortcut." Who caught it stays in the surface reason.
+- **Money.** `formatDollars` prints an overdrawn budget, treasury or cash line as -$858, not $-858.
+- **Campaign review.** A failed season no longer reads "the crew was still delivering" or "production stayed high".
+- **Browser suite.** The campaign spec's bot looped on the new release confirmation, picking "Choose another method — Back to…" every time, and never reached recon travel. Travel itself was fine: it stops at its named destination and says so. A rounding flake (about 1 run in 100) in the 7.5 km arrival-snap unit test is fixed.
+- **Checks.** `npm test` 837/837, Playwright 142/142. Gates: recon, planning, permitting, silviculture and GM 8/8 in every area (72/72 each); silviculture 24/24 at full length; every role 8/8 at campaign scale; GM honest 30/30 on normal. `sim:seasonal` is unchanged from the merge base. `simulate-campaign` good play: 7 Outstanding, 28 Solid, 1 Mixed of 36. The silviculture "release 99% of 260 ha" loss did not reproduce at this head: 270/270 across 9 areas × 30 seeds, and 162/162 in the policy sim.

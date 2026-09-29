@@ -45,6 +45,7 @@ import { applyDifficultyMultipliers } from './ForestryTrailGame.js';
 import { readCampaignSave, saveCampaignState, clearCampaignSave } from './saveLoad.js';
 import { getCareerDeltas } from './debrief.js';
 import { recordTieredRun } from '../career.js';
+import { formatDollars } from '../resources.js';
 import { promptSeasonalCard, promptSummaryCard, renderMetricStrip, setExpeditionChromeHidden } from './seasonalAdapter.js';
 
 // One year, four hats, in the order the work actually happens on a licensee's
@@ -446,7 +447,7 @@ function computeBudgetEntry(journey, completion, startBudget) {
   let delta = clamp(Math.round((completion - spentFraction) * 8), -8, 5);
   const parts = [`Spent ${(spentFraction * 100).toFixed(0)}% of the season allowance for ${(completion * 100).toFixed(0)}% of the work`];
   if (shortcutCash > 0) {
-    parts.push(`$${Math.round(shortcutCash).toLocaleString('en-CA')} of shortcut cash is not a saving`);
+    parts.push(`${formatDollars(shortcutCash)} of shortcut cash is not a saving`);
   }
   const hungry = Number(journey.resourcePressure?.hungryShifts) || 0;
   const quits = (journey.crew || []).filter((member) => member?.hasQuit).length;
@@ -994,7 +995,7 @@ async function runCampaignSeason(game, campaign, season) {
   }
 
   const consequences = applyRoundConsequences(gsSeason);
-  const explained = describeConsequences(gsSeason, consequences);
+  const explained = describeConsequences(gsSeason, consequences, { fellShort: !endResult.victory });
   // Everything the season moved, briefing to consequences, so the review and
   // the Year in Review add up to the meters.
   const seasonDeltas = diffMetrics(seasonStartMetrics(campaign), campaign.yearMetrics);
