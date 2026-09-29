@@ -46,6 +46,9 @@ export const CAMPAIGN_SEASONS = [
     roleId: 'silviculture',
     title: 'Silviculture Program',
     situation: 'Breakup is over and the reefers are full: get the spring plant in before the stock ages out.',
+    // No frost to come out of the ground on the maritime coast; the plant
+    // runs through the late-winter rain.
+    coastSituation: 'The reefers are full and the rain has not let up: get the spring plant in before the stock ages out.',
   },
   {
     id: 'summer',
@@ -67,10 +70,25 @@ export const CAMPAIGN_SEASONS = [
     roleId: 'permitter',
     title: 'Permitting Push',
     situation: 'The plan means nothing until the District Manager signs the cutting and road permits. Shepherd them through before breakup.',
+    coastSituation: 'The plan means nothing until the District Manager signs the cutting and road permits. Shepherd them through before the spring operating window opens.',
   },
 ];
 
 const isFieldSeason = (journeyType) => ['recon', 'field', 'silviculture'].includes(journeyType);
+
+/**
+ * The season's opening line for this area: breakup is an Interior word, so
+ * an area without frozen ground (no "freeze-thaw" tag) gets the coastal line.
+ */
+export function getSeasonSituation(season, area) {
+  if (season?.coastSituation && !hasFrozenGround(area)) return season.coastSituation;
+  return season?.situation || '';
+}
+
+function hasFrozenGround(area) {
+  const tags = Array.isArray(area?.tags) ? area.tags : null;
+  return !tags || tags.includes('freeze-thaw');
+}
 
 // Season briefing stances: a small immediate posture on the year's meters,
 // plus one concrete perk for the deployment about to start. The perk (and its
@@ -139,10 +157,12 @@ function fallFellShort(campaign) {
 
 /** The briefing's situation line, told against what the year already did. */
 export function describeSeasonSituation(campaign, season) {
+  const area = OPERATING_AREAS.find((a) => a.id === campaign?.areaId) || null;
   if (season.id === 'winter' && fallFellShort(campaign)) {
-    return 'The fall plan never got its approval. The district extended the old FSP\'s term, so only blocks already consistent with it can go: the cutting permits for the new blocks wait for a replacement plan. Push what the extension covers through before breakup.';
+    const deadline = hasFrozenGround(area) ? 'before breakup' : 'before the spring operating window opens';
+    return `The fall plan never got its approval. The district extended the old FSP's term, so only blocks already consistent with it can go: the cutting permits for the new blocks wait for a replacement plan. Push what the extension covers through ${deadline}.`;
   }
-  return season.situation;
+  return getSeasonSituation(season, area);
 }
 
 /**

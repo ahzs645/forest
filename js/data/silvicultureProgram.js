@@ -222,19 +222,29 @@ export function buildSilvicultureProgram(journey) {
   };
 }
 
+// Local outfits by zone: planters, brushers, surveyors. Northern Interior
+// names on the coast or in the southern valleys read as the wrong province.
+const CONTRACTOR_NAMES_BY_ZONE = {
+  CWH: ['Salal Coast Planting', 'Alder Flats Brushing', 'Tidewater Regen Surveys'],
+  ICH: ['Cedar Draw Planters', 'Wetbelt Brushing Co', 'Columbia Regen Surveys'],
+  IDF: ['Benchland Planters', 'Bunchgrass Vegetation Management', 'Drybelt Regen Surveys'],
+};
+const DEFAULT_CONTRACTOR_NAMES = ['Mountain Pine Planters', 'Northern Regen Co', 'Boreal Silviculture'];
+
 /**
  * Contractor roster with real economics. Three outfits: production planters
  * paid per tree with a holdback, a brushing outfit with saw crews and a PMP
  * applicator ticket, and an accredited survey contractor on a day rate.
- * @param {string} becCode - sets the per-tree price band
+ * @param {string} becCode - sets the per-tree price band and the local outfits
  */
 export function generateSilvicultureContractors(becCode) {
   const standard = getStockingStandard(becCode);
   const basePrice = standard.pricePerTree;
+  const names = CONTRACTOR_NAMES_BY_ZONE[standard.zone] || DEFAULT_CONTRACTOR_NAMES;
   return [
     {
       id: 'contractor_1',
-      name: 'Mountain Pine Planters',
+      name: names[0],
       productivity: 80 + Math.floor(Math.random() * 20),
       morale: 70 + Math.floor(Math.random() * 20),
       crewSize: 12,
@@ -248,7 +258,7 @@ export function generateSilvicultureContractors(becCode) {
     },
     {
       id: 'contractor_2',
-      name: 'Northern Regen Co',
+      name: names[1],
       productivity: 80 + Math.floor(Math.random() * 20),
       morale: 70 + Math.floor(Math.random() * 20),
       crewSize: 18,
@@ -261,7 +271,7 @@ export function generateSilvicultureContractors(becCode) {
     },
     {
       id: 'contractor_3',
-      name: 'Boreal Silviculture',
+      name: names[2],
       productivity: 80 + Math.floor(Math.random() * 20),
       morale: 70 + Math.floor(Math.random() * 20),
       crewSize: 4,

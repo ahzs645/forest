@@ -23,7 +23,9 @@ const FAILURE_RUNS = [
     areaIndex: 2,
     difficultyLabel: 'Old Growth',
     seed: 7000,
-    expectedReason: /(ALL CREW LOST|OUT OF FUEL|stranded)/i
+    // Any of the field collapses: crew gone, fuel gone, or food gone
+    // (js/journey/fieldMechanics.js).
+    expectedReason: /(ALL CREW LOST|OUT OF FUEL|stranded|NO FOOD)/i
   },
   {
     name: 'silviculture',

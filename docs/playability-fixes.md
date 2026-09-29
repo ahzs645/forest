@@ -141,3 +141,11 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Goodwill** (`js/events/resolution.js`, `js/game/debrief.js`): every event outcome prints "District goodwill ±N → M", warns at 15 or below, and the debrief opens with the end reason before the archive prompt. Hints say "goodwill" on desk files.
 - **Reload determinism** (`js/events/dayRng.js`, both game loops, `js/modes/permitting.js` night): each day is seeded at the boundary before the save; the draw, temptation lane, outcome band, injury, reaction and permitting night roll from that seed, so a reload replays the day.
 - **Seasonal probability** (`js/engine/content.js`): the seasonal draw folds the deck's `probability` into the weight (squared below the deck median, floored to keep rare cards alive) and never draws probability-0 payoffs cold. Seeded 1,080-year sim: any joke card 39% → 3% of years.
+
+## 2026-09-29 — Regional content (playtest workstream W2)
+
+- **Recon routes for the south.** Vancouver Island Coast, Kootenay Wetbelt and Okanagan/Shuswap Drybelt each have their own twelve-stop recon route (`js/data/json/field/blocks.json`) instead of falling back to Fort St. John. Areas gain `mainland`, `freeze-thaw`, `ich` and `idf` tags.
+- **Region gating.** `northern-bc` no longer matches `bc-wide` in reverse, so northern-only cards stay north. Caribou, moose, grizzly, -30C and breakup cards are gated to the areas where they belong. Place names that leaked through broad tags are gone. Shared field events no longer use recon wording, and area situations only play in their home area.
+- **Silviculture by zone.** Release copy, manual-release targets, sheep grazing (Interior only), contractor names and drought/brush pressure now differ between coast, wetbelt and drybelt. The coast gets its own campaign briefings.
+- **File names and BC facts.** Permit files are named after the area's own route blocks and roads, and labels are unique. RUP letters ask for road-use terms. Spills are reported to the EMCR spill line with a 100 L framing. Riparian, glossary, MSSpa and trap-tree details are corrected.
+- **Tests.** `tests/regionalContent.test.mjs` fails when an area lacks its own route or when regional wording can be drawn outside its region.

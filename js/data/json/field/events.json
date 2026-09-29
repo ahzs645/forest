@@ -255,7 +255,7 @@
   "options": [
    {
     "label": "Winch it off a stump with the truck's own winch",
-    "outcome": "The winch line goes around a big stump and does the rest, slow and ugly. The truck comes free with the fenders full of muskeg.",
+    "outcome": "The winch line goes around a big stump and does the rest, slow and ugly. The truck comes free with the fenders packed full of mud.",
     "effects": {
      "equipment": -12,
      "fuel": -5
@@ -459,6 +459,9 @@
   "type": "weather",
   "severity": "moderate",
   "probability": 0.08,
+  "areaTags": [
+   "freeze-thaw"
+  ],
   "description": "Temperature drops to -30C overnight. Everything is frozen solid.",
   "options": [
    {
@@ -475,7 +478,7 @@
      "crew_health": -8,
      "crew_morale": -10
     },
-    "failureOutcome": "By morning the compassman can't feel two fingers, and by noon they're the wrong colour. He's bandaged, off the line, and you're short a set of hands with the cold snap still parked overhead.",
+    "failureOutcome": "By morning the youngest hand on the crew can't feel two fingers, and by noon they're the wrong colour. He's bandaged, off the block, and you're short a set of hands with the cold snap still parked overhead.",
     "failureEffects": {
      "crew_health": -12,
      "crew_morale": -14,
@@ -621,6 +624,9 @@
   "severity": "severe",
   "managerEscalation": false,
   "probability": 0.06,
+  "areaTags": [
+   "mainland"
+  ],
   "description": "Fresh grizzly signs everywhere. Tracks, scat, claw marks on trees. This is her home.",
   "options": [
    {
@@ -668,7 +674,7 @@
    },
    {
     "label": "Bear-aware protocol: pairs, spray, hourly radio checks",
-    "outcome": "Nobody runs line alone. Every pair carries spray on the hip, not in the pack, and the radio check goes out on the hour. Slower, noisier, and everyone sleeps.",
+    "outcome": "Nobody works alone. Every pair carries spray on the hip, not in the pack, and the radio check goes out on the hour. Slower, noisier, and everyone sleeps.",
     "effects": {
      "progress": -2,
      "crew_morale": -2
@@ -682,6 +688,9 @@
   "type": "wildlife",
   "severity": "minor",
   "probability": 0.15,
+  "areaTags": [
+   "mainland"
+  ],
   "description": "A bull moose stands in the middle of the road. He's not moving.",
   "options": [
    {
@@ -741,6 +750,10 @@
   "type": "wildlife",
   "severity": "minor",
   "probability": 0.1,
+  "areaTags": [
+   "caribou",
+   "bwbs"
+  ],
   "description": "A herd of caribou is crossing ahead. Dozens of them, taking their time.",
   "options": [
    {
@@ -765,7 +778,7 @@
      "crew_morale": -5,
      "compliance": -3
     },
-    "failureOutcome": "The herd breaks the wrong way and pours down the ditch line in a panic — right past a conservation officer's parked truck at the junction. Southern mountain caribou are listed under SARA and he was writing before you'd stopped. The complaint lands with C&E with your plate number on it.",
+    "failureOutcome": "The herd breaks the wrong way and pours down the ditch line in a panic — right past a conservation officer's parked truck at the junction. Every caribou herd up here is a listed species at risk, and he was writing before you'd stopped. The complaint lands with C&E with your plate number on it.",
     "failureEffects": {
      "compliance": -8,
      "relationships": -6,
@@ -803,7 +816,7 @@
   "type": "injury",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "A crew member slips on a wet log along the traverse and goes down hard, clutching their ankle.",
+  "description": "A crew member slips on a wet log on the slope and goes down hard, clutching their ankle.",
   "options": [
    {
     "label": "Have the OFA 3 tape it and keep them on light duty",
@@ -926,7 +939,7 @@
      "crew_morale": -12
     },
     "riskInjury": 0.15,
-    "failureOutcome": "Mid-morning one of the sick ones goes down on a bluff along the traverse line and cracks his head on a rock. He's concussed where he landed. Work stops, and the near-miss write-up asks in plain language why sick people were on a steep line.",
+    "failureOutcome": "Mid-morning one of the sick ones goes down on a bluff above the block and cracks his head on a rock. He's concussed where he landed. Work stops, and the near-miss write-up asks in plain language why sick people were on steep ground.",
     "failureEffects": {
      "progress": -8,
      "crew_morale": -14,
@@ -2035,7 +2048,7 @@
   "type": "social",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "Your most experienced layout tech corners you after dinner. He says he's had enough — the pay isn't worth the conditions. He wants out tomorrow morning.",
+  "description": "Your most experienced hand corners you after dinner. He says he's had enough — the pay isn't worth the conditions. He wants out tomorrow morning.",
   "options": [
    {
     "label": "Let them go",
@@ -2358,7 +2371,7 @@
    },
    {
     "label": "Aerial recon of the route ($1,800)",
-    "outcome": "An hour in the front seat, eighteen hundred dollars on the card. From above you spot a washout, a good crossing, and the best line for the traverse.",
+    "outcome": "An hour in the front seat, eighteen hundred dollars on the card. From above you spot a washout, a good crossing, and the best way into the far blocks.",
     "effects": {
      "budget": -1800,
      "progress": 5
@@ -2623,7 +2636,7 @@
   "type": "wildlife",
   "severity": "minor",
   "probability": 0.06,
-  "description": "Large canine tracks circle the camp perimeter. Too big for coyote. The food scraps from last night are gone.",
+  "description": "Large canine tracks circle the camp perimeter. Too big for anybody's dog. The food scraps from last night are gone.",
   "options": [
    {
     "label": "Set up better food storage and carry on",
@@ -2757,7 +2770,7 @@
   "options": [
    {
     "label": "Push hard now to get ahead of it",
-    "outcome": "The crew works double-time and hates it. But the traverse is ahead of schedule when the first gusts arrive, and that is money in the bank.",
+    "outcome": "The crew works double-time and hates it. But the work is ahead of schedule when the first gusts arrive, and that is money in the bank.",
     "effects": {
      "progress": 6,
      "crew_health": -8,
@@ -3200,7 +3213,7 @@
     },
     "hiddenOutcome": true,
     "riskInjury": 0.2,
-    "partialOutcome": "Nobody swings. The winner pockets the pot, the loser goes to his tent, and the thing sits there festering. They will not run line together now, and you are building each day's plan around it.",
+    "partialOutcome": "Nobody swings. The winner pockets the pot, the loser goes to his tent, and the thing sits there festering. They will not work together now, and you are building each day's plan around it.",
     "partialEffects": {
      "crew_morale": -6,
      "progress": -2
@@ -3600,6 +3613,9 @@
   "type": "wildlife",
   "severity": "moderate",
   "probability": 0.05,
+  "roles": [
+   "recce"
+  ],
   "description": "A bald eagle nest sits in a big veteran Douglas-fir inside the boundary you're flagging. Two chicks are visible. Nest trees are protected under the Wildlife Act whether or not anyone has mapped them.",
   "options": [
    {
@@ -3757,6 +3773,9 @@
   "type": "terrain",
   "severity": "moderate",
   "probability": 0.06,
+  "areaTags": [
+   "freeze-thaw"
+  ],
   "description": "The frost is coming out of the ground. Roads that were solid yesterday are turning to mush. The window for getting trucks into the block is closing fast.",
   "options": [
    {
@@ -4223,7 +4242,7 @@
   "type": "discovery",
   "severity": "minor",
   "probability": 0.05,
-  "description": "You find a natural mineral lick heavily used by wildlife. Dozens of tracks — deer, elk, moose, bear — converge on this muddy depression.",
+  "description": "You find a natural mineral lick heavily used by wildlife. Dozens of tracks — deer, elk, bear and more — converge on this muddy depression.",
   "options": [
    {
     "label": "Flag it and establish a buffer",
@@ -4367,7 +4386,7 @@
   "type": "weather",
   "severity": "minor",
   "probability": 0.08,
-  "description": "You can't see twenty metres. The forest has vanished into white. Running line in this is asking for trouble — you can't see the danger trees, let alone the ribbon.",
+  "description": "You can't see twenty metres. The forest has vanished into white. Working in this is asking for trouble — you can't see the danger trees, let alone the ribbon.",
   "options": [
    {
     "label": "Wait for it to burn off",
@@ -4378,20 +4397,20 @@
    },
    {
     "label": "Do truck work until it clears",
-    "outcome": "Plot cards, GPS downloads, ribbon inventory — no line work. Decent use of time.",
+    "outcome": "Plot cards, GPS downloads, gear checks — nobody goes under the snags. Decent use of time.",
     "effects": {
      "progress": -2
     }
    },
    {
-    "label": "Run line anyway, tight spacing, voice contact",
-    "outcome": "Slow, tense work — every call answered, every danger tree called by voice. One close call that makes everyone sweat, but the line keeps moving.",
+    "label": "Work anyway, tight spacing, voice contact",
+    "outcome": "Slow, tense work — every call answered, every danger tree called by voice. One close call that makes everyone sweat, but the work keeps moving.",
     "effects": {
      "progress": -1,
      "crew_morale": -5
     },
     "riskInjury": 0.2,
-    "failureOutcome": "A dead fir lets go in the white and comes down where the compassman was not. It misses him and finds the quad. Line work is done for the day, and the crew makes it plain they will not run line in fog again this trip.",
+    "failureOutcome": "A dead fir lets go in the white and comes down where the nearest worker was not. It misses him and finds the quad. Field work is done for the day, and the crew makes it plain they will not work under snags in fog again this trip.",
     "failureEffects": {
      "progress": -4,
      "equipment": -12,
@@ -5004,7 +5023,7 @@
    },
    {
     "label": "Buy his route notes ($150)",
-    "outcome": "Pages of tight pencil from thirty winters. Your traverse plan just got smarter.",
+    "outcome": "Pages of tight pencil from thirty winters. Your route plan just got smarter.",
     "effects": {
      "budget": -150,
      "progress": 5
@@ -5170,7 +5189,7 @@
   "options": [
    {
     "label": "Fix his generator for meat and fuel",
-    "outcome": "An hour of wrenching buys smoked moose and ten litres of fuel. Everyone at the fire agrees this is the correct economy.",
+    "outcome": "An hour of wrenching buys smoked venison and ten litres of fuel. Everyone at the fire agrees this is the correct economy.",
     "effects": {
      "equipment": -3,
      "food": 15,

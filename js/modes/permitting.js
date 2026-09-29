@@ -65,6 +65,16 @@ function sentence(text) {
  * actually missing from the file; `summary` takes the file it is about so the
  * letter reads like one about that block, road, or camp rather than a form.
  */
+// What a completeness screen bounces, by permit type. Appraisal data is a
+// cutting-permit item; a road use permit on an existing FSR is about the haul.
+const PACKAGE_COMPLETENESS_GAPS = {
+  CP: ['the FOM consistency statement', 'the appraisal data submission'],
+  RP: ['the Exhibit A road location map', 'the FOM consistency statement'],
+  RUP: ['the haul period', 'the vehicle configurations'],
+  SUP: ['the occupancy map', 'the site plan for the camp footprint'],
+  HCA: ['the project description', 'the assessment methodology'],
+};
+
 const PERMIT_REVISION_PROFILES = [
   {
     id: 'fish-passage',
@@ -174,7 +184,7 @@ const PERMIT_REVISION_PROFILES = [
     title: 'Access engineering',
     summary: () => 'Exhibit A map does not show the deactivation intent; terrain stability field assessment is referenced but not attached.',
     tags: ['road', 'access', 'steep', 'karst', 'winter-road'],
-    types: ['RP', 'RUP', 'CP'],
+    types: ['RP', 'CP'],
     pressure: {
       engineering: 4,
       hydrology: 1,
@@ -197,9 +207,38 @@ const PERMIT_REVISION_PROFILES = [
     }
   },
   {
+    id: 'road-use-terms',
+    title: 'Road use terms',
+    summary: () => 'The district wants the haul period, the truck configurations and a maintenance arrangement with the road\'s primary user before it issues the road use permit.',
+    tags: ['road', 'access', 'winter-road'],
+    types: ['RUP'],
+    pressure: {
+      engineering: 2,
+      timing: 2
+    },
+    clean: {
+      label: 'Settle the road use terms',
+      note: 'You file the haul schedule and truck configurations and sign the maintenance-sharing arrangement with the primary user.',
+      scrutiny: -2,
+      compliance: 3,
+      relationships: { ministry: 1 }
+    },
+    fast: {
+      label: 'Send the haul schedule, sort maintenance later',
+      note: 'The file moves, but the maintenance question stays open on the district\'s desk.',
+      scrutiny: 3,
+      compliance: 1,
+      politicalCapital: -1,
+      relationships: { ministry: -1 }
+    }
+  },
+  {
     id: 'package-completeness',
     title: 'Application incomplete',
-    summary: () => 'Application is missing the FOM consistency statement and the appraisal data submission; district will not start the referral clock until they are attached.',
+    summary: (file) => {
+      const missing = PACKAGE_COMPLETENESS_GAPS[file?.type] || PACKAGE_COMPLETENESS_GAPS.CP;
+      return `Application is missing ${missing.join(' and ')}; ${file?.type === 'HCA' ? 'the Archaeology Branch' : 'the district'} will not start the ${file?.type === 'RUP' || file?.type === 'HCA' ? 'file' : 'referral clock'} until they are attached.`;
+    },
     tags: [],
     types: ['CP', 'RP', 'RUP', 'SUP', 'HCA'],
     completeness: true,
@@ -210,7 +249,7 @@ const PERMIT_REVISION_PROFILES = [
     },
     clean: {
       label: 'Complete the package',
-      note: 'You attach the FOM consistency statement and the appraisal data submission and refile.',
+      note: (file) => `You attach ${(PACKAGE_COMPLETENESS_GAPS[file?.type] || PACKAGE_COMPLETENESS_GAPS.CP).join(' and ')} and refile.`,
       scrutiny: -2,
       compliance: 3,
       relationships: { ministry: 1, agencies: 1 }
@@ -832,7 +871,7 @@ function scoreRevisionProfiles(journey, file = null) {
         // one, and a file the screen bounced is incomplete by definition.
         if (profile.types && !profile.types.includes(file.type)) score -= 12;
         if (file.type === 'RP' && (profile.id === 'access-engineering' || profile.id === 'fish-passage')) score += 4;
-        if (file.type === 'RUP' && profile.id === 'access-engineering') score += 6;
+        if (file.type === 'RUP' && profile.id === 'road-use-terms') score += 6;
         if (file.touchesStream && profile.id === 'fish-passage') score += 3;
         if (file.heritageClass === 'heavy' && profile.id === 'consultation') score += 5;
         if (file.heritageClass === 'moderate' && profile.id === 'consultation') score += 2;
@@ -861,6 +900,11 @@ function pickRevisionProfile(journey, index = 0, file = null) {
     return profiles.find((profile) => profile.id === file.deficiencyProfileId) || profiles[0];
   }
   return profiles[index % profiles.length];
+}
+
+function resolveRevisionResponse(response, file) {
+  if (!response || typeof response.note !== 'function') return response;
+  return { ...response, note: response.note(file) };
 }
 
 function buildDeficiencySummary(profile, file, journey) {
@@ -916,8 +960,8 @@ function pushRevisionTicket(journey, file, source = {}) {
     completeness: Boolean(profile.completeness),
     title: profile.title,
     summary: buildDeficiencySummary(profile, file, journey),
-    clean: profile.clean,
-    fast: profile.fast,
+    clean: resolveRevisionResponse(profile.clean, file),
+    fast: resolveRevisionResponse(profile.fast, file),
     sourcePhase: journey.currentPhase || 'review',
     source: source.type || source.reason || 'review'
   };

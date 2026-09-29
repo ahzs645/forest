@@ -1,6 +1,11 @@
 /**
  * Area Situations
  * Recurring zone-specific constraints that color event selection over time.
+ *
+ * Each situation is written for one operating area (`areaIds`) and never
+ * plays in another valley: the Okanagan used to draw "Wetbelt runoff
+ * scrutiny" because a tag match plus a season bonus beat its own card. A
+ * journey without an area id (tests, older fixtures) still matches on tags.
  */
 
 const AREA_SITUATIONS = [
@@ -8,6 +13,7 @@ const AREA_SITUATIONS = [
     id: 'peace_industrial_traffic',
     title: 'Industrial traffic pulse',
     summary: 'Linear disturbance and heavy industrial traffic are making access and coordination noisier than usual.',
+    areaIds: ['fort-st-john-plateau'],
     areaTags: ['peace-region', 'gas-interface'],
     seasons: ['winter', 'spring', 'summer'],
     fieldEventMultiplier: 1.1,
@@ -46,6 +52,7 @@ const AREA_SITUATIONS = [
     id: 'muskwa_runoff_slump',
     title: 'Foothill runoff slump',
     summary: 'Steep drainages and thaw-sensitive fills are making old access assumptions feel optimistic.',
+    areaIds: ['muskwa-foothills'],
     areaTags: ['steep', 'remote-camps'],
     seasons: ['spring'],
     fieldEventMultiplier: 1.18,
@@ -82,6 +89,7 @@ const AREA_SITUATIONS = [
     id: 'bulkley_visual_backlash',
     title: 'Visual backlash',
     summary: 'Visible ground and community-use corridors are keeping public optics tied to every move.',
+    areaIds: ['bulkley-valley'],
     areaTags: ['community-interface', 'visuals'],
     seasons: ['summer', 'fall'],
     fieldEventMultiplier: 1.05,
@@ -119,6 +127,7 @@ const AREA_SITUATIONS = [
     id: 'fraser_smoke_push',
     title: 'Smoke push',
     summary: 'Wildfire smoke and nearby community risk are compressing the useful work window.',
+    areaIds: ['fraser-plateau'],
     areaTags: ['wildfire', 'beetle-recovery'],
     seasons: ['summer', 'fall'],
     fieldEventMultiplier: 1.2,
@@ -156,6 +165,7 @@ const AREA_SITUATIONS = [
     id: 'skeena_crossing_stress',
     title: 'Crossing stress',
     summary: 'Fish-bearing crossings and saturated ground are making rushed access choices expensive.',
+    areaIds: ['skeena-nass'],
     areaTags: ['cwh', 'salmon'],
     becCodes: ['CWHws1'],
     seasons: ['spring', 'summer', 'fall'],
@@ -194,6 +204,7 @@ const AREA_SITUATIONS = [
     id: 'tahltan_supply_lag',
     title: 'Supply-line lag',
     summary: 'Remote cold-country logistics are making every mobilization and schedule promise more fragile.',
+    areaIds: ['tahltan-highland'],
     areaTags: ['glacial', 'remote-camps'],
     seasons: ['spring', 'fall'],
     fieldEventMultiplier: 1.12,
@@ -231,6 +242,7 @@ const AREA_SITUATIONS = [
     id: 'island_storm_window',
     title: 'Storm-window squeeze',
     summary: 'Rainfall and fish-stream timing are shrinking the set of coastal tasks that are honestly ready to move.',
+    areaIds: ['vancouver-island-coast'],
     areaTags: ['cwh', 'salmon', 'visuals'],
     seasons: ['fall', 'winter'],
     fieldEventMultiplier: 1.14,
@@ -268,6 +280,7 @@ const AREA_SITUATIONS = [
     id: 'wetbelt_runoff_scrutiny',
     title: 'Wetbelt runoff scrutiny',
     summary: 'Community-water and steep-road concerns are making drainage mistakes far more visible than usual.',
+    areaIds: ['kootenay-wetbelt'],
     areaTags: ['watershed', 'steep', 'community-interface'],
     seasons: ['spring', 'summer', 'fall'],
     fieldEventMultiplier: 1.12,
@@ -305,6 +318,7 @@ const AREA_SITUATIONS = [
     id: 'drybelt_interface_smoke',
     title: 'Drybelt interface smoke',
     summary: 'Heat, smoke, and visible interface work are narrowing both safe production choices and public tolerance for sloppy execution.',
+    areaIds: ['okanagan-shuswap-drybelt'],
     areaTags: ['wildfire', 'community-interface', 'visuals'],
     seasons: ['summer', 'fall'],
     fieldEventMultiplier: 1.18,
@@ -351,8 +365,13 @@ function getJourneySeasonId(journey) {
 function scoreSituationMatch(situation, journey) {
   const areaTags = new Set(Array.isArray(journey?.area?.tags) ? journey.area.tags : []);
   const becCode = journey?.area?.becCode || null;
+  const areaId = journey?.area?.id || journey?.areaId || null;
   const seasonId = getJourneySeasonId(journey);
   let score = 0;
+
+  if (areaId && Array.isArray(situation.areaIds) && !situation.areaIds.includes(areaId)) {
+    return 0;
+  }
 
   for (const tag of situation.areaTags || []) {
     if (areaTags.has(tag)) score += 3;

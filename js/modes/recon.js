@@ -134,14 +134,15 @@ const RECON_ACCESS_HAZARDS = new Set([
   'bog',
   'glacial_outburst',
   'karst_collapse',
-  'hidden_cavities'
+  'hidden_cavities',
+  'debris_flow'
 ]);
 
 // Stream features and the riparian class a layout crew would call them in
 // the field (FPPR s.47 widths). Fish presence is assumed until a fish
 // sampling says otherwise; the sweep flags what needs sampling.
 const RECON_STREAM_FEATURES = {
-  river: { label: 'main river', cls: 'S1/S2', rma: '70 m RMA, 50 m RRZ' },
+  river: { label: 'main river', cls: 'S1', rma: '70 m RMA, 50 m RRZ' },
   salmon_river: { label: 'salmon river', cls: 'S1', rma: '70 m RMA, 50 m RRZ' },
   salmon_stream: { label: 'salmon stream', cls: 'S2', rma: '50 m RMA, 30 m RRZ' },
   fish_habitat: { label: 'fish stream', cls: 'S2/S3', rma: '40-50 m RMA' },
@@ -150,7 +151,7 @@ const RECON_STREAM_FEATURES = {
   community_water: { label: 'intake stream', cls: 'S3', rma: '40 m RMA, 20 m RRZ' },
   wetland: { label: 'wetland', cls: 'W1-W3', rma: '30-50 m RMA' },
   wetland_buffer: { label: 'wetland', cls: 'W3', rma: '30 m RMA' },
-  lake: { label: 'lakeshore', cls: 'L1', rma: '10 m RRZ, 100 m RMA' },
+  lake: { label: 'lakeshore', cls: 'L1-B', rma: '10 m RRZ, no management zone' },
   flood_channel: { label: 'outburst channel', cls: 'S3 (non-classified drainage)', rma: 'keep the road out of it' },
 };
 
@@ -172,6 +173,16 @@ const FLAGGING_PER_BLOCK = 3;
 
 function normalizeReconToken(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+/**
+ * Moose, grizzly and caribou are mainland animals; Vancouver Island has none
+ * of them (js/data/operatingAreas.js "mainland" tag). A journey with no area
+ * (bare fixtures) keeps the mainland defaults.
+ */
+function isMainlandJourney(journey) {
+  const tags = journey?.area?.tags;
+  return !Array.isArray(tags) || tags.includes('mainland');
 }
 
 function ensureReconIntelState(journey) {
@@ -286,7 +297,7 @@ function maybeFinalizeReconAssessment(ui, journey, block) {
  * read off its features. Every cutblock needs the sweep; what it produces
  * is the block's own content, not a generic checklist.
  */
-function getReconValueSweepProfile(block, journey) {
+export function getReconValueSweepProfile(block, journey) {
   const features = new Set((block?.features || []).map(normalizeReconToken).filter(Boolean));
   const hazards = new Set((block?.hazards || []).map(normalizeReconToken).filter(Boolean));
   const tags = new Set();
@@ -306,6 +317,9 @@ function getReconValueSweepProfile(block, journey) {
   if (features.has('beetle_kill') || features.has('wildfire_scar') || features.has('burn_recovery')) {
     wtp.push('grey snags with cavities — keep a patch of the safest ones and a danger-tree assessment on the rest');
   }
+  if (features.has('fire_veterans')) {
+    wtp.push('fire-scarred veterans with thick bark — the old survivors anchor the WTP, and the snags beside them stay if they are safe');
+  }
   if (features.has('blowdown') || hazards.has('windthrow')) {
     wtp.push('windfirm edge retention on the exposed side; the WTP goes in the lee');
   }
@@ -324,11 +338,26 @@ function getReconValueSweepProfile(block, journey) {
     wildlife.push('caribou sign and lichen on the flats — check the UWR/WHA boundary and the GAR order timing window');
     tags.add('winter_access');
   }
-  if (hazards.has('moose') || features.has('wetland') || features.has('wetland_buffer')) {
+  const mainland = isMainlandJourney(journey);
+  if (features.has('murrelet_habitat')) {
+    wildlife.push('moss platforms on the big limbs — potential marbled murrelet nesting habitat; check the WHA and the survey window before the boundary is final');
+  }
+  if (features.has('elk_range')) {
+    wildlife.push('Roosevelt elk trails and a wallow in the draw — check the ungulate winter range line and record the wallow for the site plan');
+  }
+  if (features.has('mule_deer_winter_range')) {
+    wildlife.push('mule deer winter range on the south aspect — the UWR order sets the retention and the snow-interception cover');
+  }
+  if (mainland && (hazards.has('moose') || features.has('wetland') || features.has('wetland_buffer'))) {
     wildlife.push('moose browse and a wallow on the wetland edge — record as a wildlife feature for the site plan');
   }
   if (hazards.has('grizzly') || features.has('wildlife')) {
-    wildlife.push('bear sign and a day bed — a wildlife feature for the site plan and a note for the tailgate');
+    wildlife.push(mainland && hazards.has('grizzly')
+      ? 'grizzly sign and a day bed — a wildlife feature for the site plan and a note for the tailgate'
+      : 'bear sign and a day bed — a wildlife feature for the site plan and a note for the tailgate');
+  }
+  if (hazards.has('cougar')) {
+    wildlife.push('cougar scrape and tracks on the game trail — a note for the tailgate and the working-alone check-ins');
   }
   if (features.has('karst') || features.has('sensitive_area')) {
     wildlife.push('karst sinks and disappearing streams — each one a reserve and a terrain note');
@@ -389,7 +418,7 @@ function getReconValueSweepProfile(block, journey) {
  * What the boundary shift produces on this block: the ribbon, the streams
  * it crossed and the class it called them, terrain and soils, danger trees.
  */
-function getReconLayoutProfile(block) {
+export function getReconLayoutProfile(block) {
   const features = new Set((block?.features || []).map(normalizeReconToken).filter(Boolean));
   const hazards = new Set((block?.hazards || []).map(normalizeReconToken).filter(Boolean));
   const streams = [];
@@ -406,6 +435,8 @@ function getReconLayoutProfile(block) {
   const terrainId = normalizeReconToken(block?.terrain);
   if (terrainId === 'steep' || hazards.has('grade')) terrain.push('slopes over 60% on the upper boundary — terrain stability field card, likely Class IV');
   if (hazards.has('rockslide') || features.has('moraine') || features.has('glacial_terrain')) terrain.push('unstable till and slide scars — road location wants the bench, not the toe');
+  if (hazards.has('debris_flow')) terrain.push('a debris-flow gully above the fan — the terrain stability assessment covers the channel above the road, not just the block');
+  if (hazards.has('avalanche')) terrain.push('snow avalanche paths above the upper boundary — the avalanche assessment decides where the line stops');
   if (terrainId === 'muskeg' || hazards.has('bog') || hazards.has('subsidence') || features.has('permafrost')) terrain.push('organic soils and standing water — frozen-ground harvest window, no summer machine traffic');
   if (features.has('karst')) terrain.push('karst: sinks, grikes and a disappearing stream — each one flagged and buffered');
   if (hazards.has('erosion') || features.has('watershed') || features.has('community_water')) terrain.push('fine-textured soils on the lower slope — sediment control notes for every crossing');
@@ -1150,9 +1181,10 @@ function pickTrailWildlife(journey, paceId) {
   const chance = { slow: 0.28, normal: 0.16, fast: 0.08, grueling: 0.03 }[paceId] || 0;
   if (Math.random() >= chance) return null;
   const block = journey.blocks[journey.currentBlockIndex];
-  const kinds = ['moose', 'deer'];
+  const mainland = isMainlandJourney(journey);
+  const kinds = mainland ? ['moose', 'deer'] : ['deer', 'deer'];
   if (block?.hazards?.some((h) => /grizzly|bear/.test(h))) kinds.push('bear', 'bear');
-  if (block?.hazards?.some((h) => /moose|wildlife/.test(h))) kinds.push('moose');
+  if (block?.hazards?.some((h) => /moose|wildlife/.test(h))) kinds.push(mainland ? 'moose' : 'bear');
   return kinds[Math.floor(Math.random() * kinds.length)];
 }
 
