@@ -13,7 +13,7 @@ import {
 // across a handful of seeds. Kept deterministic so the assertions are stable.
 const SEEDS = 8;
 // Re-picked after the 2026-09 playtest balance pass.
-const WITNESS_SEED = 1003;
+const WITNESS_SEED = 5;
 const MATRIX = simulateMatrix({
   roles: listSeasonalRoleIds(),
   areas: listAreaIds(),
@@ -31,7 +31,8 @@ test("Outstanding is reachable under a known seed", () => {
   // Regression guard for the reachable-Outstanding tuning pass. The witness
   // seed is re-picked whenever draw-order changes shift the RNG stream (last:
   // the 2026-09 realism pass — region gating, event-pool trims, fallout
-  // resolution led by authored weights).
+  // resolution led by authored weights; then the tier consolidation and
+  // shortcut-economics pass).
   const run = simulateRun({
     roleId: "permitter",
     areaId: "fort-st-john-plateau",

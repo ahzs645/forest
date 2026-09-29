@@ -64,10 +64,6 @@ const CONSEQUENCE_INFO = {
     title: "Ecological strain",
     cause: "Production stayed high while compliance sat low, and the stands are starting to show it.",
   },
-  "steady-program": {
-    title: "Steady program",
-    cause: "No meter was left far behind the others, so the weakest one had room to recover.",
-  },
 };
 
 // "steady-program" → "Steady program": a consequence added to the engine

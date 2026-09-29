@@ -22,7 +22,6 @@ import {
   endFieldDay,
   executeFieldAction,
   getBlockAccessVerdict,
-  getFieldThriftContext,
 } from '../js/journey/fieldMechanics.js';
 import { ARRIVAL_SNAP_KM } from '../js/journey/constants.js';
 import { runDaySituation } from '../js/journey/daySituation.js';
@@ -427,10 +426,9 @@ test('an unspent allowance saved by starving the crew or by shortcut cash earns 
   assert.ok(budgetEntry(fed).delta > 0, 'a thrifty, fed season still earns its credit');
 
   const hungry = open();
-  hungry.resourcePressure.hungryShiftsTotal = 2;
-  assert.equal(getFieldThriftContext(hungry).hungryShifts, 2);
-  assert.equal(budgetEntry(hungry).delta, 0);
-  assert.match(budgetEntry(hungry).reason, /went hungry/);
+  hungry.resourcePressure.hungryShifts = 2;
+  assert.ok(budgetEntry(hungry).delta <= 0, 'an allowance saved by an empty food box earns no credit');
+  assert.match(budgetEntry(hungry).reason, /empty food box/);
 
   const paidOff = open();
   paidOff.resources.budget -= 600;

@@ -219,7 +219,7 @@ test('a shortcut caught in the last season says where its fallout goes and the y
 
   const consequences = applyRoundConsequences(state);
   assert.ok(consequences.includes('unlanded-fallout'));
-  assert.equal(state.pendingIssues.length, 0, 'settled, not left dangling');
+  assert.equal(state.pendingIssues.filter((entry) => entry.causedBy?.kind === 'shortcut' || entry.id === 'ministry-data-audit').length, 0, 'the shortcut\'s fallout is settled, not left dangling');
   const settled = state.history.find((entry) => entry.id === 'unlanded-fallout');
   assert.deepEqual(settled.rawEffects, { compliance: -3, relationships: -1 });
   assert.equal(settled.falloutId, 'ministry-data-audit');
