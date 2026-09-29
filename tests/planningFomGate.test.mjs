@@ -324,6 +324,9 @@ test('an event reopening the block question does not ease scrutiny again for the
     assert.equal(prompts.filter((prompt) => prompt === 'Constraint triage:').length, 2);
     assert.ok(!reopenedLines.some((line) => /Scrutiny eases to .* as you choose/.test(line)), 'the same triage eased scrutiny twice');
     assert.ok(reopenedLines.some((line) => /Scrutiny holds at \d+%: the file already carries the Water and ecology first posture/.test(line)));
+  });
+});
+
 test('filing over and over neither skips the comment period nor wears it down', async () => {
   await withSeededRandom(778, async () => {
     const journey = makeJourneyWithArea();
