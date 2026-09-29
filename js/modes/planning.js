@@ -1276,7 +1276,7 @@ export function applyValuesConsequences(journey) {
  * concerns into the record. The Values Workshop is where the rest is won back.
  */
 const LANE_VALUE_DRIFT = {
-  analyze: { timberSupply: 2, biodiversity: -2, firstNationsValues: -1 },
+  analyze: { timberSupply: 1, biodiversity: -1, firstNationsValues: -1 },
   timber: { timberSupply: 12, biodiversity: -3, communityNeeds: -2 },
   stakeholder: { communityNeeds: 2, firstNationsValues: 2 },
 };
@@ -2047,11 +2047,14 @@ async function advanceToNextDay(game) {
     ? journey.deadline - journey.day
     : null;
   // A file at the District Manager is not an approved one: the old FSP runs
-  // out on the same date either way.
+  // out on the same date either way, so the warning stands. The licensee's
+  // pressure lands on a file that has not yet reached the district.
   if (daysRemainingBeforeAdvance !== null && daysRemainingBeforeAdvance <= 4 && !journey.isComplete) {
-    journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
-    if (journey.protagonist) {
-      journey.protagonist.stress = Math.min(100, journey.protagonist.stress + 6);
+    if (journey.plan.phase !== 'ministerial_approval') {
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
+      if (journey.protagonist) {
+        journey.protagonist.stress = Math.min(100, journey.protagonist.stress + 6);
+      }
     }
     ui.writeWarning('The current FSP expires soon. Every day without a replacement is a day the licence cannot apply for new cutting permits.');
   }

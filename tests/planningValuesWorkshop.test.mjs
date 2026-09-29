@@ -141,7 +141,8 @@ test('the mission pane carries the weakest value against the floor', () => {
 test('the analysis and a Timber Supply Analysis wear the non-timber values down, and a session rebuilds some', () => {
   const journey = makeJourney();
   for (let day = 0; day < 4; day += 1) applyLaneValueDrift(journey, 'analyze');
-  applyLaneValueDrift(journey, 'timber');
+  assert.ok(journey.values.biodiversity < 50 && journey.values.firstNationsValues < 50, 'the analysis thins the non-timber results');
+  for (let day = 0; day < 3; day += 1) applyLaneValueDrift(journey, 'timber');
   assert.ok(journey.values.biodiversity < PLANNING_VALUES_FLOOR, `a timber-first file drops biodiversity under the floor (${journey.values.biodiversity})`);
   assert.ok(journey.values.timberSupply > 50);
   assert.deepEqual(getValuesGateDeficits(journey).map((entry) => entry.label), ['Biodiversity']);
