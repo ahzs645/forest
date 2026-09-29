@@ -139,7 +139,9 @@ export function applyDeferredSituation(journey, event, { weight, imposedCost = t
       const crew = Array.isArray(journey.crew) ? journey.crew.filter((m) => m.isActive) : [];
       if (crew.length > 0) {
         for (const member of crew) member.morale = Math.max(0, member.morale - humanCost);
-        humanLine = `; the crew notices (morale -${humanCost})`;
+        humanLine = journey.journeyType === 'manager'
+          ? `; the executive team notices (morale -${humanCost})`
+          : `; the crew notices (morale -${humanCost})`;
       } else if (journey.protagonist) {
         journey.protagonist.stress = Math.min(100, (journey.protagonist.stress || 0) + humanCost);
         humanLine = `; it sits with you (stress +${humanCost})`;
@@ -152,7 +154,7 @@ export function applyDeferredSituation(journey, event, { weight, imposedCost = t
       ? `You did not decide, and the file notices. ${tail}`
       : weight >= 2
         ? `You leave it. ${tail}`
-        : `You leave it for another day. ${tail}`);
+        : `You leave it for ${journey.journeyType === 'manager' ? 'another month' : 'another day'}. ${tail}`);
     messages.push(...describeGoodwillChange(journey, goodwillBefore));
     applied = { ...applied, scrutiny: scrutinyDelta };
   }

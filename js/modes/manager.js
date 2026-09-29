@@ -252,6 +252,12 @@ export async function runManagerDay(game) {
   retireUnfitTemptations(journey);
   const event = fitManagerEvent(journey, journey.day > 1 ? checkForEvent(journey) : null);
   if (event) {
+    // The card clears the screen: hold the decision's result until it has been read.
+    await ui.promptChoice('', [{
+      label: 'Continue to the desk',
+      description: 'Something has landed that needs the GM.',
+      value: 'next',
+    }]);
     const monthsLeft = Math.max(0, (journey.deadline || 0) - journey.day);
     const logBefore = journey.log.length;
     const outcome = await runDaySituation(game, event, {
@@ -834,32 +840,33 @@ async function runBudgetAllocation(game) {
     },
   ]);
 
+  let result = '';
   switch (choice.value) {
     case "operations":
       spendBudget(journey, 30000);
       adjustMetric(journey, "progress", 4);
       adjustMetric(journey, "forestHealth", 2);
-      ui.writeSuccess("Crews get parts, gravel, and a rare sense of being believed. Deliveries tick up.");
+      result = say(ui, 'success', "Crews get parts, gravel, and a rare sense of being believed. Deliveries tick up.");
       break;
     case "pr":
       spendBudget(journey, 22500);
       adjustMetric(journey, "reputation", 4);
       adjustMetric(journey, "relationships", 2);
-      ui.writeSuccess("The open house runs. A seedling gets more column inches than your last three audits combined; the council leaves with the mill tour photos.");
+      result = say(ui, 'success', "The open house runs. A seedling gets more column inches than your last three audits combined; the council leaves with the mill tour photos.");
       break;
     case "compliance":
       spendBudget(journey, 17500);
       adjustMetric(journey, "compliance", 5);
-      ui.writeSuccess("Attendance is mandatory and the sandwiches are adequate. The site plans improve measurably.");
+      result = say(ui, 'success', "Attendance is mandatory and the sandwiches are adequate. The site plans improve measurably.");
       break;
     default:
       adjustPoliticalCapital(journey, 2);
       adjustMetric(journey, "progress", -1);
-      ui.writeInfo("You bank the room. The board notes the discipline; the divisions note the silence.");
+      result = say(ui, 'info', "You bank the room. The board notes the discipline; the divisions note the silence.");
       break;
   }
 
-  recordDecision(journey, "budget_allocation", choice.value);
+  recordDecision(journey, "budget_allocation", choice, result);
 }
 
 const DIVISIONS = [
@@ -931,27 +938,28 @@ async function runDivisionReport(game) {
     },
   ]);
 
+  let result = '';
   switch (choice.value) {
     case "intervene":
       spendBudget(journey, 25000);
       adjustMetric(journey, division.metric, 6);
-      ui.writeSuccess(`You spend two days inside ${division.name}'s problem. It gets measurably smaller; so does your calendar.`);
+      result = say(ui, 'success', `You spend two days inside ${division.name}'s problem. It gets measurably smaller; so does your calendar.`);
       break;
     case "plan":
       adjustMetric(journey, division.metric, 3);
       adjustPoliticalCapital(journey, -1);
-      ui.writeInfo("A plan arrives in five business days with a Gantt chart and modest ambitions. It will mostly work.");
+      result = say(ui, 'info', "A plan arrives in five business days with a Gantt chart and modest ambitions. It will mostly work.");
       break;
     default:
       adjustMetric(journey, "relationships", 3);
       adjustMetric(journey, "reputation", 2);
       journey.scrutiny = clampPercentValue((journey.scrutiny || 0) + 2);
       bumpCrewMorale(journey, 2);
-      ui.writeInfo(`You praise ${lead} at the all-hands. The numbers stay where they are, but loyalty is a real currency out here.`);
+      result = say(ui, 'info', `You praise ${lead} at the all-hands. The numbers stay where they are, but loyalty is a real currency out here.`);
       break;
   }
 
-  recordDecision(journey, "division_report", choice.value);
+  recordDecision(journey, "division_report", choice, result);
 }
 
 async function runFieldVisit(game) {
@@ -982,28 +990,29 @@ async function runFieldVisit(game) {
 
   const choice = await ui.promptChoice("The field window:", options);
 
+  let result = '';
   switch (choice.value) {
     case "visit":
       spendBudget(journey, 12500);
       bumpCrewMorale(journey, 6);
       adjustMetric(journey, "reputation", 3);
       adjustMetric(journey, "forestHealth", 1);
-      ui.writeSuccess("You walk a cutblock in the rain and ask one good question. Word travels faster than the truck back to town.");
+      result = say(ui, 'success', "You walk a cutblock in the rain and ask one good question. Word travels faster than the truck back to town.");
       break;
     case "ceo_tour":
       spendBudget(journey, 6000);
       adjustMetric(journey, "relationships", 2);
       bumpCrewMorale(journey, 2);
-      ui.writeInfo(`${capitalize(journey.ceo.name)} works the contractor camps and the band office like a campaign stop. Different audience, same photos.`);
+      result = say(ui, 'info', `${capitalize(journey.ceo.name)} works the contractor camps and the band office like a campaign stop. Different audience, same photos.`);
       break;
     default:
       adjustPoliticalCapital(journey, 1);
       bumpCrewMorale(journey, -2);
-      ui.writeInfo("The window closes. The inbox empties slightly. Somewhere out there, a crew decides head office is a rumour.");
+      result = say(ui, 'info', "The window closes. The inbox empties slightly. Somewhere out there, a crew decides head office is a rumour.");
       break;
   }
 
-  recordDecision(journey, "field_visit", choice.value);
+  recordDecision(journey, "field_visit", choice, result);
 }
 
 async function runBoardPrep(game) {
@@ -1030,25 +1039,26 @@ async function runBoardPrep(game) {
     },
   ]);
 
+  let result = '';
   switch (choice.value) {
     case "rehearse":
       adjustPoliticalCapital(journey, 4);
       adjustMetric(journey, "compliance", 1);
-      ui.writeSuccess("You can now recite stumpage variance in your sleep. Unfortunately, you do.");
+      result = say(ui, 'success', "You can now recite stumpage variance in your sleep. Unfortunately, you do.");
       break;
     case "polish":
       adjustMetric(journey, "reputation", 3);
       journey.scrutiny = clampPercentValue((journey.scrutiny || 0) + 2);
-      ui.writeInfo("The deck is beautiful. Decks this beautiful invite questions about what they're hiding.");
+      result = say(ui, 'info', "The deck is beautiful. Decks this beautiful invite questions about what they're hiding.");
       break;
     default:
       adjustPoliticalCapital(journey, -2);
       adjustMetric(journey, "reputation", 1);
-      ui.writeInfo("Confidence carries the room further than it should. One director takes up fact-checking as a hobby.");
+      result = say(ui, 'info', "Confidence carries the room further than it should. One director takes up fact-checking as a hobby.");
       break;
   }
 
-  recordDecision(journey, "board_prep", choice.value);
+  recordDecision(journey, "board_prep", choice, result);
 }
 
 /**
@@ -1590,6 +1600,30 @@ function bumpCrewMorale(journey, delta) {
   }
 }
 
-function recordDecision(journey, beat, choice) {
-  journey.decisions.push({ day: journey.day, type: "strategic", beat, choice });
+/** Write a strategic decision's result and hand the text back for the Log. */
+function say(ui, tone, text) {
+  if (tone === 'success') ui.writeSuccess(text);
+  else ui.writeInfo(text);
+  return text;
+}
+
+const BEAT_TITLES = {
+  budget_allocation: 'Discretionary spend',
+  division_report: 'Division report',
+  field_visit: 'Field presence',
+  board_prep: 'Board prep',
+};
+
+/**
+ * The decision goes on the record and in the Log, so its result can still be
+ * read after the month's card has cleared the screen.
+ */
+function recordDecision(journey, beat, choice, result = '') {
+  journey.decisions.push({ day: journey.day, type: "strategic", beat, choice: choice.value });
+  journey.log.push({
+    day: journey.day,
+    type: 'decision',
+    summary: `${BEAT_TITLES[beat] || 'Strategic decision'}: ${choice.label}`,
+    detail: result,
+  });
 }

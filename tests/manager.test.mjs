@@ -16,48 +16,45 @@ const NEW_MANAGER_EVENT_IDS = [
   'gm_certification_audit_prep'
 ];
 
-test('manager operational progress blends term progress with metric health', () => {
+test('manager progress is the calendar: months closed over the term, whatever the meters read', () => {
   const journey = createManagerJourney();
 
-  // Month 1 of 12 with all metrics at 50: 0.6 * (1/12) + 0.4 * 0.5 = 0.25 -> 25
+  // January is open, nothing is closed yet.
   assert.equal(journey.day, 1);
   assert.equal(journey.deadline, 12);
-  assert.equal(getOperationalProgress(journey), 25);
+  assert.equal(getOperationalProgress(journey), 0);
 
-  // Halfway through the term: 0.6 * 0.5 + 0.4 * 0.5 = 0.5 -> 50
-  journey.day = 6;
+  // Six months closed is half the year, with the meters high or low.
+  journey.day = 7;
+  assert.equal(getOperationalProgress(journey), 50);
+  for (const key of Object.keys(journey.metrics)) journey.metrics[key] = 0;
   assert.equal(getOperationalProgress(journey), 50);
 
-  journey.day = 12;
-  for (const key of Object.keys(journey.metrics)) {
-    journey.metrics[key] = 100;
-  }
+  journey.day = 13;
   assert.equal(getOperationalProgress(journey), 100);
 
   // Overshooting the deadline stays clamped to 100
   journey.day = 30;
   assert.equal(getOperationalProgress(journey), 100);
-
-  // Collapsed metrics drag progress below pure term progress
-  journey.day = 6;
-  for (const key of Object.keys(journey.metrics)) {
-    journey.metrics[key] = 0;
-  }
-  assert.equal(getOperationalProgress(journey), 30);
 });
 
-test('manager journeys now cross the shared milestone thresholds', () => {
+test('manager milestones fall on the quarter closes, not on meter health', () => {
+  const crossed = {};
   const journey = createManagerJourney();
-  journey.day = 3; // 0.6 * (3/12) + 0.4 * 0.5 = 0.35 -> 35%
-
-  const messages = [];
-  const reached = recordProgressMilestones(journey, 0, messages, journey.day);
-
-  assert.deepEqual(reached, [25]);
-  assert.equal(messages.length, 1);
-  assert.match(messages[0], /MILESTONE/);
-  assert.match(messages[0], /First quarter closes/);
-  assert.equal(journey.milestonesReached.length, 1);
+  for (let month = 1; month <= 12; month += 1) {
+    const before = getOperationalProgress(journey);
+    journey.day = month + 1; // the month closes
+    const messages = [];
+    for (const threshold of recordProgressMilestones(journey, before, messages, month)) {
+      crossed[threshold] = { month, message: messages.find((line) => /MILESTONE/.test(line)) };
+    }
+  }
+  assert.deepEqual(Object.keys(crossed).map(Number), [25, 50, 75, 90]);
+  assert.equal(crossed[25].month, 3);
+  assert.match(crossed[25].message, /First quarter closes/);
+  assert.equal(crossed[50].month, 6, 'the mid-year review follows June');
+  assert.equal(crossed[75].month, 9, 'Q4 starts after September');
+  assert.equal(crossed[90].month, 11, 'the wrap-up is December');
 });
 
 test('new manager desk events are manager-tagged, expedition-only, and well-formed', () => {

@@ -111,9 +111,11 @@ export async function handleEvent(game, event, frame = {}) {
   // the very consequence that makes this decision meaningful.
   await ui.promptChoice('', [{
     label: 'Acknowledge outcome and continue',
-    description: spendsDay
-      ? 'Close the outcome and move to day closeout'
-      : 'Return to the day after reviewing the result',
+    description: journey.journeyType === 'manager'
+      ? 'Back to the month'
+      : spendsDay
+        ? 'Close the outcome and move to day closeout'
+        : 'Return to the day after reviewing the result',
     value: 'continue'
   }]);
 

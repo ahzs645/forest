@@ -239,7 +239,7 @@ export const InitFlowMixin = {
       entries.push({
         label: 'Resume Expedition',
         detail: `${expedition.companyName || 'Your crew'} — ${expedition.role?.name || 'Forester'}, `
-          + `${expedition.area?.name || 'the operating area'}, day ${expedition.day}`
+          + `${expedition.area?.name || 'the operating area'}, ${expedition.journeyType === 'manager' ? 'month' : 'day'} ${expedition.day}`
           + `${expedition.activeReconShift ? ' (mid-shift)' : ''}`,
         onSelect: () => routeTo({ action: 'load', journey: expedition }),
       });

@@ -116,6 +116,37 @@ test('an event\'s reputation effect is printed with the outcome', () => {
   assert.ok(result.messages.includes(`Reputation +8 → ${before + 8}.`), result.messages.join(' | '));
 });
 
+test('a strategic decision\'s result is held before the month\'s card and kept in the Log', async () => {
+  const lines = [];
+  const events = [];
+  const holds = [];
+  const journey = createManagerJourney({ areaId: 'fraser-plateau' });
+  const push = (text) => { if (typeof text === 'string') lines.push(text); };
+  const ui = {
+    write: push, writeHeader: push, writeWarning: push, writePositive: push, writeDanger: push, writeInfo: push, writeSuccess: push, writeDivider: push,
+    clear() { lines.push('<clear>'); }, updateAllStatus() {}, playEventVignette() {}, async playScene() {}, setMissionStatus() {}, clearMissionStatus() {},
+    async promptChoice(prompt, options = []) {
+      if (options.some((option) => option.value === 'set_aside')) events.push(lines.length);
+      if (options.length === 1 && options[0].label === 'Continue to the desk') holds.push(lines.length);
+      return options.find((option) => ['steady', 'none', 'pr', 'plan', 'visit', 'rehearse', 'transparent', 'pace:1', 'set_aside', 'continue', 'next'].includes(option.value)) || options[0];
+    },
+  };
+  const original = Math.random;
+  let state = 5;
+  Math.random = () => { state = (1664525 * state + 1013904223) >>> 0; return state / 0x100000000; };
+  try {
+    for (let month = 0; month < 12; month += 1) await runManagerDay({ ui, journey, gameOver: false, checkpoint() {} });
+  } finally {
+    Math.random = original;
+  }
+  assert.ok(events.length >= 3, `cards dealt: ${events.length}`);
+  assert.equal(holds.length, events.length, 'every card is preceded by a hold');
+  const decisions = journey.log.filter((entry) => entry.type === 'decision');
+  assert.equal(decisions.length, 11, 'February through December');
+  assert.ok(decisions.some((entry) => entry.summary === 'Discretionary spend: Community and Nation relations' && /The open house runs/.test(entry.detail)));
+  assert.ok(decisions.every((entry) => entry.detail), 'each carries its result');
+});
+
 test('the set-aside chip says what setting a card aside means at head office', async () => {
   const journey = createManagerJourney({ areaId: 'fraser-plateau' });
   const cards = [];
@@ -138,4 +169,43 @@ test('the set-aside chip says what setting a card aside means at head office', a
   }
   assert.ok(cards.length > 0);
   assert.ok(cards.every((text) => !/Delegate/.test(text)), cards.join(' | '));
+});
+
+test('a monthly year speaks in months: no lost days, no crew, no days in the chair', async () => {
+  const text = [];
+  let answered = 0;
+  const push = (line) => { if (typeof line === 'string') text.push(line); };
+  const ui = {
+    write: push, writeHeader: push, writeWarning: push, writePositive: push, writeDanger: push, writeInfo: push, writeSuccess: push, writeDivider: push,
+    clear() {}, updateAllStatus() {}, playEventVignette() {}, async playScene() {}, setMissionStatus() {}, clearMissionStatus() {},
+    async promptChoice(prompt, options = []) {
+      for (const option of options) text.push(`${option.label} | ${option.description || ''}`);
+      // Answer every other card and set the rest aside, so both paths are read.
+      const card = options.some((option) => option.value === 'set_aside');
+      if (card) {
+        answered += 1;
+        if (answered % 2) return options.find((option) => option.value === 'set_aside');
+        return options.find((option) => typeof option.value === 'number');
+      }
+      return options.find((option) => ['steady', 'none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', 'pace:1', 'continue', 'next'].includes(option.value)) || options[0];
+    },
+  };
+  for (const seed of [3, 8, 21]) {
+    const journey = createManagerJourney({ areaId: 'bulkley-valley' });
+    const original = Math.random;
+    let state = seed;
+    Math.random = () => { state = (1664525 * state + 1013904223) >>> 0; return state / 0x100000000; };
+    try {
+      for (let month = 0; month < 12; month += 1) await runManagerDay({ ui, journey, gameOver: false, checkpoint() {} });
+    } finally {
+      Math.random = original;
+    }
+  }
+  assert.ok(answered >= 6, `cards read: ${answered}`);
+  const offending = text.filter((line) => /losing the day|Return to the day|another day|day closeout|the crew notices/.test(line));
+  assert.deepEqual(offending, []);
+  assert.ok(text.some((line) => /Acknowledge outcome and continue \| Back to the month/.test(line)));
+  assert.ok(text.some((line) => /the executive team notices|another month/.test(line)), 'a set-aside charge was read');
+  const { CAREER_LABELS } = await import('../js/career.js');
+  assert.equal(CAREER_LABELS.daysInTheChair, 'Months in the chair');
 });

@@ -506,6 +506,17 @@ export class TerminalUI {
         });
         break;
 
+      case 'manager': {
+        const monthsLeft = Math.max(0, journey.deadline - journey.day);
+        this.updateLocationPanel({
+          name: `Month ${Math.min(journey.day, journey.deadline)} of ${journey.deadline}`,
+          description: `${monthsLeft} month${monthsLeft === 1 ? '' : 's'} left after this one`,
+          phase: journey.currentPhase,
+          season: journey.season
+        });
+        break;
+      }
+
       case 'permitting':
       case 'desk':
       default:
