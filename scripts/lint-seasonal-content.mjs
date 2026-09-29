@@ -161,7 +161,33 @@ export function lintSeasonalContent() {
   // issue whose candidates all fail the area gate is dropped silently.
   lintReachability(allIssues, err);
 
+  // 7. Season-specific copy must be season-gated, or a -30C cold snap turns up
+  // in summer and a heat dome in winter.
+  for (const issue of allIssues) {
+    const cue = seasonCue(issue);
+    if (cue && !(issue.seasonLock && issue.seasonBias?.length)) {
+      err(`issue:${issue.id}`, `text names a season-bound condition ("${cue}") but the card has no seasonLock`);
+    }
+  }
+  for (const event of [...DESK_EVENTS, ...FIELD_EVENTS]) {
+    if (event?.expeditionOnly) continue;
+    const cue = seasonCue(event);
+    const gated = (Array.isArray(event?.seasons) && event.seasons.length) || event?.preconditions?.seasons?.length;
+    if (cue && !gated) {
+      err(`event:${event.id}`, `text names a season-bound condition ("${cue}") but the event has no seasons`);
+    }
+  }
+
   return { errors, warnings };
+}
+
+// Conditions that only happen in one part of the year. Deliberately narrow:
+// "winter road" or "last winter's permit" are fine in any season.
+const SEASON_BOUND_PATTERN = /-\d{2} ?°?C|cold snap|whiteout|heat dome|record highs|heat wave|early snow|snowmelt|freshet|fire season/i;
+
+function seasonCue(card) {
+  const text = [card?.title, card?.description].filter(Boolean).join(" ");
+  return text.match(SEASON_BOUND_PATTERN)?.[0] || null;
 }
 
 const SEASON_ROUNDS = [1, 2, 3, 4];

@@ -83,3 +83,25 @@ test('a balanced answer on a seasonal chain card brings the next stage with its 
   const chain = controller.gs.professional.paperworkChains.find((entry) => entry.id === 'fom-notice-cycle');
   assert.ok(chain.stageIndex >= 1);
 });
+
+test('season-bound events and issues only surface in their season', async () => {
+  const { drawSeasonalEvent, getOperationalEventLibrary } = await import('../js/engine/content.js');
+  const { ISSUE_LIBRARY, CHAINED_ISSUES } = await import('../js/data/index.js');
+  const allIssueIds = [...ISSUE_LIBRARY, ...CHAINED_ISSUES].map((issue) => issue.id);
+
+  const drawOnly = (round, kind, id) => {
+    const state = createInitialState({ companyName: 'T', roleId: 'recce', areaId: 'fraser-plateau' });
+    state.round = round;
+    if (kind === 'event') {
+      const others = getOperationalEventLibrary(state).map((event) => event.id).filter((eventId) => eventId !== id);
+      return drawSeasonalEvent(state, makeRng(3), { advancePending: false, excludeIds: others })?.id || null;
+    }
+    const others = allIssueIds.filter((issueId) => issueId !== id);
+    return drawIssue(state, makeRng(3), { advancePending: false, excludeIds: others })?.id || null;
+  };
+
+  assert.equal(drawOnly(2, 'event', 'extreme_cold'), null, 'no -30C cold snap in summer');
+  assert.equal(drawOnly(4, 'event', 'extreme_cold'), 'extreme_cold');
+  assert.equal(drawOnly(4, 'issue', 'wildfire-heat-dome'), null, 'no heat dome in winter');
+  assert.equal(drawOnly(2, 'issue', 'wildfire-heat-dome'), 'wildfire-heat-dome');
+});

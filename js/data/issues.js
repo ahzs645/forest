@@ -352,6 +352,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce", "silviculture"],
     areaTags: ["wildfire", "sbs", "swb"],
     seasonBias: ["Summer Field"],
+    seasonLock: true,
     options: [
       {
         label: "Suspend operations and cut fuel breaks with Nations",
@@ -524,15 +525,16 @@ export const ISSUE_LIBRARY = [
     id: "pine-beetle-scouts",
     title: "Mountain Pine Beetle Scouts Detected",
     description:
-      "Beetles are surfacing on the fringe of your salvage recovery units. The district's forest health staff warn an outbreak could reignite.",
+      "Spring bark checks find live broods that came through the winter on the fringe of your salvage recovery units. The district's forest health staff warn an outbreak could reignite at the summer flight.",
     roles: ["planner", "recce", "silviculture"],
     areaTags: ["sbs", "beetle-recovery"],
     seasonBias: ["Spring Planning"],
+    seasonLock: true,
     options: [
       {
         label: "Launch sanitation crews immediately",
         outcome:
-          "You fall trap-trees and chip hotspots, buying valuable time against the beetles.",
+          "Crews fall and burn the infested trees before the summer flight, buying valuable time against the beetles.",
         effects: { progress: -2, forestHealth: 5, compliance: 3, relationships: 2, budget: -3 },
         clearFlags: ["pineBeetleMonitor", "pineBeetleUnchecked"],
       },
@@ -562,6 +564,7 @@ export const ISSUE_LIBRARY = [
     roles: ["planner", "silviculture"],
     areaTags: ["sbs", "beetle-recovery"],
     seasonBias: ["Summer Field"],
+    seasonLock: true,
     requiresAnyFlags: ["pineBeetleMonitor", "pineBeetleUnchecked"],
     options: [
       {
@@ -597,6 +600,7 @@ export const ISSUE_LIBRARY = [
     roles: ["planner", "permitter"],
     areaTags: ["sbs", "beetle-recovery"],
     seasonBias: ["Fall Close-out"],
+    seasonLock: true,
     requiresFlags: ["pineBeetleUnchecked"],
     options: [
       {
@@ -937,6 +941,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce"],
     areaTags: ["remote-camps", "glacial", "northern-bc"],
     seasonBias: ["Fall Close-out"],
+    seasonLock: true,
     description:
       "Fog, early snow, and short daylight keep collapsing the last workable access window for one unfinished ridge traverse.",
     options: [
@@ -966,6 +971,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce"],
     areaTags: ["winter-road", "remote-camps", "northern-bc"],
     seasonBias: ["Winter Operations"],
+    seasonLock: true,
     description:
       "A whiteout closes both the road and aviation window with one field crew still beyond the camp line during your final winter push.",
     options: [
@@ -1197,7 +1203,7 @@ export const ISSUE_LIBRARY = [
     id: "wildlife-collar-drop",
     title: "Caribou GPS Collar Drop",
     description:
-      "A collared caribou loses signal near your winter block, and the regional biologist reads it as a possible mortality signal.",
+      "A collared caribou loses signal near your block, and the regional biologist reads it as a possible mortality signal.",
     roles: ["recce", "silviculture"],
     areaTags: ["caribou", "winter-road"],
     seasonBias: ["Winter Operations"],
@@ -1259,6 +1265,7 @@ export const ISSUE_LIBRARY = [
     roles: ["recce", "silviculture"],
     areaTags: ["remote-camps", "bwbs", "watershed"],
     seasonBias: ["Spring Planning", "Summer Field"],
+    seasonLock: true,
     options: [
       {
         label: "Evacuate via helicopter and rebuild on higher ground",

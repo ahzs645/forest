@@ -910,6 +910,12 @@ function eventMatchesSeasonalContext(event, state) {
     return false;
   }
 
+  // Same season gate the expedition deck applies (js/events/selection.js): a
+  // -30C cold snap is a winter card, not a summer one.
+  if (Array.isArray(event.seasons) && event.seasons.length > 0 && !event.seasons.includes(seasonIdForRound(state.round))) {
+    return false;
+  }
+
   const tags = Array.isArray(state.area.tags) ? state.area.tags : [];
   if (Array.isArray(event.areaTags) && event.areaTags.length > 0) {
     if (!matchesAreaContext(event.areaTags, tags)) {

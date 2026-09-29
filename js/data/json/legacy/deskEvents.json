@@ -82,7 +82,8 @@
           "crew_morale": 2
         }
       }
-    ]
+    ],
+    "seasons": ["summer"]
   },
   {
     "id": "media_spotlight",
@@ -167,7 +168,8 @@
           "politicalCapital": -1
         }
       }
-    ]
+    ],
+    "seasons": ["summer", "fall"]
   },
   {
     "id": "severe_windstorm",

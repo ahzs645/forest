@@ -513,7 +513,8 @@
      "food": -8
     }
    }
-  ]
+  ],
+  "seasons": ["winter"]
  },
  {
   "id": "bear_encounter",
