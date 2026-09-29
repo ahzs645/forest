@@ -445,3 +445,8 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Leave prompts.** Campaign and Seasonal default to Keep Playing, like the expedition.
 - **Settings in-game.** Classic and Grid have a Settings button and the O key; Help links to it. Crisis from the landing files its career tree, and `tui.html` wears the Settings theme.
 - **Smaller fixes.** Intel role cards no longer repeat, acronym tags are upper case, and the search box no longer autofocuses on touch. Summer has no freeze-up or heavy snow.
+## 2026-09-29 — Campaign bot loop and silent no-ops
+
+- **Campaign spec.** The day-13 "free-growing survey does nothing" loop was the bot, not the game. It filtered the disabled Brush row ("Waits for Northern Regen Co, on days off until day 14.") out of its labels but clicked by index into the unfiltered buttons, so it clicked the disabled row every pass. It now clicks the button it picked, and the matrix script skips disabled rows. The survey itself passes FS-29 when chosen.
+- **Silviculture refusals stay on screen.** A task, meeting or rotation that cannot go once chosen keeps its reason on its own row, disabled, for the rest of the day, instead of printing a line the redraw wiped and offering the same no-op again. A replacement the program cannot pay for is disabled on the card with the figures.
+- **No silent no-op test.** Every enabled option on silviculture and recon day cards is chosen across areas, days, stressed setups and state changes between card and call; each must spend the day, change the state, or leave its reason visible. Recon, planning, permitting and GM already acknowledge or gate their refusals.
