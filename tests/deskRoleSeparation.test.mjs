@@ -27,6 +27,8 @@ async function batch(role, areaId, policy) {
 
 for (const role of ['planning', 'permitting']) {
   test(`${role}: competent and reckless play separate in every operating area`, async () => {
+    let competentWins = 0;
+    let recklessWins = 0;
     for (const area of OPERATING_AREAS) {
       const competent = await batch(role, area.id, 'competent');
       const reckless = await batch(role, area.id, 'reckless');
@@ -41,8 +43,33 @@ for (const role of ['planning', 'permitting']) {
       // A planning file needs a lead block set to publish a FOM; an area with
       // no block pool cannot be won yet, and that is a data gap, not balance.
       const winnable = role === 'permitting' || getPlanningAreaBlockPool(area.id).length > 0;
-      if (winnable) assert.ok(competent.wins >= SEEDS.length - 1, where);
+      // The permit season is sized so a competent Journeyman desk wins about
+      // five seasons in six (the calendar binds), so one area can lose two of
+      // four; across the province it still has to win most of them.
+      if (winnable) assert.ok(competent.wins >= SEEDS.length - (role === 'permitting' ? 2 : 1), where);
       if (role === 'planning') assert.equal(reckless.wins, 0, `${where}: spam and a draft FOM never win`);
+      competentWins += competent.wins;
+      recklessWins += reckless.wins;
     }
+    const runs = OPERATING_AREAS.length * SEEDS.length;
+    assert.ok(competentWins >= runs * 0.75, `${role}: competent won ${competentWins}/${runs}`);
+    assert.ok(recklessWins <= runs * 0.2, `${role}: reckless won ${recklessWins}/${runs}`);
+  });
+}
+
+// Over a run, honest play has to come out ahead of habitual shortcut-taking:
+// the competent player and the one who takes every off-book option play the
+// file the same way otherwise.
+for (const role of ['planning', 'permitting']) {
+  test(`${role}: taking every shortcut grades worse than playing it straight`, async () => {
+    let competent = 0;
+    let shortcuts = 0;
+    const areas = ['fort-st-john-plateau', 'kootenay-wetbelt', 'vancouver-island-coast', 'skeena-nass'];
+    for (const areaId of areas) {
+      competent += (await batch(role, areaId, 'competent')).meanScore;
+      shortcuts += (await batch(role, areaId, 'shortcuts')).meanScore;
+    }
+    assert.ok(shortcuts < competent,
+      `${role}: shortcuts ${Math.round(shortcuts / areas.length)} vs competent ${Math.round(competent / areas.length)}`);
   });
 }

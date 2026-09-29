@@ -226,13 +226,11 @@ export function checkPermittingEndConditions(journey) {
     return { victory: true, reason: 'Every permit the season needed is issued.' };
   }
 
-  // Deadline handling
+  // The deadline is the season's: the mill needs every permit by then. A
+  // four-in-five consolation win meant no desk could lose to the calendar -
+  // a competent one always had twelve of fifteen, and so did a reckless one.
   if (journey.day > journey.deadline) {
-    if (journey.permits.approved >= journey.permits.target * 0.8) {
-      return { victory: true, reason: 'Deadline reached with enough permits issued to keep the mill supplied' };
-    } else {
-      return { gameOver: true, reason: 'Failed to meet deadline' };
-    }
+    return { gameOver: true, reason: `Failed to meet deadline: ${journey.permits.approved} of ${journey.permits.target} permits issued.` };
   }
 
   // Game over: Budget depleted

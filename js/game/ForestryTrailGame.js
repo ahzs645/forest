@@ -62,6 +62,11 @@ export function applyDifficultyMultipliers(journey, difficulty) {
   if (journey.journeyType === 'planning' && Number.isFinite(journey.deadline)) {
     journey.deadline += difficulty === 'easy' ? 2 : -1;
   }
+  // The permit season is sized so the calendar binds (js/modes/permitting.js
+  // getPermitApprovalRate carries the rest of the difficulty).
+  if (journey.journeyType === 'permitting' && Number.isFinite(journey.deadline)) {
+    journey.deadline += difficulty === 'easy' ? 3 : 0;
+  }
   journey.startingResources = { ...r };
 }
 

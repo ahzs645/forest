@@ -577,7 +577,7 @@ function summarizeState(journey) {
   return '';
 }
 
-export async function simulateRun(roleName, seed, scale, trace = null, { areaId = DEFAULT_AREA, policy = 'competent', difficulty = null } = {}) {
+export async function simulateRun(roleName, seed, scale, trace = null, { areaId = DEFAULT_AREA, policy = 'competent', difficulty = null, onDay = null } = {}) {
   const role = ROLES[roleName];
   const policyFn = policy === 'reckless' ? RECKLESS_POLICIES[roleName]
     : policy === 'shortcuts' ? (RECKLESS_POLICIES[roleName] ? shortcutTaker(role.policy) : null)
@@ -612,6 +612,7 @@ export async function simulateRun(roleName, seed, scale, trace = null, { areaId 
         break;
       }
       days += 1;
+      onDay?.(journey);
       outcome = checkEndConditions(journey);
     }
 

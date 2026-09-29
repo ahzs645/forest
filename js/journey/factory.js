@@ -562,7 +562,7 @@ export function createPermittingJourney(options = {}) {
     season: createSeasonState(effectiveRoleId),
     scrutiny: 38,
     day: 1,
-    deadline: 30,
+    deadline: 16,
     actionsRemaining: ACTIONS_PER_DAY,
     currentPhase: "planning",
 

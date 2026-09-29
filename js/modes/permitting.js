@@ -2131,15 +2131,29 @@ export function getPermitApprovalRate(journey) {
   const professionalPenalty = professional?.registrationActive
     ? Math.min(0.15, (professional.auditExposure / 300) + (professional.competenceRisk / 500))
     : 0.2;
-  return Math.max(0.42, 0.8 - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
+  const difficulty = PERMIT_DIFFICULTY[journey?.difficulty] || PERMIT_DIFFICULTY.normal;
+  return Math.max(0.42, 0.8 + difficulty.approval - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
 }
+
+/**
+ * How hard the district reads a file, by difficulty. Old Growth used to
+ * change only the budget and the event rate, so a competent Old Growth desk
+ * won as surely and as fast as a Journeyman one; the season's length is set
+ * alongside (js/game/ForestryTrailGame.js applyDifficultyMultipliers).
+ */
+const PERMIT_DIFFICULTY = {
+  easy: { approval: 0.05, completeness: -0.03 },
+  normal: { approval: 0, completeness: 0 },
+  hard: { approval: -0.08, completeness: 0.04 },
+};
 
 /** Share of screened files bounced as incomplete. */
 export function getPermitCompletenessReturnRate(journey) {
   const professional = getPermittingProfessionalSnapshot(journey);
   const paperwork = Math.min(0.12, (professional?.paperworkLoad || 0) / 250);
   const registration = professional?.registrationActive ? 0 : 0.1;
-  return Math.min(0.35, 0.08 + paperwork + registration);
+  const difficulty = PERMIT_DIFFICULTY[journey?.difficulty] || PERMIT_DIFFICULTY.normal;
+  return Math.min(0.35, Math.max(0, 0.08 + difficulty.completeness + paperwork + registration));
 }
 
 /**
