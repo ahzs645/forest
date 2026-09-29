@@ -393,6 +393,8 @@ test('headless years: the review prints an amount for every meter it moves, and 
   }
   assert.ok(explained > 0, 'a careful year draws at least one recovery or consequence');
   assert.equal(lines.filter((line) => /^Season total:/.test(line)).length, 4);
+  // Each deployment keeps its own CPD file; the seasonal reminder is no crisis.
+  assert.ok(!lines.some((line) => /CPD Log Behind/.test(line)));
 
   // The season lines sum to the year's trendlines.
   const totals = { progress: 50, forestHealth: 50, relationships: 50, compliance: 50, budget: 50 };

@@ -550,6 +550,10 @@ export function formatBridgeCauses(entries, moved = {}, notes = {}) {
   return lines;
 }
 
+// The seasonal CPD reminder is not a campaign crisis: each deployment keeps
+// its own professional file and logs CPD at the desk (professional_admin).
+const CAMPAIGN_EXCLUDED_ISSUES = ['cpd-log-behind'];
+
 /** Build a fresh seasonal-engine state for this season's role, sharing the year's meters. */
 function buildSeasonState(campaign, season) {
   const gs = createInitialState({
@@ -560,6 +564,8 @@ function buildSeasonState(campaign, season) {
   gs.metrics = campaign.yearMetrics;
   gs.history = campaign.history;
   gs.flags = campaign.flags;
+  // Never schedule the seasonal CPD reminder into the year (see above).
+  gs.flags.cpdReminderSent = true;
   gs.pendingIssues = campaign.pendingIssues;
   gs.round = campaign.seasonIndex + 1;
   gs.totalRounds = CAMPAIGN_SEASONS.length;
@@ -936,7 +942,7 @@ async function runCampaignSeason(game, campaign, season) {
 
   // Crisis interlude: a danger-severity issue interrupts the review — and a
   // failed deployment always draws one, so falling short has a face.
-  const issue = drawIssue(gsSeason, campaign.rng);
+  const issue = drawIssue(gsSeason, campaign.rng, { excludeIds: CAMPAIGN_EXCLUDED_ISSUES });
   const isCrisis = issue && Array.isArray(issue.options) && issue.options.length
     && (issue.surfaceSeverity === 'danger' || !endResult.victory);
   if (isCrisis) {
