@@ -60,7 +60,18 @@ const CONSEQUENCE_INFO = {
     title: "Ecological strain",
     cause: "Production stayed high while compliance sat low, and the stands are starting to show it.",
   },
+  "steady-program": {
+    title: "Steady program",
+    cause: "No meter was left far behind the others, so the weakest one had room to recover.",
+  },
 };
+
+// "steady-program" → "Steady program": a consequence added to the engine
+// without copy here must still read as words, never as a bare id.
+function humanizeConsequenceId(id) {
+  const words = String(id || "").replace(/[-_]+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Season consequence";
+}
 
 function formatEffectText(effects = {}) {
   const pieces = Object.entries(effects)
@@ -79,7 +90,6 @@ export function describeConsequences(state, ids = []) {
   const history = Array.isArray(state?.history) ? state.history : [];
 
   return ids.map((id) => {
-    const info = CONSEQUENCE_INFO[id] || { title: id, cause: "" };
     const entry = [...history]
       .reverse()
       .find(
@@ -88,6 +98,10 @@ export function describeConsequences(state, ids = []) {
           && item?.id === id
           && Number(item?.round) === round,
       );
+    // Uncatalogued ids fall back to the title the engine logged, then to
+    // the id in words.
+    const info = CONSEQUENCE_INFO[id]
+      || { title: entry?.title || humanizeConsequenceId(id), cause: "" };
     return {
       id,
       title: info.title,

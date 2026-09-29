@@ -81,3 +81,22 @@ test('buildRoleLens frames the ending around the role-relevant metric', () => {
   const weak = buildRoleLens(state);
   assert.match(weak, /slipped/i);
 });
+
+test('describeConsequences explains every id the round engine can fire, never the bare id', () => {
+  const state = makeState();
+  state.round = 2;
+  Object.assign(state.metrics, { progress: 50, forestHealth: 55, relationships: 52, compliance: 54, budget: 48 });
+  const ids = applyRoundConsequences(state);
+  assert.ok(ids.includes('steady-program'), `expected the steady-program recovery, got ${ids.join(', ')}`);
+
+  for (const entry of describeConsequences(state, ids)) {
+    assert.notEqual(entry.title, entry.id, `${entry.id} needs a title`);
+    assert.ok(entry.cause, `${entry.id} needs a Why: line`);
+  }
+  const steady = describeConsequences(state, ['steady-program'])[0];
+  assert.equal(steady.title, 'Steady program');
+  assert.match(steady.effectText, /\+3/);
+
+  // An id added to the engine without copy still reads as words.
+  assert.equal(describeConsequences(state, ['late-season-slump'])[0].title, 'Late season slump');
+});
