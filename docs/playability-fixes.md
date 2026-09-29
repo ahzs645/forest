@@ -87,3 +87,22 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - A broken arm or concussion is treated once and then heals with time (broken arm: 12 shifts). A second kit is not spent.
 - Resupply sells only what fits. The bear is reported to RAPP once. Fording a fish stream outside the summer work window costs scrutiny. The flood message matches the crossing type.
 - Recon expedition sims: 24/24 wins before and after. The median dropped from 27 to 24 shifts because of the arrival snap.
+## 2026-09-29: Silviculture playtest fixes
+
+- **Contractor fatigue.** Fatigue is earned on the block and shed on days off (3 a day). Crews standing by no longer accrue it. Crews now work a real plant-and-plot rotation instead of one day on and two off, which brings contractor calls back. A contractor meeting is offered only when a foreman is available, and backing out of one keeps the day. Calling a crew onto the block is a free radio call. Brushing never puts the planters on the block.
+- **What "delivered" means.** Victory, the objectives score and the failure reason all come from one assessment (`assessSilvicultureProgram`). It requires every block planted and inspected, fill done, the release queue treated, and the declarations in RESULTS. Planting quality also counts toward the grade. A program that is not delivered grades no higher than D, or F if under half of it was delivered. Time and resource scores scale by the share delivered.
+- **Integrity.** Shortcuts go on a ledger (`js/modes/silvicultureIntegrity.js`). Each caught falsification costs 20 points on top of scrutiny, and each caught field shortcut costs 6. Two caught falsifications pull the program. A check at season close can surface records that were never caught during the season.
+- **Final report.** Reporting as surveyed pays +4, or +2 when there is a false record. Spin is a +3/-12 gamble whose odds fall with scrutiny and false records.
+- **Free-growing surveys.** A stand that fails waits out its resurvey interval (2 years), and its prescribed release joins this season's program. The free-growing list carries one spare opening. Sprayed brush takes 10 days before a surveyor can read the stand. Survey plots read the stand and the release program, not random noise.
+- **Other fixes.**
+  - Planting carries across block boundaries.
+  - Holdbacks are released when a later block passes clean plots.
+  - Dead "paused/blocked" options are replaced by reasons on the card.
+  - Contractor-call outcomes and set-aside costs stay on the day card under "Earlier today".
+  - Fuel and food event effects are charged to the budget.
+  - Brush copy names the zone's species.
+- **Evidence.** `node scripts/simulate-silviculture-policies.mjs` runs 8 seeds in each of the 9 areas:
+  - competent: 72/72 wins, all grade A
+  - neglect: 0/72 wins, all grade F
+  - fraud: 0/72 wins, grades D/F
+  - shortcuts with full delivery: mostly D/F once caught

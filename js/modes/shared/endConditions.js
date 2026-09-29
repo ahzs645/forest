@@ -5,6 +5,7 @@
 
 import { getSurveyedBlockCount } from '../../journey.js';
 import { allPackagesFinalized, getPackagesFinalized, getPackageTarget } from '../../journey/packages.js';
+import { assessSilvicultureProgram } from '../../data/silvicultureProgram.js';
 
 /**
  * Whether a FOM's public comment period has closed. Older saves recorded the
@@ -97,9 +98,11 @@ export function checkSilvicultureEndConditions(journey) {
     return { gameOver: true, reason: 'All crew members lost' };
   }
 
-  // Victory: this year's blocks planted, this year's declarations in RESULTS
-  if (journey.planting.blocksPlanted >= journey.planting.blocksToPlant &&
-      journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget) {
+  // Victory: the whole program - this year's blocks planted and inspected,
+  // last year's openings filled, the release queue treated, and this year's
+  // declarations in RESULTS (js/data/silvicultureProgram.js).
+  const assessment = assessSilvicultureProgram(journey);
+  if (assessment.complete) {
     return { victory: true, reason: 'Planting program delivered and this year\'s free-growing declarations submitted to RESULTS.' };
   }
 
@@ -119,7 +122,7 @@ export function checkSilvicultureEndConditions(journey) {
   // mode-specific deadline was not authored.
   const programDeadline = Number.isFinite(journey.deadline) ? journey.deadline : 120;
   if (journey.day > programDeadline) {
-    return { gameOver: true, reason: 'Silviculture program fell short of its targets' };
+    return { gameOver: true, reason: `The season closed with the program short: ${assessment.shortfalls.join(', ')}.` };
   }
 
   return null;

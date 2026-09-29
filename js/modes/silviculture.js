@@ -31,11 +31,20 @@ import {
   getBlockAwaitingInspection,
   describeBlock,
   summarizeProgram,
+  isFreeGrowingSurveyable,
   BRUSH_RATES,
   FILL_PRICE_PREMIUM,
   SURVEY_DAY_RATE,
   SUPERVISOR_OVERHEAD_PER_DAY,
+  FG_RESURVEY_YEARS,
+  RELEASE_TAKES_DAYS,
 } from '../data/silvicultureProgram.js';
+import {
+  recordProgramShortcut,
+  recordTemptationOutcome,
+  runSeasonCloseAudit,
+  summarizeIntegrity,
+} from './silvicultureIntegrity.js';
 
 // Contractor events. Each one is a call from a foreman that needs an answer
 // before the crews go out; answering is brief and never spends the day.
@@ -83,7 +92,7 @@ const CONTRACTOR_EVENTS = [
     id: 'stand_down',
     trigger: (c) => c.specialty === 'planting' || c.specialty === 'brushing',
     title: 'Stand-Down Call',
-    getText: (c) => `${c.name}'s foreman calls a stand-down: ${STAND_DOWN_REASONS[Math.floor(Math.random() * STAND_DOWN_REASONS.length)]}. Planters plant in rain; this is not rain.`,
+    getText: (c) => `${c.name}'s foreman calls a stand-down: ${STAND_DOWN_REASONS[Math.floor(Math.random() * STAND_DOWN_REASONS.length)]}. ${c.specialty === 'planting' ? 'Planters plant in rain' : 'Saw crews work in rain'}; this is not rain.`,
     options: [
       { label: 'Back the stand-down', description: 'Crew off the block today; the tailgate meeting covers it tomorrow', value: 'rest', cost: 0, moraleGain: 10, prodGain: 0 },
       { label: 'Keep them on the block', description: 'Production today; a WorkSafeBC prevention officer would call it differently', value: 'push', cost: 0, moraleGain: -8, prodGain: -5, scrutiny: 1 },
@@ -107,6 +116,9 @@ const CONTRACTOR_TASK_TRAITS = {
   brush: ['brush-specialist', 'heat-hard', 'remote-ready', 'terrain-aware'],
   survey: ['survey-minded', 'process-cautious', 'community-facing', 'remote-ready'],
 };
+
+/** Fatigue a crew sheds for each day off. */
+const DAY_OFF_RECOVERY = 3;
 
 const TRAIT_LABELS = {
   'wet-ground': 'wet-ground crew',
@@ -137,8 +149,15 @@ export async function runSilvicultureDay(game) {
   const progressBeforeDay = getOperationalProgress(journey);
 
   startDay(journey);
+  // What happened earlier today (a contractor call answered, a situation set
+  // aside) stays on the day card instead of being cleared by its redraw.
+  silvicultureState.dayNotes = [];
+  silvicultureState.contractorCallToday = false;
 
-  // Daily contractor productivity and morale drift.
+  // Daily contractor productivity and morale drift. Fatigue is earned on the
+  // block (applySilvicultureContractorUsage) and shed on days off
+  // (tickSilvicultureContractorRecovery); a crew that stood by yesterday
+  // sheds a point instead of earning one.
   for (const contractor of journey.contractors) {
     const contractorState = ensureSilvicultureContractorState(contractor, journey, zoneProfile);
     const fit = getSilvicultureContractorFit(contractor, zoneProfile, 'plant');
@@ -150,18 +169,20 @@ export async function runSilvicultureDay(game) {
     }
 
     if (contractor.isActive) {
-      const productivityDecay = currentSeason === 'summer' ? 3 : 2;
+      const productivityDecay = currentSeason === 'summer' ? 2 : 1;
       const moraleDecay = currentSeason === 'summer' ? 2 : 1;
       const accessDrag = zoneProfile.accessPressure > 0.12 ? 1 : 0;
       const fitDrag = fit < 0.9 ? 1 : 0;
       contractor.productivity = Math.max(20, contractor.productivity - productivityDecay - (vegetationPressure > 0.25 ? 1 : 0) - accessDrag - fitDrag);
       contractor.morale = Math.max(0, contractor.morale - moraleDecay - accessDrag - (fit < 0.85 ? 1 : 0));
       contractorState.deploymentDays = (contractorState.deploymentDays || 0) + 1;
-      contractorState.fatigue = Math.min(6, (contractorState.fatigue || 0) + 1 + (accessDrag ? 1 : 0));
+      if (contractorState.lastWorkedDay !== journey.day - 1) {
+        contractorState.fatigue = Math.max(0, (contractorState.fatigue || 0) - 1);
+      }
       contractorState.status = 'deployed';
       contractorState.zoneFit = fit;
       if (contractorState.fatigue >= 4 || contractor.morale <= 28) {
-        startSilvicultureContractorRecovery(contractor, contractorState.fatigue >= 5 ? 2 : 1, 'fatigue');
+        startSilvicultureContractorRecovery(contractor, contractorState.fatigue >= 5 ? 2 : 1, contractor.morale <= 28 ? 'morale' : 'fatigue');
       }
     } else {
       contractorState.status ||= contractorState.cooldownDays > 0 ? 'recovering' : 'ready';
@@ -177,7 +198,9 @@ export async function runSilvicultureDay(game) {
   // Contractor call before the crews go out (never on day 1).
   const activeContractors = journey.contractors.filter(c => c.isActive);
   const contractorStress = activeContractors.some(c => c.morale < 55 || c.productivity < 60);
-  if (journey.day > 1 && Math.random() < (contractorStress ? 0.40 : 0.30)) {
+  // Crews are on the block most mornings now that fatigue clears on days
+  // off, so the odds are set for a call every few days, not every other one.
+  if (journey.day > 1 && Math.random() < (contractorStress ? 0.35 : 0.25)) {
     if (activeContractors.length > 0) {
       const targetContractor = activeContractors[Math.floor(Math.random() * activeContractors.length)];
       const applicableEvents = CONTRACTOR_EVENTS.filter(e => e.trigger(targetContractor));
@@ -185,14 +208,17 @@ export async function runSilvicultureDay(game) {
         const cEvent = applicableEvents[Math.floor(Math.random() * applicableEvents.length)];
         await handleContractorEvent(game, cEvent, targetContractor);
         if (game.gameOver) return;
+        if (journey.isGameOver) return;
       }
     }
   }
 
   // The day's situation. Day 1 stays event-free so the program loop is
   // legible before disruptions begin.
-  const event = journey.day > 1 ? checkForEvent(journey) : null;
+  const drawn = journey.day > 1 ? checkForEvent(journey) : null;
+  const event = drawn ? adaptEventForProgram(drawn) : null;
   if (event) {
+    const scrutinyBefore = Number(journey.scrutiny) || 0;
     const outcome = await runDaySituation(game, event, {
       frame: {
         dayHeader: buildSilvicultureDayHeader(journey),
@@ -203,6 +229,11 @@ export async function runSilvicultureDay(game) {
     });
     if (outcome.gameOver) return;
     if (outcome.spendsDay) spendDay(journey);
+    if (outcome.setAside) {
+      const scrutinyRise = Math.round((Number(journey.scrutiny) || 0) - scrutinyBefore);
+      silvicultureState.dayNotes.push(`You set aside "${event.title}"${scrutinyRise > 0 ? `; scrutiny +${scrutinyRise}` : ''}.`);
+    }
+    if (settleShortcut(journey, event, ui)) return;
   }
 
   const seasonMods = journey.season
@@ -225,7 +256,7 @@ export async function runSilvicultureDay(game) {
       statusLine: buildSilvicultureStatusLine(journey),
       label: 'MORNING CHECK-INS',
       title: buildSilvicultureQuietTitle(journey, seasonInfo),
-      body: buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState),
+      body: buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState, currentSeason),
       context: buildSilvicultureContextLines(journey, seasonInfo, silvicultureState, zoneProfile),
       prompt: dayPrompt(journey),
       options: actionOptions,
@@ -277,12 +308,14 @@ export async function runSilvicultureDay(game) {
     journey.isComplete = true;
     journey.endReason = endResult.reason;
   }
+  if (endResult) closeOutSeason(journey, ui);
 
   if (!journey.isComplete && !journey.isGameOver &&
       (silvicultureState.zombieDays || 0) >= 4 &&
       isSilvicultureUnwinnable(journey)) {
     journey.isGameOver = true;
     journey.gameOverReason = 'The program can no longer reach its targets - the season is called.';
+    closeOutSeason(journey, ui);
   }
 
   ui.updateAllStatus(journey);
@@ -348,10 +381,12 @@ function buildSilvicultureQuietTitle(journey, seasonInfo) {
   return 'ALL CREWS ACCOUNTED FOR';
 }
 
-function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState) {
+function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState, currentSeason) {
   const activeContractors = (journey.contractors || []).filter((c) => c.isActive);
   const unhappy = activeContractors.find((c) => c.morale < 40);
   const parts = [];
+  const notes = silvicultureState?.dayNotes || [];
+  if (notes.length) parts.push(`Earlier today: ${notes.join(' ')}`);
 
   if (seasonInfo?.id === 'winter') {
     parts.push('The ground is frozen through and nothing plants until spring. What moves today is the roster, the RESULTS submissions and next year\'s seedling order.');
@@ -365,6 +400,8 @@ function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState) {
       : 'The contractors are on days off. Give them the day, or use your own crew for the plots and surveys it can carry.');
   } else if (unhappy) {
     parts.push(`${unhappy.name} keeps the morning call short and lets you hear it. Nothing that needs an answer yet.`);
+  } else if (silvicultureState?.contractorCallToday) {
+    parts.push('The rest of the morning check-ins are quiet. Whatever today is, it is yours to decide.');
   } else {
     parts.push('The foremen call in one by one and none of them has a problem for you. Whatever today is, it is yours to decide.');
   }
@@ -372,6 +409,7 @@ function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState) {
   if (seasonInfo?.id !== 'winter') {
     parts.push(`Next up: ${describeNextTask(journey, silvicultureState)}.`);
   }
+  parts.push(...describeHeldWork(journey, currentSeason));
   if (Number.isFinite(journey.deadline)) {
     const daysLeft = Math.max(0, journey.deadline - journey.day);
     if (daysLeft <= 5) {
@@ -381,11 +419,50 @@ function buildSilvicultureQuietBody(journey, seasonInfo, silvicultureState) {
   return parts.join(' ');
 }
 
+/** "planted yesterday", "planted on day 12" - never a stale "yesterday". */
+function describePlantedWhen(journey, block) {
+  if (!Number.isFinite(block?.plantedDay)) return 'planted and waiting';
+  const ago = journey.day - block.plantedDay;
+  if (ago <= 0) return 'planted out today';
+  if (ago === 1) return 'planted yesterday';
+  return `planted out on day ${block.plantedDay}`;
+}
+
+/**
+ * Work the program is holding, and why. These used to be menu options that
+ * only printed their reason - which the card redraw then wiped - so they sit
+ * on the card itself now.
+ */
+function describeHeldWork(journey, currentSeason) {
+  const program = journey.program;
+  const held = [];
+  const plantingRemaining = journey.planting.blocksPlanted < journey.planting.blocksToPlant && getCurrentPlantingBlock(program);
+  const awaiting = getBlockAwaitingInspection(program);
+  if (plantingRemaining && currentSeason === 'winter') {
+    held.push('Planting waits for spring: the ground is frozen.');
+  } else if (plantingRemaining && awaiting) {
+    held.push(`Planting holds until the plots on ${awaiting.id} are walked - the contractor gets paid on them.`);
+  }
+  if (currentSeason !== 'winter' && journey.surveys.freeGrowingComplete < journey.surveys.freeGrowingTarget && !getSurveyableOpening(journey)) {
+    const waiting = (program.freeGrowing || []).filter((opening) => !(opening.surveyed && opening.result === 'pass'));
+    const underBrush = waiting.find((opening) => opening.needsRelease && !opening.released);
+    const takingEffect = waiting.find((opening) => opening.needsRelease && opening.released && opening.releaseReadyDay > journey.day);
+    if (takingEffect) {
+      held.push(`The release on ${takingEffect.id} has not taken yet; the surveyor can read it from day ${takingEffect.releaseReadyDay}.`);
+    } else if (underBrush) {
+      held.push(`Free-growing surveys wait on the release: ${underBrush.id} is still under brush and would fail on competition.`);
+    } else if (waiting.length) {
+      held.push('Every candidate left on the free-growing list is inside its resurvey interval.');
+    }
+  }
+  return held;
+}
+
 /** What a supervisor would say the program needs next, in vintage terms. */
 function describeNextTask(journey, silvicultureState) {
   const program = journey.program;
   const awaiting = getBlockAwaitingInspection(program);
-  if (awaiting) return `quality plots on ${awaiting.id}, planted yesterday`;
+  if (awaiting) return `quality plots on ${awaiting.id}, ${describePlantedWhen(journey, awaiting)}`;
   const current = getCurrentPlantingBlock(program);
   if (current && journey.planting.blocksPlanted < journey.planting.blocksToPlant) {
     return `${current.status === 'planting' ? 'finish' : 'start'} ${current.id} (${current.ha} ha of this year's program)`;
@@ -394,7 +471,7 @@ function describeNextTask(journey, silvicultureState) {
   if (fill) return `fill plant ${fill.id} (${fill.year}, ${fill.ha} ha, ${fill.stockedSph} sph against MSS ${fill.mss})`;
   const brush = (program.brush || []).find((opening) => opening.treated < opening.ha);
   if (brush) return `release treatment on ${brush.id} (${brush.year}, ${brush.ha} ha)`;
-  const fg = (program.freeGrowing || []).find((opening) => !(opening.surveyed && opening.result === 'pass'));
+  const fg = journey.surveys.freeGrowingComplete < journey.surveys.freeGrowingTarget ? getSurveyableOpening(journey) : null;
   if (fg) return `free-growing survey on ${fg.id} (${fg.year}, ${fg.ha} ha)`;
   return silvicultureState.lastAction ? 'closing out the file' : 'the program binder';
 }
@@ -408,7 +485,7 @@ function buildSilvicultureContextLines(journey, seasonInfo, silvicultureState, z
   if (standStrip) lines.push(standStrip);
 
   const standard = getStockingStandard(journey.program?.becCode || journey.area?.becCode);
-  lines.push(`Five vintages, one crew: this year's blocks (plant, inspect), last year's openings (fill), the ${journey.program.year - 5}–${journey.program.year - 2} stands (release), the ${describeFgYears(journey.program)} openings (free-growing survey). New seedlings do not become free-growing this season.`);
+  lines.push(`Four vintages, one crew: this year's blocks (plant, inspect), last year's openings (fill), the ${journey.program.year - 5}–${journey.program.year - 2} stands (release), the ${describeFgYears(journey.program)} openings (free-growing survey). New seedlings do not become free-growing this season.`);
   lines.push(`Stocking standard ${describeStockingStandard(standard)}.`);
   lines.push(`Program: ${describeProgramLine(journey)} | ${zoneProfile.summary}`);
   const roster = getSilvicultureContractorRoster(journey, zoneProfile);
@@ -457,21 +534,30 @@ function updateSilvicultureMissionStatus(ui, journey, seasonInfo, zoneProfile) {
   if (summary.fillTotal) facts.push({ label: 'Fill', value: `${summary.fillDone}/${summary.fillTotal} openings` });
   facts.push({ label: 'Roster', value: roster.summary });
 
+  const releaseOpen = (journey.program?.brush || []).some((opening) => opening.treated < opening.ha);
   const checklist = [
     {
       label: `this year's planting ${plantPct}% (${Math.min(journey.planting.blocksPlanted, journey.planting.blocksToPlant)}/${journey.planting.blocksToPlant} blocks, ${summary.blocksInspected} inspected)`,
-      done: plantDone
+      done: plantDone && summary.blocksInspected >= journey.planting.blocksToPlant
+    },
+    summary.fillTotal ? {
+      label: `fill planting (${summary.fillDone}/${summary.fillTotal} of last year's openings)`,
+      done: summary.fillDone >= summary.fillTotal
+    } : null,
+    {
+      label: `release treatments ${brushPct}% (${Math.round(journey.brushing.hectaresComplete)}/${journey.brushing.hectaresTarget} ha)`,
+      done: !releaseOpen && journey.brushing.hectaresComplete >= journey.brushing.hectaresTarget
     },
     {
       label: `free-growing declarations ${surveyPct}% (${Math.min(journey.surveys.freeGrowingComplete, journey.surveys.freeGrowingTarget)}/${journey.surveys.freeGrowingTarget})`,
       done: surveyDone
     }
-  ];
+  ].filter(Boolean);
 
   const alerts = [];
   const vegetationPressure = getVegetationPressure(journey);
   if (vegetationPressure > 0.25) {
-    alerts.push({ level: 'warn', text: 'Release is behind the calendar - the older stands are losing the height race to aspen and willow.' });
+    alerts.push({ level: 'warn', text: `Release is behind the calendar - the older stands are losing the height race to ${describeBrush(journey)}.` });
   }
   if (getBlockAwaitingInspection(journey.program)) {
     alerts.push({ level: 'info', text: 'A planted block is waiting on its quality plots; the contractor gets paid on them.' });
@@ -481,7 +567,7 @@ function updateSilvicultureMissionStatus(ui, journey, seasonInfo, zoneProfile) {
   }
 
   ui.setMissionStatus?.({
-    objective: 'Plant and inspect this year\'s blocks; get this year\'s free-growing declarations into RESULTS.',
+    objective: 'Plant and inspect this year\'s blocks, fill last year\'s openings, release the older stands, and get this year\'s free-growing declarations into RESULTS.',
     meter: { label: 'Planting', value: plantPct, text: `${plantPct}%` },
     facts,
     checklist,
@@ -525,9 +611,15 @@ function displaySilvicultureBriefing(ui, journey, silvicultureState, zoneProfile
   }
   ui.write('Free-growing survey candidates:');
   for (const opening of program.freeGrowing) {
-    const status = opening.surveyed
-      ? (opening.result === 'pass' ? 'declared free-growing' : `FAILED on competition; ${opening.released ? 'released, resurvey due' : 'release prescribed'}`)
-      : (opening.needsRelease && !opening.released ? 'under brush - release before survey' : 'ready for survey');
+    const status = opening.surveyed && opening.result === 'pass'
+      ? 'declared free-growing'
+      : opening.surveyed
+        ? `FAILED; ${opening.released ? 'released' : 'treatment prescribed'}, resurvey ${opening.resurveyYear || program.year + FG_RESURVEY_YEARS}`
+        : opening.needsRelease && !opening.released
+          ? 'under brush - release before survey'
+          : opening.needsRelease && opening.releaseReadyDay > journey.day
+            ? `released, readable from day ${opening.releaseReadyDay}`
+            : 'ready for survey';
     ui.write(`  ${opening.id} (${opening.year}, ${opening.ha} ha): ${status}`);
   }
 
@@ -585,27 +677,15 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
       description: `Send the planting contractor onto ${currentBlock.status === 'planting' ? 'the rest of' : 'the next block of this year\'s program,'} ${currentBlock.id} (${currentBlock.ha} ha, ${currentBlock.speciesMix}) - ${getSilvicultureTaskSummary(journey, zoneProfile, 'plant')}`,
       value: 'plant'
     });
-  } else if (plantingRemaining && plantingEff <= 0) {
-    // A no-op entry so the player knows why; deliberately does not start
-    // with "Plant (" so a greedy picker never latches onto it.
-    actionOptions.push({
-      label: 'Planting frozen (winter lockout)',
-      description: 'Ground is frozen. Planting waits for spring.',
-      value: 'plant_disabled'
-    });
-  } else if (plantingRemaining && awaitingInspection) {
-    actionOptions.push({
-      label: `Planting paused (plots pending on ${awaitingInspection.id})`,
-      description: 'Planting stays paused until the inspection on the block you planted yesterday is closed - the contractor gets paid on it.',
-      value: 'plant_blocked'
-    });
   }
+  // Held planting (frozen ground, plots pending) is explained on the card
+  // body (describeHeldWork), not offered as an option that does nothing.
 
   // Planting quality inspection (this year's blocks): your own crew walks it.
   if (awaitingInspection) {
     actionOptions.push({
       label: 'Planting quality inspection (this year\'s blocks)',
-      description: `Walk quality plots on ${awaitingInspection.id}, planted yesterday: spacing, depth, J-roots, % excess. Payment holdback rides on it - ${describeInspectionTeam(journey)}`,
+      description: `Walk quality plots on ${awaitingInspection.id}, ${describePlantedWhen(journey, awaitingInspection)}: spacing, depth, J-roots, % excess. Payment holdback rides on it - ${describeInspectionTeam(journey)}`,
       value: 'inspect'
     });
   }
@@ -634,8 +714,8 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
       currentSeason !== 'winter') {
     const seasonNote = brushingEff >= 1.2 ? ' (release window)' : '';
     actionOptions.push({
-      label: `Brush (${program.year - 5}–${program.year - 2} stands)${seasonNote}`,
-      description: `Release the older plantations from aspen, willow and fireweed before they lose the height race; next up ${brushOpening.id} (${brushOpening.year}, ${brushOpening.ha} ha)${brushOpening.fgId ? ', a free-growing candidate' : ''} - ${getSilvicultureTaskSummary(journey, zoneProfile, 'brush')}`,
+      label: `Brush (release the older stands)${seasonNote}`,
+      description: `Release the older plantations from ${describeBrush(journey)} before they lose the height race; next up ${brushOpening.id} (${brushOpening.year}, ${Math.round(brushOpening.ha - brushOpening.treated)} ha left)${brushOpening.fgId ? ', a free-growing candidate' : ''} - ${getSilvicultureTaskSummary(journey, zoneProfile, 'brush')}`,
       value: 'brush'
     });
   }
@@ -645,21 +725,15 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   if (currentSeason !== 'winter' &&
       journey.surveys.freeGrowingComplete < journey.surveys.freeGrowingTarget) {
     const seasonNote = surveyEff >= 1.2 ? ' (survey window)' : '';
-    const surveyable = getSurveyableOpening(program);
-    const underBrush = (program.freeGrowing || []).find((opening) => !(opening.surveyed && opening.result === 'pass') && opening.needsRelease && !opening.released);
+    const surveyable = getSurveyableOpening(journey);
     if (surveyable) {
       actionOptions.push({
         label: `Free-growing survey (${describeFgYears(program)} openings)${seasonNote}`,
-        description: `Assess ${surveyable.id} (${surveyable.year}, ${surveyable.ha} ha) against the site plan's stocking standard: well-spaced, healthy, acceptable species, free of competition - ${getSilvicultureTaskSummary(journey, zoneProfile, 'survey')}`,
+        description: `Assess ${surveyable.id} (${surveyable.year}, ${surveyable.ha} ha) against the site plan's stocking standard: well-spaced, healthy, acceptable species, free of competition${getVegetationPressure(journey) > 0.25 ? '. The release program is behind the calendar and the plots will read the brush' : ''} - ${getSilvicultureTaskSummary(journey, zoneProfile, 'survey')}`,
         value: 'survey'
       });
-    } else if (underBrush) {
-      actionOptions.push({
-        label: `Free-growing survey blocked (${underBrush.id} under brush)`,
-        description: 'The stands due for free-growing survey are still under brush. Get the release treatment done first or the surveyor will fail them on competition.',
-        value: 'survey_blocked'
-      });
     }
+    // Blocked surveys are explained on the card body (describeHeldWork).
   }
 
   if (roster.rotatableCount > 0) {
@@ -670,11 +744,13 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
     });
   }
 
-  actionOptions.push({
-    label: 'Contractor Meeting',
-    description: 'Sit down with a foreman over the plot cards and the pay sheet',
-    value: 'meeting'
-  });
+  if (getMeetableContractors(journey, zoneProfile).length > 0) {
+    actionOptions.push({
+      label: 'Contractor Meeting',
+      description: 'Sit down with a foreman over the plot cards and the pay sheet',
+      value: 'meeting'
+    });
+  }
 
   if (journey.crew && journey.crew.length > 0) {
     actionOptions.push({
@@ -708,9 +784,16 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   });
 }
 
-function getSurveyableOpening(program) {
-  return (program?.freeGrowing || []).find((opening) =>
-    !(opening.surveyed && opening.result === 'pass') && (!opening.needsRelease || opening.released)) || null;
+function getSurveyableOpening(journey) {
+  const context = { year: journey?.program?.year, day: journey?.day };
+  return (journey?.program?.freeGrowing || []).find((opening) => isFreeGrowingSurveyable(opening, context)) || null;
+}
+
+/** The brush this zone's stands are losing the height race to. */
+function describeBrush(journey) {
+  const species = getStockingStandard(journey?.program?.becCode || journey?.area?.becCode).brushSpecies || ['brush'];
+  if (species.length === 1) return species[0];
+  return `${species.slice(0, -1).join(', ')} and ${species[species.length - 1]}`;
 }
 
 function describeInspectionTeam(journey) {
@@ -728,26 +811,12 @@ async function processAction(game, actionId, currentSeason, seasonMods, silvicul
       if (await handlePlanting(game, seasonMods, silvicultureState, zoneProfile)) spendDay(journey);
       break;
 
-    case 'plant_disabled':
-      ui.writeWarning('Ground is frozen. Planting waits for spring.');
-      break;
-
-    case 'plant_blocked': {
-      const awaiting = getBlockAwaitingInspection(journey.program);
-      ui.writeWarning(`Planting stays paused until the inspection on ${awaiting?.id || 'the block you planted yesterday'} is closed - the contractor gets paid on it.`);
-      break;
-    }
-
     case 'brush':
       if (await handleBrushTreatment(game, seasonMods, silvicultureState, zoneProfile)) spendDay(journey);
       break;
 
     case 'survey':
       if (await handleFreeGrowingSurvey(game, seasonMods, silvicultureState, zoneProfile)) spendDay(journey);
-      break;
-
-    case 'survey_blocked':
-      ui.writeWarning('The stands due for free-growing survey are still under brush. Get the release treatment done first or the surveyor will fail them on competition.');
       break;
 
     case 'inspect':
@@ -759,8 +828,7 @@ async function processAction(game, actionId, currentSeason, seasonMods, silvicul
       break;
 
     case 'meeting':
-      await handleContractorMeeting(game);
-      spendDay(journey);
+      if (await handleContractorMeeting(game, zoneProfile)) spendDay(journey);
       break;
 
     case 'briefing':
@@ -825,11 +893,14 @@ async function handlePlanting(game, seasonMods, silvicultureState, zoneProfile) 
   const price = Number(contractor.pricePerTree) || 0.32;
   const holdbackPct = Number(contractor.holdbackPct) || 0;
   const completed = [];
+  const touched = [];
   let planted = 0;
+  let holdback = 0;
 
   // The day's trees go onto the current block; a crew that finishes a block
-  // moves onto the next in the afternoon, and stops there until the plots
-  // on the finished block are walked.
+  // moves onto the next in the afternoon, and goes no further than that
+  // until the plots on the finished block are walked. Stopping at the block
+  // line used to spend whole days planting the last few dozen trees.
   while (toPlant > 0) {
     const target = getCurrentPlantingBlock(program);
     if (!target) break;
@@ -837,27 +908,30 @@ async function handlePlanting(game, seasonMods, silvicultureState, zoneProfile) 
     const put = Math.min(room, toPlant);
     target.planted += put;
     target.status = 'planting';
+    // The holdback rides on the block the trees went into.
+    const blockHoldback = Math.round(put * price * (holdbackPct / 100));
+    target.holdback += blockHoldback;
+    holdback += blockHoldback;
     planted += put;
     toPlant -= put;
+    touched.push(target);
     if (target.planted >= target.trees) {
       target.status = 'planted';
+      target.plantedDay = journey.day;
       completed.push(target);
-      break; // planting pauses until this block is inspected
     }
+    if (completed.length > 0 && target !== completed[0]) break;
   }
 
   journey.planting.seedlingsPlanted = Math.min(journey.planting.seedlingsAllocated, journey.planting.seedlingsPlanted + planted);
   journey.resources.seedlings -= planted;
   journey.resources.contractorCapacity -= 4;
-  const invoice = Math.round(planted * price * (1 - holdbackPct / 100));
-  const holdback = Math.round(planted * price * (holdbackPct / 100));
+  const invoice = Math.round(planted * price) - holdback;
   journey.resources.budget -= invoice;
-  for (const done of completed) done.holdback += holdback;
-  const activeBlock = completed[0] || getCurrentPlantingBlock(program);
-  if (activeBlock && !completed.length) activeBlock.holdback += holdback;
 
-  const shown = completed[0] || activeBlock;
-  ui.write(`${describeBlock(shown)}: ${shown.planted.toLocaleString()} of ${shown.trees.toLocaleString()} planted (${Math.round((shown.planted / shown.trees) * 100)}%).`);
+  for (const block of touched) {
+    ui.write(`${describeBlock(block)}: ${block.planted.toLocaleString()} of ${block.trees.toLocaleString()} planted (${Math.round((block.planted / block.trees) * 100)}%).`);
+  }
   ui.write(`${contractor.name}: ${planted.toLocaleString()} trees at $${price.toFixed(2)}/tree - invoice $${invoice.toLocaleString()}${holdbackPct ? `, $${holdback.toLocaleString()} held back pending plots` : ''}.`);
   if (journey.day <= 7 && plantingEff >= 1.2) {
     ui.writePositive('Early-season ground: cool soil, moisture in the rooting zone, the planters hit their numbers.');
@@ -870,7 +944,8 @@ async function handlePlanting(game, seasonMods, silvicultureState, zoneProfile) 
 
   for (const done of completed) {
     journey.planting.blocksPlanted = Math.min(journey.planting.blocksToPlant, journey.planting.blocksPlanted + 1);
-    ui.writePositive(`${done.id} planted out (${done.trees.toLocaleString()} trees on ${done.ha} ha). Quality plots tomorrow before the crew moves on.`);
+    const next = getCurrentPlantingBlock(program);
+    ui.writePositive(`${done.id} planted out (${done.trees.toLocaleString()} trees on ${done.ha} ha). Quality plots tomorrow before the crew goes further${next && next.planted > 0 ? ` than ${next.id}` : ''}.`);
   }
 
   applySilvicultureContractorUsage(journey, crew, pressure, 'plant');
@@ -933,15 +1008,28 @@ async function handleQualityInspection(game, seasonMods, silvicultureState, zone
   journey.planting.survivalRate = journey.planting.qualityAverage;
 
   ui.writeHeader('PLANTING QUALITY INSPECTION');
+  if (silvicultureState.falseCardsPending) {
+    silvicultureState.falseCardsPending = false;
+    ui.writeWarning('Your checker\'s plots do not match the cards you signed for the foreman. Anyone who pulls both will see it.');
+  }
   ui.write(`${describeBlock(block)}: ${quality}% quality on ${hasChecker ? 'your checker\'s' : 'your'} plots - spacing ${spacingSph.toLocaleString()} sph against ${block.sph.toLocaleString()} target, ${jRoots}% J-roots, ${excess}% excess.`);
 
   const holdback = block.holdback || 0;
   if (quality >= 90) {
     journey.resources.budget -= holdback;
+    block.holdback = 0;
     ui.writePositive(`Plots pass. Holdback of $${holdback.toLocaleString()} released to ${contractor?.name || 'the contractor'}.`);
     if (contractor) contractor.morale = Math.min(100, contractor.morale + 3);
+    // A clean block is the tighter spacing the marginal ones were held for.
+    const retained = program.blocks.filter((other) => other !== block && other.status === 'inspected' && other.quality >= 85 && other.holdback > 0);
+    const owed = retained.reduce((sum, other) => sum + other.holdback, 0);
+    if (owed > 0) {
+      journey.resources.budget -= owed;
+      for (const other of retained) other.holdback = 0;
+      ui.write(`The crew tightened up: $${owed.toLocaleString()} held back on ${retained.map((other) => other.id).join(', ')} goes out with it.`);
+    }
   } else if (quality >= 85) {
-    ui.writeWarning(`Plots pass at the margin. Holdback of $${holdback.toLocaleString()} stays held until the crew tightens spacing on the next block.`);
+    ui.writeWarning(`Plots pass at the margin. Holdback of $${holdback.toLocaleString()} stays held until the crew passes clean plots on a later block.`);
     if (contractor) contractor.morale = Math.max(0, contractor.morale - 6);
     program.notes.push(`${block.id}: ${quality}% quality, holdback retained.`);
   } else {
@@ -1004,7 +1092,10 @@ async function handleFillPlanting(game, seasonMods, silvicultureState, zoneProfi
   if (output < trees) {
     ui.write('Fill work is slow walking: the crew hunts gaps between live seedlings instead of planting lines.');
   }
-  ui.write('Last year\'s openings are back above minimum stocking.');
+  const fillLeft = (program.fill || []).filter((o) => !o.done).length;
+  ui.write(fillLeft === 0
+    ? 'Last year\'s openings are all back above minimum stocking.'
+    : `${fillLeft === 1 ? 'One' : fillLeft} of last year's openings ${fillLeft === 1 ? 'is' : 'are'} still below minimum stocking.`);
   if (pressure.fillPressure > 0.05) ui.writeWarning(pressure.summary);
 
   applySilvicultureContractorUsage(journey, crew, pressure, 'fill');
@@ -1059,7 +1150,7 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   const options = [
     {
       label: `Manual brushing (saw crews, ~$${BRUSH_RATES.manual}/ha)`,
-      description: 'Slower, no PMP, nothing in the water. The crews cut aspen and willow below the seedling leaders.',
+      description: `Slower, no PMP, nothing in the water. The crews cut ${describeBrush(journey)} below the seedling leaders.`,
       value: 'manual',
     },
   ];
@@ -1115,6 +1206,8 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
       if (fg) {
         fg.released = true;
         fg.releaseMethod = method;
+        fg.releasedDay = journey.day;
+        fg.releaseReadyDay = journey.day + (RELEASE_TAKES_DAYS[method] ?? 1);
       }
     }
   }
@@ -1129,7 +1222,7 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   const openingsText = treated.map((entry) => `${entry.opening.id} (${entry.opening.year}, ${Math.round(entry.ha)} ha)`).join(' and ');
   const yearsText = [...new Set(treated.map((entry) => entry.opening.year))].sort().join('/');
   if (method === 'manual') {
-    ui.write(`Treated ${Math.round(hectares)} ha of ${yearsText} openings by manual release - aspen and willow cut below the seedling leaders.`);
+    ui.write(`Treated ${Math.round(hectares)} ha of ${yearsText} openings by manual release - ${describeBrush(journey)} cut below the seedling leaders.`);
   } else if (method === 'glyphosate') {
     const pmp = silvicultureState.pmpNumber ||= `402-0${700 + Math.floor(Math.random() * 90)}`;
     ui.write(`${hectares >= 60 ? 'Aerial' : 'Backpack'} glyphosate on ${Math.round(hectares)} ha of ${yearsText} openings under PMP ${pmp}. 10 m pesticide-free zones flagged on every stream.`);
@@ -1147,11 +1240,18 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   ui.write(`Release treatment: ${openingsText} - ${Math.round(hectares)} ha. ${contractor.name}: $${rate}/ha - invoice $${invoice.toLocaleString()}.`);
   const releasedFg = treated.map((entry) => entry.opening).filter((opening) => opening.fgId && opening.treated >= opening.ha);
   for (const opening of releasedFg) {
-    ui.writePositive(`Release treatment done on the ${opening.year} opening ${opening.id}. That stand is back on track for its free-growing survey.`);
+    const fg = (program.freeGrowing || []).find((candidate) => candidate.id === opening.fgId);
+    if (fg?.surveyed && fg.result === 'fail') {
+      ui.writePositive(`Prescribed release done on ${opening.id}. The stand goes back on the free-growing list for its ${fg.resurveyYear} resurvey.`);
+    } else if (method === 'glyphosate') {
+      ui.writePositive(`Release treatment done on the ${opening.year} opening ${opening.id}. The sprayed brush browns out over the next weeks; the surveyor can read the stand from day ${fg?.releaseReadyDay}.`);
+    } else {
+      ui.writePositive(`Release treatment done on the ${opening.year} opening ${opening.id}. That stand is back on track for its free-growing survey.`);
+    }
   }
   const young = treated.map((entry) => entry.opening).filter((opening) => !opening.fgId && opening.treated >= opening.ha);
   if (young.length) {
-    ui.writePositive(`Release treatment done on the ${[...new Set(young.map((o) => o.year))].sort().join('/')} openings. Those stands are back on track for their free-growing dates.`);
+    ui.writePositive(`Release treatment done on ${young.map((o) => `${o.id} (${o.year})`).join(', ')}. ${young.length === 1 ? 'That stand is' : 'Those stands are'} back on track for ${young.length === 1 ? 'its' : 'their'} free-growing date.`);
   }
   if (pressure.brushPressure > 0.05) ui.writeWarning(pressure.summary);
   if (brushingEff >= 1.2) ui.write('The summer release window: full leaf on the brush, the treatment takes.');
@@ -1182,9 +1282,10 @@ async function handleFreeGrowingSurvey(game, seasonMods, silvicultureState, zone
     ui.write('This year\'s free-growing declarations are all in RESULTS.');
     return false;
   }
-  const opening = getSurveyableOpening(program);
+  const opening = getSurveyableOpening(journey);
   if (!opening) {
-    ui.writeWarning('The stands due for free-growing survey are still under brush. Get the release treatment done first or the surveyor will fail them on competition.');
+    ui.writeWarning(describeHeldWork(journey, 'spring').find((line) => /survey|release/i.test(line))
+      || 'No stand on the free-growing list can be surveyed today.');
     return false;
   }
 
@@ -1205,10 +1306,12 @@ async function handleFreeGrowingSurvey(game, seasonMods, silvicultureState, zone
   // The stand's condition, as the plots read it today. Zone pressure and a
   // release program behind the calendar cost plots; a stand that has had
   // its release treatment reads clean - the brush is below the leaders.
+  // A failure now costs the stand its place on this year's list, so the
+  // plots read the stand and the program, not the dice.
   let plotPct = opening.fgPlotPct;
-  plotPct -= Math.round(pressure.surveyPressure * 60);
+  plotPct -= Math.round(pressure.surveyPressure * 30);
   plotPct -= Math.round(Math.max(0, vegetationPressure - 0.25) * 40);
-  plotPct += Math.round(-3 + Math.random() * 7);
+  plotPct += Math.round(-2 + Math.random() * 5);
   if (surveyEff >= 1.2) plotPct += 2;
   if (opening.needsRelease && opening.released) plotPct = Math.max(plotPct + 30, 84 + Math.round(Math.random() * 8));
   plotPct = Math.max(20, Math.min(100, plotPct));
@@ -1227,7 +1330,7 @@ async function handleFreeGrowingSurvey(game, seasonMods, silvicultureState, zone
     ui.writePositive(`${opening.id} declared free-growing: ${standard.preferred.join('/')} above ${standard.fgHeightMin} m, clear of the ${standard.competitionRatio}% competition ratio. Declaration submitted to RESULTS.`);
     if (surveyEff >= 1.2) ui.write('Fall conditions: leaves off the brush, every stem readable.');
     // A second team clears a second opening on a good day.
-    const second = getSurveyableOpening(program);
+    const second = getSurveyableOpening(journey);
     if (second && hasAccreditedSurveyor && contractor && surveyEff >= 1.1 && journey.surveys.freeGrowingComplete < journey.surveys.freeGrowingTarget) {
       second.surveyed = true;
       second.result = 'pass';
@@ -1236,21 +1339,33 @@ async function handleFreeGrowingSurvey(game, seasonMods, silvicultureState, zone
       ui.writePositive(`Two survey teams on the ground: ${second.id} (${second.year}) also declared free-growing.`);
     }
   } else {
+    // A failed stand is treated and waits out its resurvey interval; it does
+    // not go back in front of the surveyor this season. The treatment is
+    // still this season's obligation.
     opening.surveyed = true;
     opening.result = 'fail';
+    opening.resurveyYear = program.year + FG_RESURVEY_YEARS;
     if (!stocked) {
-      ui.write(`Prescription: fill plant ${opening.id} to MSS and resurvey; the opening leaves this year's declaration list.`);
-      opening.needsRelease = false;
-      opening.released = true;
-      opening.wellSpacedSph = standard.mss + 120;
-      opening.fgPlotPct = Math.max(opening.fgPlotPct, 84);
+      const trees = Math.round(opening.ha * (standard.mss - wellSpaced) * 1.4);
+      ui.write(`Prescription: fill plant ${opening.id} to MSS this season and resurvey in ${opening.resurveyYear}. The opening leaves this year's declaration list.`);
+      program.fill.push({ id: opening.id, year: opening.year, ha: opening.ha, stockedSph: wellSpaced, mss: standard.mss, trees, done: false });
+      journey.planting.fillTarget = program.fill.length;
+      journey.resources.seedlings += trees; // fill stock ordered off the nursery's surplus
     } else {
-      ui.write(`Prescription: ${pressure.brushPressure > 0.05 ? 'manual' : 'manual or chemical'} release, resurvey in 2 years. The release crew takes it next.`);
+      const ha = Math.min(opening.ha, 24);
+      ui.write(`Prescription: ${pressure.brushPressure > 0.05 ? 'manual' : 'manual or chemical'} release this season, resurvey in ${opening.resurveyYear}. The opening leaves this year's declaration list; the release crew takes it next.`);
       opening.needsRelease = true;
       opening.released = false;
+      opening.releaseReadyDay = null;
       if (!program.brush.some((entry) => entry.fgId === opening.id && entry.treated < entry.ha)) {
-        program.brush.unshift({ id: opening.id, year: opening.year, ha: Math.min(opening.ha, 24), treated: 0, method: null, fgId: opening.id });
+        program.brush.unshift({ id: opening.id, year: opening.year, ha, treated: 0, method: null, fgId: opening.id });
+        journey.brushing.hectaresTarget += ha;
       }
+    }
+    const spares = (program.freeGrowing || []).filter((candidate) => !candidate.surveyed).length;
+    const needed = journey.surveys.freeGrowingTarget - journey.surveys.freeGrowingComplete;
+    if (spares < needed) {
+      ui.writeWarning(`The free-growing list is now ${spares} opening${spares === 1 ? '' : 's'} for ${needed} declaration${needed === 1 ? '' : 's'}. This year's declarations will come up short.`);
     }
     addDiscoveryTags(journey, ['regen_gap'], {
       source: 'silviculture:survey',
@@ -1277,27 +1392,38 @@ function describeFailure(opening, standard, stocked, plotPct) {
 
 // ── Meetings, briefings, contractor calls ───────────────────────────────────
 
-/**
- * Contractor meeting: the plot cards and the pay sheet.
- */
-async function handleContractorMeeting(game) {
-  const { ui, journey } = game;
-  const activeContractors = journey.contractors.filter(c => c.isActive);
+/** Foremen you can sit down with today: anyone not on days off. */
+function getMeetableContractors(journey, zoneProfile) {
+  return (journey.contractors || []).filter((contractor) => {
+    const state = ensureSilvicultureContractorState(contractor, journey, zoneProfile);
+    return state.status !== 'recovering' && !(state.cooldownDays > 0);
+  });
+}
 
-  if (activeContractors.length === 0) {
-    ui.write('No contractor is on the block to meet with.');
-    return;
+/**
+ * Contractor meeting: the plot cards and the pay sheet. The foreman of a crew
+ * on the block or available for it comes in; a crew on days off does not.
+ * @returns {Promise<boolean>} whether a meeting happened (and spent the day)
+ */
+async function handleContractorMeeting(game, zoneProfile = null) {
+  const { ui, journey } = game;
+  const meetable = getMeetableContractors(journey, zoneProfile || getSilvicultureZoneProfile(journey));
+
+  if (meetable.length === 0) {
+    ui.write('Every crew is on days off; there is no foreman to sit down with today.');
+    return false;
   }
 
-  const options = activeContractors.map(c => ({
+  const options = meetable.map(c => ({
     label: `${c.name} (${c.specialty})`,
-    description: `${describeContractorEconomics(c)} | productivity ${c.productivity}% | morale ${c.morale}%`,
+    description: `${c.isActive ? 'on the block' : 'available'} | ${describeContractorEconomics(c)} | productivity ${c.productivity}% | morale ${c.morale}%`,
     value: c.id
   }));
+  options.push({ label: 'Never mind', description: 'Keep the day for the program.', value: 'cancel' });
 
   const choice = await ui.promptChoice('Meet with which contractor?', options);
   const contractor = journey.contractors.find(c => c.id === choice.value);
-  if (!contractor) return;
+  if (!contractor) return false;
 
   if (contractor.specialty === 'planting') {
     const retained = (journey.program?.blocks || []).filter((block) => block.status === 'inspected' && block.quality < 90 && block.holdback > 0);
@@ -1326,6 +1452,7 @@ async function handleContractorMeeting(game) {
     contractor.morale = Math.min(100, contractor.morale + 7);
     ui.write(`${contractor.name} appreciated the time as much as the numbers.`);
   }
+  return true;
 }
 
 function handleTeamBriefing(game) {
@@ -1343,7 +1470,6 @@ function handleTeamBriefing(game) {
 
 async function handleContractorEvent(game, cEvent, contractor) {
   const { ui, journey } = game;
-  const contractorState = ensureSilvicultureContractorState(contractor, journey, getSilvicultureZoneProfile(journey));
   const zoneProfile = getSilvicultureZoneProfile(journey);
   const silvicultureState = ensureSilvicultureState(journey);
 
@@ -1362,28 +1488,42 @@ async function handleContractorEvent(game, cEvent, contractor) {
   const choice = await ui.promptChoice('How do you respond?', options);
   const selected = cEvent.options.find(o => o.value === choice.value);
   if (!selected) return;
+  const note = (text) => silvicultureState.dayNotes?.push(text);
+  silvicultureState.contractorCallToday = true;
 
   if (selected.cost > 0) {
     if (journey.resources.budget < selected.cost) {
       ui.writeWarning(`Not enough budget! ($${selected.cost.toLocaleString()} needed)`);
       contractor.morale = Math.max(0, contractor.morale - 10);
       startSilvicultureContractorRecovery(contractor, 1, 'budget');
+      note(`${cEvent.title}: no money for it, so ${contractor.name} takes the day off unhappy.`);
       return;
     }
     journey.resources.budget -= selected.cost;
   }
   contractor.morale = Math.max(0, Math.min(100, contractor.morale + selected.moraleGain));
   contractor.productivity = Math.max(20, Math.min(100, contractor.productivity + selected.prodGain));
-  contractorState.fatigue = Math.max(0, contractorState.fatigue - 1);
+  note(`${cEvent.title}: ${selected.label.charAt(0).toLowerCase()}${selected.label.slice(1)}; ${contractor.name} morale ${selected.moraleGain >= 0 ? 'up' : 'down'}.`);
 
   if (selected.qualityLift) {
     silvicultureState.qualityLift = (silvicultureState.qualityLift || 0) + selected.qualityLift;
   }
   if (selected.fraud) {
     silvicultureState.qualityPenaltyNext = (silvicultureState.qualityPenaltyNext || 0) + 5;
+    silvicultureState.falseCardsPending = true;
     adjustScrutiny(journey, 3);
     adjustCompliance(journey, -4);
+    // Your own checker's next plots will not match the cards: noticed, and
+    // likely to surface when the district checks the season.
+    recordProgramShortcut(journey, {
+      id: 'signed-foreman-plot-cards',
+      title: 'Plot cards signed for the foreman',
+      kind: 'false-record',
+      status: 'noticed',
+      source: 'contractor-call',
+    });
     ui.writeWarning('You sign plot cards you did not walk. The holdback goes out, the next inspection will read what the crew actually did, and the file now carries a false record an NRO would find in an hour.');
+    note('The plot cards you signed for the foreman are a false record on file.');
   }
   if (selected.priceLift) {
     contractor.pricePerTree = Math.round(((Number(contractor.pricePerTree) || 0.32) + selected.priceLift) * 100) / 100;
@@ -1536,6 +1676,75 @@ function settleProgramSchedule(journey, ui) {
   }
 }
 
+// The program runs on a budget, not a fuel cache and a grub box. An event
+// that trades in fuel or food moves money here instead (crummy and reefer
+// fuel, camp groceries), so its preview and its effect say the same thing.
+const FUEL_UNIT_COST = 25;  // $ per authored fuel unit
+const FOOD_UNIT_COST = 60;  // $ per person-day of camp groceries
+const EVENT_EFFECT_BANDS = ['effects', 'partialEffects', 'failureEffects'];
+
+/**
+ * A copy of the day's event with fuel and food effects priced into the
+ * program budget. The authored event is left alone.
+ * @param {Object} event
+ * @returns {Object}
+ */
+export function adaptEventForProgram(event) {
+  if (!Array.isArray(event?.options)) return event;
+  let changed = false;
+  const options = event.options.map((option) => {
+    if (!option) return option;
+    let adapted = option;
+    for (const band of EVENT_EFFECT_BANDS) {
+      const effects = option[band];
+      if (!effects || (typeof effects.fuel !== 'number' && typeof effects.food !== 'number')) continue;
+      const { fuel, food, ...rest } = effects;
+      const budget = (Number(rest.budget) || 0) + (Number(fuel) || 0) * FUEL_UNIT_COST + (Number(food) || 0) * FOOD_UNIT_COST;
+      if (adapted === option) adapted = { ...option };
+      adapted[band] = budget ? { ...rest, budget } : rest;
+      changed = true;
+    }
+    return adapted;
+  });
+  return changed ? { ...event, options } : event;
+}
+
+/**
+ * A shortcut the day's situation just took goes on the integrity ledger.
+ * Two falsifications on file and the licensee pulls you off the program.
+ * @returns {boolean} whether the run ended
+ */
+function settleShortcut(journey, event, ui) {
+  if (!recordTemptationOutcome(journey, event)) return false;
+  return pullProgramIfFalsified(journey, ui);
+}
+
+/**
+ * Enough falsified records on file and the program is not delivered, however
+ * much of it is in the ground: the declarations it rests on are under review.
+ * @returns {boolean} whether the program was pulled
+ */
+function pullProgramIfFalsified(journey, ui) {
+  if (!summarizeIntegrity(journey).programPulled) return false;
+  if (journey.isGameOver && !journey.isComplete) return true;
+  journey.isComplete = false;
+  journey.endReason = null;
+  journey.isGameOver = true;
+  journey.gameOverReason = 'C&E has falsified records with your signature on them. The licensee pulls you off the program and your declarations go under review.';
+  ui.writeDanger(journey.gameOverReason);
+  return true;
+}
+
+/** The district's check on the season's file, once, when the season ends. */
+function closeOutSeason(journey, ui) {
+  const lines = runSeasonCloseAudit(journey);
+  if (!lines.length) return;
+  ui.write('');
+  ui.writeHeader('SEASON CLOSE: DISTRICT CHECK');
+  for (const line of lines) ui.writeWarning(line);
+  pullProgramIfFalsified(journey, ui);
+}
+
 /**
  * Nothing left that can move any track, and the resources to finish are gone.
  */
@@ -1543,10 +1752,11 @@ function isSilvicultureUnwinnable(journey) {
   const remainingBlocks = journey.planting.blocksToPlant - (journey.planting.blocksPlanted || 0);
   const remainingBrush = journey.brushing.hectaresTarget - journey.brushing.hectaresComplete;
   const remainingSurveys = journey.surveys.freeGrowingTarget - journey.surveys.freeGrowingComplete;
-  const stillHasWorkToDo = remainingBlocks > 0 || remainingBrush > 0 || remainingSurveys > 0;
+  const remainingFill = (journey.program?.fill || []).filter((opening) => !opening.done).length;
+  const stillHasWorkToDo = remainingBlocks > 0 || remainingBrush > 0 || remainingSurveys > 0 || remainingFill > 0;
   if (!stillHasWorkToDo) return false;
 
-  const capacityExhausted = journey.resources.contractorCapacity <= 0 && (remainingBlocks > 0 || remainingBrush > 0);
+  const capacityExhausted = journey.resources.contractorCapacity <= 0 && (remainingBlocks > 0 || remainingBrush > 0 || remainingFill > 0);
   const seedlingsExhausted = journey.resources.seedlings <= 0 && journey.planting.seedlingsPlanted < journey.planting.seedlingsAllocated;
   // The cheapest step left is a survey day; below that nothing can move.
   const budgetCantAffordNextStep = journey.resources.budget < SURVEY_DAY_RATE && stillHasWorkToDo;
@@ -1786,7 +1996,10 @@ function getSilvicultureTaskContractors(journey, zoneProfile, task, deployMissin
       continue;
     }
 
-    if (contractor.isActive && task !== 'survey') {
+    // A crew on the block can pick up planting or fill outside its
+    // specialty; brushing and surveys wait for the outfit with the saws or
+    // the accreditation.
+    if (contractor.isActive && (task === 'plant' || task === 'fill')) {
       fallback.push({ contractor, fit });
     }
   }
@@ -1825,7 +2038,7 @@ function matchesSilvicultureTask(contractor, task) {
   }
 
   if (task === 'brush') {
-    return contractor.specialty === 'brushing' || contractor.specialty === 'planting';
+    return contractor.specialty === 'brushing';
   }
 
   return contractor.specialty === 'planting';
@@ -1990,6 +2203,7 @@ function tickSilvicultureContractorRecovery(journey, zoneProfile) {
 
     if (state.cooldownDays > 0) {
       state.cooldownDays -= 1;
+      state.fatigue = Math.max(0, (state.fatigue || 0) - DAY_OFF_RECOVERY);
       if (state.cooldownDays <= 0) {
         state.cooldownDays = 0;
         state.status = 'ready';
@@ -2022,15 +2236,18 @@ function applySilvicultureContractorUsage(journey, contractors, zoneProfile, tas
     const state = ensureSilvicultureContractorState(contractor, journey, zoneProfile);
     const fit = getSilvicultureContractorFit(contractor, zoneProfile, task);
     state.lastTask = task;
-    state.deploymentDays = (state.deploymentDays || 0) + 1;
+    state.lastWorkedDay = journey.day;
     state.zoneFit = fit;
-    state.fatigue = Math.min(6, (state.fatigue || 0) + 1 + (taskPressure ? 1 : 0) - (fit > 1.05 ? 1 : 0));
+    // A shift on the block: hard ground adds to it, a crew that suits the
+    // ground carries it. Days off take it back off (DAY_OFF_RECOVERY).
+    state.fatigue = Math.max(0, Math.min(6, (state.fatigue || 0) + 1 + (taskPressure ? 1 : 0) - (fit > 1.05 ? 1 : 0)));
 
     contractor.productivity = Math.max(20, Math.min(100, contractor.productivity + (fit > 1 ? 2 : -1)));
     contractor.morale = Math.max(0, Math.min(100, contractor.morale + (fit > 1 ? 1 : 0) - (state.fatigue >= 4 ? 1 : 0)));
 
+    // The days off start tomorrow: the count includes tonight.
     if (state.fatigue >= 4 || contractor.morale < 30) {
-      startSilvicultureContractorRecovery(contractor, state.fatigue >= 5 ? 2 : 1, 'workload');
+      startSilvicultureContractorRecovery(contractor, (state.fatigue >= 5 ? 2 : 1) + 1, 'workload');
     } else if (scrutinyPressure > 0 && task === 'survey' && fit < 0.95) {
       adjustScrutiny(journey, 1);
     }
@@ -2099,7 +2316,8 @@ async function handleContractorRotation(game, silvicultureState = null, zoneProf
       ui.write(`${contractor.name} stays on the block.`);
       return false;
     }
-    startSilvicultureContractorRecovery(contractor, restDays, 'rotation');
+    // The stand-down takes the rest of today; the days off start tomorrow.
+    startSilvicultureContractorRecovery(contractor, restDays + 1, 'rotation');
     ui.write(`${contractor.name} is stood down for ${restDays} day${restDays > 1 ? 's' : ''} off.`);
     if (getScrutinyPressure(journey) > 0 && (pressure.surveyPressure > 0.05 || pressure.brushPressure > 0.05)) {
       adjustScrutiny(journey, -1);
@@ -2107,10 +2325,10 @@ async function handleContractorRotation(game, silvicultureState = null, zoneProf
     return true;
   }
 
+  // Calling a crew onto the block is a radio call, not the day's work: the
+  // day still goes to whatever they are called on for.
   deploySilvicultureContractor(contractor, pressure, contractor.specialty === 'brushing' ? 'brush' : 'plant');
   ui.writePositive(`${contractor.name} goes back on the block.`);
-  if (getScrutinyPressure(journey) > 0 && pressure.accessPressure > 0.08) {
-    adjustScrutiny(journey, -1);
-  }
-  return true;
+  activeState.dayNotes?.push(`${contractor.name} called onto the block.`);
+  return false;
 }

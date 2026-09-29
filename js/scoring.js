@@ -3,6 +3,9 @@
  * Calculates a letter grade (A-F) based on journey performance
  */
 
+import { assessSilvicultureProgram } from './data/silvicultureProgram.js';
+import { summarizeIntegrity } from './modes/silvicultureIntegrity.js';
+
 /**
  * Calculate final score for a completed journey
  * @param {Object} journey - Journey state at end of game
@@ -25,9 +28,9 @@ export function calculateScore(journey, victory) {
       break;
 
     case 'silviculture':
-      components.speed = scoreSilvicultureSpeed(journey);
+      components.speed = scoreSilvicultureSpeed(journey, victory);
       components.crewWelfare = scoreCrewWelfare(journey);
-      components.resourceEfficiency = scoreDeskResourceEfficiency(journey);
+      components.resourceEfficiency = scoreSilvicultureResources(journey);
       components.objectives = scoreSilvicultureObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
       break;
@@ -73,10 +76,36 @@ export function calculateScore(journey, victory) {
   const baseScore = Math.round(weighted);
   const victoryBonus = victory ? Math.min(10, 100 - baseScore) : 0;
   const scrutinyPenalty = scoreScrutinyPenalty(journey);
-  const totalScore = Math.max(0, baseScore + victoryBonus - scrutinyPenalty);
+  const integrityPenalty = scoreIntegrityPenalty(journey);
+  const scoreCap = scoreFailureCap(journey, victory);
+  const totalScore = Math.min(scoreCap ?? 100, Math.max(0, baseScore + victoryBonus - scrutinyPenalty - integrityPenalty));
   const grade = getLetterGrade(totalScore);
 
-  return { totalScore, grade, components, victory, baseScore, victoryBonus, scrutinyPenalty };
+  return { totalScore, grade, components, victory, baseScore, victoryBonus, scrutinyPenalty, integrityPenalty, scoreCap };
+}
+
+/**
+ * What a silviculture run's caught shortcuts cost, on top of scrutiny. A
+ * falsified plot card or declaration the district has found is not a bad
+ * day on the file; it is the file (js/modes/silvicultureIntegrity.js).
+ * @param {Object} journey
+ * @returns {number}
+ */
+export function scoreIntegrityPenalty(journey) {
+  if (journey?.journeyType !== 'silviculture') return 0;
+  return summarizeIntegrity(journey).penalty;
+}
+
+/**
+ * The ceiling on a silviculture program that was not delivered. Crew welfare,
+ * a clean file and an unspent budget are easy to keep by doing nothing, so a
+ * failed program tops out at D, and one that delivered under half of its
+ * obligations at F.
+ * @returns {number|null}
+ */
+export function scoreFailureCap(journey, victory) {
+  if (victory || journey?.journeyType !== 'silviculture') return null;
+  return assessSilvicultureProgram(journey).delivered < 0.5 ? 40 : 54;
 }
 
 /**
@@ -126,12 +155,16 @@ function scoreReconSpeed(journey) {
   return { score, label: `${daysUsed} shifts (optimal: ~${optimalDays})` };
 }
 
-function scoreSilvicultureSpeed(journey) {
+// Pace only counts for work that got done: a program that ran out the season
+// having delivered a third of itself was not fast, it was short.
+function scoreSilvicultureSpeed(journey, victory) {
   const daysUsed = journey.day - 1;
   const optimalDays = 30;
   const ratio = optimalDays / Math.max(1, daysUsed);
-  const score = Math.min(100, Math.round(ratio * 75));
-  return { score, label: `${daysUsed} days` };
+  const pace = Math.min(100, Math.round(ratio * 75));
+  if (victory) return { score: pace, label: `${daysUsed} days` };
+  const delivered = assessSilvicultureProgram(journey).delivered;
+  return { score: Math.round(pace * delivered), label: `${daysUsed} days, program not delivered` };
 }
 
 function scorePlanningSpeed(journey) {
@@ -235,6 +268,19 @@ function scoreDeskResourceEfficiency(journey) {
   return { score, label: `Budget: $${Math.round(r.budget || 0).toLocaleString()}` };
 }
 
+// The program budget against what it bought. Money left because the work
+// was never done is not efficiency, so the margin is scaled by delivery.
+function scoreSilvicultureResources(journey) {
+  const budget = Number(journey.resources?.budget) || 0;
+  const start = Number(journey.program?.budgetStart) || 380000;
+  const delivered = assessSilvicultureProgram(journey).delivered;
+  const margin = budget <= 0 ? 0 : 40 + scoreSweetSpot(budget / start) * 60;
+  return {
+    score: Math.max(0, Math.min(100, Math.round(margin * delivered))),
+    label: `Budget: $${Math.round(budget).toLocaleString()} of $${Math.round(start).toLocaleString()} left`,
+  };
+}
+
 function scoreManagerResources(journey) {
   const r = journey.resources || {};
   let score = 50;
@@ -272,21 +318,14 @@ function scoreReconObjectives(journey, victory) {
   return { score, label: `${Math.round(progress * 100)}% traversed` };
 }
 
-function scoreSilvicultureObjectives(journey, victory) {
-  let score = victory ? 45 : 10;
-  const p = journey.planting || {};
-  const s = journey.surveys || {};
-  const b = journey.brushing || {};
-  const plantPct = p.blocksToPlant > 0 ? p.blocksPlanted / p.blocksToPlant : 0;
-  const surveyPct = s.freeGrowingTarget > 0 ? s.freeGrowingComplete / s.freeGrowingTarget : 0;
-  const brushPct = b.hectaresTarget > 0 ? b.hectaresComplete / b.hectaresTarget : 0;
-  score += Math.round(plantPct * 25);
-  score += Math.round(surveyPct * 15);
-  score += Math.round(brushPct * 15);
-  score = Math.min(100, score);
+// Every obligation on the program counts: planting and its plots, fill,
+// release, the declarations, and how well the trees went in
+// (PROGRAM_TRACK_WEIGHTS in js/data/silvicultureProgram.js).
+function scoreSilvicultureObjectives(journey) {
+  const assessment = assessSilvicultureProgram(journey);
   return {
-    score,
-    label: `${p.blocksPlanted}/${p.blocksToPlant} planted, ${s.freeGrowingComplete}/${s.freeGrowingTarget} surveys, ${Math.round(brushPct * 100)}% brush`,
+    score: Math.max(0, Math.min(100, Math.round(assessment.delivered * 100))),
+    label: assessment.label,
   };
 }
 
@@ -386,6 +425,14 @@ export function formatScoreDisplay(scoreResult) {
 
   if (scoreResult.scrutinyPenalty > 0) {
     lines.push(`  ${'Scrutiny'.padEnd(14)} -${scoreResult.scrutinyPenalty} for what the file carries`);
+  }
+
+  if (scoreResult.integrityPenalty > 0) {
+    lines.push(`  ${'Integrity'.padEnd(14)} -${scoreResult.integrityPenalty} for shortcuts the district found`);
+  }
+
+  if (Number.isFinite(scoreResult.scoreCap)) {
+    lines.push(`  ${'Not delivered'.padEnd(14)} a program that missed its obligations grades no higher than ${getLetterGrade(scoreResult.scoreCap)}`);
   }
 
   return lines;

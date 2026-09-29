@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createSilvicultureJourney } from '../js/journey/factory.js';
-import { runSilvicultureDay } from '../js/modes/silviculture.js';
+import { runSilvicultureDay, adaptEventForProgram } from '../js/modes/silviculture.js';
+import { checkSilvicultureEndConditions } from '../js/modes/shared/endConditions.js';
 import { getStockingStandard, describeStockingStandard, listStockingStandards } from '../js/data/stockingStandards.js';
 import {
   buildSilvicultureProgram,
   generateSilvicultureContractors,
   contractorHasCert,
+  assessSilvicultureProgram,
   BRUSH_RATES,
 } from '../js/data/silvicultureProgram.js';
 import { SILVICULTURE_CREW_ROLES } from '../js/data/silvicultureCrewRoles.js';
@@ -104,7 +106,8 @@ test('the program derives five vintages from the area and the targets', async ()
       assert.ok(opening.stockedSph < opening.mss, 'fill openings are below MSS');
       assert.ok(opening.trees > 0);
     }
-    assert.equal(program.freeGrowing.length, journey.surveys.freeGrowingTarget);
+    assert.equal(program.freeGrowing.length, journey.surveys.freeGrowingTarget + 1,
+      'the free-growing list carries one opening more than the year must declare');
     for (const opening of program.freeGrowing) {
       const age = program.year - opening.year;
       assert.ok(age >= 8 && age <= 15, `${opening.id} is 8–15 years old (${age})`);
@@ -126,7 +129,7 @@ test('campaign-scale programs shrink with the targets and key by the area BEC fa
   const journey = createSilvicultureJourney({ areaId: 'fort-st-john-plateau', scale: 'campaign' });
   assert.equal(journey.program.blocks.length, 3);
   assert.equal(journey.program.fill.length, 1);
-  assert.equal(journey.program.freeGrowing.length, 2);
+  assert.equal(journey.program.freeGrowing.length, 3);
   assert.equal(journey.program.zone, 'BWBS');
   assert.equal(journey.program.blocks[0].speciesMix, 'Sw/Pl 60/40');
   const program = buildSilvicultureProgram({ area: { becCode: 'CWHxm2', id: 'vancouver-island-coast' }, planting: { blocksToPlant: 8, seedlingsAllocated: 140000 }, brushing: { hectaresTarget: 260 }, surveys: { freeGrowingTarget: 3 } });
@@ -184,10 +187,15 @@ test('planting pays per tree less the holdback, and pauses until the plots on th
     assert.equal(journey.planting.blocksPlanted, 1);
     const price = planters.pricePerTree;
     const treesPlanted = journey.planting.seedlingsPlanted;
-    assert.ok(treesPlanted >= 6000, 'the crew finishes the block and moves on in the afternoon');
-    const expectedInvoice = Math.round(treesPlanted * price * 0.98);
+    assert.ok(treesPlanted > 6000, 'the crew finishes the block and moves on in the afternoon');
+    const next = journey.program.blocks[1];
+    assert.equal(next.status, 'planting', 'the day\'s leftover output goes onto the next block');
+    assert.equal(block.planted + next.planted, treesPlanted);
+    const holdbacks = block.holdback + next.holdback;
+    const expectedInvoice = Math.round(treesPlanted * price) - holdbacks;
     assert.equal(budgetBefore - journey.resources.budget, 550 + expectedInvoice, 'overhead plus trees × price less the 2% holdback');
-    assert.ok(block.holdback > 0, 'the holdback sits on the finished block');
+    assert.ok(Math.abs(holdbacks - treesPlanted * price * 0.02) <= 1, 'the holdback is 2% of the day\'s trees');
+    assert.ok(block.holdback > 0 && next.holdback > 0, 'each block carries the holdback on its own trees');
     assert.ok(ui.lines.some((line) => /Block 1 FP-\d+ \(SBSdw2, [\d.]+ ha, Sx\/Pl 70\/30, 1,400 sph, 1\+0 plugs/.test(line)), 'the block line carries zone, area, mix, density and stock type');
     assert.ok(ui.lines.some((line) => /trees at \$0\.\d\d\/tree - invoice \$/.test(line)));
 
@@ -197,8 +205,10 @@ test('planting pays per tree less the holdback, and pauses until the plots on th
     const menu = ui2.prompts.find((entry) => entry.options.some((o) => o.value === 'end'));
     assert.ok(menu.options.some((o) => o.value === 'inspect'), 'quality inspection is offered');
     assert.ok(!menu.options.some((o) => o.value === 'plant'), 'planting is paused');
-    const paused = menu.options.find((o) => o.value === 'plant_blocked');
-    assert.match(paused.description, /Planting stays paused until the inspection on the block you planted yesterday is closed/);
+    assert.ok(!menu.options.some((o) => /paused|blocked/i.test(o.label)), 'no dead option that only prints why it is blocked');
+    assert.ok(ui2.lines.some((line) => new RegExp(`Planting holds until the plots on ${block.id} are walked`).test(line)),
+      'the card itself says why planting holds');
+    assert.ok(ui2.lines.some((line) => new RegExp(`quality plots on ${block.id}, planted yesterday`).test(line)));
   });
 });
 
@@ -238,10 +248,15 @@ test('the free-growing survey prints a stocking-standard result and fails on com
     const brushy = program.freeGrowing.find((o) => o.needsRelease);
     clean.fgPlotPct = 94;
     clean.wellSpacedSph = 1140;
-    for (const other of program.freeGrowing) {
-      if (other !== clean && other !== brushy) { other.surveyed = true; other.result = 'pass'; }
-    }
-    journey.surveys.freeGrowingComplete = program.freeGrowing.filter((o) => o.surveyed).length;
+    // Of the other two, one is declared and one failed last spring and is
+    // inside its resurvey interval.
+    const [declared, failed] = program.freeGrowing.filter((o) => o !== clean && o !== brushy);
+    declared.surveyed = true;
+    declared.result = 'pass';
+    failed.surveyed = true;
+    failed.result = 'fail';
+    failed.resurveyYear = program.year + 1;
+    journey.surveys.freeGrowingComplete = 1;
 
     const chooser = (prompt, options) => options.find((o) => o.value === 'survey') || options.find((o) => o.value === 'set_aside') || options.find((o) => o.value === 'end');
     let ui = makeRecordingUi(chooser);
@@ -255,10 +270,8 @@ test('the free-growing survey prints a stocking-standard result and fails on com
     ui = makeRecordingUi((prompt, options) => options.find((o) => o.value === 'set_aside') || options.find((o) => o.value === 'end'));
     await runSilvicultureDay({ ui, journey, gameOver: false });
     const menu = ui.prompts.find((entry) => entry.options.some((o) => o.value === 'end'));
-    const blocked = menu.options.find((o) => o.value === 'survey_blocked');
-    assert.ok(blocked, 'the survey is blocked while the stand is under brush');
-    assert.match(blocked.description, /still under brush\. Get the release treatment done first or the surveyor will fail them on competition/);
-    assert.ok(!menu.options.some((o) => o.value === 'survey'));
+    assert.ok(!menu.options.some((o) => o.value === 'survey'), 'the survey is blocked while the stand is under brush');
+    assert.ok(ui.lines.some((line) => new RegExp(`Free-growing surveys wait on the release: ${brushy.id} is still under brush and would fail on competition`).test(line)));
 
     // Release it manually; the survey reopens and the stand passes.
     ui = makeRecordingUi((prompt, options) => {
@@ -267,7 +280,7 @@ test('the free-growing survey prints a stocking-standard result and fails on com
     });
     await runSilvicultureDay({ ui, journey, gameOver: false });
     assert.equal(brushy.released, true);
-    assert.ok(ui.lines.some((line) => /by manual release - aspen and willow cut below the seedling leaders/.test(line)));
+    assert.ok(ui.lines.some((line) => /by manual release - aspen, willow and fireweed cut below the seedling leaders/.test(line)));
     assert.ok(ui.lines.some((line) => new RegExp(`Release treatment done on the ${brushy.year} opening ${brushy.id}\\. That stand is back on track for its free-growing survey`).test(line)));
     assert.ok(ui.lines.some((line) => /\$900\/ha - invoice \$/.test(line)));
 
@@ -348,7 +361,7 @@ test('fill planting tops up last year\'s opening from the fill stock at the fill
     assert.equal(journey.planting.seedlingsPlanted, 0, 'fill trees never count against this year\'s allocation');
     assert.ok(ui.lines.some((line) => new RegExp(`Fill plant on ${opening.id} \\(${opening.year}, ${opening.ha} ha\\): ${opening.trees.toLocaleString()} trees into the gaps take the opening from ${opening.stockedSph} sph back above MSS 700`).test(line)));
     assert.ok(ui.lines.some((line) => new RegExp(`fill work at \\$${(planters.pricePerTree + 0.06).toFixed(2)}/tree`).test(line)));
-    assert.ok(ui.lines.some((line) => /Last year's openings are back above minimum stocking/.test(line)));
+    assert.ok(ui.lines.some((line) => /One of last year's openings is still below minimum stocking/.test(line)));
   });
 });
 
@@ -439,11 +452,229 @@ test('the winning day records its milestone without printing it', async () => {
     for (const opening of journey.program.freeGrowing) { opening.needsRelease = false; opening.fgPlotPct = 95; }
     journey.program.freeGrowing[0].surveyed = true;
     journey.program.freeGrowing[0].result = 'pass';
+    // Fill and release are part of the program too.
+    for (const opening of journey.program.fill) opening.done = true;
+    for (const opening of journey.program.brush) opening.treated = opening.ha;
+    journey.brushing.hectaresComplete = journey.brushing.hectaresTarget;
     const ui = makeRecordingUi((prompt, options) => options.find((o) => o.value === 'survey') || options.find((o) => o.value === 'set_aside') || options.find((o) => o.value === 'end'));
     await runSilvicultureDay({ ui, journey, gameOver: false });
     assert.equal(journey.isComplete, true);
     assert.equal(journey.endReason, 'Planting program delivered and this year\'s free-growing declarations submitted to RESULTS.');
     assert.ok(!ui.lines.some((line) => /MILESTONE/.test(line)), 'no milestone copy on the winning day');
     assert.ok(journey.milestonesReached.includes(90));
+  });
+});
+
+// ── Playtest fixes: contractors, program obligations, survey rules ──────────
+
+const endDay = (prompt, options) => options.find((o) => o.value === 'set_aside') || options.find((o) => o.value === 'end');
+
+test('contractor fatigue is shed on days off and never earned standing by, so crews do not stall one day on, two off', async () => {
+  await withSeededRandom(131, async () => {
+    const journey = createSilvicultureJourney({ areaId: 'kootenay-wetbelt' });
+    const planters = journey.contractors.find((c) => c.specialty === 'planting');
+    const surveyors = journey.contractors.find((c) => c.specialty === 'survey');
+    planters.isActive = false;
+    planters.silvicultureState = { status: 'recovering', cooldownDays: 2, fatigue: 6, traits: [] };
+    const ui = makeRecordingUi(endDay);
+    for (let day = 0; day < 6; day += 1) await runSilvicultureDay({ ui, journey, gameOver: false });
+    assert.equal(planters.silvicultureState.status, 'ready', 'days off end');
+    assert.equal(planters.silvicultureState.fatigue, 0, 'two days off clear the legs');
+    assert.equal(surveyors.silvicultureState.fatigue, 0, 'a crew standing by earns no fatigue');
+    assert.notEqual(surveyors.silvicultureState.status, 'recovering', 'and is never sent on days off for standing by');
+  });
+});
+
+test('a planting crew works a real rotation: plant and plot days, not two days off for every day on', async () => {
+  await withSeededRandom(137, async () => {
+    const journey = createSilvicultureJourney({ areaId: 'kootenay-wetbelt' });
+    const planters = journey.contractors.find((c) => c.specialty === 'planting');
+    const ui = makeRecordingUi((prompt, options) => options.find((o) => o.value === 'inspect')
+      || options.find((o) => o.value === 'plant') || endDay(prompt, options));
+    let offDays = 0;
+    for (let day = 0; day < 16; day += 1) {
+      await runSilvicultureDay({ ui, journey, gameOver: false });
+      if (planters.silvicultureState?.status === 'recovering') offDays += 1;
+      assert.ok((planters.silvicultureState?.fatigue || 0) <= 5);
+    }
+    assert.ok(offDays <= 4, `planters spent ${offDays} of 16 days on days off`);
+    assert.ok(journey.planting.blocksPlanted >= 4, `planted ${journey.planting.blocksPlanted} blocks in 16 days`);
+  });
+});
+
+test('no foreman to meet means no meeting on the menu, and backing out of one keeps the day', async () => {
+  await withSeededRandom(141, async () => {
+    const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
+    for (const contractor of journey.contractors) {
+      contractor.isActive = false;
+      contractor.silvicultureState = { status: 'recovering', cooldownDays: 3, fatigue: 4, traits: [] };
+    }
+    let ui = makeRecordingUi(endDay);
+    await runSilvicultureDay({ ui, journey, gameOver: false });
+    let menu = ui.prompts.find((entry) => entry.options.some((o) => o.value === 'end'));
+    assert.ok(!menu.options.some((o) => o.value === 'meeting'), 'every crew is on days off');
+
+    const fresh = createSilvicultureJourney({ areaId: 'fraser-plateau' });
+    let menus = 0;
+    ui = makeRecordingUi((prompt, options) => {
+      if (prompt === 'Meet with which contractor?') return options.find((o) => o.value === 'cancel');
+      if (options.some((o) => o.value === 'end')) {
+        menus += 1;
+        return menus === 1 ? options.find((o) => o.value === 'meeting') : options.find((o) => o.value === 'end');
+      }
+      return endDay(prompt, options);
+    });
+    await runSilvicultureDay({ ui, journey: fresh, gameOver: false });
+    menu = ui.prompts.find((entry) => entry.prompt === 'Meet with which contractor?');
+    assert.ok(menu.options.some((o) => o.value === 'cancel'));
+    assert.equal(menus, 2, 'backing out of the meeting returns to the day card instead of spending the day');
+  });
+});
+
+test('brushing waits for the saw crews, never puts the planting contractor on the block, and names the zone\'s brush', async () => {
+  await withSeededRandom(151, async () => {
+    const journey = createSilvicultureJourney({ areaId: 'okanagan-shuswap-drybelt' });
+    const planters = journey.contractors.find((c) => c.specialty === 'planting');
+    const ui = makeRecordingUi((prompt, options) => {
+      if (prompt.startsWith('Release treatment on ')) return options.find((o) => o.value === 'manual');
+      return options.find((o) => o.value === 'brush') || endDay(prompt, options);
+    });
+    await runSilvicultureDay({ ui, journey, gameOver: false });
+    assert.ok(journey.brushing.hectaresComplete > 0);
+    assert.ok(ui.lines.includes('Working crew: Northern Regen Co.'), ui.lines.filter((l) => /Working crew/.test(l)).join('\n'));
+    assert.notEqual(planters.silvicultureState?.lastTask, 'brush');
+    assert.ok(ui.lines.some((line) => /by manual release - pinegrass, snowbrush and aspen cut below the seedling leaders/.test(line)));
+  });
+});
+
+test('a failed free-growing survey waits out its resurvey interval and puts its release on this season\'s program', async () => {
+  await withSeededRandom(161, async () => {
+    const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
+    const program = journey.program;
+    const stand = program.freeGrowing.find((o) => !o.needsRelease);
+    for (const other of program.freeGrowing) if (other !== stand) { other.surveyed = true; other.result = 'pass'; }
+    journey.surveys.freeGrowingComplete = 1;
+    stand.fgPlotPct = 60;
+    const targetBefore = journey.brushing.hectaresTarget;
+    const survey = (prompt, options) => options.find((o) => o.value === 'survey') || endDay(prompt, options);
+    let ui = makeRecordingUi(survey);
+    await runSilvicultureDay({ ui, journey, gameOver: false });
+    assert.equal(stand.result, 'fail');
+    assert.equal(stand.resurveyYear, program.year + 2);
+    assert.ok(ui.lines.some((line) => /resurvey in 2028\. The opening leaves this year's declaration list/.test(line)));
+    const prescribed = program.brush.find((entry) => entry.fgId === stand.id);
+    assert.ok(prescribed && prescribed.treated === 0, 'the prescribed release joins the queue');
+    assert.equal(journey.brushing.hectaresTarget, targetBefore + prescribed.ha, 'and the season\'s release target');
+
+    // Release it; the stand still cannot go back in front of the surveyor.
+    ui = makeRecordingUi((prompt, options) => {
+      if (prompt.startsWith('Release treatment on ')) return options.find((o) => o.value === 'manual');
+      return options.find((o) => o.value === 'brush') || endDay(prompt, options);
+    });
+    await runSilvicultureDay({ ui, journey, gameOver: false });
+    assert.equal(stand.released, true);
+    for (let day = 0; day < 2; day += 1) {
+      ui = makeRecordingUi(survey);
+      await runSilvicultureDay({ ui, journey, gameOver: false });
+      const menu = ui.prompts.find((entry) => entry.options.some((o) => o.value === 'end'));
+      assert.ok(!menu.options.some((o) => o.value === 'survey'), 'no free retry the next morning');
+    }
+    assert.equal(stand.result, 'fail');
+    assert.equal(journey.surveys.freeGrowingComplete, 1);
+  });
+});
+
+test('sprayed brush stands green: a glyphosate release is readable to the surveyor only after it browns out', async () => {
+  await withSeededRandom(171, async () => {
+    const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
+    const program = journey.program;
+    const brushy = program.freeGrowing.find((o) => o.needsRelease);
+    for (const other of program.freeGrowing) if (other !== brushy) { other.surveyed = true; other.result = 'pass'; }
+    journey.surveys.freeGrowingComplete = 2;
+    let ui = makeRecordingUi((prompt, options) => {
+      if (prompt.startsWith('Release treatment on ')) return options.find((o) => o.value === 'glyphosate');
+      return options.find((o) => o.value === 'brush') || endDay(prompt, options);
+    });
+    await runSilvicultureDay({ ui, journey, gameOver: false });
+    assert.equal(brushy.released, true);
+    assert.equal(brushy.releaseReadyDay, 1 + 10);
+    ui = makeRecordingUi(endDay);
+    await runSilvicultureDay({ ui, journey, gameOver: false });
+    const menu = ui.prompts.find((entry) => entry.options.some((o) => o.value === 'end'));
+    assert.ok(!menu.options.some((o) => o.value === 'survey'));
+    assert.ok(ui.lines.some((line) => new RegExp(`The release on ${brushy.id} has not taken yet; the surveyor can read it from day 11`).test(line)));
+    journey.day = brushy.releaseReadyDay;
+    ui = makeRecordingUi((prompt, options) => options.find((o) => o.value === 'survey') || endDay(prompt, options));
+    await runSilvicultureDay({ ui, journey, gameOver: false });
+    assert.equal(brushy.result, 'pass');
+  });
+});
+
+test('the program is delivered only when planting, plots, fill, release and declarations are all done', async () => {
+  await withSeededRandom(181, async () => {
+    const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
+    journey.planting.blocksPlanted = journey.planting.blocksToPlant;
+    for (const block of journey.program.blocks) { block.planted = block.trees; block.status = 'inspected'; block.quality = 92; }
+    journey.planting.qualityAverage = 92;
+    journey.surveys.freeGrowingComplete = journey.surveys.freeGrowingTarget;
+    let assessment = assessSilvicultureProgram(journey);
+    assert.equal(assessment.complete, false, 'fill and release are still open');
+    assert.deepEqual(assessment.shortfalls, ['fill 0/2', 'release 0% of 260 ha']);
+    assert.equal(checkSilvicultureEndConditions(journey), null);
+
+    for (const opening of journey.program.fill) opening.done = true;
+    for (const opening of journey.program.brush) opening.treated = opening.ha;
+    journey.brushing.hectaresComplete = journey.brushing.hectaresTarget;
+    journey.program.blocks[7].status = 'planted';
+    assessment = assessSilvicultureProgram(journey);
+    assert.equal(assessment.complete, false, 'the last block still needs its plots');
+    assert.deepEqual(assessment.shortfalls, ['1 planted block never inspected']);
+
+    journey.program.blocks[7].status = 'inspected';
+    assessment = assessSilvicultureProgram(journey);
+    assert.equal(assessment.complete, true);
+    assert.ok(assessment.delivered > 0.99);
+    assert.equal(checkSilvicultureEndConditions(journey).victory, true);
+
+    journey.day = journey.deadline + 1;
+    journey.program.fill[0].done = false;
+    assert.equal(checkSilvicultureEndConditions(journey).reason, 'The season closed with the program short: fill 1/2.');
+  });
+});
+
+test('fuel and food effects are priced into the program budget, since the program carries neither', () => {
+  const event = {
+    id: 'trapper',
+    title: 'The Trapper\'s Price',
+    options: [
+      { label: 'Trade food', effects: { food: -8, progress: 5 } },
+      { label: 'Share fuel', effects: { fuel: 20, food: 15 }, failureEffects: { fuel: -5 } },
+      { label: 'Walk on', effects: { crew_morale: -2 } },
+    ],
+  };
+  const adapted = adaptEventForProgram(event);
+  assert.deepEqual(adapted.options[0].effects, { progress: 5, budget: -480 });
+  assert.deepEqual(adapted.options[1].effects, { budget: 1400 });
+  assert.deepEqual(adapted.options[1].failureEffects, { budget: -125 });
+  assert.equal(adapted.options[2], event.options[2]);
+  assert.deepEqual(event.options[0].effects, { food: -8, progress: 5 }, 'the authored event is untouched');
+});
+
+test('a contractor call\'s outcome stays on the day card instead of being redrawn away', async () => {
+  await withSeededRandom(191, async () => {
+    const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
+    journey.day = 2;
+    const originalRandom = Math.random;
+    let calls = 0;
+    Math.random = () => { calls += 1; return calls <= 2 ? 0.01 : originalRandom(); };
+    const ui = makeRecordingUi((prompt, options) => (prompt === 'How do you respond?' ? options[0] : endDay(prompt, options)));
+    try {
+      await runSilvicultureDay({ ui, journey, gameOver: false });
+    } finally {
+      Math.random = originalRandom;
+    }
+    const call = ui.prompts.find((entry) => entry.prompt === 'How do you respond?');
+    assert.ok(call, 'the forced morning call happened');
+    assert.ok(ui.lines.some((line) => /^Earlier today: .+: .+morale (up|down)\./.test(line)), ui.lines.filter((l) => /Earlier/.test(l)).join('\n'));
   });
 });
