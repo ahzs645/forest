@@ -22,7 +22,7 @@ import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { buildStandStrip } from '../scene/forest.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
 import { checkSilvicultureEndConditions } from './shared/endConditions.js';
-import { getStockingStandard, describeStockingStandard } from '../data/stockingStandards.js';
+import { getStockingStandard, describeStockingStandard, formatBrushSpecies, formatReleaseTargets } from '../data/stockingStandards.js';
 import {
   buildSilvicultureProgram,
   ensureContractorEconomics,
@@ -791,9 +791,7 @@ function getSurveyableOpening(journey) {
 
 /** The brush this zone's stands are losing the height race to. */
 function describeBrush(journey) {
-  const species = getStockingStandard(journey?.program?.becCode || journey?.area?.becCode).brushSpecies || ['brush'];
-  if (species.length === 1) return species[0];
-  return `${species.slice(0, -1).join(', ')} and ${species[species.length - 1]}`;
+  return formatBrushSpecies(getStockingStandard(journey?.program?.becCode || journey?.area?.becCode));
 }
 
 function describeInspectionTeam(journey) {
@@ -1045,7 +1043,7 @@ async function handleQualityInspection(game, seasonMods, silvicultureState, zone
       note: 'Planting quality on this year\'s blocks will show up in the year-1 survival survey.'
     });
   }
-  if (wetDrag > 0) ui.write(`Wet microsites cost spacing and depth on this ground: ${pressure.summary}`);
+  if (wetDrag > 0) ui.write(`${SURVIVAL_CAUSE_PLOT_NOTE[pressure.survivalCause] || 'Difficult microsites cost spacing and depth on this ground'}: ${pressure.summary}`);
   if (getScrutinyPressure(journey) > 0 && quality < 85) adjustScrutiny(journey, 1);
 
   silvicultureState.lastAction = 'inspect';
@@ -1145,12 +1143,15 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   const contractor = crew.find((c) => c.specialty === 'brushing') || crew[0];
   const sensitive = areaHasTag(journey, 'community-interface', 'watershed', 'community-water', 'salmon', 'visuals');
   const hasApplicator = contractorHasCert(contractor, 'PMP-applicator');
-  const sheepAllowed = areaHasTag(journey, 'community-interface', 'watershed', 'community-water', 'visuals') && !areaHasTag(journey, 'remote-camps', 'glacial', 'winter-road');
+  const standard = getStockingStandard(program.becCode || journey.area?.becCode);
+  const sheepAllowed = standard.sheepGrazing !== false
+    && areaHasTag(journey, 'community-interface', 'watershed', 'community-water', 'visuals')
+    && !areaHasTag(journey, 'remote-camps', 'glacial', 'winter-road');
 
   const options = [
     {
       label: `Manual brushing (saw crews, ~$${BRUSH_RATES.manual}/ha)`,
-      description: `Slower, no PMP, nothing in the water. The crews cut ${describeBrush(journey)} below the seedling leaders.`,
+      description: `Slower, no PMP, nothing in the water. ${standard.manualRelease || `The crews cut ${describeBrush(journey)} below the seedling leaders.`}`,
       value: 'manual',
     },
   ];
@@ -1222,7 +1223,7 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   const openingsText = treated.map((entry) => `${entry.opening.id} (${entry.opening.year}, ${Math.round(entry.ha)} ha)`).join(' and ');
   const yearsText = [...new Set(treated.map((entry) => entry.opening.year))].sort().join('/');
   if (method === 'manual') {
-    ui.write(`Treated ${Math.round(hectares)} ha of ${yearsText} openings by manual release - ${describeBrush(journey)} cut below the seedling leaders.`);
+    ui.write(`Treated ${Math.round(hectares)} ha of ${yearsText} openings by manual release - ${formatReleaseTargets(standard)} cut below the seedling leaders.`);
   } else if (method === 'glyphosate') {
     const pmp = silvicultureState.pmpNumber ||= `402-0${700 + Math.floor(Math.random() * 90)}`;
     ui.write(`${hectares >= 60 ? 'Aerial' : 'Backpack'} glyphosate on ${Math.round(hectares)} ha of ${yearsText} openings under PMP ${pmp}. 10 m pesticide-free zones flagged on every stream.`);
@@ -1778,10 +1779,27 @@ function getSilvicultureZoneProfile(journey, silvicultureState = null) {
     surveyPressure: 0,
     accessPressure: 0,
   };
+  // Why survival suffers here: 'wet' (peat and seepage), 'drought' (drybelt
+  // south aspects) or 'cold' (frost pockets and short seasons).
+  let survivalCause = null;
 
   if (tags.has('peatland') || tags.has('wetland') || becCode.startsWith('bwbs')) {
     pressure.survivalPenalty += 0.05;
     pressure.fillPressure += 0.06;
+    survivalCause = 'wet';
+  }
+
+  if (becCode.startsWith('idf')) {
+    // Drybelt: summer drought on the south aspects kills more seedlings than
+    // brush does, and fill planting chases the dead spots.
+    pressure.survivalPenalty += 0.03;
+    survivalCause = 'drought';
+  } else if (becCode.startsWith('ich')) {
+    // Wetbelt: alder and thimbleberry come back hard in the cedar seepage.
+    pressure.brushPressure += 0.05;
+  } else if (becCode.startsWith('cwh')) {
+    // Coast: salmonberry and red alder outgrow a seedling in two seasons.
+    pressure.brushPressure += 0.06;
   }
 
   if (tags.has('karst') || tags.has('salmon') || tags.has('community-water')) {
@@ -1807,6 +1825,7 @@ function getSilvicultureZoneProfile(journey, silvicultureState = null) {
   if (becCode.startsWith('swb')) {
     pressure.survivalPenalty += 0.04;
     pressure.accessPressure += 0.04;
+    survivalCause ||= 'cold';
   }
 
   if (discoveryIds.has('regen_gap')) {
@@ -1832,7 +1851,9 @@ function getSilvicultureZoneProfile(journey, silvicultureState = null) {
 
   const summaryPieces = [];
   if (pressure.accessPressure > 0.08) summaryPieces.push('access is tight');
-  if (pressure.survivalPenalty > 0.04) summaryPieces.push('survival is less forgiving');
+  if (pressure.survivalPenalty > 0.04 || survivalCause === 'drought') {
+    summaryPieces.push(SURVIVAL_CAUSE_SUMMARY[survivalCause] || 'survival is less forgiving');
+  }
   if (pressure.fillPressure > 0.05) summaryPieces.push('fill planting will matter');
   if (pressure.brushPressure > 0.05) summaryPieces.push('brush pressure is high');
   if (pressure.surveyPressure > 0.05) summaryPieces.push('survey credibility is under more scrutiny');
@@ -1847,11 +1868,24 @@ function getSilvicultureZoneProfile(journey, silvicultureState = null) {
 
   return {
     ...pressure,
+    survivalCause,
     summary,
     likelyFinds,
     zoneSummary: briefing.zoneSummary || '',
   };
 }
+
+const SURVIVAL_CAUSE_SUMMARY = {
+  wet: 'wet microsites make survival less forgiving',
+  drought: 'summer drought on the south aspects will cost survival',
+  cold: 'frost pockets and a short season make survival less forgiving',
+};
+
+const SURVIVAL_CAUSE_PLOT_NOTE = {
+  wet: 'Wet microsites cost spacing and depth on this ground',
+  drought: 'Dry south aspects cost spacing: the planters hunt shade and mineral soil on this ground',
+  cold: 'Frost pockets cost spacing: the planters hunt raised microsites on this ground',
+};
 
 function getScrutinyLabel(journey) {
   return Number.isFinite(Number(journey?.scrutiny))

@@ -10,6 +10,12 @@
  * a real site plan would refine them by site series. Keyed by zone prefix so
  * SBSwk1, SBSdw2 and SBSmc2 all resolve the same way, and so an unknown or
  * renamed code still lands on a sensible interior default.
+ *
+ * `mss` is the minimum stocking standard for preferred and acceptable species
+ * together (MSSpa); `mssP` is the smaller minimum for preferred species alone.
+ * `brushSpecies` is the zone's competing vegetation; `releaseTargets` and
+ * `manualRelease` are what a saw crew actually cuts back there, and `sheepGrazing` says whether a herder contract is a real option
+ * there (an interior practice, not a coastal one).
  */
 
 const STANDARDS = {
@@ -18,7 +24,7 @@ const STANDARDS = {
     zoneName: 'Sub-Boreal Spruce',
     tss: 1200,
     mss: 700,
-    mssPa: 600,
+    mssP: 600,
     fgHeightMin: 1.2,
     fgHeightMax: 2.0,
     competitionRatio: 150,
@@ -28,6 +34,9 @@ const STANDARDS = {
     stockType: '1+0 plugs (PSB 410)',
     speciesMix: 'Sx/Pl 70/30',
     brushSpecies: ['aspen', 'willow', 'fireweed'],
+    releaseTargets: ['aspen', 'willow'],
+    manualRelease: 'The crews cut aspen and willow below the seedling leaders.',
+    sheepGrazing: true,
     pricePerTree: 0.32,
     regenDelay: 4,
     fgWindow: [8, 15],
@@ -37,7 +46,7 @@ const STANDARDS = {
     zoneName: 'Boreal White and Black Spruce',
     tss: 1200,
     mss: 700,
-    mssPa: 600,
+    mssP: 600,
     fgHeightMin: 1.0,
     fgHeightMax: 2.0,
     competitionRatio: 150,
@@ -47,6 +56,9 @@ const STANDARDS = {
     stockType: '1+0 plugs (PSB 412A)',
     speciesMix: 'Sw/Pl 60/40',
     brushSpecies: ['aspen', 'bluejoint', 'willow'],
+    releaseTargets: ['aspen', 'willow'],
+    manualRelease: 'The crews cut aspen and willow and knock the bluejoint off the seedlings.',
+    sheepGrazing: false,
     pricePerTree: 0.34,
     regenDelay: 4,
     fgWindow: [8, 15],
@@ -56,7 +68,7 @@ const STANDARDS = {
     zoneName: 'Coastal Western Hemlock',
     tss: 900,
     mss: 500,
-    mssPa: 400,
+    mssP: 400,
     fgHeightMin: 1.5,
     fgHeightMax: 2.5,
     competitionRatio: 150,
@@ -66,6 +78,9 @@ const STANDARDS = {
     stockType: '1+0 plugs (PSB 415B)',
     speciesMix: 'Cw/Hw/Fd 40/40/20',
     brushSpecies: ['salmonberry', 'red alder', 'salal'],
+    releaseTargets: ['red alder', 'salmonberry'],
+    manualRelease: 'The crews girdle red alder and slash salmonberry back off the seedling leaders.',
+    sheepGrazing: false,
     pricePerTree: 0.41,
     regenDelay: 3,
     fgWindow: [8, 12],
@@ -75,7 +90,7 @@ const STANDARDS = {
     zoneName: 'Interior Cedar-Hemlock',
     tss: 1000,
     mss: 600,
-    mssPa: 500,
+    mssP: 500,
     fgHeightMin: 1.2,
     fgHeightMax: 2.0,
     competitionRatio: 150,
@@ -84,7 +99,10 @@ const STANDARDS = {
     plantingSph: 1400,
     stockType: '1+0 plugs (PSB 412A)',
     speciesMix: 'Cw/Fd/Sx 40/30/30',
-    brushSpecies: ['thimbleberry', 'alder', 'fireweed'],
+    brushSpecies: ['thimbleberry', 'Sitka alder', 'fireweed'],
+    releaseTargets: ['Sitka alder', 'thimbleberry'],
+    manualRelease: 'The crews cut Sitka alder and thimbleberry back off the cedar and fir leaders.',
+    sheepGrazing: true,
     pricePerTree: 0.36,
     regenDelay: 4,
     fgWindow: [8, 15],
@@ -94,7 +112,7 @@ const STANDARDS = {
     zoneName: 'Interior Douglas-fir',
     tss: 1000,
     mss: 500,
-    mssPa: 400,
+    mssP: 400,
     fgHeightMin: 1.0,
     fgHeightMax: 1.8,
     competitionRatio: 150,
@@ -104,6 +122,9 @@ const STANDARDS = {
     stockType: '1+0 plugs (PSB 410)',
     speciesMix: 'Fd/Pl 60/40',
     brushSpecies: ['pinegrass', 'snowbrush', 'aspen'],
+    releaseTargets: ['snowbrush', 'aspen suckers'],
+    manualRelease: 'The crews cut snowbrush and aspen suckers and spot-screef the pinegrass around each seedling.',
+    sheepGrazing: true,
     pricePerTree: 0.30,
     regenDelay: 5,
     fgWindow: [8, 15],
@@ -113,7 +134,7 @@ const STANDARDS = {
     zoneName: 'Spruce-Willow-Birch',
     tss: 1000,
     mss: 500,
-    mssPa: 400,
+    mssP: 400,
     fgHeightMin: 0.8,
     fgHeightMax: 1.5,
     competitionRatio: 150,
@@ -123,6 +144,9 @@ const STANDARDS = {
     stockType: '1+0 plugs (PSB 412A)',
     speciesMix: 'Sw/Bl 80/20',
     brushSpecies: ['willow', 'scrub birch', 'bluejoint'],
+    releaseTargets: ['willow', 'scrub birch'],
+    manualRelease: 'The crews cut willow and scrub birch back off the spruce leaders.',
+    sheepGrazing: false,
     pricePerTree: 0.44,
     regenDelay: 5,
     fgWindow: [10, 15],
@@ -157,6 +181,28 @@ export function describeStockingStandard(standard) {
   const s = standard || STANDARDS.SBS;
   return `${s.zone}: TSS ${s.tss.toLocaleString()} / MSS ${s.mss} well-spaced sph, free-growing ${s.fgHeightMin}–${s.fgHeightMax} m, `
     + `preferred ${s.preferred.join(' ')}, acceptable ${s.acceptable.join(' ')}`;
+}
+
+/**
+ * The zone's brush in a sentence: "salmonberry, red alder and salal".
+ * @param {Object} standard
+ */
+export function formatBrushSpecies(standard) {
+  return formatSpeciesList((standard || STANDARDS.SBS).brushSpecies);
+}
+
+/**
+ * What the saw crews cut on a manual release: "red alder and salmonberry".
+ * @param {Object} standard
+ */
+export function formatReleaseTargets(standard) {
+  const s = standard || STANDARDS.SBS;
+  return formatSpeciesList(s.releaseTargets || s.brushSpecies);
+}
+
+function formatSpeciesList(list = []) {
+  if (list.length <= 1) return list[0] || 'brush';
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
 }
 
 /**

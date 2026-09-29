@@ -280,7 +280,7 @@ test('the free-growing survey prints a stocking-standard result and fails on com
     });
     await runSilvicultureDay({ ui, journey, gameOver: false });
     assert.equal(brushy.released, true);
-    assert.ok(ui.lines.some((line) => /by manual release - aspen, willow and fireweed cut below the seedling leaders/.test(line)));
+    assert.ok(ui.lines.some((line) => /by manual release - aspen and willow cut below the seedling leaders/.test(line)));
     assert.ok(ui.lines.some((line) => new RegExp(`Release treatment done on the ${brushy.year} opening ${brushy.id}\\. That stand is back on track for its free-growing survey`).test(line)));
     assert.ok(ui.lines.some((line) => /\$900\/ha - invoice \$/.test(line)));
 
@@ -541,9 +541,9 @@ test('brushing waits for the saw crews, never puts the planting contractor on th
     });
     await runSilvicultureDay({ ui, journey, gameOver: false });
     assert.ok(journey.brushing.hectaresComplete > 0);
-    assert.ok(ui.lines.includes('Working crew: Northern Regen Co.'), ui.lines.filter((l) => /Working crew/.test(l)).join('\n'));
+    assert.ok(ui.lines.includes('Working crew: Bunchgrass Vegetation Management.'), ui.lines.filter((l) => /Working crew/.test(l)).join('\n'));
     assert.notEqual(planters.silvicultureState?.lastTask, 'brush');
-    assert.ok(ui.lines.some((line) => /by manual release - pinegrass, snowbrush and aspen cut below the seedling leaders/.test(line)));
+    assert.ok(ui.lines.some((line) => /by manual release - snowbrush and aspen suckers cut below the seedling leaders/.test(line)));
   });
 });
 
