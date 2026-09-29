@@ -7,6 +7,7 @@ import { getSurveyedBlockCount } from '../../journey.js';
 import { allPackagesFinalized, getPackagesFinalized, getPackageTarget } from '../../journey/packages.js';
 import { assessSilvicultureProgram } from '../../data/silvicultureProgram.js';
 import { CUT_CONTROL } from '../../data/managerRoles.js';
+import { PLANNING_SCRUTINY_GATE } from '../../journey/constants.js';
 
 /**
  * Whether a FOM's public comment period has closed. Older saves recorded the
@@ -29,7 +30,18 @@ export function isPlanningApprovalReady(journey) {
     (plan.analysisQuality || 0) >= 80 &&
     (plan.stakeholderBuyIn || 0) >= 75 &&
     (plan.ministerialConfidence || 0) >= 80 &&
-    isFomCommentPeriodClosed(journey);
+    isFomCommentPeriodClosed(journey) &&
+    !hasPlanningDecisionHold(journey);
+}
+
+/**
+ * Whether the District Manager is holding the decision: the file's scrutiny
+ * is at the gate, or a regulator has an open file on one of its shortcuts
+ * whose finding has not landed yet (js/modes/planning.js names them).
+ */
+export function hasPlanningDecisionHold(journey) {
+  if ((Number(journey?.scrutiny) || 0) >= PLANNING_SCRUTINY_GATE) return true;
+  return (journey?.temptationMemory?.pendingCatches || []).length > 0;
 }
 
 /**

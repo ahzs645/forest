@@ -23,7 +23,7 @@ import {
   formatPlanningBlockPromptDescription,
   formatPlanningBlockTriageEvidence,
 } from '../data/planningBlocks.js';
-import { PLANNING_DECISION_GATE, PLANNING_VALUES_FLOOR } from '../journey/constants.js';
+import { PLANNING_DECISION_GATE, PLANNING_SCRUTINY_GATE, PLANNING_VALUES_FLOOR } from '../journey/constants.js';
 import {
   formatRoadAssetSummary,
   getPlanningRoadAssetContext,
@@ -41,6 +41,7 @@ import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
 import { checkpointDeskDay, closeDeskDay, resumingDeskDay } from '../journey/deskMechanics.js';
 import { describeGoodwillChange, readGoodwill } from '../events/resolution.js';
+import { institutionDisplayName } from '../events/selection.js';
 import { formatDollars } from '../resources.js';
 
 /**
@@ -73,6 +74,13 @@ const PLANNING_DAILY_BURN = 600;
 export const RETURNED_SUBMISSION_READINESS_COST = 5;
 /** District goodwill a Stakeholder Session spends: the district sits in on every one. */
 export const SESSION_GOODWILL_COST = 3;
+/**
+ * A District Compliance Review: a day walking district compliance staff
+ * through every open question on the file. It is how a planner brings an
+ * exposed file back under the District Manager's scrutiny gate.
+ */
+export const COMPLIANCE_REVIEW_SCRUTINY = 12;
+const COMPLIANCE_REVIEW_COST = 900;
 
 /**
  * The FSP's results and strategies have to be consistent with every objective
@@ -209,6 +217,36 @@ function getPlanningApprovalGaps(journey) {
   return gaps;
 }
 
+
+/**
+ * What is holding the District Manager's decision, as gate conditions. A
+ * file this exposed is not signed, and neither is a plan while a regulator has
+ * an open file on one of its own shortcuts: the reckless file used to be
+ * approved at scrutiny 100% with a Forest Practices Board investigation into
+ * the plan's own survey still open.
+ * @param {Object} journey
+ * @returns {Array<{key: string, reason: string, headline: string}>}
+ */
+export function getPlanningDecisionHolds(journey) {
+  const holds = [];
+  for (const entry of journey?.temptationMemory?.pendingCatches || []) {
+    const who = institutionDisplayName(entry.institution);
+    holds.push({
+      key: 'open_file',
+      reason: `${who} has an open file on “${entry.title}” (lands Day ${entry.dueDay})`,
+      headline: `The District Manager will not decide while ${who} has an open file on “${entry.title}”. It lands on Day ${entry.dueDay}; keep the rest of the file ready.`,
+    });
+  }
+  const scrutiny = Math.round(Number(journey?.scrutiny) || 0);
+  if (scrutiny >= PLANNING_SCRUTINY_GATE) {
+    holds.push({
+      key: 'scrutiny',
+      reason: `scrutiny ${scrutiny}% (the District Manager decides under ${PLANNING_SCRUTINY_GATE}%)`,
+      headline: `District Compliance Review to bring scrutiny under ${PLANNING_SCRUTINY_GATE}% (${scrutiny}% now): the District Manager will not sign a file this exposed.`,
+    });
+  }
+  return holds;
+}
 
 function applyPlanningProfessionalWork(journey, changes = {}) {
   const professional = ensurePlanningProfessionalState(journey);
@@ -683,6 +721,22 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
     return { lane, headline, steps };
   }
 
+  const holds = getPlanningDecisionHolds(journey);
+  if (!deficits.length && holds.length > 0) {
+    // A scrutiny hold has a remedy today; an open regulator file only lands
+    // on its day, so the headline leads with the one the player can act on.
+    const hold = holds.find((entry) => entry.key === 'scrutiny') || holds[0];
+    lane = 'District file';
+    headline = hold.headline;
+    for (const other of holds) {
+      if (other !== hold) pushPlanningGuideStep(steps, other.headline);
+    }
+    if (hold.key === 'open_file') {
+      pushPlanningGuideStep(steps, 'Pre-submission meetings and the other gates can still move while you wait.');
+    }
+    return { lane, headline, steps };
+  }
+
   if (!deficits.length && !readiness.ready) {
     lane = 'Submission package';
     headline = `Clear the submission gate: ${readiness.reasons.join(' | ')}.`;
@@ -1028,6 +1082,16 @@ export function updatePlanningMissionStatus(ui, journey, seasonInfo = null) {
     label: `FOM ${describeReviewState(fom).toLowerCase()}`,
     done: fom?.status === 'closed'
   });
+  // The District Manager's own conditions: an exposed file, or a regulator's
+  // open file on the plan, holds the decision whatever the meters say.
+  const scrutinyNow = Math.round(Number(journey.scrutiny) || 0);
+  checklist.push({
+    label: `Scrutiny ${scrutinyNow}% (the District Manager decides under ${PLANNING_SCRUTINY_GATE}%)`,
+    done: scrutinyNow < PLANNING_SCRUTINY_GATE
+  });
+  for (const hold of getPlanningDecisionHolds(journey).filter((entry) => entry.key === 'open_file')) {
+    checklist.push({ label: `Open file: ${hold.reason}`, done: false });
+  }
   // The guidance headline is the one recommendation; the alerts only carry
   // the clocks and blockers the headline cannot hold.
   const alerts = [];
@@ -1095,7 +1159,7 @@ function displayPlanningBriefing(ui, journey, seasonInfo) {
   if (Number.isFinite(journey.scrutiny)) {
     const scrutiny = Math.round(journey.scrutiny);
     const scrutinyLevel = scrutiny > 70 ? 'HIGH' : scrutiny > 40 ? 'MODERATE' : 'LOW';
-    ui.write(`Scrutiny: ${scrutiny}% (${scrutinyLevel})`);
+    ui.write(`Scrutiny: ${scrutiny}% (${scrutinyLevel}; the District Manager decides under ${PLANNING_SCRUTINY_GATE}%)`);
   }
   const areaSituation = getAreaSituationSummary(journey);
   if (areaSituation) {
@@ -1447,7 +1511,8 @@ function buildActionOptions(journey, seasonInfo = null) {
     const valuesOk = deficits.length === 0;
     const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
     const professionalIssues = getPlanningProfessionalIssues(journey);
-    if (valuesOk && submissionReadiness.ready && professionalIssues.length === 0 && approvalGaps.length === 0) {
+    const holds = getPlanningDecisionHolds(journey);
+    if (valuesOk && submissionReadiness.ready && professionalIssues.length === 0 && approvalGaps.length === 0 && holds.length === 0) {
       const gain = getSubmissionConfidenceGain(submissionReadiness);
       const readinessNow = Math.round(journey.plan.ministerialConfidence || 0);
       actionOptions.push({
@@ -1459,7 +1524,7 @@ function buildActionOptions(journey, seasonInfo = null) {
       });
     } else {
       const guidance = buildPlanningActionGuidance(journey, seasonInfo);
-      const needs = [...new Set([deficits.length ? formatValuesGateDeficits(deficits) : null, ...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons, ...professionalIssues].filter(Boolean))];
+      const needs = [...new Set([deficits.length ? formatValuesGateDeficits(deficits) : null, ...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons, ...professionalIssues, ...holds.map((hold) => hold.reason)].filter(Boolean))];
       actionOptions.push({
         label: 'Prepare Submission (BLOCKED)',
         description: `Needs: ${needs.join(' | ')} | Next: ${guidance.headline}`,
@@ -1488,6 +1553,14 @@ function buildActionOptions(journey, seasonInfo = null) {
         ? `Lane: professional file | Works on: ${pieces.join(' | ')}`
         : 'Lane: professional file | Renew registration, log CPD, and clear the filing backlog',
       value: 'professional_admin'
+    });
+  }
+
+  if ((Number(journey.scrutiny) || 0) >= PLANNING_SCRUTINY_GATE) {
+    actionOptions.push({
+      label: 'District Compliance Review',
+      description: `Lane: district file | Walk district compliance staff through every open question on the file; scrutiny -${COMPLIANCE_REVIEW_SCRUTINY} (the District Manager decides under ${PLANNING_SCRUTINY_GATE}%) | ${formatDollars(COMPLIANCE_REVIEW_COST)}`,
+      value: 'compliance_review'
     });
   }
 
@@ -1735,6 +1808,10 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       if (!isFomBlocked && submissionReadiness.reasons.length > 0) {
         ui.write(`Planning gate: ${submissionReadiness.reasons.join(' | ')}.`);
       }
+      const decisionHolds = actionValue === 'submit_blocked' ? getPlanningDecisionHolds(journey) : [];
+      if (decisionHolds.length > 0) {
+        ui.write(`District Manager's conditions: ${decisionHolds.map((hold) => hold.reason).join(' | ')}.`);
+      }
       ui.write(`Lane Focus: ${guidance.lane}`);
       ui.write(`Next Best Move: ${guidance.headline}`);
       if (guidance.steps.length > 0) {
@@ -1754,8 +1831,9 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
       const approvalGaps = getPlanningApprovalGaps(journey);
       const valueDeficits = getValuesGateDeficits(journey);
-      if (!submissionReadiness.ready || approvalGaps.length > 0 || valueDeficits.length > 0) {
-        ui.writeWarning(`Submission blocked: ${[...(valueDeficits.length ? [formatValuesGateDeficits(valueDeficits)] : []), ...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons].join(' | ')}.`);
+      const decisionHolds = getPlanningDecisionHolds(journey);
+      if (!submissionReadiness.ready || approvalGaps.length > 0 || valueDeficits.length > 0 || decisionHolds.length > 0) {
+        ui.writeWarning(`Submission blocked: ${[...(valueDeficits.length ? [formatValuesGateDeficits(valueDeficits)] : []), ...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons, ...decisionHolds.map((hold) => hold.reason)].join(' | ')}.`);
         break;
       }
       spendDay(journey);
@@ -1879,6 +1957,25 @@ export async function processAction(game, actionValue, seasonInfo = null) {
           ui.writeWarning(`Road-engineering blocker: ${roadContext.blockerReasons.join(' | ')}`);
         }
       }
+      break;
+    }
+
+    case 'compliance_review': {
+      if ((Number(journey.scrutiny) || 0) < PLANNING_SCRUTINY_GATE) {
+        ui.write(`Scrutiny is under ${PLANNING_SCRUTINY_GATE}%: the district has nothing it needs walked through.`);
+        break;
+      }
+      const before = Math.round(Number(journey.scrutiny) || 0);
+      journey.scrutiny = clampValue(before - COMPLIANCE_REVIEW_SCRUTINY);
+      journey.resources.budget = Math.max(0, journey.resources.budget - COMPLIANCE_REVIEW_COST);
+      spendDay(journey);
+      applyProtagonistCost(journey, { energy: 8, stress: 8 });
+      applyPlanningProfessionalWork(journey, { paperworkLoad: 2, auditExposure: -2 });
+      const after = Math.round(journey.scrutiny);
+      ui.write(`You walk district compliance staff through every open question on the file: the survey records, the engagement log, the support-site permits. Scrutiny -${before - after} → ${after}%.`);
+      ui.write(after >= PLANNING_SCRUTINY_GATE
+        ? `Still at ${PLANNING_SCRUTINY_GATE}% or more: the District Manager is not signing yet.`
+        : `Under ${PLANNING_SCRUTINY_GATE}%: the District Manager will decide the file on its merits.`);
       break;
     }
 
