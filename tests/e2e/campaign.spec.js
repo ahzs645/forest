@@ -59,9 +59,15 @@ test('campaign plays all four seasons through the year-end review', async ({ pag
       break;
     }
 
+    // A disabled row (a crew on days off) is on the card, not a choice. Keep
+    // each label's position among all the buttons: indexing the filtered
+    // list into the unfiltered one clicked the disabled row above the
+    // intended option, and the bot waited out the click every pass.
     const buttons = page.locator('#choices button');
-    const labels = await buttons.evaluateAll((nodes) =>
-      nodes.filter((n) => n.offsetParent !== null && !n.disabled).map((n) => n.innerText.replace(/\s+/g, ' ').trim()));
+    const choices = await buttons.evaluateAll((nodes) => nodes
+      .map((n, at) => ({ at, live: n.offsetParent !== null && !n.disabled, label: n.innerText.replace(/\s+/g, ' ').trim() }))
+      .filter((choice) => choice.live));
+    const labels = choices.map((choice) => choice.label);
     if (!labels.length) continue;
 
     if (travelDestination) {
@@ -104,7 +110,7 @@ test('campaign plays all four seasons through the year-end review', async ({ pag
     // Travel labels read "Move on to <stop> | Waypoint — …" or "| Next block on the file; …".
     const destination = labels[index].match(/Move on to (.+?) (?:Waypoint —|Next block on the file|Cover ground)/);
     if (destination) travelDestination = destination[1];
-    await buttons.nth(index).click({ timeout: 3000 }).catch(() => {});
+    await buttons.nth(choices[index].at).click({ timeout: 3000 }).catch(() => {});
   }
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);

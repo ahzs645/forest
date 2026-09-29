@@ -242,6 +242,7 @@ export async function runSilvicultureDay(game) {
   // What happened earlier today (a contractor call answered, a situation set
   // aside) stays on the day card instead of being cleared by its redraw.
   silvicultureState.dayNotes = [];
+  silvicultureState.heldToday = {};
   silvicultureState.contractorCallToday = false;
 
   // Daily contractor productivity and morale drift. Fatigue is earned on the
@@ -989,11 +990,23 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   // Someone gone for the season: say what the crew can no longer do, and
   // offer the way back.
   for (const role of getVacantCrewRoles(journey)) {
+    const unaffordable = describeUnaffordableReplacement(journey, role);
     actionOptions.push({
       label: `Bring up a replacement ${role.noun}`,
-      description: `${role.lost} A day on the road to town and ${formatMoney(SILVICULTURE_REPLACEMENT_COST[role.id])}.`,
+      description: unaffordable || `${role.lost} A day on the road to town and ${formatMoney(SILVICULTURE_REPLACEMENT_COST[role.id])}.`,
       value: `replace:${role.id}`,
+      ...(unaffordable ? { disabled: true } : {}),
     });
+  }
+
+  // A task held back today keeps its row and its reason even when the card
+  // would no longer list it (the stock ran out between the card and the call).
+  const heldToday = silvicultureState?.heldToday || {};
+  for (const [value, reason] of Object.entries(heldToday)) {
+    const label = HELD_TASK_LABELS[value]?.(program);
+    if (label && !actionOptions.some((option) => option.value === value)) {
+      actionOptions.push({ label, description: reason, value, disabled: true });
+    }
   }
 
   actionOptions.push({
@@ -1015,6 +1028,7 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   const fieldTasks = { plant: 'plant', fill: 'fill', brush: 'brush', survey: 'survey' };
   const hasAccreditedSurveyor = crewHasRole(journey.crew || [], 'surveyor');
   return actionOptions.map((option) => {
+    if (heldToday[option.value] && !option.disabled) return { ...option, disabled: true, description: heldToday[option.value] };
     const task = fieldTasks[option.value];
     if (!task || option.disabled) return option;
     if (task === 'survey' && hasAccreditedSurveyor) return option;
@@ -1022,6 +1036,17 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
     return { ...option, disabled: true, description: describeCrewWait(journey, zoneProfile, task) };
   });
 }
+
+/** The card rows a held task keeps (holdChosenTask), by action value. */
+const HELD_TASK_LABELS = {
+  plant: () => 'Plant (this year\'s blocks)',
+  inspect: () => 'Planting quality inspection (this year\'s blocks)',
+  fill: () => 'Fill plant (last year\'s blocks)',
+  brush: () => 'Brush (release the older stands)',
+  survey: (program) => `Free-growing survey (${describeFgYears(program)} openings)`,
+  rotation: () => 'Contractor Rotation',
+  meeting: () => 'Contractor Meeting',
+};
 
 const TASK_CREWS = {
   plant: 'planting crew',
@@ -1055,6 +1080,21 @@ export function describeCrewWait(journey, zoneProfile, task) {
 function getSurveyableOpening(journey) {
   const context = { year: journey?.program?.year, day: journey?.day };
   return (journey?.program?.freeGrowing || []).find((opening) => isFreeGrowingSurveyable(opening, context)) || null;
+}
+
+/**
+ * A task that turns out not to go once it is chosen (the roster or the stock
+ * moved after the card was drawn) says why, and the redrawn card keeps the
+ * reason on that task's row, disabled, for the rest of the day. The line it
+ * printed used to be wiped by the redraw, which offered the same task again
+ * as if nothing had happened.
+ * @returns {false} the day is not spent
+ */
+function holdChosenTask(ui, journey, actionId, reason, write = 'writeWarning') {
+  ui[write]?.(reason);
+  const state = journey.silvicultureState;
+  if (state) state.heldToday = { ...(state.heldToday || {}), [actionId]: reason };
+  return false;
 }
 
 /** The brush this zone's stands are losing the height race to. */
@@ -1136,26 +1176,22 @@ async function handlePlanting(game, seasonMods, silvicultureState, zoneProfile) 
   const block = getCurrentPlantingBlock(program);
 
   if (!block || journey.planting.blocksPlanted >= journey.planting.blocksToPlant) {
-    ui.write('This year\'s blocks are all in the ground. Shift the day to the older vintages.');
-    return false;
+    return holdChosenTask(ui, journey, 'plant', 'This year\'s blocks are all in the ground. Shift the day to the older vintages.', 'write');
   }
   if (getBlockAwaitingInspection(program)) {
-    ui.writeWarning('Close the quality plots on yesterday\'s block before the planters move on.');
-    return false;
+    return holdChosenTask(ui, journey, 'plant', 'Close the quality plots on yesterday\'s block before the planters move on.');
   }
 
   const crew = getSilvicultureTaskContractors(journey, pressure, 'plant', true, ui);
   if (crew.length === 0) {
-    ui.writeWarning('No planting contractor is available. Put an available crew on the block first.');
-    return false;
+    return holdChosenTask(ui, journey, 'plant', 'No planting contractor is available. Put an available crew on the block first.');
   }
 
   const output = estimatePlantingOutput(crew, pressure, plantingEff);
   const remainingAllocation = Math.max(0, journey.planting.seedlingsAllocated - journey.planting.seedlingsPlanted);
   let toPlant = Math.min(output, journey.resources.seedlings, remainingAllocation);
   if (toPlant <= 0) {
-    ui.writeWarning('No seedlings remain for this year\'s blocks. Check the reefer and the nursery order.');
-    return false;
+    return holdChosenTask(ui, journey, 'plant', 'No seedlings remain for this year\'s blocks. Check the reefer and the nursery order.');
   }
 
   const contractor = crew[0];
@@ -1246,8 +1282,7 @@ async function handleQualityInspection(game, seasonMods, silvicultureState, zone
   const pressure = zoneProfile || getSilvicultureZoneProfile(journey, silvicultureState);
   const block = getBlockAwaitingInspection(program);
   if (!block) {
-    ui.write('No block is waiting on quality plots.');
-    return false;
+    return holdChosenTask(ui, journey, 'inspect', 'No block is waiting on quality plots.', 'write');
   }
 
   const contractor = (journey.contractors || []).find((c) => c.specialty === 'planting') || journey.contractors[0];
@@ -1332,19 +1367,16 @@ async function handleFillPlanting(game, seasonMods, silvicultureState, zoneProfi
   const pressure = zoneProfile || getSilvicultureZoneProfile(journey, silvicultureState);
   const opening = (program.fill || []).find((o) => !o.done);
   if (!opening) {
-    ui.write('Last year\'s openings are all back above minimum stocking.');
-    return false;
+    return holdChosenTask(ui, journey, 'fill', 'Last year\'s openings are all back above minimum stocking.', 'write');
   }
   const crew = getSilvicultureTaskContractors(journey, pressure, 'fill', true, ui);
   if (crew.length === 0) {
-    ui.writeWarning('No contractor is available for fill work. Put an available crew on the program first.');
-    return false;
+    return holdChosenTask(ui, journey, 'fill', 'No contractor is available for fill work. Put an available crew on the program first.');
   }
   const output = Math.round(estimatePlantingOutput(crew, pressure, plantingEff) * (1 - Math.min(0.22, pressure.fillPressure + pressure.survivalPenalty * 0.5)));
   const trees = Math.min(opening.trees, journey.resources.seedlings);
   if (trees <= 0) {
-    ui.writeWarning('No fill stock left in the reefer for this opening.');
-    return false;
+    return holdChosenTask(ui, journey, 'fill', 'No fill stock left in the reefer for this opening.');
   }
   const contractor = crew[0];
   const price = (Number(contractor.pricePerTree) || 0.32) + FILL_PRICE_PREMIUM;
@@ -1464,13 +1496,11 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   const queue = (program.brush || []).filter((o) => o.treated < o.ha);
 
   if (!queue.length) {
-    ui.write('The release program is treated for the year.');
-    return false;
+    return holdChosenTask(ui, journey, 'brush', 'The release program is treated for the year.', 'write');
   }
   const crew = getSilvicultureTaskContractors(journey, pressure, 'brush', true, ui);
   if (crew.length === 0) {
-    ui.writeWarning('No brushing contractor is available. Put an available crew on the program first.');
-    return false;
+    return holdChosenTask(ui, journey, 'brush', 'No brushing contractor is available. Put an available crew on the program first.');
   }
   const contractor = crew.find((c) => c.specialty === 'brushing') || crew[0];
   const access = getReleaseAccess(journey, silvicultureState);
@@ -1535,8 +1565,7 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
     }
     const ha = hectaresFor(choice.value);
     if (ha <= 0) {
-      ui.write('No release hectares remain on the program map.');
-      return false;
+      return holdChosenTask(ui, journey, 'brush', 'No release hectares remain on the program map.', 'write');
     }
     const rate = BRUSH_RATES[choice.value] || BRUSH_RATES.manual;
     const invoice = Math.round(ha * rate);
@@ -1661,22 +1690,19 @@ async function handleFreeGrowingSurvey(game, seasonMods, silvicultureState, zone
   const scrutinyPressure = getScrutinyPressure(journey);
 
   if (journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget) {
-    ui.write('This year\'s free-growing declarations are all in RESULTS.');
-    return false;
+    return holdChosenTask(ui, journey, 'survey', 'This year\'s free-growing declarations are all in RESULTS.', 'write');
   }
   const opening = getSurveyableOpening(journey);
   if (!opening) {
-    ui.writeWarning(describeHeldWork(journey, 'spring').find((line) => /survey|release/i.test(line))
+    return holdChosenTask(ui, journey, 'survey', describeHeldWork(journey, 'spring').find((line) => /survey|release/i.test(line))
       || 'No stand on the free-growing list can be surveyed today.');
-    return false;
   }
 
   const hasAccreditedSurveyor = crewHasRole(journey.crew || [], 'surveyor');
   const contractors = getSilvicultureTaskContractors(journey, pressure, 'survey', !hasAccreditedSurveyor, ui)
     .filter((c) => contractorHasCert(c, 'surveyor-accredited'));
   if (contractors.length === 0 && !hasAccreditedSurveyor) {
-    ui.writeWarning('Free-growing surveys need an accredited silviculture surveyor - your own, or the survey contractor. Nobody unaccredited signs a declaration.');
-    return false;
+    return holdChosenTask(ui, journey, 'survey', 'Free-growing surveys need an accredited silviculture surveyor - your own, or the survey contractor. Nobody unaccredited signs a declaration.');
   }
 
   const contractor = contractors[0] || null;
@@ -1792,8 +1818,7 @@ async function handleContractorMeeting(game, zoneProfile = null) {
   const meetable = getMeetableContractors(journey, zoneProfile || getSilvicultureZoneProfile(journey));
 
   if (meetable.length === 0) {
-    ui.write('Every crew is on days off; there is no foreman to sit down with today.');
-    return false;
+    return holdChosenTask(ui, journey, 'meeting', 'Every crew is on days off; there is no foreman to sit down with today.', 'write');
   }
 
   const options = meetable.map(c => ({
@@ -2377,16 +2402,22 @@ function getVacantCrewRoles(journey) {
     && !crewHasRole(crew, role.id));
 }
 
+/** Why the program cannot bring a replacement up, or null when it can. */
+function describeUnaffordableReplacement(journey, role) {
+  const cost = SILVICULTURE_REPLACEMENT_COST[role.id];
+  const budget = Number(journey.resources?.budget) || 0;
+  if (budget >= cost) return null;
+  return `The program cannot carry a replacement ${role.noun}: ${formatMoney(cost)} against ${formatMoney(Math.max(0, budget))} left.`;
+}
+
 /** Bring a replacement for a vacant role up from town. Spends the day. */
 function handleCrewReplacement(game, roleId) {
   const { ui, journey } = game;
   const role = SILVICULTURE_CREW_ROLES.find((candidate) => candidate.id === roleId);
   if (!role || crewHasRole(journey.crew || [], roleId)) return false;
   const cost = SILVICULTURE_REPLACEMENT_COST[roleId];
-  if ((Number(journey.resources.budget) || 0) < cost) {
-    ui.writeWarning(`The program cannot carry a replacement ${role.noun} (${formatMoney(cost)}).`);
-    return false;
-  }
+  const unaffordable = describeUnaffordableReplacement(journey, role);
+  if (unaffordable) return holdChosenTask(ui, journey, `replace:${roleId}`, unaffordable);
   journey.resources.budget -= cost;
   const replacement = generateCrewMember('field', role);
   const names = new Set(journey.crew.map((member) => member.name));
@@ -3023,8 +3054,7 @@ async function handleContractorRotation(game, silvicultureState = null, zoneProf
     });
 
   if (options.length === 0) {
-    ui.write('No contractors are available to rotate right now.');
-    return false;
+    return holdChosenTask(ui, journey, 'rotation', 'No contractors are available to rotate right now.', 'write');
   }
 
   // Always offer a way out.
@@ -3077,5 +3107,7 @@ async function handleContractorRotation(game, silvicultureState = null, zoneProf
   deploySilvicultureContractor(contractor, pressure, contractor.specialty === 'brushing' ? 'brush' : 'plant');
   ui.writePositive(`${contractor.name} goes back on the block.`);
   activeState.dayNotes?.push(`${contractor.name} called onto the block.`);
+  // A crew on the block can change what the card holds back.
+  activeState.heldToday = {};
   return false;
 }
