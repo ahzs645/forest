@@ -848,7 +848,12 @@ function scoreRevisionProfiles(journey, file = null) {
 }
 
 function pickRevisionProfile(journey, index = 0, file = null) {
-  const profiles = scoreRevisionProfiles(journey, file);
+  // A gap the licensee has already answered cleanly on this file is closed;
+  // the letter has to be about something else.
+  const resolved = new Set(file?.resolvedDeficiencies || []);
+  const scored = scoreRevisionProfiles(journey, file);
+  const open = scored.filter((profile) => !resolved.has(profile.id));
+  const profiles = open.length ? open : scored;
   if (!profiles.length) {
     return PERMIT_REVISION_PROFILES[PERMIT_REVISION_PROFILES.length - 1];
   }
@@ -1013,7 +1018,11 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
     if (index !== -1) queue.splice(index, 1);
     const file = entry.fileId ? getPermitFileById(journey, entry.fileId) : null;
     if (file) {
-      resubmitPermitFile(journey, file.id, { completeness: Boolean(entry.completeness) });
+      resubmitPermitFile(journey, file.id, {
+        completeness: Boolean(entry.completeness),
+        fastTracked: selectedMode === 'fast',
+        answeredProfileId: entry.profileId,
+      });
       refiled.push(file);
     }
   }
@@ -1032,14 +1041,16 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
   }
 
   if (selectedMode === 'fast') {
-    messages.push('It keeps the file moving, but it adds heat to the review trail.');
+    messages.push('It goes back on tonight\'s pile, but a thin answer is likelier to come back, and it adds heat to the review trail.');
   } else {
     messages.push('The file reads cleaner and should draw less scrutiny on the next pass.');
   }
 
   const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
   const roadIntel = getPermittingRoadAssetContext(journey);
-  if (ticket.profileId === 'community-watershed' && pressure.hydrology > 0) {
+  if (selectedMode === 'fast') {
+    // A lean refile has not lined anything up; say nothing it did not do.
+  } else if (ticket.profileId === 'community-watershed' && pressure.hydrology > 0) {
     messages.push('The watershed response is now lined up with the hydrology concerns on the file.');
   } else if (ticket.profileId === 'access-engineering' && roadIntel.engineering > 0) {
     messages.push('The road package now lines up with the access engineering issues on the file.');
@@ -1067,6 +1078,8 @@ export async function runPermittingDay(game) {
   ensurePermitFiles(journey);
   ensurePermittingRevisionState(journey);
   ensurePermittingProfessionalState(journey);
+  // The debrief measures spending against what the desk started with.
+  if (!Number.isFinite(journey.budgetStart)) journey.budgetStart = journey.resources?.budget || 0;
 
   // Morning at the office: the season outside the window, coffee inside.
   if (typeof ui.playScene === 'function') {
@@ -1418,7 +1431,7 @@ export function buildActionOptions(journey) {
     });
     bucket.push({
       label: `Fast-track: ${ticket.fileLabel || ticket.id}`,
-      description: `${ticket.title}: quicker resubmission, but more heat on the file`,
+      description: `${ticket.title}: decided tonight instead of tomorrow, but a thin answer is likelier to come back and draws more heat`,
       value: `revise_permit:${ticket.id}:fast`
     });
   });
