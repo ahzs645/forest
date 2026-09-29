@@ -23,6 +23,7 @@ import { getOperationalProgress, recordProgressMilestones } from './progress.js'
 import {
   applyRandomInjury,
   applyStatusEffect,
+  evacuateIfInjuryRequires,
   getActiveCrewCount,
   getTotalWorkCapacity,
   processDailyUpdate
@@ -878,8 +879,12 @@ export function calculateTravelDistance(journey, paceId) {
   // its boundary exactly.
   const remaining = Math.round(Math.max(0, segmentLength - distanceIntoSegment) * 100) / 100;
   // A leg that runs out within ARRIVAL_SNAP_KM of the stop walks the rest in.
-  const snapsToStop = distance > 0 && remaining > 0 && remaining - distance <= ARRIVAL_SNAP_KM;
-  const clampedDistance = remaining > 0 ? (snapsToStop ? remaining : Math.min(distance, remaining)) : 0;
+  // Decided on the tenth of a kilometre the player is shown: a 7.46 km leg
+  // prints "Walked 7.5 km" and leaves 1.5 km, and that has to snap too.
+  const shownDistance = Math.round(distance * 10) / 10;
+  const shownLeftover = Math.round((remaining - shownDistance) * 10) / 10;
+  const snapsToStop = shownDistance > 0 && remaining > 0 && shownLeftover <= ARRIVAL_SNAP_KM;
+  const clampedDistance = remaining > 0 ? (snapsToStop ? remaining : Math.min(shownDistance, remaining)) : 0;
   const reachesBlock = clampedDistance >= remaining && remaining > 0;
 
   return {
@@ -1100,7 +1105,14 @@ export function executeFieldAction(journey, paceId) {
   // hand the player a loss for a file they had just closed.
   if (getActiveCrewCount(journey.crew) === 0 && !(journey.journeyType === 'recon' && allPackagesFinalized(journey))) {
     journey.isGameOver = true;
-    journey.gameOverReason = 'ALL CREW LOST - The crew is off the block: nobody left in the field to finish the season.';
+    // Nobody died: they quit or went out on the ETV. Say which.
+    const quit = journey.crew.filter((member) => member.hasQuit).length;
+    const sentOut = journey.crew.filter((member) => !member.isActive && !member.hasQuit).length;
+    const how = [
+      quit ? `${quit} quit` : null,
+      sentOut ? `${sentOut} ${sentOut === 1 ? 'was' : 'were'} sent out injured or ill` : null,
+    ].filter(Boolean).join(' and ');
+    journey.gameOverReason = `NO CREW LEFT - ${how || 'The crew is off the block'}. Nobody is left in the field to finish the season.`;
     messages.push(journey.gameOverReason);
   }
 
@@ -1131,6 +1143,25 @@ export function executeFieldAction(journey, paceId) {
   }
 
   return { journey, messages };
+}
+
+/**
+ * What a field season's money actually bought, for anything that scores its
+ * thrift (the campaign's Budget line, js/game/campaign.js). Cash a shortcut
+ * paid out is not a saving, and an allowance left unspent because the crew
+ * went hungry or walked off was paid for by the crew, not by good management.
+ * @param {Object} journey
+ * @returns {{illicitCash: number, hungryShifts: number, quits: number}}
+ */
+export function getFieldThriftContext(journey) {
+  const illicitCash = (journey?.log || [])
+    .filter((entry) => entry?.type === 'event' && /^temptation_/.test(String(entry.eventId || '')))
+    .reduce((sum, entry) => sum + Math.max(0, Number(entry.effects?.budget) || 0), 0);
+  return {
+    illicitCash,
+    hungryShifts: Number(journey?.resourcePressure?.hungryShiftsTotal || 0),
+    quits: (journey?.crew || []).filter((member) => member?.hasQuit).length,
+  };
 }
 
 /**
@@ -1217,6 +1248,9 @@ function applyRoutePlanConsequences(journey, routePlan, paceId, fromBlock, toBlo
       const severity = actualRisk >= 0.4 ? 'severe' : actualRisk >= 0.2 ? 'moderate' : 'minor';
       const result = applyRandomInjury(victim, severity);
       messages.push(`Route mishap! ${result.message}`);
+      // The crew's end-of-shift pass has already run; a fracture goes out on
+      // the ETV now, not after a night in camp and a kit spent on it.
+      evacuateIfInjuryRequires(victim, journey.day ?? null, messages);
     }
   }
 }
@@ -1249,6 +1283,8 @@ function applyFieldHardships(journey, resourceStatus, messages) {
   // the season.
   const starving = journey.resources.food <= 0;
   pressure.hungryDays = starving ? Number(pressure.hungryDays || 0) + 1 : 0;
+  // The season's total, for whoever later asks what the savings cost.
+  if (starving) pressure.hungryShiftsTotal = Number(pressure.hungryShiftsTotal || 0) + 1;
   if (starving) {
     const days = pressure.hungryDays;
     const healthLoss = Math.min(14, 4 + days * 2);

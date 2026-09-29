@@ -165,6 +165,12 @@ export async function runDaySituation(game, event, options = {}) {
     return { setAside: true, spendsDay: false, gameOver: false };
   }
 
+  // Turning back to report an obstruction closes the road behind the call:
+  // nobody drives past it until the office has had it looked at.
+  if (obstruction && outcome.option?.effects?.progressMode === 'turn_back') {
+    addRouteConstraintFromEvent(journey, event, { reported: true });
+  }
+
   const spendsDay = optionSpendsDay(event, outcome.option, journey.journeyType);
   if (spendsDay && Number(journey.travelSetback || 0) > travelSetbackBefore) {
     const setbackDelta = Number(journey.travelSetback || 0) - travelSetbackBefore;

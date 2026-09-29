@@ -22,8 +22,8 @@ export const CONSEQUENCE_FLAGS = {
   // the water-crossing beat next shift off journey.pendingCrossing.
   blocks_crossing: 'recon: pendingCrossing',
   // This crossing will not take another loaded trip. Consumed by
-  // getCondemnedCrossingPenalty below, called from the recon travel leg.
-  bridge_condemned: 'recon travel: detour cost',
+  // getCondemnedCrossingPenalty below, charged by recon trips back over it.
+  bridge_condemned: 'recon trips back: detour cost',
   // Someone got paid to stay. Consumed by getCrewPrecedentMultiplier below,
   // applied to later crew-morale losses.
   crew_precedent_set: 'resolution: crew_morale scaling',

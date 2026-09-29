@@ -729,12 +729,12 @@
       "id": "thl-7",
       "name": "Block TH-07 - Ealue Lake",
       "kind": "block",
-      "description": "Fly-in block on Ealue Lake with a supply cache on the shore. The bush plane drops gear when the ceiling lifts; the lakeshore reserve will be wide.",
+      "description": "Road-end block at Ealue Lake, east of Highway 37 on the Ealue Lake road. The cache on the shore is stocked by float plane when the ceiling lifts; the lakeshore reserve will be wide.",
       "distance": 20,
       "terrain": "hilly",
       "hasSupply": true,
-      "hazards": ["weather_delay"],
-      "features": ["remote_camp", "bush_plane", "lake", "spruce_forest"]
+      "hazards": ["grade"],
+      "features": ["lake", "float_plane_cache", "spruce_forest"]
     },
     {
       "id": "thl-8",

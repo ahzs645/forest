@@ -117,7 +117,7 @@ test('recon mode ends when no active crew remain', () => {
   };
 
   const result = checkEndConditions(reconJourney);
-  assert.deepEqual(result, { gameOver: true, reason: 'The crew is off the block: nobody left in the field to finish the season' });
+  assert.deepEqual(result, { gameOver: true, reason: 'The crew is off the block: nobody left in the field to finish the season.' });
 });
 
 test('recon mode victory uses fully surveyed block count for the final checkpoint', () => {
@@ -174,7 +174,7 @@ test('recon mode fails on the final block when mobility is gone and open package
 
   assert.deepEqual(checkEndConditions(reconJourney), {
     gameOver: true,
-    reason: 'Recon package stalled on the final block with no mobility left'
+    reason: 'Recon package stalled on the final block with no mobility left.'
   });
 });
 
@@ -194,7 +194,7 @@ test('recon loses when the access season closes with blocks still open', () => {
 
   assert.deepEqual(checkEndConditions(reconJourney), {
     gameOver: true,
-    reason: 'The layout deadline passed with blocks still unassessed — the cutting permit goes in without them'
+    reason: 'The layout deadline passed with blocks still unassessed — the cutting permit goes in without them.'
   });
 });
 

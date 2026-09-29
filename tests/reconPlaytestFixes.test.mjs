@@ -214,7 +214,7 @@ test('a crew on an empty food box weakens every shift, rest does not offset it, 
   }
   assert.ok(walkedOff, 'an empty box is a failure path, not a long rest');
   assert.ok(walkedOff.shift <= STARVATION_WALKOFF_DAYS);
-  assert.match(journey.gameOverReason, /NO FOOD|ALL CREW LOST/);
+  assert.match(journey.gameOverReason, /NO FOOD|NO CREW LEFT/);
 });
 
 test('an empty food box is not offered as a full-or-short rations choice', async () => {

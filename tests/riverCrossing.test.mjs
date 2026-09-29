@@ -213,6 +213,8 @@ test('the ferry runs the crew across below flood and has the cable up at flood',
   const flood = makeJourney({ weather: { id: 'heavy_rain' } });
   const floodCtx = getCrossingContext(flood, ferryBlock);
   assert.equal(floodCtx.flood, true);
+  // Nothing to radio for: the landing offers only the wait, never a refusal loop.
+  assert.deepEqual(values(getCrossingOptions(floodCtx)), ['wait']);
   const shut = ferryCrossing(flood, floodCtx);
   assert.equal(shut.crossed, false);
   assert.match(shut.messages[0], /cable up/);

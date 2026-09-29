@@ -48,7 +48,7 @@ import {
   resolveCrossingChoice
 } from '../journey/riverCrossing.js';
 import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journey/blockNav.js';
-import { getActiveRouteConstraint, resolveRouteConstraint } from '../journey/routeConstraints.js';
+import { getActiveRouteConstraint, reopenReportedConstraints, resolveRouteConstraint } from '../journey/routeConstraints.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { PACE_OPTIONS } from '../journey/constants.js';
 import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
@@ -567,6 +567,10 @@ async function runFieldDay(game) {
 
   const resumingShift = journey.activeReconShift?.day === journey.day;
   startDay(journey, { resuming: resumingShift });
+  if (!resumingShift) {
+    const reopened = reopenReportedConstraints(journey);
+    if (reopened.length) journey.routeNews = { day: journey.day, text: reopened.join(' ') };
+  }
 
   let hasTraveled = Boolean(resumingShift && journey.activeReconShift.hasTraveled);
   // Tracks whether this shift's daily resolution (resource burn, crew updates,
@@ -610,7 +614,18 @@ async function runFieldDay(game) {
       const interruptingEvent = pendingEvent;
       pendingEvent = null;
       checkpointReconShift(game, shiftState, pendingEvent);
-      await handleEvent(game, interruptingEvent);
+      // The card redraws the screen, so the grounding has to ride on the
+      // card itself, and no option may promise that work continues.
+      const grounded = `${journey.weather.name} has grounded all operations. The crew hunkers down.`;
+      await handleEvent(game, {
+        ...interruptingEvent,
+        heldInCamp: `${journey.weather.name.toLowerCase()} holds the crew in camp`,
+      }, {
+        dayHeader: buildReconDayHeader(journey),
+        statusLine: grounded,
+        context: buildReconContextLines(journey),
+        onRender: () => updateReconMissionStatus(ui, journey),
+      });
       if (game.gameOver) return;
     }
     spendDay(journey);
@@ -742,13 +757,15 @@ async function runFieldDay(game) {
       });
     }
 
-    if (routeConstraint) {
+    if (routeConstraint && routeConstraint.status !== 'reported') {
       options.push({
         label: 'Report it and work the near side',
         description: `${routeConstraint.title} blocks ${routeConstraint.toBlockName}. Flag it, photograph it, call the road permit holder — uses this shift`,
         tag: 'TRADEOFF',
         value: 'report_route_constraint'
       });
+    }
+    if (routeConstraint) {
       options.push({
         label: routeConstraint.kind === 'landslide' ? 'Take the old spur around' : 'Walk in from the last sound approach',
         description: `Bypass ${routeConstraint.title.toLowerCase()} on the old line with extra fuel and rougher travel — uses this shift`,
@@ -840,14 +857,24 @@ async function runFieldDay(game) {
         value: 'food_cache'
       });
     }
-    if ((journey.resources.fuel || 0) <= FIELD_RESOURCES.fuel.max - FUEL_RUN_LITRES) {
+    // A run to town the card cannot pay for is not offered as a shift's
+    // work; the camp prompt says what it would take instead.
+    const cashOnHand = Number(journey.resources.budget || 0);
+    const unaffordableRuns = [];
+    const fuelRunCost = priceByRemoteness(journey, FUEL_RUN_BASE_COST);
+    const groceryRunCost = priceByRemoteness(journey, GROCERY_RUN_BASE_COST);
+    if ((journey.resources.fuel || 0) <= FIELD_RESOURCES.fuel.max - FUEL_RUN_LITRES && cashOnHand < fuelRunCost) {
+      unaffordableRuns.push(`fuel run $${fuelRunCost}, $${Math.ceil(fuelRunCost - cashOnHand)} short`);
+    } else if ((journey.resources.fuel || 0) <= FIELD_RESOURCES.fuel.max - FUEL_RUN_LITRES) {
       campOptions.push({
         label: 'Fuel run',
         description: `Send the driver to the nearest cardlock: +${FUEL_RUN_LITRES} L, about $${priceByRemoteness(journey, FUEL_RUN_BASE_COST)}; uses this shift`,
         value: 'fuel_run'
       });
     }
-    if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.max - GROCERY_RUN_FOOD) {
+    if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.max - GROCERY_RUN_FOOD && cashOnHand < groceryRunCost) {
+      unaffordableRuns.push(`grocery run $${groceryRunCost}, $${Math.ceil(groceryRunCost - cashOnHand)} short`);
+    } else if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.max - GROCERY_RUN_FOOD) {
       campOptions.push({
         label: 'Grocery run',
         description: `Send the driver to town for a rations restock: +${GROCERY_RUN_FOOD} person-days, about $${priceByRemoteness(journey, GROCERY_RUN_BASE_COST)}; uses this shift`,
@@ -884,7 +911,9 @@ async function runFieldDay(game) {
     });
 
     if (actionId === 'camp_menu') {
-      const camp = await ui.promptChoice('Camp & crew:', [
+      const camp = await ui.promptChoice(unaffordableRuns.length
+        ? `Camp & crew (not enough cash: ${unaffordableRuns.join('; ')}):`
+        : 'Camp & crew:', [
         ...campOptions,
         { label: 'Back', description: 'Return to the shift', value: 'camp_back' }
       ]);
@@ -1406,7 +1435,9 @@ export function updateReconMissionStatus(ui, journey) {
   if (routeConstraint) {
     alerts.push({
       level: 'danger',
-      text: `${routeConstraint.title} blocks ${routeConstraint.toBlockName}; clear it or mark a detour before travelling.`
+      text: routeConstraint.status === 'reported'
+        ? `${routeConstraint.title} reported; the road to ${routeConstraint.toBlockName} is shut until it has been looked at.`
+        : `${routeConstraint.title} blocks ${routeConstraint.toBlockName}; clear it or mark a detour before travelling.`
     });
   }
   const currentAccessVerdict = getDisplayedAccessVerdict(journey, currentBlock);
@@ -1418,7 +1449,7 @@ export function updateReconMissionStatus(ui, journey) {
   if (journey.rationPlan?.mode === 'short') {
     alerts.push({
       level: 'warn',
-      text: `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
+      text: `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'}): ${SHORT_RATION_MORALE_COST} morale a shift each`
     });
   }
 
@@ -1465,16 +1496,6 @@ async function runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent 
     checkpointReconShift(game, shiftState, pendingEvent);
   }
   applyReconTravelIntelPenalty(ui, journey, currentBlock, paceId);
-
-  // A crossing the crew broke behind them keeps costing. This is the standing
-  // half of a bad band that would otherwise have been a one-day bill
-  // (js/events/consequences.js).
-  const condemned = getCondemnedCrossingPenalty(journey);
-  if (condemned.fuel > 0 || condemned.equipment > 0) {
-    journey.resources.fuel = Math.max(0, journey.resources.fuel - condemned.fuel);
-    journey.resources.equipment = Math.max(0, journey.resources.equipment - condemned.equipment);
-    ui.writeWarning(`${condemned.note} Fuel -${condemned.fuel} L, equipment -${condemned.equipment}.`);
-  }
 
   // Losing the machine for the season is paid on every leg after it, not once.
   const machine = getMachineDownPenalty(journey);
@@ -1591,10 +1612,12 @@ async function handleSetTempo(ui, journey) {
   if (rationChoice.value === 'short' && rations.mode !== 'short') {
     rations.mode = 'short';
     rations.shortRationStreak = 1;
-    ui.writeWarning('Short rations ordered. They hold until you change them.');
+    rations.orderedAtFood = Number(journey.resources.food || 0);
+    ui.writeWarning(`Short rations ordered: ${SHORT_RATION_MORALE_COST} morale a shift for everyone. They hold until you change them, the box is restocked, or someone gets close to walking.`);
   } else if (rationChoice.value === 'normal' && rations.mode === 'short') {
     rations.mode = 'normal';
     rations.shortRationStreak = 0;
+    rations.orderedAtFood = null;
     ui.write('Back on full rations.');
   }
 }
@@ -1636,6 +1659,13 @@ function buildQuietShiftBody(journey) {
   const parts = [recent
     ? `${recent.setAside ? 'You left' : 'You handled'} ${recent.title}. The rest of the shift is still yours to decide.`
     : 'The radio stays quiet through breakfast. Whatever today is, it is yours to decide.'];
+  if (journey.routeNews?.day === journey.day) {
+    parts.push(journey.routeNews.text);
+  }
+  const constraint = getActiveRouteConstraint(journey);
+  if (constraint?.status === 'reported') {
+    parts.push(`The road past the ${constraint.title.toLowerCase()} is shut until the office has had it looked at. Work this side today, or take the old spur around.`);
+  }
   if (openHere) {
     parts.push(`${currentBlock.name} is still open in the file.`);
   }
@@ -1934,6 +1964,62 @@ function chooseTreatmentEffect(member) {
   return activeEffects[0] || null;
 }
 
+/** A crew member this low is a few short-ration shifts from walking (crew.js quits at 10). */
+export const SHORT_RATION_MORALE_FLOOR = 30;
+/** What a shift on short rations costs each crew member (js/crew.js processDailyUpdate). */
+const SHORT_RATION_MORALE_COST = 4;
+
+/**
+ * Whether a short-rations order should come off by itself, and why.
+ *
+ * Short rations are a standing order (Set the tempo), but an order is given
+ * for a reason, and it lapses when the reason does: the box has been
+ * restocked past the warning line, or the crew is close enough to walking
+ * that the food saved is not worth the person lost. A thin box keeps the
+ * order; the morning beat says what it is costing instead.
+ * @param {Object} journey
+ * @returns {{reason: 'restocked'|'morale', food: number, member?: Object}|null}
+ */
+export function reviewShortRations(journey) {
+  const rations = ensureRationPlan(journey);
+  if (rations.mode !== 'short') return null;
+  const food = Number(journey.resources?.food || 0);
+  if (food <= 0) return null;
+  // Restocked: back above the warning line, and more than the order was
+  // given on (an order given on a full box to stretch it lapses at the next
+  // restock, not the next morning).
+  const orderedAt = Number(rations.orderedAtFood);
+  const restocked = food > FIELD_RESOURCES.food.warning
+    && (!Number.isFinite(orderedAt) || food > orderedAt);
+  if (restocked) return { reason: 'restocked', food };
+  if (food <= FIELD_RESOURCES.food.critical) return null;
+  const active = (journey.crew || []).filter((member) => member.isActive);
+  const lowest = active.reduce((low, member) => (!low || member.morale < low.morale ? member : low), null);
+  if (lowest && lowest.morale <= SHORT_RATION_MORALE_FLOOR) return { reason: 'morale', food, member: lowest };
+  return null;
+}
+
+/**
+ * Lift a lapsed short-rations order and say why. Returns true when it lifted.
+ * Called on the morning food beat and straight after anything that restocks
+ * the box, so a grocery run does not leave the crew on 65% for the night.
+ */
+function liftLapsedShortRations(ui, journey) {
+  const review = reviewShortRations(journey);
+  if (!review) return false;
+  const rations = ensureRationPlan(journey);
+  rations.mode = 'normal';
+  rations.shortRationStreak = 0;
+  rations.orderedAtFood = null;
+  const food = Math.round(review.food * 10) / 10;
+  if (review.reason === 'restocked') {
+    ui.writePositive(`Food is back up to ${food} person-days. Short rations lift; the crew is back on full meals.`);
+  } else {
+    ui.writeWarning(`${review.member.name} is at morale ${Math.round(review.member.morale)} and short rations cost everyone ${SHORT_RATION_MORALE_COST} a shift. You put the crew back on full meals; the box (${food} person-days) can carry it for now.`);
+  }
+  return true;
+}
+
 /**
  * Whether this morning opens on the food box. Once a day, and only when there
  * is something to say: an empty box, a crew already on short rations running
@@ -1943,6 +2029,7 @@ function foodBeatDue(journey) {
   const rations = ensureRationPlan(journey);
   const food = journey.resources.food || 0;
   if (rations.lastDecisionDay === journey.day) return false;
+  if (reviewShortRations(journey)) return true;
   if (food > FIELD_RESOURCES.food.warning) return false;
   if (food <= 0) return true;
   // Short rations are a carried standing order (Set the tempo). A crew
@@ -1962,6 +2049,11 @@ async function maybeHandleFoodDecision(game) {
   rations.lastDecisionDay = journey.day;
   const foodLevel = journey.resources.food || 0;
 
+  if (liftLapsedShortRations(ui, journey)) {
+    ui.write('');
+    return;
+  }
+
   // An empty box is not a rationing decision; full or short of nothing is
   // nothing. Say what the day costs and what fixes it.
   if (foodLevel <= 0) {
@@ -1975,7 +2067,7 @@ async function maybeHandleFoodDecision(game) {
   }
 
   if (rations.mode === 'short') {
-    ui.writeWarning(`Food is down to ${Math.round(foodLevel * 10) / 10} person-days, and the crew is ${rations.shortRationStreak || 1} day${rations.shortRationStreak === 1 ? '' : 's'} into short rations. Get food in before the box is empty.`);
+    ui.writeWarning(`Food is down to ${Math.round(foodLevel * 10) / 10} person-days, and the crew is ${rations.shortRationStreak || 1} day${rations.shortRationStreak === 1 ? '' : 's'} into short rations at ${SHORT_RATION_MORALE_COST} morale a shift each. Get food in before the box is empty.`);
     ui.write('');
     return;
   }
@@ -2002,7 +2094,8 @@ async function maybeHandleFoodDecision(game) {
   if (choice.value === 'short') {
     rations.mode = 'short';
     rations.shortRationStreak = 1;
-    ui.writeWarning('Short rations ordered. They stay in force until you change them under Set the tempo.');
+    rations.orderedAtFood = foodLevel;
+    ui.writeWarning(`Short rations ordered: ${SHORT_RATION_MORALE_COST} morale a shift for everyone. They hold until you change them under Set the tempo, the box is restocked, or someone gets close to walking.`);
     ui.write('');
     return;
   }
@@ -2215,6 +2308,7 @@ function handleReplaceAttendant(ui, journey) {
   }
   journey.crew.push(replacement);
   ui.writePositive(`${replacement.name} (OFA 3, with the ETV) rides back out with the driver. $${cost} on the card.`);
+  chargeCondemnedCrossings(ui, journey);
   ui.write('WorkSafeBC first aid coverage is back in place. The crew can work the line tomorrow.');
 }
 
@@ -2232,6 +2326,7 @@ function handleFuelRun(ui, journey) {
   journey.resources.budget = Math.max(0, cash - cost);
   journey.resources.fuel = Math.min(FIELD_RESOURCES.fuel.max, (journey.resources.fuel || 0) + FUEL_RUN_LITRES);
   ui.writePositive(`The driver fills two jerry cans and the tank at the cardlock. Fuel +${FUEL_RUN_LITRES} L, $${cost}. Fuel now ${Math.round(journey.resources.fuel)} L.`);
+  chargeCondemnedCrossings(ui, journey);
 }
 
 /**
@@ -2249,6 +2344,8 @@ function handleGroceryRun(ui, journey) {
   journey.resources.budget = Math.max(0, cash - cost);
   journey.resources.food = Math.min(FIELD_RESOURCES.food.max, (journey.resources.food || 0) + GROCERY_RUN_FOOD);
   ui.writePositive(`The driver fills the cooler and the dry box in town. Food +${GROCERY_RUN_FOOD} person-days, $${cost}. Food now ${Math.round(journey.resources.food)} person-days.`);
+  chargeCondemnedCrossings(ui, journey);
+  liftLapsedShortRations(ui, journey);
 }
 
 /**
@@ -2275,6 +2372,28 @@ function getReconNotebookTargets(journey) {
   });
 }
 
+/**
+ * A crossing the crew broke behind them keeps costing, but only the trips
+ * that go back over it: a run to town, a return visit to a block on the far
+ * side. The traverse itself only goes forward and never recrosses it. This is
+ * the standing half of a bad band that would otherwise have been a one-day
+ * bill (js/events/consequences.js).
+ * @param {Object} ui
+ * @param {Object} journey
+ * @param {number} [backToIndex=-1] - the stop the trip goes back to; -1 is town
+ */
+function chargeCondemnedCrossings(ui, journey, backToIndex = -1) {
+  const recrossed = (journey.condemnedCrossings || []).filter((id) => {
+    const index = (journey.blocks || []).findIndex((block) => block.id === id);
+    return index > backToIndex && index <= journey.currentBlockIndex;
+  });
+  const toll = getCondemnedCrossingPenalty({ condemnedCrossings: recrossed });
+  if (toll.fuel <= 0 && toll.equipment <= 0) return;
+  journey.resources.fuel = Math.max(0, journey.resources.fuel - toll.fuel);
+  journey.resources.equipment = Math.max(0, journey.resources.equipment - toll.equipment);
+  ui.writeWarning(`${toll.note} Fuel -${toll.fuel} L, equipment -${toll.equipment}.`);
+}
+
 function handleFieldNotebook(ui, journey) {
   const target = getReconNotebookTargets(journey)[0];
   if (!target) {
@@ -2289,6 +2408,7 @@ function handleFieldNotebook(ui, journey) {
   journey.resources.fuel -= NOTEBOOK_FUEL_L;
   ui.writeHeader('RETURN FIELD VISIT');
   ui.write(`The crew revisits ${target.block.name}, then returns to camp. Fuel used: ${NOTEBOOK_FUEL_L} L.`);
+  chargeCondemnedCrossings(ui, journey, journey.blocks.indexOf(target.block));
   if (!target.intel.layoutWalked) {
     handleLayoutShift(ui, journey, target.block);
   } else {
@@ -2441,6 +2561,7 @@ export async function handleResupply(game, block) {
     } : null)
   ];
 
+  const listedShort = new Set();
   while (true) {
     const money = journey.resources.budget || 0;
     const offers = offerBuilders.map((build) => build()).filter(Boolean);
@@ -2449,6 +2570,13 @@ export async function handleResupply(game, block) {
     if (offers.length === 0) {
       ui.write('The truck is full. Nothing here it can carry.');
       break;
+    }
+    // What the card cannot cover stays on the list as a line with its price,
+    // the way an event card says what it could not pay for, instead of
+    // quietly vanishing from the shelf.
+    for (const offer of offers.filter((o) => money < o.cost && !listedShort.has(o.id))) {
+      listedShort.add(offer.id);
+      ui.write(`${offer.label} ($${offer.cost}): $${Math.ceil(offer.cost - money)} short.`, 'term-dim');
     }
     if (affordableOffers.length === 0) {
       ui.writeWarning('You cannot afford anything at this stop. Better keep moving.');
@@ -2473,6 +2601,7 @@ export async function handleResupply(game, block) {
     journey.resources.budget = Math.max(0, money - offer.cost);
     offer.apply();
     ui.writePositive(`Purchased ${offer.label}.`);
+    liftLapsedShortRations(ui, journey);
     ui.updateAllStatus(journey);
     updateReconMissionStatus(ui, journey);
   }
@@ -2500,7 +2629,8 @@ export async function handleTriage(game) {
 
   const options = candidates.map(m => {
     const info = getCrewDisplayInfo(m);
-    const effect = info.effects?.[0]?.name ? `, ${info.effects[0].name}` : '';
+    // Every condition they carry, not just the first one on the list.
+    const effect = info.effects?.length ? `, ${[...new Set(info.effects.map((e) => e.name))].join(', ')}` : '';
     return {
       label: `${info.name} (${info.health}% HP${effect})`,
       description: info.role,
@@ -2620,4 +2750,5 @@ function retrieveCachedRations(ui, journey) {
   ui.writeHeader('RATION CACHE');
   ui.writePositive(`The sealed crate was where the map said. ${foodRecovered} person-days.`);
   ui.write(`Fuel used reaching the cache: ${fuelUsed} L. Food now ${Math.round(journey.resources.food)} person-days.`);
+  liftLapsedShortRations(ui, journey);
 }
