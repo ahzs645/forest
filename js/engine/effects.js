@@ -676,7 +676,15 @@ function scheduleIssueEntries(state, scheduleSpec, causedBy = null) {
   }
 
   for (const schedule of schedules) {
-    const existing = state.pendingIssues.find((pending) => pendingIssueKey(pending) === pendingIssueKey(schedule));
+    // A caught shortcut's fallout keeps its own entry: merged into another
+    // source's pending card it lost the "Because you took" provenance, and
+    // the year end (settleUnlandedFallout) could no longer see it to settle.
+    // The same act caught twice is one determination.
+    const shortcut = causedBy?.kind === "shortcut";
+    const existing = state.pendingIssues.find((pending) => pendingIssueKey(pending) === pendingIssueKey(schedule)
+      && (shortcut
+        ? pending.causedBy?.kind === "shortcut" && pending.causedBy?.actId === causedBy.actId
+        : pending.causedBy?.kind !== "shortcut"));
     const delay = Math.max(0, Number(schedule.delay || 0));
     if (existing) {
       existing.delay = Math.min(existing.delay ?? delay, delay);

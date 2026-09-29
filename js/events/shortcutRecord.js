@@ -17,7 +17,7 @@ import { getPendingFallout } from './fallout.js';
 import { applyEventEffects } from './resolution.js';
 import { applyConsequenceFlags } from './consequences.js';
 import { describeEffectChips } from './display.js';
-import { institutionDisplayName } from './selection.js';
+import { institutionDisplayName, reconcileTakenShortcuts } from './selection.js';
 
 const TAKE_LABELS = new Set(['Take the shortcut', 'Let it stand']);
 const BAND_NAMES = { good: 'clean', partial: 'noticed', bad: 'caught' };
@@ -222,6 +222,10 @@ export function carryShortcutsIntoJourney(campaign, journey) {
  */
 export function collectShortcutsFromJourney(campaign, journey, season) {
   const record = ensureCampaignShortcuts(campaign);
+  // The log is the record of what was taken; the memory only catches up
+  // with it when the next offer is drawn, so a shortcut taken after the
+  // season's last offer check was dropped from the year's count.
+  reconcileTakenShortcuts(journey);
   const memory = journey.temptationMemory || {};
   const label = String(season?.label || 'the season').toLowerCase();
   const unit = dayWord(journey);

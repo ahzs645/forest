@@ -23,7 +23,7 @@ import {
   REOFFER_PITCHES,
   SELF_SET_ASIDE_OUTCOME
 } from '../data/illegalActs.js';
-import { computeBandOdds, matchesOddsCondition, TEMPTATION_FLAG_LABELS } from './odds.js';
+import { computeBandOdds, matchesOddsCondition, TEMPTATION_FLAG_LABELS, TEMPTATION_WATCH_FLAGS } from './odds.js';
 import { OPERATING_AREAS } from '../data/operatingAreas.js';
 import { getDiscoveryEventTypeMultipliers } from '../data/discoveryTags.js';
 import { getAreaSituationMultipliers } from '../data/areaSituations.js';
@@ -610,6 +610,17 @@ const PLANNING_GATE_BY_LINE = [
   [/referral|consult|engagement|comment|sign-off from the Nation/i, 'buyIn'],
   [/\bdata\b|inventory|cruise|survey|layer|\bplots?\b/i, 'data'],
 ];
+const PLANNING_GATE_METRIC = { data: 'dataCompleteness', analysis: 'analysisQuality', buyIn: 'stakeholderBuyIn' };
+// Fewer points than this left under a gate's ceiling is not a payoff.
+const PLANNING_GATE_MIN_PAYOFF = 4;
+
+/** Points a planning gate can still take before its ceiling. */
+function planningGateHeadroom(journey, gate) {
+  const metric = PLANNING_GATE_METRIC[gate];
+  if (!metric) return 0;
+  const value = Number(journey?.plan?.[metric]);
+  return Number.isFinite(value) ? Math.max(0, 100 - value) : 100;
+}
 
 // A careful record buys cover, but some things are never safe: the least
 // chance of being caught, by how serious the act is (js/events/odds.js).
@@ -638,14 +649,26 @@ const INSTITUTION_NAMES = {
   'the contractor': 'the contractor',
 };
 
-// Consequence flags a noticed or caught band leaves behind. Registered as
-// odds-only flags in js/events/odds.js; applyConsequenceFlags records any flag
-// it is handed, so they shift later gambles without more machinery.
+// Consequence flags a noticed or caught band leaves behind: the catching
+// institution's own watch (js/events/odds.js TEMPTATION_WATCH_FLAGS), so the
+// mission panel names who is reading the file and only that institution
+// reads the next attempt at the same kind of act closely.
+// applyConsequenceFlags records any flag it is handed, so they shift later
+// gambles without more machinery.
 const WATCH_FLAG_BY_INSTITUTION = {
-  'C&E': 'ce_watching', FPB: 'ce_watching', FPBC: 'ce_watching', BCWS: 'ce_watching',
-  COS: 'ce_watching', ENV: 'ce_watching', DFO: 'ce_watching', 'Archaeology Branch': 'ce_watching',
-  'Timber Pricing': 'ce_watching', 'Revenue Branch': 'ce_watching', RCMP: 'ce_watching',
-  CVSE: 'ce_watching', 'Transport Canada': 'ce_watching',
+  'C&E': 'ce_watching',
+  FPB: 'fpb_watching',
+  FPBC: 'fpbc_watching',
+  BCWS: 'bcws_watching',
+  COS: 'cos_watching',
+  ENV: 'env_watching',
+  DFO: 'dfo_watching',
+  'Archaeology Branch': 'arch_watching',
+  'Timber Pricing': 'pricing_watching',
+  'Revenue Branch': 'pricing_watching',
+  RCMP: 'rcmp_watching',
+  CVSE: 'cvse_watching',
+  'Transport Canada': 'cvse_watching',
   'the Nation': 'fn_watching',
   WorkSafeBC: 'worksafe_watching',
   'internal audit': 'contractor_owns_you',
@@ -653,10 +676,27 @@ const WATCH_FLAG_BY_INSTITUTION = {
 };
 
 const WATCH_FLAG_SENTENCES = {
+  ce_watching: 'C&E is now reading everything with your name on it',
+  fpb_watching: 'the Forest Practices Board has your file on its list',
+  fpbc_watching: 'Forest Professionals BC has a note with your name in it',
   fn_watching: "the Nation's referrals office has a note with your name in it",
   worksafe_watching: "WorkSafeBC's prevention officer has the site on a list",
+  bcws_watching: 'the Wildfire Service has the block on a list',
+  cos_watching: 'a conservation officer has your plate number',
+  env_watching: 'an environmental protection officer has the block on a list',
+  dfo_watching: 'a DFO fishery officer has the crossing on a list',
+  arch_watching: 'the Archaeology Branch has the block on a list',
+  pricing_watching: 'Timber Pricing has your cruises on the check list',
+  rcmp_watching: 'the RCMP have a note with your name in it',
+  cvse_watching: 'CVSE has the hauling contractor on a list',
   contractor_owns_you: 'the person who did it for you now owns a piece of you',
 };
+
+// Days an FPBC complaint file stays open after its determination lands. While
+// it is open the registration is under review and no renewal clears it
+// (js/engine/professional.js); when the review closes the file is decided,
+// the registration can be renewed, and FPBC keeps a note.
+const FPBC_REVIEW_DAYS = 8;
 
 // Institutions whose caught band is a criminal or professional-conduct matter
 // rather than an administrative one. Their flag outlasts the season: an FPBC
@@ -764,12 +804,39 @@ export function reconcileTakenShortcuts(journey) {
 function settleTemptationFallout(journey) {
   const memory = ensureTemptationMemory(journey);
   const flags = Array.isArray(journey.consequenceFlags) ? journey.consequenceFlags : [];
+  const day = Number(journey?.day || 1);
   if (flags.includes('fpbc_file_open') && !memory.settledFlags.includes('fpbc_file_open')) {
     memory.settledFlags.push('fpbc_file_open');
+    memory.fpbcFileOpenedDay = day;
     if (journey.professional && journey.professional.registrationStatus !== 'suspended') {
       journey.professional.registrationStatus = 'under-review';
     }
   }
+  // The practice review runs its course: the file closes, the registration
+  // can be renewed again, and FPBC keeps watching the signature.
+  if (flags.includes('fpbc_file_open') && memory.settledFlags.includes('fpbc_file_open')
+    && day - (Number(memory.fpbcFileOpenedDay) || day) >= FPBC_REVIEW_DAYS) {
+    journey.consequenceFlags = flags.filter((flag) => flag !== 'fpbc_file_open');
+    if (!journey.consequenceFlags.includes('fpbc_watching')) journey.consequenceFlags.push('fpbc_watching');
+    memory.settledFlags = memory.settledFlags.filter((flag) => flag !== 'fpbc_file_open');
+    delete memory.fpbcFileOpenedDay;
+    memory.fpbcFileClosedDay = day;
+  }
+}
+
+/**
+ * Days until an open FPBC complaint file is decided, for the desk's own
+ * professional-file action to say why a renewal cannot clear the review yet.
+ * @param {Object} journey
+ * @returns {number|null} null when no file is open
+ */
+export function fpbcReviewDaysLeft(journey) {
+  const flags = Array.isArray(journey?.consequenceFlags) ? journey.consequenceFlags : [];
+  if (!flags.includes('fpbc_file_open')) return null;
+  const opened = Number(journey?.temptationMemory?.fpbcFileOpenedDay);
+  const day = Number(journey?.day || 1);
+  if (!Number.isFinite(opened)) return FPBC_REVIEW_DAYS;
+  return Math.max(1, FPBC_REVIEW_DAYS - (day - opened));
 }
 
 /**
@@ -918,10 +985,15 @@ export function buildTemptationPayoff(act, journey) {
     }
   } else if (journeyType === 'planning') {
     // The gate the pitch names ("the analysis clears"), else the one the plan
-    // is on; past the gates it is the planner's own time back.
-    const named = PLANNING_GATE_BY_LINE.find(([pattern]) => pattern.test(String(payoff.line || '')));
-    const gate = named?.[1] || PLANNING_GATE_BY_PHASE[journey?.plan?.phase];
-    effects[gate || 'progress'] = progressForShifts(shifts);
+    // is on, and only as much as that gate can still take: a gate already
+    // full cannot be paid, and the chip must not promise what cannot land.
+    // Past the gates it is the planner's own time back.
+    const wanted = progressForShifts(shifts);
+    const named = PLANNING_GATE_BY_LINE.find(([pattern]) => pattern.test(String(payoff.line || '')))?.[1];
+    const gates = [...new Set([named, PLANNING_GATE_BY_PHASE[journey?.plan?.phase]].filter(Boolean))];
+    const open = gates.find((gate) => planningGateHeadroom(journey, gate) >= PLANNING_GATE_MIN_PAYOFF);
+    if (open) effects[open] = Math.min(wanted, planningGateHeadroom(journey, open));
+    else effects.progress = wanted;
   } else if (journeyType === 'permitting' || journeyType === 'desk') {
     const wanted = kind === 'files' ? Math.round(shift * amount) : progressForShifts(shifts);
     const clockDays = Math.min(4, Math.max(1, Math.round(wanted / 5)), permitClockCapacity(journey));
@@ -956,7 +1028,34 @@ export function buildCaughtEffects(act, journey) {
   };
   const standing = isDesk ? 'politicalCapital' : 'crew_morale';
   const shifts = (count) => -Math.round((SHIFT_OF_WORK[journeyType] || 4) * count);
+  const determination = institutionDetermination(act, money, standing, shifts);
 
+  // A serious act (badBandFloorFor's highest floor: harm, or a criminal or
+  // federal catcher) caught must cost more than it would have paid. The
+  // institution's own cost mix is the floor; the payoff sets the rest, so a
+  // buried spill worth $12,000 is not a $4,000 fine.
+  if (badBandFloorFor(act) >= BAD_BAND_FLOOR.serious) {
+    const payoff = buildTemptationPayoff(act, journey).effects;
+    if (payoff.budget > 0) {
+      const owed = Math.round(payoff.budget * SERIOUS_CATCH_PAYBACK);
+      const cap = journeyType === 'recon' || journeyType === 'field' ? RECCE_CASH_CAP : isManager ? MANAGER_PENALTY_CAP : Infinity;
+      determination.budget = Math.min(determination.budget || 0, -Math.min(cap, owed));
+    }
+    if (payoff.progress > 0) {
+      determination.progress = Math.min(determination.progress || 0, -payoff.progress);
+    }
+    for (const gate of ['data', 'analysis', 'buyIn']) {
+      if (payoff[gate] > 0) determination[gate] = Math.min(determination[gate] || 0, -payoff[gate]);
+    }
+  }
+  return determination;
+}
+
+// What a serious catch costs in the payoff's own currency, as a multiple of
+// the payoff: the fine takes the money back and then some.
+const SERIOUS_CATCH_PAYBACK = 1.5;
+
+function institutionDetermination(act, money, standing, shifts) {
   switch (act?.catch?.by) {
     case 'C&E':
       return { compliance: -10, scrutiny: 15, budget: money(800, 3000) };
@@ -1045,8 +1144,13 @@ export function badBandFloorFor(act) {
 export function catchDelayFor(act, journey) {
   const lag = Math.max(0, Number(act?.catch?.lagDays) || 0);
   if (journey?.journeyType === 'manager') return Math.min(6, Math.round(lag / 30));
-  return Math.min(8, Math.round(lag / 7));
+  // A desk file is often closed by day 15 of 30, so its determinations are
+  // capped shorter, or a catch in the middle of the run landed only as a
+  // line in the debrief. One the run still ends before settles at close.
+  const cap = isDeskJourney(journey?.journeyType) ? DESK_CATCH_DELAY_CAP : 8;
+  return Math.min(cap, Math.round(lag / 7));
 }
+const DESK_CATCH_DELAY_CAP = 5;
 
 // Desk-side proposers voiced at a tailgate: the person who would actually be
 // standing there. Plain noun phrases, because the card adds ", at the
@@ -1230,12 +1334,12 @@ export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPena
       { when: 'difficulty:hard', move: 0.10, from: 'good', to: 'bad' },
       { when: 'difficulty:easy', move: 0.10, from: 'bad', to: 'good' },
       // Somebody is already watching. The institution that would catch this
-      // act is the one whose attention hurts most.
+      // act is the one whose attention hurts most; any other watch makes it
+      // a little likelier that somebody writes down what they saw.
       { when: `hasFlag:${watchFlag}`, move: 0.20, from: 'good', to: 'bad' },
-      { when: 'hasFlag:ce_watching', move: 0.05, from: 'good', to: 'partial' },
-      { when: 'hasFlag:fn_watching', move: 0.05, from: 'good', to: 'partial' },
-      { when: 'hasFlag:worksafe_watching', move: 0.05, from: 'good', to: 'partial' },
-      { when: 'hasFlag:contractor_owns_you', move: 0.05, from: 'good', to: 'partial' },
+      ...TEMPTATION_WATCH_FLAGS
+        .filter((flag) => flag !== watchFlag)
+        .map((flag) => ({ when: `hasFlag:${flag}`, move: 0.05, from: 'good', to: 'partial' })),
     ],
     payoffLine: payoff.line,
     caughtBy: catcher,
@@ -1289,21 +1393,39 @@ export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPena
  */
 export function describeShortcutStakes(option, journey) {
   const journeyType = journey?.journeyType || 'field';
-  const { scrutiny: _scrutiny, ...payoffEffects } = option.effects || {};
-  const gain = describeEffectChips(payoffEffects, journeyType).join(', ') || 'nothing you can bank today';
+  // One projection of the clean band: the payoff chips, and the scrutiny it
+  // carries either way (the authored +3, plus what a large payoff draws).
+  const { scrutiny: _cleanScrutiny, ...payoffEffects } = option.effects || {};
+  const cleanChips = describeEffectChips(option.effects || {}, journeyType);
+  const scrutinyChip = cleanChips.find((chip) => / scrutiny$/.test(chip));
+  const gain = cleanChips.filter((chip) => chip !== scrutinyChip).join(', ') || 'nothing you can bank today';
+  const buried = scrutinyChip ? ` (${scrutinyChip} even if it stays buried)` : '';
   const pct = (value) => Math.round((Number(value) || 0) * 100);
   const odds = option.liveOdds || { good: 1, partial: 0, bad: 0 };
   const good = pct(odds.good);
   const bad = pct(odds.bad);
   const partial = Math.max(0, 100 - good - bad);
-  const noticed = describeEffectChips({ compliance: option.partialEffects?.compliance, scrutiny: option.partialEffects?.scrutiny }, journeyType);
+  // What the noticed band costs on top of the payoff, as it lands: the
+  // authored "-2 compliance, +8 scrutiny" is +11 scrutiny once compliance
+  // moves it, and on a permitting desk -2 goodwill too.
+  const noticedCosts = Object.fromEntries(Object.entries(option.partialEffects || {})
+    .filter(([key]) => !(key in payoffEffects)));
+  const noticed = describeEffectChips(noticedCosts, journeyType);
+  const watch = TEMPTATION_FLAG_LABELS[option.partialFlags?.[0]] || 'a watch on your file';
+  const finding = option.failureFallout ? describeEffectChips(option.failureEffects || {}, journeyType).join(', ') : '';
   const determination = option.failureFallout?.effects || option.failureEffects || {};
   const caught = describeEffectChips(determination, journeyType).join(', ');
   const when = option.failureFallout ? `, landing about ${describeSpan(journey, option.failureFallout.dueIn)} later` : '';
+  const caughtFlags = (option.failureFallout?.flags || option.failureFlags || [])
+    .map((flag) => TEMPTATION_FLAG_LABELS[flag]).filter(Boolean);
+  const record = caughtFlags.length ? `; on your record: ${caughtFlags.join(', ')}` : '';
+  const caughtText = finding
+    ? `no payoff; ${finding} today, then ${caught}${when}${record}`
+    : `no payoff; ${caught}${record}`;
 
   const lines = [
-    `Take it and you get ${gain}. Saying no costs nothing.`,
-    `Odds today: ${good}% it stays buried · ${partial}% somebody notices (${[...noticed, 'and a watch on your file'].join(', ')}) · ${bad}% ${option.caughtBy || 'somebody'} catches it (no payoff; ${caught}${when}).`,
+    `Take it and you get ${gain}${buried}. Saying no costs nothing.`,
+    `Odds today: ${good}% it stays buried · ${partial}% somebody notices (${[...noticed, `and ${watch}`].join(', ')}) · ${bad}% ${option.caughtBy || 'somebody'} catches it (${caughtText}).`,
   ];
   const shifts = option.oddsShifts || { worse: [], better: [] };
   if (shifts.worse.length) lines.push(`Worse odds today because ${shifts.worse.join('; ')}.`);
@@ -1330,7 +1452,8 @@ function buildGoAroundEvent(act, journey) {
     probability: 0,
     cardLabel: isDesk ? 'IN THE INBOX' : 'AT THE TAILGATE',
     cardMarker: 'SHORTCUT',
-    setAsideDescription: SET_ASIDE_DESCRIPTIONS.goaround,
+    // Silence has a price, and the card says it as it lands.
+    setAsideDescription: `${SET_ASIDE_DESCRIPTIONS.goaround} It costs ${describeEffectChips(GO_AROUND_SILENCE_COST, journey.journeyType).join(', ')}.`,
     description: `You set it aside and somebody went around you. ${found} ${proposer} is not answering the radio. The question now is whether you report a thing you did not do.`,
     options: [
       {

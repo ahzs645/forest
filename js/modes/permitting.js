@@ -18,6 +18,7 @@ import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
 import { checkPermittingEndConditions } from './shared/endConditions.js';
 import { describeGoodwillChange, readGoodwill } from '../events/resolution.js';
+import { fpbcReviewDaysLeft } from '../events/selection.js';
 import { checkpointDeskDay, closeDeskDay, resumingDeskDay } from '../journey/deskMechanics.js';
 import {
   DAILY_PERMIT_THROUGHPUT,
@@ -1581,7 +1582,13 @@ export function buildActionOptions(journey) {
   {
     const professional = getPermittingProfessionalSnapshot(journey);
     const pieces = [];
-    if (professional?.registrationStatus !== 'active') {
+    // An open FPBC complaint keeps the registration under review, and no
+    // renewal clears it until the file is decided (js/events/selection.js
+    // settleTemptationFallout); the day still logs CPD and trims the backlog.
+    const reviewDays = fpbcReviewDaysLeft(journey);
+    if (professional?.registrationStatus !== 'active' && reviewDays !== null) {
+      pieces.push(`registration under review: the FPBC complaint file is decided in about ${reviewDays} day${reviewDays === 1 ? '' : 's'}; a renewal cannot clear it before then`);
+    } else if (professional?.registrationStatus !== 'active') {
       pieces.push(`registration ${professional.registrationStatus} (your licence to sign off is not current)`);
     }
     if (professional?.cpdGap > 0) {
@@ -1592,7 +1599,7 @@ export function buildActionOptions(journey) {
     }
     const adminUrgent = openRevisionTickets.length === 0 && (
       (professional?.paperworkLoad || 0) >= PAPERWORK_ADMIN_URGENT_THRESHOLD
-      || professional?.registrationStatus !== 'active'
+      || (professional?.registrationStatus !== 'active' && reviewDays === null)
     );
     const prefix = adminUrgent ? 'Best move | ' : '';
     primary.push({
@@ -1899,7 +1906,10 @@ async function processAction(game, actionId) {
       const effect = getPaperworkChainStageEffect(chainId, stage);
       if (effect) {
         applyPermittingProfessionalWork(journey, effect.changes);
-        ui.write(effect.message);
+        const reviewDays = chainId === 'registration' ? fpbcReviewDaysLeft(journey) : null;
+        ui.write(reviewDays !== null
+          ? `The renewal is filed and the CPD logged, but the FPBC complaint file is still open: your registration stays under review until it is decided, in about ${reviewDays} day${reviewDays === 1 ? '' : 's'}.`
+          : effect.message);
       }
       if (chainId === 'archaeology' && stage === 'field-review' && journey.relationships) {
         journey.relationships.nations = Math.min(100, journey.relationships.nations + 2);

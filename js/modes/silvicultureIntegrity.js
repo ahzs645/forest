@@ -13,6 +13,8 @@
 
 import { ILLEGAL_ACTS } from '../data/illegalActs.js';
 import { assessSilvicultureProgram } from '../data/silvicultureProgram.js';
+import { buildShortcutOption } from '../events/selection.js';
+import { getDayRng } from '../events/dayRng.js';
 
 /** Grade points a shortcut costs once the district has it on file. */
 export const INTEGRITY_PENALTY = {
@@ -109,27 +111,28 @@ export function summarizeIntegrity(journey) {
 }
 
 /**
- * The district's check at season close. Every shortcut still on the ledger
- * gets read against the ground: one somebody already noticed is likely to
- * surface, and a file the district is already reading is read closely.
- * Runs once per journey.
+ * The district's check at season close. A shortcut somebody wrote down at
+ * the time gets read against the ground now, at the odds the act's own card
+ * gives it today (js/events/selection.js buildShortcutOption: the file's
+ * scrutiny and who is watching are in the number). A take nobody noticed
+ * stays buried: it already rolled the odds the card stated, and a second
+ * check the card never mentioned would make those odds a lie. Runs once per
+ * journey, on the day's own dice, so a reload replays the same check.
  * @param {Object} journey
  * @param {Function} [rng]
  * @returns {string[]} lines to print
  */
-export function runSeasonCloseAudit(journey, rng = Math.random) {
+export function runSeasonCloseAudit(journey, rng = getDayRng(journey, 'season-close')) {
   const ledger = ensureLedger(journey);
   if (ledger.audited) return [];
   ledger.audited = true;
-  const open = ledger.records.filter((record) => record.status !== 'caught');
+  const open = ledger.records.filter((record) => record.status === 'noticed');
   if (open.length === 0) return [];
 
-  const scrutiny = Number(journey?.scrutiny) || 0;
-  const watched = (journey?.consequenceFlags || []).includes('ce_watching');
   const lines = [];
   for (const record of open) {
-    const base = record.status === 'noticed' ? 0.6 : 0.3;
-    const chance = Math.min(0.9, base + Math.max(0, scrutiny - 30) / 100 + (watched ? 0.15 : 0));
+    const act = ILLEGAL_ACTS.find((candidate) => candidate?.id === record.id) || null;
+    const chance = act ? buildShortcutOption(act, journey).liveOdds.bad : 0.3;
     if (rng() < chance) {
       record.status = 'caught';
       record.caughtAtClose = true;

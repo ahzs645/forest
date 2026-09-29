@@ -758,7 +758,10 @@ export function adaptIllegalActTemptation(act, state) {
     successOutcome: `${cleanLine} You get ${payoff.line}. Nobody asks this season.`,
     partialEffects: noticedEffects,
     partialOutcome: `${cleanLine} You get ${payoff.line}. Somebody also wrote down what they saw: ${watchSentence}.`,
-    partialFlags: failFlags,
+    // Noticed leaves the institution's watch, which worsens the next offer's
+    // odds (isAlreadyWatched); the catch flags, which open the chained
+    // fallout issues, belong to the caught band only.
+    partialFlags: buildIllegalActWatchFlags(act),
     failEffects: caughtEffects,
     failOutcome: `It does not hold. ${buildCaughtNarrative(act, Number(state?.round || 1) % 2)}`,
     failFlags,
@@ -767,6 +770,7 @@ export function adaptIllegalActTemptation(act, state) {
   };
   const odds = riskBandOdds(state, risk);
   const oddsLine = formatOddsLine(odds, institution);
+  const oddsReason = describeIllegalActOddsShifts(act, state);
 
   return normalizeSeasonalCard({
     id: `temptation:${act.id}`,
@@ -777,6 +781,7 @@ export function adaptIllegalActTemptation(act, state) {
     institution,
     odds,
     oddsLine,
+    oddsReason,
     payoffChip: payoff.chip,
     payoffLine: payoff.line,
     payoffEffects: payoff.effects,
@@ -795,10 +800,12 @@ export function adaptIllegalActTemptation(act, state) {
         preview: [
           `${formatSeasonalDelta(cleanEffects)} if it lands`,
           oddsLine,
+          oddsReason,
           `caught: ${formatSeasonalDelta(caughtEffects)}`,
-        ].join(" · "),
+        ].filter(Boolean).join(" · "),
         odds,
         oddsLine,
+        oddsReason,
         payoffChip: payoff.chip,
         payoffLine: payoff.line,
         institution,
@@ -1753,6 +1760,14 @@ function buildIllegalActFailFlags(act) {
   return flags;
 }
 
+// The noticed band's flag: the catching institution's watch, keyed by who it
+// is ("watched:DFO"). It moves the odds on the next act that institution
+// would catch (isAlreadyWatched) and opens no chained issue, so a noticed
+// take never lands a fallout card about a different act with no link back.
+export function buildIllegalActWatchFlags(act) {
+  return { [`watched:${act?.catch?.by || "the district"}`]: true };
+}
+
 /**
  * Which seasonal issue a caught shortcut schedules, routed by the institution
  * that caught it and the kind of act, and filtered to issues the role can
@@ -1992,10 +2007,34 @@ function hasTakenShortcutThisYear(state) {
 }
 
 // Whether the institution that would catch this act is already reading the
-// file: any flag its caught band would set is set.
+// file: its watch from a noticed take, or any flag its caught band would set.
 function isAlreadyWatched(act, state) {
   const flags = state?.flags || {};
-  return Object.keys(buildIllegalActFailFlags(act)).some((flag) => Boolean(flags[flag]));
+  return [...Object.keys(buildIllegalActWatchFlags(act)), ...Object.keys(buildIllegalActFailFlags(act))]
+    .some((flag) => Boolean(flags[flag]));
+}
+
+/**
+ * Why today's odds are what they are, in one line under the odds, so a
+ * card that reads 32% clean against the usual 55% says who is watching and
+ * what was done before. Empty when nothing has moved them.
+ * @returns {string}
+ */
+export function describeIllegalActOddsShifts(act, state) {
+  const worse = [];
+  const better = [];
+  if (hasTakenShortcutThisYear(state)) worse.push("you have taken a shortcut this year");
+  if (isAlreadyWatched(act, state)) worse.push(`${act?.catch?.by || "the district"} is already watching your file`);
+  const compliance = Number(state?.metrics?.compliance);
+  if (Number.isFinite(compliance) && compliance < 40) worse.push("the file's compliance is low");
+  if (Number.isFinite(compliance) && compliance > 70) better.push("the file's compliance record is strong");
+  const relationships = Number(state?.metrics?.relationships);
+  if (Number.isFinite(relationships) && relationships > 70) better.push("people you deal with rate you");
+  if (Number.isFinite(relationships) && relationships < 35) worse.push("nobody is inclined to look the other way");
+  const parts = [];
+  if (worse.length) parts.push(`Worse odds because ${worse.join("; ")}.`);
+  if (better.length) parts.push(`Better odds because ${better.join("; ")}.`);
+  return parts.join(" ");
 }
 
 /**

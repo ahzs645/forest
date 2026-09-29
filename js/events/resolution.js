@@ -260,11 +260,67 @@ export function resolveEvent(journey, event, option) {
 }
 
 /**
+ * What a compliance or relationship move does to scrutiny on top of any
+ * scrutiny the option names: the file notices a compliance loss at one and a
+ * half times its size, and a relationship loss at a third. Gains ease it.
+ * @param {Object} effects - authored effects
+ * @returns {number} the knock-on scrutiny, without `effects.scrutiny` itself
+ */
+function coupledScrutiny(effects = {}) {
+  let delta = 0;
+  if (typeof effects.compliance === 'number' && effects.compliance !== 0) {
+    delta += effects.compliance < 0 ? Math.abs(effects.compliance) * 1.5 : -Math.max(1, Math.round(effects.compliance * 0.5));
+  }
+  if (typeof effects.relationships === 'number' && effects.relationships !== 0) {
+    delta += effects.relationships < 0
+      ? Math.max(1, Math.round(Math.abs(effects.relationships) / 3))
+      : -Math.max(1, Math.round(effects.relationships / 4));
+  }
+  if (typeof effects.progress === 'number' && effects.progress > 6) delta += 1;
+  if (typeof effects.politicalCapital === 'number' && effects.politicalCapital > 4) delta += 1;
+  return delta;
+}
+
+/**
+ * The effects as they will land, knock-ons included. An authored effects
+ * object says "-10 compliance, +15 scrutiny"; on a permitting desk that is
+ * +30 scrutiny and -10 district goodwill, because a compliance loss also
+ * moves scrutiny (coupledScrutiny) and, on a desk, goodwill one for one, and
+ * a desk's reputation effect lands on its relationships. Every card chip and
+ * every application go through this once, so the number the player reads is
+ * the number the meter moves by. The projected object carries the same keys
+ * the resolver reads; applyEventEffects applies it without coupling again.
+ * @param {Object} effects - authored effects
+ * @param {string} journeyType
+ * @returns {Object} projected effects
+ */
+export function projectAppliedEffects(effects, journeyType = 'field') {
+  const source = effects && typeof effects === 'object' ? effects : {};
+  const projected = { ...source };
+  const knockOn = coupledScrutiny(source);
+  if (knockOn !== 0) projected.scrutiny = (Number(source.scrutiny) || 0) + knockOn;
+  const compliance = Number(source.compliance) || 0;
+  // A permitting desk's compliance is its standing with the district.
+  if (compliance !== 0 && isDeskJourney(journeyType) && journeyType !== 'planning') {
+    projected.politicalCapital = (Number(source.politicalCapital) || 0) + compliance;
+  }
+  const reputation = Number(source.reputation) || 0;
+  if (reputation !== 0 && isDeskJourney(journeyType)) {
+    projected.relationships = (Number(source.relationships) || 0) + reputation;
+    delete projected.reputation;
+  }
+  return projected;
+}
+
+/**
  * Apply effects from an event option. Exported for the deferral path
  * (js/events/deferral.js), which lands an imposed situation's cost without
- * an option having been chosen.
+ * an option having been chosen. The authored effects are projected once
+ * (projectAppliedEffects) and the projection is what lands, so the chips
+ * built from the same projection cannot drift from it.
  */
-export function applyEventEffects(journey, effects, messages) {
+export function applyEventEffects(journey, authored, messages) {
+  const effects = projectAppliedEffects(authored, journey.journeyType);
   journey.scrutiny = clampScrutiny(Number(journey.scrutiny || 0));
 
   // Resource effects (field)
@@ -433,17 +489,12 @@ export function applyEventEffects(journey, effects, messages) {
     }
   }
 
-  // Reputation outside manager mode lands on standing: relationships for desk
-  // journeys, compliance/scrutiny for field crews (the manager branch above
-  // routes it to metrics.reputation directly). On a desk it joins the
-  // relationship effect as one line, not two "Relationships frayed" in a row.
-  let relationshipDelta = typeof effects.relationships === 'number' ? effects.relationships : 0;
-  if (typeof effects.reputation === 'number' && effects.reputation !== 0 && journey.journeyType !== 'manager') {
-    if (isFieldJourney(journey.journeyType)) {
-      applyComplianceEffects(journey, effects.reputation, messages);
-    } else {
-      relationshipDelta += effects.reputation;
-    }
+  // Reputation outside manager mode lands on standing: a field crew's on its
+  // compliance ledger (the manager branch above routes it to
+  // metrics.reputation directly, and a desk's is already folded into the
+  // relationship effect by projectAppliedEffects).
+  if (typeof effects.reputation === 'number' && effects.reputation !== 0 && isFieldJourney(journey.journeyType)) {
+    applyComplianceEffects(journey, effects.reputation, messages);
   }
 
   // Compliance/relationships (legacy compatibility)
@@ -451,40 +502,13 @@ export function applyEventEffects(journey, effects, messages) {
     applyComplianceEffects(journey, effects.compliance, messages);
   }
 
-  if (relationshipDelta !== 0) {
-    applyRelationshipEffects(journey, relationshipDelta, messages);
+  if (typeof effects.relationships === 'number' && effects.relationships !== 0) {
+    applyRelationshipEffects(journey, effects.relationships, messages);
   }
 
-  applyScrutinyEffects(journey, effects);
-}
-
-function applyScrutinyEffects(journey, effects) {
-  let delta = 0;
-
-  if (typeof effects.scrutiny === 'number') {
-    delta += effects.scrutiny;
-  }
-
-  if (typeof effects.compliance === 'number') {
-    delta += effects.compliance < 0 ? Math.abs(effects.compliance) * 1.5 : -Math.max(1, Math.round(effects.compliance * 0.5));
-  }
-
-  if (typeof effects.relationships === 'number') {
-    delta += effects.relationships < 0
-      ? Math.max(1, Math.round(Math.abs(effects.relationships) / 3))
-      : -Math.max(1, Math.round(effects.relationships / 4));
-  }
-
-  if (typeof effects.progress === 'number' && effects.progress > 6) {
-    delta += 1;
-  }
-
-  if (typeof effects.politicalCapital === 'number' && effects.politicalCapital > 4) {
-    delta += 1;
-  }
-
-  if (delta !== 0) {
-    journey.scrutiny = clampScrutiny((journey.scrutiny || 0) + delta);
+  // The projection already carries the knock-on scrutiny (coupledScrutiny).
+  if (typeof effects.scrutiny === 'number' && effects.scrutiny !== 0) {
+    journey.scrutiny = clampScrutiny((journey.scrutiny || 0) + effects.scrutiny);
   }
 }
 
@@ -661,9 +685,9 @@ function applyComplianceEffects(journey, delta, messages) {
     return;
   }
 
-  if (isDeskJourney(journey.journeyType) && typeof journey.resources?.politicalCapital === 'number') {
-    journey.resources.politicalCapital = clampPercent(journey.resources.politicalCapital + delta);
-  }
+  // A desk's compliance also moves the district's goodwill one for one; the
+  // projection (projectAppliedEffects) puts that on politicalCapital, so it
+  // lands above with the rest of the resources and shows on the chip.
 
   if (journey.journeyType === 'permitting' && journey.regulations) {
     journey.regulations.complianceScore = clampPercent((journey.regulations.complianceScore || 0) + delta);

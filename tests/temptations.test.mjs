@@ -416,10 +416,10 @@ test('the caught band pays in the institution currency and leaves the right flag
   assert.ok(determinationOf(nation).effects.relationships < 0);
 
   const fpbc = buildShortcutOption(ILLEGAL_ACTS.find((act) => act.id === 'borrowed-rpf-stamp'), journeyFor('planner'));
-  assert.deepEqual(determinationOf(fpbc).flags, ['ce_watching', 'fpbc_file_open']);
+  assert.deepEqual(determinationOf(fpbc).flags, ['fpbc_watching', 'fpbc_file_open'], 'an FPBC finding is FPBC\'s watch, not C&E\'s');
 
   const rcmp = buildShortcutOption(ILLEGAL_ACTS.find((act) => act.id === 'midnight-variance-forgery'), journeyFor('permitter'));
-  assert.deepEqual(determinationOf(rcmp).flags, ['ce_watching', 'rcmp_file']);
+  assert.deepEqual(determinationOf(rcmp).flags, ['rcmp_watching', 'rcmp_file']);
   assert.ok(determinationOf(rcmp).effects.compliance <= -16);
 
   const contractor = buildShortcutOption(ILLEGAL_ACTS.find((act) => act.id === 'silvi-falsify-planting-quality'), journeyFor('silviculture'));
