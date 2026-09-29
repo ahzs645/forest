@@ -25,7 +25,9 @@ test('campaign plays all four seasons through the year-end review', async ({ pag
   // "Choose another method" backs out of a costed confirmation (the release
   // invoice); its "Back to the release options" would otherwise win on
   // /Back to/ below and loop the bot between the two prompts all spring.
-  const skip = /Glossary|Intel|Status|Help|Restart|Review the|More context|locked|NEEDS|Never mind|Program Binder|Consult|Briefing$|Camp & Support|Choose another method/i;
+  // "Waits for <crew>, on days off until day N" is an option the card shows
+  // but cannot run today (it says why): a player passes it over, so the bot does.
+  const skip = /Glossary|Intel|Status|Help|Restart|Review the|More context|locked|NEEDS|Never mind|Program Binder|Consult|Briefing$|Camp & Support|Choose another method|Waits for|days off until/i;
   // Objective-focused priorities keep the bot from wandering: close packages,
   // travel the mainline, and always take flow-advancing prompts.
   const prefer = [
