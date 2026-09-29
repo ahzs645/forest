@@ -11,12 +11,15 @@
   },
   "broken_arm": {
     "name": "Broken Arm",
-    "duration": 5,
+    "duration": 12,
     "healthDrain": 0,
     "moraleEffect": -3,
     "workCapacity": 0.3,
     "description": "Splinted. Rides in the truck and does the paperwork until it is cleared.",
-    "canTravel": true
+    "canTravel": true,
+    "healsWithTime": true,
+    "treatedDays": 2,
+    "treatmentNote": "Splinted and slung. They ride in the truck and do the paperwork; a bone takes weeks, not a kit."
   },
   "sprained_ankle": {
     "name": "Sprained Ankle",
@@ -34,7 +37,10 @@
     "moraleEffect": -4,
     "workCapacity": 0,
     "description": "Must rest. No line work until cleared.",
-    "canTravel": true
+    "canTravel": true,
+    "healsWithTime": true,
+    "treatedDays": 1,
+    "treatmentNote": "Checked over and watched: pupils, balance, no second knock. Rest clears a concussion; a kit does not."
   },
   "flu": {
     "name": "Flu",

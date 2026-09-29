@@ -4896,7 +4896,7 @@
   "options": [
    {
     "label": "Trade 10 food for a jerry transfer",
-    "outcome": "You pump 15 fuel off his saddle tank while he loads a rations box. Both crews leave happier.",
+    "outcome": "You pump 60 L off his saddle tank while he loads a rations box. Both crews leave happier.",
     "effects": {
      "food": -10,
      "fuel": 15,
@@ -5035,7 +5035,7 @@
     }
    },
    {
-    "label": "Trade 12 fuel for the pass",
+    "label": "Trade 48 L of diesel for the pass",
     "outcome": "He tops up, you roll through behind the blade. Handshake economics.",
     "effects": {
      "fuel": -12,

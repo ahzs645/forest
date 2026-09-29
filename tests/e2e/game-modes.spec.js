@@ -265,7 +265,7 @@ function pickReconChoice(labels, terminalText) {
 
   if (terminalText.includes('RESUPPLY')) {
     if (food <= 18) {
-      return findFirstMatching(labels, ['Rations Crate', 'Fuel Drum', 'Field Repair', 'First Aid Kit', 'Done']);
+      return findFirstMatching(labels, ['Rations crate', 'Rations Crate', 'Fuel Drum', 'Field Repair', 'First Aid Kit', 'Done']);
     }
     if (fuel <= 30) {
       return findFirstMatching(labels, ['Fuel Drum', 'Rations Crate', 'Field Repair', 'First Aid Kit', 'Done']);
@@ -279,8 +279,11 @@ function pickReconChoice(labels, terminalText) {
     return findFirstMatching(labels, ['Done']);
   }
 
+  // An empty food box ends the run now, so a hungry crew gets fed: the
+  // supply point if the crew is at one, else a grocery run or the cache
+  // from behind Camp & crew.
   if (food <= 12) {
-    return findFirstMatching(labels, ['Resupply', 'Retrieve Cached Rations', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Stand Down']);
+    return findFirstMatching(labels, ['Run into the supply point', 'Pull the emergency crate', 'Grocery run', 'Camp & crew', 'Resupply', 'Retrieve Cached Rations', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Stand Down']);
   }
 
   if (fuel <= 25 || equipment <= 35) {
@@ -411,7 +414,8 @@ function assertModeSpecificExpectations(modeName, terminalText) {
       break;
     }
     case 'recce': {
-      const surveyed = extractPair(terminalText, 'Blocks Surveyed');
+      // Recon prints packages, not "Blocks Surveyed" (js/game/endScreen.js).
+      const surveyed = extractPair(terminalText, 'Packages Finalized');
       expect(surveyed.current).toBeLessThanOrEqual(surveyed.total);
       if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
         expect(surveyed.current).toBe(surveyed.total);

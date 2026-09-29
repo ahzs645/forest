@@ -348,12 +348,14 @@ export function processDailyUpdate(member, conditions = {}) {
     member.health = Math.max(0, member.health - 2);
   }
 
-  if (!hasSeriousEffect && member.health < member.maxHealth) {
+  // Nobody heals on an empty stomach, and a rest day with nothing to eat is
+  // not a rest (js/journey/fieldMechanics.js applies the hunger itself).
+  if (!hasSeriousEffect && !conditions.starving && member.health < member.maxHealth) {
     member.health = Math.min(member.maxHealth, member.health + (conditions.restDay ? 7 : 5));
   }
 
   // Morale adjustments based on conditions
-  if (conditions.restDay) {
+  if (conditions.restDay && !conditions.starving) {
     member.morale = Math.min(100, member.morale + 10);
   }
   if (conditions.gruelingPace) {
@@ -564,10 +566,37 @@ export function treatCrewCondition(member, effectId, currentDay = null) {
   const effectDef = STATUS_EFFECTS[effectId];
   const isSevere = effectDef && (effectDef.healthDrain >= 3 || effectDef.canTravel === false);
 
+  // A fracture or a concussion is treated once — splinted, or checked and
+  // watched — and then it is time. A second kit does nothing for a bone, so
+  // it is not spent (kitUsed: false).
+  if (effectDef?.healsWithTime && status.treated) {
+    const days = status.daysRemaining;
+    return {
+      member,
+      cleared: false,
+      kitUsed: false,
+      healsWithTime: true,
+      message: `${member.name}'s ${effectDef.name.toLowerCase()} is already treated. It needs about ${days} more shift${days === 1 ? '' : 's'}, not another kit.`
+    };
+  }
+
   if (currentDay !== null) {
     member.lastTreatedDay = currentDay;
   }
   member.untreatedSeriousDays = 0;
+
+  if (effectDef?.healsWithTime) {
+    status.treated = true;
+    status.daysRemaining = Math.max(1, status.daysRemaining - (effectDef.treatedDays || 0));
+    member.morale = Math.min(100, member.morale + 3);
+    return {
+      member,
+      cleared: false,
+      kitUsed: true,
+      healsWithTime: true,
+      message: `${member.name}: ${effectDef.treatmentNote || `${effectDef.name} treated; it needs time now.`} About ${status.daysRemaining} shift${status.daysRemaining === 1 ? '' : 's'} to clear.`
+    };
+  }
 
   if (isSevere && status.daysRemaining > 1) {
     status.daysRemaining -= 1;
@@ -585,6 +614,20 @@ export function treatCrewCondition(member, effectId, currentDay = null) {
     cleared: true,
     message: removed.message || `${member.name}'s condition has stabilized.`
   };
+}
+
+/**
+ * Whether a kit would do this crew member any good today: hurt, or carrying
+ * a condition a kit still treats. A splinted arm that only needs time does
+ * not count, so the camp menu does not offer a day of triage for nothing.
+ * @param {Object} member
+ * @returns {boolean}
+ */
+export function needsTreatment(member) {
+  if (!member?.isActive) return false;
+  if (member.health < 85) return true;
+  return (member.statusEffects || []).some((effect) =>
+    !(effect.treated && STATUS_EFFECTS[effect.effectId]?.healsWithTime));
 }
 
 /**

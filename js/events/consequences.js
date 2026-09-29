@@ -93,6 +93,8 @@ export function applyConsequenceFlags(journey, flags, messages = []) {
 
       case 'camp_bear': {
         journey.campBear = true;
+        // A new bear is a new RAPP call (js/modes/recon.js gates one per bear).
+        journey.bearReported = false;
         messages.push('It will be back tonight, and every night, for as long as there is food here.');
         break;
       }

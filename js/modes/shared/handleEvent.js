@@ -13,6 +13,7 @@ import { formatEventForDisplay, resolveEvent } from '../../events.js';
 import { crewHasRole } from '../../crew.js';
 import { presentDayCard, buildEventCardContent } from '../../journey/dayCard.js';
 import { optionSpendsDay } from '../../events/timePolicy.js';
+import { getOptionShortfall, formatShortfall } from '../../events/affordability.js';
 
 function formatRoleName(roleId) {
   if (!roleId) return 'specialist';
@@ -52,14 +53,23 @@ export async function handleEvent(game, event, frame = {}) {
     raw: event.options[index] || {},
     index
   }));
-  const actionable = entries.filter(({ raw }) => !isUnavailable(raw));
+  // An option the crew cannot pay for is left off too, but the card says so:
+  // unlike a missing specialist, the player may want to know what cash buys.
+  const staffed = entries.filter(({ raw }) => !isUnavailable(raw));
+  const actionable = staffed.filter(({ raw }) => !getOptionShortfall(journey, raw));
   // Defensive: no event ships with every option gated, but never leave the
   // player with zero choices if one somehow did.
   const usable = actionable.length ? actionable : entries;
+  const unpaid = actionable.length
+    ? staffed
+      .filter(({ raw }) => getOptionShortfall(journey, raw))
+      .map(({ opt, raw }) => formatShortfall(opt.label, getOptionShortfall(journey, raw)))
+    : [];
 
   const content = buildEventCardContent(formatted, event, usable);
   const card = {
     ...content,
+    notes: unpaid,
     label: journey.journeyType === 'manager' && event.reporter ? 'OPS ESCALATION' : content.label,
     options: [...content.options, ...(frame.extraOptions || [])],
     dayHeader: frame.dayHeader || null,

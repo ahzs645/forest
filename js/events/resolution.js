@@ -6,7 +6,7 @@
 import { isFieldJourney, isDeskJourney } from './constants.js';
 import { PLANNING_PRE_SUBMISSION_CAP } from '../journey/constants.js';
 import { applyRandomInjury, applyStatusEffect, evacuateCrewMember } from '../crew.js';
-import { syncBlocksFromDistance } from '../journey/blockNav.js';
+import { applyEventTravelEffect } from '../journey/fieldMechanics.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
 import { buildEventReaction } from './reactions.js';
@@ -32,7 +32,7 @@ const DESK_DELAY_STRAIN = 2;
  * rather than in sixty places of content. A -8 in the deck is -32 L on the
  * truck.
  */
-const FUEL_EFFECT_SCALE = 4;
+export const FUEL_EFFECT_SCALE = 4;
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
@@ -140,8 +140,8 @@ export function resolveEvent(journey, event, option) {
     journey.travelSetback = Math.min(MAX_TRAVEL_SETBACK, (journey.travelSetback || 0) + setback);
     if (setback > 0) {
       messages.push(setback >= 0.35
-        ? 'Sorting that out eats most of tomorrow\'s leg.'
-        : 'Sorting that out eats into tomorrow\'s leg.');
+        ? 'Sorting that out eats most of the next leg.'
+        : 'Sorting that out eats into the next leg.');
     }
   }
 
@@ -228,12 +228,12 @@ function applyEventEffects(journey, effects, messages) {
       const litres = Math.round(effects.fuel * FUEL_EFFECT_SCALE);
       journey.resources.fuel = Math.max(0,
         Math.min(FIELD_RESOURCES.fuel.max, journey.resources.fuel + litres));
-      if (litres < 0) messages.push(`Fuel: ${litres} L`);
+      if (litres !== 0) messages.push(`Fuel: ${litres > 0 ? '+' : ''}${litres} L`);
     }
     if (typeof effects.food === 'number' && typeof journey.resources?.food === 'number') {
       journey.resources.food = Math.max(0,
         Math.min(FIELD_RESOURCES.food.max, journey.resources.food + effects.food));
-      if (effects.food < 0) messages.push(`Food: ${effects.food} days`);
+      if (effects.food !== 0) messages.push(`Food: ${effects.food > 0 ? '+' : ''}${effects.food} person-days`);
     }
     if (typeof effects.equipment === 'number' && typeof journey.resources?.equipment === 'number') {
       journey.resources.equipment = Math.max(0,
@@ -459,18 +459,12 @@ function applyProgressEffects(journey, progressPoints, messages, effects = {}) {
 
     case 'field':
     case 'recon':
+      // Never a direct move: ground an event gains or loses goes through the
+      // next travel leg, which stops at the next stop and its road check.
       if (typeof journey.distanceTraveled === 'number') {
-        if (progressPoints < 0 && effects.progressMode !== 'turn_back') {
-          const setback = Math.min(MAX_TRAVEL_SETBACK, Math.abs(progressPoints) / 16);
-          journey.travelSetback = Math.min(MAX_TRAVEL_SETBACK, (journey.travelSetback || 0) + setback);
-          messages.push(`Tomorrow's leg will be slower (about ${Math.abs(progressPoints)} km less ground).`);
-        } else {
-          // Ground gained never runs past the end of the route: the traverse
-          // read 40/35 km after a late +5 km.
-          const routeEnd = Number.isFinite(journey.totalDistance) ? journey.totalDistance : Infinity;
-          journey.distanceTraveled = Math.min(routeEnd, Math.max(0, journey.distanceTraveled + progressPoints));
-          syncBlocksFromDistance(journey);
-        }
+        messages.push(...applyEventTravelEffect(journey, progressPoints, {
+          turnBack: effects.progressMode === 'turn_back'
+        }));
       }
       return;
 

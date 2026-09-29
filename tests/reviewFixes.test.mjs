@@ -216,9 +216,10 @@ test('detouring a route constraint queues delay for the next travel leg', async 
   const journey = createReconJourney({ areaId: 'fort-st-john-plateau' });
   journey.blocks = [
     { id: 'camp', name: 'Camp', distance: 0, terrain: 'flat', hazards: [], features: [] },
-    { id: 'ridge', name: 'Ridge Spur', distance: 10, terrain: 'flat', hazards: [], features: [] },
+    // Long enough that a slowed leg ends well outside the arrival snap.
+    { id: 'ridge', name: 'Ridge Spur', distance: 14, terrain: 'flat', hazards: [], features: [] },
   ];
-  journey.totalDistance = 10;
+  journey.totalDistance = 14;
   journey.currentBlockIndex = 0;
   journey.distanceTraveled = 0;
   journey.resources.food = 50;
@@ -245,7 +246,7 @@ test('detouring a route constraint queues delay for the next travel leg', async 
   assert.ok(journey.travelSetback > 0);
   assert.equal(journey.pendingTravelSetback, 0);
   const result = withRandom(0.5, () => executeFieldAction(journey, 'normal'));
-  assert.ok(journey.distanceTraveled > 0 && journey.distanceTraveled < 10);
+  assert.ok(journey.distanceTraveled > 0 && journey.distanceTraveled < 14);
   assert.equal(journey.currentBlockIndex, 0, 'the detour delay slows this leg instead of teleporting progress');
 });
 
@@ -292,7 +293,7 @@ test('incidental negative field progress creates delay without moving the crew b
   assert.equal(journey.currentBlockIndex, 1);
   assert.equal(journey.distanceTraveled, 5);
   assert.ok(journey.travelSetback > 0);
-  assert.ok(result.messages.some((message) => /Tomorrow's leg will be slower/i.test(message)));
+  assert.ok(result.messages.some((message) => /next leg will be slower/i.test(message)));
 });
 
 test('GIS data recovery does not route a technical setback into stakeholder buy-in', () => {

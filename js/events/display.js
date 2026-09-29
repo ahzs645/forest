@@ -5,6 +5,7 @@
 
 import { isFieldJourney } from './constants.js';
 import { formatOptionTimeCost } from './timePolicy.js';
+import { FUEL_EFFECT_SCALE } from './resolution.js';
 
 /**
  * Give field events one consistent radio lead without making the reporter's
@@ -176,9 +177,16 @@ function getOptionHint(option, journeyType, event = null) {
   if (option.payoffLine) hints.push(`offer: ${option.payoffLine}`);
   if (timeHint) hints.push(timeHint);
 
+  const field = isFieldJourney(journeyType);
+  // Only a crew on a traverse has a next leg for ground to land on.
+  const traverse = journeyType === 'field' || journeyType === 'recon';
   if (option.effects) {
     if (option.effects.fuel !== undefined) {
-      hints.push(option.effects.fuel > 0 ? `+${option.effects.fuel} fuel` : `${option.effects.fuel} fuel`);
+      // The deck is written in the old units; a field crew's stock is litres
+      // and resolution scales the delta, so the preview has to as well.
+      const fuel = field ? Math.round(option.effects.fuel * FUEL_EFFECT_SCALE) : option.effects.fuel;
+      const unit = field ? ' L fuel' : ' fuel';
+      hints.push(fuel > 0 ? `+${fuel}${unit}` : `${fuel}${unit}`);
     }
     if (option.effects.food !== undefined) {
       hints.push(option.effects.food > 0 ? `+${option.effects.food} food` : `${option.effects.food} food`);
@@ -219,18 +227,22 @@ function getOptionHint(option, journeyType, event = null) {
       hints.push(option.effects.data > 0 ? `+${option.effects.data} data` : `${option.effects.data} data`);
     }
     if (option.effects.progress !== undefined && option.effects.progress !== 0) {
-      const field = journeyType === 'field' || journeyType === 'recon';
-      if (field && option.effects.progress < 0 && option.effects.progressMode !== 'turn_back') {
+      // Field ground goes through the next leg (applyEventTravelEffect), so
+      // the hint says so rather than promising a jump down the road.
+      if (traverse && option.effects.progressMode === 'turn_back') {
+        hints.push('turn back; slower next travel leg');
+      } else if (traverse && option.effects.progress < 0) {
         hints.push('slower next travel leg');
       } else if (journeyType === 'planning' && option.effects.progress < 0) {
         // A planning setback is strain, not a gate, and an explicit data /
         // analysis / buy-in key replaces it (js/events/resolution.js).
         if (!['data', 'analysis', 'buyIn'].some((key) => option.effects[key])) hints.push('costs the file time');
+      } else if (traverse) {
+        hints.push(`up to +${option.effects.progress} km on the next leg`);
       } else {
-        const unit = field ? ' km traverse' : ' progress';
         hints.push(option.effects.progress > 0
-          ? `+${option.effects.progress}${unit}`
-          : `${option.effects.progress}${unit}`);
+          ? `+${option.effects.progress} progress`
+          : `${option.effects.progress} progress`);
       }
     }
     if (option.effects.permits_approved !== undefined) {
@@ -238,6 +250,13 @@ function getOptionHint(option, journeyType, event = null) {
       const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
       hints.push(`${sign}${Math.abs(amount)} permits`);
     }
+  }
+
+  // A brief response that still costs ground (js/events/resolution.js turns
+  // timeUsed into a travel setback) has to say so.
+  const timeUsed = Number(option.timeUsed ?? option.effects?.timeUsed);
+  if (traverse && timeUsed > 0 && !hints.some((hint) => hint.includes('slower next travel leg'))) {
+    hints.push('slower next travel leg');
   }
 
   if (option.riskInjury) {
