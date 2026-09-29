@@ -8,7 +8,6 @@ import {
   getCurrentBlock,
   getNextBlock,
   advanceBlocksForDistance,
-  getCumulativeDistanceToIndex,
   getCurrentSegmentLength,
   getDistanceIntoCurrentSegment
 } from './blockNav.js';

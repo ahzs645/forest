@@ -9,7 +9,6 @@ import { createFieldResources, createDeskResources } from "../resources.js";
 import {
   getBlocksForArea,
   getRandomWeather,
-  getTemperature,
 } from "../data/blocks.js";
 import { getPlanningCadenceDays } from "../data/planningBlocks.js";
 import { createSeasonState } from "../season.js";

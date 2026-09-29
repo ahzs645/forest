@@ -453,7 +453,7 @@ function getDefaultPrice(resourceId) {
  * @param {string} locationId - Current location
  * @returns {Object[]} Array of purchasable items
  */
-export function getSupplyStoreItems(journeyType, locationId = null) {
+export function getSupplyStoreItems(journeyType, _locationId = null) {
   if (journeyType === 'field') {
     return [
       {

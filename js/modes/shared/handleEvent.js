@@ -14,12 +14,6 @@ import { crewHasRole } from '../../crew.js';
 import { presentDayCard, buildEventCardContent } from '../../journey/dayCard.js';
 import { optionSpendsDay } from '../../events/timePolicy.js';
 
-function formatRoleName(roleId) {
-  if (!roleId) return 'specialist';
-  const formatted = roleId.replace(/[_-]+/g, ' ').trim();
-  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
-}
-
 /**
  * Present an event, gather the player's decision, and resolve it.
  * @param {Object} game - ForestryTrailGame instance ({ ui, journey, gameOver })

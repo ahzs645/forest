@@ -19,7 +19,7 @@ export const DESK_EVENTS = [...eventsData, ...(managerEventsData || []), ...(leg
  * @param {string} phase - Current desk phase
  * @returns {Object[]} Filtered events
  */
-export function getApplicableDeskEvents(phase) {
+export function getApplicableDeskEvents(_phase) {
   // All events are generally applicable
   return DESK_EVENTS;
 }

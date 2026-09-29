@@ -251,7 +251,6 @@ export function removeStatusEffect(member, effectId) {
   const index = member.statusEffects.findIndex(e => e.effectId === effectId);
   if (index === -1) return { member, message: null };
 
-  const effect = STATUS_EFFECTS[effectId];
   member.statusEffects.splice(index, 1);
 
   const messageTemplate = pickRandom(RECOVERY_MESSAGES);

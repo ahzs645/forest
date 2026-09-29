@@ -94,7 +94,6 @@ test('silviculture setback events slip the schedule and leave planted blocks alo
 });
 
 test('gamble options use the failure branch when the roll misses', () => {
-  const journey = createReconJourney({ areaId: 'fort-st-john-plateau' });
   const gamble = {
     label: 'risk it',
     outcome: 'It works!',
@@ -244,7 +243,7 @@ test('detouring a route constraint queues delay for the next travel leg', async 
   endFieldDay(journey);
   assert.ok(journey.travelSetback > 0);
   assert.equal(journey.pendingTravelSetback, 0);
-  const result = withRandom(0.5, () => executeFieldAction(journey, 'normal'));
+  withRandom(0.5, () => executeFieldAction(journey, 'normal'));
   assert.ok(journey.distanceTraveled > 0 && journey.distanceTraveled < 10);
   assert.equal(journey.currentBlockIndex, 0, 'the detour delay slows this leg instead of teleporting progress');
 });

@@ -10,12 +10,9 @@ import { FORESTER_ROLES, OPERATING_AREAS } from '../data/index.js';
 import { generateCrew, getCrewDisplayInfo } from '../crew.js';
 import {
   createJourney,
-  formatJourneyLog,
-  getSurveyedBlockCount
+  formatJourneyLog
 } from '../journey.js';
 import { checkScheduledEvents } from '../events.js';
-import { getCurrentSeasonInfo } from '../season.js';
-import { calculateScore, formatScoreDisplay } from '../scoring.js';
 import { FIELD_RESOURCES } from '../resources.js';
 
 // Import mode runners

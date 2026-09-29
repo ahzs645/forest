@@ -841,7 +841,6 @@ function getLastAssignmentEntry(state) {
 }
 
 function isEligibleDiscoveryCandidate(state, context, candidate) {
-  const history = state?.assignmentHistory || [];
   const last = getLastAssignmentEntry(state);
   if (last?.sourceFamily !== "discovery" || last.sourceKey !== candidate.sourceKey) {
     return true;
@@ -908,7 +907,7 @@ export function buildAssignmentCandidates(state, context) {
   return Array.from(families).flatMap((family) => familyCandidates(state, context, family));
 }
 
-export function buildLegacyTaskFallback(state, context) {
+export function buildLegacyTaskFallback(state) {
   const history = state?.assignmentHistory || [];
   const legacyCount = history.filter((entry) => entry.sourceFamily === "legacy-task").length;
   if (legacyCount >= 1) {
@@ -936,7 +935,8 @@ export function buildLegacyTaskFallback(state, context) {
   }, state);
 }
 
-export function drawSeasonalAssignment(state, context, rng = Math.random) {
+// Assignment choice is a deterministic priority sort; it takes no rng.
+export function drawSeasonalAssignment(state, context) {
   const priorities = ROLE_ASSIGNMENT_PRIORITIES[context?.roleId]?.[context?.theme] || [];
 
   for (const family of priorities) {
