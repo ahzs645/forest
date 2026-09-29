@@ -38,7 +38,7 @@ export function calculateScore(journey, victory) {
 
     case 'planning':
       components.speed = scorePlanningSpeed(journey, victory);
-      components.crewWelfare = scoreProtagonistWelfare(journey);
+      components.crewWelfare = scoreProtagonistWelfare(journey, victory);
       components.resourceEfficiency = scoreDeskResourceEfficiency(journey, victory);
       components.objectives = scorePlanningObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
@@ -47,7 +47,7 @@ export function calculateScore(journey, victory) {
     case 'permitting':
     case 'desk':
       components.speed = scorePermittingSpeed(journey, victory);
-      components.crewWelfare = scoreProtagonistWelfare(journey);
+      components.crewWelfare = scoreProtagonistWelfare(journey, victory);
       components.resourceEfficiency = scoreDeskResourceEfficiency(journey, victory);
       components.objectives = scorePermittingObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
@@ -240,16 +240,25 @@ function scoreCrewWelfare(journey) {
 /**
  * The desk roles have no crew; the person carrying the file is the one whose
  * welfare the season spends. Stress that ends high and energy that ends low
- * both cost.
+ * both cost. A file that was not delivered scales the same way its unspent
+ * budget does: being pulled off the file on day 11, or holding the line
+ * from day 16, is not a restful season well spent.
  */
-function scoreProtagonistWelfare(journey) {
+function scoreProtagonistWelfare(journey, victory = true) {
   if (journey.crew?.length) return scoreCrewWelfare(journey);
   const protagonist = journey.protagonist;
   if (!protagonist) return { score: 50, label: 'N/A' };
   const stress = Math.max(0, Math.min(100, Number(protagonist.stress) || 0));
   const energy = Math.max(0, Math.min(100, Number(protagonist.energy ?? 100)));
-  const score = Math.max(0, Math.min(100, Math.round(100 - stress * 0.6 - Math.max(0, 50 - energy) * 0.6)));
-  return { score, label: `Your stress ${Math.round(stress)}%, energy ${Math.round(energy)}%`, name: 'Wellbeing' };
+  let score = Math.max(0, Math.min(100, Math.round(100 - stress * 0.6 - Math.max(0, 50 - energy) * 0.6)));
+  const deskRole = ['planning', 'permitting', 'desk'].includes(journey.journeyType);
+  const undelivered = deskRole && !victory;
+  if (undelivered) score = Math.round(score * deskDeliveredShare(journey));
+  return {
+    score,
+    label: `Your stress ${Math.round(stress)}%, energy ${Math.round(energy)}%${undelivered ? '; file not delivered' : ''}`,
+    name: 'Wellbeing',
+  };
 }
 
 /** Share of the desk's job that got done, 0-1. */

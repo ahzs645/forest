@@ -5,6 +5,7 @@ import { createPermittingJourney } from '../js/journey/factory.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { resolveEvent } from '../js/events/resolution.js';
+import { calculateScore } from '../js/scoring.js';
 import { eventSupportsJourney } from '../js/events/selection.js';
 import {
   ensurePermitFiles,
@@ -174,4 +175,16 @@ test('"Permit Issued Early" only turns up when a file is on the District Manager
   file.wsaClockCloses = null;
   syncPermitCounters(journey);
   assert.equal(eventSupportsJourney(event, journey), true);
+});
+
+test('being pulled off the file early is not scored as a restful season', () => {
+  const journey = makeJourney('fraser-plateau');
+  journey.protagonist.stress = 10;
+  journey.protagonist.energy = 90;
+  journey.permits.approved = 3;
+  const lost = calculateScore(journey, false).components.crewWelfare;
+  journey.permits.approved = journey.permits.target;
+  const won = calculateScore(journey, true).components.crewWelfare;
+  assert.ok(lost.score < won.score / 2, `lost ${lost.score} vs won ${won.score}`);
+  assert.match(lost.label, /file not delivered/);
 });

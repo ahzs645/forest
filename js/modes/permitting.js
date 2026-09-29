@@ -1495,9 +1495,12 @@ function displayPermittingBriefing(ui, journey) {
 
   ui.writeDivider('RESOURCES');
   const deskResourceStatus = getFormattedResourceStatus(journey.resources, DESK_RESOURCES);
-  for (const [, status] of Object.entries(deskResourceStatus)) {
+  for (const [key, status] of Object.entries(deskResourceStatus)) {
     const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
-    ui.write(`${icon} ${status.label}: ${status.display}`);
+    // One name for the meter: outcomes and hints call it district goodwill.
+    const label = key === 'politicalCapital' ? 'District goodwill' : status.label;
+    const display = key === 'politicalCapital' ? `${Math.round(journey.resources.politicalCapital || 0)}` : status.display;
+    ui.write(`${icon} ${label}: ${display}`);
   }
 
   if (journey.protagonist?.expertise) {

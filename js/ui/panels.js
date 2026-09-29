@@ -299,7 +299,7 @@ export const PanelsMixin = {
   /**
    * Update the resources panel
    * @param {Object} resources - Current resources
-   * @param {string} journeyType - 'field' or 'desk'
+   * @param {string} journeyType - 'field', 'desk' or 'manager'
    */
   updateResourcesPanel(resources, journeyType) {
     if (!this.resourcesPanel) return;
@@ -325,7 +325,11 @@ export const PanelsMixin = {
       const row = document.createElement('div');
       row.className = 'resource-row';
 
-      const displayLabel = key === 'food' ? 'FOOD (PD)' : def.shortLabel;
+      // The desk calls this meter district goodwill everywhere else; only
+      // the GM's board speaks of political capital.
+      const displayLabel = key === 'food' ? 'FOOD (PD)'
+        : key === 'politicalCapital' && journeyType !== 'manager' ? 'GOODWILL'
+          : def.shortLabel;
       const rounded = Math.round(value);
       const displayValue = key === 'food' ? `${rounded} pd`
         : key === 'budget' ? `${rounded < 0 ? '-' : ''}$${Math.abs(rounded).toLocaleString('en-CA')}`
