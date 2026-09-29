@@ -23,6 +23,7 @@ import {
   SEASONS,
 } from "../js/engine.js";
 import { formatMetricName } from "../js/engine/shared.js";
+import { SEASONAL_SAVE_KEY, validateSeasonalSave } from "../js/game/saveLoad.js";
 import { detectArt } from "./art.js";
 import {
   getRoleDisplayName,
@@ -47,7 +48,7 @@ const INITIAL_CONTENT = {
 // tab, a phone call mid-commute). We snapshot at every season boundary so the
 // player can pick the year back up from the start of the current season.
 const SAVE_VERSION = 1;
-const DEFAULT_SAVE_KEY = "bc-forestry-trail/seasonal-run/v1";
+const DEFAULT_SAVE_KEY = SEASONAL_SAVE_KEY;
 
 // Resolve a Web Storage target without assuming the browser exists (sims and
 // node tests run with no localStorage), mirroring the existing js/game pattern.
@@ -117,7 +118,10 @@ export function peekSeasonalSave(storage, saveKey = DEFAULT_SAVE_KEY) {
   } catch {
     return null;
   }
-  if (!save || save.version !== SAVE_VERSION || !save.state?.role || !save.state?.metrics) {
+  // A partial or older save (no area, no history, a role id where the role
+  // object belongs) used to reach resumeSavedRun and throw on the first card.
+  // Boot names the problem and offers to discard it (findUnreadableSaves).
+  if (validateSeasonalSave(save)) {
     return null;
   }
   // A finished (or over-run) save has nothing left to resume.

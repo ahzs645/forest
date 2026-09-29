@@ -104,6 +104,46 @@ export function validateCampaignSave(state) {
   return null;
 }
 
+/** The Seasonal Strategy autosave (written by tui/controller.js). */
+export const SEASONAL_SAVE_KEY = 'bc-forestry-trail/seasonal-run/v1';
+const SEASONAL_SAVE_VERSION = 1;
+// Containers the seasonal engine appends to when present.
+const SEASONAL_OPTIONAL_ARRAYS = [
+  'pendingIssues', 'pendingEvents', 'issueHistory', 'assignmentHistory',
+  'timeline', 'seasonContexts', 'discoveryTags',
+];
+
+/**
+ * Check a parked Seasonal Strategy run before the controller resumes it.
+ * The controller replays the parked season from `rngState` and reads role,
+ * area, meters and history on the first card.
+ * @param {*} save
+ * @returns {string|null} what is wrong, or null when it can be resumed
+ */
+export function validateSeasonalSave(save) {
+  if (!isObject(save) || !isObject(save.state)) return 'no seasonal data';
+  if (save.version !== SEASONAL_SAVE_VERSION) return 'saved by a different version of the game';
+  const state = save.state;
+  if (!isObject(state.role) || typeof state.role.id !== 'string') return 'role missing';
+  if (!isObject(state.area) || typeof state.area.id !== 'string') return 'operating area missing';
+  if (!isObject(state.metrics) || !CAMPAIGN_METRICS.every((key) => Number.isFinite(state.metrics[key]))) {
+    return 'meters missing';
+  }
+  if (!Array.isArray(state.history)) return 'history missing';
+  if (!Number.isInteger(save.round) || save.round < 0 || !Number.isInteger(state.round) || state.round < 0) {
+    return 'season missing';
+  }
+  if (state.totalRounds != null && !(Number.isInteger(state.totalRounds) && state.totalRounds > 0)) {
+    return 'season count missing';
+  }
+  if (!Number.isFinite(save.rngState)) return 'random seed missing';
+  if (state.flags != null && !isObject(state.flags)) return 'flags missing';
+  for (const key of SEASONAL_OPTIONAL_ARRAYS) {
+    if (state[key] != null && !Array.isArray(state[key])) return `${key} missing`;
+  }
+  return null;
+}
+
 /**
  * Read a save slot without throwing.
  * @returns {{status: 'empty'}|{status: 'ok', data: *}|{status: 'unreadable', reason: string}}
@@ -203,6 +243,12 @@ export function clearCampaignSave() {
   } catch { /* ignore */ }
 }
 
+function clearSeasonalSaveSlot() {
+  try {
+    storage()?.removeItem(SEASONAL_SAVE_KEY);
+  } catch { /* ignore */ }
+}
+
 /**
  * Every save slot that holds something the game cannot resume, with a
  * player-facing name and a way to discard it.
@@ -217,6 +263,10 @@ export function findUnreadableSaves() {
   const campaign = readCampaignSave();
   if (campaign.status === 'unreadable') {
     found.push({ label: 'campaign year', reason: campaign.reason, discard: clearCampaignSave });
+  }
+  const seasonal = readSlot(SEASONAL_SAVE_KEY, validateSeasonalSave);
+  if (seasonal.status === 'unreadable') {
+    found.push({ label: 'seasonal run', reason: seasonal.reason, discard: clearSeasonalSaveSlot });
   }
   return found;
 }
