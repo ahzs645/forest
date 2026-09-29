@@ -159,3 +159,12 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - Field events: gains no longer add Progress, gambles land as their expected outcome, medevac is charged. Practice-burden cards log CPD; the CPD gap is prorated across the year.
 - Expedition housekeeping: scrutiny clamped at 100, crew ids unique across reloads, resource scoring uses the run's real starting stores. eslint warnings 31 -> 5.
 - Balance (`npm run sim:seasonal`, 12,600 years): greedy 2.28 -> 2.22, role-optimal 2.05 -> 1.85, cautious 1.80 -> 1.72, balanced 1.47 -> 1.50; greedy Outstanding by role planner 3% -> 15%, silviculture 30% -> 7%.
+
+## 2026-09-29 — Illegal-act library content (wave 2, F2a)
+
+- **Caught paragraphs** (`js/data/illegalActs.js`): the ENV, BCWS, RCMP, Transport Canada, DFO, C&E, Timber Pricing and Revenue Branch templates now say only what the institution does, so they hold for every act it catches (spray and smoke as well as spills, a false fire claim as well as a fire). No template names its own delay; `catch.lagDays` is the act's.
+- **Clean and go-around lines:** 44 acts whose category line described a different act carry their own `cleanOutcome`/`goAround`; the category go-around lines read the same at a desk or a tailgate.
+- **Proposers:** self-proposed acts have their own refusal lines and are never re-offered or gone around; field voices are plain noun phrases ("The client's forester, at the tailgate"). Two surgical edits in `js/events/selection.js` (the voice table, the self deck).
+- **Facts and fit:** riparian reserve from the top of the bank, pre-1846 CMTs, opening-size cap, CRP, PMP, RFT registration, no statutory trapline/outfitter terms, forged RP amendment, check scaling; coastal/interior gates; planting, camp, bear and spray acts out of winter; field roles no longer authorise haul; duplicates removed or split by role.
+- **Payoffs:** lines are noun phrases, never name a figure the mechanic does not pay, and desk/program budget payoffs are capped. `js/data/mischief.js` no longer pays fraud in compliance.
+- **Tests:** `tests/illegalActsContent.test.mjs`.
