@@ -316,6 +316,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "seedling-switcheroo",
+    seasons: ["spring", "summer", "fall"],
     title: "Seedling Switcheroo",
     description: "Invoice Class A orchard spruce at the contract price while the boxes on the block hold the cheaper wild-stand B-class stock the nursery had left over.",
     pitch: "Nursery's got B-class Sx they'll let go at half. Same species, same seed zone near enough. Nobody pulls a seedling out of the ground and checks its pedigree. You bank the difference against the planting budget.",
@@ -358,6 +359,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "bigfoot-haulage",
+    seasons: ["spring", "summer", "fall"],
     title: "Put Bigfoot on the Crew",
     description: "Take on a very large, very hairy subcontractor who does not have a SIN, a WorkSafeBC number or, technically, a name.",
     pitch: "He does eleven hundred trees a day and he doesn't want a camp bed. He wants cash and no questions. I'm not saying what he is. I'm saying he plants.",
@@ -414,6 +416,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "helicopter-bingo",
+    seasons: ["spring", "summer", "fall"],
     title: "Bill the Sling Loads Twice",
     description: "Shuffle the helicopter flight sheets so the same sling loads of seedlings are invoiced to two blocks.",
     pitch: "Your two blocks share a staging. I fly the same loads, you sign two flight sheets, we split what the second one pays. The pilot's log says what I tell it to say.",
@@ -442,6 +445,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "wildlife-eviction-notices",
+    seasons: ["spring", "summer"],
     title: "Serve the Owls an Eviction Notice",
     description: "Staple official-looking 'relocation approved' notices to the nest trees so any spotter assumes the owls were moved by somebody with authority.",
     pitch: "I made a form. It's got a crest on it. Anyone who finds the nest reads the notice and figures the biologists handled it. The owls can't read.",
@@ -612,6 +616,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "midnight-planting-bots",
+    seasons: ["spring", "summer", "fall"],
     title: "Deploy the Midnight Planting Bots",
     description: "Sneak a pair of prototype autonomous planters into the burn scar overnight and claim the stocking without a human having seen the slope.",
     pitch: "Start-up in Kelowna wants a field trial and they'll pay us to run it. Robots plant at night. We claim the stems. If they plant a road, we blame the software.",
@@ -783,6 +788,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "stealth-owl-relocation",
+    seasons: ["spring", "summer"],
     title: "Relocate the Owls Yourself",
     description: "Move a family of owls in a pet carrier, then submit photographs of the empty nest to justify clearing the buffer.",
     pitch: "There's three of them. I've got a cat carrier and a ladder. Twenty minutes and the buffer's just trees.",
@@ -1210,6 +1216,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "planner-manipulate-ha-size",
+    areaTags: ["cwh", "ich", "idf"],
     title: "Trim the Block Area on Paper",
     description: "Fudge the GIS area calculation just enough to keep the block under the maximum opening size that would need a rationale.",
     pitch: "It's forty-one hectares. The cap is forty. Draw the boundary a little tighter in the GIS, leave the ribbon where it is, and it's a thirty-nine.",
@@ -1651,6 +1658,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "permitter-approve-illegal-camp",
+    seasons: ["spring", "summer", "fall"],
     title: "Call the Camp 'Equipment Storage'",
     description: "Put the fifty-person camp inside the drinking-water buffer by describing it as mobile equipment storage on the special use permit.",
     pitch: "The only flat ground is a hundred metres from the lake intake. Call the camp 'mobile equipment storage' on the SUP and put the trailers in. Trailers are equipment.",
@@ -1754,6 +1762,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "permitter-falsify-seed-transfer",
+    areaTags: ["cwh"],
     title: "Tell the Nursery the Seed Variance Is Approved",
     description: "Tell the nursery the seed transfer variance for the coastal Douglas-fir came through when it is still sitting with the Tree Seed Centre.",
     pitch: "The variance has been with the Tree Seed Centre for a month. Tell the nursery it's approved and sow. If it comes back denied, the trees are already in the ground.",
@@ -1827,6 +1836,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "recce-hide-bear-den",
+    seasons: ["spring", "summer", "fall"],
     title: "Forget the Grizzly Den",
     description: "Find an active grizzly den in the middle of the block and 'forget' to put it on the GPS.",
     pitch: "You put that den on the map and there's a three-hundred-metre no-work zone in the middle of the best timber. The bear's not home. It's just a hole.",
@@ -2228,6 +2238,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   // ── Silviculture acts ─────────────────────────────────────────────────────
   {
     id: "silvi-misreport-planting",
+    seasons: ["spring", "summer", "fall"],
     title: "Invoice 1,600 Stems and Plant 1,200",
     description: "Invoice the client for 1,600 stems per hectare when the crew planted 1,200 and stashed the rest under a stump.",
     pitch: "Sixteen hundred a hectare is the contract. Twelve hundred is what the ground takes. The rest go under a stump and the invoice says sixteen.",
@@ -2286,6 +2297,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-wrong-seed-zone",
+    areaTags: ["sbs", "ich", "idf"],
     title: "Plant the Coastal Fir in the Interior",
     description: "Plant cheap coastal Douglas-fir on a high-elevation interior block because the correct seedlot ran out.",
     pitch: "We're two hundred boxes short of interior fir and the nursery has coastal fir on the dock. Fir's fir. Plant it.",
@@ -2373,6 +2385,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-ignore-arch-site",
+    seasons: ["spring", "summer", "fall"],
     title: "Plant Through the Pit House",
     description: "Send the crew's shovels straight through a flagged pit house depression to get the plantable spots.",
     pitch: "There's a flagged circle in the middle of the best planting ground. It's a hole. Plant it and pull the ribbon after.",
@@ -2415,6 +2428,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-hire-undocumented",
+    seasons: ["spring", "summer", "fall"],
     title: "Pay the Planters in Cash",
     description: "Staff the planting crew with cash-paid, undocumented workers to avoid WorkSafeBC premiums and overtime.",
     pitch: "I've got a crew that plants and doesn't have paperwork. Cash daily. No WorkSafe, no EI, no questions. Cheapest trees you'll ever buy.",
@@ -2459,6 +2473,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-smuggle-cones",
+    areaTags: ["ich", "idf", "sbs"],
     title: "Pick Cones in the Park",
     description: "Pick whitebark pine cones inside the provincial park and sell them to a private nursery.",
     pitch: "Best whitebark cone crop in a decade and it's all inside the park boundary. Nobody's up there. A nursery in Alberta pays by the bushel.",
@@ -2475,6 +2490,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-falsify-planting-quality",
+    seasons: ["spring", "summer", "fall"],
     title: "Buy the Checker a Carton",
     description: "Give the planting checker a carton of cigarettes to ignore the J-roots and shallow planting so the crew's rate stays up.",
     pitch: "The checker's failing plots for J-roots. A carton a week and the plots pass. The trees don't know the difference.",
@@ -2489,6 +2505,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-steal-competitor-trees",
+    seasons: ["spring", "summer", "fall"],
     title: "Load the Other Outfit's Seedlings",
     description: "Drive into another company's block at night and load their staged seedling boxes into your reefer.",
     pitch: "They've got forty boxes staged on the landing across the valley and nobody sleeping with them. We're short forty boxes.",
@@ -2504,6 +2521,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-ignore-bear-encounters",
+    seasons: ["spring", "summer", "fall"],
     title: "Don't Report the Grizzly Charge",
     description: "Tell the crew not to report the grizzly that bluff-charged them, because a wildlife shutdown costs the contract deadline.",
     pitch: "It charged, it stopped, everybody's fine. Report it and the block shuts for three days. Don't, and we finish Friday.",
@@ -2550,6 +2568,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-fudge-species-mix",
+    seasons: ["spring", "summer", "fall"],
     title: "Plant 90/10 and Bill 50/50",
     description: "Plant 90 percent cheap spruce and 10 percent fir, and bill the client for a 50/50 mix.",
     pitch: "Fir's twice the price of spruce. Plant ninety spruce, ten fir, bill it fifty-fifty. They both come up green.",
@@ -2564,6 +2583,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-abandon-contract",
+    seasons: ["spring", "summer", "fall"],
     title: "Let Them Walk and Bill the Block Done",
     description: "Let the contractor walk off the rocky block in the night and bill the block as planted anyway.",
     pitch: "The block's rock and the crew's gone. Bill it planted. Nobody surveys a block for three years and by then who knows what happened.",
@@ -2578,6 +2598,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-ignore-first-aid",
+    seasons: ["spring", "summer", "fall"],
     title: "Run the Camp Without an OFA 3",
     description: "Run a 40-person camp two hours from town with a basic kit and an attendant whose ticket expired three years ago.",
     pitch: "The OFA 3 quit. Dave's got a ticket from 2019. Camp opens Monday. Dave's the attendant.",
@@ -2620,6 +2641,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-ignore-water-quality",
+    seasons: ["spring", "summer", "fall"],
     title: "Put the Latrines Above the Creek",
     description: "Set up the camp latrines five metres uphill from the creek that feeds the town's water intake.",
     pitch: "The only flat spot for the outhouses is by the creek. Five metres is fine. Water flows downhill; the town's twenty kilometres of downhill away.",
@@ -2649,6 +2671,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "silvi-hide-dead-stock",
+    seasons: ["spring", "summer", "fall"],
     title: "Dump the Dead Stock and Report It Planted",
     description: "When the reefer fails and kills 50,000 trees, dump them in a ravine and report them planted.",
     pitch: "Reefer died Saturday. Fifty thousand trees, cooked. Dump them in the draw and report them planted. The block gets surveyed in three years and trees die for all kinds of reasons.",
@@ -3356,7 +3379,7 @@ export const ILLEGAL_ACTS_SOURCE = [
     phase: "any",
     tier: "core",
     category: "results",
-    seasons: ["winter"],
+    seasons: ["fall", "winter"],
     payoff: { kind: "budget", amount: 40000, line: "this year's planting budget for those blocks, deferred" },
     catch: { by: "FPB", how: "The district's FSP amendment review picks up the missed dates, and the Forest Practices Board's audit of the licence notes the pattern.", lagDays: 120 },
     tags: ["silviculture", "planner", "regen-delay", "fsp"],
@@ -3392,6 +3415,7 @@ export const ILLEGAL_ACTS_SOURCE = [
   },
   {
     id: "dont-report-the-grizzly-encounter",
+    seasons: ["spring", "summer", "fall"],
     title: "Don't Report the Grizzly Encounter",
     description: "Leave the grizzly encounter on the traverse out of the daybook so the wildlife danger assessment does not shut the block.",
     pitch: "It looked at us and left. Write it up and the block gets a wildlife danger assessment and a three-day stand-down. It's a bear. It's the bush.",
