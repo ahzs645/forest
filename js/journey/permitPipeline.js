@@ -330,6 +330,14 @@ function enterLane(file, lane, journey, { clockDays = null } = {}) {
   const days = clockDays === null ? laneDays({ ...file, lane }, journey) : clockDays;
   file.clockCloses = lane === 'issued' || lane === 'deficiency' || lane === 'drafted' ? null : day + Math.max(0, days);
   if (lane === 'issued') file.issuedDay = day;
+  // An issued HCA permit releases the cutting permit waiting on it, whichever
+  // path issued it. A CP left pointing at an issued permit read "with the
+  // Archaeology Branch (Day ?)" until the next night pass noticed.
+  if (lane === 'issued' && file.type === 'HCA') {
+    for (const held of journey?.permits?.files || []) {
+      if (held.pausedBy === file.id) held.pausedBy = null;
+    }
+  }
   return file;
 }
 
@@ -412,6 +420,8 @@ export function describeHcaHold(hca) {
       return `${hca.label} came back from the Archaeology Branch with a letter; answer it`;
     case 'decision':
       return `${hca.label} is with the Archaeology Branch for decision (Day ${hca.clockCloses})`;
+    case 'issued':
+      return `${hca.label} was issued by the Archaeology Branch on Day ${hca.issuedDay}`;
     default:
       return `${hca?.label || 'The HCA permit'} is with the Archaeology Branch (Day ${hca?.clockCloses ?? '?'})`;
   }
@@ -715,12 +725,13 @@ export function slipPermitClock(journey, lanes, days = 1) {
 
 /**
  * Files the District Manager could sign today: at decision, with nothing
- * holding them. Due files first, then the soonest clock.
+ * holding them. Due files first, then the soonest clock. An HCA permit is the
+ * Archaeology Branch's to decide, so no District Manager event signs one.
  */
 export function getSignableFiles(journey) {
   ensurePermitFiles(journey);
   return getPermitFiles(journey)
-    .filter((file) => file.lane === 'decision' && !isHeldAtDecision(file, journey).held)
+    .filter((file) => file.lane === 'decision' && countsInQueue(file) && !isHeldAtDecision(file, journey).held)
     .sort((a, b) => (a.clockCloses ?? Infinity) - (b.clockCloses ?? Infinity));
 }
 

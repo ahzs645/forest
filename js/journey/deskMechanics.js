@@ -401,3 +401,16 @@ export function resumingDeskDay(journey) {
 export function closeDeskDay(journey) {
   if (journey) journey.activeDeskDay = null;
 }
+
+/**
+ * A desk protagonist carries one energy meter: their own. Older permitting
+ * saves also kept `resources.energy`, which difficulty scaled and nothing
+ * spent, so the file showed 80 in SUPPLIES beside the real 100 under YOUR
+ * STATUS. Drop the copy so every panel reads the one number.
+ * @param {Object} journey
+ */
+export function dropDuplicateDeskEnergy(journey) {
+  if (journey?.protagonist && journey.resources && 'energy' in journey.resources) {
+    delete journey.resources.energy;
+  }
+}

@@ -615,16 +615,17 @@ export function createPermittingJourney(options = {}) {
       complianceScore: 80,
     },
 
-    // Resources (no crew-related)
-    resources: createDeskResources({
+    // Resources (no crew-related). Energy is the protagonist's own meter
+    // (protagonist.energy above), as on the planning file: a second copy here
+    // was scaled by difficulty and showed 80 beside the real 100.
+    resources: {
       // Same reasoning as the planning file: a longer calendar at the same
       // daily overhead. See scripts/simulate-expeditions.mjs.
       budget: 58000,
       // Same reasoning as the planning file: a longer calendar at the same
       // daily drain. See scripts/simulate-expeditions.mjs.
       politicalCapital: 66,
-      energy: 100,
-    }),
+    },
 
     discoveryTags: [],
     roadAssets: {
