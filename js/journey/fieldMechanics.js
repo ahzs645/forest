@@ -737,7 +737,7 @@ export function applyAccessVerdictPressure(journey, verdict, context = {}) {
 
   if (delta !== 0) {
     const current = Number(journey.scrutiny ?? journey.heat ?? 0);
-    const next = Math.max(0, current + delta);
+    const next = Math.max(0, Math.min(100, current + delta));
     journey.scrutiny = next;
     if (Object.prototype.hasOwnProperty.call(journey, 'heat')) {
       journey.heat = next;

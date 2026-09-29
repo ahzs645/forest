@@ -183,6 +183,13 @@ function applyCampaignScale(journey, journeyType) {
  * @returns {Object} Journey state for the appropriate type
  */
 export function createJourney(options = {}) {
+  const journey = createJourneyForRole(options);
+  // End-of-run scoring compares what is left against what the run started with.
+  journey.startingResources = { ...(journey.resources || {}) };
+  return journey;
+}
+
+function createJourneyForRole(options) {
   const roleId = options.roleId || options.role?.id;
   const journeyType = ROLE_JOURNEY_TYPES[roleId];
 

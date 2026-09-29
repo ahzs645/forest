@@ -64,6 +64,7 @@ export function applyDifficultyMultipliers(journey, difficulty) {
   if (journey.journeyType === 'planning' && Number.isFinite(journey.deadline)) {
     journey.deadline += difficulty === 'easy' ? 2 : -1;
   }
+  journey.startingResources = { ...r };
 }
 
 export class ForestryTrailGame {

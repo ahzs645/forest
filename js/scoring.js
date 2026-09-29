@@ -194,16 +194,26 @@ function scoreCrewWelfare(journey) {
 
 // --- Resource Efficiency Scoring ---
 
+// What the run started with. Journeys record it at creation (and after the
+// difficulty multipliers); older saves fall back to today's normal-difficulty
+// stores. The old fixed divisors (fuel 320, food 40, budgets of 35-100k) were
+// a fraction of the real starting stocks, so every run scored full marks.
+function startingAmount(journey, key, fallback) {
+  const start = Number(journey?.startingResources?.[key]);
+  return start > 0 ? start : fallback;
+}
+
+const DESK_BUDGET_FALLBACK = { silviculture: 380000, planning: 82000, permitting: 58000 };
+
 function scoreResourceEfficiency(journey) {
   const r = journey.resources || {};
   let score = 50;
 
-  // Remaining resources are good (didn't waste), but having too much means journey was too easy
-  const fuelPct = (r.fuel || 0) / 320;
-  const foodPct = (r.food || 0) / 40;
-  const equipPct = (r.equipment || 0) / 85;
+  const fuelPct = (r.fuel || 0) / startingAmount(journey, 'fuel', 520);
+  const foodPct = (r.food || 0) / startingAmount(journey, 'food', 80);
+  const equipPct = (r.equipment || 0) / startingAmount(journey, 'equipment', 90);
 
-  // Sweet spot: 10-40% remaining
+  // Share of the starting stores still on hand (see scoreSweetSpot).
   score += scoreSweetSpot(fuelPct) * 15;
   score += scoreSweetSpot(foodPct) * 15;
   score += scoreSweetSpot(equipPct) * 10;
@@ -220,12 +230,11 @@ function scoreDeskResourceEfficiency(journey) {
   const r = journey.resources || {};
   let score = 50;
 
-  const budgetStart = journey.journeyType === 'silviculture' ? 100000 :
-                      journey.journeyType === 'planning' ? 50000 : 35000;
+  const budgetStart = startingAmount(journey, 'budget', DESK_BUDGET_FALLBACK[journey.journeyType] || 35000);
   const budgetPct = (r.budget || 0) / budgetStart;
   score += scoreSweetSpot(budgetPct) * 25;
 
-  const polCapPct = (r.politicalCapital || 0) / 40;
+  const polCapPct = (r.politicalCapital || 0) / startingAmount(journey, 'politicalCapital', 40);
   score += scoreSweetSpot(polCapPct) * 15;
 
   if (r.budget <= 0) score -= 20;
@@ -239,10 +248,10 @@ function scoreManagerResources(journey) {
   const r = journey.resources || {};
   let score = 50;
 
-  const budgetPct = (r.budget || 0) / 500000;
+  const budgetPct = (r.budget || 0) / startingAmount(journey, 'budget', 850000);
   score += scoreSweetSpot(budgetPct) * 25;
 
-  const polCapPct = (r.politicalCapital || 0) / 100;
+  const polCapPct = (r.politicalCapital || 0) / startingAmount(journey, 'politicalCapital', 100);
   score += scoreSweetSpot(polCapPct) * 15;
 
   if (r.budget <= 0) score -= 20;
