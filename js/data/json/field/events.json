@@ -1158,13 +1158,14 @@
   "description": "The road ahead has collapsed into the creek. No way through.",
   "options": [
    {
-    "label": "Build a bypass",
-    "outcome": "With shovels and chainsaws, you cut a rough detour. Takes all day.",
+    "label": "Cut a bypass with the saws",
+    "outcome": "With shovels and chainsaws, you cut a rough detour. It takes all day, and it is road nobody permitted: the road permit holder will want to know who built it.",
     "spendsDay": true,
     "effects": {
      "progress": -8,
      "equipment": -10,
-     "fuel": -5
+     "fuel": -5,
+     "compliance": -4
     }
    },
    {

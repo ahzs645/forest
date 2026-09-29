@@ -11,7 +11,7 @@ import {
   createReconJourney,
   createPermittingJourney
 } from '../js/journey/factory.js';
-import { endFieldDay, executeFieldAction } from '../js/journey/fieldMechanics.js';
+import { executeFieldAction } from '../js/journey/fieldMechanics.js';
 import { runDaySituation } from '../js/journey/daySituation.js';
 import { getActiveRouteConstraint, resolveRouteConstraint } from '../js/journey/routeConstraints.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
@@ -158,7 +158,7 @@ test('event option hints disclose whether the response uses the day', () => {
 
   const washout = FIELD_EVENTS.find((event) => event.id === 'road_washout');
   const washoutFormatted = formatEventForDisplay(washout, 'recon');
-  const bypass = washoutFormatted.options.find((option) => option.label === 'Build a bypass');
+  const bypass = washoutFormatted.options.find((option) => option.label === 'Cut a bypass with the saws');
   assert.match(bypass.hint, /uses this day/i);
 
   const hidden = formatEventForDisplay({
@@ -211,7 +211,7 @@ test('setting aside a road washout leaves a persistent route constraint that blo
   assert.equal(getActiveRouteConstraint(journey), null);
 });
 
-test('detouring a route constraint queues delay for the next travel leg', async () => {
+test('detouring a route constraint slows the leg the detour is', async () => {
   const journey = createReconJourney({ areaId: 'fort-st-john-plateau' });
   journey.blocks = [
     { id: 'camp', name: 'Camp', distance: 0, terrain: 'flat', hazards: [], features: [] },
@@ -238,12 +238,10 @@ test('detouring a route constraint queues delay for the next travel leg', async 
   const constraint = getActiveRouteConstraint(journey);
   const detoured = resolveRouteConstraint(journey, constraint.id, 'detour');
   assert.equal(detoured.resolved, true);
-  assert.ok(journey.pendingTravelSetback > 0);
-  assert.equal(journey.travelSetback || 0, 0);
-
-  endFieldDay(journey);
+  // The spur is driven today (js/modes/recon.js runs the leg on the same
+  // shift), so its delay lands on this leg, not on the one after it.
   assert.ok(journey.travelSetback > 0);
-  assert.equal(journey.pendingTravelSetback, 0);
+  assert.equal(journey.pendingTravelSetback || 0, 0);
   withRandom(0.5, () => executeFieldAction(journey, 'normal'));
   assert.ok(journey.distanceTraveled > 0 && journey.distanceTraveled < 10);
   assert.equal(journey.currentBlockIndex, 0, 'the detour delay slows this leg instead of teleporting progress');

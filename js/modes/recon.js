@@ -783,7 +783,7 @@ async function runFieldDay(game) {
     if (routeConstraint) {
       options.push({
         label: routeConstraint.kind === 'landslide' ? 'Take the old spur around' : 'Walk in from the last sound approach',
-        description: `Bypass ${routeConstraint.title.toLowerCase()} on the old line with extra fuel and rougher travel — uses this shift`,
+        description: `Bypass ${routeConstraint.title.toLowerCase()} on the old line: a slow, rough leg toward ${journey.blocks[journey.currentBlockIndex + 1]?.name || 'the next stop'} with extra fuel — uses this shift`,
         tag: 'TRADEOFF',
         value: 'detour_route_constraint'
       });
@@ -1036,17 +1036,26 @@ async function runFieldDay(game) {
       if (!constraint) {
         ui.write('No route obstruction is active on the next leg.');
       } else {
-        spendDay(journey);
-        const result = resolveRouteConstraint(
-          journey,
-          constraint.id,
-          actionId === 'detour_route_constraint' ? 'detour' : 'report'
-        );
+        const detour = actionId === 'detour_route_constraint';
+        const result = resolveRouteConstraint(journey, constraint.id, detour ? 'detour' : 'report');
         for (const message of result.messages) {
-          if (actionId === 'detour_route_constraint') ui.writeWarning(message);
+          if (detour) ui.writeWarning(message);
           else ui.write(message);
         }
         logReconAction(journey, result.messages[0] || 'Resolved route obstruction');
+        // The old spur is the road today: a slow, rough leg that still makes
+        // ground. It used to take the shift, cover nothing, and slow the next
+        // leg too, which made waiting for the office strictly better.
+        const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
+        if (detour && nextBlock && journey.resources.fuel > 0 && journey.resources.equipment > 0) {
+          journey.routePlan = { ...buildRoutePlan('mainline', journey, currentBlock, nextBlock), note: '' };
+          const leg = await runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent });
+          if (leg.gameOver) return;
+          hasTraveled = true;
+          dayResolved = true;
+        } else {
+          spendDay(journey);
+        }
       }
     }
 

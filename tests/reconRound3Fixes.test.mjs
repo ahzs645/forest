@@ -21,6 +21,8 @@ import { eventFitsStop } from '../js/journey/packages.js';
 import { formatEventForDisplay } from '../js/events/display.js';
 import { applyEventTravelEffect, executeFieldAction, fitEventToCrew, fitEventToRemainingRoute } from '../js/journey/fieldMechanics.js';
 import { calculateScore, formatScoreDisplay } from '../js/scoring.js';
+import { addRouteConstraintFromEvent, getActiveRouteConstraint } from '../js/journey/routeConstraints.js';
+import { runDaySituation } from '../js/journey/daySituation.js';
 import { buildCrewEpilogue } from '../js/game/debrief.js';
 
 function withRandom(value, fn) {
@@ -385,6 +387,49 @@ test('a dry block\'s layout notes are read off its ground', () => {
   assert.notEqual(flat.terrain[0], hilly.terrain[0]);
   assert.notEqual(flat.streams[0], hilly.streams[0]);
   assert.doesNotMatch(hilly.terrain[0], /gentle ground/);
+});
+
+// ── The landslide's legal answers cost about a shift, not two ──────────────
+
+function slideJourney() {
+  const journey = createReconJourney({ areaId: 'kootenay-wetbelt' });
+  journey.blocks = [
+    { id: 'a', name: 'Salmo Yard', kind: 'waypoint', distance: 0, terrain: 'flat', hazards: [], features: [] },
+    { id: 'b', name: 'Block KW-02', kind: 'block', distance: 9, terrain: 'flat', hazards: [], features: [] },
+    { id: 'c', name: 'Block KW-03', kind: 'block', distance: 9, terrain: 'flat', hazards: [], features: [] },
+  ];
+  journey.totalDistance = 18;
+  journey.currentBlockIndex = 0;
+  journey.distanceTraveled = 0;
+  journey.day = 4;
+  journey.weather = WEATHER_CONDITIONS.find((w) => w.id === 'clear');
+  journey.resources.food = 60;
+  journey.resources.fuel = 400;
+  return journey;
+}
+
+test('the old spur around a slide is a slow leg that makes ground this shift', async () => {
+  const journey = slideJourney();
+  const slide = FIELD_EVENTS.find((e) => e.id === 'landslide');
+  addRouteConstraintFromEvent(journey, slide);
+  const pick = (options) => options.find((o) => o.value === 'detour_route_constraint')
+    || options.find((o) => o.value === 'next' || o.value === 'continue')
+    || options[0];
+  await withRandom(0.99, () => runReconDay({ ui: makeUi(pick), journey, checkpoint() {} }));
+  assert.ok(journey.distanceTraveled > 0, 'the spur covered ground');
+  assert.equal(getActiveRouteConstraint(journey), null);
+  assert.equal(journey.pendingTravelSetback || 0, 0, 'and it does not slow tomorrow as well');
+});
+
+test('turning back to report a slide closes the road but slows the reopened leg only lightly', async () => {
+  const journey = slideJourney();
+  const slide = FIELD_EVENTS.find((e) => e.id === 'landslide');
+  const ui = makeUi((options) => options.find((o) => /Turn back and report/.test(o.label))
+    || options.find((o) => o.value === 'continue') || options[0]);
+  await runDaySituation({ ui, journey, gameOver: false }, slide);
+  assert.ok(getActiveRouteConstraint(journey), 'the road is shut for the rest of the shift');
+  const setback = Number(journey.travelSetback || 0) + Number(journey.pendingTravelSetback || 0);
+  assert.ok(setback > 0 && setback <= 0.25, `setback ${setback}`);
 });
 
 // ── Block cards stay on open blocks ────────────────────────────────────────

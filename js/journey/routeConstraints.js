@@ -19,7 +19,7 @@ const OBSTRUCTION_EVENT_PROFILES = {
     summary: 'The road ahead has collapsed and blocks the next leg.',
     report: { fuel: -8, scrutiny: -1, travelSetback: 0.5 },
     detour: { fuel: -28, equipment: -4, scrutiny: 0, travelSetback: 0.25 },
-    reportNote: 'You flag the failure, photograph it, call it in to the road permit holder and work the near-side blocks. The road crew will be days.',
+    reportNote: 'You flag the failure, photograph it, call it in to the road permit holder and work the near-side blocks while the road crew puts in a temporary crossing.',
     detourNote: 'You walk in from the last sound approach and take the old spur around with the trucks. Slower, rougher, and nobody had to build anything.',
   },
   landslide: {
@@ -125,7 +125,7 @@ export function reopenReportedConstraints(journey) {
   return messages;
 }
 
-function applyConstraintEffects(journey, effects = {}) {
+function applyConstraintEffects(journey, effects = {}, { thisLeg = false } = {}) {
   const resources = journey.resources || {};
   for (const key of ['fuel', 'equipment', 'food', 'firstAid', 'budget']) {
     if (typeof effects[key] !== 'number' || typeof resources[key] !== 'number') continue;
@@ -135,7 +135,10 @@ function applyConstraintEffects(journey, effects = {}) {
     journey.scrutiny = Math.max(0, Math.min(100, (journey.scrutiny || 0) + effects.scrutiny));
   }
   if (typeof effects.travelSetback === 'number') {
-    journey.pendingTravelSetback = Math.min(0.75, (journey.pendingTravelSetback || 0) + effects.travelSetback);
+    // A detour is driven now, so it slows the leg it is; a report slows the
+    // first leg after the road reopens.
+    const key = thisLeg ? 'travelSetback' : 'pendingTravelSetback';
+    journey[key] = Math.min(0.75, (journey[key] || 0) + effects.travelSetback);
   }
 }
 
@@ -151,7 +154,7 @@ export function resolveRouteConstraint(journey, constraintId, mode = 'report') {
   // 'clear' is the pre-rename spelling from older saves and callers; it is
   // the report path now, never a chainsaw bypass.
   const selectedMode = mode === 'detour' ? 'detour' : 'report';
-  applyConstraintEffects(journey, profile[selectedMode] || {});
+  applyConstraintEffects(journey, profile[selectedMode] || {}, { thisLeg: selectedMode === 'detour' });
   constraint.status = 'resolved';
   constraint.resolvedDay = journey.day || 0;
   constraint.resolution = selectedMode;
@@ -159,7 +162,7 @@ export function resolveRouteConstraint(journey, constraintId, mode = 'report') {
   const messages = selectedMode === 'detour'
     ? [
         `Detour marked around ${constraint.title} between ${constraint.fromBlockName} and ${constraint.toBlockName}.`,
-        profile.detourNote || 'The route is passable again, but the next travel leg will be slower and rougher.',
+        profile.detourNote || 'The route is passable again, but this leg is slower and rougher.',
       ]
     : [
         `${constraint.title} reported between ${constraint.fromBlockName} and ${constraint.toBlockName}.`,
