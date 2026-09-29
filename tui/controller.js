@@ -1,5 +1,6 @@
 import { FORESTER_ROLES, OPERATING_AREAS, getRoleAreaBriefing } from "../js/data/index.js";
 import {
+  adaptIllegalActTemptation,
   buildSeasonContext,
   createInitialState,
   applyOptionOutcome,
@@ -24,7 +25,7 @@ import {
 } from "../js/engine.js";
 import { formatMetricName } from "../js/engine/shared.js";
 import { applyEffects } from "../js/engine/effects.js";
-import { resolveRisk } from "../js/risk.js";
+import { riskBandOdds, riskBandPercents } from "../js/risk.js";
 import { ILLEGAL_ACTS } from "../js/data/illegalActs.js";
 import { SEASONAL_SAVE_KEY, validateSeasonalSave } from "../js/game/saveLoad.js";
 import { detectArt } from "./art.js";
@@ -483,8 +484,9 @@ function summarizeProjectedEffects(gs, effects, option = null) {
 // A shortcut is a legal and ethical call, not another operational card, so it
 // is presented on its own terms: who checks, the odds it holds this season,
 // what it pays, what a catch costs, and that saying no is free. The engine
-// may carry the odds and payoff on the card; when it does not, they are read
-// from the risk roll and the act itself.
+// carries the odds, payoff, catcher and band effects on the card
+// (js/engine/content.js adaptIllegalActTemptation); a card without them is
+// priced from js/risk.js and the act itself.
 
 const SHORTCUT_CATCHERS = {
   "C&E": "Compliance and Enforcement (C&E)",
@@ -513,63 +515,24 @@ function findShortcutAct(item) {
   return ILLEGAL_ACTS_BY_ID.get(id) || null;
 }
 
-function toPercent(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return null;
-  return Math.round(numeric <= 1 ? numeric * 100 : numeric);
+// The offer is drawn when the season opens, but the season's earlier cards
+// move the meters its odds, catch cost and fallout are read from. Rebuilt from
+// the act on the file as it stands, what the card prints is what the roll
+// applies.
+function repriceShortcutOffer(gs, item) {
+  const act = item?.shortcut ? findShortcutAct(item) : null;
+  return act ? adaptIllegalActTemptation(act, gs) : item;
 }
 
-// Odds the engine already put on the card: the three shortcut bands
-// ({clean, noticed, caught}) or a deployment's live odds ({good, bad}).
-// Returned as whole percentages; `noticed` is 0 on a two-band roll.
-function readCardOdds(item, option) {
-  const source = option?.odds || option?.risk?.odds || option?.liveOdds || item?.odds;
-  if (!source || typeof source !== "object") return null;
-  const clean = toPercent(source.clean ?? source.good);
-  if (clean === null) return null;
-  const caught = toPercent(source.caught ?? source.bad);
-  const noticed = toPercent(source.noticed ?? source.partial)
-    ?? (caught === null ? 0 : Math.max(0, 100 - clean - caught));
-  return { clean, noticed, caught: caught ?? Math.max(0, 100 - clean - noticed) };
-}
-
-// Where resolveRisk's roll crosses from `test` holding to not: rolls under
-// the returned value pass.
-function rollThreshold(gs, risk, test) {
-  const state = { metrics: { ...gs.metrics }, flags: { ...(gs.flags || {}) } };
-  let low = 0;
-  let high = 1;
-  for (let i = 0; i < 24; i += 1) {
-    const mid = (low + high) / 2;
-    if (test(resolveRisk(state, risk, () => mid))) low = mid;
-    else high = mid;
-  }
-  return Math.round(((low + high) / 2) * 1e4) / 1e4;
-}
-
-/**
- * The chance a risk roll lands (the payoff arrives) on this file, read from
- * resolveRisk itself: bisecting on the roll recovers its threshold without
- * restating the compliance and relationship modifiers here.
- */
-export function riskHoldChance(gs, risk) {
-  if (!risk || !Number.isFinite(Number(risk.baseSuccess)) || !gs?.metrics) return null;
-  return rollThreshold(gs, risk, (result) => result.success);
-}
-
+// The bands as whole percentages. The engine puts the odds it will roll on
+// the offer (fractions, from js/risk.js riskBandOdds); a card without them is
+// priced by that same function, never by a local restatement of the modifiers.
+// `noticed` is 0 on a two-band roll.
 function readShortcutOdds(gs, item, option) {
-  const carried = readCardOdds(item, option);
-  if (carried) return carried;
-  const holds = riskHoldChance(gs, option?.risk);
-  if (holds === null) return null;
-  // A three-band roll reports its band: the clean share ends where "noticed"
-  // begins. A two-band roll has none, and holds is all clean.
-  const clean = option.risk.chancePartial
-    ? rollThreshold(gs, option.risk, (result) => (result.band ? result.band === "clean" : result.success))
-    : holds;
-  const cleanPct = Math.round(clean * 100);
-  const holdsPct = Math.round(holds * 100);
-  return { clean: cleanPct, noticed: holdsPct - cleanPct, caught: 100 - holdsPct };
+  const carried = option?.odds || item?.odds;
+  if (carried && Number.isFinite(Number(carried.clean))) return riskBandPercents(carried);
+  if (!option?.risk || !Number.isFinite(Number(option.risk.baseSuccess)) || !gs?.metrics) return null;
+  return riskBandPercents(riskBandOdds(gs, option.risk));
 }
 
 export function formatShortcutOdds(odds) {
@@ -599,7 +562,11 @@ export function buildShortcutBrief(gs, item) {
   const catcherKey = take.institution || take.risk?.institution || item?.institution || act?.catch?.by || null;
   const catcher = catcherKey ? SHORTCUT_CATCHERS[catcherKey] || catcherKey : null;
   const payoffLine = take.payoffLine || take.payoff?.line || item?.payoffLine || act?.payoff?.line || "";
-  const payoffChip = take.payoffChip || item?.payoffChip || "";
+  // The chip states the payoff as it will land: a gain on a meter already at
+  // 75+ tapers, so "Progress +7" can arrive as +4.
+  const payoffEffects = take.payoffEffects || item?.payoffEffects;
+  const payoffChip = (payoffEffects && summarizeProjectedEffects(gs, payoffEffects))
+    || take.payoffChip || item?.payoffChip || "";
   const finalSeason = Number(gs?.round || 0) >= Number(gs?.totalRounds || SEASONS.length);
   // Fallout scheduled in the last season has no season left to land in,
   // unless the engine promises where it lands (next year's file).
@@ -1370,7 +1337,7 @@ export class TuiGameController {
       || phase.type === "event"
       || phase.type === "temptation"
     ) {
-      const item = phase.data;
+      const item = phase.type === "temptation" ? repriceShortcutOffer(gs, phase.data) : phase.data;
       const isCrisisIssue = phase.type === "issue" && item.surfaceSeverity === "danger";
       const shortcut = phase.type === "temptation" ? buildShortcutBrief(gs, item) : null;
       const presentedOptions = buildPresentedOptions(item, phase.type, gs, shortcut);

@@ -122,15 +122,17 @@ export function describeConsequences(state, ids = []) {
 const SHORTCUT_NOT_TAKEN = /^(decline|say no|document and report)\b/i;
 
 function isTakenShortcut(causedBy) {
-  if (causedBy.shortcut === true || causedBy.tookShortcut === true) return true;
+  if (causedBy.kind === "shortcut" || causedBy.shortcut === true || causedBy.tookShortcut === true) return true;
   return causedBy.sourceType === "temptation" && !SHORTCUT_NOT_TAKEN.test(String(causedBy.option || ""));
 }
 
+// Fallout from a shortcut names the act itself ("Because you took: Fudge the
+// Species Composition — your fall shortcut."), not the generic option label
+// every offer shares; who caught it is the card's own surfaceReason. Any other
+// scheduled card names the decision that put it on the calendar.
 export function describeCardCause(card) {
   const causedBy = card?.causedBy;
   if (!causedBy) return "";
-  // Fallout from a shortcut names the act itself ("Fudge the Species
-  // Composition"), not the generic option label every offer shares.
   const shortcutTitle = isTakenShortcut(causedBy)
     ? card.sourceTitle || causedBy.sourceTitle || causedBy.title
     : "";
@@ -139,12 +141,6 @@ export function describeCardCause(card) {
     return `Because you took: ${shortcutTitle}${seasonWord ? ` — your ${seasonWord} shortcut` : ""}.`;
   }
   const season = causedBy.season ? `${causedBy.season} ` : "";
-  // A shortcut's fallout names the act and who caught it, not the generic
-  // option label ("Take the shortcut").
-  if (causedBy.kind === "shortcut" && causedBy.title) {
-    const who = causedBy.institution || "the district";
-    return `Connected to your ${season}decision: you took the shortcut “${causedBy.title}”, and ${who} caught it.`;
-  }
   const option = causedBy.option ? `“${causedBy.option}”` : "an earlier call";
   return `Connected to your ${season}decision: ${option}.`;
 }

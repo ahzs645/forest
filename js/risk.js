@@ -50,6 +50,21 @@ export function riskBandOdds(state, risk) {
 }
 
 /**
+ * The same bands as whole percentages that always sum to 100, rounded at the
+ * roll's own cut points (clean ends, then noticed ends), so every chip, odds
+ * line and preview prints one set of numbers.
+ * @param {{ clean: number, noticed?: number }} odds – fractions
+ * @returns {{ clean: number, noticed: number, caught: number }}
+ */
+export function riskBandPercents(odds) {
+  const clean = clamp(Number(odds?.clean) || 0, 0, 1);
+  const landed = clamp(clean + Math.max(0, Number(odds?.noticed) || 0), clean, 1);
+  const cleanPct = Math.round(clean * 100);
+  const landedPct = Math.round(landed * 100);
+  return { clean: cleanPct, noticed: landedPct - cleanPct, caught: 100 - landedPct };
+}
+
+/**
  * Resolve a risk-based option outcome.
  * @param {object} state  – current game state (has state.metrics, state.flags)
  * @param {object} risk   – { baseSuccess, successEffects, failEffects, successOutcome, failOutcome,

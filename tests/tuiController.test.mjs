@@ -277,7 +277,9 @@ test('scheduled fallout issues expose why they surfaced in the issue card', () =
   assert.equal(state.contentData.title, 'Heritage Protocol Gap Identified');
   assert.equal(state.contentData.surfaceSeverity, 'warning');
   assert.match(state.contentData.surfaceReason || '', /you took the shortcut “Grease the Layout Crew”.*the Nation caught it/i);
-  assert.match(state.contentData.provenance || '', /you took the shortcut/i);
+  // Provenance names the act under the title; who caught it is the
+  // surface reason's to say, so the two lines do not repeat each other.
+  assert.equal(state.contentData.provenance, 'Because you took: Grease the Layout Crew.');
 });
 
 test('temptation outcome notices preview the most likely fallout branch', () => {

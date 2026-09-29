@@ -32,7 +32,7 @@ import {
   SHORTCUT_PAYOFF_SCALE,
   TEMPTATION_REPEAT_COOLDOWN_ROUNDS,
 } from "./constants.js";
-import { riskBandOdds } from "../risk.js";
+import { riskBandOdds, riskBandPercents } from "../risk.js";
 import {
   clamp,
   eventTouchesMetric,
@@ -688,8 +688,8 @@ function formatSeasonalDelta(effects = {}) {
 }
 
 function formatOddsLine(odds, institution) {
-  const pct = (value) => `${Math.round(Number(value || 0) * 100)}%`;
-  return `${pct(odds.clean)} clean, ${pct(odds.noticed)} noticed, ${pct(odds.caught)} caught by ${institution}`;
+  const pct = riskBandPercents(odds);
+  return `${pct.clean}% clean, ${pct.noticed}% noticed, ${pct.caught}% caught by ${institution}`;
 }
 
 // What the noticed band leaves behind, in the voice of who is now watching.
@@ -842,7 +842,10 @@ export function falloutLandingContext(state, delay = 1) {
   };
 }
 
-export function buildScheduledIssueTeaser(state, scheduleSpec) {
+// `settles`: a caught shortcut's schedule, which the year end settles when it
+// never gets its season (js/engine/effects.js). Anything else scheduled past
+// the last season has nowhere to land, so it promises nothing.
+export function buildScheduledIssueTeaser(state, scheduleSpec, { settles = false } = {}) {
   const schedules = normalizeScheduleEntries(scheduleSpec)
     .slice()
     .sort((a, b) => {
@@ -857,6 +860,7 @@ export function buildScheduledIssueTeaser(state, scheduleSpec) {
 
   for (const schedule of schedules) {
     const landing = falloutLandingContext(state, schedule.delay);
+    if (landing.afterYear && !settles) continue;
     const preview = resolvePendingIssue(landing.state, schedule, { tags: landing.tags, season: landing.season }, () => 0);
     if (preview) {
       return formatScheduledIssueTeaser(preview, { promised: typeof schedule.id === "string", afterYear: landing.afterYear });
@@ -883,19 +887,31 @@ export function describePromisedFallout(state, scheduleSpec) {
   return null;
 }
 
+// The card ids survive the merge: a teaser that names the card it delivers is
+// a commitment the UI keeps showing even in the last season.
 export function combineScheduledIssueTeasers(...teasers) {
   const unique = [];
   let severity = "info";
+  let issueId = null;
+  let afterYear = false;
   for (const teaser of teasers) {
     if (!teaser || typeof teaser.text !== "string" || !teaser.text.trim() || unique.includes(teaser.text)) {
       continue;
     }
     unique.push(teaser.text);
+    issueId = issueId || teaser.issueId || null;
+    afterYear = afterYear || Boolean(teaser.afterYear);
     if (previewSeverityRank(teaser.severity) > previewSeverityRank(severity)) {
       severity = teaser.severity;
     }
   }
-  return unique.length ? { text: unique.join("\n\n"), severity } : null;
+  if (!unique.length) return null;
+  return {
+    text: unique.join("\n\n"),
+    severity,
+    ...(issueId ? { issueId } : {}),
+    ...(afterYear ? { afterYear } : {}),
+  };
 }
 
 // Expedition travel beats — a supply cache to scavenge, a washed-out ford, a
