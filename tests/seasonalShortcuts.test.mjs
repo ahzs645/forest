@@ -268,8 +268,11 @@ test('seasonal offers respect season and area: no bears or planting in winter, n
   assert.equal(actMatchesSeasonalTemptationContext(byId('silvi-wrong-seed-zone'), stateFor('silviculture', 'vancouver-island-coast', 2)), false);
   assert.equal(actMatchesSeasonalTemptationContext(byId('silvi-wrong-seed-zone'), stateFor('silviculture', 'fort-st-john-plateau', 2)), false);
   assert.equal(actMatchesSeasonalTemptationContext(byId('silvi-wrong-seed-zone'), stateFor('silviculture', 'kootenay-wetbelt', 2)), true);
-  assert.equal(actMatchesSeasonalTemptationContext(byId('permitter-falsify-seed-transfer'), stateFor('permitter', 'fort-st-john-plateau', 4)), false);
-  assert.equal(actMatchesSeasonalTemptationContext(byId('permitter-falsify-seed-transfer'), stateFor('permitter', 'skeena-nass', 4)), true);
+  // Coastal Douglas-fir seed is the Island's, and a seed variance is the silviculture forester's file.
+  assert.equal(actMatchesSeasonalTemptationContext(byId('permitter-falsify-seed-transfer'), stateFor('silviculture', 'fort-st-john-plateau', 4)), false);
+  assert.equal(actMatchesSeasonalTemptationContext(byId('permitter-falsify-seed-transfer'), stateFor('silviculture', 'skeena-nass', 4)), false);
+  assert.equal(actMatchesSeasonalTemptationContext(byId('permitter-falsify-seed-transfer'), stateFor('silviculture', 'vancouver-island-coast', 4)), true);
+  assert.equal(actMatchesSeasonalTemptationContext(byId('permitter-falsify-seed-transfer'), stateFor('permitter', 'vancouver-island-coast', 4)), false);
   assert.equal(actMatchesSeasonalTemptationContext(byId('planner-manipulate-ha-size'), stateFor('planner', 'fort-st-john-plateau', 2)), false, 'the 40 ha cap is not a Northern Interior number');
   assert.equal(actMatchesSeasonalTemptationContext(byId('planner-manipulate-ha-size'), stateFor('planner', 'okanagan-shuswap-drybelt', 2)), true);
 });

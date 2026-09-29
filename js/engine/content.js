@@ -8,6 +8,7 @@ import {
 } from "../data/index.js";
 import {
   actFitsRole,
+  actPremises,
   buildCaughtNarrative,
   capitalizeProposer,
   CATEGORY_CLEAN_OUTCOMES,
@@ -1387,7 +1388,9 @@ export function actMatchesSeasonalTemptationContext(act, state) {
   if (act.tier === "comic" && state.difficulty === "hard") {
     return false;
   }
-  if (act.onlyWhen === "scrutinyHigh" && Number(state.metrics?.compliance ?? 100) > 45) {
+  // The seasonal year keeps meters, not a program: only a premise it can
+  // read gates the act (the deployment lane reads the rest).
+  if (actPremises(act).includes("scrutinyHigh") && Number(state.metrics?.compliance ?? 100) > 45) {
     return false;
   }
   return true;

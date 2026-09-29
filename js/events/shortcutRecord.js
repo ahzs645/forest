@@ -12,7 +12,7 @@
  */
 
 import { TEMPTATION_FLAG_LABELS } from './odds.js';
-import { ILLEGAL_ACTS } from '../data/illegalActs.js';
+import { findIllegalAct } from '../data/illegalActs.js';
 import { getPendingFallout } from './fallout.js';
 import { applyEventEffects } from './resolution.js';
 import { applyConsequenceFlags } from './consequences.js';
@@ -28,11 +28,11 @@ const CARRIED_FLAGS = new Set([...Object.keys(TEMPTATION_FLAG_LABELS), 'locals_s
 const SERIOUS_FLAGS = new Set(['fpbc_file_open', 'rcmp_file']);
 
 function actTitle(actId) {
-  return ILLEGAL_ACTS.find((act) => act?.id === actId)?.title || 'a shortcut';
+  return findIllegalAct(actId)?.title || 'a shortcut';
 }
 
 function actInstitution(actId) {
-  return ILLEGAL_ACTS.find((act) => act?.id === actId)?.catch?.by || null;
+  return findIllegalAct(actId)?.catch?.by || null;
 }
 
 function dayWord(journey) {

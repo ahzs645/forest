@@ -165,8 +165,11 @@ test('the comic tier lands about 15% of the pool weight and grey acts weigh 60% 
   const total = pool.reduce((sum, entry) => sum + entry.weight, 0);
   const comic = pool.filter((entry) => entry.act.tier === 'comic').reduce((sum, entry) => sum + entry.weight, 0);
   assert.ok(Math.abs(comic / total - 0.15) < 0.01, `comic share ${comic / total}`);
-  const grey = pool.find((entry) => entry.act.tier === 'grey' && !entry.act.rare);
-  const core = pool.find((entry) => entry.act.tier === 'core' && !entry.act.rare);
+  // The GM has no grey acts left (they were a registrant's); a planner does.
+  const planner = journeyFor('planner');
+  const deskPool = weightTemptationPool(ILLEGAL_ACTS.filter((act) => actMatchesTemptationContext(act, planner)));
+  const grey = deskPool.find((entry) => entry.act.tier === 'grey' && !entry.act.rare);
+  const core = deskPool.find((entry) => entry.act.tier === 'core' && !entry.act.rare);
   assert.equal(grey.weight / core.weight, 0.6);
 });
 
