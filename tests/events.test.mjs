@@ -349,7 +349,7 @@ test('a negative-progress event with nothing left to slip leaves approved permit
   assert.ok(!result.messages.some((message) => message.includes('Permit pipeline slowed')));
 });
 
-test('planning events advance the active phase instead of no-oping against permit state', () => {
+test('generic progress on a planning file is the planner\'s time, never a gate or a phase', () => {
   const journey = {
     journeyType: 'planning',
     day: 7,
@@ -360,7 +360,9 @@ test('planning events advance the active phase instead of no-oping against permi
       politicalCapital: 40
     },
     protagonist: {
-      reputation: 50
+      reputation: 50,
+      energy: 70,
+      stress: 30
     },
     plan: {
       phase: 'analysis',
@@ -377,7 +379,7 @@ test('planning events advance the active phase instead of no-oping against permi
     }
   };
 
-  resolveEvent(journey, { id: 'model-boost', title: 'Model Boost' }, {
+  const gained = resolveEvent(journey, { id: 'model-boost', title: 'Model Boost' }, {
     label: 'Use the new outputs',
     effects: {
       progress: 10,
@@ -386,8 +388,15 @@ test('planning events advance the active phase instead of no-oping against permi
     }
   });
 
-  assert.equal(journey.plan.phase, 'stakeholder_review');
-  assert.equal(journey.plan.analysisQuality, 81);
+  // Generic progress is the planner's own time: it buys energy and eases
+  // stress. The gates and the phase move only on the planner's own actions
+  // or an explicit data/analysis/buyIn key.
+  assert.equal(journey.plan.phase, 'analysis');
+  assert.equal(journey.plan.analysisQuality, 66);
+  assert.equal(journey.plan.dataCompleteness, 82);
+  assert.equal(journey.protagonist.energy, 76);
+  assert.equal(journey.protagonist.stress, 24);
+  assert.ok(gained.messages.some((message) => /Time back on the file/.test(message)));
   // Relationships land on stakeholder moods and the planner's reputation,
   // compliance on reputation and scrutiny; neither writes the engagement
   // record or the District Manager's readiness (only the planner's own work does).
@@ -395,6 +404,20 @@ test('planning events advance the active phase instead of no-oping against permi
   assert.equal(journey.plan.ministerialConfidence, 44);
   assert.equal(journey.stakeholders.nations.mood, 53);
   assert.equal(journey.protagonist.reputation, 56);
+
+  // A lost week in the decision phase costs the planner, not the DM.
+  journey.plan.phase = 'ministerial_approval';
+  journey.plan.ministerialConfidence = 29;
+  const lost = resolveEvent(journey, { id: 'wildfire_evacuation', title: 'Wildfire Approaching' }, {
+    label: 'Preemptively shut down operations and evacuate',
+    effects: { progress: -10 }
+  });
+  assert.equal(journey.plan.ministerialConfidence, 29, 'evacuating ahead of a fire is not the DM losing confidence');
+  assert.equal(journey.plan.phase, 'ministerial_approval');
+  assert.equal(journey.protagonist.energy, 70);
+  assert.equal(journey.protagonist.stress, 30);
+  assert.ok(lost.messages.some((message) => /Lost time on the file: energy -6, stress \+6/.test(message)));
+  assert.ok(!lost.messages.some((message) => /readiness|buy-in/i.test(message)));
 });
 
 test('planning mode ignores permit-only approval effects instead of crashing on missing permit data', () => {
@@ -408,7 +431,9 @@ test('planning mode ignores permit-only approval effects instead of crashing on 
       politicalCapital: 44
     },
     protagonist: {
-      reputation: 50
+      reputation: 50,
+      energy: 60,
+      stress: 40
     },
     plan: {
       phase: 'analysis',
@@ -428,9 +453,10 @@ test('planning mode ignores permit-only approval effects instead of crashing on 
     }
   });
 
-  assert.equal(journey.plan.analysisQuality, 48);
+  assert.equal(journey.plan.analysisQuality, 40);
   assert.equal(journey.resources.politicalCapital, 47);
-  assert.ok(result.messages.some((message) => message.includes('Analysis quality improved')));
+  assert.equal(journey.protagonist.energy, 63);
+  assert.ok(result.messages.some((message) => message.includes('Time back on the file')));
 });
 
 test('silviculture random-event check stays safe without recon block data', () => {

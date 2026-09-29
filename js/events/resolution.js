@@ -4,7 +4,6 @@
  */
 
 import { isFieldJourney, isDeskJourney } from './constants.js';
-import { PLANNING_PRE_SUBMISSION_CAP } from '../journey/constants.js';
 import { applyRandomInjury, applyStatusEffect, evacuateCrewMember } from '../crew.js';
 import { syncBlocksFromDistance } from '../journey/blockNav.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
@@ -534,52 +533,38 @@ function applyPlanningMetricEffects(journey, effects, messages) {
 }
 
 /**
- * Generic progress on a planning file lands on the metric of the phase the
- * file is in. It is the fallback for decks that do not say which track
- * moved; an option that carries an explicit data/analysis/buyIn key has said
- * so, and the generic amount is not applied on top.
+ * Strain (energy down, stress up) per point of generic progress lost on a
+ * planning file, and the floor and ceiling on one event's charge.
+ */
+const PLANNING_PROGRESS_STRAIN = 0.6;
+const PLANNING_PROGRESS_STRAIN_MIN = 2;
+const PLANNING_PROGRESS_STRAIN_MAX = 12;
+
+/**
+ * Generic progress on a planning file is the planner's own working time,
+ * never the file's gates. Data, analysis, buy-in and DM readiness move only
+ * on the planner's own actions or an explicit data/analysis/buyIn key: a
+ * wildfire evacuation or a grant application costs the week, not the
+ * District Manager's confidence or the engagement record. It used to land
+ * on whichever gate the current phase was tracking, which is how evacuating
+ * ahead of a fire read as "DM readiness slipped (-29%)".
  */
 function applyPlanningProgress(journey, progressPoints, messages, effects = {}) {
-  if (!journey.plan) return;
+  if (!journey.plan || !journey.protagonist) return;
   if (hasExplicitPlanningKey(effects)) return;
 
-  const amount = Math.max(3, Math.round(Math.abs(progressPoints) * 1.5));
-  let metricKey = 'dataCompleteness';
-  let metricLabel = 'Data readiness';
-  let ceiling = 100;
-
-  switch (journey.plan.phase) {
-    case 'analysis':
-      metricKey = 'analysisQuality';
-      metricLabel = 'Analysis quality';
-      break;
-    case 'stakeholder_review':
-      metricKey = 'stakeholderBuyIn';
-      metricLabel = 'Stakeholder buy-in';
-      break;
-    case 'ministerial_approval':
-      // A good week at the district can lift readiness, but never past the
-      // point where only Prepare Submission crosses the decision gate.
-      metricKey = 'ministerialConfidence';
-      metricLabel = 'DM readiness';
-      ceiling = PLANNING_PRE_SUBMISSION_CAP;
-      break;
-    default:
-      break;
+  const strain = Math.max(PLANNING_PROGRESS_STRAIN_MIN,
+    Math.min(PLANNING_PROGRESS_STRAIN_MAX, Math.round(Math.abs(progressPoints) * PLANNING_PROGRESS_STRAIN)));
+  const protagonist = journey.protagonist;
+  if (progressPoints < 0) {
+    protagonist.energy = clampPercent((protagonist.energy || 0) - strain);
+    protagonist.stress = clampPercent((protagonist.stress || 0) + strain);
+    messages.push(`Lost time on the file: energy -${strain}, stress +${strain}.`);
+  } else {
+    protagonist.energy = clampPercent((protagonist.energy || 0) + strain);
+    protagonist.stress = clampPercent((protagonist.stress || 0) - strain);
+    messages.push(`Time back on the file: energy +${strain}, stress -${strain}.`);
   }
-
-  const signedAmount = progressPoints > 0 ? amount : -amount;
-  const current = journey.plan[metricKey] || 0;
-  const next = signedAmount > 0
-    ? Math.max(current, Math.min(ceiling, current + signedAmount))
-    : clampPercent(current + signedAmount);
-  journey.plan[metricKey] = next;
-
-  const applied = Math.round(next - current);
-  if (applied === 0) return;
-  const direction = applied > 0 ? 'improved' : 'slipped';
-  messages.push(`${metricLabel} ${direction} (${applied > 0 ? '+' : ''}${applied}%).`);
-  advancePlanningPhaseIfReady(journey, messages);
 }
 
 function applyComplianceEffects(journey, delta, messages) {
@@ -641,26 +626,6 @@ function applyRelationshipEffects(journey, delta, messages) {
   }
 
   messages.push(`Relationships ${delta > 0 ? 'improved' : 'frayed'} (${delta > 0 ? '+' : ''}${delta}).`);
-}
-
-/**
- * The technical phases can close on the back of an event; the engagement
- * phase closes only on a Stakeholder Session, and the District Manager's
- * decision only on Prepare Submission (js/modes/planning.js).
- */
-function advancePlanningPhaseIfReady(journey, messages) {
-  if (!journey.plan) return;
-
-  if (journey.plan.phase === 'data_gathering' && journey.plan.dataCompleteness >= 80) {
-    journey.plan.phase = 'analysis';
-    messages.push('Inventory complete. The analysis opens with the cutblock priority decision.');
-    return;
-  }
-
-  if (journey.plan.phase === 'analysis' && journey.plan.analysisQuality >= 80) {
-    journey.plan.phase = 'stakeholder_review';
-    messages.push('Draft plan complete. Moving to Engagement & Public Review.');
-  }
 }
 
 /**

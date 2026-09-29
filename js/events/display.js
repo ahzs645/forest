@@ -222,6 +222,10 @@ function getOptionHint(option, journeyType, event = null) {
       const field = journeyType === 'field' || journeyType === 'recon';
       if (field && option.effects.progress < 0 && option.effects.progressMode !== 'turn_back') {
         hints.push('slower next travel leg');
+      } else if (journeyType === 'planning') {
+        // On a planning file generic progress is the planner's own time
+        // (js/events/resolution.js applyPlanningProgress), never a gate.
+        hints.push(option.effects.progress > 0 ? 'time back on the file' : 'lost time on the file');
       } else {
         const unit = field ? ' km traverse' : ' progress';
         hints.push(option.effects.progress > 0

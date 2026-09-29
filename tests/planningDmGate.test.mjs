@@ -96,7 +96,7 @@ test('explicit data / analysis / buyIn keys land on their own tracks and suppres
   assert.equal(journey.plan.phase, 'analysis');
 });
 
-test('generic progress in the decision phase is capped below the gate so only Prepare Submission crosses it', () => {
+test('generic progress in the decision phase never touches DM readiness; only Prepare Submission crosses the gate', () => {
   const journey = makeJourney();
   journey.day = 20;
   journey.plan.phase = 'ministerial_approval';
@@ -110,8 +110,16 @@ test('generic progress in the decision phase is capped below the gate so only Pr
     label: 'Ride it',
     effects: { progress: 40 },
   });
-  assert.equal(journey.plan.ministerialConfidence, PLANNING_PRE_SUBMISSION_CAP);
+  assert.equal(journey.plan.ministerialConfidence, 60);
+  assert.ok(journey.plan.ministerialConfidence < PLANNING_PRE_SUBMISSION_CAP);
   assert.equal(journey.isComplete, false);
+
+  resolveEvent(journey, { id: 'grant_application', title: 'Unexpected Grant' }, {
+    label: 'Drop everything and apply',
+    effects: { progress: -8 },
+  });
+  assert.equal(journey.plan.ministerialConfidence, 60, 'a grant application is not the DM losing confidence');
+  assert.equal(journey.plan.stakeholderBuyIn, 80);
 });
 
 test('a relationship event does not advance the engagement phase; only a Stakeholder Session does', async () => {
