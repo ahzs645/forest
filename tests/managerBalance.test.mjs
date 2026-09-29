@@ -53,6 +53,27 @@ test('play styles separate: competent and honest win inside the band, reckless l
   assert.ok(c.medianScore - r.medianScore >= 30, `competent ${c.medianScore} vs reckless ${r.medianScore}`);
 });
 
+test('at competent play, spinning the board costs six points or more against telling it straight, and can still win', async () => {
+  // The same GM, the same year, the same decisions, except the board prep
+  // and the answer to the chair. Before, spin trailed honesty by two points.
+  MANAGER_STYLES.__spinner = (journey, options, prompt) => options.find((o) => o.value === 'spin' || o.value === 'polish')
+    || MANAGER_STYLES.competent(journey, options, prompt);
+  try {
+    for (const difficulty of ['normal', 'hard']) {
+      const honest = await batch('competent', difficulty);
+      const spun = await batch('__spinner', difficulty);
+      const median = (results) => summarizeBatch(results).medianScore;
+      assert.ok(median(honest) - median(spun) >= 6, `${difficulty}: honest ${median(honest)} vs spin ${median(spun)}`);
+      assert.ok(mean(honest.map((r) => r.score)) - mean(spun.map((r) => r.score)) >= 6, `${difficulty} means`);
+      assert.ok(summarizeBatch(spun).winRate >= 0.9, `${difficulty}: spin still wins`);
+      // What it costs is the file the audit committee reads.
+      assert.ok(mean(spun.map((r) => r.scrutiny)) > mean(honest.map((r) => r.scrutiny)) + 30);
+    }
+  } finally {
+    delete MANAGER_STYLES.__spinner;
+  }
+});
+
 test('a random policy does not go bankrupt on Greenhorn, and difficulty orders the treasuries', async () => {
   const seeds = Array.from({ length: 24 }, (_, index) => 9100 + index * 13);
   const easy = await batch('random', 'easy', seeds);
@@ -103,8 +124,10 @@ test('no posture and certificate pair is free: each one gives something up', asy
   // a partnership year nearly always does.
   assert.ok(leanFsc.certified <= seeds.length / 2, `lean FSC certified ${leanFsc.certified}`);
   assert.ok(partnershipFsc.certified >= seeds.length - 1, `partnership FSC certified ${partnershipFsc.certified}`);
-  // A certificate the year can carry pays for itself.
-  assert.ok(steadyCsa.treasury > steadyNone.treasury);
+  // Skipping certification is a choice, not a mistake: no system to run and
+  // no audit to fail keeps the treasury richer, and the certificate is what
+  // the grade and the buyers pay for (asserted below).
+  assert.ok(steadyNone.treasury > steadyCsa.treasury, `none ${steadyNone.treasury} vs CSA ${steadyCsa.treasury}`);
   const growthNone = await pair('growth', 'none');
   for (const result of [steadyCsa, leanCsa, leanFsc, partnershipFsc, steadyNone, growthNone]) {
     assert.ok(result.wins >= seeds.length - 1);

@@ -361,3 +361,21 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Who is asked.** The GM no longer hears registrant, consultant or planting-crew acts; its own acts are corporate, harvest or haul, and the five `recce-` ids are renamed (old ids still resolve). The woodlot, community-forest and "(Ret)" acts are retired; the appraisal and carbon-dashboard acts leave the planner; the seed-variance act is the Island silviculture forester's; the fire-claim act waits for fire season; knapweed stays in the Interior.
 - **Payoffs.** Poaching pays a grocery run, not $300; the WTP card no longer offers a bonus it never charges; the blockade's clean band is no longer filmed; plate swapping is an RCMP file; old-growth theft, scaler and salvage payoffs sit at or under what the catch costs.
 - **Tests.** `tests/illegalActsContent.test.mjs`: premise vocabulary, a true/false state matrix for every premise across roles, areas and seasons, the named playtest cases, waypoint/closed-package/final-block stop checks, and GM and planner fit.
+## 2026-09-29 — Wave 3: General Manager (W3-C)
+
+- **Ledger hooks follow the band.** A hook lands only on the band whose outcome the player read (`js/modes/manager.js` `LEDGER_HOOKS`, `shownBand`). A lost BCTS bid, a refused export permit, a failed surplus test and a counter read as bad faith book nothing. Mediation's curtailment lands only when the processor is pulled. Chips say both sides: "ledger if it lands: …; if not: …".
+- **A card's operations are this month's wood.** Generic `progress` on a GM card no longer moves the ops meter, which scaled the whole licence's run rate (one +8 was +18,424 m³). It becomes ±250 m³ a point on this month's deliveries, capped at 2,500 m³, and shows on the chip, the "Ledger:" line and the Delivered line. A shortcut's operations are paid as margin at today's rate, so the gain chip, the stakes and the applied budget agree, and the resolver's progress-scrutiny coupling no longer fires for the GM. Strategic decisions that move the ops meter print what they do to December's projection, and the discretionary-spend options show their meter numbers.
+- **Resignations.** When the poaching card's text says the woodlands manager leaves, the seat goes to an acting successor, who carries the posture on the pane, in the quarterly lines and in the epilogue. A generic card's "someone leaves" no longer empties a random executive seat.
+- **Shortcuts the GM cannot be asked.** "Wear Every Hat", "Drop the (Ret)" and "Drop a Tree Near the Blockade" are struck from the GM's draw. No blockade exists in a GM year. The act data is untouched.
+- **Honesty margin.** Board answers are tabled and printed (for example "Reputation +4 -> 54, political capital -2 -> 62, scrutiny +12 -> 48%"). Spin costs more scrutiny: +6 on a sound quarter, +12 on a weak one, +3 for a polished deck. A restated quarter also puts compliance -3 and scrutiny +8 on the file.
+- **Certification is a trade-off.** Premiums are now $0.50, $1 and $2/m³, and annual costs $60k, $90k and $120k (the system plus audits) (`certifications.json`, GM-only). A standard costs more than it earns in the year it is booked. Skipping keeps more cash and avoids audits; certifying earns the grade and reputation.
+- **Sims** (`simulate-manager.mjs`, 30 seeds; median score, median treasury; before → after):
+
+  | Style | Normal | Hard |
+  | --- | --- | --- |
+  | competent | 100, $1.50M → 100, $1.27M | 100, $1.14M → 100, $0.97M |
+  | honest | 94 → 95 | 95 → 95 |
+  | spin | 93 → 90 | 93 → 90 |
+  | reckless | 41, 0/30 → 38, 0/30 | 41, 1/30 → 37, 0/30 |
+
+  Competent vs. the same play with every board spun: 100 vs 96 → 100 vs 92 on normal, and 100 vs 97 → 100 vs 94 on hard. Spin still wins 30/30. Competent with no certificate grades 98 against SFI's 100, and ends $60k richer.

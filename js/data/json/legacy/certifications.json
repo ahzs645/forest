@@ -1,13 +1,13 @@
 {
   "category": "Forest Certifications",
-  "description": "Third-party forest management certifications a BC licensee can hold. Costs are the audit and system costs; the premium is what certified fibre earns per m³ once the certificate is issued.",
+  "description": "Third-party forest management certifications a BC licensee can hold. The up-front cost is the system build and the registration audit; the annual cost is running the system (a certification coordinator, internal audits, the advisory group) and the auditors' fees, billed monthly. The premium is what certified fibre earns per m³ once the certificate is issued: small, because certification mostly buys market access. In the year it is booked a standard costs more than it earns; what it pays for is the certificate, the reputation and the buyers.",
   "certifications": [
     {
       "id": "FSC",
       "name": "Forest Stewardship Council (FSC)",
       "initial_cost": 150000,
-      "annual_cost": 25000,
-      "premium_per_m3": 4,
+      "annual_cost": 120000,
+      "premium_per_m3": 2,
       "reputation_bonus": 0.1,
       "requirements": {
         "compliance": 55,
@@ -19,8 +19,8 @@
       "id": "CSA",
       "name": "CSA Z809 (PEFC-endorsed)",
       "initial_cost": 100000,
-      "annual_cost": 18000,
-      "premium_per_m3": 3,
+      "annual_cost": 90000,
+      "premium_per_m3": 1,
       "reputation_bonus": 0.07,
       "requirements": {
         "compliance": 50,
@@ -32,8 +32,8 @@
       "id": "SFI",
       "name": "Sustainable Forestry Initiative (SFI)",
       "initial_cost": 80000,
-      "annual_cost": 15000,
-      "premium_per_m3": 2,
+      "annual_cost": 60000,
+      "premium_per_m3": 0.5,
       "reputation_bonus": 0.05,
       "requirements": {
         "compliance": 45

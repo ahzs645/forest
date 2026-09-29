@@ -63,7 +63,7 @@ test('a year of GM months never deals a fire or smoke card out of season', async
   assert.deepEqual(outOfSeason, []);
 });
 
-test('the CEO budget fight and the woodlot and community-forest shortcuts are not the GM\'s', async () => {
+test('the CEO budget fight and the shortcuts written for other tenures and registrants are not the GM\'s', async () => {
   assert.equal(fitManagerEvent(atMonth(4), find('competing_budget_claim')), null);
 
   const offered = new Set();
@@ -76,6 +76,11 @@ test('the CEO budget fight and the woodlot and community-forest shortcuts are no
   assert.ok(offered.size > 5, `the GM still hears shortcuts (${offered.size})`);
   assert.ok(!offered.has('woodlot-overcut-gambit'));
   assert.ok(!offered.has('community-forest-coasting'));
+  // No client, no council seat, no retired-status side business, and no
+  // blockade anywhere in a GM's year for a contractor to intimidate.
+  for (const id of ['wear-every-hat', 'drop-the-ret-from-the-signature', 'recce-harass-protesters']) {
+    assert.ok(!offered.has(id), id);
+  }
 });
 
 test('replacement crews in a labour dispute read as the section 68 problem they are', () => {
@@ -84,7 +89,9 @@ test('replacement crews in a labour dispute read as the section 68 problem they 
   const option = fitted.options[2];
   assert.match(option.label, /replacement crews/);
   assert.match(option.outcome, /section 68 of the Labour Relations Code/);
-  assert.ok(option.effects.progress < 0 && option.effects.reputation < 0, 'it does not buy progress');
+  assert.ok(option.effects.reputation < 0, 'it does not buy anything');
+  assert.equal(option.effects.progress, undefined, 'the slowdown lands on the ledger, not the run rate');
+  assert.match(option.ledgerHint, /^ledger: -1,500 m³ on this month's deliveries$/);
   assert.equal(formatEventForDisplay(fitted, 'manager').options[2].tag, 'RISKY');
   assert.deepEqual(fitted.options[0], event.options[0], 'the other options are the deck\'s');
   assert.ok(event.options[2].effects.permits_approved, 'the shared deck is untouched');
@@ -94,7 +101,7 @@ test('a ledger-hook option says on its chip and in its outcome what it does to t
   const event = managerEvents.find((entry) => entry.id === 'gm_contractor_rate_renegotiation');
   const shown = formatEventForDisplay(fitManagerEvent(atMonth(6), event), 'manager');
   assert.match(shown.options[0].hint, /ledger: logging & haul \+\$2\.50\/m³ for the rest of the year/);
-  assert.match(shown.options[1].hint, /ledger: logging & haul \+\$2\/m³ for the rest of the year, this month's deliveries at 90% of plan/);
+  assert.match(shown.options[1].hint, /ledger if it lands: logging & haul \+\$2\/m³ for the rest of the year; if not: logging & haul \+\$3\/m³ for the rest of the year, this month's deliveries at 90% of plan/);
   assert.match(shown.options[2].hint, /ledger: logging & haul \+\$3\/m³ for the rest of the year/);
 
   const sharing = managerEvents.find((entry) => entry.id === 'gm_fn_revenue_sharing');

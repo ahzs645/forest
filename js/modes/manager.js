@@ -13,6 +13,8 @@
 
 import { checkForEvent } from "../events.js";
 import { getDayRng } from '../events/dayRng.js';
+import { describeEffectChips } from '../events/display.js';
+import { describeShortcutStakes } from '../events/selection.js';
 import { runDaySituation } from '../journey/daySituation.js';
 import { formatStatusLine } from '../journey/dayCard.js';
 import { buildBoardChartFrames } from "../scene/textmode/scenes.js";
@@ -29,7 +31,9 @@ import {
   getHarvestPace,
   DELIVERY_CURVES,
   getAreaEconomics,
+  MANAGER_EXECUTIVE_ROLES,
 } from "../data/managerRoles.js";
+import { FIRST_NAMES } from '../data/crewNames.js';
 
 import certificationsData from "../data/json/legacy/certifications.json" with { type: "json" };
 
@@ -82,6 +86,11 @@ const CERT_LOSS_REPUTATION = Number(CERT_MECHANICS.loss_penalty_reputation) || 5
  * managerEvents.json), keyed by event id and option index. The event
  * resolves its metric effects through the shared resolver; this is the part
  * only the ledger can carry: volume, price and cost per m³.
+ *
+ * A hook tagged with a `band` lands only when the outcome the player read is
+ * that band's (see shownBand): a lost BCTS bid used to book the sale's volume
+ * and stumpage anyway. An untagged hook lands whichever way the option goes.
+ * An option with several hooks lists them.
  */
 const LEDGER_HOOKS = {
   gm_mill_curtailment: [
@@ -91,31 +100,68 @@ const LEDGER_HOOKS = {
     { curtailment: 0.85, monthCostShift: 4, note: 'volume diverted to pulp and a second sawmill for the month' },
   ],
   gm_bcts_bid: [
-    { bonusVolume: 9000, bonusSource: 'the BCTS sale', stumpageShift: 1, note: 'BCTS sale won at appraisal plus bonus' },
+    { band: 'good', bonusVolume: 9000, bonusSource: 'the BCTS sale', stumpageShift: 1, note: 'BCTS sale won at appraisal plus bonus' },
     { bonusVolume: 12000, bonusSource: 'the BCTS sale', stumpageShift: 3, note: 'BCTS sale won on a high bid' },
     {},
   ],
   gm_softwood_duty_deposit: [
     { priceShift: -4, note: 'log supply agreement re-priced' },
-    { priceShift: -1, note: 'volume shopped to other mills' },
+    [
+      { band: 'good', priceShift: -1, note: 'volume shopped to other mills' },
+      // "You go back with less leverage than you left with": the customer's price.
+      { band: 'bad', priceShift: -4, note: 'back to the customer at the lower price' },
+    ],
     { priceShift: -2, note: 'three-year supply agreement' },
   ],
   gm_fn_revenue_sharing: [
     { costShift: 2, note: 'revenue-sharing per m³ on territory volume' },
-    { costShift: 1.5, note: 'revenue-sharing at the countered rate' },
+    // A counter that reads as bad faith signs nothing.
+    { band: 'good', costShift: 1.5, note: 'revenue-sharing at the countered rate' },
     {},
   ],
   gm_contractor_rate_renegotiation: [
     { costShift: 2.5, note: 'fuel-indexed logging rate' },
-    { costShift: 2, curtailment: 0.9, note: 'rate mediation' },
+    [
+      { band: 'good', costShift: 2, note: 'rate mediation' },
+      // "Delivery slips ... the rate you eventually sign is higher than the one you refused."
+      { band: 'bad', costShift: 3, curtailment: 0.9, note: 'processor pulled, then the rate mediation' },
+    ],
     { costShift: 3, note: 'three-year logging contract with SAFE clause' },
   ],
   gm_log_export_permit: [
-    { bonusVolume: 1500, bonusSource: 'the export parcel', note: 'export parcel moved' },
+    // A failed surplus test sells the parcel domestic, like the second option.
+    { band: 'good', bonusVolume: 1500, bonusSource: 'the export parcel', note: 'export parcel moved' },
     {},
-    { bonusVolume: 1500, bonusSource: 'the export parcel', note: 'export parcel shipped ahead of the permit' },
+    { band: 'good', bonusVolume: 1500, bonusSource: 'the export parcel', note: 'export parcel shipped ahead of the permit' },
   ],
 };
+
+/**
+ * Executives a card's outcome says leave the company, keyed by event id and
+ * option index, with the band whose text says so. The card said "the
+ * resignation letter arrives inside the month" and the woodlands manager
+ * stayed in the job; now the seat is filled by an acting successor, who
+ * carries the posture for the rest of the year.
+ */
+const EXECUTIVE_DEPARTURES = {
+  gm_executive_poaching: { 0: { band: 'bad', role: 'woodlands' }, 1: { band: 'bad', role: 'woodlands' } },
+};
+
+/**
+ * Operations on a card, in wood. The shared decks move a generic `progress`
+ * meter a desk-sized amount ("a week of files"); the GM's ops meter used to
+ * scale the whole company's run rate by it, so one +8 added 18,000 m³ to the
+ * year and one -8 took 26,000 m³ off it, printed nowhere. At head office a
+ * point of operations is a quarter of a truck-week on this month's
+ * deliveries, and a card moves at most a few days of haul.
+ */
+const OPS_POINT_M3 = 250;
+const OPS_CARD_CAP_M3 = 2500;
+
+function opsVolume(points) {
+  const volume = Math.round((Number(points) || 0) * OPS_POINT_M3);
+  return Math.max(-OPS_CARD_CAP_M3, Math.min(OPS_CARD_CAP_M3, volume));
+}
 
 /**
  * Events that only make sense for some licensees. The shared pipeline has no
@@ -160,13 +206,21 @@ function eventFitsMonth(event, month) {
 }
 
 /**
- * Shared-library shortcuts written for a woodlot licensee or a community
- * forest's manager. This GM runs a 240,000 m³ replaceable licence with a
- * board, so they are struck from the journey's draw before it happens (the
- * act library has no tenure-size gate); striking them after the draw would
- * cost the month its offer.
+ * Shared-library shortcuts written for a woodlot licensee, a community
+ * forest's manager or a consulting registrant, or that need a situation a
+ * GM's year never has. This GM runs a 240,000 m³ replaceable licence with a
+ * board: no client, no council seat, no retired-status side business, and no
+ * blockade on the road for a contractor to intimidate. They are struck from
+ * the journey's draw before it happens (the act library has no tenure-size
+ * gate); striking them after the draw would cost the month its offer.
  */
-const UNFIT_TEMPTATION_ACTS = ['woodlot-overcut-gambit', 'community-forest-coasting'];
+const UNFIT_TEMPTATION_ACTS = [
+  'woodlot-overcut-gambit',
+  'community-forest-coasting',
+  'wear-every-hat',
+  'drop-the-ret-from-the-signature',
+  'recce-harass-protesters',
+];
 
 function retireUnfitTemptations(journey) {
   const memory = journey.temptationMemory || (journey.temptationMemory = {});
@@ -200,14 +254,154 @@ function describeLedgerHook(hook) {
   if (hook.bonusVolume) parts.push(`+${hook.bonusVolume.toLocaleString()} m³ on this month's cut`);
   if (hook.curtailment && hook.curtailment < 1) parts.push(`this month's deliveries at ${Math.round(hook.curtailment * 100)}% of plan`);
   if (hook.monthCostShift) parts.push(`+$${formatRate(hook.monthCostShift)}/m³ haul this month`);
+  if (hook.opsVolume) parts.push(`${hook.opsVolume > 0 ? '+' : '-'}${Math.abs(hook.opsVolume).toLocaleString()} m³ on this month's deliveries`);
   return parts.join(', ');
+}
+
+const OUTCOME_BANDS = ['good', 'partial', 'bad'];
+const BAND_EFFECT_KEYS = { good: 'effects', partial: 'partialEffects', bad: 'failureEffects' };
+
+/**
+ * The band whose outcome text the player reads when the roll lands on
+ * `band`: a partial or bad band with nothing of its own authored reads the
+ * next one down (js/events/odds.js resolveOutcomeBand).
+ */
+function shownBand(option, band) {
+  if (band === 'partial' && option.partialOutcome) return 'partial';
+  if (band !== 'good' && option.failureOutcome) return 'bad';
+  return 'good';
+}
+
+/** The effects a band applies, with the same fallbacks the resolver uses. */
+function bandEffects(option, band) {
+  if (band === 'partial') return option.partialEffects || option.failureEffects || option.effects;
+  if (band === 'bad') return option.failureEffects || option.effects;
+  return option.effects;
+}
+
+function withoutProgress(effects) {
+  if (!effects || typeof effects.progress !== 'number') return effects;
+  const { progress: _progress, ...rest } = effects;
+  return rest;
+}
+
+/**
+ * What each band of an option does to the ledger: the authored hooks for the
+ * band the player reads, and the card's operations as this month's wood.
+ * Cards with an authored hook table carry their operations in the hooks (a
+ * curtailment, a sale), so their `progress` is not counted twice.
+ */
+function ledgerByBand(option, authored, hookedEvent) {
+  const hooks = (Array.isArray(authored) ? authored : [authored]).filter(Boolean);
+  const byBand = {};
+  for (const band of OUTCOME_BANDS) {
+    const shown = shownBand(option, band);
+    const hook = {};
+    for (const { band: only, ...fields } of hooks) {
+      if (!only || only === shown) Object.assign(hook, fields);
+    }
+    const ops = hookedEvent ? 0 : opsVolume(bandEffects(option, band)?.progress);
+    if (ops) hook.opsVolume = ops;
+    byBand[band] = hook;
+  }
+  return byBand;
+}
+
+/**
+ * The ledger chip: one line when every band lands the same, else what it
+ * does if it lands and if it does not. Only the bands the option can roll.
+ */
+function describeLedgerBands(option, byBand) {
+  const risky = typeof option.chanceSuccess === 'number';
+  const bands = !risky ? ['good'] : typeof option.chancePartial === 'number' ? OUTCOME_BANDS : ['good', 'bad'];
+  const text = Object.fromEntries(bands.map((band) => [band, describeLedgerHook(byBand[band])]));
+  if (bands.every((band) => text[band] === text.good)) return text.good ? `ledger: ${text.good}` : '';
+  const phrase = bands.length === 3
+    ? { good: 'if clean', partial: 'if partly wrong', bad: 'if badly wrong' }
+    : { good: 'if it lands', bad: 'if not' };
+  return `ledger ${bands.map((band) => `${phrase[band]}: ${text[band] || 'nothing'}`).join('; ')}`;
+}
+
+/**
+ * The GM's operations on a generic card, as this month's wood (see
+ * OPS_POINT_M3), and the executive seats kept: a card's "someone leaves" is
+ * somebody below the executive team, so it does not empty a seat at random.
+ */
+function fitOperations(option, authored, hookedEvent) {
+  const hasProgress = ['effects', 'partialEffects', 'failureEffects'].some((key) => typeof option[key]?.progress === 'number');
+  const leaves = (effect) => Boolean(effect?.lose_member || effect?.leave);
+  const crewKeys = ['crewEffect', 'partialCrewEffect', 'failureCrewEffect'].filter((key) => leaves(option[key]));
+  if (!hasProgress && !authored && !crewKeys.length) return option;
+
+  const byBand = ledgerByBand(option, authored, hookedEvent);
+  const fitted = { ...option };
+  for (const key of Object.values(BAND_EFFECT_KEYS)) {
+    if (option[key]) fitted[key] = withoutProgress(option[key]);
+  }
+  for (const key of crewKeys) {
+    const { lose_member: _lose, leave: _leave, ...rest } = option[key];
+    fitted[key] = Object.keys(rest).length ? rest : undefined;
+  }
+  if (OUTCOME_BANDS.some((band) => Object.keys(byBand[band]).length)) {
+    fitted.managerLedger = byBand;
+    const hint = describeLedgerBands(option, byBand);
+    if (hint) fitted.ledgerHint = hint;
+  }
+  return fitted;
+}
+
+/**
+ * This month's margin per m³ at today's prices and costs: what a cubic metre
+ * more or less on the month's deliveries is worth to the treasury.
+ */
+function currentMarginPerM3(journey) {
+  const ledger = ensureLedger(journey);
+  const premium = earningCertifications(journey).reduce((sum, cert) => sum + certificationPremium(ledger, cert), 0);
+  const cost = ledger.loggingHaul + (Number(journey.ceo?.costPerM3) || 0) + (ledger.costShiftPerM3 || 0) + getHarvestPace(ledger.pace).costPerM3;
+  return Math.max(5, ledger.logPrice + premium - stumpageRate(ledger) - cost);
+}
+
+/**
+ * A shortcut's operations, in the GM's own currency. The shortcut card reads
+ * its gain and each band's cost off the option's effects (js/events/
+ * selection.js describeShortcutStakes), so the wood a shortcut buys or a
+ * stop-work costs is booked as the margin on it, at today's margin: "+8
+ * progress" was worth $400k at one ops reading and nothing at another.
+ */
+function priceShortcutOperations(journey, option) {
+  const price = (effects) => {
+    if (typeof effects?.progress !== 'number') return effects;
+    const { progress, ...rest } = effects;
+    const dollars = Math.round((opsVolume(progress) * currentMarginPerM3(journey)) / 500) * 500;
+    if (dollars) rest.budget = (Number(rest.budget) || 0) + dollars;
+    return rest;
+  };
+  const keys = Object.values(BAND_EFFECT_KEYS).filter((key) => typeof option[key]?.progress === 'number');
+  const fallout = typeof option.failureFallout?.effects?.progress === 'number';
+  if (!keys.length && !fallout) return option;
+  const fitted = { ...option };
+  for (const key of keys) fitted[key] = price(option[key]);
+  if (fallout) fitted.failureFallout = { ...option.failureFallout, effects: price(option.failureFallout.effects) };
+  return fitted;
+}
+
+/** A shortcut card's stakes, restated from its fitted options. */
+function restateShortcutStakes(journey, event) {
+  if (event.temptationStage === 'fallout') {
+    const costs = describeEffectChips(event.options?.[0]?.effects || {}, 'manager').join(', ');
+    return costs ? [`What it costs: ${costs}.`] : [];
+  }
+  const shortcut = (event.options || []).find((option) => option.liveOdds);
+  return shortcut && Array.isArray(event.stakes) ? describeShortcutStakes(shortcut, journey) : event.stakes;
 }
 
 /**
  * The drawn card as the GM should see it, or null when it does not belong
  * in this month or at this desk. Options with a ledger hook say on their
  * chip what they do to the ledger for the rest of the year; the resolver
- * alone would print only the one-off budget line.
+ * alone would print only the one-off budget line. A card's operations land
+ * as this month's wood (or, on a shortcut, its margin), never on the run
+ * rate of the whole licence.
  */
 export function fitManagerEvent(journey, event) {
   if (!event) return null;
@@ -215,15 +409,20 @@ export function fitManagerEvent(journey, event) {
   if (!eventFitsMonth(event, journey.day)) return null;
   const overrides = MANAGER_OPTION_OVERRIDES[event.id];
   const hooks = LEDGER_HOOKS[event.id];
-  if (!overrides && !hooks) return event;
-  return {
-    ...event,
-    options: (event.options || []).map((option, index) => {
-      const replaced = overrides?.[index] ? { ...option, ...overrides[index] } : option;
-      const hint = hooks?.[index] ? describeLedgerHook(hooks[index]) : '';
-      return hint ? { ...replaced, ledgerHint: `ledger: ${hint}` } : replaced;
-    }),
-  };
+  const departures = EXECUTIVE_DEPARTURES[event.id];
+  const shortcut = event.type === 'temptation';
+  let changed = false;
+  const options = (event.options || []).map((option, index) => {
+    let fitted = overrides?.[index] ? { ...option, ...overrides[index] } : option;
+    fitted = shortcut ? priceShortcutOperations(journey, fitted) : fitOperations(fitted, hooks?.[index], Boolean(hooks));
+    if (departures?.[index]) fitted = { ...fitted, executiveDeparture: departures[index] };
+    if (fitted !== option) changed = true;
+    return fitted;
+  });
+  if (!changed) return event;
+  const fitted = { ...event, options };
+  if (shortcut) fitted.stakes = restateShortcutStakes(journey, fitted);
+  return fitted;
 }
 
 export async function runManagerDay(game) {
@@ -423,11 +622,18 @@ async function runOperatingPlan(game) {
 
   // Certification: booked now, earned at the registration audit in May.
   const certOptions = certificationsData.certifications.map((cert) => ({
-    label: `${cert.name} - $${cert.initial_cost.toLocaleString()} up front, $${cert.annual_cost.toLocaleString()}/yr, +$${certificationPremium(ledger, cert)}/m³ once certified`,
+    label: `${cert.name} - $${cert.initial_cost.toLocaleString()} up front, $${cert.annual_cost.toLocaleString()}/yr, +$${formatRate(certificationPremium(ledger, cert))}/m³ once certified`,
     value: cert.id,
     hint: `${monthName(REGISTRATION_AUDIT_MONTH)} audit wants ${describeRequirements(cert)}. ${cert.description}`,
   }));
-  certOptions.push({ label: "Skip certification for now", value: "none", hint: 'Hold the cash; the customers keep asking.' });
+  // A standard costs more than its premium earns in the year it is booked;
+  // what it buys is the certificate, the reputation and the buyers. Skipping
+  // keeps head office lean and the auditors away.
+  certOptions.push({
+    label: "Skip certification for now",
+    value: "none",
+    hint: 'No system to run and no auditors this year: the treasury keeps what a standard costs, and there is no audit to fail. The buyers who want certified fibre keep asking.',
+  });
 
   const certRes = await ui.promptChoice(
     `${chiefForester ? `${chiefForester.name} (Chief Forester) asks: ` : ''}Certification - hold or pursue a standard this year?`,
@@ -628,7 +834,7 @@ export function projectYearEndCut(journey, pace = journey.ledger?.pace) {
   const ledger = ensureLedger(journey);
   const firstMonth = Math.max(1, Number(journey.day) || 1);
   const rate = runRate(journey, pace);
-  let volume = ledger.deliveredYtd + (ledger.bonusVolume || 0);
+  let volume = ledger.deliveredYtd + (ledger.bonusVolume || 0) + (ledger.opsVolume || 0);
   for (let month = firstMonth; month <= lastLedgerMonth(journey); month += 1) {
     const curtailment = month === firstMonth ? (ledger.curtailmentFactor || 1) : 1;
     volume += ledger.monthlyPlan * deliveryCurve(ledger)[month - 1] * rate * curtailment;
@@ -803,6 +1009,7 @@ async function maybeFlagCutProjection(game) {
 async function runStrategicDecision(game) {
   const { journey } = game;
   const beat = STRATEGIC_BEATS[Math.max(0, journey.day - 2) % STRATEGIC_BEATS.length];
+  const before = projectionReading(journey);
 
   switch (beat) {
     case "budget_allocation":
@@ -818,6 +1025,26 @@ async function runStrategicDecision(game) {
       await runBoardPrep(game);
       break;
   }
+  writeProjectionShift(game.ui, journey, before);
+}
+
+/** The ops meter and where it puts December, for a before-and-after line. */
+function projectionReading(journey) {
+  return { ops: Math.round(journey.metrics?.progress ?? 50), projection: projectYearEndCut(journey) };
+}
+
+/**
+ * The ops meter runs the licence's delivery rate for the rest of the year
+ * (runRate), so a decision that moves it says what it did to December.
+ */
+function writeProjectionShift(ui, journey, before) {
+  const after = projectionReading(journey);
+  if (after.ops === before.ops) return;
+  const moved = after.projection.volume - before.projection.volume;
+  const cut = moved === 0
+    ? 'the delivery rate is already at its limit, so December does not move'
+    : `December's projection ${moved > 0 ? '+' : '-'}${Math.abs(moved).toLocaleString()} m³, to ${after.projection.volume.toLocaleString()} m³ (${formatCutPercent(after.projection.ratio)} of the AAC)`;
+  ui.writeInfo(`Operations ${before.ops}% -> ${after.ops}%: ${cut}.`);
 }
 
 async function runBudgetAllocation(game) {
@@ -836,22 +1063,22 @@ async function runBudgetAllocation(game) {
   const choice = await ui.promptChoice("Where does the money go?", [
     {
       label: "Operations push",
-      description: "-$30,000 | road and logging contractors get the parts, the gravel and the second shift they asked for",
+      description: "-$30,000, operations +4 (the delivery rate), forest health +2 | road and logging contractors get the parts, the gravel and the second shift they asked for",
       value: "operations",
     },
     {
       label: "Community and Nation relations",
-      description: "-$22,500 | the Guardians program, the open house, the mill tour for the band council",
+      description: "-$22,500, reputation +4, relationships +2 | the Guardians program, the open house, the mill tour for the band council",
       value: "pr",
     },
     {
       label: "Compliance and safety training",
-      description: "-$17,500 | FRPA refresher for the layout crews, SAFE Companies audit prep, a WorkSafeBC day nobody requests and everybody needs",
+      description: "-$17,500, compliance +5 | FRPA refresher for the layout crews, SAFE Companies audit prep, a WorkSafeBC day nobody requests and everybody needs",
       value: "compliance",
     },
     {
       label: "Hold the line",
-      description: "Bank it. The board loves restraint; the divisions less so",
+      description: "Political capital +2, operations -1 (the delivery rate) | Bank it. The board loves restraint; the divisions less so",
       value: "hold",
     },
   ]);
@@ -1064,7 +1291,7 @@ async function runBoardPrep(game) {
       break;
     case "polish":
       adjustMetric(journey, "reputation", 3);
-      journey.scrutiny = clampPercentValue((journey.scrutiny || 0) + 2);
+      journey.scrutiny = clampPercentValue((journey.scrutiny || 0) + 3);
       result = say(ui, 'info', "The deck is beautiful. Decks this beautiful invite questions about what they're hiding.");
       break;
     default:
@@ -1078,16 +1305,21 @@ async function runBoardPrep(game) {
 }
 
 /**
- * Ledger consequences of a resolved manager desk event: the last log entry
- * names the event and the option label, which maps back to LEDGER_HOOKS.
+ * Ledger consequences of a resolved card: the last log entry names the event,
+ * the option label and the band it resolved to, which map back to the fitted
+ * option's per-band ledger (fitManagerEvent). A set-aside card logs no option
+ * of its own, so it books nothing here.
  */
-function applyLedgerHooks(ui, journey, event, logBefore) {
-  const hooks = LEDGER_HOOKS[event?.id];
-  if (!hooks || journey.log.length <= logBefore) return;
+export function applyLedgerHooks(ui, journey, event, logBefore) {
+  if (journey.log.length <= logBefore) return;
   const entry = journey.log[journey.log.length - 1];
-  if (entry?.type !== 'event' || entry.eventId !== event.id) return;
-  const index = (event.options || []).findIndex((option) => option.label === entry.optionLabel);
-  const hook = hooks[index];
+  if (entry?.type !== 'event' || entry.eventId !== event?.id) return;
+  const option = (event.options || []).find((candidate) => candidate.label === entry.optionLabel);
+  const band = entry.band || 'good';
+  if (option?.executiveDeparture && shownBand(option, band) === option.executiveDeparture.band) {
+    replaceExecutive(ui, journey, option.executiveDeparture.role);
+  }
+  const hook = option?.managerLedger?.[band];
   if (!hook || !Object.keys(hook).length) return;
   const ledger = journey.ledger;
   if (hook.curtailment) ledger.curtailmentFactor = Math.min(ledger.curtailmentFactor, hook.curtailment);
@@ -1095,12 +1327,58 @@ function applyLedgerHooks(ui, journey, event, logBefore) {
     ledger.bonusVolume += hook.bonusVolume;
     ledger.bonusSource = hook.bonusSource || 'the extra volume';
   }
+  if (hook.opsVolume) {
+    ledger.opsVolume = (ledger.opsVolume || 0) + hook.opsVolume;
+    ledger.opsSources = [...(ledger.opsSources || []), event.title || 'the month\'s events'];
+  }
   if (hook.costShift) ledger.costShiftPerM3 += hook.costShift;
   if (hook.monthCostShift) ledger.monthCostShift = (ledger.monthCostShift || 0) + hook.monthCostShift;
   if (hook.priceShift) ledger.logPrice = Math.max(60, ledger.logPrice + hook.priceShift);
   if (hook.stumpageShift) ledger.stumpage += hook.stumpageShift;
   const lasting = describeLedgerHook(hook);
   if (hook.note) ui.writeInfo(`Ledger: ${hook.note}${lasting ? ` - ${lasting}` : ''}.`);
+  else if (lasting) ui.writeInfo(`Ledger: ${lasting}.`);
+}
+
+/**
+ * An executive leaves the company and the seat is filled from inside: an
+ * acting successor with the same role, who takes over whatever the departing
+ * executive carried (the woodlands manager carries the year's posture). The
+ * name is drawn on the month's dice, so a reload names the same successor.
+ */
+function replaceExecutive(ui, journey, roleId) {
+  const departing = findExecutive(journey, roleId);
+  if (!departing) return;
+  departing.isActive = false;
+  departing.hasQuit = true;
+  const taken = new Set((journey.crew || []).map((member) => member.name));
+  const names = FIRST_NAMES.filter((name) => !taken.has(name));
+  const rng = monthRng(journey, `successor:${roleId}`);
+  const name = names.length ? names[Math.floor(rng() * names.length)] : `${departing.name} II`;
+  const role = MANAGER_EXECUTIVE_ROLES.find((entry) => entry.id === roleId);
+  const successor = {
+    ...departing,
+    id: `${departing.id}-successor`,
+    name,
+    health: role?.baseHealth ?? departing.health,
+    morale: Math.max(30, (role?.baseMorale ?? 70) - 15),
+    traits: [],
+    statusEffects: [],
+    isActive: true,
+    hasQuit: false,
+    status: 'active',
+    actingFor: departing.name,
+  };
+  journey.crew.push(successor);
+  if (roleId === 'woodlands' && journey.ceo) journey.ceo.name = name;
+  const title = (role?.name || roleId).toLowerCase();
+  ui.writeWarning(`${departing.name} clears out the office by month end. ${name} steps up as acting ${title}${roleId === 'woodlands' && journey.ceo ? ` and inherits the ${journey.ceo.posture || 'year\'s'} posture` : ''}.`);
+  journey.log.push({
+    day: journey.day,
+    type: 'crew',
+    summary: `${departing.name} (${role?.name || roleId}) resigns; ${name} acting`,
+    detail: `${departing.name} leaves the company. ${name} is acting ${title} for the rest of the year.`,
+  });
 }
 
 /**
@@ -1180,6 +1458,8 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
   let delivered;
   let bonus = 0;
   let bonusSource = '';
+  let ops = 0;
+  let opsSources = [];
   let curtailed = false;
   if (carryIn) {
     delivered = Math.round(planned * JANUARY_CARRY_IN);
@@ -1192,6 +1472,12 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
     delivered += bonus;
     ledger.bonusVolume = 0;
     ledger.bonusSource = null;
+    // The month's cards: wood a situation added to the month or cost it.
+    ops = Math.max(-delivered, Math.round(ledger.opsVolume || 0));
+    opsSources = ledger.opsSources || [];
+    delivered += ops;
+    ledger.opsVolume = 0;
+    ledger.opsSources = [];
     curtailed = ledger.curtailmentFactor < 1;
     ledger.curtailmentFactor = 1;
 
@@ -1233,6 +1519,8 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
   const volumeNotes = [
     curtailed ? 'curtailed' : null,
     bonus ? `incl. ${bonus.toLocaleString()} m³ from ${bonusSource}` : null,
+    ops > 0 ? `incl. ${ops.toLocaleString()} m³ from ${listSources(opsSources)}` : null,
+    ops < 0 ? `less ${Math.abs(ops).toLocaleString()} m³ lost to ${listSources(opsSources)}` : null,
     pace.factor !== 1 ? pace.name.toLowerCase() : null,
   ].filter(Boolean);
   const deliveredLine = `Delivered: ${delivered.toLocaleString()} m³ (plan ${planned.toLocaleString()}${volumeNotes.length ? `, ${volumeNotes.join(', ')}` : ''}; year to date ${Math.round(ledger.deliveredYtd).toLocaleString()} / ${ledger.aac.toLocaleString()} m³ AAC)`;
@@ -1257,6 +1545,13 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
   if (journey.resources.budget <= 0) {
     ui.writeDanger('The treasury is empty. The bank calls the covenant.');
   }
+}
+
+/** Card titles as the ledger names them: “Road Washed Out” and “Sick Day Wave”. */
+function listSources(sources) {
+  const unique = [...new Set(sources.filter(Boolean))].map((title) => `“${title}”`);
+  if (!unique.length) return 'the month\'s events';
+  return unique.length === 1 ? unique[0] : `${unique.slice(0, -1).join(', ')} and ${unique.at(-1)}`;
 }
 
 /**
@@ -1463,6 +1758,65 @@ function readQuarter(journey, baseline, quarterMonths, quarter) {
 }
 
 /**
+ * What each answer to the chair does to the file, for a sound and a weak
+ * quarter. Honesty costs nothing and cools the file. Spin is borrowed
+ * standing: a little reputation now, an audit committee that reads the next
+ * deck harder, and for a weak quarter a place on the year-end audit's list.
+ * Gilding a good quarter buys almost nothing and still draws the questions.
+ */
+const BOARD_STANCES = {
+  transparent: {
+    sound: { reputation: 3, politicalCapital: 5, compliance: 3, scrutiny: -4 },
+    weak: { politicalCapital: 5, compliance: 3, scrutiny: -4 },
+    soundLine: 'Good numbers, honestly told. The rarest deck in forestry. The chair almost smiles.',
+    weakLine: 'The board respects the honesty more than they enjoy it. The audit committee nods, and nobody has to find the bad news for themselves.',
+  },
+  spin: {
+    sound: { reputation: 1, politicalCapital: -2, scrutiny: 6 },
+    weak: { reputation: 4, politicalCapital: -2, scrutiny: 12 },
+    soundLine: 'A good quarter, gilded anyway. The chair wonders aloud what the gilding is for, and the audit committee asks for the working papers.',
+    weakLine: 'The quarter sounds magnificent. Two directors take notes for later, which is never decorative.',
+  },
+  deflect: {
+    sound: { politicalCapital: -4, relationships: -3, scrutiny: 3 },
+    weak: { politicalCapital: -4, relationships: -3, scrutiny: 3 },
+    soundLine: "The board's analysts have the same spreadsheets you do. The deflection is noted, in the minutes, verbatim.",
+    weakLine: "The board's analysts have the same spreadsheets you do. The deflection is noted, in the minutes, verbatim.",
+  },
+};
+
+const STANCE_LABELS = { reputation: 'reputation', politicalCapital: 'political capital', compliance: 'compliance', relationships: 'relationships', scrutiny: 'scrutiny' };
+
+/**
+ * Apply a board answer and say what it did: "reputation +4 -> 58, political
+ * capital -2 -> 61, scrutiny +8 -> 39%". What lands is what the clamps let
+ * through, not what was asked.
+ */
+function applyBoardStance(journey, deltas) {
+  const parts = [];
+  for (const [key, delta] of Object.entries(deltas)) {
+    let before;
+    let after;
+    if (key === 'politicalCapital') {
+      before = journey.resources.politicalCapital || 0;
+      adjustPoliticalCapital(journey, delta);
+      after = journey.resources.politicalCapital;
+    } else if (key === 'scrutiny') {
+      before = journey.scrutiny || 0;
+      journey.scrutiny = clampPercentValue(before + delta);
+      after = journey.scrutiny;
+    } else {
+      before = journey.metrics[key] ?? 50;
+      adjustMetric(journey, key, delta);
+      after = journey.metrics[key];
+    }
+    const moved = Math.round(after) - Math.round(before);
+    if (moved) parts.push(`${STANCE_LABELS[key] || key} ${moved > 0 ? '+' : ''}${moved} -> ${Math.round(after)}${key === 'scrutiny' ? '%' : ''}`);
+  }
+  return parts.join(', ');
+}
+
+/**
  * Quarterly board review after months 3, 6, 9 and 12.
  *
  * Honesty is the strategy that holds up: a transparent report of a weak
@@ -1542,37 +1896,12 @@ async function runBoardReview(game, monthClosed) {
     },
   ]);
 
-  switch (choice.value) {
-    case "transparent":
-      adjustPoliticalCapital(journey, 5);
-      adjustMetric(journey, "compliance", 3);
-      journey.scrutiny = clampPercentValue((journey.scrutiny || 0) - 4);
-      if (reading.weak) {
-        ui.write("The board respects the honesty more than they enjoy it. The audit committee nods, and nobody has to find the bad news for themselves.");
-      } else {
-        adjustMetric(journey, "reputation", 3);
-        ui.write("Good numbers, honestly told. The rarest deck in forestry. The chair almost smiles.");
-      }
-      break;
-    case "spin":
-      adjustPoliticalCapital(journey, -2);
-      if (reading.weak) {
-        adjustMetric(journey, "reputation", 4);
-        journey.scrutiny = clampPercentValue((journey.scrutiny || 0) + 6);
-        journey.flags.boardSpunQuarters = [...(journey.flags.boardSpunQuarters || []), quarter];
-        ui.write("The quarter sounds magnificent. Two directors take notes for later, which is never decorative.");
-      } else {
-        adjustMetric(journey, "reputation", 2);
-        journey.scrutiny = clampPercentValue((journey.scrutiny || 0) + 3);
-        ui.write("A good quarter, gilded anyway. The chair wonders aloud what the gilding is for.");
-      }
-      break;
-    default:
-      adjustPoliticalCapital(journey, -4);
-      adjustMetric(journey, "relationships", -3);
-      journey.scrutiny = clampPercentValue((journey.scrutiny || 0) + 3);
-      ui.write("The board's analysts have the same spreadsheets you do. The deflection is noted, in the minutes, verbatim.");
-      break;
+  const stance = BOARD_STANCES[choice.value] || BOARD_STANCES.deflect;
+  ui.write(reading.weak ? stance.weakLine : stance.soundLine);
+  const applied = applyBoardStance(journey, reading.weak ? stance.weak : stance.sound);
+  if (applied) ui.writeInfo(`${capitalize(applied)}.`);
+  if (choice.value === 'spin' && reading.weak) {
+    journey.flags.boardSpunQuarters = [...(journey.flags.boardSpunQuarters || []), quarter];
   }
 
   if (quarter === 4) runYearEndAudit(ui, journey);
@@ -1617,13 +1946,26 @@ function runYearEndAudit(ui, journey) {
     ui.writeInfo(`The auditors reconcile the year to the decks and let appendix C stand. ${survivors}, this time.`);
     return;
   }
+  // A restatement is a finding in the management letter, and that letter is
+  // on the file the certification auditors and C&E read.
   const reputationCost = caught.length * 8;
   adjustMetric(journey, 'reputation', -reputationCost);
   adjustPoliticalCapital(journey, -3 * caught.length);
+  const complianceBefore = journey.metrics.compliance ?? 50;
+  adjustMetric(journey, 'compliance', -3 * caught.length);
+  const complianceCost = Math.round(complianceBefore) - Math.round(journey.metrics.compliance);
+  const scrutinyBefore = journey.scrutiny || 0;
+  journey.scrutiny = clampPercentValue(scrutinyBefore + 8 * caught.length);
+  const scrutinyAdded = Math.round(journey.scrutiny) - Math.round(scrutinyBefore);
   const restated = caught.map((q) => `Q${q}`);
   const restatedList = restated.length > 1 ? `${restated.slice(0, -1).join(', ')} and ${restated.at(-1)}` : restated[0];
-  ui.writeDanger(`The management letter reconciles the audited statements to the quarterly decks and restates ${restatedList}. The board learns ${caught.length === 1 ? 'the quarter' : 'those quarters'} from the auditors instead of from you: reputation -${reputationCost}.`);
-  journey.log.push({ day: journey.day, type: 'audit', summary: `Year-end audit restated ${caught.map((q) => `Q${q}`).join(', ')}`, detail: `Reputation -${reputationCost}.` });
+  const fileCost = [
+    complianceCost ? `compliance -${complianceCost}` : null,
+    scrutinyAdded ? `scrutiny +${scrutinyAdded}` : null,
+  ].filter(Boolean).join(', ');
+  const detail = `Reputation -${reputationCost}.${fileCost ? ` The letter goes on the licensee's file: ${fileCost}.` : ''}`;
+  ui.writeDanger(`The management letter reconciles the audited statements to the quarterly decks and restates ${restatedList}. The board learns ${caught.length === 1 ? 'the quarter' : 'those quarters'} from the auditors instead of from you: reputation -${reputationCost}.${fileCost ? ` The letter goes on the licensee's file: ${fileCost}.` : ''}`);
+  journey.log.push({ day: journey.day, type: 'audit', summary: `Year-end audit restated ${caught.map((q) => `Q${q}`).join(', ')}`, detail });
 }
 
 // --- helpers ---

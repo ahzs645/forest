@@ -194,12 +194,14 @@ test('certification is booked in January and earned at the May registration audi
     await runManagerDay({ ui, journey, gameOver: false, checkpoint() {} });
     const certPrompt = ui.prompts.find((entry) => /Certification/.test(entry.prompt));
     const csa = certPrompt.options.find((o) => o.value === 'CSA');
-    assert.match(csa.label, /\$100,000 up front, \$18,000\/yr, \+\$3\/m³ once certified/);
+    assert.match(csa.label, /\$100,000 up front, \$90,000\/yr, \+\$1\/m³ once certified/);
+    const skip = certPrompt.options.find((o) => o.value === 'none');
+    assert.match(skip.hint, /no auditors this year: the treasury keeps what a standard costs, and there is no audit to fail/);
     assert.match(csa.hint, /^May audit wants compliance 50%\+ and relationships 45%\+\./);
     assert.equal(journey.certifications[0].status, 'pending');
     assert.equal(journey.metrics.reputation, 50, 'no reputation until the certificate is issued');
     assert.equal(journey.ledger.months[0].premium, 0);
-    assert.equal(journey.ledger.months[0].certCost, 1500);
+    assert.equal(journey.ledger.months[0].certCost, 7500, 'the system is run from January');
   });
 });
 
@@ -218,8 +220,8 @@ test('a registration audit that passes issues the certificate; the premium start
   const june = makeUi(answerWith('intervene', 'plan', 'set_aside', 'pace:1'));
   journey.flags.paceSetMonth = 6;
   await withRandom(() => 0.99, () => runManagerDay({ ui: june, journey, gameOver: false, checkpoint() {} }));
-  assert.equal(journey.ledger.months.at(-1).premium, 4);
-  assert.ok(june.lines.some((line) => / \+ \$4 certified premium - stumpage/.test(line)));
+  assert.equal(journey.ledger.months.at(-1).premium, 2);
+  assert.ok(june.lines.some((line) => / \+ \$2 certified premium - stumpage/.test(line)));
 });
 
 test('a failed registration gets one re-audit in October; failing that withdraws the application', async () => {
@@ -240,7 +242,7 @@ test('a failed registration gets one re-audit in October; failing that withdraws
   assert.equal(journey.certifications[0].status, 'withdrawn');
   assert.equal(journey.metrics.reputation, reputation - 5);
   assert.ok(october.lines.includes('FSC RE-AUDIT'));
-  assert.equal(journey.ledger.months.at(-1).certCost, 2083, 'October still pays the fee');
+  assert.equal(journey.ledger.months.at(-1).certCost, 10000, 'October still pays the fee');
 
   const november = makeUi(answerWith('desk', 'set_aside', 'pace:1'));
   journey.flags.paceSetMonth = 11;
@@ -257,7 +259,7 @@ test('a held certificate that fails its October surveillance audit is suspended 
   await withRandom(() => 0.99, () => runManagerDay({ ui, journey, gameOver: false, checkpoint() {} }));
   assert.equal(journey.certifications[0].status, 'suspended');
   assert.equal(journey.metrics.reputation, 70 - 7 - 5);
-  assert.equal(journey.ledger.months.at(-1).premium, 3, 'October delivered before the audit');
+  assert.equal(journey.ledger.months.at(-1).premium, 1, 'October delivered before the audit');
   assert.ok(ui.lines.some((line) => /Certificate suspended\. The premium stops and the buyers get the letter; reputation -12\./.test(line)));
 });
 
