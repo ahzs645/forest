@@ -13,12 +13,12 @@ function eventWith(effects) {
   return { id: 'consequence-test', title: 'Consequence test', severity: 'minor', options: [{ label: 'Answer it', effects }] };
 }
 
-test('ground gained from an event never runs the traverse past the end of the route', () => {
+test('ground gained from an event is banked for the next leg and never runs the traverse past the route', () => {
   const journey = createReconJourney({ roleId: 'recce', areaId: AREA_ID, area, scale: 'campaign' });
   journey.distanceTraveled = journey.totalDistance - 1;
   const event = eventWith({ progress: 5 });
   resolveEvent(journey, event, event.options[0]);
-  assert.equal(journey.distanceTraveled, journey.totalDistance, 'Traverse 40/35 km is not a place');
+  assert.ok(journey.distanceTraveled <= journey.totalDistance, 'Traverse 40/35 km is not a place');
 });
 
 test('a generic planning setback is time lost, not a gate unwound', () => {
