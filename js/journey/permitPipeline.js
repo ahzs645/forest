@@ -360,13 +360,13 @@ export function reconcilePermitFiles(journey) {
     }
   }
 
-  // Whatever the counters no longer account for has left the queue.
-  if (loose.length) {
-    const gone = new Set(loose.map((file) => file.id));
-    permits.files = permits.files.filter((file) => !gone.has(file.id));
-    for (const file of permits.files) {
-      if (file.pausedBy && gone.has(file.pausedBy)) file.pausedBy = null;
-    }
+  // Whatever the counters no longer account for has not left the queue: a
+  // named file, and the HCA hold it may carry or answer, never vanishes on a
+  // counter edit. It goes back to drafted, and the nameless backlog it was
+  // drafted out of shrinks by one so the season's total stays put.
+  for (const file of loose) {
+    enterLane(file, 'drafted', journey);
+    if ((permits.backlog || 0) > 0) permits.backlog -= 1;
   }
 
   return syncPermitCounters(journey);
@@ -470,6 +470,43 @@ export function shortenPermitClock(journey, lanes, days = 1) {
   if (!file) return null;
   file.clockCloses = Math.max(journey.day || 1, file.clockCloses - Math.max(1, days));
   file.chased = (file.chased || 0) + 1;
+  return file;
+}
+
+/**
+ * Push the soonest live clock in those lanes back by a day: a distracted
+ * week at the desk. Returns the file, or null when nothing was on a clock.
+ */
+export function slipPermitClock(journey, lanes, days = 1) {
+  ensurePermitFiles(journey);
+  const [file] = getPermitFiles(journey)
+    .filter((entry) => lanes.includes(entry.lane) && Number.isFinite(entry.clockCloses) && !entry.pausedBy)
+    .sort((a, b) => a.clockCloses - b.clockCloses);
+  if (!file) return null;
+  file.clockCloses += Math.max(1, days);
+  return file;
+}
+
+/**
+ * Files the District Manager could sign today: at decision, with nothing
+ * holding them. Due files first, then the soonest clock.
+ */
+export function getSignableFiles(journey) {
+  ensurePermitFiles(journey);
+  return getPermitFiles(journey)
+    .filter((file) => file.lane === 'decision' && !isHeldAtDecision(file, journey).held)
+    .sort((a, b) => (a.clockCloses ?? Infinity) - (b.clockCloses ?? Infinity));
+}
+
+/**
+ * Issue a file that is already at decision. Anything not on the District
+ * Manager's desk cannot be signed, whatever an event says.
+ */
+export function issuePermitFile(journey, fileId) {
+  const file = getPermitFileById(journey, fileId);
+  if (!file || file.lane !== 'decision') return null;
+  enterLane(file, 'issued', journey);
+  syncPermitCounters(journey);
   return file;
 }
 

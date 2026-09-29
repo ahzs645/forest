@@ -6,6 +6,14 @@
 import { isFieldJourney, isDeskJourney } from './constants.js';
 import { applyRandomInjury, applyStatusEffect, evacuateCrewMember } from '../crew.js';
 import { syncBlocksFromDistance } from '../journey/blockNav.js';
+import {
+  describeLane,
+  ensurePermitFiles,
+  getSignableFiles,
+  issuePermitFile,
+  shortenPermitClock,
+  slipPermitClock
+} from '../journey/permitPipeline.js';
 import { FIELD_RESOURCES, DESK_RESOURCES } from '../resources.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromEvent } from '../data/discoveryTags.js';
 import { buildEventReaction } from './reactions.js';
@@ -144,12 +152,8 @@ export function resolveEvent(journey, event, option) {
     }
   }
 
-  if (typeof effects?.permits_approved === 'number' && journey.permits) {
-    journey.permits.approved = Math.min(
-      journey.permits.target,
-      journey.permits.approved + effects.permits_approved
-    );
-    messages.push(`Permits approved: ${journey.permits.approved}/${journey.permits.target}`);
+  if (typeof effects?.permits_approved === 'number' && effects.permits_approved > 0 && journey.permits) {
+    applyPermitsApproved(journey, effects.permits_approved, messages);
   }
 
   // A consequence on a timer has to belong to the band that earned it. An
@@ -699,81 +703,85 @@ function handleCrewEffect(journey, crewEffect, messages) {
   }
 }
 
+/** Points of generic desk progress per clock-day moved, and the most files one event moves. */
+const DESK_PROGRESS_POINTS_PER_CLOCK_DAY = 5;
+const DESK_PROGRESS_MAX_FILES = 4;
+const PERMIT_CLOCK_LANES = ['screening', 'referral', 'decision'];
+
+function describeMovedFiles(journey, files) {
+  const seen = new Set();
+  return files
+    .filter((file) => !seen.has(file.id) && seen.add(file.id))
+    .map((file) => `${file.label} (${describeLane(file, journey)})`)
+    .join(', ');
+}
+
+/**
+ * Generic progress on a permit queue moves clocks, never lanes. A good week
+ * brings the soonest clocks forward a day, the way a follow-up call does; a
+ * distracted week pushes them back. Nothing here issues a permit, skips a
+ * referral, or walks past a WSA or HCA hold - the District Manager's roll
+ * stays the only way a file gets signed, and a file that exists keeps
+ * existing. This used to edit the lane counters directly, which conjured
+ * issued files out of nothing and deleted named ones (with their HCA holds)
+ * once the files were reconciled back to the counters.
+ */
 function applyDeskProgress(journey, progressPoints, messages) {
   if (!journey.permits) return;
+  ensurePermitFiles(journey);
 
-  const target = journey.permits.target || 0;
-  const magnitude = Math.round(Math.abs(progressPoints) / 10);
-  if (magnitude <= 0) return;
-
-  let remaining = magnitude;
-  let moved = 0;
-
-  if (progressPoints > 0) {
-    while (remaining > 0 && journey.permits.inReview > 0 && (target <= 0 || journey.permits.approved < target)) {
-      journey.permits.inReview--;
-      journey.permits.approved = target > 0
-        ? Math.min(target, journey.permits.approved + 1)
-        : journey.permits.approved + 1;
-      remaining--;
-      moved++;
-    }
-
-    while (remaining > 0) {
-      if (journey.permits.submitted === 0 && journey.permits.backlog > 0) {
-        journey.permits.backlog--;
-        journey.permits.submitted++;
-      }
-      if (journey.permits.submitted > 0) {
-        journey.permits.submitted--;
-        journey.permits.inReview++;
-        remaining--;
-        moved++;
-        continue;
-      }
-      break;
-    }
-
-    if (moved > 0) {
-      messages.push(`Permit pipeline accelerated (+${moved}).`);
-    }
-  } else {
-    // A negative progress effect is a generic setback (a distracted week,
-    // a scheduling slip, ...), not a regulator revoking a decision. It can
-    // only slip work that is still in motion - drafts and reviews - back a
-    // stage. An approved permit is a legal decision that has already been
-    // granted, so it is deliberately excluded from every bucket below and
-    // can never be decremented here.
-    while (remaining > 0 && journey.permits.inReview > 0) {
-      journey.permits.inReview--;
-      journey.permits.needsRevision++;
-      remaining--;
-      moved++;
-    }
-
-    while (remaining > 0 && (journey.permits.inReferral || 0) > 0) {
-      journey.permits.inReferral--;
-      journey.permits.needsRevision++;
-      remaining--;
-      moved++;
-    }
-
-    while (remaining > 0 && journey.permits.submitted > 0) {
-      journey.permits.submitted--;
-      journey.permits.backlog = (journey.permits.backlog || 0) + 1;
-      remaining--;
-      moved++;
-    }
-
-    while (remaining > 0 && (journey.permits.drafting || 0) > 0) {
-      journey.permits.drafting--;
-      journey.permits.backlog = (journey.permits.backlog || 0) + 1;
-      remaining--;
-      moved++;
-    }
-
-    if (moved > 0) {
-      messages.push(`Permit pipeline slowed (-${moved}).`);
-    }
+  const steps = Math.min(DESK_PROGRESS_MAX_FILES,
+    Math.max(1, Math.round(Math.abs(progressPoints) / DESK_PROGRESS_POINTS_PER_CLOCK_DAY)));
+  const moved = [];
+  for (let step = 0; step < steps; step += 1) {
+    const file = progressPoints > 0
+      ? shortenPermitClock(journey, PERMIT_CLOCK_LANES)
+      : slipPermitClock(journey, PERMIT_CLOCK_LANES);
+    if (!file) break;
+    moved.push(file);
   }
+
+  if (!moved.length) {
+    messages.push(progressPoints > 0
+      ? 'Nothing in the queue is on a clock to bring forward.'
+      : 'The queue was already stalled; nothing slips further.');
+    return;
+  }
+  messages.push(progressPoints > 0
+    ? `The queue moves faster: ${describeMovedFiles(journey, moved)}.`
+    : `The queue slips: ${describeMovedFiles(journey, moved)}.`);
+}
+
+/**
+ * An authored early approval signs files that are already on the District
+ * Manager's desk and not held. When fewer are there than the event promised,
+ * the rest of the momentum goes into the queue's clocks - it never invents an
+ * issued file that was never drafted, screened or referred.
+ */
+function applyPermitsApproved(journey, count, messages) {
+  ensurePermitFiles(journey);
+  const signed = [];
+  for (let index = 0; index < count; index += 1) {
+    const [file] = getSignableFiles(journey);
+    if (!file) break;
+    issuePermitFile(journey, file.id);
+    signed.push(file);
+  }
+  if (signed.length) {
+    const target = journey.permits.target || 0;
+    const tally = target > 0 ? ` ${journey.permits.approved}/${target} issued.` : '';
+    messages.push(`${signed.map((file) => file.label).join(' and ')} ISSUED by the District Manager.${tally}`);
+  }
+
+  const short = count - signed.length;
+  if (short <= 0) return;
+  const moved = [];
+  for (let step = 0; step < short; step += 1) {
+    const file = shortenPermitClock(journey, PERMIT_CLOCK_LANES);
+    if (!file) break;
+    moved.push(file);
+  }
+  messages.push(moved.length
+    ? `Nothing else is on the District Manager's desk to sign; the momentum goes into the queue instead: ${describeMovedFiles(journey, moved)}.`
+    : 'Nothing is on the District Manager\'s desk to sign, and nothing in the queue is on a clock to bring forward.');
 }

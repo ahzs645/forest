@@ -255,7 +255,11 @@ test('permitting events update relationship and compliance tracks without legacy
   assert.equal(journey.relationships.agencies, 50);
   assert.equal(journey.regulations.complianceScore, 83);
   assert.equal(journey.resources.politicalCapital, 43);
-  assert.equal(journey.permits.approved, 1);
+  // Generic progress brings a clock forward; it never signs a permit.
+  assert.equal(journey.permits.approved, 0);
+  assert.equal(journey.permits.inReview, 2);
+  assert.equal(journey.permits.files.length, 3, 'no file is conjured or lost');
+  assert.ok(result.messages.some((message) => /The queue moves faster: .+District Manager decision Day 4/.test(message)));
   assert.ok(result.messages.some((message) => message.includes('Relationships improved')));
 });
 
@@ -300,12 +304,15 @@ test('a generic negative-progress event slips reviews back but never revokes an 
 
   const result = resolveEvent(journey, event, option);
 
-  // "Approved 2/5" must stay "Approved 2/5" — a setback can knock the file
-  // in review back to needing revision, but it cannot un-approve a permit.
+  // "Approved 2/5" must stay "Approved 2/5" — a setback pushes the clock on
+  // the file in review back a day, but it cannot un-approve a permit, and the
+  // file stays exactly where it was in the queue.
   assert.equal(journey.permits.approved, 2);
-  assert.equal(journey.permits.inReview, 0);
-  assert.equal(journey.permits.needsRevision, 1);
-  assert.ok(result.messages.some((message) => message.includes('Permit pipeline slowed')));
+  assert.equal(journey.permits.inReview, 1);
+  assert.equal(journey.permits.needsRevision, 0);
+  const inReview = journey.permits.files.find((file) => file.lane === 'decision');
+  assert.equal(inReview.clockCloses, 11, 'the decision slips a day');
+  assert.ok(result.messages.some((message) => /The queue slips: .+District Manager decision Day 11/.test(message)));
 });
 
 test('a negative-progress event with nothing left to slip leaves approved permits untouched', () => {
@@ -346,7 +353,9 @@ test('a negative-progress event with nothing left to slip leaves approved permit
 
   assert.equal(journey.permits.approved, 3);
   assert.equal(journey.permits.needsRevision, 0);
-  assert.ok(!result.messages.some((message) => message.includes('Permit pipeline slowed')));
+  assert.equal(journey.permits.files.length, 3, 'the issued files are the only files, before and after');
+  assert.ok(!result.messages.some((message) => /queue slips/.test(message)));
+  assert.ok(result.messages.some((message) => /already stalled/.test(message)));
 });
 
 test('generic progress on a planning file is the planner\'s time, never a gate or a phase', () => {
