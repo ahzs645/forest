@@ -60,7 +60,18 @@ const CONSEQUENCE_INFO = {
     title: "Ecological strain",
     cause: "Production stayed high while compliance sat low, and the stands are starting to show it.",
   },
+  "steady-program": {
+    title: "Steady program",
+    cause: "No meter was left far behind the others, so the weakest one had room to recover.",
+  },
 };
+
+// "steady-program" → "Steady program": a consequence added to the engine
+// without copy here must still read as words, never as a bare id.
+function humanizeConsequenceId(id) {
+  const words = String(id || "").replace(/[-_]+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Season consequence";
+}
 
 function formatEffectText(effects = {}) {
   const pieces = Object.entries(effects)
@@ -79,7 +90,6 @@ export function describeConsequences(state, ids = []) {
   const history = Array.isArray(state?.history) ? state.history : [];
 
   return ids.map((id) => {
-    const info = CONSEQUENCE_INFO[id] || null;
     const entry = [...history]
       .reverse()
       .find(
@@ -88,9 +98,10 @@ export function describeConsequences(state, ids = []) {
           && item?.id === id
           && Number(item?.round) === round,
       );
-    // A consequence without table copy (a shortcut's fallout settling at year
-    // end, a steady-program recovery) reads from what the engine logged,
-    // never as a raw id.
+    // Uncatalogued ids fall back to the title the engine logged, then to
+    // the id in words.
+    const info = CONSEQUENCE_INFO[id]
+      || { title: entry?.title || humanizeConsequenceId(id), cause: "" };
     return {
       id,
       title: info?.title || entry?.title || id,
@@ -106,9 +117,27 @@ export function describeConsequences(state, ids = []) {
  * Fall decision" connection. Returns "" when the card surfaced for other
  * reasons (area context, low metric, random operational noise).
  */
+// Refusing or reporting an offer never schedules fallout today, but the label
+// check keeps a future "report it" follow-up from reading as "you took it".
+const SHORTCUT_NOT_TAKEN = /^(decline|say no|document and report)\b/i;
+
+function isTakenShortcut(causedBy) {
+  if (causedBy.shortcut === true || causedBy.tookShortcut === true) return true;
+  return causedBy.sourceType === "temptation" && !SHORTCUT_NOT_TAKEN.test(String(causedBy.option || ""));
+}
+
 export function describeCardCause(card) {
   const causedBy = card?.causedBy;
   if (!causedBy) return "";
+  // Fallout from a shortcut names the act itself ("Fudge the Species
+  // Composition"), not the generic option label every offer shares.
+  const shortcutTitle = isTakenShortcut(causedBy)
+    ? card.sourceTitle || causedBy.sourceTitle || causedBy.title
+    : "";
+  if (shortcutTitle) {
+    const seasonWord = String(causedBy.season || "").split(" ")[0];
+    return `Because you took: ${shortcutTitle}${seasonWord ? ` — your ${seasonWord} shortcut` : ""}.`;
+  }
   const season = causedBy.season ? `${causedBy.season} ` : "";
   // A shortcut's fallout names the act and who caught it, not the generic
   // option label ("Take the shortcut").

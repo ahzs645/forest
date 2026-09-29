@@ -4,6 +4,17 @@ export type NoticeData = {
   tone?: "info" | "positive" | "warning" | "danger";
 };
 
+/** A shortcut offer's terms, built by the controller (buildShortcutBrief). */
+export type ShortcutBrief = {
+  banner: string;
+  odds: { clean: number; noticed: number; caught: number } | null;
+  oddsText: string;
+  catcher: string | null;
+  offerText: string;
+  declineText: string;
+  bands: { tone: "positive" | "warning" | "danger"; text: string }[];
+};
+
 /** Structured content for the Field Radio display. */
 type BaseContent = {
   notice?: NoticeData;
@@ -35,11 +46,17 @@ export type ContentData =
       intelLines?: string[];
       optionHeading?: string;
       optionTone?: "info" | "warning" | "danger";
+      headline?: string;
+      /** "Because you took: …" on a card an earlier choice scheduled. */
+      provenance?: string;
+      /** Present on a shortcut offer: its banner, odds and terms. */
+      shortcut?: ShortcutBrief;
       optionDetails: {
         label: string;
         preview?: string;
         outcome?: string;
         riskLevel?: "low" | "medium" | "high";
+        bands?: { tone: "positive" | "warning" | "danger"; text: string }[];
       }[];
       notice?: NoticeData;
     }

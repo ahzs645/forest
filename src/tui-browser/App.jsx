@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useGameFlow } from "../../tui/useGameFlow";
 import { renderMapsciiFrame } from "../../js/scene/mapscii/index.js";
+import { Overlay, OVERLAY_KEYS } from "./Overlays";
 
 // Findings are authored as sentence fragments ("peatland edges, ..."), which
 // read fine mid-sentence but look wrong when they lead a line. Capitalize the
@@ -29,18 +30,40 @@ function toKeyInput(domEvent) {
   };
 }
 
-function Header({ onExit, isCrisis }) {
+const HEADER_PANELS = [
+  { kind: "status", label: "Status", key: "S" },
+  { kind: "glossary", label: "Glossary", key: "G" },
+  { kind: "log", label: "Log", key: "L" },
+  { kind: "intel", label: "Intel", key: "P" },
+  { kind: "help", label: "Help", key: "?" },
+];
+
+function Header({ onExit, isCrisis, onOpenPanel }) {
   return (
     <header className="tui-header">
       <div className="tui-header-title">
         <span className="tui-header-brand">{isCrisis ? "BC Forestry Simulator" : "BC Forestry Trail"}</span>
         <span className="tui-header-tag">{isCrisis ? "Incident command TUI" : "Seasonal Strategy TUI"}</span>
       </div>
+      <nav className="tui-header-panels" aria-label="Panels">
+        {HEADER_PANELS.map((panel) => (
+          <button
+            type="button"
+            className="tui-header-panel"
+            key={panel.kind}
+            aria-keyshortcuts={panel.key}
+            onClick={() => onOpenPanel(panel.kind)}
+          >
+            <span className="tui-header-panel-key" aria-hidden="true">{`[${panel.key}]`}</span>
+            {panel.label}
+          </button>
+        ))}
+      </nav>
       <div className="tui-header-actions">
         <button type="button" className="tui-header-button" onClick={onExit}>
           ← Main Menu
         </button>
-        <div className="tui-header-help">Press Q to return to the main menu</div>
+        <div className="tui-header-help">Q returns to the main menu</div>
       </div>
     </header>
   );
@@ -331,6 +354,43 @@ function Dashboard({ gameState }) {
         </div>
       )}
     </aside>
+  );
+}
+
+// [S]: the five meters, where the year stands, and the mandate, in one panel
+// (on a phone the dashboard otherwise sits below the card).
+function StatusPanel({ gameState }) {
+  if (!gameState?.metrics) {
+    return <p className="tui-copy dim">No run yet. Name the company, pick a role and an area.</p>;
+  }
+  const deltas = gameState.lastChoiceEffects || {};
+  const objective = gameState.crisisObjective || gameState.roleObjective;
+  return (
+    <div className="tui-dashboard-body">
+      <div className="tui-metric-list">
+        {METRIC_ROWS.map((row) => (
+          <MetricBar
+            key={row.key}
+            label={row.label}
+            tone={row.tone}
+            color={row.color}
+            value={gameState.metrics[row.key]}
+            delta={deltas[row.key]}
+          />
+        ))}
+      </div>
+      <p className="tui-copy">
+        {[
+          `${gameState.gameMode === "crisis-command" ? "Phase" : "Season"} ${gameState.round || 0} of ${gameState.totalRounds || 4}`,
+          gameState.roleDisplayName,
+          gameState.area?.name,
+        ].filter(Boolean).join(" · ")}
+      </p>
+      {objective?.mandate ? <p className="tui-copy dim">{`Mandate: ${objective.mandate}`}</p> : null}
+      {gameState.objectiveStrip?.pressure ? (
+        <p className="tui-copy dim">{`Right now: ${gameState.objectiveStrip.pressure}`}</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -689,6 +749,82 @@ function AmbientArt({ art }) {
   return <pre className="tui-art">{art.frames[frameIndex]}</pre>;
 }
 
+// Bring a block of the card fully into view without the player scrolling:
+// shift the scroller (the Field Radio on desktop, the page on a phone) just
+// far enough that `end` is visible, never so far that `start` leaves the top.
+// When start-to-end is taller than the view, `fallbackStart` (a later
+// element) is kept at the top instead.
+function revealBlock(start, end, fallbackStart = null) {
+  if (!start || !end) return;
+  const main = start.closest(".tui-field-main");
+  const panelScrolls = main && main.scrollHeight > main.clientHeight + 1;
+  // A little headroom so the first line does not sit flush under the edge.
+  const viewTop = (panelScrolls ? main.getBoundingClientRect().top : 0) + 6;
+  const viewBottom = panelScrolls ? main.getBoundingClientRect().bottom : window.innerHeight;
+  if (fallbackStart && end.getBoundingClientRect().bottom - start.getBoundingClientRect().top > viewBottom - viewTop) {
+    start = fallbackStart;
+  }
+  const startTop = start.getBoundingClientRect().top;
+  const overflow = end.getBoundingClientRect().bottom - viewBottom;
+  const shift = Math.min(Math.max(overflow, startTop < viewTop ? startTop - viewTop : 0), startTop - viewTop);
+  if (!shift) return;
+  if (panelScrolls) main.scrollTop += shift;
+  else window.scrollBy(0, shift);
+}
+
+// A shortcut offer is a legal and ethical call, not another operational card:
+// it drops the four-question scaffold for its own terms (who checks, the odds
+// this season, what it pays, that saying no is free) under a danger banner.
+function ShortcutCard({ data }) {
+  const shortcut = data.shortcut;
+  const stackRef = useRef(null);
+  const bannerRef = useRef(null);
+  const endRef = useRef(null);
+
+  useEffect(() => {
+    revealBlock(stackRef.current, endRef.current, bannerRef.current);
+  }, [data]);
+
+  return (
+    <div className="tui-content-stack tui-decision-card tui-shortcut-card" ref={stackRef}>
+      <NoticeBlock notice={data.notice} />
+      <div className="tui-shortcut-banner" ref={bannerRef}>
+        <span aria-hidden="true">[!] </span>
+        {shortcut.banner}
+      </div>
+      <div className="tui-heading">{data.title}</div>
+      {data.headline ? <p className="tui-card-headline tui-shortcut-headline preserve">{data.headline}</p> : null}
+      <p className="tui-copy preserve">{leadCapitalize(data.description)}</p>
+      <div className="tui-shortcut-terms" ref={endRef}>
+        {shortcut.offerText ? <p className="tui-shortcut-offer">{shortcut.offerText}</p> : null}
+        {shortcut.oddsText ? (
+          <p className="tui-shortcut-odds">
+            <OddsMeter odds={shortcut.odds} />
+            <span>{shortcut.oddsText}.</span>
+            {shortcut.declineText ? <span className="tui-shortcut-free">{` ${shortcut.declineText}`}</span> : null}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// Ten cells, one per ten percent: the share of seasons this shortcut holds
+// clean, is noticed, and is caught.
+function OddsMeter({ odds }) {
+  if (!odds) return null;
+  const cells = (pct) => Math.max(0, Math.min(10, Math.round(pct / 10)));
+  const clean = cells(odds.clean);
+  const noticed = Math.min(10 - clean, cells(odds.noticed || 0));
+  return (
+    <span className="tui-odds-meter" aria-hidden="true">
+      <span className="tone-green">{"■".repeat(clean)}</span>
+      <span className="tone-yellow">{"■".repeat(noticed)}</span>
+      <span className="tone-red">{"■".repeat(10 - clean - noticed)}</span>
+    </span>
+  );
+}
+
 // Every seasonal decision card answers the same four questions up front, so the
 // player never has to open a panel to understand the choice they're making:
 //   1. What job am I doing?   2. What changed?
@@ -696,6 +832,22 @@ function AmbientArt({ art }) {
 // Each section falls back to sensible copy so the contract holds even when a
 // card omits a piece of context.
 function DecisionCard({ data, objective }) {
+  return data.shortcut
+    ? <ShortcutCard data={data} />
+    : <StandardDecisionCard data={data} objective={objective} />;
+}
+
+function StandardDecisionCard({ data, objective }) {
+  const stackRef = useRef(null);
+  const titleRef = useRef(null);
+  const changedRef = useRef(null);
+
+  // A new card opens at its top (the last call's result, the title, and any
+  // "Because you took" line), not wherever the previous card was scrolled to.
+  useEffect(() => {
+    revealBlock(stackRef.current, changedRef.current, titleRef.current);
+  }, [data]);
+
   const job = data.context?.operation || data.sourceLabel || data.cardLabel
     || "This season's fieldwork";
   const changed = leadCapitalize(data.description) || "A new situation needs your call.";
@@ -705,27 +857,23 @@ function DecisionCard({ data, objective }) {
     || "Choose the response that best fits your strategy.";
 
   return (
-    <div className="tui-content-stack tui-decision-card">
+    <div className="tui-content-stack tui-decision-card" ref={stackRef}>
       <NoticeBlock notice={data.notice} />
       <ObjectiveStrip strip={objective} />
       {data.sourceLabel || data.cardLabel ? (
         <div className="tui-source-label">{data.sourceLabel || data.cardLabel}</div>
       ) : null}
       {data.phaseLabel ? <div className="tui-source-label tone-yellow">{data.phaseLabel}</div> : null}
-      <div className="tui-heading">{data.title}</div>
+      <div className="tui-heading" ref={titleRef}>{data.title}</div>
+      {/* A card an earlier choice scheduled says which one, under its title. */}
+      {data.provenance ? <p className="tui-provenance">{data.provenance}</p> : null}
       {data.headline ? <p className="tui-card-headline preserve">{data.headline}</p> : null}
-
-      {data.provenance ? (
-        <div className="tui-notice tone-yellow">
-          <p className="tui-copy">{data.provenance}</p>
-        </div>
-      ) : null}
 
       <div className="tui-subheading">What job am I doing?</div>
       <p className="tui-copy preserve">{job}</p>
 
       <div className="tui-subheading">What changed?</div>
-      <p className="tui-copy preserve">{changed}</p>
+      <p className="tui-copy preserve" ref={changedRef}>{changed}</p>
 
       <div className="tui-subheading">Why does it matter now?</div>
       <p className="tui-copy preserve">{whyNow}</p>
@@ -755,6 +903,9 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
   // never on setup/menu lists. New players read "SAFE" as "correct", so spell
   // out that the bands describe exposure, not the right answer.
   const hasRiskTags = (optionDetails || []).some((detail) => detail?.riskLevel);
+  // A priced shortcut already states its odds; the generic footnote would
+  // only push the offer off a short screen.
+  const pricedShortcut = (optionDetails || []).some((detail) => detail?.bands?.length);
 
   return (
     <section className="tui-panel tui-options">
@@ -769,13 +920,15 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
           // which lands in the result notice after the choice is made.
           const preview = detail?.preview;
           const sub = preview && preview !== label ? preview : null;
+          // A shortcut's take option prices each odds band on its own line.
+          const bands = Array.isArray(detail?.bands) && detail.bands.length ? detail.bands : null;
           const riskTag = detail?.riskLevel ? RISK_TAGS[detail.riskLevel] : null;
           const isSelected = index === selected;
           // Decision options get a clean, spoken accessible name ("Option 2:
           // Continue run — Risky"); setup/menu options keep their visible text as
           // their accessible name so existing role-name selectors still resolve.
           const ariaLabel = riskTag
-            ? `Option ${index + 1}: ${label} — ${riskTag.word}`
+            ? `Option ${index + 1}: ${label} — ${riskTag.word}${bands ? `. ${bands.map((band) => band.text).join(". ")}` : ""}`
             : detail
               ? `Option ${index + 1}: ${label}`
               : undefined;
@@ -791,7 +944,16 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
               <span className="tui-option-number" aria-hidden="true">{index + 1}</span>
               <span className="tui-option-body">
                 <span className="tui-option-label">{label}</span>
-                {sub ? <span className="tui-option-preview">{sub}</span> : null}
+                {bands
+                  ? bands.map((band, bandIndex) => (
+                    <span
+                      className={`tui-option-preview tui-option-band band-${band.tone}`}
+                      key={`band-${bandIndex}`}
+                    >
+                      {band.text}
+                    </span>
+                  ))
+                  : sub ? <span className="tui-option-preview">{sub}</span> : null}
               </span>
               {riskTag ? (
                 <span className={`tui-option-tag ${riskTag.className}`} aria-hidden="true">{riskTag.text}</span>
@@ -800,7 +962,7 @@ function OptionsPanel({ options, optionDetails, heading, tone, selected, onSelec
           );
         })}
       </div>
-      {hasRiskTags ? (
+      {hasRiskTags && !pricedShortcut ? (
         <p className="tui-options-risk-help">
           Risk tags flag downside, not the best move — SAFE can be slow, RISKY can still pay off.
         </p>
@@ -839,10 +1001,40 @@ export default function App() {
     onExit: () => window.location.assign("./index.html"),
   });
 
+  const [overlay, setOverlay] = useState(null);
+  const overlayRef = useRef(null);
+  overlayRef.current = overlay;
+
   useEffect(() => {
     const onKeyDown = (event) => {
+      const open = overlayRef.current;
       const tag = document.activeElement?.tagName;
+      if (open && event.key === "Escape") {
+        // Escape closes the panel, and never also leaves the run.
+        event.preventDefault();
+        setOverlay(null);
+        return;
+      }
       if (tag === "INPUT" || tag === "TEXTAREA" || event.metaKey) return;
+
+      // While a panel is up the card underneath takes no keys; its own key
+      // closes it again.
+      if (open) {
+        if (OVERLAY_KEYS[event.key] === open) {
+          event.preventDefault();
+          setOverlay(null);
+        }
+        return;
+      }
+
+      // The panel keys, as the hub answers them. Not while the company
+      // name is being typed: those letters belong to the name.
+      const panel = OVERLAY_KEYS[event.key];
+      if (panel && !event.ctrlKey && !event.altKey && controller.getState().mode !== "setup-name") {
+        event.preventDefault();
+        setOverlay(panel);
+        return;
+      }
 
       if (
         event.key === "ArrowUp" ||
@@ -893,7 +1085,7 @@ export default function App() {
   return (
     <main className="tui-app-shell">
       <div className="tui-shell">
-        <Header onExit={exitGame} isCrisis={isCrisis} />
+        <Header onExit={exitGame} isCrisis={isCrisis} onOpenPanel={setOverlay} />
         <div className="tui-main">
           <Dashboard gameState={state.gameState} />
           <div className="tui-stage">
@@ -913,7 +1105,9 @@ export default function App() {
                 <pre className="tui-art">{state.animFrame}</pre>
               </section>
             ) : null}
-            {state.mode !== "end" ? (
+            {/* A card that opens on the last call's outcome notice already
+                reports it; the panel's height is the card's to read. */}
+            {state.mode !== "end" && !state.contentData?.notice ? (
               <LastDecisionPanel decision={state.gameState?.lastDecision} />
             ) : null}
             <MobileMetricStrip gameState={state.gameState} />
@@ -928,6 +1122,12 @@ export default function App() {
             />
           </div>
         </div>
+        <Overlay
+          kind={overlay}
+          gameState={state.gameState}
+          status={<StatusPanel gameState={state.gameState} />}
+          onClose={() => setOverlay(null)}
+        />
         {isCrisis ? (
           <footer className="tui-terminal-footer">
             <span className="tone-green">forest-ops@bc-simulator</span>

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   CAMPAIGN_SAVE_KEY,
+  SEASONAL_SAVE_KEY,
   findUnreadableSaves,
   loadActiveRun,
   readActiveRun,
@@ -10,7 +11,9 @@ import {
   saveActiveRun,
   validateCampaignSave,
   validateJourneySave,
+  validateSeasonalSave,
 } from "../js/game/saveLoad.js";
+import { TuiGameController, peekSeasonalSave } from "../tui/controller.js";
 import { createJourney } from "../js/journey.js";
 import { FORESTER_ROLES, OPERATING_AREAS } from "../js/data/index.js";
 
@@ -203,5 +206,60 @@ test("storage that throws reads as empty", () => {
   };
   assert.equal(readActiveRun().status, "empty");
   assert.equal(readCampaignSave().status, "empty");
+  assert.deepEqual(findUnreadableSaves(), []);
+});
+
+// A real Seasonal Strategy autosave: a seeded run parked at the summer
+// boundary.
+function genuineSeasonalSave() {
+  const map = new Map();
+  const storage = {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => map.set(k, String(v)),
+    removeItem: (k) => map.delete(k),
+  };
+  const controller = new TuiGameController({ seed: 5150, storage, onExit: () => {} });
+  controller.setInputText("Save Co");
+  controller.submitCurrent();
+  controller.selectOption(0);
+  controller.selectOption(0);
+  for (let guard = 0; guard < 40 && controller.gs.round < 2; guard += 1) controller.selectOption(0);
+  return JSON.parse(map.get(SEASONAL_SAVE_KEY));
+}
+
+test("a partial or older seasonal save is caught before it can dead-end the resume", () => {
+  const good = genuineSeasonalSave();
+  assert.equal(validateSeasonalSave(good), null);
+  const memory = (save) => ({ getItem: () => JSON.stringify(save), setItem() {}, removeItem() {} });
+  assert.ok(peekSeasonalSave(memory(good)), "a genuine save is offered");
+
+  const drop = (key) => {
+    const copy = JSON.parse(JSON.stringify(good));
+    delete copy.state[key];
+    return copy;
+  };
+  const broken = [
+    { version: 1, round: 1, state: { role: "planner", metrics: {} } },
+    drop("history"),
+    drop("area"),
+    drop("round"),
+    { ...good, rngState: undefined },
+    { ...good, version: 2 },
+    { ...good, state: { ...good.state, metrics: { ...good.state.metrics, budget: null } } },
+    { ...good, state: { ...good.state, pendingIssues: {} } },
+  ];
+  for (const save of broken) {
+    assert.notEqual(validateSeasonalSave(save), null, JSON.stringify(save).slice(0, 80));
+    assert.equal(peekSeasonalSave(memory(save)), null, "never offered for resume");
+  }
+
+  const map = withStorage({ [SEASONAL_SAVE_KEY]: JSON.stringify(broken[0]) });
+  const found = findUnreadableSaves();
+  assert.deepEqual(found.map((s) => s.label), ["seasonal run"]);
+  assert.equal(found[0].reason, "role missing");
+  found[0].discard();
+  assert.equal(map.has(SEASONAL_SAVE_KEY), false);
+
+  withStorage({ [SEASONAL_SAVE_KEY]: JSON.stringify(good) });
   assert.deepEqual(findUnreadableSaves(), []);
 });
