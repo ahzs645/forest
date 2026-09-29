@@ -296,3 +296,16 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Campaign review.** A failed season no longer reads "the crew was still delivering" or "production stayed high".
 - **Browser suite.** The campaign spec's bot looped on the new release confirmation, picking "Choose another method — Back to…" every time, and never reached recon travel. Travel itself was fine: it stops at its named destination and says so. A rounding flake (about 1 run in 100) in the 7.5 km arrival-snap unit test is fixed.
 - **Checks.** `npm test` 837/837, Playwright 142/142. Gates: recon, planning, permitting, silviculture and GM 8/8 in every area (72/72 each); silviculture 24/24 at full length; every role 8/8 at campaign scale; GM honest 30/30 on normal. `sim:seasonal` is unchanged from the merge base. `simulate-campaign` good play: 7 Outstanding, 28 Solid, 1 Mixed of 36. The silviculture "release 99% of 260 ha" loss did not reproduce at this head: 270/270 across 9 areas × 30 seeds, and 162/162 in the policy sim.
+
+## 2026-09-29 — Wave 3: seasonal engine and campaign
+
+- **CPD reminder.** It no longer takes the summer contested call. A season kept to the standards (no aggressive stance on the planned work, no shortcut) logs its share of the 30-hour FPBC year, so careful desk and field years keep pace. The "CPD Log Behind" card comes once a year, only when the log is more than a season behind. It is an extra card after the season's own (`CALENDAR_REMINDERS`), never an issue draw. It was in 100% of years; now it is in 6–9% (the pushed ones). Round 2 now deals 48 distinct issues, up from 2. The summer-only heat dome, herbicide drift, camp flooding and beetle escalation cards are all dealt again. `lint:seasonal` checks calendar cards and that no round-end pass queues into an issue slot, and a matrix test covers every one-season issue.
+- **No repeats in a year.** The seasonal deal keeps a per-year memory of the issues and events already answered. Scheduled follow-ups, including shortcut fallout, are exempt. Years with a repeated issue fell from 16–30% to under 1%.
+- **Recoveries credit what the season did.** The documentation rebound needs compliance work that season. The comeback window says whether the calls went into the meter; in a campaign it pays only for that work. A campaign season that fell short gets no dividend and no steady-program top-up, and neither does any season with a noticed or caught shortcut. A season that fell short earns no thrift credit for unspent allowance.
+- **Hard fall file.** On hard, the fall planning allowance is the normal allowance plus a contingency (`HARD_FALL_ALLOWANCE`). Careful play now clears the hard fall in 93% of runs, up from 48%, and careless play still fails it.
+- **Copy and odds.** The desk "rate you" odds line now names the district goodwill it reads and its value. The joke cards appear in about 3% of field years, down from 7–10%.
+- **Leftovers.**
+  - Evacuated crew are no longer hit by the pace and the weather.
+  - The fish-passage and smoke-hold cards reach the coast and the Okanagan.
+  - The dead seasonal comic gate is gone.
+  - Both eslint warnings are fixed.
