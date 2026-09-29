@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { createInitialState, drawSeasonalEvent } from '../js/engine.js';
 import { makeRng } from '../js/engine/rng.js';
+import { simulateMatrix } from '../js/engine/simulate.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 
@@ -30,12 +31,19 @@ test('the seasonal draw honours the deck\'s probability: the legacy joke cards a
     const share = jokes / draws;
     // Fresh states sit at 50 on every metric, where a joke card earns every
     // metric bonus; over a real year (metrics drift up, cooldowns apply) the
-    // four cards together land in about 6% of field-role years. Before the
+    // four cards together land in about 3% of field-role years. Before the
     // draw honoured probability they were in four field years out of five.
     assert.ok(share < 0.03, `${roleId} @ ${areaId}: joke cards are ${(share * 100).toFixed(2)}% of draws`);
     assert.ok(JOKE_EVENT_IDS.every((id) => FIELD_EVENTS.some((event) => event.id === id && event.probability <= 0.005)),
       'the fixture jokes are still the rare cards of the expedition deck');
   }
+});
+
+test('a field year meets a joke card about one year in thirty, not one in ten', () => {
+  const runs = simulateMatrix({ roles: ['recce', 'silviculture'], strategies: ['balanced'], runs: 20, seedBase: 1000 });
+  const jokeYears = runs.filter((run) => run.eventsSeen.some((id) => JOKE_EVENT_IDS.includes(id))).length;
+  const share = jokeYears / runs.length;
+  assert.ok(share <= 0.05, `joke cards in ${(share * 100).toFixed(1)}% of ${runs.length} field years`);
 });
 
 test('a card at the deck\'s reference probability keeps its weight; a rarer one is drawn less', () => {

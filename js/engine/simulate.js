@@ -220,6 +220,7 @@ export function simulateRun({ roleId, areaId, strategy = "balanced", seed = 1, c
     consequences: uniqueHistoryIds(gs.history, "consequence"),
     seasonHeadlines: (gs.seasonTimeline || []).map((entry) => entry.headline).filter(Boolean),
     issuesSeen: uniqueHistoryIds(gs.history, "issue"),
+    eventsSeen: uniqueHistoryIds(gs.history, "event"),
     ...describeDealing(gs.history),
     completed: view.mode === "end",
   };

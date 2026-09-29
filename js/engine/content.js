@@ -1009,12 +1009,19 @@ export function getOperationalEventLibrary(state) {
 // rather than retiring them: rare is the brief, not gone.
 const SEASONAL_REFERENCE_PROBABILITY = 0.05;
 const SEASONAL_PROBABILITY_WEIGHT_FLOOR = 0.05;
+// The four joke cards (the legacy deck's "legacy" type: the sasquatch, the
+// alien landing, the celebrity endorsement, the viral post) sit on a lower
+// floor: at the shared one they reached 7-10% of field years once the
+// per-year no-repeat memory thinned the rest of the pool. At this floor a
+// field year sees one about 3% of the time.
+const SEASONAL_JOKE_WEIGHT_FLOOR = 0.015;
 
 function seasonalProbabilityWeight(event) {
   const probability = Number(event?.probability);
   if (!Number.isFinite(probability) || probability <= 0 || probability >= SEASONAL_REFERENCE_PROBABILITY) return 1;
   const ratio = probability / SEASONAL_REFERENCE_PROBABILITY;
-  return Math.max(SEASONAL_PROBABILITY_WEIGHT_FLOOR, ratio * ratio);
+  const floor = event?.type === "legacy" ? SEASONAL_JOKE_WEIGHT_FLOOR : SEASONAL_PROBABILITY_WEIGHT_FLOOR;
+  return Math.max(floor, ratio * ratio);
 }
 
 function findOperationalEventById(eventId, state) {
