@@ -12,9 +12,10 @@
  *     field crew's morale, a desk protagonist's stress;
  *   - an imposed situation, one where every authored option carries a cost
  *     (a budget cut, an audit, a Board report), lands anyway. The least of
- *     its authored costs is charged, without the work that would have
- *     earned anything back. "Set it aside" used to cancel a 15% budget cut
- *     outright.
+ *     what answering would have cost is charged - gambles at their expected
+ *     cost - without the work that would have earned anything back, and
+ *     capped by the situation's weight. "Set it aside" used to cancel a 15%
+ *     budget cut outright.
  *
  * Every deferral is logged as a situation, so the debrief's compliance tally
  * counts it against the file instead of pretending it never happened.
@@ -75,27 +76,90 @@ export function isImposedSituation(event, weight) {
 }
 
 /**
- * The cost that lands when an imposed situation is deferred: the least-bad
- * certain option's own costs. A gamble's good band is a hope, not a cost, so
- * gambles are only considered when nothing certain is on the card, and then
- * by what happens when nobody acts - their failure band. Null when the
- * situation is not imposed, or when the least-bad option's exposure is all
- * risk and no fixed cost.
+ * How much of an imposed situation a deferral may land, by weight. Past this
+ * the charge is scaled down, never refused: walking away from a moderate call
+ * costs at most two steep hits on the file, a severe one three, and the
+ * budget at most a small share of what the run started with. Setting aside a
+ * billing dispute once charged $18,000 - a quarter of an Old Growth budget -
+ * because the only certain option on the card was paying the invoice.
+ */
+const DEFERRAL_CAP_STEEP_UNITS = { 2: 2, 3: 3 };
+const DEFERRAL_BUDGET_SHARE = { 2: 0.06, 3: 0.1 };
+
+/**
+ * What an option costs on average. A certain option costs its effects; a
+ * gamble costs its bands weighted by the authored odds, so a 60% chance of
+ * getting away clean is not priced as if it always failed, nor as if it
+ * never could.
+ */
+function expectedCosts(option) {
+  if (typeof option?.chanceSuccess !== 'number') return negativeCosts(option?.effects);
+  const odds = Math.max(0, Math.min(1, option.chanceSuccess));
+  const good = option.effects || {};
+  const bad = option.failureEffects || option.effects || {};
+  const blended = {};
+  for (const key of new Set([...Object.keys(good), ...Object.keys(bad)])) {
+    const a = Number(good[key] || 0);
+    const b = Number(bad[key] || 0);
+    if (Number.isFinite(a) && Number.isFinite(b)) blended[key] = odds * a + (1 - odds) * b;
+  }
+  return negativeCosts(blended);
+}
+
+/**
+ * Scale a charge down to what the situation's weight allows. Non-budget
+ * costs shrink together, so the shape of the hit survives; the budget is
+ * capped on its own against the run's starting budget.
+ */
+function capDeferredCost(costs, weight, budgetBase) {
+  const capped = {};
+  const { budget, ...rest } = costs;
+  const units = downsideScore(rest);
+  const limit = DEFERRAL_CAP_STEEP_UNITS[weight] ?? DEFERRAL_CAP_STEEP_UNITS[3];
+  const scale = units > limit ? limit / units : 1;
+  for (const [key, value] of Object.entries(rest)) {
+    const charged = Math.round(value * scale);
+    if (charged < 0) capped[key] = charged;
+  }
+  if (typeof budget === 'number') {
+    const share = DEFERRAL_BUDGET_SHARE[weight] ?? DEFERRAL_BUDGET_SHARE[3];
+    const ceiling = Number(budgetBase) > 0 ? Math.floor((Number(budgetBase) * share) / 100) * 100 : Infinity;
+    const charged = Math.max(-ceiling, Math.round(budget / 100) * 100);
+    if (charged < 0) capped.budget = charged;
+  }
+  return capped;
+}
+
+/**
+ * The cost that lands when an imposed situation is deferred: the least of
+ * what answering it would have cost, capped by the situation's weight.
+ *
+ * Every option is priced on the same footing - a certain option by its
+ * effects, a gamble by its expected cost - and the cheapest is charged, a
+ * certain option winning a tie. Null when the situation is not imposed, or
+ * when the cheapest answer costs nothing fixed (it is all risk).
  * @param {Object} event
  * @param {number} weight
- * @returns {{option: Object, effects: Object}|null}
+ * @param {Object} [context]
+ * @param {number} [context.budgetBase] - the run's starting budget, for the cap
+ * @returns {{option: Object, effects: Object, uncapped: Object}|null}
  */
-export function pickDeferredCost(event, weight) {
+export function pickDeferredCost(event, weight, { budgetBase } = {}) {
   if (!isImposedSituation(event, weight)) return null;
-  const certain = event.options.filter((option) => typeof option?.chanceSuccess !== 'number');
-  const candidates = (certain.length ? certain : event.options).map((option) => ({
-    option,
-    effects: certain.length ? option.effects : (option.failureEffects || option.effects),
-  }));
-  candidates.sort((a, b) => optionDownside(a.option, a.effects) - optionDownside(b.option, b.effects));
+  const candidates = event.options.map((option, index) => {
+    const costs = expectedCosts(option);
+    return {
+      option,
+      costs,
+      score: optionDownside(option, costs),
+      gamble: typeof option?.chanceSuccess === 'number',
+      index,
+    };
+  });
+  candidates.sort((a, b) => (a.score - b.score) || (a.gamble - b.gamble) || (a.index - b.index));
   const least = candidates[0];
-  const effects = negativeCosts(least?.effects);
-  return Object.keys(effects).length ? { option: least.option, effects } : null;
+  const effects = capDeferredCost(least.costs, weight, budgetBase);
+  return Object.keys(effects).length ? { option: least.option, effects, uncapped: least.costs } : null;
 }
 
 /**
@@ -120,7 +184,8 @@ export function applyDeferredSituation(journey, event, { weight, imposedCost = t
   if (severity === 'positive') {
     messages.push('You let it pass. Nothing lost but the moment.');
   } else {
-    const deferred = imposedCost ? pickDeferredCost(event, weight) : null;
+    const budgetBase = Number(journey.budgetStart) > 0 ? journey.budgetStart : journey.resources?.budget;
+    const deferred = imposedCost ? pickDeferredCost(event, weight, { budgetBase }) : null;
     if (deferred) {
       messages.push('You set it aside. It lands anyway — the least of it:');
       applyEventEffects(journey, deferred.effects, messages);

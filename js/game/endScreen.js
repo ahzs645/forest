@@ -9,6 +9,7 @@ import { getPackagesFinalized, getPackageTarget } from '../journey/packages.js';
 import { getCurrentSeasonInfo } from '../season.js';
 import { calculateScore, formatScoreDisplay } from '../scoring.js';
 import { summarizeIntegrity } from '../modes/silvicultureIntegrity.js';
+import { getPlanningPhaseLabel } from '../modes/planning.js';
 
 /**
  * Show the end-of-game screen
@@ -134,7 +135,7 @@ export function writeFinalStatistics(ui, journey) {
       break;
     }
     case 'planning':
-      ui.write(`Final Phase: ${journey.plan.phase}`);
+      ui.write(`Final Phase: ${getPlanningPhaseLabel(journey.plan.phase)}`);
       ui.write(`Data Completeness: ${journey.plan.dataCompleteness}%`);
       ui.write(`Analysis Quality: ${journey.plan.analysisQuality}%`);
       ui.write(`Stakeholder Buy-in: ${journey.plan.stakeholderBuyIn}%`);
@@ -228,8 +229,14 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
   }
 }
 
+/** An end reason as a sentence: most are written as labels, without a full stop. */
+function asSentence(text) {
+  const trimmed = String(text || '').trim();
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
 export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
-  const reason = journey.endReason || journey.gameOverReason || 'The expedition ground to a halt.';
+  const reason = asSentence(journey.endReason || journey.gameOverReason || 'The expedition ground to a halt.');
 
   switch (journey.journeyType) {
     case 'recon':
@@ -256,7 +263,7 @@ export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
     case 'permitting':
     case 'desk':
       return `The licensee's permitting desk in ${areaName} could not get the season's permits issued. ` +
-        `${reason} After ${daysUsed} days, the backlog remains.`;
+        `${reason} After ${daysUsed} days, ${journey.permits?.approved || 0} of ${journey.permits?.target || 0} are issued; the rest go to whoever takes the desk.`;
     case 'manager':
       return `${crewName}'s tenure leading the ${areaName} operation ended after ${daysUsed} months. ` +
         `${reason} The board is already interviewing replacements.`;

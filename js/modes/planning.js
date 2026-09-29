@@ -39,6 +39,8 @@ import { getOperationalProgress, recordProgressMilestones } from '../journey.js'
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
+import { checkpointDeskDay, closeDeskDay, resumingDeskDay } from '../journey/deskMechanics.js';
+import { describeGoodwillChange, readGoodwill } from '../events/resolution.js';
 
 /**
  * What a day on each track of the planning file is worth.
@@ -68,6 +70,8 @@ const PLANNING_DAILY_BURN = 600;
  * is the only way to the gate.
  */
 export const RETURNED_SUBMISSION_READINESS_COST = 5;
+/** District goodwill a Stakeholder Session spends: the district sits in on every one. */
+export const SESSION_GOODWILL_COST = 3;
 
 /**
  * The FSP's results and strategies have to be consistent with every objective
@@ -297,7 +301,7 @@ export function getFomPublicationGaps(journey) {
   return gaps;
 }
 
-function getPlanningPhaseLabel(phase) {
+export function getPlanningPhaseLabel(phase) {
   return PLANNING_PHASE_NAMES[phase] || phase;
 }
 
@@ -790,13 +794,18 @@ function actionNeedsReceipt(actionValue) {
 export async function runPlanningDay(game) {
   const { ui, journey } = game;
   const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
-  const progressBeforeDay = getOperationalProgress(journey);
+  // A reload mid-day picks up after the last settled decision instead of
+  // replaying the morning (js/journey/deskMechanics.js).
+  const resumed = resumingDeskDay(journey);
+  const progressBeforeDay = resumed?.progressBeforeDay ?? getOperationalProgress(journey);
   ensurePlanningProfessionalState(journey);
   // The debrief measures spending against what the file started with.
   if (!Number.isFinite(journey.budgetStart)) journey.budgetStart = journey.resources?.budget || 0;
+  // A follow-up that fired before the day opened can spend the last of it.
+  if (endsFileNow(game)) return;
 
   // Morning at the office: the season outside the window, coffee inside.
-  if (typeof ui.playScene === 'function') {
+  if (!resumed && typeof ui.playScene === 'function') {
     await ui.playScene(buildOfficeWindowFrames({
       weatherId: journey.weather?.id,
       season: journey.season?.currentSeason,
@@ -804,17 +813,21 @@ export async function runPlanningDay(game) {
     }), { delay: 140, holdLastFrame: false, ambient: 'work' });
   }
 
-  startDay(journey);
+  startDay(journey, { resuming: Boolean(resumed) });
 
-  // Periodic real-data block decision: selected block influences events and values.
-  await maybePromptForBlockSelection(game, seasonInfo);
+  if (!resumed) {
+    // Periodic real-data block decision: selected block influences events and values.
+    await maybePromptForBlockSelection(game, seasonInfo);
 
-  // Apply daily values consequences (Phase 4.1)
-  applyValuesConsequences(journey);
+    // Apply daily values consequences (Phase 4.1)
+    applyValuesConsequences(journey);
+  } else if (resumed.situation) {
+    journey.recentSituationContext = { day: journey.day, ...resumed.situation };
+  }
 
   // Check for event at start of day. Day 1 stays event-free so the player meets
   // the normal planning loop before the game starts throwing disruptions.
-  const event = journey.day > 1 ? checkForEvent(journey) : null;
+  const event = !resumed && journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     const daysLeft = Number.isFinite(journey.deadline)
       ? Math.max(0, journey.deadline - journey.day)
@@ -831,12 +844,24 @@ export async function runPlanningDay(game) {
           `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
         ]),
         onRender: () => updatePlanningMissionStatus(ui, journey, seasonInfo),
+        onResolved: ({ spendsDay, setAside }) => {
+          if (spendsDay) spendDay(journey);
+          checkpointDeskDay(game, {
+            progressBeforeDay,
+            situation: { title: event.title || 'the situation', setAside },
+          });
+        },
       },
       setAsideDescription: 'Not today. Keep the day for the file.',
     });
     if (outcome.gameOver) return;
+    // A situation that spends the last of the goodwill or the budget ends the
+    // file there. The outcome has already said "the file stops here"; a full
+    // day's work after it (and a meeting that won the goodwill back) made
+    // that a lie.
+    if (endsFileNow(game)) return;
     // A situation worth a day is the day — the action menu below never opens.
-    if (outcome.spendsDay) spendDay(journey);
+    // (Spent as it resolved, so the checkpoint already knows.)
   }
 
   // Check protagonist energy
@@ -914,6 +939,7 @@ export async function runPlanningDay(game) {
       if (settleDayPass(journey, freeChoices, ui)) break;
       continue;
     }
+    if (dayIsSpent(journey)) checkpointDeskDay(game, { progressBeforeDay });
 
     ui.updateAllStatus(journey);
     updatePlanningMissionStatus(ui, journey, seasonInfo);
@@ -949,6 +975,7 @@ export async function runPlanningDay(game) {
   checkGameOver(game);
 
   ui.updateAllStatus(journey);
+  updatePlanningMissionStatus(ui, journey, seasonInfo);
 
   const milestoneMessages = [];
   recordProgressMilestones(journey, progressBeforeDay, milestoneMessages, Math.max(1, journey.day - 1));
@@ -956,8 +983,11 @@ export async function runPlanningDay(game) {
     ui.writePositive(message);
   }
 
-  // Contextual continue (Phase 6.1)
-  const continueLabel = `Continue... (Phase: ${getPlanningPhaseLabel(journey.plan.phase)}, Day ${journey.day})`;
+  // Contextual continue (Phase 6.1). On the night the file closes, the
+  // button says so instead of promising another day.
+  const continueLabel = journey.isGameOver
+    ? 'The work stops here...'
+    : `Continue... (Phase: ${getPlanningPhaseLabel(journey.plan.phase)}, Day ${journey.day})`;
   await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
 }
 
@@ -990,7 +1020,7 @@ export function updatePlanningMissionStatus(ui, journey, seasonInfo = null) {
   }));
   const weakest = getWeakestPlanningValue(journey);
   checklist.push({
-    label: `Weakest value: ${weakest.label} ${weakest.value}% of ${PLANNING_VALUES_FLOOR}%`,
+    label: `Weakest value: ${weakest.label} ${weakest.value}% (needs ${PLANNING_VALUES_FLOOR}%)`,
     done: weakest.value >= PLANNING_VALUES_FLOOR
   });
   checklist.push({
@@ -1363,7 +1393,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (valuesOk) {
       actionOptions.push({
         label: 'Stakeholder Session',
-        description: 'Engagement record: hear concerns, record responses and agree follow-up actions',
+        description: `Engagement record: hear concerns, record responses and agree follow-up actions | $700, district goodwill -${SESSION_GOODWILL_COST}`,
         value: 'stakeholder'
       });
     } else {
@@ -1398,7 +1428,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (valuesOk) {
       actionOptions.push({
         label: 'Stakeholder Session',
-        description: 'Lane: engagement recovery | Rebuild buy-in before the final package',
+        description: `Lane: engagement recovery | Rebuild buy-in before the final package | $700, district goodwill -${SESSION_GOODWILL_COST}`,
         value: 'stakeholder'
       });
     } else {
@@ -1445,7 +1475,8 @@ function buildActionOptions(journey, seasonInfo = null) {
       pieces.push(`registration ${professional.registrationStatus} (your licence to sign off is not current)`);
     }
     if (professional?.cpdGap > 0) {
-      pieces.push(`CPD ${professional.cpdHours}/${professional.cpdTarget}h logged this season`);
+      const logged = professional.registrationStatus !== 'active' ? 8 : 6;
+      pieces.push(`CPD ${professional.cpdHours}/${professional.cpdTarget}h logged this season (a day logs ${logged}h)`);
     }
     if ((professional?.paperworkLoad || 0) >= PAPERWORK_FLAG_THRESHOLD) {
       pieces.push(`filing backlog high (the next audit will find it)`);
@@ -1453,7 +1484,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     actionOptions.push({
       label,
       description: pieces.length
-        ? `Lane: professional file | Clears: ${pieces.join(' | ')}`
+        ? `Lane: professional file | Works on: ${pieces.join(' | ')}`
         : 'Lane: professional file | Renew registration, log CPD, and clear the filing backlog',
       value: 'professional_admin'
     });
@@ -1655,12 +1686,14 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       const mood = getStakeholderMoodAverage(journey);
       if (mood !== null && mood >= 60) {
         journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
-        ui.write('The room was already warm; the session landed well (+2 buy-in).');
+        ui.write('The stakeholders came in warm; the session landed well (+2 buy-in).');
       } else if (mood !== null && mood <= 40) {
         journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 2);
         ui.write('The room came in sour; the session spent its first hour on old grievances (-2 buy-in).');
       }
-      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 3);
+      const goodwillBefore = readGoodwill(journey);
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - SESSION_GOODWILL_COST);
+      for (const line of describeGoodwillChange(journey, goodwillBefore)) ui.write(line);
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 20, stress: 16 });
@@ -1889,8 +1922,10 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       } else {
         ui.write('Compliance admin logged the season\'s CPD and trimmed the filing backlog.');
       }
-      if (chainProgress?.stage) {
-        ui.write(`Registration chain advanced to: ${chainProgress.stage}.`);
+      const cpd = ensurePlanningProfessionalState(journey);
+      if (cpd) ui.write(`CPD logged this season: ${cpd.cpdHours}/${cpd.cpdTarget}h.`);
+      if (didRenewal && chainProgress?.stage) {
+        ui.write('Registration is current again; the renewal is on file.');
       }
       break;
     }
@@ -2106,6 +2141,7 @@ async function advanceToNextDay(game) {
   }
 
   journey.day++;
+  closeDeskDay(journey);
   startDay(journey);
 
   // Protagonist recovery
@@ -2145,6 +2181,15 @@ async function advanceToNextDay(game) {
   }
 
   ui.write(`Planning team burn: -$${PLANNING_DAILY_BURN}.`);
+}
+
+/**
+ * Close the file on the spot if what it runs on is gone.
+ * @returns {boolean} true when the run has ended
+ */
+function endsFileNow(game) {
+  checkGameOver(game);
+  return Boolean(game.journey.isGameOver);
 }
 
 function checkGameOver(game) {

@@ -73,8 +73,9 @@ test('permitter smoke shows file-lane guidance on boot', async ({ page }) => {
   );
 
   // Lane guidance renders in the mission dashboard pane now, not the log.
+  // A Stage fact only appears beside the area's own paperwork lane (road,
+  // archaeology, special use); the permit queue has no stages.
   await expect(page.locator('#mission-panel .mission-fact-label').filter({ hasText: 'Lane' })).toBeVisible();
-  await expect(page.locator('#mission-panel .mission-fact-label').filter({ hasText: 'Stage' })).toBeVisible();
   await expect(page.locator('#mission-panel .mission-guidance')).toBeVisible();
   await expect(page.locator('#choices button').first()).toBeVisible();
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);

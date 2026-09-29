@@ -392,9 +392,9 @@ function extractElapsedDays(text) {
 function assertModeSpecificExpectations(modeName, terminalText) {
   switch (modeName) {
     case 'planner': {
-      expect(terminalText).toMatch(/Final Phase:\s*(data_gathering|analysis|stakeholder_review|ministerial_approval)/);
+      expect(terminalText).toMatch(/Final Phase:\s*(Inventory & Data|Analysis & Draft Plan|Engagement & Public Review|District Manager Decision)/);
       if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
-        expect(terminalText).toMatch(/Final Phase:\s*ministerial_approval/);
+        expect(terminalText).toMatch(/Final Phase:\s*District Manager Decision/);
         expect(extractStat(terminalText, 'Data Completeness')).toBeGreaterThanOrEqual(80);
         expect(extractStat(terminalText, 'Analysis Quality')).toBeGreaterThanOrEqual(80);
         expect(extractStat(terminalText, 'Stakeholder Buy-in')).toBeGreaterThanOrEqual(75);

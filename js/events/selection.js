@@ -29,6 +29,7 @@ import { getDiscoveryEventTypeMultipliers } from '../data/discoveryTags.js';
 import { getAreaSituationMultipliers } from '../data/areaSituations.js';
 import { formatRadioReport } from './display.js';
 import { getDayRng } from './dayRng.js';
+import { getSignableFiles } from '../journey/permitPipeline.js';
 
 /**
  * Chance that an ordinary day carries an event at all.
@@ -317,8 +318,16 @@ function mergeTypeMultipliers(...groups) {
   return merged;
 }
 
-function eventSupportsJourney(event, journey) {
+export function eventSupportsJourney(event, journey) {
   if (!event) {
+    return false;
+  }
+
+  // An event whose premise is a signed permit ("Permit Issued Early") needs a
+  // file on the District Manager's desk to sign, or its first line is false.
+  if (journey?.permits && event.options?.length
+    && event.options.every((option) => Number(option?.effects?.permits_approved) > 0)
+    && getSignableFiles(journey).length === 0) {
     return false;
   }
 

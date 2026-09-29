@@ -445,7 +445,9 @@ export class TerminalUI {
     }
 
     // Resource panel type mapping
-    const resourceType = (journey.journeyType === 'field' || journey.journeyType === 'recon') ? 'field' : 'desk';
+    const resourceType = (journey.journeyType === 'field' || journey.journeyType === 'recon')
+      ? 'field'
+      : journey.journeyType === 'manager' ? 'manager' : 'desk';
     this.updateResourcesPanel(journey.resources, resourceType);
 
     // Location panel varies by journey type

@@ -51,7 +51,7 @@ export const MILESTONE_COPY = {
   planning: {
     25: 'The inventory wall has shape now. The operating area no longer feels theoretical.',
     50: 'Half the plan is standing. The Nations and the public can finally see where this is headed.',
-    75: 'The FSP binder has shape. The District Manager\'s decision is in sight.',
+    75: 'The FSP binder has shape. What is left is earning the District Manager\'s confidence in it.',
     90: 'Last mile to sign-off. One clean submission could carry the plan over the line.'
   },
   permitting: {

@@ -134,7 +134,7 @@ test('the mission pane carries the weakest value against the floor', () => {
   const status = updatePlanningMissionStatus({ setMissionStatus() {} }, journey, null);
   const item = status.checklist.find((entry) => /^Weakest value/.test(entry.label));
   assert.ok(item);
-  assert.equal(item.label, `Weakest value: First Nations 33% of ${PLANNING_VALUES_FLOOR}%`);
+  assert.equal(item.label, `Weakest value: First Nations 33% (needs ${PLANNING_VALUES_FLOOR}%)`);
   assert.equal(item.done, false);
 });
 
