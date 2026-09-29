@@ -476,7 +476,14 @@ test('the winning day records its milestone without printing it', async () => {
 
 // ── Playtest fixes: contractors, program obligations, survey rules ──────────
 
-const endDay = (prompt, options) => options.find((o) => o.value === 'set_aside') || options.find((o) => o.value === 'end');
+// Waves the day's situation off without losing the day: set it aside, or,
+// when setting it aside would take the day as well, answer it briefly.
+const endDay = (prompt, options) => {
+  const setAside = options.find((o) => o.value === 'set_aside');
+  if (setAside && !/day included/.test(setAside.description || '')) return setAside;
+  return options.find((o) => typeof o.value === 'number' && /brief response/.test(o.description || ''))
+    || setAside || options.find((o) => o.value === 'end');
+};
 
 test('contractor fatigue is shed on days off and never earned standing by, so crews do not stall one day on, two off', async () => {
   await withSeededRandom(131, async () => {
