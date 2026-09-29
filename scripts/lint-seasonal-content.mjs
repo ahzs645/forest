@@ -30,7 +30,8 @@ import {
 import { ASSIGNMENT_FLAG_PRODUCERS, buildAssignmentCandidates } from "../js/engine/assignments.js";
 import { actMatchesSeasonalTemptationContext } from "../js/engine/content.js";
 import { SEASON_CONTEXT_FLAGS } from "../js/engine/context.js";
-import { ROUND_CONSEQUENCE_FLAGS } from "../js/engine/effects.js";
+import { CALENDAR_REMINDERS } from "../js/engine/constants.js";
+import { ROUND_CONSEQUENCE_FLAGS, applyRoundConsequences } from "../js/engine/effects.js";
 import {
   getSeasonalPlayableRoles,
   matchesAreaContext,
@@ -161,6 +162,12 @@ export function lintSeasonalContent() {
   // issue whose candidates all fail the area gate is dropped silently.
   lintReachability(allIssues, err);
 
+  // 6b. The issue slot belongs to the season's draw. A card the round-end pass
+  // hands out on its own (the CPD reminder) is a calendar card dealt after the
+  // season's cards; queued as a pending issue it owned the summer slot in
+  // every year and four summer-only issues never surfaced.
+  lintCalendarCards(allIssues, err);
+
   // 7. Season-specific copy must be season-gated, or a -30C cold snap turns up
   // in summer and a heat dome in winter.
   for (const issue of allIssues) {
@@ -289,6 +296,45 @@ function lintReachability(allIssues, err) {
         const target = issueById.get(scheduled);
         if (target && !issueFitsAnywhere(target, roleIds)) {
           err(where, `option ${i} schedules "${scheduled}", which can never surface for this card's roles`);
+        }
+      }
+    }
+  }
+}
+
+function lintCalendarCards(allIssues, err) {
+  const calendarIds = new Set(Object.values(CALENDAR_REMINDERS));
+  for (const issue of allIssues) {
+    const where = `issue:${issue.id}`;
+    if (issue.calendarReminder && !calendarIds.has(issue.id)) {
+      err(where, "is marked calendarReminder but no CALENDAR_REMINDERS flag deals it");
+    }
+    if (calendarIds.has(issue.id)) {
+      if (!issue.calendarReminder) err(where, "is a calendar reminder but not marked calendarReminder, so the issue draw can deal it");
+      if (issue.priorityFlag || issue.requiresFlags?.length || issue.requiresAnyFlags?.length) {
+        err(where, "is a calendar reminder: the calendar deals it, so it carries no draw gates");
+      }
+    }
+  }
+  for (const id of calendarIds) {
+    if (!allIssues.some((issue) => issue.id === id)) err(`calendar:${id}`, "names an issue that does not exist");
+  }
+
+  // A year played with nothing but pushed seasons, the one that falls furthest
+  // behind: the round-end pass may set calendar flags, never queue an issue.
+  for (const role of getSeasonalPlayableRoles(FORESTER_ROLES)) {
+    for (const area of OPERATING_AREAS) {
+      const state = createInitialState({ companyName: "Lint", roleId: role.id, areaId: area.id });
+      state.totalRounds = SEASON_ROUNDS.length;
+      for (const round of SEASON_ROUNDS.slice(0, -1)) {
+        state.round = round;
+        state.currentSeasonContext = buildSeasonContext(state);
+        state.history.push({ type: "assignment", id: `lint-${round}`, round, stance: "aggressive" });
+        applyRoundConsequences(state);
+        const queued = (state.pendingIssues || []).map((entry) => entry.id || entry.candidates?.[0]?.id);
+        if (queued.length) {
+          err(`round-end:${role.id}:${area.id}`, `the round-${round} pass queues ${queued.join(", ")} into round ${round + 1}'s issue slot`);
+          break;
         }
       }
     }

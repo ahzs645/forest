@@ -14,6 +14,7 @@ import {
 } from "../data/illegalActs.js";
 import {
   AUDIT_TEMPTATION_TAGS,
+  CALENDAR_REMINDERS,
   COMMUNITY_TEMPTATION_TAGS,
   ECOLOGICAL_TEMPTATION_TAGS,
   ETHICS_TEMPTATION_TAGS,
@@ -184,6 +185,9 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
       if (typeof pending.delay === "number" && pending.delay > 0) {
         continue;
       }
+      // A calendar reminder queued by an older save is dealt as its own card
+      // (drawCalendarReminder), not in this slot.
+      if (CALENDAR_REMINDER_IDS.has(pending.id)) continue;
       const candidate = resolvePendingIssue(state, pending, { tags, season }, rng);
       if (candidate) {
         state.pendingIssues.splice(i, 1);
@@ -204,7 +208,7 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
 
   const allIssues = [...ISSUE_LIBRARY, ...CHAINED_ISSUES];
   const pool = allIssues
-    .filter((issue) => !excludeIds.includes(issue.id))
+    .filter((issue) => !issue.calendarReminder && !excludeIds.includes(issue.id))
     .filter((issue) => issueMatchesContext(issue, state, tags));
   const freshPool = pool.filter((issue) => !isIssueInCooldown(state, issue.id));
   const selectablePool = freshPool.length ? freshPool : pool;
@@ -231,6 +235,30 @@ export function drawIssue(state, rng = Math.random, { advancePending = true, exc
     }
   }
   return normalizeSeasonalCard(weightedPool[weightedPool.length - 1].issue, state, "issue");
+}
+
+const CALENDAR_REMINDER_IDS = new Set(Object.values(CALENDAR_REMINDERS));
+
+/**
+ * The calendar reminder due this season (CALENDAR_REMINDERS), as an extra
+ * card dealt after the season's own: the round-end pass sets its flag once a
+ * year, and dealing it clears the flag. A reminder an older save queued as a
+ * pending issue is picked up here too.
+ */
+export function drawCalendarReminder(state) {
+  if (!state?.flags) return null;
+  const pending = Array.isArray(state.pendingIssues) ? state.pendingIssues : [];
+  for (const [flag, id] of Object.entries(CALENDAR_REMINDERS)) {
+    const queued = pending.findIndex((entry) => entry?.id === id);
+    if (!state.flags[flag] && queued < 0) continue;
+    delete state.flags[flag];
+    if (queued >= 0) pending.splice(queued, 1);
+    const issue = ISSUE_LIBRARY.find((entry) => entry.id === id);
+    if (issue && issueMatchesContext(issue, state, state.area?.tags || [])) {
+      return normalizeSeasonalCard({ ...issue, scheduled: true }, state, "issue");
+    }
+  }
+  return null;
 }
 
 export function scoreIssueSelection(issue, state, context) {

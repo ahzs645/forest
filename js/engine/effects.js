@@ -6,6 +6,8 @@ import {
 import {
   BUDGET_ATTRITION_THRESHOLD,
   COMPLIANCE_AUDIT_THRESHOLD,
+  CPD_CARD_GAP,
+  DEFAULT_CPD_TARGET,
   RELATIONSHIP_TRUST_THRESHOLD,
 } from "./constants.js";
 import { buildScheduledIssueTeaser, combineScheduledIssueTeasers, describePromisedFallout } from "./content.js";
@@ -79,7 +81,9 @@ export function applyOptionOutcome(state, option = {}, source, rng = Math.random
 
   if (option.risk) {
     const result = resolveRisk(state, option.risk, rng);
-    const effects = applyEffects(state, result.effects, source);
+    // The history keeps the band, so the round-end pass can tell a shortcut
+    // taken (and whether anyone noticed) from one refused.
+    const effects = applyEffects(state, result.effects, source && { ...source, band: result.band || (result.success ? "clean" : "caught") });
     applyOptionFlags(state, option);
     if (result.flags) {
       applyOptionFlags(state, { setFlags: result.flags });
@@ -186,12 +190,16 @@ export const ROUND_CONSEQUENCE_FLAGS = Object.freeze([
   "contractorAttritionActive",
   "auditEscalationActive",
   "budgetEmergencyScheduled",
-  "cpdBehind",
 ]);
 
-// Hours behind the prorated FPBC year before the CPD log becomes a card
-// ("cpd-log-behind" in js/data/issues.js).
-const CPD_CARD_GAP = 6;
+/**
+ * Whether the season's own calls kept to the professional standards: no
+ * planned work answered with the aggressive stance, and no shortcut taken.
+ */
+function seasonKeptToStandards(state, round) {
+  return !(state.history || []).some((entry) => Number(entry?.round) === round
+    && (entry.stance === "aggressive" || (entry.type === "temptation" && entry.band)));
+}
 
 export function applyRoundConsequences(state) {
   if (!state?.metrics || !state?.flags) {
@@ -283,6 +291,18 @@ export function applyRoundConsequences(state) {
 
   if (professional) {
     const complianceLow = metrics.compliance < COMPLIANCE_AUDIT_THRESHOLD;
+    // A season run to the standards leaves room for the CPD a professional
+    // logs in the ordinary course of the work (the district's technical
+    // sessions, a practice advisory read and noted): its share of the year.
+    // A season spent pushing the file past them logs none.
+    if (seasonKeptToStandards(state, round)) {
+      const target = Number(professional.cpdTarget) || DEFAULT_CPD_TARGET;
+      professional.cpdHours = clamp(
+        Number(professional.cpdHours || 0) + target / Math.max(1, Number(state.totalRounds) || 4),
+        0,
+        100,
+      );
+    }
     // CPD is a year-long target: judge the log against the share of the year
     // that has passed, not the full 30 hours from the first season.
     const cpdGap = getCpdShortfall(state, round).gap;
@@ -293,19 +313,12 @@ export function applyRoundConsequences(state) {
     } else if (professional.competenceRisk > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk - 1, 0, 100);
     }
-    // The practice-burden card that logs CPD is an assignment the desk roles'
-    // paperwork chains always outrank, so a planner or permitter could never
-    // close the gap this charges for. A log far enough behind puts its own
-    // card on the desk: the first time in a year it lands next season, and
-    // while the log stays behind it can come back.
-    if (cpdGap >= CPD_CARD_GAP) {
-      flags.cpdBehind = true;
-      if (!flags.cpdReminderSent) {
-        flags.cpdReminderSent = true;
-        scheduleIssueEntries(state, { id: "cpd-log-behind", delay: 1 });
-      }
-    } else {
-      delete flags.cpdBehind;
+    // A log let slide more than a season behind puts its own card on the
+    // desk, once a year: an extra card at the end of next season
+    // (CALENDAR_REMINDERS), never the season's contested call.
+    if (cpdGap >= CPD_CARD_GAP && !flags.cpdReminderSent && round < (Number(state.totalRounds) || 4)) {
+      flags.cpdReminderSent = true;
+      flags.cpdReminderDue = true;
     }
 
     // Seasonal play barely touched the professional state, so its two
