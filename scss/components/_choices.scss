@@ -285,3 +285,26 @@
   color: var(--fg-muted);
   line-height: 1.5;
 }
+
+// An option shown for its reason rather than offered (the crew for it is on
+// days off). Dim text, no hover bar, never the selection.
+.choice-btn:disabled,
+.decision-card:disabled {
+  cursor: not-allowed;
+  color: var(--text-dim);
+
+  .choice-key,
+  .choice-label,
+  .card-label {
+    color: var(--text-dim);
+  }
+
+  &:hover {
+    background: transparent;
+    border-color: var(--border-color);
+  }
+}
+
+.decision-card:disabled:hover {
+  background: var(--card);
+}

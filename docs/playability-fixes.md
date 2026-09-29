@@ -187,3 +187,16 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Gating** (`js/data/illegalActs.js`): grizzly and nesting acts, planting crews and camps stay out of winter; coastal fir and the coastal seed variance are gated by BEC; whitebark cones to the interior; the 40 ha cap to the Coast and Southern Interior (FPPR s.64). A silviculture deployment runs the growing season, so its brushing/survey acts are reachable there; the regen-delay push is fall/winter.
 - **Fields for the card UI (F1b):** on the offer card `shortcut {actId,title,proposer,institution,category,tier}`, `odds {clean,noticed,caught}`, `oddsLine`, `payoffChip`, `payoffLine`, `payoffEffects`, `institution`, `promisedFallout {id,title,severity}`; on the take option the same plus `bands.{clean,noticed,caught}.{effects,outcome}`; on the fallout card `causedBy`, `sourceTitle`, `scheduled`; on `gs.lastDecision` and the outcome notice, `band`.
 - **Sims** (`node scratchpad f1a-sim.mjs`, 4 roles × 9 areas × 12 seeds, balanced play elsewhere): take-all vs refuse-all mean score planner 52.0→58.1 vs 61.6, permitter 50.9→59.3 vs 61.3, recce 55.2→58.7 vs 61.7, silviculture 48.8→53.1 vs 55.2; net-positive clean takes 0–41% → 100%; promised fallout dealt next season 37–62% → 100%; final-season catches resolved in the review 0 → 26/26. Tests: `tests/seasonalShortcuts.test.mjs`.
+## 2026-09-29 — Silviculture residuals (round 2)
+
+- **Coast budget.** Day 1 and the binder say what the budget assumes: what planting, fill, surveys and overhead need, and what the release queue costs by each method. Cylinder release (saw crews clear a ring round each crop tree, $560/ha) is a chemical-free route the budget carries on every area and difficulty. Four saw crews brush 30 ha on a normal day, not 48 to 65. Each release day is quoted and confirmed before the crews go out.
+- **Events.** Fuel and food costs are priced into the budget, but gains, first-aid counts and traverse time setbacks are dropped. Buying food no longer earns money. Options that say they take the day now spend it. Traverse-only cards are skipped. The chainsaw partial band evacuates the worker it says was lost.
+- **Crews on days off.** Field tasks stay on the card, disabled, with the day the crew is back. Surveyors never plant, and fill does not call the saw crew in beside the planters.
+- **Standing.** Glyphosate on sensitive ground writes relationships to the standing ledger. After three spray days the Nation asks for no more spraying, and glyphosate is shown off the table.
+- **Copy.** Stand-down reasons follow the season and the ground. Contractor calls fit the outfit, and quality disputes follow short plots. Milestones print the program's real numbers. The panel refreshes after the day's work.
+- **End of run.** A delivered run graded D or F is "EXPEDITION COMPLETE", not "SUCCESSFUL". A pulled or failed program is handed over, not reported, and its narrative follows what was planted. The expedition gets the silviculture crew. The grade reads the difficulty-adjusted budget.
+- **Sims.** `node scripts/simulate-silviculture-policies.mjs` now covers 9 areas x 3 difficulties with a no-spray `honest` policy, 8 seeds each:
+  - competent: 216/216 wins
+  - honest: 216/216 wins, never broke; about $26k left on the hard coast
+  - neglect: 0/216 wins
+  - fraud: 0/216 wins

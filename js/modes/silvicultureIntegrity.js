@@ -12,6 +12,7 @@
  */
 
 import { ILLEGAL_ACTS } from '../data/illegalActs.js';
+import { assessSilvicultureProgram } from '../data/silvicultureProgram.js';
 
 /** Grade points a shortcut costs once the district has it on file. */
 export const INTEGRITY_PENALTY = {
@@ -133,8 +134,8 @@ export function runSeasonCloseAudit(journey, rng = Math.random) {
       record.status = 'caught';
       record.caughtAtClose = true;
       lines.push(record.kind === 'false-record'
-        ? `The district's check survey reads ${record.title.toLowerCase()} against the ground. It does not match, and the signature on it is yours.`
-        : `The season-close inspection finds ${record.title.toLowerCase()}. It goes in the file.`);
+        ? `The district's check survey reads a record you signed against the ground: "${record.title}". It does not match, and the signature on it is yours.`
+        : `The season-close inspection turns up a shortcut you took: "${record.title}". It goes in the file.`);
     }
   }
   return lines;
@@ -152,10 +153,13 @@ export function runSeasonCloseAudit(journey, rng = Math.random) {
 export function resolveSilvicultureFinalReport(style, journey, rng = Math.random) {
   const summary = summarizeIntegrity(journey);
   const scrutiny = Number(journey?.scrutiny) || 0;
+  // A program pulled or not delivered is handed over, not reported
+  // (js/game/debrief.js); same stances, same odds, its own words.
+  const handover = summary.programPulled || !assessSilvicultureProgram(journey).complete;
+  if (handover) return resolveHandover(style, summary, scrutiny, rng);
   switch (style) {
     case 'spin': {
-      const odds = Math.max(0.05, Math.min(0.55, 0.55 - Math.max(0, scrutiny - 20) / 100 - 0.2 * summary.falseRecords));
-      if (rng() < odds) {
+      if (rng() < spinOdds(summary, scrutiny)) {
         return {
           delta: 3,
           lines: ['The projection holds, for now. The district files the report and books a check survey on your blocks for next summer anyway.'],
@@ -183,5 +187,35 @@ export function resolveSilvicultureFinalReport(style, journey, rng = Math.random
         delta: 4,
         lines: ['The numbers go in as surveyed. The district\'s check survey lands close to yours, and the next declaration you sign gets read a little faster.'],
       };
+  }
+}
+
+function spinOdds(summary, scrutiny) {
+  return Math.max(0.05, Math.min(0.55, 0.55 - Math.max(0, scrutiny - 20) / 100 - 0.2 * summary.falseRecords));
+}
+
+function resolveHandover(style, summary, scrutiny, rng) {
+  switch (style) {
+    case 'spin':
+      if (rng() < spinOdds(summary, scrutiny)) {
+        return {
+          delta: 3,
+          lines: ['The licensee takes your version, for now. The invoices and the plot cards are still in the file.'],
+        };
+      }
+      return {
+        delta: -12,
+        lines: ['The foremen have their own copies of the plot cards. The licensee reads both, and the gap has your name on it.'],
+      };
+    case 'people':
+      return {
+        delta: 2,
+        lines: ['The incoming supervisor gets a day on the blocks with you and the foremen. The crews keep their rhythm.'],
+      };
+    case 'integrity':
+    default:
+      return summary.falseRecords > 0
+        ? { delta: 2, lines: ['The binder goes over as it stands, false cards and all. It does not undo them, but nothing new is hidden.'] }
+        : { delta: 4, lines: ['The binder goes over complete. Whoever picks it up starts from what is actually on the ground.'] };
   }
 }

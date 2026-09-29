@@ -95,7 +95,8 @@ async function autoPlayToEnd(page, modeName, strategy, maxSteps = 420) {
     }
 
     await page.waitForSelector('#choices button', { timeout: 15000 });
-    const buttons = page.locator('#choices button');
+    // A disabled option (a crew on days off) is on the card, not a choice.
+    const buttons = page.locator('#choices button:not([disabled])');
     const labels = await buttons.evaluateAll((nodes) =>
       nodes.map((node) => node.innerText.replace(/\s+/g, ' ').trim())
     );
@@ -203,5 +204,5 @@ function findFirstMatching(labels, priorities) {
 }
 
 function isEndScreen(text) {
-  return text.includes('EXPEDITION SUCCESSFUL') || text.includes('EXPEDITION FAILED');
+  return text.includes('EXPEDITION SUCCESSFUL') || text.includes('EXPEDITION COMPLETE') || text.includes('EXPEDITION FAILED');
 }

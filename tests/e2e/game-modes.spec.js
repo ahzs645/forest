@@ -59,7 +59,7 @@ for (const run of TEST_RUNS) {
 
     expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
     expect(result.ended).toBeTruthy();
-    expect(result.terminalText).toMatch(/EXPEDITION (SUCCESSFUL|FAILED)/);
+    expect(result.terminalText).toMatch(/EXPEDITION (SUCCESSFUL|COMPLETE|FAILED)/);
     expect(extractElapsedDays(result.terminalText)).toBeGreaterThan(0);
     assertModeSpecificExpectations(run.name, result.terminalText);
   });
@@ -123,7 +123,8 @@ async function autoPlayToEnd(page, strategyName, maxSteps = 900) {
     }
 
     await page.waitForSelector('#choices button', { timeout: 15000 });
-    const buttons = page.locator('#choices button');
+    // A disabled option (a crew on days off) is on the card, not a choice.
+    const buttons = page.locator('#choices button:not([disabled])');
     const labels = await buttons.evaluateAll((nodes) =>
       nodes.map((node) => node.innerText.replace(/\s+/g, ' ').trim())
     );
@@ -380,7 +381,7 @@ function getPlanningPriorities(terminalText) {
 }
 
 function isEndScreen(text) {
-  return text.includes('EXPEDITION SUCCESSFUL') || text.includes('EXPEDITION FAILED');
+  return text.includes('EXPEDITION SUCCESSFUL') || text.includes('EXPEDITION COMPLETE') || text.includes('EXPEDITION FAILED');
 }
 
 function extractElapsedDays(text) {
@@ -429,11 +430,12 @@ function assertModeSpecificExpectations(modeName, terminalText) {
       const surveys = extractPair(terminalText, 'Free-Growing Surveys');
       expect(planted.current).toBeLessThanOrEqual(planted.total);
       expect(surveys.current).toBeLessThanOrEqual(surveys.total);
-      if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
+      // A delivered program that grades D or F is COMPLETE, not SUCCESSFUL.
+      if (terminalText.includes('EXPEDITION SUCCESSFUL') || terminalText.includes('EXPEDITION COMPLETE')) {
         expect(planted.current).toBeGreaterThanOrEqual(planted.total);
         expect(surveys.current).toBeGreaterThanOrEqual(surveys.total);
       } else {
-        expect(terminalText).toMatch(/fell short of its targets|Budget exhausted|No contractor capacity/i);
+        expect(terminalText).toMatch(/fell short of its targets|pulled you off|Budget exhausted|No contractor capacity/i);
         expect(planted.current).toBeLessThanOrEqual(planted.total);
       }
       break;

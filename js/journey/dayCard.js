@@ -72,7 +72,7 @@ export const DAY_CARD_CONTEXT = Symbol('day-card-context');
  * @param {string[]} [card.notes] - why an option is missing (it costs more
  *   cash than the crew has), shown under the body
  * @param {string} [card.prompt] - the decision prompt
- * @param {Array} card.options - [{ label, description, tag, value }]
+ * @param {Array} card.options - [{ label, description, tag, value, disabled }]
  * @param {Function} [card.onRender] - called before each render (scenes, panes)
  * @returns {Promise<*>} the chosen option's `value`
  */
@@ -112,10 +112,13 @@ export async function presentDayCard(ui, card = {}) {
     }
     ui.write('');
 
+    // A disabled option stays on the card with its reason in the
+    // description; the renderer shows it but will not take it.
     const choices = options.map((option) => ({
       label: `${option.label}${formatRiskTag(option.tag)}`,
       description: option.description || '',
       value: option.value,
+      ...(option.disabled ? { disabled: true } : {}),
     }));
     if (context.length && !showContext) {
       choices.push({

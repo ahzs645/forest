@@ -8,6 +8,7 @@ import { getSurveyedBlockCount } from '../journey/progress.js';
 import { getPackagesFinalized, getPackageTarget } from '../journey/packages.js';
 import { getCurrentSeasonInfo } from '../season.js';
 import { calculateScore, formatScoreDisplay } from '../scoring.js';
+import { summarizeIntegrity } from '../modes/silvicultureIntegrity.js';
 
 /**
  * Show the end-of-game screen
@@ -189,10 +190,16 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
         `${activeCrew} crew members finalized all ${blocksCount} block packages over ${daysUsed} shifts. ` +
         `The layout and recon data go to the planning file and the cutting permit application.`;
     }
-    case 'silviculture':
+    case 'silviculture': {
+      // Delivered is not the same as clean: caught shortcuts stay on the file.
+      const caught = summarizeIntegrity(journey);
+      const onFile = caught.caughtFalseRecords + caught.caughtShortcuts;
       return `After ${daysUsed} days, the silviculture program in ${areaName} is delivered: ` +
         `${journey.planting.blocksPlanted} blocks planted and inspected, ${journey.surveys.freeGrowingComplete} free-growing declaration${journey.surveys.freeGrowingComplete === 1 ? '' : 's'} submitted. ` +
-        `The year's program is in the ground and in RESULTS.`;
+        (onFile > 0
+          ? `The year's program is in the ground and in RESULTS, and the district has ${onFile} caught shortcut${onFile === 1 ? '' : 's'} on the file with your signature.`
+          : `The year's program is in the ground and in RESULTS.`);
+    }
     case 'planning':
       return `The Forest Stewardship Plan and first Forest Operations Map for ${areaName} were approved by the District Manager after ${daysUsed} days of analysis, ` +
         `engagement with the Nations and the public, and careful balancing of competing values. ` +
@@ -233,9 +240,16 @@ export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
       return `The expedition stalled at ${lastBlock}, ${progress}% of the way through the traverse. ` +
         `${reason} After ${daysUsed} shifts, ${crewName} could go no further.`;
     }
-    case 'silviculture':
-      return `The silviculture program in ${areaName} fell short of its targets after ${daysUsed} days. ` +
-        `${reason} The unplanted blocks roll into next year's program and the nursery invoices for the stock either way.`;
+    case 'silviculture': {
+      const planted = (journey.planting?.blocksPlanted || 0) >= (journey.planting?.blocksToPlant || 0);
+      const aftermath = planted
+        ? 'The blocks are in the ground; what the program still owes rolls into next year\'s.'
+        : 'The unplanted blocks roll into next year\'s program and the nursery invoices for the stock either way.';
+      if (summarizeIntegrity(journey).programPulled) {
+        return `The licensee pulled you off the silviculture program in ${areaName} after ${daysUsed} days. ${reason} ${aftermath}`;
+      }
+      return `The silviculture program in ${areaName} fell short of its targets after ${daysUsed} days. ${reason} ${aftermath}`;
+    }
     case 'planning':
       return `The FSP replacement for ${areaName} failed to achieve approval after ${daysUsed} days. ` +
         `${reason} The planning process will need to restart with a new approach.`;

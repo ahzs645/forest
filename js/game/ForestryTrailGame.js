@@ -423,8 +423,12 @@ export class ForestryTrailGame {
     const legacyJourneyType = role.journeyType || 'field';
     // The GM's executive team (CFO, woodlands manager, chief forester...) is
     // built by createManagerJourney; a generic desk crew here handed the
-    // woodlands portfolio to whichever analyst came first.
-    const crew = legacyJourneyType === 'manager' ? undefined : generateCrew(5, legacyJourneyType);
+    // woodlands portfolio to whichever analyst came first. Silviculture builds
+    // its own checker, accredited surveyor, OFA 3 attendant and driver, as the
+    // campaign already does; a layout crew has nobody to walk plots or sign.
+    const crew = legacyJourneyType === 'manager' || role.id === 'silviculture'
+      ? undefined
+      : generateCrew(5, legacyJourneyType);
 
     this.journey = createJourney({
       crewName,

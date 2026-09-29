@@ -111,7 +111,19 @@ const PERMITTING_HANDOVER = {
   ],
 };
 
+// A silviculture program that was not delivered, or that the licensee
+// pulled, has no regeneration report of yours to frame: it is handed over.
+const SILVICULTURE_HANDOVER = {
+  prompt: 'The program goes to whoever picks it up next. How do you hand it over?',
+  options: [
+    { label: 'Hand over every plot card, survey card and treatment record as it stands', hint: 'The next supervisor, and anyone from C&E, starts from what is on the ground.', value: 'integrity' },
+    { label: 'Tell the licensee the shortfall was the contractors’', hint: 'Risky. The plot cards and the invoices say who signed what.', value: 'spin' },
+    { label: 'Walk the incoming supervisor and the foremen through each block', hint: 'The crews keep working when the name on the binder changes.', value: 'people' },
+  ],
+};
+
 const HANDOVER_PROMPTS = {
+  silviculture: SILVICULTURE_HANDOVER,
   planning: PLANNING_HANDOVER,
   permitting: PERMITTING_HANDOVER,
   desk: PERMITTING_HANDOVER,
@@ -441,9 +453,15 @@ export async function runFinalDebrief(ui, journey, victory) {
   journey.finalReport = { style: reportStyle, delta: reportResult.delta };
   await next(ui);
 
+  // The grade is settled now; the banner and the grade line follow it, so
+  // a delivered run that grades D or F is not announced as a success.
+  const scoreResult = calculateScore(journey, victory);
+  scoreResult.totalScore = Math.max(0, Math.min(100, scoreResult.totalScore + reportResult.delta));
+  scoreResult.grade = getLetterGrade(scoreResult.totalScore);
+
   // --- Stage 2: The road home ---
   ui.clear();
-  ui.writeHeader(victory ? 'EXPEDITION SUCCESSFUL' : 'EXPEDITION FAILED');
+  ui.writeHeader(getEndBanner(victory, scoreResult.grade));
   ui.writeBox(pickEndArt(journey, victory));
   ui.write(victory
     ? buildVictoryNarrative(journey, areaName, crewName, daysUsed)
@@ -496,10 +514,6 @@ export async function runFinalDebrief(ui, journey, victory) {
   }
 
   // --- Stage 4: Performance review ---
-  const scoreResult = calculateScore(journey, victory);
-  scoreResult.totalScore = Math.max(0, Math.min(100, scoreResult.totalScore + reportResult.delta));
-  scoreResult.grade = getLetterGrade(scoreResult.totalScore);
-
   ui.clear();
   ui.writeDivider('PERFORMANCE REVIEW');
   const scoreLines = formatScoreDisplay(scoreResult);
@@ -511,7 +525,7 @@ export async function runFinalDebrief(ui, journey, victory) {
   const deltaLabel = reportResult.delta >= 0 ? `+${reportResult.delta}` : `${reportResult.delta}`;
   ui.write(`  ${'Final Report'.padEnd(14)} ${reportStyleLabel(reportStyle)} (${deltaLabel} pts)`);
   ui.write('');
-  if (victory) {
+  if (victory && !isFailingGrade(scoreResult.grade)) {
     // An A-grade run earns the sky.
     if (String(scoreResult.grade).startsWith('A') && typeof ui.playScene === 'function') {
       const { buildFireworksFrames } = await import('../scene/textmode/scenes.js');
@@ -548,6 +562,23 @@ export async function runFinalDebrief(ui, journey, victory) {
     }
   }
   ui.write('');
+}
+
+/** D and F: the work may be done, but the run is not a success. */
+function isFailingGrade(grade) {
+  return /^[DF]/.test(String(grade || ''));
+}
+
+/**
+ * The end-of-run banner: success only when the work was delivered and the
+ * grade says it was done well enough to call it one.
+ * @param {boolean} victory
+ * @param {string} grade
+ * @returns {string}
+ */
+export function getEndBanner(victory, grade) {
+  if (!victory) return 'EXPEDITION FAILED';
+  return isFailingGrade(grade) ? 'EXPEDITION COMPLETE' : 'EXPEDITION SUCCESSFUL';
 }
 
 function reportStyleLabel(style) {

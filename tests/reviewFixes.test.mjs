@@ -349,11 +349,15 @@ test('silviculture cannot manufacture planting output when no workforce is avail
   journey.crew = [];
   const dayBefore = journey.day;
   const offered = [];
+  const shown = [];
   const ui = {
     write() {}, writeHeader() {}, writePositive() {}, writeDanger() {},
     writeWarning() {},
     clear() {}, updateAllStatus() {}, playEventVignette() {},
-    async promptChoice(_prompt, options) {
+    async promptChoice(_prompt, all) {
+      // Like the real renderer: a disabled option is shown, never taken.
+      shown.push(...all);
+      const options = all.filter((option) => !option.disabled);
       offered.push(...options.map((option) => option.value));
       return options.find((option) => option.value === 'plant') || options.find((option) => option.value === 'end') || options[0];
     }
@@ -363,6 +367,9 @@ test('silviculture cannot manufacture planting output when no workforce is avail
   assert.equal(journey.planting.seedlingsPlanted, 0);
   assert.equal(journey.day, dayBefore + 1);
   assert.equal(offered.includes('plant'), false, 'unavailable fieldwork must not be offered');
+  const plant = shown.find((option) => option.value === 'plant');
+  assert.ok(plant?.disabled, 'unavailable fieldwork is shown disabled, not hidden');
+  assert.match(plant.description, /^Waits for .+, on days off until day \d+\./);
 });
 
 test('silviculture hides surveys without a workforce and does not charge for them', async () => {
@@ -385,7 +392,8 @@ test('silviculture hides surveys without a workforce and does not charge for the
     write() {}, writeHeader() {}, writePositive() {}, writeDanger() {},
     writeWarning() {},
     clear() {}, updateAllStatus() {}, playEventVignette() {},
-    async promptChoice(_prompt, options) {
+    async promptChoice(_prompt, all) {
+      const options = (all || []).filter((option) => !option.disabled);
       offered.push(...options.map((option) => option.value));
       if ((options || []).some((option) => option.value === 'survey')) {
         actionPrompts++;

@@ -35,7 +35,9 @@ test('silviculture progress clamps completed survey work instead of exceeding 10
     }
   };
 
-  assert.equal(getOperationalProgress(silvicultureJourney), 86);
+  // Read through the program assessment (js/data/silvicultureProgram.js):
+  // planting 14/15, declarations capped at 5/5, no release, no plots.
+  assert.equal(getOperationalProgress(silvicultureJourney), 68);
 });
 
 test('progress milestones log once when a mode crosses a major threshold', () => {

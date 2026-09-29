@@ -247,12 +247,16 @@ test('recovering contractors cannot be assigned fieldwork; rest makes work avail
     ui.promptChoice = async (_prompt, options = []) => {
       if (options.some((o) => o.value === 'end')) {
         if (!checkedFirstMenu) {
-          assert.equal(options.some((o) => ['plant', 'fill', 'brush', 'inspect', 'survey'].includes(o.value)), false);
+          const fieldTasks = options.filter((o) => ['plant', 'fill', 'brush', 'inspect', 'survey'].includes(o.value));
+          assert.equal(fieldTasks.some((o) => !o.disabled), false);
+          // Shown, not hidden: each waits on its crew, with the day it is back.
+          assert.ok(fieldTasks.length > 0);
+          for (const task of fieldTasks) assert.match(task.description, /^Waits for .+, on days off until day \d+\./);
           assert.ok(options.some((o) => o.label === 'Rest crews and plan tomorrow'));
           checkedFirstMenu = true;
           sawRest = true;
         } else {
-          sawAvailablePlanting ||= options.some((o) => o.value === 'plant');
+          sawAvailablePlanting ||= options.some((o) => o.value === 'plant' && !o.disabled);
         }
         return options.find((o) => o.value === 'end');
       }
