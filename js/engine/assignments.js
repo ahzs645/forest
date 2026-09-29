@@ -46,13 +46,13 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "balanced",
       label: "Balance around it",
       outcome: "You adapt the work around the signal without surrendering the season outright.",
-      effects: { progress: 2, compliance: 1, forestHealth: 1 },
+      effects: { progress: 2, compliance: 2, forestHealth: 1 },
     },
     {
       stance: "aggressive",
       label: "Push the original plan",
       outcome: "You hold the original line and bank the momentum, accepting that the exposure may come back later.",
-      effects: { progress: 4, compliance: -3, relationships: -2 },
+      effects: { progress: 5, compliance: -2, relationships: -1 },
     },
   ],
   process: [
@@ -60,7 +60,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Rebuild the file properly",
       outcome: "You rebuild the file from first principles and reduce the odds that the record falls apart under review.",
-      effects: { progress: -1, compliance: 6, relationships: 2, budget: -1 },
+      effects: { progress: -1, compliance: 5, relationships: 2, budget: -1 },
     },
     {
       stance: "balanced",
@@ -72,7 +72,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Push the package through",
       outcome: "You preserve momentum and hope the weak spots do not become next season's audit problem.",
-      effects: { progress: 4, compliance: -3, relationships: -3 },
+      effects: { progress: 5, compliance: -2, relationships: -2 },
     },
   ],
   planning: [
@@ -80,7 +80,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Redesign around the constraint",
       outcome: "You reshape the work to fit the constraint instead of treating it like a memo item.",
-      effects: { progress: -1, forestHealth: 5, compliance: 3, budget: -1 },
+      effects: { progress: -2, forestHealth: 5, compliance: 3, budget: -1 },
     },
     {
       stance: "balanced",
@@ -92,7 +92,7 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "aggressive",
       label: "Hold the original line",
       outcome: "You protect the original harvest logic and trust that mitigation can absorb the rough edges.",
-      effects: { progress: 4, forestHealth: -3, compliance: -3, relationships: -2 },
+      effects: { progress: 5, forestHealth: -2, compliance: -2, relationships: -1 },
     },
   ],
   road: [
@@ -100,19 +100,19 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Repair and document now",
       outcome: "You spend the time to stabilize the access story before field reality outruns the paperwork.",
-      effects: { progress: 0, compliance: 5, budget: -2 },
+      effects: { progress: -1, compliance: 5, budget: -2 },
     },
     {
       stance: "balanced",
       label: "Reroute and sequence around it",
       outcome: "You keep the season alive by changing the sequence instead of forcing a brittle access plan.",
-      effects: { progress: 1, compliance: 2, forestHealth: 1 },
+      effects: { progress: 2, compliance: 2, forestHealth: 1 },
     },
     {
       stance: "aggressive",
       label: "Run the access window hard",
       outcome: "You take the short access window and accept the higher chance of downstream scrutiny.",
-      effects: { progress: 4, compliance: -3, budget: -1, forestHealth: -1 },
+      effects: { progress: 5, compliance: -2, budget: -1, forestHealth: -1 },
     },
   ],
   discovery: [
@@ -120,19 +120,19 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Stop, flag, and report",
       outcome: "You elevate the finding early and keep the later file cleaner, even if the schedule slips.",
-      effects: { progress: -1, compliance: 5, relationships: 3 },
+      effects: { progress: -2, compliance: 5, relationships: 3 },
     },
     {
       stance: "balanced",
       label: "Verify before redirecting",
       outcome: "You verify the finding fast enough to keep moving without fully ignoring what the ground is telling you.",
-      effects: { progress: 1, compliance: 2 },
+      effects: { progress: 1, compliance: 3, relationships: 1 },
     },
     {
       stance: "aggressive",
       label: "Work around it quietly",
       outcome: "You keep the crews moving and hope the field signal does not come back as a louder problem next round.",
-      effects: { progress: 3, compliance: -3, relationships: -3 },
+      effects: { progress: 4, compliance: -2, relationships: -2 },
     },
   ],
   situation: [
@@ -140,19 +140,19 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Adapt the schedule",
       outcome: "You accept the season on its own terms and reshape the schedule before the constraint turns into damage.",
-      effects: { progress: 0, compliance: 3, relationships: 1, budget: -1 },
+      effects: { progress: -1, compliance: 3, relationships: 1, budget: -1 },
     },
     {
       stance: "balanced",
       label: "Add buffers and keep moving",
       outcome: "You add just enough buffer to stay operational without pretending the constraint is gone.",
-      effects: { progress: 2, compliance: 1 },
+      effects: { progress: 2, compliance: 2 },
     },
     {
       stance: "aggressive",
       label: "Push through the window",
       outcome: "You chase the work window hard and rely on later cleanup to absorb the strain.",
-      effects: { progress: 4, compliance: -3, forestHealth: -2, relationships: -1 },
+      effects: { progress: 5, compliance: -2, forestHealth: -2, relationships: -1 },
     },
   ],
   professional: [
@@ -160,19 +160,19 @@ const ASSIGNMENT_RESPONSE_PROFILES = {
       stance: "cautious",
       label: "Clear the admin burden now",
       outcome: "You spend the season clearing the professional burden, CPD log included, before it turns into a live practice problem.",
-      effects: { progress: 0, compliance: 5 },
+      effects: { progress: -1, compliance: 5 },
     },
     {
       stance: "balanced",
       label: "Patch only the hot spots",
       outcome: "You clean the most exposed parts of the practice load and log the CPD you can fit in, keeping enough momentum to avoid a stall.",
-      effects: { progress: 1, compliance: 2 },
+      effects: { progress: 1, compliance: 3 },
     },
     {
       stance: "aggressive",
       label: "Defer and keep producing",
       outcome: "You leave the admin debt in place and squeeze one more productive window out of the season.",
-      effects: { progress: 3, compliance: -3 },
+      effects: { progress: 4, compliance: -2 },
     },
   ],
 };
@@ -424,7 +424,13 @@ function buildDiscoveryAggressiveFlags(tagId) {
   return { ...(DISCOVERY_FLAG_MAP[tagId] || {}) };
 }
 
-function buildAssignmentOptions(candidate) {
+// A silviculture supervisor's seasonal work is the stand itself: the careful
+// answer on a planting, brushing or survey card shows up in forest health, the
+// meter the role is judged on. The generic templates only moved it on planning
+// cards, which silviculture never draws.
+const SILVICULTURE_STAND_CARE = { cautious: 2, balanced: 1 };
+
+function buildAssignmentOptions(candidate, roleId = null) {
   if (candidate.sourceFamily === "legacy-task") {
     return (candidate.task?.options || []).map((option) => ({
       ...option,
@@ -448,7 +454,7 @@ function buildAssignmentOptions(candidate) {
     const option = {
       label: stageResponse?.label || template.label,
       outcome: stageResponse?.outcome || template.outcome,
-      effects: { ...template.effects },
+      effects: withStandCare({ ...template.effects }, roleId, candidate.sourceFamily, template.stance),
       // Carry the authored stance forward so chosen decisions can feed the
       // management-style meter without re-deriving intent from the effects.
       stance: template.stance,
@@ -514,6 +520,12 @@ function buildAssignmentOptions(candidate) {
   });
 }
 
+function withStandCare(effects, roleId, sourceFamily, stance) {
+  const care = roleId === "silviculture" && sourceFamily !== "planning" ? SILVICULTURE_STAND_CARE[stance] : 0;
+  if (care) effects.forestHealth = Number(effects.forestHealth || 0) + care;
+  return effects;
+}
+
 function finalizeCandidate(candidate, state = null) {
   const sourceFamily = candidate.sourceFamily;
   const sourceKey = candidate.sourceKey;
@@ -528,7 +540,7 @@ function finalizeCandidate(candidate, state = null) {
     sourceKey,
     sourceLabel: sanitizeText(candidate.sourceLabel, SOURCE_LABELS[sourceFamily]),
     whyNow: sanitizeText(candidate.whyNow),
-    options: buildAssignmentOptions(candidate),
+    options: buildAssignmentOptions(candidate, state?.role?.id || state?.roleId || null),
     context: candidate.context || null,
     riskClass: candidate.riskClass || null,
   }, state, "assignment");

@@ -35,7 +35,7 @@ test('operational event effects are normalized into TUI metrics', () => {
   });
 
   assert.deepEqual(mapped, {
-    progress: -6,
+    progress: -4,
     relationships: 2,
     compliance: 9,
     budget: -6,

@@ -136,6 +136,47 @@ test('a practice-burden card logs CPD and the CPD gap is judged against the year
   assert.ok(early.professional.competenceRisk <= risk);
 });
 
+test('balance: a turtled file earns no operational dividend, a steady one gets its weakest meter back', () => {
+  const turtle = createInitialState({ companyName: 'T', roleId: 'planner', areaId: 'fraser-plateau' });
+  turtle.round = 3;
+  turtle.metrics = { progress: 20, forestHealth: 70, relationships: 85, compliance: 95, budget: 40 };
+  assert.ok(!applyRoundConsequences(turtle).includes('operational-dividend'));
+
+  const steady = createInitialState({ companyName: 'T', roleId: 'recce', areaId: 'fraser-plateau' });
+  steady.round = 2;
+  steady.metrics = { progress: 55, forestHealth: 58, relationships: 60, compliance: 62, budget: 45 };
+  assert.ok(applyRoundConsequences(steady).includes('steady-program'));
+  assert.equal(steady.metrics.budget, 48);
+});
+
+test('balance: tiers weigh roles on their own mandate', async () => {
+  const { deriveTier, scoreRolePerformance } = await import('../js/engine/scoring.js');
+  // Progress is not on the planner's mandate, so a 38 still clears Outstanding;
+  // the permitter is judged on progress and needs 40.
+  const year = { progress: 38, forestHealth: 72, relationships: 85, compliance: 95, budget: 60 };
+  assert.equal(deriveTier(year, 'planner'), 'outstanding');
+  assert.notEqual(deriveTier(year, 'permitter'), 'outstanding');
+
+  // Compliance past 85 earns the planner no more role credit than forest
+  // health past 85 earns silviculture.
+  const planner = createInitialState({ companyName: 'T', roleId: 'planner', areaId: 'fraser-plateau' });
+  planner.metrics = { progress: 50, forestHealth: 50, relationships: 50, compliance: 85, budget: 50 };
+  const at85 = scoreRolePerformance(planner);
+  planner.metrics.compliance = 99;
+  assert.equal(scoreRolePerformance(planner), at85);
+});
+
+test('balance: silviculture assignment answers move the stands', () => {
+  const state = createInitialState({ companyName: 'T', roleId: 'silviculture', areaId: 'bulkley-valley' });
+  state.round = 1;
+  const context = buildSeasonContext(state);
+  state.currentSeasonContext = context;
+  const card = buildAssignmentCandidates(state, context).find((candidate) => candidate.sourceFamily === 'briefing');
+  const byStance = Object.fromEntries(card.options.map((option) => [option.stance, option]));
+  assert.equal(byStance.cautious.effects.forestHealth, 2);
+  assert.equal(byStance.aggressive.effects.forestHealth, undefined);
+});
+
 function makeHubUi() {
   const lines = [];
   const ui = {

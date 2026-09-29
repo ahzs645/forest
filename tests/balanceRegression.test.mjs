@@ -12,8 +12,8 @@ import {
 // A modest but representative matrix: every role × every area × every strategy
 // across a handful of seeds. Kept deterministic so the assertions are stable.
 const SEEDS = 8;
-// Re-picked after dead seasonal issues were made reachable (new draws).
-const WITNESS_SEED = 1006;
+// Re-picked after the 2026-09 playtest balance pass.
+const WITNESS_SEED = 1003;
 const MATRIX = simulateMatrix({
   roles: listSeasonalRoleIds(),
   areas: listAreaIds(),

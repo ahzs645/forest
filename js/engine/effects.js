@@ -127,6 +127,10 @@ function buildCausedBy(state, source) {
   };
 }
 
+// Widest gap between the strongest and weakest meter that still counts as a
+// program run on all fronts (see applyRoundRecoveries).
+const STEADY_PROGRAM_SPREAD = 30;
+
 // Flags the end-of-season pass sets, for the content lint's reachability check.
 export const ROUND_CONSEQUENCE_FLAGS = Object.freeze([
   "lowBudgetStreak",
@@ -335,7 +339,10 @@ function applyEcologyDrift(state, round, consequences) {
   // the land responds to a track record, not to week one.
   if (round < 2) return;
 
-  if (metrics.compliance >= 65 && metrics.forestHealth < 72) {
+  // Regeneration is the silviculture program's own work, so a disciplined
+  // silviculture year carries stands further than the others can.
+  const recoveryCeiling = state.role?.id === "silviculture" ? 80 : 72;
+  if (metrics.compliance >= 65 && metrics.forestHealth < recoveryCeiling) {
     applyEffects(
       state,
       { forestHealth: 3 },
@@ -373,11 +380,12 @@ function applyEcologyDrift(state, round, consequences) {
 // the run-scoring risk penalty never counts them against the player.
 function applyRoundRecoveries(state, round, consequences) {
   const { metrics } = state;
+  const firedBefore = consequences.length;
 
   // Operational dividend: a clean, well-trusted file burns far less budget on
   // rework and firefighting, so a strongly-run year recovers some budget. This
   // is the missing budget lever that made Outstanding unreachable.
-  if (metrics.compliance >= 70 && metrics.relationships >= 65 && metrics.budget < 72) {
+  if (metrics.compliance >= 70 && metrics.relationships >= 65 && metrics.progress >= 35 && metrics.budget < 72) {
     applyEffects(
       state,
       { budget: 5 },
@@ -437,6 +445,30 @@ function applyRoundRecoveries(state, round, consequences) {
       },
     );
     consequences.push("field-discipline-rebound");
+  }
+
+  // Steady program: the dividends above pay a file that piles up compliance
+  // and trust, which made turtling the dominant line. A program that kept
+  // every meter in play earns its own return: the weakest meter gets room to
+  // recover. Paid only in a season no dividend already rewarded.
+  if (round >= 2 && consequences.length === firedBefore) {
+    const values = Object.values(metrics).map((value) => Number(value) || 0);
+    const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
+    const spread = Math.max(...values) - Math.min(...values);
+    if (weakest && Number(weakest[1]) >= 40 && Number(weakest[1]) < 60 && spread <= STEADY_PROGRAM_SPREAD) {
+      applyEffects(
+        state,
+        { [weakest[0]]: 3 },
+        {
+          type: "recovery",
+          id: "steady-program",
+          title: "Steady program",
+          option: `No meter was left behind, so ${formatMetricName(weakest[0])} had room to recover`,
+          round,
+        },
+      );
+      consequences.push("steady-program");
+    }
   }
 
   // Comeback window: late in the year a single collapsing meter gets a modest

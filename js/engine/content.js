@@ -308,8 +308,10 @@ export function adaptOperationalEventEffects(effects = {}, option = {}) {
   }
 
   const timeUsed = Number.isFinite(option?.timeUsed) ? option.timeUsed : effects.timeUsed;
+  // Hours on an expedition card are a small slice of a season. At 1.4 points
+  // an hour, desk events alone drained ~26 Progress from a planner's year.
   if (typeof timeUsed === "number") {
-    add("progress", -Math.max(1, Math.round(Math.abs(timeUsed) * 1.4)));
+    add("progress", -Math.max(1, Math.round(Math.abs(timeUsed) * 0.8)));
   }
 
   // Crew and stock losses slow the work; gains do not speed it up. Mapping
@@ -351,7 +353,7 @@ export function adaptOperationalEventEffects(effects = {}, option = {}) {
   }
 
   if (typeof effects.permits_approved === "number") {
-    add("progress", Math.round(effects.permits_approved * 4));
+    add("progress", Math.round(effects.permits_approved * 3));
     add("compliance", Math.round(effects.permits_approved * 2));
   }
 

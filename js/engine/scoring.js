@@ -26,6 +26,8 @@ export function scoreMetricHealth(metrics = {}) {
   return Math.round(weightedMetricAverage(metrics));
 }
 
+const PRIMARY_METRIC_CREDIT_CAP = 85;
+
 /** How well the run served the role's primary/secondary objectives, 0–100. */
 export function scoreRolePerformance(state) {
   const metrics = state?.metrics || {};
@@ -33,7 +35,10 @@ export function scoreRolePerformance(state) {
   if (!objective) {
     return scoreMetricHealth(metrics);
   }
-  const primary = Number(metrics[objective.primary] ?? 50);
+  // Past 85 the primary meter has done its job. Without the cap a role judged
+  // on compliance, which the economy lets climb to the high 90s, out-scored one
+  // judged on forest health, which stands only lift so fast.
+  const primary = Math.min(PRIMARY_METRIC_CREDIT_CAP, Number(metrics[objective.primary] ?? 50));
   const secondaryValues = objective.secondary.map((metric) => Number(metrics[metric] ?? 50));
   const secondaryMean = secondaryValues.length
     ? secondaryValues.reduce((sum, value) => sum + value, 0) / secondaryValues.length
@@ -75,6 +80,20 @@ export function scoreStyleFit(state) {
   return 0;
 }
 
+// Outstanding needs every meter off the floor. Progress is held to that line
+// only for roles judged on it (permitter, recce); a planner's year moves
+// through referrals and reviews and a silviculture year is read in the
+// stands, so for them a thinner delivery year can still be excellent.
+const OUTSTANDING_METER_FLOOR = 40;
+const OUTSTANDING_OFF_MANDATE_PROGRESS_FLOOR = 38;
+
+function outstandingDeliveryFloor(roleId) {
+  const objective = getRoleObjective(roleId);
+  if (!objective) return OUTSTANDING_METER_FLOOR;
+  const judgedOnProgress = objective.primary === "progress" || objective.secondary.includes("progress");
+  return judgedOnProgress ? OUTSTANDING_METER_FLOOR : OUTSTANDING_OFF_MANDATE_PROGRESS_FLOOR;
+}
+
 // Tier gates are calibrated against the simulated economy (see
 // reports/balance/): sensible "balanced" play lands a weighted average near
 // 53, expert "role-optimal" play near 60, and reckless play near 38. Forest
@@ -87,15 +106,18 @@ export function scoreStyleFit(state) {
 //   • outstanding — an expert year (~top sixth of optimal play) via one of
 //                    two role-flavored excellence paths over a shared
 //                    "nothing collapsed and work got delivered" floor.
-export function deriveTier(metrics = {}) {
+export function deriveTier(metrics = {}, roleId = null) {
   const averages = weightedMetricAverage(metrics);
+  const deliveryFloor = outstandingDeliveryFloor(roleId);
   const strongOutcomeFloors =
     metrics.compliance >= 60 && metrics.relationships >= 52 && metrics.forestHealth >= 48;
   const stableOutcomeFloors =
     metrics.compliance >= 45 && metrics.relationships >= 42 && metrics.forestHealth >= 42;
   const stewardshipStrong =
     metrics.compliance >= 80 && metrics.relationships >= 68 && metrics.forestHealth >= 50 && metrics.progress >= 30;
-  const nothingCollapsed = Object.values(metrics).every((value) => Number(value) >= 40);
+  // Progress has its own role-aware floor below; every other meter must hold 40.
+  const nothingCollapsed = Object.entries(metrics)
+    .every(([key, value]) => key === "progress" || Number(value) >= OUTSTANDING_METER_FLOOR);
   // Excellence gates were re-raised when the seasonal year deepened from ~12
   // to ~17 decision cards: optimizer play banks proportionally more compliance
   // and relationships across the longer year, and the old gates let ~1 in 3
@@ -109,7 +131,7 @@ export function deriveTier(metrics = {}) {
 
   if (
     averages >= 67
-    && metrics.progress >= 45
+    && metrics.progress >= deliveryFloor
     && nothingCollapsed
     && (stewardshipExcellence || ecologicalExcellence)
   ) {
@@ -146,15 +168,17 @@ function scoreCapForTier(tier) {
 }
 
 // The first gate that kept the year out of the next tier, in player terms.
-function describeTierGate(metrics, gateTier) {
+function describeTierGate(metrics, gateTier, roleId) {
   const value = (key) => Number(metrics[key] ?? 0);
   const below = (key, floor) => (value(key) < floor ? `${formatMetricName(key)} finished under ${floor}` : null);
   const average = weightedMetricAverage(metrics);
 
   if (gateTier === "solid") {
-    const collapsed = Object.keys(metrics).filter((key) => value(key) < 40).map(formatMetricName);
-    return (collapsed.length ? `${collapsed.join(" and ")} finished under 40` : null)
-      || below("progress", 45)
+    const collapsed = Object.keys(metrics)
+      .filter((key) => key !== "progress" && value(key) < OUTSTANDING_METER_FLOOR)
+      .map(formatMetricName);
+    return (collapsed.length ? `${collapsed.join(" and ")} finished under ${OUTSTANDING_METER_FLOOR}` : null)
+      || below("progress", outstandingDeliveryFloor(roleId))
       || (average < 67 ? "the meters averaged under 67" : null)
       || (value("forestHealth") >= 67
         ? below("compliance", 75) || below("relationships", 65)
@@ -224,9 +248,9 @@ export function scoreRun(state) {
   const riskPenalty = scoreRiskLoad(state);
   const styleBonus = scoreStyleFit(state);
   const earned = Math.round(clamp(metricScore * 0.6 + roleScore * 0.4 + riskPenalty + styleBonus, 0, 100));
-  const score = Math.min(earned, scoreCapForTier(deriveTier(metrics)));
+  const score = Math.min(earned, scoreCapForTier(deriveTier(metrics, state?.role?.id)));
   const tier = tierForScore(score);
-  const gate = score < earned ? describeTierGate(metrics, tier) : null;
+  const gate = score < earned ? describeTierGate(metrics, tier, state?.role?.id) : null;
 
   return {
     tier,
