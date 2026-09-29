@@ -159,3 +159,30 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - Field events: gains no longer add Progress, gambles land as their expected outcome, medevac is charged. Practice-burden cards log CPD; the CPD gap is prorated across the year.
 - Expedition housekeeping: scrutiny clamped at 100, crew ids unique across reloads, resource scoring uses the run's real starting stores. eslint warnings 31 -> 5.
 - Balance (`npm run sim:seasonal`, 12,600 years): greedy 2.28 -> 2.22, role-optimal 2.05 -> 1.85, cautious 1.80 -> 1.72, balanced 1.47 -> 1.50; greedy Outstanding by role planner 3% -> 15%, silviculture 30% -> 7%.
+
+## 2026-09-29 — Recon regressions (round-2 retest, F3)
+
+- **Short rations** stay a standing order but lapse with their reason: when the box is restocked above the warning line (at the morning beat, a grocery run, the cache or the supply point), or when someone falls to morale 30 while the box can carry full meals. Each lift prints why. The order, the morning beat and the mission panel all state the cost (4 morale a shift each).
+- **Grade:** a recon season that was not delivered earns no Time. Objectives count packages, not kilometres. A recon win gets no flat +10, and Resources can reach 100. Time runs from a clean run (two shifts a package, one a leg) down to the layout window. Careful seasons score 85-95, and only a flawless season scores 100. The crew-loss ending reads "NO CREW LEFT - N quit and M were sent out".
+- **Landslide:** "Turn back and report" closes the road until the next shift, and the crew can take the old spur around meanwhile.
+- **Stop gating:**
+  - Block-ground cards (`stopKinds: ["block"]`) and layout shortcuts on a block's own ground are not drawn at waypoints.
+  - Ealue Lake is a road-end block with a float-plane cache.
+  - Fair-weather cards skip storms (`notInWeather`).
+- **Arrival snap:** decided on the rounded figure the player sees.
+- **Injuries and crossings:**
+  - A route-mishap fracture goes out on the ETV the same shift.
+  - A broken bridge bills only trips back over it: town runs and return visits.
+- **Storm days:** event cards carry the grounding, and their options read "storm holds the crew in camp". "Stand down until comms are restored" uses the shift.
+- **Prices:**
+  - The supply point lists what the card cannot cover, with the shortfall.
+  - Town runs the card cannot pay for are named in the camp prompt instead of burning a shift.
+  - A set-aside never lands an option the card could not pay for.
+  - The recon medevac charges standby time ($1,200); WorkSafeBC covers the flight.
+- **Ferry at FLOOD** offers only the wait, which ends the harness spin at Tahltan.
+- **Campaign Budget line (small hook in campaign.js):** shortcut cash is not savings, and no thrift credit goes to a season whose crew went hungry or quit.
+- **Sim (`--role recon --area all`, 8 runs per area):**
+  - Before: 56/64, with Tahltan spinning.
+  - After: 72/72.
+  - Matrix of 9 areas × 12 seeds, competent policy, easy/normal/hard: before 0.97/0.84/0.55, after 1.00/1.00/0.90. The policy now manages fuel and supply stops and does not set aside injuries.
+  - With the unchanged policy: 1.00/0.97/0.84.
