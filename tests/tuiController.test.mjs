@@ -276,7 +276,8 @@ test('scheduled fallout issues expose why they surfaced in the issue card', () =
   assert.equal(state.contentData.type, 'issue');
   assert.equal(state.contentData.title, 'Heritage Protocol Gap Identified');
   assert.equal(state.contentData.surfaceSeverity, 'warning');
-  assert.match(state.contentData.surfaceReason || '', /relationship damage/i);
+  assert.match(state.contentData.surfaceReason || '', /you took the shortcut “Grease the Layout Crew”.*the Nation caught it/i);
+  assert.match(state.contentData.provenance || '', /you took the shortcut/i);
 });
 
 test('temptation outcome notices preview the most likely fallout branch', () => {
@@ -312,8 +313,7 @@ test('temptation outcome notices preview the most likely fallout branch', () => 
   assert.equal(state.contentData.type, 'message');
   assert.match(state.contentData.notice?.heading || '', /^Caught:/);
   assert.equal(state.contentData.notice?.tone, 'warning');
-  assert.match(state.contentData.notice?.body || '', /Likely fallout \(manageable\): Heritage Protocol Gap Identified/i);
-  assert.match(state.contentData.notice?.body || '', /relationship damage/i);
+  assert.match(state.contentData.notice?.body || '', /Fallout \(manageable\): Heritage Protocol Gap Identified\. It lands next season\./i);
 });
 
 test('serious fallout previews keep danger tone on the outcome notice', () => {
@@ -348,7 +348,7 @@ test('serious fallout previews keep danger tone on the outcome notice', () => {
   const state = controller.getState();
   assert.equal(state.contentData.type, 'message');
   assert.equal(state.contentData.notice?.tone, 'danger');
-  assert.match(state.contentData.notice?.body || '', /Likely fallout \(serious\): Formal Investigation/i);
+  assert.match(state.contentData.notice?.body || '', /Fallout \(serious\): Formal Investigation\. It lands next season\./i);
 });
 
 test('serious fallout issues carry danger severity on the issue card', () => {

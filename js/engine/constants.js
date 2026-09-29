@@ -100,9 +100,62 @@ export const AUDIT_TEMPTATION_TAGS = new Set([
 
 export const COMMUNITY_TEMPTATION_TAGS = new Set(["cultural", "community", "labour", "media"]);
 
+// The shortcut as a three-band gamble, by act tier: clean (the payoff, and it
+// stays buried), noticed (the payoff, and somebody wrote down what they saw),
+// caught (the institution named on the act does what it does). Same base odds
+// as the deployment card (js/events/selection.js buildShortcutOption); the
+// state of the file then moves them (js/risk.js riskBandOdds).
+export const SHORTCUT_BAND_ODDS = {
+  core: { clean: 0.5, noticed: 0.3 },
+  grey: { clean: 0.6, noticed: 0.25 },
+  comic: { clean: 0.45, noticed: 0.3 },
+};
+
+// Odds shifts the seasonal shortcut applies on top of the tier base. Doing it
+// again is how people get caught, and an institution already reading the file
+// reads the next one properly.
+export const SHORTCUT_ODDS_SHIFTS = {
+  priorShortcutThisYear: -0.15,
+  alreadyWatched: -0.2,
+  ethicsTag: -0.08,
+  ecologicalTag: -0.06,
+  auditTag: 0.02,
+  communityTag: -0.02,
+};
+
+// What the clean band costs besides the payoff: the paper trail is now the
+// problem (the deployment card's "+3 scrutiny"), the ground pays for an
+// ecological act whether or not anyone looks, and a community act is noticed
+// by the people it was done to.
+export const SHORTCUT_CLEAN_BAND_COSTS = {
+  compliance: -2,
+  ecologicalForestHealth: -3,
+  communityRelationships: -2,
+};
+
+// The noticed band lands the payoff and leaves a watch flag; "somebody wrote
+// it down" costs a file about what the payoff was worth (the deployment
+// card's "+8 scrutiny, -2 compliance"), so only a clean take is a clear win.
+export const SHORTCUT_NOTICED_BAND_COSTS = { compliance: -4, relationships: -2 };
+
+// How an act's payoff (js/data/illegalActs.js) lands on the five seasonal
+// meters. Dollars go to Budget; time, files, volume and shifts of work go to
+// Progress. Sized so a single clean take is a visible gain (a season's careful
+// play moves a meter 5–8 points) without one shortcut deciding the year.
+export const SHORTCUT_PAYOFF_SCALE = {
+  budget: { perPoint: 1500, min: 4, max: 10 },
+  time: { base: 3, perPoint: 2.5, min: 5, max: 10 },
+  progress: { base: 4, perShift: 3, min: 5, max: 10 },
+  files: { base: 4, perFile: 3, min: 5, max: 10 },
+  volume: { base: 4, perPoint: 400, min: 5, max: 9 },
+};
+
 // Temptation chances are tuned so a typical year meets roughly one shortcut
 // offer (P(none) ≈ 0.25–0.3 before pressure bonuses) instead of the old
 // ~0.07 per season, which left the temptation deck effectively unplayed.
+// `failConfig` is the caught band: the immediate cost when the institution
+// named on the act catches it. Budget is in dollars (normalizeBudgetDelta puts
+// it on the meter) and never less than the payoff plus a fifth.
 export const ROLE_TEMPTATION_PROFILES = {
   planner: {
     flavor: "Bureaucratic shortcut",
@@ -117,16 +170,11 @@ export const ROLE_TEMPTATION_PROFILES = {
         relationships: { threshold: 34, bonus: 0.01 },
       },
     },
-    gainRange: [1400, 2800],
-    successBaseEffects: { progress: 3, politicalCapital: -5 },
     failConfig: {
       budgetMin: 2400,
       budgetMultiplier: 1.2,
       effects: { politicalCapital: -10, compliance: -14, relationships: -8, progress: -6 },
     },
-    refuseEffects: { politicalCapital: 2, compliance: 2 },
-    reportEffects: { politicalCapital: 5, compliance: 4, timeUsed: 2 },
-    baseSuccess: 0.4,
     preferredTags: {
       mapping: 2.5,
       data: 2,
@@ -151,16 +199,11 @@ export const ROLE_TEMPTATION_PROFILES = {
         relationships: { threshold: 35, bonus: 0.02 },
       },
     },
-    gainRange: [1800, 3400],
-    successBaseEffects: { progress: 5, politicalCapital: -6 },
     failConfig: {
       budgetMin: 2600,
       budgetMultiplier: 1.25,
       effects: { politicalCapital: -12, compliance: -15, relationships: -9, progress: -6 },
     },
-    refuseEffects: { politicalCapital: 2, compliance: 2 },
-    reportEffects: { politicalCapital: 5, compliance: 4, timeUsed: 2 },
-    baseSuccess: 0.36,
     preferredTags: {
       procurement: 2.5,
       paperwork: 2,
@@ -185,16 +228,11 @@ export const ROLE_TEMPTATION_PROFILES = {
         relationships: { threshold: 32, bonus: 0.02 },
       },
     },
-    gainRange: [300, 900],
-    successBaseEffects: { progress: 4, equipment: -10, crew_morale: -4 },
     failConfig: {
       budgetMin: 450,
       budgetMultiplier: 0.9,
       effects: { equipment: -15, crew_morale: -10, compliance: -12, progress: -8 },
     },
-    refuseEffects: { crew_morale: 2, compliance: 1 },
-    reportEffects: { crew_morale: 1, compliance: 3, timeUsed: 2 },
-    baseSuccess: 0.34,
     preferredTags: {
       access: 2,
       logistics: 2,
@@ -219,16 +257,11 @@ export const ROLE_TEMPTATION_PROFILES = {
         relationships: { threshold: 32, bonus: 0.02 },
       },
     },
-    gainRange: [350, 950],
-    successBaseEffects: { progress: 2, equipment: -12, crew_morale: -5 },
     failConfig: {
       budgetMin: 500,
       budgetMultiplier: 0.9,
       effects: { equipment: -16, crew_morale: -10, compliance: -12, progress: -9 },
     },
-    refuseEffects: { crew_morale: 2, compliance: 1 },
-    reportEffects: { crew_morale: 1, compliance: 3, timeUsed: 2 },
-    baseSuccess: 0.28,
     preferredTags: {
       nursery: 2.5,
       herbicide: 2,

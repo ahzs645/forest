@@ -79,7 +79,7 @@ export function describeConsequences(state, ids = []) {
   const history = Array.isArray(state?.history) ? state.history : [];
 
   return ids.map((id) => {
-    const info = CONSEQUENCE_INFO[id] || { title: id, cause: "" };
+    const info = CONSEQUENCE_INFO[id] || null;
     const entry = [...history]
       .reverse()
       .find(
@@ -88,10 +88,13 @@ export function describeConsequences(state, ids = []) {
           && item?.id === id
           && Number(item?.round) === round,
       );
+    // A consequence without table copy (a shortcut's fallout settling at year
+    // end, a steady-program recovery) reads from what the engine logged,
+    // never as a raw id.
     return {
       id,
-      title: info.title,
-      cause: info.cause,
+      title: info?.title || entry?.title || id,
+      cause: info?.cause || entry?.option || "",
       effectText: formatEffectText(entry?.effects || {}),
     };
   });
@@ -107,6 +110,12 @@ export function describeCardCause(card) {
   const causedBy = card?.causedBy;
   if (!causedBy) return "";
   const season = causedBy.season ? `${causedBy.season} ` : "";
+  // A shortcut's fallout names the act and who caught it, not the generic
+  // option label ("Take the shortcut").
+  if (causedBy.kind === "shortcut" && causedBy.title) {
+    const who = causedBy.institution || "the district";
+    return `Connected to your ${season}decision: you took the shortcut “${causedBy.title}”, and ${who} caught it.`;
+  }
   const option = causedBy.option ? `“${causedBy.option}”` : "an earlier call";
   return `Connected to your ${season}decision: ${option}.`;
 }

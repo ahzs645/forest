@@ -425,11 +425,18 @@ test('the seasonal card refuses for free, names the institution when caught, and
   const card = adaptIllegalActTemptation(act, state, () => 0.5);
   assert.equal(card.options[0].label, 'Say no');
   assert.deepEqual(card.options[0].effects, {});
-  assert.equal(card.options[0].outcome, 'The file stays yours. Nothing else changes.');
+  assert.equal(card.options[0].outcome, 'Not on your ticket. Nothing else changes.');
   const risky = card.options.find((option) => option.risk);
-  assert.match(risky.label, /C&E/);
+  assert.equal(risky.label, 'Take the shortcut');
+  assert.equal(risky.institution, 'C&E');
+  assert.match(risky.oddsLine, /^\d+% clean, \d+% noticed, \d+% caught by C&E$/);
+  assert.match(risky.preview, /caught by C&E/);
   assert.match(risky.risk.failOutcome, /NRO/);
   assert.doesNotMatch(risky.preview, /equipment|crew_morale|politicalCapital|Political Capital|Crew Morale/i);
+  // The success band pays the act's own payoff (a day of layout) in the role's currency.
+  assert.ok(risky.risk.successEffects.progress > 0, 'a clean take pays progress');
+  assert.equal(risky.payoffChip, `Progress +${risky.risk.successEffects.progress}`);
+  assert.equal(card.payoffLine, act.payoff.line);
   assert.match(card.description, /The layout contractor: “My guys can walk right past/);
   const report = card.options[2];
   assert.ok(report.effects.compliance > 0);

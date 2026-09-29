@@ -436,15 +436,17 @@ test('bureaucratic shortcut failures queue specific bureaucratic fallout issues'
     state.pendingIssues[0].candidates.map((candidate) => candidate.id),
     ['ministry-data-audit', 'fpbc-competence-audit', 'referral-miss-at-two-levels', 'fsp-comment-surge']
   );
+  // The promise is the heaviest candidate whose gates are open next season,
+  // fixed at schedule time so the notice and the draw agree.
+  assert.equal(state.pendingIssues[0].id, 'ministry-data-audit');
   assert.equal(state.flags.auditTriggered, true);
   assert.equal(state.flags.ethicsInquiry, undefined);
   assert.equal(resolution?.scheduledIssueTeaser?.severity, 'warning');
-  assert.match(resolution?.scheduledIssueTeaser?.text || '', /Likely fallout \(manageable\): Ministry Data Audit/i);
-  assert.match(resolution?.scheduledIssueTeaser?.text || '', /schedule strain/i);
+  assert.match(resolution?.scheduledIssueTeaser?.text || '', /^Fallout \(manageable\): Ministry Data Audit\. It lands next season\.$/i);
 
   const issue = drawIssue(state, () => 0);
   assert.equal(issue?.id, 'ministry-data-audit');
-  assert.match(issue?.surfaceReason || '', /schedule strain/i);
+  assert.match(issue?.surfaceReason || '', /you took the shortcut “Doctor the Referral Maps”, and C&E caught it/i);
   assert.deepEqual(state.pendingIssues, []);
 });
 
@@ -488,15 +490,17 @@ test('ecological shortcut failures queue specific ecological fallout issues', ()
   // Provenance stamp ties the delayed fallout to the shortcut that scheduled it.
   assert.equal(pending.causedBy?.sourceType, 'temptation');
   assert.equal(pending.causedBy?.option, riskyOption.label);
+  assert.equal(pending.id, 'environmental-audit-fallout');
+  assert.equal(pending.causedBy?.kind, 'shortcut');
+  assert.equal(pending.causedBy?.institution, 'BCWS');
   assert.equal(state.flags.environmentalAudit, true);
   assert.equal(state.flags.underInvestigation, undefined);
   assert.equal(resolution?.scheduledIssueTeaser?.severity, 'warning');
-  assert.match(resolution?.scheduledIssueTeaser?.text || '', /Likely fallout \(manageable\): Environmental Audit Fallout/i);
-  assert.match(resolution?.scheduledIssueTeaser?.text || '', /ecological stress/i);
+  assert.match(resolution?.scheduledIssueTeaser?.text || '', /^Fallout \(manageable\): Environmental Audit Fallout\. It lands next season\.$/i);
 
   const issue = drawIssue(state, () => 0);
   assert.equal(issue?.id, 'environmental-audit-fallout');
-  assert.match(issue?.surfaceReason || '', /ecological stress/i);
+  assert.match(issue?.surfaceReason || '', /you took the shortcut “Burn Without a Registration Number”, and BCWS caught it/i);
   assert.deepEqual(state.pendingIssues, []);
 });
 
@@ -551,10 +555,12 @@ test('mixed fallout bundles shift toward the dominant pressure at draw time', ()
   const trustIssue = drawIssue(pressureLowTrust, () => 0);
   const budgetIssue = drawIssue(pressureLowBudget, () => 0);
 
+  // The institution and the kind of act decide the card, not the meters: the
+  // Nation's catch leads with the heritage branch, internal audit's with the freeze.
   assert.equal(trustIssue?.id, 'heritage-protocol-gap');
-  assert.match(trustIssue?.surfaceReason || '', /relationship damage/i);
+  assert.match(trustIssue?.surfaceReason || '', /the Nation caught it/i);
   assert.equal(budgetIssue?.id, 'budget-freeze');
-  assert.match(budgetIssue?.surfaceReason || '', /budget stress/i);
+  assert.match(budgetIssue?.surfaceReason || '', /internal audit caught it/i);
 });
 
 test('serious fallout previews stay marked as danger when formal investigation is likely', () => {
@@ -587,7 +593,7 @@ test('serious fallout previews stay marked as danger when formal investigation i
   }
 
   assert.equal(resolution?.scheduledIssueTeaser?.severity, 'danger');
-  assert.match(resolution?.scheduledIssueTeaser?.text || '', /Likely fallout \(serious\): Formal Investigation/i);
+  assert.match(resolution?.scheduledIssueTeaser?.text || '', /^Fallout \(serious\): Formal Investigation\. It lands next season\.$/i);
 });
 
 test('temptations respect seasonal cooldowns to avoid back-to-back shortcut cards', () => {

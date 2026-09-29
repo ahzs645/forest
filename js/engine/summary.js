@@ -29,6 +29,13 @@ export function buildSummary(state) {
   if (state.flags?.budgetLoanActive) {
     messages.push("[$] Emergency loan repayments trimmed future budget gains by 20%.");
   }
+  // Fallout from a shortcut caught too late in the year to be dealt as a card
+  // is still owed; the review says so by name.
+  for (const entry of Array.isArray(state.history) ? state.history : []) {
+    if (entry?.type === "consequence" && entry.id === "unlanded-fallout" && entry.title) {
+      messages.push(`[!] ${entry.title}. ${entry.option || ""}`.trim());
+    }
+  }
 
   const score = scoreRun(state);
   const overall = {

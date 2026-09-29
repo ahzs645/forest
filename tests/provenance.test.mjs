@@ -60,7 +60,11 @@ test("a delayed issue carries the decision that scheduled it, and describeCardCa
   assert.ok(issue.causedBy, "drawn issue should carry provenance forward");
   const sentence = describeCardCause(issue);
   assert.match(sentence, /Connected to your Fall Integration decision/);
-  assert.match(sentence, new RegExp(risky.label.slice(0, 8)));
+  // Names the act and who caught it, not the generic option label.
+  assert.match(sentence, new RegExp(`you took the shortcut “${act.title}”, and BCWS caught it`));
+  assert.equal(issue.causedBy.kind, "shortcut");
+  assert.equal(issue.causedBy.actId, act.id);
+  assert.equal(issue.sourceTitle, act.title);
 });
 
 test("describeCardCause returns empty string when there is no provenance", () => {

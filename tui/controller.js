@@ -171,9 +171,12 @@ function buildOutcomeNotice(option, outcomeResult, cardType = null, round = null
     .join("\n\n");
 
   if (riskResult) {
-    const tone = riskResult.success ? "positive" : scheduledIssuePreview?.severity || "danger";
+    // Three bands: clean lands, noticed lands with somebody watching, caught.
+    const band = riskResult.band || (riskResult.success ? "clean" : "caught");
+    const tone = band === "clean" ? "positive" : band === "noticed" ? "warning" : scheduledIssuePreview?.severity || "danger";
+    const word = band === "clean" ? "Success" : band === "noticed" ? "Noticed" : "Caught";
     return {
-      heading: riskResult.success ? `Success: ${option.label}` : `Caught: ${option.label}`,
+      heading: `${word}: ${option.label}`,
       body,
       tone,
     };
@@ -200,6 +203,8 @@ function buildLastDecision(option, outcomeResult) {
     effectText: formatMetricDelta(effects),
     // null for a plain decision; true/false for a gamble that resolved.
     success: riskResult ? Boolean(riskResult.success) : null,
+    // clean | noticed | caught for a gamble; null otherwise.
+    band: riskResult ? riskResult.band || (riskResult.success ? "clean" : "caught") : null,
   };
 }
 
