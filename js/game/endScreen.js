@@ -185,9 +185,17 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
       // so only claim the traverse when the odometer backs it up.
       const traverseDone = journey.totalDistance > 0
         && journey.distanceTraveled >= journey.totalDistance;
+      // Said from the run, not a stock phrase: every ending used to close
+      // "as summer settled in".
+      const shiftsLeft = Number.isFinite(journey.deadline) ? Math.max(0, journey.deadline - daysUsed) : null;
+      const when = shiftsLeft === null
+        ? `in the ${seasonName} window`
+        : shiftsLeft === 0
+          ? `on the last shift of the ${seasonName} window`
+          : `with ${shiftsLeft} shift${shiftsLeft === 1 ? '' : 's'} left in the ${seasonName} window`;
       const opening = traverseDone
-        ? `${crewName} completed the ${journey.totalDistance} km traverse through ${areaName} as ${seasonName} settled in.`
-        : `${crewName} closed out every block package in ${areaName} as ${seasonName} settled in.`;
+        ? `${crewName} completed the ${journey.totalDistance} km traverse through ${areaName} ${when}.`
+        : `${crewName} closed out every block package in ${areaName} ${when}.`;
       return `${opening} ` +
         `${activeCrew} crew members finalized all ${blocksCount} block packages over ${daysUsed} shifts. ` +
         `The layout and recon data go to the planning file and the cutting permit application.`;
@@ -246,7 +254,7 @@ export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
         ? Math.round((journey.distanceTraveled / journey.totalDistance) * 100) : 0;
       const lastBlock = journey.blocks?.[journey.currentBlockIndex]?.name || 'an unknown location';
       return `The expedition stalled at ${lastBlock}, ${progress}% of the way through the traverse. ` +
-        `${reason} After ${daysUsed} shifts, ${crewName} could go no further.`;
+        `${reason} After ${daysUsed} shifts, ${String(crewName).replace(/^The /, 'the ')} could go no further.`;
     }
     case 'silviculture': {
       const planted = (journey.planting?.blocksPlanted || 0) >= (journey.planting?.blocksToPlant || 0);

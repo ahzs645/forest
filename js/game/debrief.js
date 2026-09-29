@@ -275,56 +275,159 @@ const TRAIT_EPILOGUES = {
   clumsy: 'buys the first round as apology for the gear they broke',
 };
 
+// What a hand who finished the season strong asks for next, by the job they
+// did. A crew of five used to read the same line five times.
+const STRONG_BY_ROLE = {
+  faller: 'Came back stronger than they left. Asks to hang the next boundary themselves.',
+  bucker: 'Came home with every plot card legible. Signs on for the fall cruise.',
+  spotter: 'Asks to run the compass on the next traverse instead of the chain.',
+  driver: 'Knows every soft spot on the mainline now. Already booked to drive the fall crew.',
+  mechanic: 'Kept the trucks rolling all season and has opinions about next year\'s fleet.',
+  checker: 'Plots came back tight all season. Asks for the hardest contract next spring.',
+  surveyor: 'Wants the free-growing surveys again next year, on the same blocks.',
+};
+
+const STRONG_LINES = [
+  'Came back stronger than they left. Asks to run point next year.',
+  'Tells the office they want the same crew next season, and means it.',
+  'Signs on for next season before the trucks are unloaded.',
+];
+const WORN_LINES = [
+  'Healing up over the winter. The stories are worth the scars, they say.',
+  'Takes a month off to let the knees argue it out. Back for spring.',
+  'Sleeps most of October. Says the season was worth it and the body disagrees.',
+];
+const LOW_MORALE_WIN_LINES = [
+  'Glad it is done. Takes the winter to decide whether the bush is still the job.',
+  'Banks the season and does not answer the phone until March.',
+];
+const STEADY_WIN_LINES = [
+  'Banks the season and books two weeks somewhere with no trees.',
+  'Puts the season\'s pay on the truck loan and sleeps for a week.',
+  'Spends the fall back in the same country, hunting on their own time.',
+  'Takes the cheque home and fixes the porch they have been putting off.',
+];
+const DEFEAT_STEADY_LINES = [
+  'Shrugs it off. "Some years the bush wins." Already asking about next season.',
+  'Says the plan was sound and the season was not. Wants another go at the same ground.',
+  'Takes a winter contract and keeps the field book. Next time they will see it coming.',
+];
+const DEFEAT_LOW_LINES = [
+  'Quietly updating a resume, but hasn’t handed it in yet.',
+  'Takes a town job for the winter and does not say whether they will be back.',
+];
+// The crew that drove out when the food box ran dry did not finish the season.
+const WALKED_OFF_LINES = [
+  'Drove out with the crew when the food ran out. Tells every new crew lead to check the grub box before the fuel gauge.',
+  'Rode out in the crummy with an empty cooler. Took a planting contract two valleys over.',
+  'Walked off hungry and says so plainly. Would work for you again, with a cook on the payroll.',
+  'Went home and ate for three days. Has not decided about next season.',
+  'Signed on with another outfit before the week was out. They feed their crews.',
+];
+const EVACUATED_LINES = [
+  'Off the crew for the season; the WorkSafeBC file is still open. Sends the crew a photo from physio.',
+  'Spent the rest of the season on modified duties in town. Checks the crew\'s progress on the office board every morning.',
+  'Home and healing. The claim is closing; they want the first shift of next season.',
+];
+const QUIT_LOW_LINES = [
+  'Last seen driving south. The resignation letter was one sentence long.',
+  'Gone before the season closed. Left their caulks by the cook shack door.',
+];
+const QUIT_LINES = [
+  'Took a town job with regular hours. Sends the crew fish pictures.',
+  'Took a mill job closer to home. Still texts the crew on the first day of every season.',
+];
+
+/** A stable number from a crew member's id, so one member keeps one line. */
+function memberSeed(member) {
+  const key = String(member?.id ?? member?.name ?? '');
+  let hash = 0;
+  for (const char of key) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return hash;
+}
+
 /**
- * One-line epilogue for a crew member, based on fate, traits and condition.
+ * The first line in `lines` nobody else on this crew has been given yet,
+ * starting at this member's own place in the pool. `context.used` carries
+ * the lines already handed out; without it the pick is still stable.
+ */
+function pickFresh(lines, member, context) {
+  const used = context.used;
+  const start = memberSeed(member) % lines.length;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[(start + i) % lines.length];
+    if (!used?.has(line)) {
+      used?.add(line);
+      return line;
+    }
+  }
+  return lines[start];
+}
+
+/**
+ * One-line epilogue for a crew member, based on fate, role, traits and
+ * condition. Lines already given to someone else on the crew are skipped.
  * @param {Object} member - Crew member
- * @param {Object} context - { victory, reportStyle }
+ * @param {Object} context - { victory, reportStyle, injuredAt, used, walkedOff, treatedCalls }
  * @returns {string}
  */
 export function buildCrewEpilogue(member, context = {}) {
   const { victory = false, reportStyle = 'integrity' } = context;
   const info = getCrewDisplayInfo(member);
   const name = `${info.name} (${info.role})`;
+  const say = (lines) => `${name}: ${pickFresh(lines, member, context)}`;
 
   if (member.isDead || (!member.isActive && !member.hasQuit)) {
-    return `${name}: Off the crew for the season; the WorkSafeBC file is still open. Sends the crew a photo from physio.`;
-  }
-  // Survivors who took an injury during a logged event remember exactly where
-  if (member.isActive && context.injuredAt?.has(member.id)) {
-    const where = context.injuredAt.get(member.id);
-    return `${name}: Still favours the side they hurt during ${where}. Tells the story like it was a fair trade.`;
+    return say(EVACUATED_LINES);
   }
   if (member.hasQuit) {
-    return member.morale < 30
-      ? `${name}: Last seen driving south. The resignation letter was one sentence long.`
-      : `${name}: Took a town job with regular hours. Sends the crew fish pictures.`;
+    return say(member.morale < 30 ? QUIT_LOW_LINES : QUIT_LINES);
   }
   if (!member.isActive) {
     return `${name}: Recovering well. The doctors say next season is realistic.`;
   }
+  // Still on the roster when the food ran out: they drove out with the rest.
+  if (context.walkedOff) {
+    return say(WALKED_OFF_LINES);
+  }
+  // Survivors who took an injury during a logged event remember exactly where
+  if (context.injuredAt?.has(member.id)) {
+    const where = context.injuredAt.get(member.id);
+    return `${name}: Still favours the side they hurt during ${where}. Tells the story like it was a fair trade.`;
+  }
 
-  // Active survivors: trait flavour first, then condition buckets
+  // Active survivors: trait flavour first, then role and condition
   for (const traitId of member.traits || []) {
-    if (TRAIT_EPILOGUES[traitId]) {
-      return `${name}: ${capitalize(TRAIT_EPILOGUES[traitId])}.`;
+    const line = TRAIT_EPILOGUES[traitId] && `${capitalize(TRAIT_EPILOGUES[traitId])}.`;
+    if (line && !context.used?.has(line)) {
+      context.used?.add(line);
+      return `${name}: ${line}`;
     }
   }
 
   if (!victory) {
-    return member.morale >= 50
-      ? `${name}: Shrugs it off. "Some years the bush wins." Already asking about next season.`
-      : `${name}: Quietly updating a resume, but hasn’t handed it in yet.`;
+    return say(member.morale >= 50 ? DEFEAT_STEADY_LINES : DEFEAT_LOW_LINES);
   }
-  if (member.health > 80 && member.morale > 70) {
-    return `${name}: Came back stronger than they left. Asks to run point next year.`;
+  if (member.health < 40) return say(WORN_LINES);
+  if (member.morale < 40) return say(LOW_MORALE_WIN_LINES);
+  // The attendant's season is the calls they answered.
+  const calls = Number(context.treatedCalls) || 0;
+  const own = member.role === 'medic'
+    ? (calls > 0
+      ? `Wrote up all ${calls} first-aid call${calls === 1 ? '' : 's'} this season and renews the OFA 3 early.`
+      : 'Opened the kit for blisters and a splinter all season. Renews the OFA 3 anyway.')
+    : (member.health > 80 && member.morale > 70 ? STRONG_BY_ROLE[member.role] : null);
+  if (own && !context.used?.has(own)) {
+    context.used?.add(own);
+    return `${name}: ${own}`;
   }
-  if (member.health < 40) {
-    return `${name}: Healing up over the winter. The stories are worth the scars, they say.`;
+  if (member.health > 80 && member.morale > 70) return say(STRONG_LINES);
+  const appendix = 'Saw their name in the report appendix and bought a frame for it.';
+  if (reportStyle === 'people' && !context.used?.has(appendix)) {
+    context.used?.add(appendix);
+    return `${name}: ${appendix}`;
   }
-  if (reportStyle === 'people') {
-    return `${name}: Saw their name in the report appendix and bought a frame for it.`;
-  }
-  return `${name}: Banks the season and books two weeks somewhere with no trees.`;
+  return say(STEADY_WIN_LINES);
 }
 
 /**
@@ -537,7 +640,15 @@ export async function runFinalDebrief(ui, journey, victory) {
       injuredAt.set(entry.victimId, entry.eventTitle);
     }
   }
-  const epilogueContext = { victory, reportStyle, injuredAt };
+  const epilogueContext = {
+    victory,
+    reportStyle,
+    injuredAt,
+    // One crew, one set of lines: nobody gets a line someone else already has.
+    used: new Set(),
+    walkedOff: Boolean(journey.crewWalkedOff),
+    treatedCalls: (journey.log || []).filter((entry) => entry.victimId).length,
+  };
   const epilogues = [];
   if (journey.crew?.length) {
     for (const member of journey.crew) {

@@ -38,7 +38,7 @@ import { TERRAIN_TYPES, getRandomWeather, getTemperature } from '../data/blocks.
 import { advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromAccess } from '../data/discoveryTags.js';
 import { JOURNEY_MILESTONES, MILESTONE_COPY } from './constants.js';
-import { allPackagesFinalized, getPackageProgress } from './packages.js';
+import { allPackagesFinalized, getPackageProgress, isPackageBlock } from './packages.js';
 
 // The road verdict is about the road: fill, grade, crossings, drainage. Values
 // constraints — moose winter range, caribou, VQO, CMTs, a Nation's protocol —
@@ -809,6 +809,66 @@ function travelDistanceForDay(journey, paceId) {
   return Math.max(0, distance + bonus);
 }
 
+const EVENT_EFFECT_BANDS = ['effects', 'partialEffects', 'failureEffects'];
+
+/**
+ * Fit a card to the road that is left. At the last stop there is no next leg,
+ * so "+5 km on the next leg" is a promise the season cannot keep and "the
+ * next leg will be slower" a cost it never pays: the km come off every band.
+ * A card about the road ahead (`needsNextLeg`: a trapper's route notes, a
+ * grader for the spur) or with an option that offers nothing but ground is
+ * not dealt there at all. Anywhere else the card is returned untouched.
+ * @param {Object} journey
+ * @param {Object|null} event
+ * @returns {Object|null}
+ */
+export function fitEventToRemainingRoute(journey, event) {
+  if (!event || !Array.isArray(event.options) || getNextBlock(journey)) return event;
+  // A shortcut's payoff is sized and shown by its own builder
+  // (js/events/selection.js buildTemptationPayoff); it is not rewritten here.
+  if (event.type === 'temptation') return event;
+  if (event.needsNextLeg) return null;
+  const kmOnly = event.options.some((option) => {
+    const effects = option?.effects || {};
+    return Number(effects.progress) > 0
+      && Object.entries(effects).every(([key, value]) => key === 'progress' || key === 'progressMode' || !value);
+  });
+  if (kmOnly) return null;
+  let changed = false;
+  const options = event.options.map((option) => {
+    if (!option) return option;
+    // Ground and delay both land on the next leg (a timeUsed is a setback).
+    const bands = EVENT_EFFECT_BANDS.filter((band) => option[band]
+      && ('progress' in option[band] || 'timeUsed' in option[band]));
+    if (!bands.length && !('timeUsed' in option)) return option;
+    changed = true;
+    const { timeUsed: _time, ...fitted } = option;
+    for (const band of bands) {
+      const { progress: _progress, progressMode: _mode, timeUsed: _bandTime, ...rest } = option[band];
+      fitted[band] = rest;
+    }
+    return fitted;
+  });
+  return changed ? { ...event, options } : event;
+}
+
+/**
+ * Fit a card to the crew on the roster. "Send out your sick crew member" on
+ * a crew with nobody sick evacuated no one and paid its morale anyway; the
+ * option is not offered until someone is carrying a condition.
+ * @param {Object} journey
+ * @param {Object|null} event
+ * @returns {Object|null}
+ */
+export function fitEventToCrew(journey, event) {
+  if (!event || !Array.isArray(event.options)) return event;
+  const someoneSick = (journey?.crew || []).some((member) => member.isActive && (member.statusEffects?.length || 0) > 0);
+  if (someoneSick) return event;
+  const options = event.options.filter((option) => !option?.crewEffect?.evacuate_sick);
+  if (options.length === event.options.length) return event;
+  return options.length ? { ...event, options } : null;
+}
+
 /**
  * Route an event's "+/- N km traverse" through the travel system instead of
  * moving the crew directly.
@@ -837,6 +897,10 @@ export function applyEventTravelEffect(journey, km, { turnBack = false } = {}) {
     messages.push(`Worth about ${amount} km on the next leg. The crew still stops at ${nextBlock.name} for the road check.`);
     return messages;
   }
+
+  // At the last stop there is no leg left to slow down, and saying there is
+  // tells the player something false about the end of the season.
+  if (!turnBack && !getNextBlock(journey)) return messages;
 
   let setbackKm = amount;
   if (turnBack) {
@@ -946,13 +1010,18 @@ export function executeFieldAction(journey, paceId) {
   if (travelInfo.distance > 0) {
     // A layout crew's traverse is walked line and road location between
     // stops, not a drive measured in shifts.
+    // A leg to a bridge, a camp or a yard is road driven, not line walked.
     const toward = nextBlockAtStart?.name ? ` toward ${nextBlockAtStart.name}` : '';
-    messages.push(`Walked ${travelInfo.distance} km of line and road location${toward} at ${pace.name} pace.`);
+    messages.push(nextBlockAtStart && !isPackageBlock(nextBlockAtStart)
+      ? `Covered ${travelInfo.distance} km of road${toward} at ${pace.name} pace.`
+      : `Walked ${travelInfo.distance} km of line and road location${toward} at ${pace.name} pace.`);
     journey.travelSetback = 0;
     journey.travelBonusKm = 0;
   } else {
     if (effectivePaceId === 'resting') {
-      messages.push('The crew stood down and recovered this shift.');
+      messages.push(journey.resources.food <= 0
+        ? 'The crew stood down this shift, but nobody recovers on an empty food box.'
+        : 'The crew stood down and recovered this shift.');
     } else {
       messages.push('The shift ends without a travel leg.');
     }
@@ -1089,6 +1158,9 @@ export function executeFieldAction(journey, paceId) {
 
   if (!journey.isGameOver && Number(journey.resourcePressure?.hungryDays || 0) >= STARVATION_WALKOFF_DAYS) {
     journey.isGameOver = true;
+    // Whoever was still on the roster left with the trucks: the review and
+    // the epilogues read this rather than a crew that looks "5/5 active".
+    journey.crewWalkedOff = true;
     journey.gameOverReason = `NO FOOD - After ${journey.resourcePressure.hungryDays} shifts on an empty food box the crew drove themselves out. Nobody is left in the field to finish the season.`;
     messages.push(journey.gameOverReason);
   }

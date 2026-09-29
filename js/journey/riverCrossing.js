@@ -63,6 +63,23 @@ const GAUGE_LEVELS = [
   { id: 'flood', label: 'FLOOD', description: 'Brown water carrying debris. This is a river with opinions.', baseRisk: 0.58 },
 ];
 
+// A deck or a pipe reads the same gauge differently: nobody is wading a
+// bridge, so "thigh-deep, anything not chained down swims" belongs to a ford.
+const GAUGE_COPY_BY_MODE = {
+  bridge: {
+    low: 'Low water under the deck; the abutments are dry.',
+    moderate: 'Steady flow under the deck, well clear of the stringers.',
+    high: 'High and fast under the deck, a metre off the stringers. Scour at the abutments is the worry.',
+    flood: 'Brown water and debris hammering the piers. This is a river with opinions.',
+  },
+  culvert: {
+    low: 'A trickle through the pipe.',
+    moderate: 'The pipe running half full.',
+    high: 'The pipe running full and the inlet starting to back up.',
+    flood: 'The inlet is plugged and water is over the road at the fill.',
+  },
+};
+
 /** What a crossing physically is, read off the block's features. */
 export const CROSSING_MODES = {
   ford: { id: 'ford', label: 'ford' },
@@ -182,7 +199,7 @@ export function getCrossingContext(journey, block) {
     gaugeIndex,
     gaugeId: gauge.id,
     gaugeLabel: gauge.label,
-    gaugeDescription: gauge.description,
+    gaugeDescription: GAUGE_COPY_BY_MODE[mode]?.[gauge.id] || gauge.description,
     risk: Math.min(0.85, risk),
     scouted,
     undercut,

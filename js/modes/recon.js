@@ -27,6 +27,8 @@ import { getWeatherTempC } from '../data/blocks.js';
 import {
   executeFieldAction,
   endFieldDay,
+  fitEventToCrew,
+  fitEventToRemainingRoute,
   formatAccessVerdict,
   formatInfrastructureStatus,
   getBlockAccessVerdict,
@@ -366,12 +368,14 @@ export function getReconValueSweepProfile(block, journey) {
     wildlife.push('goat and wolverine sign above tree line — a wildlife feature and a note for the biologist');
   }
   if (wildlife.length === 0) {
-    wildlife.push('raptor nest search on the big cottonwoods and a den search on the south aspect');
+    wildlife.push('raptor nest search in the biggest trees on the block and a den search on the south aspect');
   }
 
   // Cultural heritage.
   if (features.has('culturally_modified_trees') || features.has('cedar_harvest')) {
-    cultural.push('bark-stripped cedar (CMTs) — flag, photograph, GPS, do not disturb; AOA/PFR and a referral before the boundary is final');
+    // Redcedar where it grows; inland the stripped trees are pine and spruce.
+    const stripped = features.has('cedar_stand') || features.has('cedar_harvest') ? 'bark-stripped cedar' : 'bark-stripped trees';
+    cultural.push(`${stripped} (CMTs) — flag, photograph, GPS, do not disturb; AOA/PFR and a referral before the boundary is final`);
     tags.add('cultural_hold');
   }
   if (features.has('first_nation') || hazards.has('cultural_protocol')) {
@@ -427,12 +431,17 @@ export function getReconLayoutProfile(block) {
       streams.push(`${stream.label}: ${stream.cls} — ${stream.rma}`);
     }
   }
+  const terrainId = normalizeReconToken(block?.terrain);
   if (streams.length === 0) {
-    streams.push('no defined channels crossed; two non-classified drainages noted for the site plan');
+    // Read off the ground, so every dry block does not file the same line.
+    streams.push(terrainId === 'hilly' || terrainId === 'steep'
+      ? 'no defined channels crossed; seepage in the side draws noted as non-classified drainages'
+      : terrainId === 'muskeg'
+        ? 'no defined channels; diffuse flow through the fen noted for the site plan'
+        : 'no defined channels crossed; one wet swale noted as a non-classified drainage');
   }
 
   const terrain = [];
-  const terrainId = normalizeReconToken(block?.terrain);
   if (terrainId === 'steep' || hazards.has('grade')) terrain.push('slopes over 60% on the upper boundary — terrain stability field card, likely Class IV');
   if (hazards.has('rockslide') || features.has('moraine') || features.has('glacial_terrain')) terrain.push('unstable till and slide scars — road location wants the bench, not the toe');
   if (hazards.has('debris_flow')) terrain.push('a debris-flow gully above the fan — the terrain stability assessment covers the channel above the road, not just the block');
@@ -440,7 +449,13 @@ export function getReconLayoutProfile(block) {
   if (terrainId === 'muskeg' || hazards.has('bog') || hazards.has('subsidence') || features.has('permafrost')) terrain.push('organic soils and standing water — frozen-ground harvest window, no summer machine traffic');
   if (features.has('karst')) terrain.push('karst: sinks, grikes and a disappearing stream — each one flagged and buffered');
   if (hazards.has('erosion') || features.has('watershed') || features.has('community_water')) terrain.push('fine-textured soils on the lower slope — sediment control notes for every crossing');
-  if (terrain.length === 0) terrain.push('gentle ground, well-drained morainal soils, no stability concerns noted');
+  if (terrain.length === 0) {
+    terrain.push(terrainId === 'hilly'
+      ? 'rolling ground, side slopes of 20-40%; cutbanks noted, no stability concerns'
+      : terrainId === 'steep'
+        ? 'steep side slopes on the boundary; walked, no slide scars or tension cracks found'
+        : 'gentle ground, well-drained morainal soils, no stability concerns noted');
+  }
 
   const dangerTrees = [];
   if (hazards.has('snag_hazard') || hazards.has('falling_timber') || features.has('beetle_kill') || features.has('wildfire_scar')) dangerTrees.push('dangerous-tree assessment on the snags along the boundary; the worst ones flagged for the faller before anyone works under them');
@@ -584,7 +599,7 @@ async function runFieldDay(game) {
   // The first shift teaches the base loop — nothing fires on day 1.
   let pendingEvent = resumingShift
     ? (journey.activeReconShift.pendingEvent || null)
-    : (journey.day > 1 ? checkForEvent(journey) : null);
+    : (journey.day > 1 ? fitEventToCrew(journey, fitEventToRemainingRoute(journey, checkForEvent(journey))) : null);
   const shiftState = ensureActiveReconShift(journey, pendingEvent);
   checkpointReconShift(game, shiftState, pendingEvent);
 
@@ -768,7 +783,7 @@ async function runFieldDay(game) {
     if (routeConstraint) {
       options.push({
         label: routeConstraint.kind === 'landslide' ? 'Take the old spur around' : 'Walk in from the last sound approach',
-        description: `Bypass ${routeConstraint.title.toLowerCase()} on the old line with extra fuel and rougher travel — uses this shift`,
+        description: `Bypass ${routeConstraint.title.toLowerCase()} on the old line: a slow, rough leg toward ${journey.blocks[journey.currentBlockIndex + 1]?.name || 'the next stop'} with extra fuel — uses this shift`,
         tag: 'TRADEOFF',
         value: 'detour_route_constraint'
       });
@@ -1021,17 +1036,26 @@ async function runFieldDay(game) {
       if (!constraint) {
         ui.write('No route obstruction is active on the next leg.');
       } else {
-        spendDay(journey);
-        const result = resolveRouteConstraint(
-          journey,
-          constraint.id,
-          actionId === 'detour_route_constraint' ? 'detour' : 'report'
-        );
+        const detour = actionId === 'detour_route_constraint';
+        const result = resolveRouteConstraint(journey, constraint.id, detour ? 'detour' : 'report');
         for (const message of result.messages) {
-          if (actionId === 'detour_route_constraint') ui.writeWarning(message);
+          if (detour) ui.writeWarning(message);
           else ui.write(message);
         }
         logReconAction(journey, result.messages[0] || 'Resolved route obstruction');
+        // The old spur is the road today: a slow, rough leg that still makes
+        // ground. It used to take the shift, cover nothing, and slow the next
+        // leg too, which made waiting for the office strictly better.
+        const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
+        if (detour && nextBlock && journey.resources.fuel > 0 && journey.resources.equipment > 0) {
+          journey.routePlan = { ...buildRoutePlan('mainline', journey, currentBlock, nextBlock), note: '' };
+          const leg = await runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent });
+          if (leg.gameOver) return;
+          hasTraveled = true;
+          dayResolved = true;
+        } else {
+          spendDay(journey);
+        }
       }
     }
 
@@ -1401,7 +1425,7 @@ export function updateReconMissionStatus(ui, journey) {
     { label: 'Weather', value: `${journey.weather?.name || 'Clear'}${tempC === null ? '' : ` ${tempC}°C`}` },
     { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
     { label: 'Days left', value: Number.isFinite(journey.deadline) ? `${Math.max(0, journey.deadline - journey.day)}` : '—' },
-    { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km` },
+    { label: 'Traverse', value: `${formatKm(journey.distanceTraveled)}/${formatKm(journey.totalDistance)} km` },
     { label: 'Stops', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` },
     {
       label: 'Scrutiny',
@@ -1604,7 +1628,9 @@ async function handleSetTempo(ui, journey) {
     },
     {
       label: `Short rations${rations.mode === 'short' ? ' (current)' : ''}`,
-      description: '65% portions; stretches the food, the crew feels it',
+      // The cost is on the option itself: the warning printed after the
+      // choice is cleared by the day screen's redraw.
+      description: `65% portions; stretches the food, ${SHORT_RATION_MORALE_COST} morale a shift for everyone`,
       value: 'short',
     },
   ]);
@@ -1620,6 +1646,11 @@ async function handleSetTempo(ui, journey) {
     rations.orderedAtFood = null;
     ui.write('Back on full rations.');
   }
+}
+
+/** Kilometres as the travel lines print them: a 6.5 km leg is not "7". */
+function formatKm(km) {
+  return String(Number((Number(km) || 0).toFixed(1)));
 }
 
 /** An occasional voice from the crew — not a daily ritual. */
@@ -1721,7 +1752,7 @@ function buildReconStatusLine(journey) {
  */
 function buildReconContextLines(journey) {
   const lines = [buildBlockMap(journey), '* supply point'];
-  lines.push(`Traverse: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`);
+  lines.push(`Traverse: ${formatKm(journey.distanceTraveled)}/${formatKm(journey.totalDistance)} km`);
   lines.push(`Packages: ${getPackagesFinalized(journey)}/${getPackageTarget(journey)} finalized`);
 
   // The briefing used to cost a slot on the decision list. It is reference
@@ -1777,7 +1808,7 @@ function displayDayHeader(ui, journey) {
     const into = getDistanceIntoCurrentSegment(journey);
     const kmToNext = Math.max(0, segment - into);
     ui.write(
-      `NEXT: ${nextBlock.name} — ${kmToNext.toFixed(1)} km   ·   TRAVELED: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`,
+      `NEXT: ${nextBlock.name} — ${kmToNext.toFixed(1)} km   ·   TRAVELED: ${formatKm(journey.distanceTraveled)}/${formatKm(journey.totalDistance)} km`,
       'term-dim'
     );
   }
@@ -2086,7 +2117,7 @@ async function maybeHandleFoodDecision(game) {
     },
     {
       label: 'Short Rations and Push On',
-      description: '65% portions until you change the order; the crew will feel it',
+      description: `65% portions until you change the order; ${SHORT_RATION_MORALE_COST} morale a shift for everyone`,
       value: 'short'
     }
   ]);
@@ -2121,7 +2152,11 @@ async function maybePromptRouteChoice(game, currentBlock) {
     && !journey.weather?.dangerous;
   if (flatQuietLeg) {
     journey.routePlan = buildRoutePlan('mainline', journey, currentBlock, nextBlock);
-    journey.routePlan.note = `Good road to ${nextBlock.name}. The crew rides easy and talks about lunch.`;
+    // Flat is not the same as easy: fog or rain still slows the trucks.
+    const slowSky = (journey.weather?.travelModifier ?? 1) < 1;
+    journey.routePlan.note = slowSky
+      ? `Flat road to ${nextBlock.name}, but the ${String(journey.weather.name).toLowerCase()} keeps the trucks slow.`
+      : `Good road to ${nextBlock.name}. The crew rides easy and talks about lunch.`;
     return;
   }
 
@@ -2541,59 +2576,94 @@ export async function handleResupply(game, block) {
     };
   };
 
+  // The restock is a freight bundle at a bundle price, charged for what the
+  // truck actually takes: a full list is $700 against about $1,090 bought
+  // item by item, and a part-load pays the same share of the bundle. With
+  // room for only one of its lines it is that single item at a discount, so
+  // it comes off the shelf; the single item is still there.
+  const RESTOCK = [
+    { resourceId: 'fuel', amount: 200, unit: ' L fuel', rate: 360 / 200, min: 50 },
+    { resourceId: 'food', amount: 25, unit: ' person-days food', rate: 160 / 20, min: 6 },
+    { resourceId: 'equipment', amount: 20, unit: '% equipment', rate: 220 / 15, min: 5 },
+    { resourceId: 'firstAid', amount: 2, unit: ' kits', rate: 120, min: 1 }
+  ];
+  const restock = () => {
+    const lines = RESTOCK.map((line) => ({ ...line, qty: Math.min(line.amount, Math.floor(roomFor(line.resourceId))) }));
+    if (lines.filter((line) => line.qty >= line.min).length < 2) return null;
+    const full = lines.every((line) => line.qty === line.amount);
+    const value = lines.reduce((sum, line) => sum + line.qty * line.rate, 0);
+    const listValue = RESTOCK.reduce((sum, line) => sum + line.amount * line.rate, 0);
+    const cost = full ? priced(700) : Math.max(10, Math.round((priced(700) * value / listValue) / 10) * 10);
+    const landing = lines.filter((line) => line.qty > 0);
+    return {
+      id: 'full_restock',
+      label: full ? 'Full restock' : 'Restock, part (all that fits)',
+      description: landing.map((line) => `+${line.qty}${line.unit}`).join(', '),
+      cost,
+      apply: () => {
+        for (const line of landing) {
+          journey.resources[line.resourceId] = clampToMax(line.resourceId, journey.resources[line.resourceId] + line.qty);
+        }
+      }
+    };
+  };
+  const SHELF_NAMES = {
+    fuel_drum: 'Fuel drum', rations: 'Rations crate', first_aid: 'First aid kit',
+    flagging: 'Flagging', field_repair: 'Field repair', full_restock: 'Full restock'
+  };
+
   const offerBuilders = [
     single('fuel_drum', 'fuel', 200, ' L', 'Fuel drum', 'A 205 L drum of diesel, pumped into the tanks and the cans', 360),
     single('rations', 'food', 20, ' person-days', 'Rations crate', 'Four days of camp food for five', 160),
     single('first_aid', 'firstAid', 1, ' kit', 'First aid kit', 'Level 3 kit restock', 120),
     single('flagging', 'flaggingTape', 12, ' rolls', 'Flagging', 'Ribbon for the next four boundaries', 60),
     single('field_repair', 'equipment', 15, '% equipment', 'Field repair', 'Tires, a fuel filter, a chain and bar', 220),
-    () => (['fuel', 'food', 'equipment', 'firstAid'].some((id) => roomFor(id) >= 1) ? {
-      id: 'full_restock',
-      label: 'Full restock',
-      description: '+200 L fuel, +25 person-days food, +20% equipment, +2 kits (up to what the truck holds)',
-      cost: priced(700),
-      apply: () => {
-        journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 200);
-        journey.resources.food = clampToMax('food', journey.resources.food + 25);
-        journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 20);
-        journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 2);
-      }
-    } : null)
+    restock
   ];
 
-  const listedShort = new Set();
+  // Positions hold for the whole visit: an item that stops fitting, or that
+  // the card can no longer cover, stays in its row, disabled with the reason,
+  // so a number key never slides onto the next item on the shelf.
+  const shelf = offerBuilders.map((build) => build()?.id ?? null);
   while (true) {
     const money = journey.resources.budget || 0;
-    const offers = offerBuilders.map((build) => build()).filter(Boolean);
+    const built = offerBuilders.map((build) => build());
+    const offers = built.filter(Boolean);
     const affordableOffers = offers.filter((offer) => money >= offer.cost);
 
     if (offers.length === 0) {
       ui.write('The truck is full. Nothing here it can carry.');
       break;
     }
-    // What the card cannot cover stays on the list as a line with its price,
-    // the way an event card says what it could not pay for, instead of
-    // quietly vanishing from the shelf.
-    for (const offer of offers.filter((o) => money < o.cost && !listedShort.has(o.id))) {
-      listedShort.add(offer.id);
-      ui.write(`${offer.label} ($${offer.cost}): $${Math.ceil(offer.cost - money)} short.`, 'term-dim');
-    }
     if (affordableOffers.length === 0) {
+      // What the card cannot cover is still named with its price, the way an
+      // event card says what it could not pay for.
+      for (const offer of offers) {
+        ui.write(`${offer.label} ($${offer.cost}): $${Math.ceil(offer.cost - money)} short.`, 'term-dim');
+      }
       ui.writeWarning('You cannot afford anything at this stop. Better keep moving.');
       break;
     }
 
-    const options = [
-      ...affordableOffers.map(o => ({
-        label: `${o.label} ($${o.cost})`,
-        description: o.description,
-        value: o.id
-      })),
-      { label: 'Done', description: 'Finish shopping', value: 'done' }
-    ];
+    const options = [];
+    shelf.forEach((id, index) => {
+      const offer = built[index];
+      if (offer) {
+        const short = money < offer.cost;
+        options.push({
+          label: `${offer.label} ($${offer.cost})`,
+          description: short ? `$${Math.ceil(offer.cost - money)} short` : offer.description,
+          value: offer.id,
+          ...(short ? { disabled: true } : {})
+        });
+      } else if (id) {
+        options.push({ label: SHELF_NAMES[id] || id, description: 'No room left on the truck for it', value: id, disabled: true });
+      }
+    });
+    options.push({ label: 'Done', description: 'Finish shopping', value: 'done' });
 
     const choice = await ui.promptChoice(`Buy supplies (cash: ${formatDollars(money)}):`, options);
-    if (choice.value === 'done') break;
+    if (!choice || choice.value === 'done') break;
 
     const offer = affordableOffers.find(o => o.id === choice.value);
     if (!offer) continue;

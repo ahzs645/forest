@@ -314,7 +314,7 @@ test('the supply point does not sell stock the truck cannot hold', async () => {
   journey.resources.fuel = FIELD_RESOURCES.fuel.max;
   const menus = [];
   const ui = makeUi((options) => {
-    menus.push(options.map((o) => `${o.value}|${o.label}`));
+    menus.push(options.map((o) => `${o.value}|${o.label}${o.disabled ? '|disabled' : ''}`));
     return menus.length === 1 ? options.find((o) => o.value === 'rations') : options.find((o) => o.value === 'done');
   });
   await handleResupply({ ui, journey }, { name: 'Supply Point' });
@@ -324,7 +324,8 @@ test('the supply point does not sell stock the truck cannot hold', async () => {
   const crate = first.find((entry) => entry.startsWith('rations|'));
   assert.match(crate, /\+8 person-days, all that fits/);
   assert.equal(journey.resources.food, FIELD_RESOURCES.food.max);
-  assert.ok(!menus[1].some((entry) => entry.startsWith('rations|')), 'a full food box is not offered more food');
+  // The row keeps its place so the number keys do not slide, but it is not a choice.
+  assert.ok(menus[1].some((entry) => entry.startsWith('rations|') && entry.endsWith('|disabled')), 'a full food box is not offered more food');
 });
 
 // ── The camp bear ──────────────────────────────────────────────────────────

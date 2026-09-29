@@ -430,7 +430,7 @@ export const PanelsMixin = {
       `Weather: ${journey.weather?.name || 'Clear'}`,
       '',
       `Progress: ${progressBarText} ${progress}%`,
-      `Traverse: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km`,
+      `Traverse: ${Number((journey.distanceTraveled || 0).toFixed(1))}/${journey.totalDistance} km`,
       '',
       `Crew: ${getActiveCrewCount(journey.crew)}/${journey.crew.length} active`,
       `Morale: ${Math.round(getAverageMorale(journey.crew))}%`

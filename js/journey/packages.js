@@ -92,14 +92,24 @@ export function getStopKind(block) {
  * on. A card that says "inside the boundary you're flagging" has no business
  * at a bridge or a staging lot. Content opts in with `stopKinds: ["block"]`;
  * a card without it fits anywhere, and so does a journey with no stop.
+ *
+ * A card about layout still being done ("you move the boundary together",
+ * "keep flagging") also sets `needsOpenPackage`: it fits only a cutblock
+ * whose package is not yet closed, since there is no boundary left to move
+ * on a block the crew has already signed off.
  * @param {Object} event
  * @param {Object|null} block - the stop the crew is on
+ * @param {Object} [journey] - read for the block's package state
  * @returns {boolean}
  */
 export function eventFitsStop(event, block, journey = null) {
   const kinds = Array.isArray(event?.stopKinds) ? event.stopKinds : [];
   const kind = getStopKind(block);
-  if (!kinds.length || !kind) return true;
+  if (!kind) return true;
+  // A card that only makes sense while the block's package is open (F1's
+  // `needsOpenPackage`) is off bridges, staging lots and closed blocks.
+  if (event?.needsOpenPackage && (kind !== 'block' || isPackageClosed(journey, block))) return false;
+  if (!kinds.length) return true;
   if (!kinds.includes(kind)) return false;
   // A card about the block's ground has nothing left to say once the crew has
   // closed that block's package, unless it also fits a waypoint.

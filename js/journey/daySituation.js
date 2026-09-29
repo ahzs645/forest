@@ -28,6 +28,9 @@ import {
   isRouteObstructionEvent
 } from './routeConstraints.js';
 
+/** How much a reported, reopened road still slows the first leg through it. */
+const REPORTED_CLOSURE_SETBACK = 0.25;
+
 /**
  * Whether answering this situation is the whole day.
  *
@@ -185,6 +188,11 @@ export async function runDaySituation(game, event, options = {}) {
   // nobody drives past it until the office has had it looked at.
   if (obstruction && outcome.option?.effects?.progressMode === 'turn_back') {
     addRouteConstraintFromEvent(journey, event, { reported: true });
+    // The closure is the delay: the rest of the shift is gone and the road
+    // reopens one lane and slow. The turn-back used to slow that first leg
+    // by three quarters on top, so the legal call cost about two shifts.
+    const added = Number(journey.travelSetback || 0) - travelSetbackBefore;
+    if (added > REPORTED_CLOSURE_SETBACK) journey.travelSetback = travelSetbackBefore + REPORTED_CLOSURE_SETBACK;
   }
 
   const spendsDay = optionSpendsDay(event, outcome.option, journey.journeyType);

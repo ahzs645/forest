@@ -8,7 +8,7 @@
   "description": "The lead truck hits a sharp rock. Hissing air signals another flat.",
   "options": [
    {
-    "label": "Change it yourself (2 hours)",
+    "label": "Change it at the roadside",
     "outcome": "The crew changes the tire in the rain. Back on the road, but behind schedule.",
     "effects": {
      "equipment": -5
@@ -320,10 +320,11 @@
   "severity": "moderate",
   "probability": 0.05,
   "description": "Dark clouds roll in fast. Lightning flashes over the ridge.",
+  "seasons": ["spring", "summer", "fall"],
   "options": [
    {
     "label": "Take shelter immediately",
-    "outcome": "Everyone piles into vehicles. Safe but no work gets done.",
+    "outcome": "Everyone piles into the trucks until the cell passes over. An hour of the shift goes to watching the ridge, and nobody is sorry.",
     "effects": {
      "progress": -5
     }
@@ -697,7 +698,7 @@
   "options": [
    {
     "label": "Wait him out",
-    "outcome": "After 20 minutes of staring, he finally ambles off.",
+    "outcome": "He stares the trucks down for the better part of an hour before he ambles off into the willows.",
     "effects": {
      "timeUsed": 1
     }
@@ -1157,13 +1158,14 @@
   "description": "The road ahead has collapsed into the creek. No way through.",
   "options": [
    {
-    "label": "Build a bypass",
-    "outcome": "With shovels and chainsaws, you cut a rough detour. Takes all day.",
+    "label": "Cut a bypass with the saws",
+    "outcome": "With shovels and chainsaws, you cut a rough detour. It takes all day, and it is road nobody permitted: the road permit holder will want to know who built it.",
     "spendsDay": true,
     "effects": {
      "progress": -8,
      "equipment": -10,
-     "fuel": -5
+     "fuel": -5,
+     "compliance": -4
     }
    },
    {
@@ -1662,7 +1664,7 @@
   "type": "equipment",
   "severity": "positive",
   "probability": 0.1,
-  "description": "Everything is humming along perfectly today. Not a single mechanical issue.",
+  "description": "Nothing breaks today. The trucks start on the first turn and the saws run clean.",
   "options": [
    {
     "label": "Keep up the momentum",
@@ -2017,6 +2019,8 @@
  {
   "id": "story_arc_ancientGrove_stage0",
   "stopKinds": ["block"],
+  "needsOpenPackage": true,
+  "stopKinds": ["block"],
   "title": "Discovery of the Ancient Grove",
   "type": "narrative",
   "severity": "moderate",
@@ -2366,6 +2370,7 @@
  },
  {
   "id": "helicopter_available",
+  "needsNextLeg": true,
   "title": "Discounted Flight Time",
   "type": "supply",
   "severity": "minor",
@@ -2779,6 +2784,7 @@
   "severity": "minor",
   "probability": 0.06,
   "description": "The weather service broadcasts a warning: a major system is building to the west. Heavy rain and wind expected within 48 hours.",
+  "journeyTypes": ["recon", "field"],
   "options": [
    {
     "label": "Push hard now to get ahead of it",
@@ -2849,6 +2855,7 @@
   "severity": "severe",
   "probability": 0,
   "description": "The storm arrives with a vengeance. Trees bend sideways, rain comes in sheets, and the road turns to soup. No one's working today.",
+  "arrivesAsWeather": "storm",
   "options": [
    {
     "label": "Hunker down and ride it out",
@@ -2946,6 +2953,8 @@
  {
   "id": "old_growth_cedar",
   "stopKinds": ["block"],
+  "needsOpenPackage": true,
+  "stopKinds": ["block"],
   "title": "Old-Growth Cedar Grove",
   "type": "discovery",
   "severity": "positive",
@@ -2989,6 +2998,8 @@
  },
  {
   "id": "unmapped_creek",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "title": "Unmapped Creek Crossing",
   "type": "discovery",
   "severity": "minor",
@@ -3064,6 +3075,8 @@
  },
  {
   "id": "historical_survey_markers",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "stopKinds": ["block"],
   "title": "Historical Survey Markers",
   "type": "discovery",
@@ -3221,9 +3234,10 @@
    },
    {
     "label": "Let them sort it out themselves",
-    "outcome": "They scuffle behind the fuel shed. One gets a black eye, the pot gets settled, and somehow they respect each other more after.",
+    "outcome": "They scuffle behind the fuel shed before you get there. One gets a black eye and the pot gets settled, and you write it up: a fight on a worksite is an incident report, whoever threw first.",
     "effects": {
-     "crew_morale": 3
+     "crew_morale": -2,
+     "compliance": -2
     },
     "hiddenOutcome": true,
     "riskInjury": 0.2,
@@ -3408,8 +3422,8 @@
     ]
    },
    {
-    "label": "Dump it all and order fresh fuel",
-    "outcome": "The safe choice but you're grounded until the delivery arrives.",
+    "label": "Drain it to waste drums and order fresh fuel",
+    "outcome": "The bad diesel goes into drums for the hauler to take out; on the ground it would be a reportable spill. The fresh load is ordered, and the trucks run on what is left in the tanks until it comes.",
     "effects": {
      "fuel": -30,
      "budget": -300,
@@ -3624,6 +3638,8 @@
  },
  {
   "id": "wildlife_nesting_area",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "stopKinds": ["block"],
   "title": "Eagle Nest in the Block",
   "type": "wildlife",
@@ -3940,6 +3956,8 @@
  {
   "id": "drone_flyover",
   "stopKinds": ["block"],
+  "needsOpenPackage": true,
+  "stopKinds": ["block"],
   "title": "Drone Flyover Opportunity",
   "type": "equipment",
   "severity": "positive",
@@ -4154,6 +4172,8 @@
  },
  {
   "id": "first_nations_consultation_field",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "title": "An Elder Visits Camp",
   "type": "social",
   "severity": "moderate",
@@ -4166,7 +4186,7 @@
    "options": [
     {
      "label": "Stand the block down and walk it with her",
-     "outcome": "The stewardship forester spends a day among bark-stripped cedars with centuries of history. The cut plan changes; the relationship doesn't have to."
+     "outcome": "The stewardship forester spends a day among bark-stripped trees with centuries of history. The cut plan changes; the relationship doesn't have to."
     },
     {
      "label": "Log the concern and keep the block moving",
@@ -4182,7 +4202,7 @@
   "options": [
    {
     "label": "Stop work and walk the area with her",
-    "outcome": "She shows you bark-stripped cedars with centuries of history. You move the boundary together and flag the CMTs for the site plan.",
+    "outcome": "She shows you trees stripped for bark and cambium generations ago. You move the boundary together and flag the CMTs for the site plan.",
     "effects": {
      "progress": -8,
      "relationships": 15,
@@ -4197,7 +4217,7 @@
      "relationships": -5
     },
     "hiddenOutcome": true,
-    "failureOutcome": "Wednesday the compassman runs line straight through a stand of bark-stripped cedars nobody flagged, because nobody looked, and blazes two of them for the boundary. A fresh blaze in a CMT is a Heritage Conservation Act problem, not a misunderstanding. The office pulls the crew off the block, the Archaeology Branch opens a file, and the Elder does not come back to talk.",
+    "failureOutcome": "Wednesday the compassman runs line straight through a stand of bark-stripped trees nobody flagged, because nobody looked, and blazes two of them for the boundary. A fresh blaze in a CMT is a Heritage Conservation Act problem, not a misunderstanding. The office pulls the crew off the block, the Archaeology Branch opens a file, and the Elder does not come back to talk.",
     "failureEffects": {
      "relationships": -15,
      "compliance": -12,
@@ -4256,6 +4276,8 @@
  },
  {
   "id": "mineral_lick_discovered",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "title": "Natural Mineral Lick",
   "type": "discovery",
   "severity": "minor",
@@ -4501,6 +4523,8 @@
  },
  {
   "id": "boundary_dispute",
+  "stopKinds": ["block"],
+  "needsOpenPackage": true,
   "stopKinds": ["block"],
   "title": "Old Ribbon Doesn't Match the Map",
   "type": "terrain",
@@ -4959,7 +4983,7 @@
  },
  {
   "id": "trade_survey_crew_chains",
-  "title": "Survey Crew Wants Your Chains",
+  "title": "Cruising Crew Wants Your Chains",
   "type": "trade",
   "severity": "minor",
   "probability": 0.05,
@@ -5026,6 +5050,7 @@
  },
  {
   "id": "trade_trapper_intel",
+  "needsNextLeg": true,
   "title": "The Trapper's Price",
   "type": "trade",
   "severity": "minor",
@@ -5058,6 +5083,7 @@
  },
  {
   "id": "trade_grader_operator",
+  "needsNextLeg": true,
   "title": "Grader Operator's Offer",
   "type": "trade",
   "severity": "minor",

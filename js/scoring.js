@@ -27,7 +27,7 @@ export function calculateScore(journey, victory) {
     case 'recon':
     case 'field':
       components.speed = scoreReconSpeed(journey, victory);
-      components.crewWelfare = scoreCrewWelfare(journey);
+      components.crewWelfare = scoreReconCrewWelfare(journey);
       components.resourceEfficiency = scoreResourceEfficiency(journey);
       components.objectives = scoreReconObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
@@ -132,15 +132,24 @@ export function scoreIntegrityPenalty(journey) {
 }
 
 /**
- * The ceiling on a silviculture program that was not delivered. Crew welfare,
- * a clean file and an unspent budget are easy to keep by doing nothing, so a
- * failed program tops out at D, and one that delivered under half of its
- * obligations at F.
+ * The ceiling on a field season that was not delivered. Crew welfare, a clean
+ * file and unspent stores are easy to keep by doing nothing, so a failed
+ * silviculture program or recon season tops out at D, and one that delivered
+ * under half of its obligations at F. A recon crew that stood down until the
+ * food ran out used to grade D 50 on a file of set-aside cards.
  * @returns {number|null}
  */
 export function scoreFailureCap(journey, victory) {
-  if (victory || journey?.journeyType !== 'silviculture') return null;
-  return assessSilvicultureProgram(journey).delivered < 0.5 ? 40 : 54;
+  if (victory) return null;
+  if (journey?.journeyType === 'silviculture') {
+    return assessSilvicultureProgram(journey).delivered < 0.5 ? 40 : 54;
+  }
+  if (journey?.journeyType === 'recon') {
+    const target = getPackageTarget(journey);
+    const share = target > 0 ? getPackagesFinalized(journey) / target : 0;
+    return share < 0.5 ? 40 : 54;
+  }
+  return null;
 }
 
 /**
@@ -179,8 +188,10 @@ export function getLetterGrade(score) {
 
 /**
  * Recon pace against the season. Two shifts a package and a shift a leg is a
- * clean run with nothing going wrong: full marks at or under it, half marks
- * for a file closed on the last day of the window, a straight line between.
+ * clean run with nothing going wrong: full marks at or under it. Every shift
+ * over it costs, measured against the clean run rather than the whole window,
+ * down to a floor of 40 once the season has run 60% over; a 40-shift window
+ * made seven extra shifts on an 18-shift route cost almost nothing.
  * A season that was not delivered earns no Time: collapsing on shift 13 used
  * to read as the fastest season on record.
  */
@@ -197,8 +208,8 @@ function scoreReconSpeed(journey, victory = true) {
   const deadline = Number.isFinite(journey.deadline) && journey.deadline > optimalDays
     ? journey.deadline
     : Math.round(optimalDays * 1.6);
-  const over = Math.max(0, Math.min(1, (daysUsed - optimalDays) / Math.max(1, deadline - optimalDays)));
-  const score = Math.round(100 - over * 50);
+  const over = Math.max(0, Math.min(1, (daysUsed - optimalDays) / Math.max(1, optimalDays * 0.6)));
+  const score = Math.round(100 - over * 60);
   return { score, label: `${daysUsed} shifts (clean run: ~${optimalDays}, window: ${deadline})` };
 }
 
@@ -281,6 +292,42 @@ function scoreCrewWelfare(journey) {
   score = Math.max(0, Math.min(100, score));
   const label = `${active.length}/${crew.length} active, ${evacuated.length} evacuated`;
   return { score, label };
+}
+
+/**
+ * A recon crew's season, not just how it looked on the last shift. Everyone
+ * home on their own feet and in good heart is full marks; what the season
+ * cost them comes off it: an evacuation, a quit, a crew that drove out when
+ * the food ran out, each injury the log recorded, and whatever health and
+ * morale they finish short of. The old scale started at 80 for anyone not
+ * evacuated, so a crew that spent the season hurt still read 95.
+ * @param {Object} journey
+ * @returns {{score: number, label: string}}
+ */
+function scoreReconCrewWelfare(journey) {
+  const crew = journey.crew || [];
+  if (crew.length === 0) return { score: 50, label: 'No crew' };
+
+  const walkedOff = Boolean(journey.crewWalkedOff);
+  const active = walkedOff ? [] : crew.filter((m) => m.isActive);
+  const evacuated = crew.filter((m) => !m.isActive && !m.hasQuit);
+  const left = walkedOff ? crew.filter((m) => m.isActive || m.hasQuit) : crew.filter((m) => m.hasQuit);
+  const injuries = (journey.log || []).filter((entry) => entry.victimId || entry.victimName).length;
+
+  let score = 100 - evacuated.length * 25 - left.length * 15 - Math.min(15, injuries * 3);
+  if (active.length > 0) {
+    const avgHealth = active.reduce((sum, m) => sum + m.health, 0) / active.length;
+    const avgMorale = active.reduce((sum, m) => sum + m.morale, 0) / active.length;
+    score -= Math.max(0, 100 - avgHealth) * 0.4 + Math.max(0, 100 - avgMorale) * 0.4;
+  }
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  const parts = walkedOff
+    ? [`the crew drove out when the food ran out (${left.length} of ${crew.length})`]
+    : [`${active.length}/${crew.length} active`, `${evacuated.length} evacuated`];
+  if (!walkedOff && left.length) parts.push(`${left.length} quit`);
+  if (injuries) parts.push(`${injuries} hurt on the job`);
+  return { score, label: parts.join(', ') };
 }
 
 /**
@@ -596,7 +643,8 @@ export function formatScoreDisplay(scoreResult) {
   }
 
   if (Number.isFinite(scoreResult.scoreCap)) {
-    lines.push(`  ${'Not delivered'.padEnd(14)} a program that missed its obligations grades no higher than ${getLetterGrade(scoreResult.scoreCap)}`);
+    const what = scoreResult.components?.objectives?.label?.includes('packages') ? 'a season' : 'a program';
+    lines.push(`  ${'Not delivered'.padEnd(14)} ${what} that missed its obligations grades no higher than ${getLetterGrade(scoreResult.scoreCap)}`);
   }
 
   return lines;

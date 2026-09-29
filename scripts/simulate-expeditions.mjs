@@ -12,11 +12,14 @@
  *   node scripts/simulate-expeditions.mjs --scale campaign # campaign-season deployments
  *   node scripts/simulate-expeditions.mjs --role recon --runs 12 --verbose
  *   node scripts/simulate-expeditions.mjs --role planning --area all --compare
+ *   node scripts/simulate-expeditions.mjs --role recon --area all --difficulty all
  *
  * --area picks the operating area (an id, or `all` for every area). --policy
  * reckless swaps in a player who cuts every corner (planner and permitter
  * only), and --compare runs both side by side with the mean grade, which is
  * how the desk roles are checked to separate good play from bad everywhere.
+ * --difficulty (easy, normal, hard or `all`) applies the same resource
+ * multipliers the new-game screen does; the default is normal.
  *
  * Exits non-zero when a role's win rate falls under --min-win-rate, so it can
  * gate a rebalance.
@@ -39,12 +42,13 @@ import { PLANNING_VALUES_FLOOR } from '../js/journey/constants.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 import { calculateScore } from '../js/scoring.js';
 import { POLICIES as SILVICULTURE_POLICIES } from './simulate-silviculture-policies.mjs';
+import { applyDifficultyMultipliers } from '../js/game/ForestryTrailGame.js';
 
 const DEFAULT_AREA = 'fraser-plateau';
 const HARD_DAY_CAP = 150;
 
 function parseArgs(argv) {
-  const args = { runs: 8, scale: undefined, role: null, verbose: false, minWinRate: 0, area: DEFAULT_AREA, policy: 'competent', compare: false };
+  const args = { runs: 8, scale: undefined, role: null, verbose: false, minWinRate: 0, area: DEFAULT_AREA, policy: 'competent', compare: false, difficulty: 'normal' };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--runs') args.runs = Number(argv[++i]);
@@ -56,6 +60,7 @@ function parseArgs(argv) {
     else if (flag === '--area') args.area = argv[++i];
     else if (flag === '--policy') args.policy = argv[++i];
     else if (flag === '--compare') args.compare = true;
+    else if (flag === '--difficulty') args.difficulty = argv[++i];
   }
   return args;
 }
@@ -106,7 +111,9 @@ function makeUi(journey, policy, tally, trace = null) {
     playTravelStrip: noop, playRadioAction: noop, setMissionStatus: noop,
     clearMissionStatus: noop, writeSuccess: write,
     async promptText() { return 'They loved this country'; },
-    async promptChoice(prompt, options = []) {
+    async promptChoice(prompt, allOptions = []) {
+      // A disabled row is on screen but is not a choice (js/ui/input.js).
+      const options = allOptions.filter((option) => !option?.disabled);
       if (!options.length) return { value: undefined };
       if (options.length === 1) return options[0];
       const picked = policy(journey, options, String(prompt || ''));
@@ -513,6 +520,34 @@ const RECKLESS_POLICIES = {
   permitting: recklessPermittingPolicy,
 };
 
+// ── Idle policy (recon) ────────────────────────────────────────────────────
+// The run the grade must not reward: the crew stands down every shift, never
+// buys food, and sets every card aside until the pantry runs out.
+function idleReconPolicy(_journey, options) {
+  if (options.some((option) => option.value === 'camp_back')) {
+    return pick(options, ['end_shift']) || options[0];
+  }
+  if (options.some((option) => option.value === 'set_tempo')) {
+    return pick(options, ['camp_menu']) || options[0];
+  }
+  return pick(options, ['set_aside', 'normal', 'full', 'done', 'cancel', 'keep', 'next', 'continue']) || options[0];
+}
+
+// ── Careful policy (recon) ─────────────────────────────────────────────────
+// The competent crew lead who answers every card instead of setting the
+// behind-schedule ones aside: the run the grade should put in the high 80s
+// and low 90s, below a flawless season but well above the competent one.
+function carefulReconPolicy(journey, options, prompt) {
+  const answered = options.filter((option) => option.value !== 'set_aside');
+  return reconPolicy(journey, answered.length ? answered : options, prompt);
+}
+
+const ALT_POLICIES = {
+  reckless: RECKLESS_POLICIES,
+  careful: { recon: carefulReconPolicy },
+  idle: { recon: idleReconPolicy },
+};
+
 export const ROLES = {
   recon: { create: createReconJourney, run: runReconDay, policy: reconPolicy, roleId: 'recce' },
   planning: { create: createPlanningJourney, run: runPlanningDay, policy: planningPolicy, roleId: 'planner' },
@@ -552,13 +587,17 @@ function summarizeState(journey) {
   return '';
 }
 
-export async function simulateRun(roleName, seed, scale, trace = null, { areaId = DEFAULT_AREA, policy = 'competent' } = {}) {
+export async function simulateRun(roleName, seed, scale, trace = null, { areaId = DEFAULT_AREA, policy = 'competent', difficulty = 'normal' } = {}) {
   const role = ROLES[roleName];
-  const policyFn = policy === 'reckless' ? RECKLESS_POLICIES[roleName] : role.policy;
+  const policyFn = policy === 'competent' ? role.policy : ALT_POLICIES[policy]?.[roleName];
   if (!policyFn) throw new Error(`no ${policy} policy for ${roleName}`);
   return withSeed(seed, async () => {
     const area = OPERATING_AREAS.find((candidate) => candidate.id === areaId) || null;
     const journey = role.create({ areaId, area, roleId: role.roleId, scale });
+    if (difficulty && difficulty !== 'normal') {
+      journey.difficulty = difficulty;
+      applyDifficultyMultipliers(journey, difficulty);
+    }
     const tally = {};
     const game = {
       ui: makeUi(journey, policyFn, tally, trace),
@@ -584,12 +623,16 @@ export async function simulateRun(roleName, seed, scale, trace = null, { areaId 
       outcome = checkEndConditions(journey);
     }
 
+    const graded = calculateScore(journey, Boolean(outcome?.victory));
     return {
       seed,
       days,
       deadline: Number.isFinite(journey.deadline) ? journey.deadline : null,
       won: Boolean(outcome?.victory),
-      score: calculateScore(journey, Boolean(outcome?.victory)).totalScore,
+      score: graded.totalScore,
+      breakdown: Object.entries(graded.components)
+        .map(([key, component]) => `${key} ${component.score} (${component.label})`).join('; ')
+        + (graded.scrutinyPenalty ? `; scrutiny -${graded.scrutinyPenalty}` : ''),
       reason: outcome?.reason || (error ? `error: ${error}` : null),
       state: summarizeState(journey),
       tally
@@ -619,6 +662,7 @@ function reportRuns(label, results, args) {
         .map(([key, count]) => `${key}:${count}`).join(' ');
       console.log(`  seed ${result.seed} days=${result.days} won=${result.won} score=${result.score} ${result.reason || ''}`);
       console.log(`    ${result.state}`);
+      console.log(`    ${result.breakdown}`);
       console.log(`    ${top}`);
     }
   } else {
@@ -665,26 +709,33 @@ async function main() {
       continue;
     }
     const areaIds = args.area === 'all' ? OPERATING_AREAS.map((area) => area.id) : [args.area];
-    const policies = args.compare ? ['competent', 'reckless'] : [args.policy];
+    const difficulties = args.difficulty === 'all' ? ['easy', 'normal', 'hard'] : [args.difficulty];
+    // --compare runs the competent player beside every other policy the role has.
+    const policies = args.compare
+      ? ['competent', ...Object.keys(ALT_POLICIES).filter((name) => ALT_POLICIES[name][roleName])]
+      : [args.policy];
+    for (const difficulty of difficulties) {
     for (const areaId of areaIds) {
       for (const policy of policies) {
-        if (policy !== 'competent' && !RECKLESS_POLICIES[roleName]) {
+        if (policy !== 'competent' && !ALT_POLICIES[policy]?.[roleName]) {
           console.log(`${roleName.padEnd(26)} skipped: no ${policy} policy`);
           continue;
         }
         const results = [];
         for (let i = 0; i < args.runs; i += 1) {
-          results.push(await simulateRun(roleName, 1000 + i * 37, args.scale, args.transcript ? console.log : null, { areaId, policy }));
+          results.push(await simulateRun(roleName, 1000 + i * 37, args.scale, args.transcript ? console.log : null, { areaId, policy, difficulty }));
         }
         const label = [
           roleName,
           args.scale ? `(${args.scale})` : null,
+          difficulties.length > 1 || difficulty !== 'normal' ? difficulty : null,
           areaIds.length > 1 || areaId !== DEFAULT_AREA ? areaId : null,
           policy !== 'competent' || policies.length > 1 ? policy : null,
         ].filter(Boolean).join(' ');
         const winRate = reportRuns(label, results, args);
         if (policy === 'competent' && winRate < args.minWinRate) failed = true;
       }
+    }
     }
   }
 
