@@ -159,3 +159,12 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - Field events: gains no longer add Progress, gambles land as their expected outcome, medevac is charged. Practice-burden cards log CPD; the CPD gap is prorated across the year.
 - Expedition housekeeping: scrutiny clamped at 100, crew ids unique across reloads, resource scoring uses the run's real starting stores. eslint warnings 31 -> 5.
 - Balance (`npm run sim:seasonal`, 12,600 years): greedy 2.28 -> 2.22, role-optimal 2.05 -> 1.85, cautious 1.80 -> 1.72, balanced 1.47 -> 1.50; greedy Outstanding by role planner 3% -> 15%, silviculture 30% -> 7%.
+
+## 2026-09-29 — Seasonal shortcut presentation (wave 2, F1b)
+
+- **Offer card** (`tui/controller.js` `buildShortcutBrief`, hub `js/game/seasonalAdapter.js`, classic `src/tui-browser/App.jsx`): a danger banner ("Shortcut offer · off the books"), a headline naming who checks, the pitch, then its terms: what it pays, the odds it holds this season (read from `resolveRisk`, or from the card when the engine carries odds/payoff) and "Saying no costs nothing". The take option prices each band with the same odds. No "upside here is regulatory defensibility" framing, no "Pressure points" tag line, no "Adapted …" dev flavour, no More context. Decline stays first and selected. Theme tokens in the hub (`scss/components/_shortcut.scss`).
+- **Fits the screen:** the hub pins the banner (or the title on a phone) to the top of the log; the classic view reveals the offer in the Field Radio, hides the Last Decision panel on any card that opens with the same outcome notice, and tightens its chrome below 800 px tall. Whole offer readable at 1280×720 and 390×844 in both views.
+- **Fallout** says "Because you took: <act> — your summer shortcut." under its title (hub and classic). A catch in the final season no longer promises fallout (unless the teaser says it lands).
+- **Previews** show the gain a meter will actually take, marked "(tapered: meter high)".
+- **Also:** "steady-program" reads as "Steady program" with a cause; Play Again clears the hub's dashboard; classic `?classic=1` answers G/P/L/S/? with panels (and header buttons); a partial Seasonal save is validated (`validateSeasonalSave`) and offered for discard instead of dead-ending.
+- **Tests:** `tests/shortcutPresentation.test.mjs`, `tests/saveValidation.test.mjs`, `tests/insights.test.mjs`; browser `tests/e2e/seasonal-shortcut.spec.js` (hub × 4 themes, classic desktop/phone, fallout, panels, Play Again, partial save).

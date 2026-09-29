@@ -919,8 +919,10 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* A four-meter swing is wider than the 28ch dashboard: it wraps inside the
+   row rather than running over the stage (and widening a phone's page). */
 .tui-trail-effect {
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 /* Mobile-only sticky metric strip. Hidden on desktop, where the dashboard is
@@ -1145,3 +1147,251 @@ body {
   }
 }
 
+
+/* ── Shortcut offers ────────────────────────────────────────────────────────
+   A legal and ethical call, set apart from operational cards: a danger banner,
+   the pitch, then its terms (what it pays, the odds, that no is free). */
+.tui-shortcut-card {
+  gap: 0.55rem;
+}
+
+.tui-shortcut-banner {
+  align-self: flex-start;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid #f85149;
+  border-left-width: 4px;
+  background: rgba(248, 81, 73, 0.12);
+  color: #ff7b72;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+}
+
+.tui-card-headline.tui-shortcut-headline {
+  border-left-color: #f85149;
+  color: #ffa198;
+}
+
+.tui-shortcut-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(210, 153, 34, 0.55);
+  border-left-width: 3px;
+  background: rgba(210, 153, 34, 0.07);
+}
+
+.tui-shortcut-offer,
+.tui-shortcut-odds {
+  margin: 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.tui-shortcut-offer {
+  color: #e6edf3;
+}
+
+.tui-shortcut-odds {
+  color: #e3b341;
+  font-weight: 600;
+}
+
+.tui-shortcut-free {
+  color: #3fb950;
+}
+
+.tui-odds-meter {
+  margin-right: 0.5rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.tui-option-band.band-holds {
+  color: #56d364;
+}
+
+.tui-option-band.band-caught {
+  color: #ff7b72;
+}
+
+/* "Because you took: …" under a fallout card's title. */
+.tui-provenance {
+  margin: 0;
+  padding: 0.3rem 0.6rem;
+  border-left: 3px solid #d29922;
+  background: rgba(210, 153, 34, 0.08);
+  color: #e3b341;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* ── Panels: [S]tatus [G]lossary [L]og [P] Intel [?] help ──────────────── */
+.tui-header-panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tui-header-panel {
+  border: 1px solid rgba(86, 212, 221, 0.35);
+  background: transparent;
+  color: #c9d1d9;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+}
+
+.tui-header-panel:hover,
+.tui-header-panel:focus-visible {
+  border-color: #56d4dd;
+  color: #e6edf3;
+}
+
+.tui-header-panel-key {
+  margin-right: 0.3rem;
+  color: #56d4dd;
+}
+
+.tui-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(3, 6, 10, 0.72);
+}
+
+.tui-overlay-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: min(640px, calc(100vh - 2rem));
+  max-height: min(640px, calc(100dvh - 2rem));
+  background: rgba(10, 14, 20, 0.98);
+}
+
+.tui-overlay-panel:focus {
+  outline: none;
+}
+
+.tui-overlay-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tui-overlay-close {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.82rem;
+}
+
+.tui-overlay-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  overflow: auto;
+}
+
+.tui-overlay-search {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tui-overlay-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tui-overlay-entry-title {
+  color: #e6edf3;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tui-overlay-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tui-overlay-key-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.tui-overlay-key {
+  flex: 0 0 7.5rem;
+  color: #56d4dd;
+  font-weight: 700;
+}
+
+/* A laptop screen (1280×720 and similar) gives the stage its margin back, so
+   a whole decision card and its options fit without scrolling. */
+@media (min-width: 721px) and (max-height: 800px) {
+  .tui-app-shell {
+    padding: 0.5rem;
+  }
+
+  .tui-shell {
+    width: calc(100vw - 1rem);
+    height: calc(100vh - 1rem);
+    min-height: 0;
+  }
+
+  .tui-header {
+    padding: 0.3rem 0.8rem;
+  }
+
+  .tui-main {
+    padding: 0.55rem;
+    gap: 0.55rem;
+  }
+
+  .tui-stage {
+    gap: 0.45rem;
+  }
+
+  .tui-field-main {
+    padding: 0.55rem 0.7rem;
+  }
+
+  .tui-options-list {
+    gap: 0.2rem;
+    padding: 0.4rem 0.6rem 0.5rem;
+  }
+
+  .tui-option {
+    padding: 0.35rem 0.5rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .tui-header {
+    flex-wrap: wrap;
+  }
+
+  .tui-header-panels {
+    order: 3;
+    width: 100%;
+  }
+
+  .tui-header-panel {
+    flex: 1 1 auto;
+    min-height: 36px;
+  }
+
+  .tui-header-panel-key {
+    display: none;
+  }
+}
