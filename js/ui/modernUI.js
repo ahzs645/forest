@@ -9,6 +9,28 @@ import { getOperationalProgress } from '../journey.js';
 import { formatDollars } from '../resources.js';
 
 /**
+ * The sidebar's budget gauge: what is left against what this run started
+ * with. Every role's purse is a different size (a recce wallet of $3,200, a
+ * GM's $850,000), so a fixed divisor read 8500% for a GM on day one. The
+ * number can pass 100% when a run earns money; the bar stops at full.
+ * @param {Object} journey
+ * @returns {{percent: number, fill: number}|null} null when there is no budget
+ */
+export function describeBudgetGauge(journey) {
+  const budget = Number(journey?.resources?.budget);
+  if (journey?.resources?.budget === undefined || !Number.isFinite(budget)) return null;
+  const start = [
+    journey.startingResources?.budget,
+    journey.budgetStart,
+    journey.program?.budgetStart,
+    journey.resources.maxBudget,
+  ].map(Number).find((value) => Number.isFinite(value) && value > 0);
+  if (!start) return null;
+  const percent = Math.round((budget / start) * 100);
+  return { percent, fill: Math.max(0, Math.min(100, percent)) };
+}
+
+/**
  * Modern UI mixin
  */
 export const ModernUIMixin = {
@@ -87,15 +109,14 @@ export const ModernUIMixin = {
       if (this.metricStressFill) this.metricStressFill.style.width = `${injuredPercent}%`;
     }
 
-    // Budget (from resources)
-    if (journey.resources?.budget !== undefined) {
-      const maxBudget = journey.resources.maxBudget || 10000;
-      const budgetPercent = Math.round((journey.resources.budget / maxBudget) * 100);
-      if (this.metricBudgetValue) this.metricBudgetValue.textContent = `${budgetPercent}%`;
+    // Budget: what is left of what the run started with
+    const budgetGauge = describeBudgetGauge(journey);
+    if (budgetGauge) {
+      if (this.metricBudgetValue) this.metricBudgetValue.textContent = `${budgetGauge.percent}%`;
       if (this.metricBudgetFill) {
-        this.metricBudgetFill.style.width = `${budgetPercent}%`;
-        this.metricBudgetFill.classList.toggle('low', budgetPercent < 30);
-        this.metricBudgetFill.classList.toggle('critical', budgetPercent < 15);
+        this.metricBudgetFill.style.width = `${budgetGauge.fill}%`;
+        this.metricBudgetFill.classList.toggle('low', budgetGauge.percent < 30);
+        this.metricBudgetFill.classList.toggle('critical', budgetGauge.percent < 15);
       }
     }
 
