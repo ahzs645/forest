@@ -7,7 +7,7 @@ import { getCrewDisplayInfo } from '../crew.js';
 import { getSurveyedBlockCount } from '../journey/progress.js';
 import { getPackagesFinalized, getPackageTarget } from '../journey/packages.js';
 import { getCurrentSeasonInfo } from '../season.js';
-import { calculateScore, formatScoreDisplay } from '../scoring.js';
+import { calculateScore, formatScoreDisplay, rateDeskConduct, summarizeDeskConduct } from '../scoring.js';
 import { summarizeIntegrity } from '../modes/silvicultureIntegrity.js';
 import { getPlanningPhaseLabel } from '../modes/planning.js';
 import { formatDollars } from '../resources.js';
@@ -202,15 +202,32 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
           ? `The year's program is in the ground and in RESULTS, and the district has ${onFile} caught shortcut${onFile === 1 ? '' : 's'} on the file with your signature.`
           : `The year's program is in the ground and in RESULTS.`);
     }
-    case 'planning':
-      return `The Forest Stewardship Plan and first Forest Operations Map for ${areaName} were approved by the District Manager after ${daysUsed} days of analysis, ` +
-        `engagement with the Nations and the public, and careful balancing of competing values. ` +
-        `The plan will shape the licensee's operations in the area for the next five years.`;
+    case 'planning': {
+      // The praise is for a file that earned it: not one approved over a
+      // caught shortcut, or after a Nation wrote that engagement was inadequate.
+      const rating = rateDeskConduct(summarizeDeskConduct(journey));
+      if (rating === 'clean' && !hasRelationshipRupture(journey)) {
+        return `The Forest Stewardship Plan and first Forest Operations Map for ${areaName} were approved by the District Manager after ${daysUsed} days of analysis, ` +
+          `engagement with the Nations and the public, and careful balancing of competing values. ` +
+          `The plan will shape the licensee's operations in the area for the next five years.`;
+      }
+      return `The Forest Stewardship Plan and first Forest Operations Map for ${areaName} were approved by the District Manager after ${daysUsed} days. ` +
+        `The plan will shape the licensee's operations in the area for the next five years, ` +
+        (rating === 'compromised'
+          ? 'and what is on the file about how it got there will follow it.'
+          : 'and the district\'s file on how it got there is thicker than it needed to be.');
+    }
     case 'permitting':
-    case 'desk':
-      return `${journey.permits?.approved ?? 0} permits issued out of ${journey.permits?.target ?? 0} the season needed. ` +
-        `The queue at the district office in ${areaName} is moving after ${daysUsed} days of clean files ` +
-        `and relationships kept warm.`;
+    case 'desk': {
+      const rating = rateDeskConduct(summarizeDeskConduct(journey));
+      const issued = `${journey.permits?.approved ?? 0} permits issued out of ${journey.permits?.target ?? 0} the season needed. `;
+      if (rating === 'clean' && !hasRelationshipRupture(journey)) {
+        return `${issued}The queue at the district office in ${areaName} is moving after ${daysUsed} days of clean files ` +
+          `and relationships kept warm.`;
+      }
+      return `${issued}The queue at the district office in ${areaName} is moving after ${daysUsed} days` +
+        (rating === 'compromised' ? ', and not every file in it would survive a second read.' : ', with more on the record than a clean season leaves.');
+    }
     case 'manager': {
       const ledger = journey.ledger || {};
       const pct = ledger.aac ? `${(Math.round((ledger.deliveredYtd / ledger.aac) * 1000) / 10).toFixed(1)}%` : '';
@@ -228,6 +245,16 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
     default:
       return journey.endReason || 'Expedition completed successfully.';
   }
+}
+
+/**
+ * Whether the run left a documented rupture on the record: a situation that
+ * cost the relationships ten or more at once (a Nation writing that
+ * engagement was inadequate, an Elder declined, a ceremonial site blamed on
+ * the map).
+ */
+function hasRelationshipRupture(journey) {
+  return (journey?.log || []).some((entry) => entry?.type === 'event' && Number(entry.effects?.relationships) <= -10);
 }
 
 /** An end reason as a sentence: most are written as labels, without a full stop. */
@@ -259,12 +286,12 @@ export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
       return `The silviculture program in ${areaName} fell short of its targets after ${daysUsed} days. ${reason} ${aftermath}`;
     }
     case 'planning':
-      return `The FSP replacement for ${areaName} failed to achieve approval after ${daysUsed} days. ` +
+      return `The FSP replacement for ${areaName} failed to achieve approval after ${daysUsed} day${daysUsed === 1 ? '' : 's'}. ` +
         `${reason} The planning process will need to restart with a new approach.`;
     case 'permitting':
     case 'desk':
       return `The licensee's permitting desk in ${areaName} could not get the season's permits issued. ` +
-        `${reason} After ${daysUsed} days, ${journey.permits?.approved || 0} of ${journey.permits?.target || 0} are issued; the rest go to whoever takes the desk.`;
+        `${reason} After ${daysUsed} day${daysUsed === 1 ? '' : 's'}, ${journey.permits?.approved || 0} of ${journey.permits?.target || 0} are issued; the rest go to whoever takes the desk.`;
     case 'manager':
       return `${crewName}'s tenure leading the ${areaName} operation ended after ${daysUsed} months. ` +
         `${reason} The board is already interviewing replacements.`;

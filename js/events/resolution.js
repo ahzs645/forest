@@ -249,6 +249,9 @@ export function resolveEvent(journey, event, option) {
     eventTitle: event.title,
     optionLabel: option.label,
     ...(typeof option.chanceSuccess === 'number' ? { band: resolved.band } : {}),
+    // An off-book answer stays on the record as one, so the debrief can read
+    // the run's conduct and not only its meters (js/scoring.js).
+    ...(option.riskTag === 'OFF-BOOK' ? { offBook: true } : {}),
     outcome: outcome || '',
     consequences: messages.filter((message) => message && message !== outcome),
     effects: effects ? { ...effects } : {},
