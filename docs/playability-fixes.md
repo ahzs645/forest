@@ -38,3 +38,14 @@ The balance harness drove 24 seeded campaign-length assignments per role using r
 The remaining simulated losses were supply/fuel exhaustion or planning bankruptcy. This is evidence that completion is reachable under a consistent strategy, not a population win-rate estimate or proof that every possible choice succeeds.
 
 The Mac remained locked during this implementation pass, so fresh verification used headless browser interaction and engine tests. The earlier visible manual campaign is documented separately. The updated local game is available at `http://127.0.0.1:5178/` while its development server is running.
+
+## 2026-09-29 — Saves and UI (playtest audit, ui.md)
+
+- **Saves:** every read is schema-checked (`js/game/saveLoad.js`). A corrupt, partial or older-schema expedition or campaign save is named, discarded and replaced by the hub, so it can no longer blank the app or strand a campaign screen. LOAD DATA only lists saves that load.
+- **Leaving a run:** the prompt leads with Keep Playing (focused), offers Save & return, and puts Abandon last. Escape then Enter no longer deletes the run.
+- **Landing:** the menu scrolls and fits above the footer at 1280×720, 1366×768 and 1024×768 once a career forest exists. Ctrl/Cmd/Alt chords no longer trigger shortcuts. The game shell is inert behind the landing and setup screens.
+- **Themes:** the legacy colour aliases now resolve per theme, so green, amber and ice apply fully, including the Trail View. Dim text meets 4.5:1 in every theme.
+- **Modern and Grid:** Modern keeps about five lines of story under the Trail View, and its phone cards stack. Grid clips on whole words with an ellipsis.
+- **Career forest:** Campaign years, Seasonal years and Crisis debriefs are filed to the service record.
+- **Intel and copy:** Intel counts and labels are corrected, the manifest reflects the province-wide game, and several copy nits are fixed.
+- **Tests:** unit coverage is `tests/saveValidation.test.mjs` and `tests/careerTieredRuns.test.mjs`. Browser coverage is `tests/e2e/saves-ui.spec.js`.
