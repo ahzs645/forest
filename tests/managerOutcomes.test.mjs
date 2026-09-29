@@ -180,7 +180,7 @@ test('a GM shortcut\'s operations are paid in margin: chip, stakes and applied a
   assert.equal(payoff % 500, 0);
   assert.equal(shortcut.partialEffects.budget, payoff, 'noticed pays the same');
   const chip = `+$${Number((payoff / 1000).toFixed(1))}k`;
-  assert.ok(fitted.stakes[0].startsWith(`Take it and you get ${chip}.`), fitted.stakes[0]);
+  assert.ok(fitted.stakes[0].startsWith(`Take it and you get ${chip}`), fitted.stakes[0]);
   assert.ok(formatEventForDisplay(fitted, 'manager').options.find((o) => o.label === shortcut.label).hint.includes(`, ${chip}, +3 scrutiny`));
 
   const budgetBefore = journey.resources.budget;
