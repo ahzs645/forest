@@ -11,25 +11,30 @@ import {
   getCrewDisplayInfo,
   hasActiveFirstAidAttendant,
   healCrewMember,
+  needsTreatment,
   treatCrewCondition
 } from '../crew.js';
-import { FIELD_ROLES } from '../data/crewNames.js';
+import { FIELD_ROLES, STATUS_EFFECTS } from '../data/crewNames.js';
 import { getFieldProgressInfo } from '../journey.js';
 import {
   getPackageBlocks,
   getPackageProgress,
   getPackagesFinalized,
   getPackageTarget,
+  isBlockFieldworkEvent,
   isPackageBlock
 } from '../journey/packages.js';
 import { getWeatherTempC } from '../data/blocks.js';
 import {
   executeFieldAction,
   endFieldDay,
+  fitEventToCrew,
+  fitEventToRemainingRoute,
   formatAccessVerdict,
   formatInfrastructureStatus,
   getBlockAccessVerdict,
-  recordAccessVerdict
+  recordAccessVerdict,
+  takeDueFollowUp
 } from '../journey/fieldMechanics.js';
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
@@ -47,14 +52,14 @@ import {
   resolveCrossingChoice
 } from '../journey/riverCrossing.js';
 import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journey/blockNav.js';
-import { getActiveRouteConstraint, resolveRouteConstraint } from '../journey/routeConstraints.js';
+import { getActiveRouteConstraint, reopenReportedConstraints, resolveRouteConstraint } from '../journey/routeConstraints.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { PACE_OPTIONS } from '../journey/constants.js';
-import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
+import { MAX_EPITAPH, recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
 import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
 import { buildCampfireFrames } from '../scene/textmode/effects.js';
 import { buildNightCampFrames } from '../scene/textmode/scenes.js';
-import { FIELD_RESOURCES } from '../resources.js';
+import { FIELD_RESOURCES, formatDollars } from '../resources.js';
 import {
   addDiscoveryTags,
   getDiscoveryTagDefinition,
@@ -133,14 +138,15 @@ const RECON_ACCESS_HAZARDS = new Set([
   'bog',
   'glacial_outburst',
   'karst_collapse',
-  'hidden_cavities'
+  'hidden_cavities',
+  'debris_flow'
 ]);
 
 // Stream features and the riparian class a layout crew would call them in
 // the field (FPPR s.47 widths). Fish presence is assumed until a fish
 // sampling says otherwise; the sweep flags what needs sampling.
 const RECON_STREAM_FEATURES = {
-  river: { label: 'main river', cls: 'S1/S2', rma: '70 m RMA, 50 m RRZ' },
+  river: { label: 'main river', cls: 'S1', rma: '70 m RMA, 50 m RRZ' },
   salmon_river: { label: 'salmon river', cls: 'S1', rma: '70 m RMA, 50 m RRZ' },
   salmon_stream: { label: 'salmon stream', cls: 'S2', rma: '50 m RMA, 30 m RRZ' },
   fish_habitat: { label: 'fish stream', cls: 'S2/S3', rma: '40-50 m RMA' },
@@ -149,7 +155,7 @@ const RECON_STREAM_FEATURES = {
   community_water: { label: 'intake stream', cls: 'S3', rma: '40 m RMA, 20 m RRZ' },
   wetland: { label: 'wetland', cls: 'W1-W3', rma: '30-50 m RMA' },
   wetland_buffer: { label: 'wetland', cls: 'W3', rma: '30 m RMA' },
-  lake: { label: 'lakeshore', cls: 'L1', rma: '10 m RRZ, 100 m RMA' },
+  lake: { label: 'lakeshore', cls: 'L1-B', rma: '10 m RRZ, no management zone' },
   flood_channel: { label: 'outburst channel', cls: 'S3 (non-classified drainage)', rma: 'keep the road out of it' },
 };
 
@@ -171,6 +177,16 @@ const FLAGGING_PER_BLOCK = 3;
 
 function normalizeReconToken(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+/**
+ * Moose, grizzly and caribou are mainland animals; Vancouver Island has none
+ * of them (js/data/operatingAreas.js "mainland" tag). A journey with no area
+ * (bare fixtures) keeps the mainland defaults.
+ */
+function isMainlandJourney(journey) {
+  const tags = journey?.area?.tags;
+  return !Array.isArray(tags) || tags.includes('mainland');
 }
 
 function ensureReconIntelState(journey) {
@@ -285,7 +301,7 @@ function maybeFinalizeReconAssessment(ui, journey, block) {
  * read off its features. Every cutblock needs the sweep; what it produces
  * is the block's own content, not a generic checklist.
  */
-function getReconValueSweepProfile(block, journey) {
+export function getReconValueSweepProfile(block, journey) {
   const features = new Set((block?.features || []).map(normalizeReconToken).filter(Boolean));
   const hazards = new Set((block?.hazards || []).map(normalizeReconToken).filter(Boolean));
   const tags = new Set();
@@ -305,6 +321,9 @@ function getReconValueSweepProfile(block, journey) {
   if (features.has('beetle_kill') || features.has('wildfire_scar') || features.has('burn_recovery')) {
     wtp.push('grey snags with cavities — keep a patch of the safest ones and a danger-tree assessment on the rest');
   }
+  if (features.has('fire_veterans')) {
+    wtp.push('fire-scarred veterans with thick bark — the old survivors anchor the WTP, and the snags beside them stay if they are safe');
+  }
   if (features.has('blowdown') || hazards.has('windthrow')) {
     wtp.push('windfirm edge retention on the exposed side; the WTP goes in the lee');
   }
@@ -323,11 +342,26 @@ function getReconValueSweepProfile(block, journey) {
     wildlife.push('caribou sign and lichen on the flats — check the UWR/WHA boundary and the GAR order timing window');
     tags.add('winter_access');
   }
-  if (hazards.has('moose') || features.has('wetland') || features.has('wetland_buffer')) {
+  const mainland = isMainlandJourney(journey);
+  if (features.has('murrelet_habitat')) {
+    wildlife.push('moss platforms on the big limbs — potential marbled murrelet nesting habitat; check the WHA and the survey window before the boundary is final');
+  }
+  if (features.has('elk_range')) {
+    wildlife.push('Roosevelt elk trails and a wallow in the draw — check the ungulate winter range line and record the wallow for the site plan');
+  }
+  if (features.has('mule_deer_winter_range')) {
+    wildlife.push('mule deer winter range on the south aspect — the UWR order sets the retention and the snow-interception cover');
+  }
+  if (mainland && (hazards.has('moose') || features.has('wetland') || features.has('wetland_buffer'))) {
     wildlife.push('moose browse and a wallow on the wetland edge — record as a wildlife feature for the site plan');
   }
   if (hazards.has('grizzly') || features.has('wildlife')) {
-    wildlife.push('bear sign and a day bed — a wildlife feature for the site plan and a note for the tailgate');
+    wildlife.push(mainland && hazards.has('grizzly')
+      ? 'grizzly sign and a day bed — a wildlife feature for the site plan and a note for the tailgate'
+      : 'bear sign and a day bed — a wildlife feature for the site plan and a note for the tailgate');
+  }
+  if (hazards.has('cougar')) {
+    wildlife.push('cougar scrape and tracks on the game trail — a note for the tailgate and the working-alone check-ins');
   }
   if (features.has('karst') || features.has('sensitive_area')) {
     wildlife.push('karst sinks and disappearing streams — each one a reserve and a terrain note');
@@ -336,12 +370,14 @@ function getReconValueSweepProfile(block, journey) {
     wildlife.push('goat and wolverine sign above tree line — a wildlife feature and a note for the biologist');
   }
   if (wildlife.length === 0) {
-    wildlife.push('raptor nest search on the big cottonwoods and a den search on the south aspect');
+    wildlife.push('raptor nest search in the biggest trees on the block and a den search on the south aspect');
   }
 
   // Cultural heritage.
   if (features.has('culturally_modified_trees') || features.has('cedar_harvest')) {
-    cultural.push('bark-stripped cedar (CMTs) — flag, photograph, GPS, do not disturb; AOA/PFR and a referral before the boundary is final');
+    // Redcedar where it grows; inland the stripped trees are pine and spruce.
+    const stripped = features.has('cedar_stand') || features.has('cedar_harvest') ? 'bark-stripped cedar' : 'bark-stripped trees';
+    cultural.push(`${stripped} (CMTs) — flag, photograph, GPS, do not disturb; AOA/PFR and a referral before the boundary is final`);
     tags.add('cultural_hold');
   }
   if (features.has('first_nation') || hazards.has('cultural_protocol')) {
@@ -388,7 +424,7 @@ function getReconValueSweepProfile(block, journey) {
  * What the boundary shift produces on this block: the ribbon, the streams
  * it crossed and the class it called them, terrain and soils, danger trees.
  */
-function getReconLayoutProfile(block) {
+export function getReconLayoutProfile(block) {
   const features = new Set((block?.features || []).map(normalizeReconToken).filter(Boolean));
   const hazards = new Set((block?.hazards || []).map(normalizeReconToken).filter(Boolean));
   const streams = [];
@@ -397,18 +433,31 @@ function getReconLayoutProfile(block) {
       streams.push(`${stream.label}: ${stream.cls} — ${stream.rma}`);
     }
   }
+  const terrainId = normalizeReconToken(block?.terrain);
   if (streams.length === 0) {
-    streams.push('no defined channels crossed; two non-classified drainages noted for the site plan');
+    // Read off the ground, so every dry block does not file the same line.
+    streams.push(terrainId === 'hilly' || terrainId === 'steep'
+      ? 'no defined channels crossed; seepage in the side draws noted as non-classified drainages'
+      : terrainId === 'muskeg'
+        ? 'no defined channels; diffuse flow through the fen noted for the site plan'
+        : 'no defined channels crossed; one wet swale noted as a non-classified drainage');
   }
 
   const terrain = [];
-  const terrainId = normalizeReconToken(block?.terrain);
   if (terrainId === 'steep' || hazards.has('grade')) terrain.push('slopes over 60% on the upper boundary — terrain stability field card, likely Class IV');
   if (hazards.has('rockslide') || features.has('moraine') || features.has('glacial_terrain')) terrain.push('unstable till and slide scars — road location wants the bench, not the toe');
+  if (hazards.has('debris_flow')) terrain.push('a debris-flow gully above the fan — the terrain stability assessment covers the channel above the road, not just the block');
+  if (hazards.has('avalanche')) terrain.push('snow avalanche paths above the upper boundary — the avalanche assessment decides where the line stops');
   if (terrainId === 'muskeg' || hazards.has('bog') || hazards.has('subsidence') || features.has('permafrost')) terrain.push('organic soils and standing water — frozen-ground harvest window, no summer machine traffic');
   if (features.has('karst')) terrain.push('karst: sinks, grikes and a disappearing stream — each one flagged and buffered');
   if (hazards.has('erosion') || features.has('watershed') || features.has('community_water')) terrain.push('fine-textured soils on the lower slope — sediment control notes for every crossing');
-  if (terrain.length === 0) terrain.push('gentle ground, well-drained morainal soils, no stability concerns noted');
+  if (terrain.length === 0) {
+    terrain.push(terrainId === 'hilly'
+      ? 'rolling ground, side slopes of 20-40%; cutbanks noted, no stability concerns'
+      : terrainId === 'steep'
+        ? 'steep side slopes on the boundary; walked, no slide scars or tension cracks found'
+        : 'gentle ground, well-drained morainal soils, no stability concerns noted');
+  }
 
   const dangerTrees = [];
   if (hazards.has('snag_hazard') || hazards.has('falling_timber') || features.has('beetle_kill') || features.has('wildfire_scar')) dangerTrees.push('dangerous-tree assessment on the snags along the boundary; the worst ones flagged for the faller before anyone works under them');
@@ -454,8 +503,6 @@ function getDisplayedAccessVerdict(journey, block) {
  * @param {Object} game - Game instance
  */
 export async function runReconDay(game) {
-  const { ui, journey } = game;
-
   // Run the field day mechanics
   await runFieldDay(game);
 }
@@ -537,6 +584,10 @@ async function runFieldDay(game) {
 
   const resumingShift = journey.activeReconShift?.day === journey.day;
   startDay(journey, { resuming: resumingShift });
+  if (!resumingShift) {
+    const reopened = reopenReportedConstraints(journey);
+    if (reopened.length) journey.routeNews = { day: journey.day, text: reopened.join(' ') };
+  }
 
   let hasTraveled = Boolean(resumingShift && journey.activeReconShift.hasTraveled);
   // Tracks whether this shift's daily resolution (resource burn, crew updates,
@@ -547,10 +598,13 @@ async function runFieldDay(game) {
   // Roll the day's random event, but hold it: Oregon Trail's rhythm is that
   // trouble finds you ON the trail, so the event fires mid-travel (the strip
   // pauses for it). If the shift never travels, it lands on camp instead.
-  // The first shift teaches the base loop — nothing fires on day 1.
+  // The first shift teaches the base loop — nothing fires on day 1. A
+  // follow-up an earlier card scheduled is the shift's situation when it is
+  // due, fitted to the crew and the road left like anything the bush sends.
+  const fitToShift = (event) => fitEventToCrew(journey, fitEventToRemainingRoute(journey, event));
   let pendingEvent = resumingShift
     ? (journey.activeReconShift.pendingEvent || null)
-    : (journey.day > 1 ? checkForEvent(journey) : null);
+    : (journey.day > 1 ? fitToShift(takeDueFollowUp(journey)) || fitToShift(checkForEvent(journey)) : null);
   const shiftState = ensureActiveReconShift(journey, pendingEvent);
   checkpointReconShift(game, shiftState, pendingEvent);
 
@@ -575,12 +629,28 @@ async function runFieldDay(game) {
     displayDayHeader(ui, journey);
     ui.writeDanger(`${journey.weather.name} has grounded all operations. The crew hunkers down.`);
     ui.write('');
+    // Nobody is out on the block to find a nest tree or move a boundary.
+    if (isBlockFieldworkEvent(pendingEvent)) {
+      pendingEvent = null;
+      checkpointReconShift(game, shiftState, pendingEvent);
+    }
     if (pendingEvent) {
       ui.write('The weather does not mean the day is quiet.');
       const interruptingEvent = pendingEvent;
       pendingEvent = null;
       checkpointReconShift(game, shiftState, pendingEvent);
-      await handleEvent(game, interruptingEvent);
+      // The card redraws the screen, so the grounding has to ride on the
+      // card itself, and no option may promise that work continues.
+      const grounded = `${journey.weather.name} has grounded all operations. The crew hunkers down.`;
+      await handleEvent(game, {
+        ...interruptingEvent,
+        heldInCamp: `${journey.weather.name.toLowerCase()} holds the crew in camp`,
+      }, {
+        dayHeader: buildReconDayHeader(journey),
+        statusLine: grounded,
+        context: buildReconContextLines(journey),
+        onRender: () => updateReconMissionStatus(ui, journey),
+      });
       if (game.gameOver) return;
     }
     spendDay(journey);
@@ -605,7 +675,7 @@ async function runFieldDay(game) {
     return;
   }
 
-  if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.warning) {
+  if (foodBeatDue(journey)) {
     displayDayHeader(ui, journey);
     await maybeHandleFoodDecision(game);
     ui.updateAllStatus(journey);
@@ -712,16 +782,18 @@ async function runFieldDay(game) {
       });
     }
 
-    if (routeConstraint) {
+    if (routeConstraint && routeConstraint.status !== 'reported') {
       options.push({
         label: 'Report it and work the near side',
         description: `${routeConstraint.title} blocks ${routeConstraint.toBlockName}. Flag it, photograph it, call the road permit holder — uses this shift`,
         tag: 'TRADEOFF',
         value: 'report_route_constraint'
       });
+    }
+    if (routeConstraint) {
       options.push({
         label: routeConstraint.kind === 'landslide' ? 'Take the old spur around' : 'Walk in from the last sound approach',
-        description: `Bypass ${routeConstraint.title.toLowerCase()} on the old line with extra fuel and rougher travel — uses this shift`,
+        description: `Bypass ${routeConstraint.title.toLowerCase()} on the old line: a slow, rough leg toward ${journey.blocks[journey.currentBlockIndex + 1]?.name || 'the next stop'} with extra fuel — uses this shift`,
         tag: 'TRADEOFF',
         value: 'detour_route_constraint'
       });
@@ -749,7 +821,7 @@ async function runFieldDay(game) {
     if (currentBlock?.hasSupply) {
       options.push({
         label: 'Run into the supply point',
-        description: 'Fuel, food, repairs, kits',
+        description: 'Fuel, food, repairs, kits; uses this shift',
         value: 'resupply'
       });
     }
@@ -781,7 +853,7 @@ async function runFieldDay(game) {
         value: 'maintain'
       }
     ];
-    const hasAnyInjured = journey.crew.some(m => m.isActive && (m.health < 85 || (m.statusEffects?.length || 0) > 0));
+    const hasAnyInjured = journey.crew.some(needsTreatment);
     if (hasAnyInjured && journey.resources.firstAid > 0) {
       campOptions.push({
         label: 'Patch up the crew',
@@ -810,14 +882,24 @@ async function runFieldDay(game) {
         value: 'food_cache'
       });
     }
-    if ((journey.resources.fuel || 0) <= FIELD_RESOURCES.fuel.max - FUEL_RUN_LITRES) {
+    // A run to town the card cannot pay for is not offered as a shift's
+    // work; the camp prompt says what it would take instead.
+    const cashOnHand = Number(journey.resources.budget || 0);
+    const unaffordableRuns = [];
+    const fuelRunCost = priceByRemoteness(journey, FUEL_RUN_BASE_COST);
+    const groceryRunCost = priceByRemoteness(journey, GROCERY_RUN_BASE_COST);
+    if ((journey.resources.fuel || 0) <= FIELD_RESOURCES.fuel.max - FUEL_RUN_LITRES && cashOnHand < fuelRunCost) {
+      unaffordableRuns.push(`fuel run $${fuelRunCost}, $${Math.ceil(fuelRunCost - cashOnHand)} short`);
+    } else if ((journey.resources.fuel || 0) <= FIELD_RESOURCES.fuel.max - FUEL_RUN_LITRES) {
       campOptions.push({
         label: 'Fuel run',
         description: `Send the driver to the nearest cardlock: +${FUEL_RUN_LITRES} L, about $${priceByRemoteness(journey, FUEL_RUN_BASE_COST)}; uses this shift`,
         value: 'fuel_run'
       });
     }
-    if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.max - GROCERY_RUN_FOOD) {
+    if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.max - GROCERY_RUN_FOOD && cashOnHand < groceryRunCost) {
+      unaffordableRuns.push(`grocery run $${groceryRunCost}, $${Math.ceil(groceryRunCost - cashOnHand)} short`);
+    } else if ((journey.resources.food || 0) <= FIELD_RESOURCES.food.max - GROCERY_RUN_FOOD) {
       campOptions.push({
         label: 'Grocery run',
         description: `Send the driver to town for a rations restock: +${GROCERY_RUN_FOOD} person-days, about $${priceByRemoteness(journey, GROCERY_RUN_BASE_COST)}; uses this shift`,
@@ -830,11 +912,15 @@ async function runFieldDay(game) {
         description: 'Burn the grease, move the food to the truck cab and the bear cache, wash the camp down — uses this shift',
         value: 'bear_cleanup'
       });
-      campOptions.push({
-        label: 'Report the habituated bear (RAPP)',
-        description: 'Call it in to the Conservation Officer Service — brief response; work continues',
-        value: 'bear_report'
-      });
+      // One call per bear. The CO Service logs it once; ringing the RAPP
+      // line again about the same animal is not another finding.
+      if (!journey.bearReported) {
+        campOptions.push({
+          label: 'Report the habituated bear (RAPP)',
+          description: 'Call it in to the Conservation Officer Service — brief response; work continues',
+          value: 'bear_report'
+        });
+      }
     }
 
     let actionId = await presentDayCard(ui, {
@@ -850,7 +936,9 @@ async function runFieldDay(game) {
     });
 
     if (actionId === 'camp_menu') {
-      const camp = await ui.promptChoice('Camp & crew:', [
+      const camp = await ui.promptChoice(unaffordableRuns.length
+        ? `Camp & crew (not enough cash: ${unaffordableRuns.join('; ')}):`
+        : 'Camp & crew:', [
         ...campOptions,
         { label: 'Back', description: 'Return to the shift', value: 'camp_back' }
       ]);
@@ -921,7 +1009,7 @@ async function runFieldDay(game) {
       ui.write('The crew burns the grease pit, scrubs the cook tent, and moves every scrap of food into the truck cab and the bear cache on the far side of the landing.');
       ui.writePositive('Nothing to come back for. It will test the camp once more and move on.');
       logReconAction(journey, 'Cleaned up the camp attractants');
-    } else if (actionId === 'bear_report') {
+    } else if (actionId === 'bear_report' && !journey.bearReported) {
       ui.writeHeader('RAPP CALL');
       ui.write('You call the habituated bear in to the Conservation Officer Service on the RAPP line with the camp location and what it has been into.');
       journey.scrutiny = Math.max(0, (journey.scrutiny || 0) - 1);
@@ -958,17 +1046,26 @@ async function runFieldDay(game) {
       if (!constraint) {
         ui.write('No route obstruction is active on the next leg.');
       } else {
-        spendDay(journey);
-        const result = resolveRouteConstraint(
-          journey,
-          constraint.id,
-          actionId === 'detour_route_constraint' ? 'detour' : 'report'
-        );
+        const detour = actionId === 'detour_route_constraint';
+        const result = resolveRouteConstraint(journey, constraint.id, detour ? 'detour' : 'report');
         for (const message of result.messages) {
-          if (actionId === 'detour_route_constraint') ui.writeWarning(message);
+          if (detour) ui.writeWarning(message);
           else ui.write(message);
         }
         logReconAction(journey, result.messages[0] || 'Resolved route obstruction');
+        // The old spur is the road today: a slow, rough leg that still makes
+        // ground. It used to take the shift, cover nothing, and slow the next
+        // leg too, which made waiting for the office strictly better.
+        const nextBlock = journey.blocks[journey.currentBlockIndex + 1];
+        if (detour && nextBlock && journey.resources.fuel > 0 && journey.resources.equipment > 0) {
+          journey.routePlan = { ...buildRoutePlan('mainline', journey, currentBlock, nextBlock), note: '' };
+          const leg = await runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent });
+          if (leg.gameOver) return;
+          hasTraveled = true;
+          dayResolved = true;
+        } else {
+          spendDay(journey);
+        }
       }
     }
 
@@ -1118,7 +1215,7 @@ async function maybeMarkIncidents(game) {
 
     let epitaph = null;
     if (typeof ui.promptText === 'function') {
-      epitaph = (await ui.promptText('Marker line (one line):', 'Watch your footing here'))
+      epitaph = (await ui.promptText(`Marker line (one line, up to ${MAX_EPITAPH} characters):`, 'Watch your footing here'))
         || 'Watch your footing here';
     }
     const marker = recordTrailMarker({
@@ -1145,9 +1242,10 @@ function pickTrailWildlife(journey, paceId) {
   const chance = { slow: 0.28, normal: 0.16, fast: 0.08, grueling: 0.03 }[paceId] || 0;
   if (Math.random() >= chance) return null;
   const block = journey.blocks[journey.currentBlockIndex];
-  const kinds = ['moose', 'deer'];
+  const mainland = isMainlandJourney(journey);
+  const kinds = mainland ? ['moose', 'deer'] : ['deer', 'deer'];
   if (block?.hazards?.some((h) => /grizzly|bear/.test(h))) kinds.push('bear', 'bear');
-  if (block?.hazards?.some((h) => /moose|wildlife/.test(h))) kinds.push('moose');
+  if (block?.hazards?.some((h) => /moose|wildlife/.test(h))) kinds.push(mainland ? 'moose' : 'bear');
   return kinds[Math.floor(Math.random() * kinds.length)];
 }
 
@@ -1252,7 +1350,7 @@ async function runRiverCrossingBeat(game, block) {
  * versus supplies. Tracks celebrations on the journey so saves stay honest.
  */
 async function celebrateNewMilestones(game) {
-  const { ui, journey } = game;
+  const { journey } = game;
   const reached = journey.milestonesReached || [];
   if (!journey.milestonesCelebrated) journey.milestonesCelebrated = [];
   for (const threshold of reached) {
@@ -1337,7 +1435,7 @@ export function updateReconMissionStatus(ui, journey) {
     { label: 'Weather', value: `${journey.weather?.name || 'Clear'}${tempC === null ? '' : ` ${tempC}°C`}` },
     { label: 'Terrain', value: currentBlock?.terrain || 'unknown' },
     { label: 'Days left', value: Number.isFinite(journey.deadline) ? `${Math.max(0, journey.deadline - journey.day)}` : '—' },
-    { label: 'Traverse', value: `${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km` },
+    { label: 'Traverse', value: `${formatKm(journey.distanceTraveled)}/${formatKm(journey.totalDistance)} km` },
     { label: 'Stops', value: `${progressInfo.blocksCompleted + 1}/${progressInfo.totalBlocks}` },
     {
       label: 'Scrutiny',
@@ -1371,7 +1469,9 @@ export function updateReconMissionStatus(ui, journey) {
   if (routeConstraint) {
     alerts.push({
       level: 'danger',
-      text: `${routeConstraint.title} blocks ${routeConstraint.toBlockName}; clear it or mark a detour before travelling.`
+      text: routeConstraint.status === 'reported'
+        ? `${routeConstraint.title} reported; the road to ${routeConstraint.toBlockName} is shut until it has been looked at.`
+        : `${routeConstraint.title} blocks ${routeConstraint.toBlockName}; clear it or mark a detour before travelling.`
     });
   }
   const currentAccessVerdict = getDisplayedAccessVerdict(journey, currentBlock);
@@ -1383,7 +1483,7 @@ export function updateReconMissionStatus(ui, journey) {
   if (journey.rationPlan?.mode === 'short') {
     alerts.push({
       level: 'warn',
-      text: `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'})`
+      text: `Short rations (${journey.rationPlan.shortRationStreak} day${journey.rationPlan.shortRationStreak === 1 ? '' : 's'}): ${SHORT_RATION_MORALE_COST} morale a shift each`
     });
   }
 
@@ -1431,16 +1531,6 @@ async function runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent 
   }
   applyReconTravelIntelPenalty(ui, journey, currentBlock, paceId);
 
-  // A crossing the crew broke behind them keeps costing. This is the standing
-  // half of a bad band that would otherwise have been a one-day bill
-  // (js/events/consequences.js).
-  const condemned = getCondemnedCrossingPenalty(journey);
-  if (condemned.fuel > 0 || condemned.equipment > 0) {
-    journey.resources.fuel = Math.max(0, journey.resources.fuel - condemned.fuel);
-    journey.resources.equipment = Math.max(0, journey.resources.equipment - condemned.equipment);
-    ui.writeWarning(`${condemned.note} Fuel -${condemned.fuel} L, equipment -${condemned.equipment}.`);
-  }
-
   // Losing the machine for the season is paid on every leg after it, not once.
   const machine = getMachineDownPenalty(journey);
   if (machine.note) {
@@ -1475,6 +1565,10 @@ async function runReconTravelLeg(game, { currentBlock, shiftState, pendingEvent 
 
   ui.writeHeader('TRAVEL RESULTS');
   writeFieldMessages(ui, result.messages);
+  // The panel has to agree with the results on screen, not catch up after
+  // the next Continue.
+  ui.updateAllStatus(journey);
+  updateReconMissionStatus(ui, journey);
   shiftState.hasTraveled = true;
   shiftState.dayResolved = true;
 
@@ -1544,20 +1638,29 @@ async function handleSetTempo(ui, journey) {
     },
     {
       label: `Short rations${rations.mode === 'short' ? ' (current)' : ''}`,
-      description: '65% portions; stretches the food, the crew feels it',
+      // The cost is on the option itself: the warning printed after the
+      // choice is cleared by the day screen's redraw.
+      description: `65% portions; stretches the food, ${SHORT_RATION_MORALE_COST} morale a shift for everyone`,
       value: 'short',
     },
   ]);
 
   if (rationChoice.value === 'short' && rations.mode !== 'short') {
     rations.mode = 'short';
-    rations.shortRationStreak = Number(rations.shortRationStreak || 0) + 1;
-    ui.writeWarning('Short rations ordered.');
+    rations.shortRationStreak = 1;
+    rations.orderedAtFood = Number(journey.resources.food || 0);
+    ui.writeWarning(`Short rations ordered: ${SHORT_RATION_MORALE_COST} morale a shift for everyone. They hold until you change them, the box is restocked, or someone gets close to walking.`);
   } else if (rationChoice.value === 'normal' && rations.mode === 'short') {
     rations.mode = 'normal';
     rations.shortRationStreak = 0;
+    rations.orderedAtFood = null;
     ui.write('Back on full rations.');
   }
+}
+
+/** Kilometres as the travel lines print them: a 6.5 km leg is not "7". */
+function formatKm(km) {
+  return String(Number((Number(km) || 0).toFixed(1)));
 }
 
 /** An occasional voice from the crew — not a daily ritual. */
@@ -1597,6 +1700,13 @@ function buildQuietShiftBody(journey) {
   const parts = [recent
     ? `${recent.setAside ? 'You left' : 'You handled'} ${recent.title}. The rest of the shift is still yours to decide.`
     : 'The radio stays quiet through breakfast. Whatever today is, it is yours to decide.'];
+  if (journey.routeNews?.day === journey.day) {
+    parts.push(journey.routeNews.text);
+  }
+  const constraint = getActiveRouteConstraint(journey);
+  if (constraint?.status === 'reported') {
+    parts.push(`The road past the ${constraint.title.toLowerCase()} is shut until the office has had it looked at. Work this side today, or take the old spur around.`);
+  }
   if (openHere) {
     parts.push(`${currentBlock.name} is still open in the file.`);
   }
@@ -1652,7 +1762,7 @@ function buildReconStatusLine(journey) {
  */
 function buildReconContextLines(journey) {
   const lines = [buildBlockMap(journey), '* supply point'];
-  lines.push(`Traverse: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`);
+  lines.push(`Traverse: ${formatKm(journey.distanceTraveled)}/${formatKm(journey.totalDistance)} km`);
   lines.push(`Packages: ${getPackagesFinalized(journey)}/${getPackageTarget(journey)} finalized`);
 
   // The briefing used to cost a slot on the decision list. It is reference
@@ -1708,7 +1818,7 @@ function displayDayHeader(ui, journey) {
     const into = getDistanceIntoCurrentSegment(journey);
     const kmToNext = Math.max(0, segment - into);
     ui.write(
-      `NEXT: ${nextBlock.name} — ${kmToNext.toFixed(1)} km   ·   TRAVELED: ${Math.round(journey.distanceTraveled)}/${Math.round(journey.totalDistance)} km`,
+      `NEXT: ${nextBlock.name} — ${kmToNext.toFixed(1)} km   ·   TRAVELED: ${formatKm(journey.distanceTraveled)}/${formatKm(journey.totalDistance)} km`,
       'term-dim'
     );
   }
@@ -1808,6 +1918,11 @@ function formatTerrainLabel(terrainId) {
     .join(' ');
 }
 
+/** "glacial_current" reads as "glacial current" to the player. */
+function formatHazardLabel(hazardId) {
+  return String(hazardId || '').replace(/_/g, ' ');
+}
+
 function getRouteHazardSummary(currentBlock, nextBlock, weather) {
   const hazardSet = new Set(nextBlock?.hazards || []);
   const details = [];
@@ -1816,7 +1931,7 @@ function getRouteHazardSummary(currentBlock, nextBlock, weather) {
     details.push(`${formatTerrainLabel(nextBlock.terrain)} terrain`);
   }
   if (hazardSet.size > 0) {
-    details.push(`hazards: ${Array.from(hazardSet).slice(0, 2).join(', ')}`);
+    details.push(`hazards: ${Array.from(hazardSet).slice(0, 2).map(formatHazardLabel).join(', ')}`);
   }
   if (weather?.dangerous) {
     details.push(weather.name.toLowerCase());
@@ -1875,7 +1990,11 @@ function buildRoutePlan(choiceId, journey, currentBlock, nextBlock) {
 }
 
 function chooseTreatmentEffect(member) {
-  const activeEffects = (member.statusEffects || []).map((effect) => effect.effectId);
+  // A splinted arm needs time, not a second kit; treat whatever else is wrong.
+  const activeEffects = (member.statusEffects || [])
+    .filter((effect) => !(effect.treated && STATUS_EFFECTS[effect.effectId]?.healsWithTime))
+    .map((effect) => effect.effectId);
+  if (!activeEffects.length) return null;
 
   for (const effectId of TREATMENT_PRIORITY) {
     if (activeEffects.includes(effectId)) {
@@ -1886,46 +2005,121 @@ function chooseTreatmentEffect(member) {
   return activeEffects[0] || null;
 }
 
+/** A crew member this low is a few short-ration shifts from walking (crew.js quits at 10). */
+export const SHORT_RATION_MORALE_FLOOR = 30;
+/** What a shift on short rations costs each crew member (js/crew.js processDailyUpdate). */
+const SHORT_RATION_MORALE_COST = 4;
+
+/**
+ * Whether a short-rations order should come off by itself, and why.
+ *
+ * Short rations are a standing order (Set the tempo), but an order is given
+ * for a reason, and it lapses when the reason does: the box has been
+ * restocked past the warning line, or the crew is close enough to walking
+ * that the food saved is not worth the person lost. A thin box keeps the
+ * order; the morning beat says what it is costing instead.
+ * @param {Object} journey
+ * @returns {{reason: 'restocked'|'morale', food: number, member?: Object}|null}
+ */
+export function reviewShortRations(journey) {
+  const rations = ensureRationPlan(journey);
+  if (rations.mode !== 'short') return null;
+  const food = Number(journey.resources?.food || 0);
+  if (food <= 0) return null;
+  // Restocked: back above the warning line, and more than the order was
+  // given on (an order given on a full box to stretch it lapses at the next
+  // restock, not the next morning).
+  const orderedAt = Number(rations.orderedAtFood);
+  const restocked = food > FIELD_RESOURCES.food.warning
+    && (!Number.isFinite(orderedAt) || food > orderedAt);
+  if (restocked) return { reason: 'restocked', food };
+  if (food <= FIELD_RESOURCES.food.critical) return null;
+  const active = (journey.crew || []).filter((member) => member.isActive);
+  const lowest = active.reduce((low, member) => (!low || member.morale < low.morale ? member : low), null);
+  if (lowest && lowest.morale <= SHORT_RATION_MORALE_FLOOR) return { reason: 'morale', food, member: lowest };
+  return null;
+}
+
+/**
+ * Lift a lapsed short-rations order and say why. Returns true when it lifted.
+ * Called on the morning food beat and straight after anything that restocks
+ * the box, so a grocery run does not leave the crew on 65% for the night.
+ */
+function liftLapsedShortRations(ui, journey) {
+  const review = reviewShortRations(journey);
+  if (!review) return false;
+  const rations = ensureRationPlan(journey);
+  rations.mode = 'normal';
+  rations.shortRationStreak = 0;
+  rations.orderedAtFood = null;
+  const food = Math.round(review.food * 10) / 10;
+  if (review.reason === 'restocked') {
+    ui.writePositive(`Food is back up to ${food} person-days. Short rations lift; the crew is back on full meals.`);
+  } else {
+    ui.writeWarning(`${review.member.name} is at morale ${Math.round(review.member.morale)} and short rations cost everyone ${SHORT_RATION_MORALE_COST} a shift. You put the crew back on full meals; the box (${food} person-days) can carry it for now.`);
+  }
+  return true;
+}
+
+/**
+ * Whether this morning opens on the food box. Once a day, and only when there
+ * is something to say: an empty box, a crew already on short rations running
+ * critically low, or a thin box on full rations that wants a decision.
+ */
+function foodBeatDue(journey) {
+  const rations = ensureRationPlan(journey);
+  const food = journey.resources.food || 0;
+  if (rations.lastDecisionDay === journey.day) return false;
+  if (reviewShortRations(journey)) return true;
+  if (food > FIELD_RESOURCES.food.warning) return false;
+  if (food <= 0) return true;
+  // Short rations are a carried standing order (Set the tempo). A crew
+  // already on them is not asked again every morning; it hears about it
+  // again only when the box is nearly empty.
+  if (rations.mode === 'short') return food <= FIELD_RESOURCES.food.critical;
+  return true;
+}
+
 async function maybeHandleFoodDecision(game) {
   const { ui, journey } = game;
   const rations = ensureRationPlan(journey);
 
-  if (rations.lastDecisionDay === journey.day) {
+  if (!foodBeatDue(journey)) {
     return;
   }
-
-  if ((journey.resources.food || 0) > FIELD_RESOURCES.food.warning) {
-    // Food came back. A standing order to stretch the meals has to lift by
-    // itself once it no longer applies, or short rations become a one-way door
-    // the player is never asked about again — which quietly starves a crew that
-    // is actually well supplied.
-    if (rations.mode === 'short') {
-      rations.mode = 'normal';
-      rations.shortRationStreak = 0;
-      ui.write('Food stores are healthy again. The crew goes back on full rations.');
-    }
-    return;
-  }
-
-  // Rations are a carried standing order now (Set the tempo), so this forced
-  // beat only needs to fire when the player has not already made the call.
-  // A crew already on short rations does not need to be asked again every
-  // single morning for the rest of the season — that was a dozen-plus prompts
-  // and acknowledgements per run saying nothing new.
-  if (rations.mode === 'short' && (journey.resources.food || 0) > FIELD_RESOURCES.food.critical) {
-    return;
-  }
-
-
+  rations.lastDecisionDay = journey.day;
   const foodLevel = journey.resources.food || 0;
+
+  if (liftLapsedShortRations(ui, journey)) {
+    ui.write('');
+    return;
+  }
+
+  // An empty box is not a rationing decision; full or short of nothing is
+  // nothing. Say what the day costs and what fixes it.
+  if (foodLevel <= 0) {
+    const hungryDays = Number(journey.resourcePressure?.hungryDays || 0);
+    ui.writeDanger(hungryDays > 0
+      ? `The food box has been empty for ${hungryDays} shift${hungryDays === 1 ? '' : 's'}. The crew is working on nothing, and it shows.`
+      : 'The food box is empty. Nobody eats today unless you get food in.');
+    ui.write('A grocery run, the supply point or a ration cache (Camp & crew) is the only fix. Rest does not heal a crew with nothing to eat.');
+    ui.write('');
+    return;
+  }
+
+  if (rations.mode === 'short') {
+    ui.writeWarning(`Food is down to ${Math.round(foodLevel * 10) / 10} person-days, and the crew is ${rations.shortRationStreak || 1} day${rations.shortRationStreak === 1 ? '' : 's'} into short rations at ${SHORT_RATION_MORALE_COST} morale a shift each. Get food in before the box is empty.`);
+    ui.write('');
+    return;
+  }
+
   const prompt = foodLevel <= FIELD_RESOURCES.food.critical
     ? 'Food stores are critically low. Decide how to handle the crew\'s meals.'
-    : 'Food stores are running thin. Decide how to handle rations today.';
-  const options = [];
+    : 'Food stores are running thin. Decide how to handle rations.';
 
-  // Setting the day's ration policy is a call, not a job. Actually going out
-  // to the cache is a shift's work and lives on the shift menu instead.
-  options.push(
+  // Setting the ration policy is a call, not a job. Actually going out to
+  // the cache is a shift's work and lives on the shift menu instead.
+  const choice = await ui.promptChoice(prompt, [
     {
       label: 'Keep Full Rations',
       description: 'Normal food use; keeps the crew steadier if you can afford it',
@@ -1933,18 +2127,16 @@ async function maybeHandleFoodDecision(game) {
     },
     {
       label: 'Short Rations and Push On',
-      description: 'Use 65% portions today; the crew will feel it',
+      description: `65% portions until you change the order; ${SHORT_RATION_MORALE_COST} morale a shift for everyone`,
       value: 'short'
     }
-  );
-
-  const choice = await ui.promptChoice(prompt, options);
-  rations.lastDecisionDay = journey.day;
+  ]);
 
   if (choice.value === 'short') {
     rations.mode = 'short';
-    rations.shortRationStreak = Number(rations.shortRationStreak || 0) + 1;
-    ui.writeWarning(`Short rations ordered. This makes ${rations.shortRationStreak} reduced-meal day${rations.shortRationStreak === 1 ? '' : 's'} in a row.`);
+    rations.shortRationStreak = 1;
+    rations.orderedAtFood = foodLevel;
+    ui.writeWarning(`Short rations ordered: ${SHORT_RATION_MORALE_COST} morale a shift for everyone. They hold until you change them under Set the tempo, the box is restocked, or someone gets close to walking.`);
     ui.write('');
     return;
   }
@@ -1970,7 +2162,11 @@ async function maybePromptRouteChoice(game, currentBlock) {
     && !journey.weather?.dangerous;
   if (flatQuietLeg) {
     journey.routePlan = buildRoutePlan('mainline', journey, currentBlock, nextBlock);
-    journey.routePlan.note = `Good road to ${nextBlock.name}. The crew rides easy and talks about lunch.`;
+    // Flat is not the same as easy: fog or rain still slows the trucks.
+    const slowSky = (journey.weather?.travelModifier ?? 1) < 1;
+    journey.routePlan.note = slowSky
+      ? `Flat road to ${nextBlock.name}, but the ${String(journey.weather.name).toLowerCase()} keeps the trucks slow.`
+      : `Good road to ${nextBlock.name}. The crew rides easy and talks about lunch.`;
     return;
   }
 
@@ -2143,7 +2339,7 @@ function handleReplaceAttendant(ui, journey) {
   const cash = Number(journey.resources.budget || 0);
   ui.writeHeader('REPLACEMENT ATTENDANT');
   if (cash < cost) {
-    ui.writeWarning(`The office will not release a Level 3 without $${cost} on the card. Cash on hand: $${Math.round(cash)}.`);
+    ui.writeWarning(`The office will not release a Level 3 without $${cost} on the card. Cash on hand: ${formatDollars(cash)}.`);
     ui.write('The crew stays in camp on light duties. Nobody works a line until an attendant is back.');
     return;
   }
@@ -2157,6 +2353,7 @@ function handleReplaceAttendant(ui, journey) {
   }
   journey.crew.push(replacement);
   ui.writePositive(`${replacement.name} (OFA 3, with the ETV) rides back out with the driver. $${cost} on the card.`);
+  chargeCondemnedCrossings(ui, journey);
   ui.write('WorkSafeBC first aid coverage is back in place. The crew can work the line tomorrow.');
 }
 
@@ -2168,12 +2365,13 @@ function handleFuelRun(ui, journey) {
   const cash = Number(journey.resources.budget || 0);
   ui.writeHeader('FUEL RUN');
   if (cash < cost) {
-    ui.writeWarning(`The cardlock wants $${cost} and the card has $${Math.round(cash)} on it. The driver comes back with coffee and no fuel.`);
+    ui.writeWarning(`The cardlock wants $${cost} and the card has ${formatDollars(cash)} on it. The driver comes back with coffee and no fuel.`);
     return;
   }
   journey.resources.budget = Math.max(0, cash - cost);
   journey.resources.fuel = Math.min(FIELD_RESOURCES.fuel.max, (journey.resources.fuel || 0) + FUEL_RUN_LITRES);
   ui.writePositive(`The driver fills two jerry cans and the tank at the cardlock. Fuel +${FUEL_RUN_LITRES} L, $${cost}. Fuel now ${Math.round(journey.resources.fuel)} L.`);
+  chargeCondemnedCrossings(ui, journey);
 }
 
 /**
@@ -2185,12 +2383,14 @@ function handleGroceryRun(ui, journey) {
   const cash = Number(journey.resources.budget || 0);
   ui.writeHeader('GROCERY RUN');
   if (cash < cost) {
-    ui.writeWarning(`The store wants $${cost} and the card has $${Math.round(cash)} on it. The driver comes back with a bag of apples and an apology.`);
+    ui.writeWarning(`The store wants $${cost} and the card has ${formatDollars(cash)} on it. The driver comes back with a bag of apples and an apology.`);
     return;
   }
   journey.resources.budget = Math.max(0, cash - cost);
   journey.resources.food = Math.min(FIELD_RESOURCES.food.max, (journey.resources.food || 0) + GROCERY_RUN_FOOD);
   ui.writePositive(`The driver fills the cooler and the dry box in town. Food +${GROCERY_RUN_FOOD} person-days, $${cost}. Food now ${Math.round(journey.resources.food)} person-days.`);
+  chargeCondemnedCrossings(ui, journey);
+  liftLapsedShortRations(ui, journey);
 }
 
 /**
@@ -2217,6 +2417,28 @@ function getReconNotebookTargets(journey) {
   });
 }
 
+/**
+ * A crossing the crew broke behind them keeps costing, but only the trips
+ * that go back over it: a run to town, a return visit to a block on the far
+ * side. The traverse itself only goes forward and never recrosses it. This is
+ * the standing half of a bad band that would otherwise have been a one-day
+ * bill (js/events/consequences.js).
+ * @param {Object} ui
+ * @param {Object} journey
+ * @param {number} [backToIndex=-1] - the stop the trip goes back to; -1 is town
+ */
+function chargeCondemnedCrossings(ui, journey, backToIndex = -1) {
+  const recrossed = (journey.condemnedCrossings || []).filter((id) => {
+    const index = (journey.blocks || []).findIndex((block) => block.id === id);
+    return index > backToIndex && index <= journey.currentBlockIndex;
+  });
+  const toll = getCondemnedCrossingPenalty({ condemnedCrossings: recrossed });
+  if (toll.fuel <= 0 && toll.equipment <= 0) return;
+  journey.resources.fuel = Math.max(0, journey.resources.fuel - toll.fuel);
+  journey.resources.equipment = Math.max(0, journey.resources.equipment - toll.equipment);
+  ui.writeWarning(`${toll.note} Fuel -${toll.fuel} L, equipment -${toll.equipment}.`);
+}
+
 function handleFieldNotebook(ui, journey) {
   const target = getReconNotebookTargets(journey)[0];
   if (!target) {
@@ -2231,6 +2453,7 @@ function handleFieldNotebook(ui, journey) {
   journey.resources.fuel -= NOTEBOOK_FUEL_L;
   ui.writeHeader('RETURN FIELD VISIT');
   ui.write(`The crew revisits ${target.block.name}, then returns to camp. Fuel used: ${NOTEBOOK_FUEL_L} L.`);
+  chargeCondemnedCrossings(ui, journey, journey.blocks.indexOf(target.block));
   if (!target.intel.layoutWalked) {
     handleLayoutShift(ui, journey, target.block);
   } else {
@@ -2258,7 +2481,7 @@ function handleScoutAhead(ui, journey) {
   ui.write(`Description: ${nextBlock.description}`);
 
   if (nextBlock.hazards && nextBlock.hazards.length > 0) {
-    ui.writeWarning(`Hazards: ${nextBlock.hazards.join(', ')}`);
+    ui.writeWarning(`Hazards: ${nextBlock.hazards.map(formatHazardLabel).join(', ')}`);
   }
 
   const accessVerdict = recordAccessVerdict(
@@ -2316,7 +2539,7 @@ export async function handleResupply(game, block) {
   const { ui, journey } = game;
   const cash = journey.resources.budget || 0;
   ui.writeHeader(`RESUPPLY: ${block?.name || 'Supply Point'}`);
-  ui.write(`Cash on hand: $${Math.round(cash).toLocaleString()}`);
+  ui.write(`Cash on hand: ${formatDollars(cash)}`);
 
   // Freight economics: the deeper into the traverse, the more everything
   // costs — buy early or pay the remoteness premium.
@@ -2335,47 +2558,122 @@ export async function handleResupply(game, block) {
     if (!def) return value;
     return Math.max(0, Math.min(def.max ?? value, value));
   };
+  const FLAGGING_MAX = 60;
+  const roomFor = (resourceId) => {
+    const max = resourceId === 'flaggingTape' ? FLAGGING_MAX : FIELD_RESOURCES[resourceId]?.max;
+    return Math.max(0, (max ?? Infinity) - (Number(journey.resources[resourceId]) || 0));
+  };
 
-  const offers = [
-    { id: 'fuel_drum', label: 'Fuel drum (+200 L)', description: 'A 205 L drum of diesel, pumped into the tanks and the cans', cost: priced(360), apply: () => { journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 200); } },
-    { id: 'rations', label: 'Rations crate (+20 person-days)', description: 'Four days of camp food for five', cost: priced(160), apply: () => { journey.resources.food = clampToMax('food', journey.resources.food + 20); } },
-    { id: 'first_aid', label: 'First aid kit (+1 kit)', description: 'Level 3 kit restock', cost: priced(120), apply: () => { journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 1); } },
-    { id: 'flagging', label: 'Flagging (+12 rolls)', description: 'Ribbon for the next four boundaries', cost: priced(60), apply: () => { journey.resources.flaggingTape = Math.min(60, (journey.resources.flaggingTape || 0) + 12); } },
-    { id: 'field_repair', label: 'Field repair (+15% equipment)', description: 'Tires, a fuel filter, a chain and bar', cost: priced(220), apply: () => { journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 15); } },
-    {
-      id: 'full_restock',
-      label: 'Full restock',
-      description: '+200 L fuel, +25 person-days food, +20% equipment, +2 kits',
-      cost: priced(700),
+  // A single item sells only what the truck can hold, at a pro-rated price;
+  // paying $180 for a crate that does not fit used to print "Purchased" and
+  // change nothing.
+  const single = (id, resourceId, amount, unit, name, description, baseCost) => () => {
+    const qty = Math.min(amount, Math.floor(roomFor(resourceId)));
+    if (qty <= 0) return null;
+    const cost = qty === amount
+      ? priced(baseCost)
+      : Math.max(10, Math.round((priced(baseCost) * qty / amount) / 10) * 10);
+    return {
+      id,
+      label: qty === amount ? `${name} (+${amount}${unit})` : `${name}, part (+${qty}${unit}, all that fits)`,
+      description,
+      cost,
       apply: () => {
-        journey.resources.fuel = clampToMax('fuel', journey.resources.fuel + 200);
-        journey.resources.food = clampToMax('food', journey.resources.food + 25);
-        journey.resources.equipment = clampToMax('equipment', journey.resources.equipment + 20);
-        journey.resources.firstAid = clampToMax('firstAid', journey.resources.firstAid + 2);
+        journey.resources[resourceId] = resourceId === 'flaggingTape'
+          ? Math.min(FLAGGING_MAX, (journey.resources.flaggingTape || 0) + qty)
+          : clampToMax(resourceId, journey.resources[resourceId] + qty);
       }
-    }
+    };
+  };
+
+  // The restock is a freight bundle at a bundle price, charged for what the
+  // truck actually takes: a full list is $700 against about $1,090 bought
+  // item by item, and a part-load pays the same share of the bundle. With
+  // room for only one of its lines it is that single item at a discount, so
+  // it comes off the shelf; the single item is still there.
+  const RESTOCK = [
+    { resourceId: 'fuel', amount: 200, unit: ' L fuel', rate: 360 / 200, min: 50 },
+    { resourceId: 'food', amount: 25, unit: ' person-days food', rate: 160 / 20, min: 6 },
+    { resourceId: 'equipment', amount: 20, unit: '% equipment', rate: 220 / 15, min: 5 },
+    { resourceId: 'firstAid', amount: 2, unit: ' kits', rate: 120, min: 1 }
+  ];
+  const restock = () => {
+    const lines = RESTOCK.map((line) => ({ ...line, qty: Math.min(line.amount, Math.floor(roomFor(line.resourceId))) }));
+    if (lines.filter((line) => line.qty >= line.min).length < 2) return null;
+    const full = lines.every((line) => line.qty === line.amount);
+    const value = lines.reduce((sum, line) => sum + line.qty * line.rate, 0);
+    const listValue = RESTOCK.reduce((sum, line) => sum + line.amount * line.rate, 0);
+    const cost = full ? priced(700) : Math.max(10, Math.round((priced(700) * value / listValue) / 10) * 10);
+    const landing = lines.filter((line) => line.qty > 0);
+    return {
+      id: 'full_restock',
+      label: full ? 'Full restock' : 'Restock, part (all that fits)',
+      description: landing.map((line) => `+${line.qty}${line.unit}`).join(', '),
+      cost,
+      apply: () => {
+        for (const line of landing) {
+          journey.resources[line.resourceId] = clampToMax(line.resourceId, journey.resources[line.resourceId] + line.qty);
+        }
+      }
+    };
+  };
+  const SHELF_NAMES = {
+    fuel_drum: 'Fuel drum', rations: 'Rations crate', first_aid: 'First aid kit',
+    flagging: 'Flagging', field_repair: 'Field repair', full_restock: 'Full restock'
+  };
+
+  const offerBuilders = [
+    single('fuel_drum', 'fuel', 200, ' L', 'Fuel drum', 'A 205 L drum of diesel, pumped into the tanks and the cans', 360),
+    single('rations', 'food', 20, ' person-days', 'Rations crate', 'Four days of camp food for five', 160),
+    single('first_aid', 'firstAid', 1, ' kit', 'First aid kit', 'Level 3 kit restock', 120),
+    single('flagging', 'flaggingTape', 12, ' rolls', 'Flagging', 'Ribbon for the next four boundaries', 60),
+    single('field_repair', 'equipment', 15, '% equipment', 'Field repair', 'Tires, a fuel filter, a chain and bar', 220),
+    restock
   ];
 
+  // Positions hold for the whole visit: an item that stops fitting, or that
+  // the card can no longer cover, stays in its row, disabled with the reason,
+  // so a number key never slides onto the next item on the shelf.
+  const shelf = offerBuilders.map((build) => build()?.id ?? null);
   while (true) {
     const money = journey.resources.budget || 0;
+    const built = offerBuilders.map((build) => build());
+    const offers = built.filter(Boolean);
     const affordableOffers = offers.filter((offer) => money >= offer.cost);
 
+    if (offers.length === 0) {
+      ui.write('The truck is full. Nothing here it can carry.');
+      break;
+    }
     if (affordableOffers.length === 0) {
+      // What the card cannot cover is still named with its price, the way an
+      // event card says what it could not pay for.
+      for (const offer of offers) {
+        ui.write(`${offer.label} ($${offer.cost}): $${Math.ceil(offer.cost - money)} short.`, 'term-dim');
+      }
       ui.writeWarning('You cannot afford anything at this stop. Better keep moving.');
       break;
     }
 
-    const options = [
-      ...affordableOffers.map(o => ({
-        label: `${o.label} ($${o.cost})`,
-        description: o.description,
-        value: o.id
-      })),
-      { label: 'Done', description: 'Finish shopping', value: 'done' }
-    ];
+    const options = [];
+    shelf.forEach((id, index) => {
+      const offer = built[index];
+      if (offer) {
+        const short = money < offer.cost;
+        options.push({
+          label: `${offer.label} ($${offer.cost})`,
+          description: short ? `$${Math.ceil(offer.cost - money)} short` : offer.description,
+          value: offer.id,
+          ...(short ? { disabled: true } : {})
+        });
+      } else if (id) {
+        options.push({ label: SHELF_NAMES[id] || id, description: 'No room left on the truck for it', value: id, disabled: true });
+      }
+    });
+    options.push({ label: 'Done', description: 'Finish shopping', value: 'done' });
 
-    const choice = await ui.promptChoice(`Buy supplies (cash: $${Math.round(money).toLocaleString()}):`, options);
-    if (choice.value === 'done') break;
+    const choice = await ui.promptChoice(`Buy supplies (cash: ${formatDollars(money)}):`, options);
+    if (!choice || choice.value === 'done') break;
 
     const offer = affordableOffers.find(o => o.id === choice.value);
     if (!offer) continue;
@@ -2383,6 +2681,7 @@ export async function handleResupply(game, block) {
     journey.resources.budget = Math.max(0, money - offer.cost);
     offer.apply();
     ui.writePositive(`Purchased ${offer.label}.`);
+    liftLapsedShortRations(ui, journey);
     ui.updateAllStatus(journey);
     updateReconMissionStatus(ui, journey);
   }
@@ -2402,7 +2701,7 @@ export async function handleTriage(game) {
     return;
   }
 
-  const candidates = journey.crew.filter(m => m.isActive && (m.health < 100 || (m.statusEffects?.length || 0) > 0));
+  const candidates = journey.crew.filter(m => m.isActive && (m.health < 100 || needsTreatment(m)));
   if (candidates.length === 0) {
     ui.write('Nobody needs treatment today.');
     return;
@@ -2410,7 +2709,8 @@ export async function handleTriage(game) {
 
   const options = candidates.map(m => {
     const info = getCrewDisplayInfo(m);
-    const effect = info.effects?.[0]?.name ? `, ${info.effects[0].name}` : '';
+    // Every condition they carry, not just the first one on the list.
+    const effect = info.effects?.length ? `, ${[...new Set(info.effects.map((e) => e.name))].join(', ')}` : '';
     return {
       label: `${info.name} (${info.health}% HP${effect})`,
       description: info.role,
@@ -2422,20 +2722,24 @@ export async function handleTriage(game) {
   const target = journey.crew.find(m => m.id === choice.value);
   if (!target || !target.isActive) return;
 
-  journey.resources.firstAid = Math.max(0, (journey.resources.firstAid || 0) - 1);
-
-  if ((target.statusEffects?.length || 0) > 0) {
-    const effectId = chooseTreatmentEffect(target);
+  const effectId = chooseTreatmentEffect(target);
+  if (effectId) {
     const treated = treatCrewCondition(target, effectId, journey.day);
+    if (treated.kitUsed === false) {
+      // Nothing a kit can do; it stays in the box.
+      if (treated.message) ui.write(treated.message);
+      return;
+    }
+    journey.resources.firstAid = Math.max(0, (journey.resources.firstAid || 0) - 1);
     if (treated.message) ui.writePositive(treated.message);
+    const healthBefore = target.health;
     const healed = healCrewMember(target, treated.cleared ? 14 : 8);
-    if (healed.message) ui.writePositive(healed.message);
-    if (!treated.cleared) {
-      ui.write(effectId === 'broken_arm'
-        ? 'Splinted and slung. They ride in the truck and do the paperwork until it is cleared; another treatment day or a rest shift finishes it.'
-        : 'They are stabilized for now, but this will take another treatment day or a rest shift to finish.');
+    if (healed.message && target.health > healthBefore) ui.writePositive(healed.message);
+    if (!treated.cleared && !treated.healsWithTime) {
+      ui.write('They are stabilized for now, but this will take another treatment day or a rest shift to finish.');
     }
   } else {
+    journey.resources.firstAid = Math.max(0, (journey.resources.firstAid || 0) - 1);
     const healed = healCrewMember(target, 25);
     if (healed.message) ui.writePositive(healed.message);
   }
@@ -2526,4 +2830,5 @@ function retrieveCachedRations(ui, journey) {
   ui.writeHeader('RATION CACHE');
   ui.writePositive(`The sealed crate was where the map said. ${foodRecovered} person-days.`);
   ui.write(`Fuel used reaching the cache: ${fuelUsed} L. Food now ${Math.round(journey.resources.food)} person-days.`);
+  liftLapsedShortRations(ui, journey);
 }

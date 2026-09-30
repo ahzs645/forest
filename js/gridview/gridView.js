@@ -36,6 +36,19 @@ function wrap(text, width) {
   return out;
 }
 
+// Fit text to a cell budget. Too-long text ends on a word with an ellipsis
+// rather than mid-word, so a clipped option detail reads as clipped
+// ("Fuel, food, repa" read as a typo).
+function clip(text, width) {
+  const s = String(text ?? '');
+  if (width <= 0) return '';
+  if (s.length <= width) return s;
+  if (width === 1) return '…';
+  let cut = s.lastIndexOf(' ', width - 1);
+  if (cut < width * 0.6) cut = width - 1;
+  return `${s.slice(0, cut).trimEnd()}…`;
+}
+
 export class GridView {
   constructor(ui) {
     this.ui = ui;
@@ -223,7 +236,7 @@ export class GridView {
       text: get('--text', '#c3cedd'),
       bright: get('--text-bright', '#eaf1fa'),
       muted: get('--text-muted', '#8494ab'),
-      dim: get('--text-dim', '#55637a'),
+      dim: get('--text-dim', '#738199'),
       accent: get('--accent', '#58a6ff'),
       accentContrast: get('--accent-contrast', '#04121f'),
       ok: get('--ok', '#3fb950'),
@@ -277,7 +290,9 @@ export class GridView {
     if (optionRows.length) {
       const step = this._touch ? Math.ceil(44 / this.renderer.cellH) : 1;
       const cap = Math.max(2 + step * 2, Math.floor(rows * 0.45));
-      optH = Math.min(optionRows.length * step + 2, cap);
+      const detail = this._focusedDetailRows(optionRows, mainW - 4).length;
+      const extra = detail ? Math.max(0, 1 + detail - step) : 0;
+      optH = Math.min(optionRows.length * step + 2 + extra, cap);
     } else if (inputVisible) optH = 3;
 
     const logH = bottom - top - optH - (hasSidebar ? 0 : (this.ui._missionStatus ? 1 : 0));
@@ -289,7 +304,10 @@ export class GridView {
     // Keep a readable log and full-size choice targets on short grids. Larger
     // grids project the same live diorama as the DOM, with semantic cell tones.
     const trail = this.ui.trailView;
-    const sceneH = trail?.state && !trail.collapsed && mainW >= 48 && logH >= 26 ? 16 : 0;
+    // A shortcut card folds the picture, as the DOM does: its pitch and odds
+    // need the rows.
+    const shortcutUp = Boolean(this.ui.terminal?.querySelector?.('.term-shortcut.term-anchor'));
+    const sceneH = trail?.state && !trail.collapsed && !shortcutUp && mainW >= 48 && logH >= 26 ? 16 : 0;
     if (sceneH) {
       t.drawBox(mainX, logY, mainW, sceneH, C.borderStrong, `TRAIL VIEW · ${trail.state.title}`);
       const frame = renderTrailFrame(trail.state, trail.tick, { cols: Math.min(120, mainW - 4), rows: 14, action: trail.action });
@@ -358,6 +376,10 @@ export class GridView {
     for (const item of items) {
       const label = item.querySelector('.status-label')?.textContent.trim() || '';
       const value = (item.querySelector('.status-value')?.textContent || '').replace(/\s+/g, ' ').trim();
+      // Whole stats or none: a bar cut to "█" (or "-12" without its °C)
+      // reads as a value.
+      const width = (x > 1 ? 2 : 0) + label.length + 1 + value.length;
+      if (x + width > cols - 1) break;
       if (x > 1) {
         t.drawText('│', x, 1, C.border);
         x += 2;
@@ -366,7 +388,6 @@ export class GridView {
       x += label.length + 1;
       t.drawText(value, x, 1, C.bright);
       x += value.length + 1;
-      if (x >= cols - 8) break;
     }
   }
 
@@ -384,7 +405,7 @@ export class GridView {
     };
     const line = (text, fg) => {
       if (row >= limit) return;
-      t.drawText(String(text).slice(0, innerW), innerX + 1, row, fg);
+      t.drawText(clip(text, innerW - 1), innerX + 1, row, fg);
       row += 1;
     };
 
@@ -419,15 +440,28 @@ export class GridView {
         if (fact?.value === undefined || fact?.value === null || fact?.value === '') continue;
         const label = String(fact.label);
         const value = String(fact.value);
-        const pad = Math.max(1, innerW - 1 - label.length - value.length);
         const tone = fact.tone === 'danger' ? C.danger : fact.tone === 'warn' ? C.warn : fact.tone === 'ok' ? C.ok : C.text;
         if (row >= limit) break;
-        t.drawText(label.slice(0, innerW), innerX + 1, row, C.muted);
-        t.drawText(value.slice(0, innerW - label.length - 1), innerX + 1 + label.length + pad, row, tone);
+        t.drawText(clip(label, innerW - 1), innerX + 1, row, C.muted);
+        if (label.length + 1 + value.length <= innerW - 1) {
+          t.drawText(value, innerX + innerW - value.length, row, tone);
+          row += 1;
+          continue;
+        }
+        // A value too long for the label's row goes under it, whole where it
+        // can be: "Freezing Conditions -12" without its °C read as a value.
         row += 1;
+        const rows = wrap(value, innerW - 3);
+        if (rows.length > 2) rows.splice(1, rows.length - 1, clip(rows.slice(1).join(' '), innerW - 3));
+        for (const l of rows) {
+          if (row >= limit) break;
+          t.drawText(l, innerX + innerW - l.length, row, tone);
+          row += 1;
+        }
       }
       for (const item of mission.checklist || []) {
-        line(`${item.done ? '[x]' : '[ ]'} ${item.label}`, item.done ? C.ok : C.text);
+        const rows = wrap(`${item.done ? '[x]' : '[ ]'} ${item.label}`, innerW - 5);
+        rows.forEach((l, i) => line(i ? `    ${l}` : l, item.done ? C.ok : C.text));
       }
       if (mission.guidance) {
         for (const l of wrap(`> ${mission.guidance}`, innerW - 1)) line(l, C.accent);
@@ -454,7 +488,19 @@ export class GridView {
           line(`${name}${role ? ` · ${role}` : ''}`, status);
           if (hp) line(` ${hp}`, C.muted);
         } else {
-          for (const l of wrap(member.textContent.replace(/\s+/g, ' ').trim(), innerW - 1).slice(0, 4)) line(l, C.text);
+          // The desk roles' own status card: one row per stat, not the whole
+          // card flattened into a run-on line.
+          const rows = Array.from(member.querySelectorAll(
+            '.protagonist-header, .protagonist-stat, .expertise-header, .expertise-skill'
+          )).map((el) => ({
+            text: el.textContent.replace(/\s+/g, ' ').trim(),
+            heading: /header/.test(el.className),
+          })).filter((r) => r.text);
+          if (rows.length) {
+            for (const r of rows) line(r.heading ? r.text : ` ${r.text}`, r.heading ? C.muted : C.text);
+          } else {
+            for (const l of wrap(member.textContent.replace(/\s+/g, ' ').trim(), innerW - 1).slice(0, 4)) line(l, C.text);
+          }
         }
       }
       row += 1;
@@ -463,17 +509,26 @@ export class GridView {
     // SUPPLIES
     const supplies = Array.from(document.querySelectorAll('#resources-panel .resource-row'));
     if (supplies.length && section('SUPPLIES')) {
-      for (const supply of supplies) {
-        if (row >= limit) break;
-        const label = supply.querySelector('.resource-label')?.textContent.trim() || '';
+      const rows = supplies.map((supply) => {
         const bar = supply.querySelector('.resource-bar-text');
-        const barText = bar?.textContent.trim() || '';
-        const value = supply.querySelector('.resource-value')?.textContent.trim() || '';
-        const tone = bar?.classList.contains('critical') ? C.danger
-          : bar?.classList.contains('low') ? C.warn : C.text;
-        t.drawText(label.padEnd(7).slice(0, 7), innerX + 1, row, C.muted);
-        t.drawText(barText.slice(0, innerW - 14), innerX + 8, row, tone);
-        t.drawText(value.padStart(5).slice(0, 6), innerX + innerW - 6, row, C.bright);
+        return {
+          label: supply.querySelector('.resource-label')?.textContent.trim() || '',
+          barText: bar?.textContent.trim() || '',
+          value: supply.querySelector('.resource-value')?.textContent.trim() || '',
+          tone: bar?.classList.contains('critical') ? C.danger
+            : bar?.classList.contains('low') ? C.warn : C.text,
+        };
+      });
+      // Size the columns from the actual labels and values: a fixed 7-cell
+      // label column cut "FUEL (L)" to "FUEL (L" and the bar drew over the rest.
+      const valueW = Math.min(10, Math.max(...rows.map((r) => r.value.length)));
+      const labelW = Math.min(12, Math.max(...rows.map((r) => r.label.length)));
+      const barW = Math.max(4, innerW - 1 - labelW - 1 - valueW - 1);
+      for (const r of rows) {
+        if (row >= limit) break;
+        t.drawText(r.label.padEnd(labelW).slice(0, labelW), innerX + 1, row, C.muted);
+        t.drawText(r.barText.slice(0, barW), innerX + 2 + labelW, row, r.tone);
+        t.drawText(r.value.padStart(valueW).slice(0, valueW), innerX + innerW - valueW, row, C.bright);
         row += 1;
       }
       row += 1;
@@ -505,7 +560,7 @@ export class GridView {
       t.drawText(text, sx, y, C.bright);
       sx += text.length + 1;
     }
-    t.drawText(String(mission.objective || mission.guidance || '').slice(0, w - sx - 1), sx, y, C.muted);
+    t.drawText(clip(mission.objective || mission.guidance || '', x + w - sx - 1), sx, y, C.muted);
   }
 
   _logStyles(C) {
@@ -515,7 +570,9 @@ export class GridView {
       'term-warning': C.warn,
       'term-danger': C.danger,
       'term-positive': C.ok,
-      'term-divider': C.dim
+      'term-divider': C.dim,
+      'term-shortcut': C.warn,
+      'term-stakes': C.bright
     };
   }
 
@@ -528,7 +585,9 @@ export class GridView {
 
     // Flatten the terminal DOM into styled, wrapped lines
     const lines = [];
+    let anchorLine = -1;
     for (const node of this.ui.terminal?.children || []) {
+      if (node === this.ui._scrollAnchor && node.isConnected) anchorLine = lines.length;
       const fg = [...node.classList].map((cls) => styles[cls]).find(Boolean) || C.text;
       const isPre = node.tagName === 'PRE' || node.classList.contains('term-box')
         || node.classList.contains('scene-canvas') || node.classList.contains('ascii-box');
@@ -544,10 +603,14 @@ export class GridView {
       }
     }
 
-    // New content snaps the view back to the bottom
+    // New content snaps the view back to the bottom, or, while a card holds
+    // an anchor (a shortcut's frame), to the top of the card when the whole
+    // card does not fit.
     if (lines.length !== this._logLineCount) {
       this._logLineCount = lines.length;
-      this._scrollOffset = 0;
+      this._scrollOffset = anchorLine >= 0
+        ? Math.max(0, lines.length - innerH - anchorLine)
+        : 0;
     }
     this._logGeom = {
       x: innerX, y: y + 1, w: innerW, h: innerH, totalLines: lines.length,
@@ -573,7 +636,37 @@ export class GridView {
       tag: btn.querySelector('.choice-tag')?.textContent.trim() || '',
       focused: document.activeElement === btn,
       click: () => btn.click()
+    })).map((entry) => ({
+      ...entry,
+      // An option that breaks a rule is never taken by one stray tap or
+      // click: the first selects it and opens its whole detail, the second
+      // (or Enter) takes it.
+      guarded: /OFF-BOOK/.test(entry.tag),
     }));
+  }
+
+  /**
+   * The focused option's detail as rows of its own, when its one-line form
+   * would be clipped: at most three on a keyboard grid. A touch grid's rows
+   * already spend their spare height on the detail, so it only expands an
+   * off-book option, in full, with the line that says how to take it.
+   * @returns {string[]}
+   */
+  _focusedDetailRows(entries, innerW) {
+    const entry = entries.find((e) => e.focused);
+    if (!entry || (this._touch && !entry.guarded)) return [];
+    const confirm = entry.guarded
+      ? [this._touch ? 'Tap again to take it.' : 'Enter or click again to take it.']
+      : [];
+    if (!entry.hint) return confirm;
+    const tagText = entry.tag ? ` ‹${entry.tag}›` : '';
+    const lead = entry.key ? `${entry.key} ` : '  ';
+    const fits = `${lead}${entry.label} · ${entry.hint}`.length <= innerW - tagText.length - 3;
+    if (fits && !entry.guarded) return [];
+    const rows = wrap(entry.hint, innerW - 4);
+    const max = entry.guarded ? 8 : 3;
+    if (rows.length > max) rows.splice(max - 1, rows.length - max + 1, clip(rows.slice(max - 1).join(' '), innerW - 4));
+    return [...rows, ...confirm];
   }
 
   _drawOptions(t, C, x, y, w, h, entries) {
@@ -584,8 +677,11 @@ export class GridView {
     // its own hit area; a clipped menu must never require a physical keyboard.
     const inner = h - 2;
     const step = this._touch ? Math.ceil(44 / this.renderer.cellH) : 1;
-    const paged = entries.length * step > inner;
-    const capacity = Math.max(1, Math.floor((inner - (paged ? step : 0)) / step));
+    // The focused row's full detail, on the rows under it.
+    const focusDetail = this._focusedDetailRows(entries, innerW);
+    const focusExtra = focusDetail.length ? Math.max(0, 1 + focusDetail.length - step) : 0;
+    const paged = entries.length * step + focusExtra > inner;
+    const capacity = Math.max(1, Math.floor((inner - focusExtra - (paged ? step : 0)) / step));
     const focusIndex = entries.findIndex((e) => e.focused);
     const focusElement = entries[focusIndex]?.element;
     if (this._optionMenu !== entries[0]?.element) {
@@ -600,26 +696,49 @@ export class GridView {
     this._optionStart = Math.min(this._optionStart, Math.floor((entries.length - 1) / capacity) * capacity);
     const visible = entries.slice(this._optionStart, this._optionStart + capacity);
 
-    visible.forEach((entry, r) => {
-      const rowY = y + 1 + r * step;
+    let rowY = y + 1;
+    visible.forEach((entry) => {
       const tagText = entry.tag ? ` ‹${entry.tag}›` : '';
-      let text = `${entry.key ? `${entry.key} ` : '  '}${entry.label}`;
-      if (entry.hint) text += ` · ${entry.hint}`;
-      text = text.slice(0, innerW - tagText.length - 3);
+      const lead = entry.key ? `${entry.key} ` : '  ';
+      const textW = innerW - tagText.length - 3;
+      // Touch rows are 44px (two or three cells) tall: spend the spare rows on
+      // the option's detail instead of cutting it off after one line. A
+      // focused keyboard row whose detail does not fit gets rows of its own,
+      // so a shortcut's odds and cost are never the part that is cut.
+      const expanded = entry.focused && focusDetail.length ? focusDetail : null;
+      const detailRows = step > 1 && entry.hint ? wrap(entry.hint, innerW - 3) : [];
+      let text = `${lead}${entry.label}`;
+      if (entry.hint && !detailRows.length && !expanded) text += ` · ${entry.hint}`;
+      text = clip(text, textW);
+      const extra = expanded || detailRows.slice(0, step - 1);
+      if (!expanded && detailRows.length > extra.length) {
+        extra[extra.length - 1] = clip(`${extra[extra.length - 1]} ${detailRows[extra.length]}`, innerW - 3);
+      }
+      const rowH = expanded ? Math.max(step, 1 + expanded.length) : step;
 
       if (entry.focused) {
-        t.fillRect(x + 1, rowY, w - 2, 1, C.accent);
+        t.fillRect(x + 1, rowY, w - 2, rowH, C.accent);
         t.drawText(`> ${text}`, innerX, rowY, C.accentContrast, C.accent);
         if (entry.tag) t.drawText(tagText, x + w - 2 - tagText.length, rowY, C.accentContrast, C.accent);
+        extra.forEach((l, i) => t.drawText(l, innerX + 2, rowY + 1 + i, C.accentContrast, C.accent));
       } else {
         t.drawText('  ' + text.slice(2), innerX, rowY, C.text);
         if (entry.key) t.drawText(entry.key, innerX, rowY, C.dim);
         if (entry.tag) {
-          const tone = /SAFE/.test(entry.tag) ? C.ok : /RISKY/.test(entry.tag) ? C.danger : C.warn;
+          const tone = /SAFE/.test(entry.tag) ? C.ok : /RISKY|OFF-BOOK/.test(entry.tag) ? C.danger : C.warn;
           t.drawText(tagText, x + w - 2 - tagText.length, rowY, tone);
         }
+        extra.forEach((l, i) => t.drawText(l, innerX + 2, rowY + 1 + i, C.muted));
       }
-      this._regions.push({ x: x + 1, y: rowY, w: w - 2, h: step, label: entry.label, type: 'option', action: entry.click });
+      const select = () => {
+        entry.element.focus();
+        this._scheduleDraw();
+      };
+      this._regions.push({
+        x: x + 1, y: rowY, w: w - 2, h: rowH, label: entry.label, type: 'option',
+        action: entry.guarded && !entry.focused ? select : entry.click,
+      });
+      rowY += rowH;
     });
 
     if (paged) {

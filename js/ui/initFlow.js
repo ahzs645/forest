@@ -95,6 +95,7 @@ export const InitFlowMixin = {
     if (!this.landingScreen.hidden) {
       this._startLandingScene();
     }
+    this._syncGameShellInert();
 
     // Experimental modes (Crisis Command) stay hidden until the core loop is
     // solid. Reveal them only when the player explicitly opts in.
@@ -166,6 +167,8 @@ export const InitFlowMixin = {
     document.addEventListener('keydown', (e) => {
       if (!this.landingScreen || this.landingScreen.hidden) return;
       if (this.isModalOpen()) return;
+      // Copying selected text (Ctrl/Cmd+C) must not launch the Campaign.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
@@ -201,7 +204,7 @@ export const InitFlowMixin = {
    * @private
    */
   async _showLoadDataModal() {
-    const [{ loadCampaign, CAMPAIGN_SEASONS }, { peekSeasonalSave }] = await Promise.all([
+    const [{ loadCampaign, describeCampaignProgress }, { peekSeasonalSave }] = await Promise.all([
       import('../game/campaign.js'),
       import('../../tui/controller.js'),
     ]);
@@ -236,17 +239,15 @@ export const InitFlowMixin = {
       entries.push({
         label: 'Resume Expedition',
         detail: `${expedition.companyName || 'Your crew'} — ${expedition.role?.name || 'Forester'}, `
-          + `${expedition.area?.name || 'the operating area'}, day ${expedition.day}`
+          + `${expedition.area?.name || 'the operating area'}, ${expedition.journeyType === 'manager' ? 'month' : 'day'} ${expedition.day}`
           + `${expedition.activeReconShift ? ' (mid-shift)' : ''}`,
         onSelect: () => routeTo({ action: 'load', journey: expedition }),
       });
     }
     if (campaign) {
-      const seasonLabel = CAMPAIGN_SEASONS[campaign.seasonIndex]?.label || 'In progress';
       entries.push({
         label: 'Resume Campaign',
-        detail: `${campaign.crewName || 'Your crew'} — ${seasonLabel} `
-          + `(season ${Math.min(campaign.seasonIndex + 1, CAMPAIGN_SEASONS.length)} of ${CAMPAIGN_SEASONS.length}), `
+        detail: `${campaign.crewName || 'Your crew'} — ${describeCampaignProgress(campaign)}, `
           + `${campaign.areaName || 'the district'}`,
         onSelect: () => routeTo({ action: 'campaign' }),
       });
@@ -317,6 +318,7 @@ export const InitFlowMixin = {
       this.landingScreen.hidden = false;
       this.landingScreen.style.display = 'flex';
     }
+    this._syncGameShellInert();
     // A mission belongs to a run; back on the landing hub there isn't one.
     this.clearMissionStatus?.();
     this.stopRadio?.();
@@ -404,6 +406,20 @@ export const InitFlowMixin = {
       this.landingScreen.hidden = true;
       this.landingScreen.style.display = 'none';
     }
+    this._syncGameShellInert();
+  },
+
+  /**
+   * The game shell sits under the landing hub and the setup overlay. While
+   * either covers it, make it inert so Tab cannot walk into invisible header
+   * buttons (and Enter cannot open panels nobody can see).
+   * @private
+   */
+  _syncGameShellInert() {
+    const shell = document.querySelector('.game-wrapper');
+    if (!shell) return;
+    shell.inert = Boolean((this.landingScreen && !this.landingScreen.hidden)
+      || (this.initOverlay && !this.initOverlay.hidden));
   },
 
   /**
@@ -492,6 +508,14 @@ export const InitFlowMixin = {
       el.classList.toggle('active', isMatch);
       // Remove hidden attribute to let CSS control display
       el.removeAttribute('hidden');
+      // Carry keyboard focus into the new step (it was left on <body>, so
+      // Tab restarted from the top of the page). The section itself takes
+      // focus, not a control: Enter keeps meaning "continue" and phones do
+      // not pop the keyboard for the crew-name field.
+      if (isMatch && !this.initOverlay.hidden) {
+        el.tabIndex = -1;
+        el.focus({ preventScroll: true });
+      }
     });
   },
 
@@ -503,6 +527,7 @@ export const InitFlowMixin = {
     if (!this.initOverlay) return;
     this.initOverlay.hidden = false;
     this.initOverlay.style.display = 'flex';
+    this._syncGameShellInert();
   },
 
   /**
@@ -513,6 +538,7 @@ export const InitFlowMixin = {
     if (!this.initOverlay) return;
     this.initOverlay.hidden = true;
     this.initOverlay.style.display = 'none';
+    this._syncGameShellInert();
   },
 
   /**
@@ -988,8 +1014,8 @@ export const InitFlowMixin = {
     this._renderAreaList(areas);
     this._renderAreaDetail(areas[0], roles[0]);
     this._renderAreaGlossary(areas[0]);
-    this._switchInitStep('intro');
     this._showInitOverlay();
+    this._switchInitStep('intro');
 
     if (this.initZoneDisplay) this.initZoneDisplay.textContent = 'MODE: SELECT ROLE';
 

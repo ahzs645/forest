@@ -204,6 +204,13 @@
   display: flex;
   gap: var(--space-xs);
 
+  // "[ ]" is one glyph to the reader: never let the flex item shrink and
+  // wrap its brackets onto separate lines.
+  .mission-check-box {
+    flex-shrink: 0;
+    white-space: pre;
+  }
+
   &.done {
     .mission-check-box { color: var(--ok); }
     .mission-check-label { color: var(--text-muted); }

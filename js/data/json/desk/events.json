@@ -5,11 +5,11 @@
   "type": "compliance",
   "severity": "moderate",
   "probability": 0.08,
-  "description": "A Natural Resource Officer from Compliance and Enforcement is in the lobby with a records request: last winter's road permit, the crossing inspection reports, and the referral log for Block 7.",
+  "description": "A Natural Resource Officer from Compliance and Enforcement is in the lobby with a records request: last winter's road permit, the crossing inspection reports, and the referral log for the block you harvested last winter.",
   "options": [
    {
     "label": "Drop everything and assist",
-    "outcome": "You spend the day pulling files and answering questions. The officer seems satisfied.",
+    "outcome": "You pull the files yourself and sit in on her questions between calls. The officer seems satisfied.",
     "effects": {
      "timeUsed": 6,
      "compliance": 8
@@ -228,7 +228,7 @@
     }
    },
    {
-    "label": "Respond to the draft report with documentation",
+    "label": "Respond to the findings with documentation",
     "outcome": "You push back respectfully with documentation. Some findings are reduced, though the relationship cools a degree.",
     "effects": {
      "politicalCapital": -8,
@@ -269,7 +269,7 @@
     ]
    },
    {
-    "label": "Blame the previous planning lead",
+    "label": "Blame your predecessor on the file",
     "outcome": "Classic move. It works politically, and colleagues quietly file it away.",
     "effects": {
      "compliance": 3,
@@ -318,7 +318,7 @@
   "type": "stakeholder",
   "severity": "moderate",
   "probability": 0.12,
-  "description": "The Chief of a partner Nation is on the line. They're not happy about something in Block 7.",
+  "description": "The Chief of a partner Nation is on the line. They're not happy about something in one of your planned blocks.",
   "options": [
    {
     "label": "Listen and apologize",
@@ -336,7 +336,7 @@
      "timeUsed": 1,
      "relationships": -5
     },
-    "failureOutcome": "They hear a lecture, not an answer, and end the call early. By Friday the Nation has taken Block 7 over your head to the district, and the file pauses while the district manager asks you to explain the same rules to him.",
+    "failureOutcome": "They hear a lecture, not an answer, and end the call early. By Friday the Nation has taken the block over your head to the district, and the file pauses while the district manager asks you to explain the same rules to him.",
     "failureEffects": {
      "timeUsed": 1,
      "relationships": -10,
@@ -366,8 +366,8 @@
     ]
    },
    {
-    "label": "Offer to halt operations pending review",
-    "outcome": "A dramatic gesture. It costs production but rebuilds trust.",
+    "label": "Offer to pause the block pending review",
+    "outcome": "A real concession. The block's schedule slips, and the trust starts to come back.",
     "effects": {
      "progress": -15,
      "relationships": 15,
@@ -583,7 +583,7 @@
   "options": [
    {
     "label": "Rebuild from field notes",
-    "outcome": "Painful work, but you reconstruct the data. The file loses the day to technical recovery.",
+    "outcome": "Painful work that runs late into the evening, but you reconstruct the data.",
     "spendsDay": true,
     "effects": {
      "timeUsed": 8
@@ -638,7 +638,7 @@
      "compliance": -4
     },
     "riskRejection": 0.3,
-    "partialOutcome": "It goes through, conditionally. The reviewer flags the data vintage and requires corrected spatial within thirty days, and your submissions now get opened carefully instead of stamped. Data readiness takes the hit.",
+    "partialOutcome": "It goes through, conditionally. The reviewer flags the data vintage and requires corrected spatial within thirty days, and your submissions now get opened carefully instead of stamped. The rebuild you skipped is now on the reviewer's deadline.",
     "partialEffects": {
      "compliance": -6,
      "timeUsed": 4,
@@ -994,7 +994,7 @@
   "type": "team",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "Your most experienced planning forester just gave two weeks notice. Better opportunity.",
+  "description": "Your most experienced forester just gave two weeks' notice. Better opportunity.",
   "options": [
    {
     "label": "Counter-offer with raise",
@@ -1131,7 +1131,7 @@
  },
  {
   "id": "permit_approved_early",
-  "title": "CP Issued Early",
+  "title": "Permit Issued Early",
   "type": "positive",
   "severity": "positive",
   "probability": 0.08,
@@ -1139,7 +1139,7 @@
    "permitting",
    "desk"
   ],
-  "description": "The district issued the salvage cutting permit inside the 25-day target. Approved ahead of schedule!",
+  "description": "A file on the District Manager's desk comes back signed inside the 25-day target. Approved ahead of schedule!",
   "options": [
    {
     "label": "Celebrate with the team",
@@ -1262,7 +1262,7 @@
   "type": "stakeholder",
   "severity": "moderate",
   "probability": 0.15,
-  "description": "The FOM package is going out and it is time to engage the Nations whose territories it overlaps. The Crown will consult; how you engage is yours to decide.",
+  "description": "Your operating areas overlap several Nations' territories, and it is time to engage. The Crown will consult; how you engage is yours to decide.",
   "options": [
    {
     "label": "Comprehensive engagement with every Nation, in community",
@@ -1297,7 +1297,7 @@
      "budget": -3500,
      "timeUsed": 3
     },
-    "failureOutcome": "A Nation writes to the district that engagement was inadequate, and the CP stalls while the Crown's consultation restarts from scratch. Every future file with that Nation now starts from documented distrust, and the harvest plan waits on a process you no longer control.",
+    "failureOutcome": "A Nation writes to the district that engagement was inadequate, and the file stalls while the Crown's consultation restarts from scratch. Every future file with that Nation now starts from documented distrust, and the harvest plan waits on a process you no longer control.",
     "failureEffects": {
      "relationships": -12,
      "reputation": -8,
@@ -1593,7 +1593,7 @@
    "planner",
    "permitter"
   ],
-  "description": "Just before submission, the archaeology screening tells you the package needs stronger overview or permit context than the draft file carried.",
+  "description": "Before the package goes in, the archaeology screening tells you the package needs stronger overview or permit context than the draft file carried.",
   "options": [
    {
     "label": "Hold the file and bring in the right specialist",
@@ -1892,13 +1892,13 @@
    },
    {
     "label": "Negotiate a user agreement first",
-    "outcome": "A day of calls to the other industrial users lands a workable split. You bring the district a calmer road politics file than they asked for.",
+    "outcome": "An afternoon of calls to the other industrial users lands a workable split. You bring the district a calmer road politics file than they asked for.",
     "effects": {
      "timeUsed": 4,
      "relationships": 4,
      "compliance": 4
     },
-    "failureOutcome": "One user stalls on cost-sharing and will not sign. The day is burned, the district is still waiting, and you end up formalizing the maintenance split yourself anyway — a week later, with the file marked as sitting.",
+    "failureOutcome": "One user stalls on cost-sharing and will not sign. The calls go nowhere, the district is still waiting, and you end up formalizing the maintenance split yourself anyway — a week later, with the file marked as sitting.",
     "failureEffects": {
      "timeUsed": 4,
      "progress": -5,
@@ -1927,7 +1927,7 @@
     ]
    },
    {
-    "label": "Push traffic while the paperwork catches up",
+    "label": "Haul on the FSR without the road use permit while the paperwork catches up",
     "outcome": "The paperwork catches up before anyone drives the road with a clipboard. The trucks never stopped, and the file closes as if it was always in order.",
     "effects": {
      "progress": 4,
@@ -1981,7 +1981,9 @@
       "from": "good",
       "to": "bad"
      }
-    ]
+    ],
+    "riskTag": "OFF-BOOK",
+    "reactionTone": "compromised"
    }
   ],
   "roles": [
@@ -1999,7 +2001,7 @@
   "options": [
    {
     "label": "Build the full permit bundle now",
-    "outcome": "It is a paperwork-heavy week, but the support infrastructure stops undermining the main file.",
+    "outcome": "It is a long afternoon of paperwork on top of the day's work, but the support infrastructure stops undermining the main file.",
     "effects": {
      "timeUsed": 5,
      "compliance": 6,
@@ -2016,8 +2018,8 @@
     }
    },
    {
-    "label": "Use the sites quietly and hope nobody notices",
-    "outcome": "The season ends before anyone flies over with a question. The camp comes out in October and the occupancy question never gets asked.",
+    "label": "Use the sites without the permit and hope nobody notices",
+    "outcome": "Nobody flies over with a question. The camp and helipad sit on Crown land without an authorization, and the occupancy question never gets asked.",
     "effects": {
      "progress": 3,
      "compliance": -8,
@@ -2066,7 +2068,9 @@
       "from": "good",
       "to": "bad"
      }
-    ]
+    ],
+    "riskTag": "OFF-BOOK",
+    "reactionTone": "compromised"
    }
   ],
   "roles": [
@@ -2080,7 +2084,7 @@
   "type": "stakeholder",
   "severity": "major",
   "probability": 0.05,
-  "description": "A journalist from a national outlet is on the phone. They have photos of a cutblock near a salmon-bearing creek and want your comment before the piece runs tonight.",
+  "description": "A journalist from a national outlet is on the phone. They have photos of a cutblock near a fish-bearing creek and want your comment before the piece runs tonight.",
   "options": [
    {
     "label": "No comment",
@@ -2100,7 +2104,7 @@
      "politicalCapital": -3,
      "compliance": 5
     },
-    "partialOutcome": "The piece runs with your quotes out of context, but the underlying numbers hold. You spend a day on follow-up letters and calls, and it ends roughly a wash.",
+    "partialOutcome": "The piece runs with your quotes out of context, but the underlying numbers hold. Follow-up letters and calls eat the afternoon, and it ends roughly a wash.",
     "partialEffects": {
      "timeUsed": 4,
      "politicalCapital": -4,
@@ -2154,7 +2158,7 @@
   "type": "political",
   "severity": "major",
   "probability": 0.06,
-  "description": "The woodlands VP wants your silviculture monitoring budget for interface fuel treatment. He has a compelling case and the CEO's ear.",
+  "description": "The woodlands VP wants part of your file's budget for interface fuel treatment. He has a compelling case and the general manager's ear.",
   "options": [
    {
     "label": "Fight it with data and lobbying",
@@ -2165,7 +2169,7 @@
      "politicalCapital": -12,
      "progress": -3
     },
-    "failureOutcome": "The executive sides with woodlands anyway. The line item transfers, the favours are spent for nothing, and you replan the monitoring season around a hole — remembered as the manager who fought and lost.",
+    "failureOutcome": "The executive sides with woodlands anyway. The line item transfers, the favours are spent for nothing, and you replan the file's work around the hole — remembered as the manager who fought and lost.",
     "failureEffects": {
      "timeUsed": 6,
      "budget": -9000,
@@ -2340,7 +2344,7 @@
     ]
    },
    {
-    "label": "Quietly bury it",
+    "label": "Quietly bury the allegation",
     "outcome": "You file the letter where letters go to be forgotten, and nothing follows. The blocks stay signed off, the contractor keeps planting, and only you know the drawer it lives in.",
     "effects": {
      "compliance": -10,
@@ -2396,7 +2400,9 @@
     ],
     "partialFlags": [
      "reviewer_watching"
-    ]
+    ],
+    "riskTag": "OFF-BOOK",
+    "reactionTone": "compromised"
    },
    {
     "label": "Report it to the district and C&E",
@@ -3008,7 +3014,7 @@
    },
    {
     "label": "Celebrate briefly and refocus on the backlog",
-    "outcome": "You have cake, say congrats, then remind everyone about the 50 referrals still pending. The mood deflates slightly.",
+    "outcome": "You have cake, say congrats, then remind everyone about the referrals still pending. The mood deflates slightly.",
     "effects": {
      "timeUsed": 1,
      "crew_morale": 5,
@@ -3135,7 +3141,7 @@
   "type": "compliance",
   "severity": "moderate",
   "probability": 0.07,
-  "description": "Your primary silviculture contractor submitted an invoice $18,000 over the agreed contract price. They claim extra work was verbally authorized by a field supervisor. Your supervisor doesn't remember it that way.",
+  "description": "Your primary contractor submitted an invoice $18,000 over the agreed contract price. They claim extra work was verbally authorized by a field supervisor. Your supervisor doesn't remember it that way.",
   "options": [
    {
     "label": "Pay the full amount to preserve the relationship",
@@ -3155,7 +3161,7 @@
      "budget": -9000,
      "relationships": -3
     },
-    "failureOutcome": "Talks collapse on the second meeting and they lawyer up mid-season. Nothing gets planted while it is in dispute, and you are now managing a legal file and an idle silviculture program at the same time.",
+    "failureOutcome": "Talks collapse on the second meeting and they lawyer up mid-season. Nothing on their contract moves while it is in dispute, and you are now managing a legal file and an idle contract at the same time.",
     "failureEffects": {
      "timeUsed": 6,
      "budget": -3000,
@@ -3186,7 +3192,7 @@
      "politicalCapital": 3,
      "compliance": 5
     },
-    "failureOutcome": "They walk off current obligations and file a claim for the full amount. The season's silviculture is suddenly uncrewed in a region with a short contractor list, and your firm letter is now exhibit A.",
+    "failureOutcome": "They walk off current obligations and file a claim for the full amount. The season's contract work is suddenly uncrewed in a region with a short contractor list, and your firm letter is now exhibit A.",
     "failureEffects": {
      "relationships": -15,
      "compliance": 5,
@@ -3219,11 +3225,16 @@
   "type": "technical",
   "severity": "major",
   "probability": 0.04,
-  "description": "Fire weather is extreme. A wildfire 30 km from your active cutblock is growing. Evacuation hasn't been ordered yet, but the wind forecast is bad.",
+  "deploymentSeasons": [
+   "spring",
+   "summer",
+   "fall"
+  ],
+  "description": "Fire weather is extreme. A wildfire 30 km from the licensee's active blocks is growing. Evacuation hasn't been ordered yet, but the wind forecast is bad.",
   "options": [
    {
-    "label": "Preemptively shut down operations and evacuate",
-    "outcome": "You pull everyone out a day before the order comes. The fire turns and misses the block — the call was right, and people will still question it at budget time.",
+    "label": "Get the contractors' crews off the block ahead of the order",
+    "outcome": "The crews are off the block a day before the order comes. The fire turns and misses the block — the call was right, and people will still question it at budget time.",
     "effects": {
      "progress": -15,
      "budget": -3000,
@@ -3286,7 +3297,7 @@
    },
    {
     "label": "Ask BCWS for direction on the work window",
-    "outcome": "By the time the fire centre calls back, you've lost a full day waiting. The direction is to continue under the danger-class restrictions already in force. You could have read that off the DGR board.",
+    "outcome": "You spend the afternoon on hold for the fire centre. The direction, when it comes, is to continue under the danger-class restrictions already in force. You could have read that off the DGR board.",
     "effects": {
      "timeUsed": 8,
      "progress": -5,
@@ -3306,7 +3317,7 @@
   "options": [
    {
     "label": "Send two team members and attend yourself",
-    "outcome": "Three of you spend three days learning. The team brings back concrete improvements to the engagement process. Operations slow while you're away.",
+    "outcome": "Next month, three of you spend three days learning. The team brings back concrete improvements to the engagement process. Operations slow while you're away.",
     "effects": {
      "budget": -4500,
      "timeUsed": 6,
@@ -3342,7 +3353,7 @@
   "type": "political",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "The Environmental Assessment Office writes to say the road-and-block package may be a reviewable project under the Reviewable Projects Regulation. The district has paused the road permit until it is settled.",
+  "description": "The Environmental Assessment Office writes to say the road-and-block package may be a reviewable project under the Reviewable Projects Regulation. The district has paused the package until it is settled.",
   "options": [
    {
     "label": "Concede and file the project notification with the EAO",
@@ -3507,11 +3518,11 @@
   "type": "technical",
   "severity": "moderate",
   "probability": 0.07,
-  "description": "The large-format plotter that prints your operational maps just died. Repair estimate: two weeks. A replacement would be faster but costs $12,000. You have permit submissions due in four days.",
+  "description": "The large-format plotter that prints your operational maps just died. Repair estimate: two weeks. A replacement would be faster but costs $12,000. You have map packages due at the district in four days.",
   "options": [
    {
     "label": "Buy a replacement immediately",
-    "outcome": "New plotter arrives in two days. Maps printed, permits submitted on time. Finance asks pointed questions about unbudgeted capital purchases.",
+    "outcome": "New plotter arrives in two days. Maps printed, packages in on time. Finance asks pointed questions about unbudgeted capital purchases.",
     "effects": {
      "budget": -12000,
      "compliance": 5,
@@ -3520,7 +3531,7 @@
    },
    {
     "label": "Use a print shop in town",
-    "outcome": "You send files to the local print shop. Quality is acceptable but not great. Cost is moderate. You lose a day to file formatting issues.",
+    "outcome": "You send files to the local print shop. Quality is acceptable but not great. Cost is moderate. Formatting fixes eat the afternoon.",
     "effects": {
      "budget": -800,
      "timeUsed": 4,
@@ -3529,12 +3540,12 @@
    },
    {
     "label": "Submit digital-only and request accommodation",
-    "outcome": "The district accepts digital maps, reluctantly, and notes the precedent they did not want to set. The permits go in on time.",
+    "outcome": "The district accepts digital maps, reluctantly, and notes the precedent they did not want to set. The packages go in on time.",
     "effects": {
      "compliance": -3,
      "politicalCapital": -5
     },
-    "failureOutcome": "Refused — hard copies or nothing. You are now four days from deadline with no plotter, paying the print shop rush rate anyway, and the permits go in late with the delay marked in your file.",
+    "failureOutcome": "Refused — hard copies or nothing. You are now four days from deadline with no plotter, paying the print shop rush rate anyway, and the packages go in late with the delay marked in your file.",
     "failureEffects": {
      "compliance": -8,
      "politicalCapital": -6,
@@ -3579,7 +3590,7 @@
   "type": "compliance",
   "severity": "moderate",
   "probability": 0.05,
-  "description": "A note slipped under your door reports illegal hunting in one of your active cutblocks. The description matches a vehicle belonging to a contractor's crew member.",
+  "description": "A note slipped under your door reports illegal hunting in one of the blocks on your file. The description matches a vehicle belonging to a contractor's crew member.",
   "options": [
    {
     "label": "Report to Conservation Officer Service",
@@ -3744,7 +3755,7 @@
   "options": [
    {
     "label": "Drop everything and write the application",
-    "outcome": "You and your best writer spend three days on a strong submission, and it is funded — $45,000 in new money for riparian work. The regular files waited and it was worth it.",
+    "outcome": "Your best writer takes it on and you edit the drafts at night. It is a strong submission, and it is funded — $45,000 in new money for riparian work. The regular files waited and it was worth it.",
     "effects": {
      "timeUsed": 6,
      "budget": 45000,
@@ -3752,7 +3763,7 @@
      "crew_morale": 8
     },
     "hiddenOutcome": true,
-    "failureOutcome": "A strong submission, reviewed and not funded — the panel liked another licensee's watershed more. Three days are gone, the backlog grew, and the riparian project goes back on the someday list you took it from.",
+    "failureOutcome": "A strong submission, reviewed and not funded — the panel liked another licensee's watershed more. Your writer's three days are gone, the backlog grew, and the riparian project goes back on the someday list you took it from.",
     "failureEffects": {
      "timeUsed": 6,
      "progress": -12
@@ -3827,7 +3838,7 @@
   "type": "technical",
   "severity": "minor",
   "probability": 0.06,
-  "description": "Facilities just announced they're replacing the HVAC system. Your floor will be without climate control for a week. It's July. Temperatures are forecast to hit 35 degrees.",
+  "description": "Facilities just announced they're replacing the HVAC system. Your floor will be without climate control for a week. It's midsummer. Temperatures are forecast to hit 35 degrees.",
   "options": [
    {
     "label": "Set up temporary workspace in the field office",
@@ -3947,7 +3958,7 @@
    },
    {
     "label": "Verify the identification before acting",
-    "outcome": "You send a second biologist. The ID and the nest status are confirmed. You've lost three days but now have bulletproof documentation for whatever you decide next.",
+    "outcome": "You send a second biologist. The ID and the nest status are confirmed. The visit costs the block three days, but you now have bulletproof documentation for whatever you decide next.",
     "effects": {
      "timeUsed": 3,
      "budget": -1500,
@@ -3962,14 +3973,14 @@
  },
  {
   "id": "intern_excellent_work",
-  "title": "Intern Produces Outstanding Analysis",
+  "title": "Co-op Student Produces Outstanding Analysis",
   "type": "positive",
   "severity": "positive",
   "probability": 0.06,
-  "description": "Your summer intern, working on a side project, has produced a spatial analysis that identifies $200,000 in potential cost savings across your road maintenance program. The analysis is solid. The presentation needs work.",
+  "description": "Your co-op student, working on a side project, has produced a spatial analysis that identifies $200,000 in potential cost savings across your road maintenance program. The analysis is solid. The presentation needs work.",
   "options": [
    {
-    "label": "Present it to senior management with the intern",
+    "label": "Present it to senior management with the student",
     "outcome": "She is nervous and impressive in the same ten minutes. The savings are real, the company looks innovative, and she leaves the room with a job offer.",
     "effects": {
      "politicalCapital": 8,
@@ -4000,8 +4011,8 @@
     ]
    },
    {
-    "label": "Present it yourself and credit the intern",
-    "outcome": "You polish the presentation and deliver it. You mention the intern's contribution. Some credit flows down. Most flows to you.",
+    "label": "Present it yourself and credit the student",
+    "outcome": "You polish the presentation and deliver it. You mention the student's contribution. Some credit flows down. Most flows to you.",
     "effects": {
      "politicalCapital": 5,
      "budget": 5000,
@@ -4010,7 +4021,7 @@
    },
    {
     "label": "Sit on it until the methodology is bulletproof",
-    "outcome": "You ask for more validation. By the time it's ready, budget season is over. The savings are implemented next year. The intern's contract has ended.",
+    "outcome": "You ask for more validation. By the time it's ready, budget season is over. The savings are implemented next year. The student's work term has ended.",
     "effects": {
      "compliance": 3
     }
@@ -4306,22 +4317,26 @@
     }
    }
   ],
-  "expeditionOnly": true
+  "expeditionOnly": true,
+  "seasons": [
+   "winter",
+   "spring"
+  ]
  },
  {
   "id": "gm_executive_poaching",
-  "title": "A Competitor Courts Your CEO",
+  "title": "A Competitor Courts Your Woodlands Manager",
   "type": "political",
   "severity": "major",
   "probability": 0.05,
   "roles": [
    "manager"
   ],
-  "description": "An Alberta outfit with deeper pockets and shallower cutblocks has taken your CEO to dinner twice this month. Your executive assistant noticed the second reservation was for the good steakhouse.",
+  "description": "An Alberta outfit with deeper pockets and shallower cutblocks has taken your woodlands manager to dinner twice this month. Your executive assistant noticed the second reservation was for the good steakhouse.",
   "options": [
    {
     "label": "Counter with money and a longer leash",
-    "outcome": "The retention package stings, but the CEO stays — and now knows exactly what staying is worth.",
+    "outcome": "The retention package stings, but your woodlands manager stays — and now knows exactly what staying is worth.",
     "effects": {
      "budget": -20000,
      "politicalCapital": 3
@@ -4381,7 +4396,7 @@
    },
    {
     "label": "Quietly start shortlisting successors",
-    "outcome": "Word gets out that you're shopping, because word always gets out. The CEO's lawyer calls your lawyer. Productive quarter all around.",
+    "outcome": "Word gets out that you're shopping, because word always gets out. Your woodlands manager's lawyer calls the company's lawyer. Productive quarter all around.",
     "effects": {
      "politicalCapital": -5,
      "crew_morale": -4,

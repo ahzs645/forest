@@ -1,0 +1,69 @@
+// =============================================
+// Shortcut offers and their fallout (Seasonal Strategy)
+// =============================================
+// A shortcut offer is a legal and ethical call, not another operational
+// card, so it wears the theme's danger and warning tokens instead of the dim
+// label every other card shares. Tokens only: each theme restyles it.
+@use '../abstracts' as *;
+
+.term-shortcut-banner {
+  display: inline-block;
+  margin-top: var(--space-sm);
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--danger);
+  border-left-width: 4px;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+
+  &::before {
+    content: '[!] ';
+  }
+}
+
+.term-shortcut-headline {
+  color: var(--warn);
+  font-weight: bold;
+}
+
+.term-shortcut-offer,
+.term-shortcut-odds {
+  padding-left: var(--space-sm);
+  border-left: 3px solid var(--warn);
+  color: var(--text-bright);
+}
+
+.term-shortcut-odds {
+  color: var(--warn);
+}
+
+// The offer and its odds read as one block of terms.
+.term-shortcut-offer {
+  margin-bottom: 2px;
+}
+
+// A phone's log pane is a dozen lines tall: the whole offer has to fit it.
+@media (max-width: $breakpoint-mobile) {
+  .term-shortcut-banner {
+    margin-top: 0;
+    letter-spacing: 0;
+  }
+
+  .term-shortcut-banner + .term-header {
+    margin-top: var(--space-xs);
+  }
+
+  .term-shortcut-banner ~ .term-line {
+    margin-bottom: var(--space-xs);
+  }
+}
+
+// "Because you took: …" under a fallout card's title.
+.term-provenance {
+  padding-left: var(--space-sm);
+  border-left: 3px solid var(--warn);
+  color: var(--warn);
+  font-weight: bold;
+}

@@ -21,6 +21,8 @@ const VALID_ROLES = new Set(['planner', 'permitter', 'recce', 'silviculture', 'm
 // Season ids as journey.season.currentSeason carries them (js/season.js);
 // events may gate on them with `seasons: [...]` (eventMatchesJourneyContext).
 const VALID_SEASONS = new Set(['spring', 'summer', 'fall', 'winter']);
+const VALID_STOP_KINDS = new Set(['block', 'waypoint']);
+const VALID_WEATHER_IDS = new Set(['clear', 'overcast', 'light_rain', 'heavy_rain', 'fog', 'light_snow', 'heavy_snow', 'freezing', 'storm']);
 const VALID_JOURNEY_TYPES = new Set(['field', 'recon', 'silviculture', 'desk', 'planning', 'permitting', 'manager']);
 
 // Vocabulary the engine actually consumes (js/events/resolution.js,
@@ -42,6 +44,9 @@ const VALID_OPTION_KEYS = new Set([
   'goodSchedulesEvent', 'partialSchedulesEvent', 'failureSchedulesEvent',
   // Flavour tone consumed by js/events/reactions.js.
   'reactionTone',
+  // The option's own chip (OFF-BOOK for an unlawful answer), read by
+  // js/events/display.js formatEventForDisplay.
+  'riskTag',
 ]);
 const VALID_EFFECT_KEYS = new Set([
   'budget', 'fuel', 'food', 'equipment', 'firstAid', 'politicalCapital',
@@ -105,6 +110,22 @@ for (const { pool, event } of ALL) {
       }
     }
   }
+  for (const kind of event.stopKinds || []) {
+    if (!VALID_STOP_KINDS.has(kind)) errors.push(`${where}: unknown stop kind "${kind}"`);
+  }
+  for (const weatherId of event.notInWeather || []) {
+    if (!VALID_WEATHER_IDS.has(weatherId)) errors.push(`${where}: unknown weather "${weatherId}" in notInWeather`);
+  }
+  if (event.needsOpenPackage !== undefined
+    && (event.needsOpenPackage !== true || !(event.stopKinds || []).includes('block'))) {
+    errors.push(`${where}: needsOpenPackage must be true and go with stopKinds ["block"]`);
+  }
+  if (event.needsNextLeg !== undefined && event.needsNextLeg !== true) {
+    errors.push(`${where}: needsNextLeg must be true when set`);
+  }
+  if (event.arrivesAsWeather !== undefined && !VALID_WEATHER_IDS.has(event.arrivesAsWeather)) {
+    errors.push(`${where}: unknown weather "${event.arrivesAsWeather}" in arrivesAsWeather`);
+  }
   if (event.expeditionOnly !== undefined && typeof event.expeditionOnly !== 'boolean') {
     errors.push(`${where}: expeditionOnly must be a boolean`);
   }
@@ -119,6 +140,9 @@ for (const { pool, event } of ALL) {
 
     for (const key of Object.keys(option)) {
       if (!VALID_OPTION_KEYS.has(key)) errors.push(`${optWhere}: unconsumed option key "${key}"`);
+    }
+    if (option.riskTag !== undefined && !['SAFE', 'RISKY', 'TRADEOFF', 'OFF-BOOK'].includes(option.riskTag)) {
+      errors.push(`${optWhere}: riskTag must be SAFE, RISKY, TRADEOFF or OFF-BOOK`);
     }
     for (const key of Object.keys(option.effects || {})) {
       if (!VALID_EFFECT_KEYS.has(key)) errors.push(`${optWhere}: unconsumed effects key "${key}"`);

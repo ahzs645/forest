@@ -23,7 +23,7 @@ import {
   formatPlanningBlockPromptDescription,
   formatPlanningBlockTriageEvidence,
 } from '../data/planningBlocks.js';
-import { PLANNING_DECISION_GATE } from '../journey/constants.js';
+import { PLANNING_DECISION_GATE, PLANNING_SCRUTINY_GATE, PLANNING_VALUES_FLOOR } from '../journey/constants.js';
 import {
   formatRoadAssetSummary,
   getPlanningRoadAssetContext,
@@ -39,6 +39,10 @@ import { getOperationalProgress, recordProgressMilestones } from '../journey.js'
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
+import { checkpointDeskDay, closeDeskDay, resumingDeskDay } from '../journey/deskMechanics.js';
+import { describeGoodwillChange, readGoodwill } from '../events/resolution.js';
+import { institutionDisplayName } from '../events/selection.js';
+import { formatDollars } from '../resources.js';
 
 /**
  * What a day on each track of the planning file is worth.
@@ -61,6 +65,37 @@ const SESSION_READINESS_LIFT = 3;
  * burn is sized for that calendar (scripts/simulate-expeditions.mjs).
  */
 const PLANNING_DAILY_BURN = 600;
+/**
+ * What a package filed before the district is ready costs. The District
+ * Manager's office returns it unread, and the next one is read with that on
+ * the file: readiness drops rather than climbs, so the pre-submission meeting
+ * is the only way to the gate.
+ */
+export const RETURNED_SUBMISSION_READINESS_COST = 5;
+/** District goodwill a Stakeholder Session spends: the district sits in on every one. */
+export const SESSION_GOODWILL_COST = 3;
+/**
+ * A District Compliance Review: a day walking district compliance staff
+ * through every open question on the file. It is how a planner brings an
+ * exposed file back under the District Manager's scrutiny gate.
+ */
+export const COMPLIANCE_REVIEW_SCRUTINY = 12;
+const COMPLIANCE_REVIEW_COST = 900;
+
+/**
+ * The FSP's results and strategies have to be consistent with every objective
+ * government has set, not only timber. A value under PLANNING_VALUES_FLOOR is
+ * an objective the draft does not yet answer: the Stakeholder Session and the
+ * submission stay blocked, and the room sours a little every day it stays
+ * there.
+ */
+export { PLANNING_VALUES_FLOOR };
+const PLANNING_VALUE_LABELS = {
+  biodiversity: 'Biodiversity',
+  timberSupply: 'Timber',
+  communityNeeds: 'Community',
+  firstNationsValues: 'First Nations',
+};
 
 // The professional reference carried by the game specifies a 30-calendar-day
 // comment period. A planning "day" is a compressed turn, so the statutory
@@ -183,6 +218,36 @@ function getPlanningApprovalGaps(journey) {
 }
 
 
+/**
+ * What is holding the District Manager's decision, as gate conditions. A
+ * file this exposed is not signed, and neither is a plan while a regulator has
+ * an open file on one of its own shortcuts: the reckless file used to be
+ * approved at scrutiny 100% with a Forest Practices Board investigation into
+ * the plan's own survey still open.
+ * @param {Object} journey
+ * @returns {Array<{key: string, reason: string, headline: string}>}
+ */
+export function getPlanningDecisionHolds(journey) {
+  const holds = [];
+  for (const entry of journey?.temptationMemory?.pendingCatches || []) {
+    const who = institutionDisplayName(entry.institution);
+    holds.push({
+      key: 'open_file',
+      reason: `${who} has an open file on “${entry.title}” (lands Day ${entry.dueDay})`,
+      headline: `The District Manager will not decide while ${who} has an open file on “${entry.title}”. It lands on Day ${entry.dueDay}; keep the rest of the file ready.`,
+    });
+  }
+  const scrutiny = Math.round(Number(journey?.scrutiny) || 0);
+  if (scrutiny >= PLANNING_SCRUTINY_GATE) {
+    holds.push({
+      key: 'scrutiny',
+      reason: `scrutiny ${scrutiny}% (the District Manager decides under ${PLANNING_SCRUTINY_GATE}%)`,
+      headline: `District Compliance Review to bring scrutiny under ${PLANNING_SCRUTINY_GATE}% (${scrutiny}% now): the District Manager will not sign a file this exposed.`,
+    });
+  }
+  return holds;
+}
+
 function applyPlanningProfessionalWork(journey, changes = {}) {
   const professional = ensurePlanningProfessionalState(journey);
   if (!professional) return null;
@@ -275,7 +340,7 @@ export function getFomPublicationGaps(journey) {
   return gaps;
 }
 
-function getPlanningPhaseLabel(phase) {
+export function getPlanningPhaseLabel(phase) {
   return PLANNING_PHASE_NAMES[phase] || phase;
 }
 
@@ -496,10 +561,10 @@ function getPlanningValueRecoveryHint(journey, deficits) {
   }
 
   const workshopFocus = {
-    Bio: 'Emphasize Biodiversity',
+    Biodiversity: 'Emphasize Biodiversity',
     Timber: 'Emphasize Timber Supply',
     Community: 'Emphasize Community',
-    FN: 'Emphasize First Nations'
+    'First Nations': 'Emphasize First Nations'
   };
 
   return {
@@ -530,6 +595,16 @@ export function getOutreachReadinessCap(readiness) {
   return PLANNING_DECISION_GATE - getSubmissionConfidenceGain(readiness);
 }
 
+/**
+ * A package filed before the pre-submission meetings have brought the district
+ * to the cap cannot cross the decision gate, so the District Manager's office
+ * sends it back rather than deciding it.
+ */
+export function isSubmissionPremature(journey, readiness) {
+  const confidence = Number(journey?.plan?.ministerialConfidence || 0);
+  return confidence + getSubmissionConfidenceGain(readiness) < PLANNING_DECISION_GATE;
+}
+
 function buildPlanningActionGuidance(journey, seasonInfo = null) {
   const readiness = getPlanningSubmissionReadiness(journey, seasonInfo);
   const deficits = getValuesGateDeficits(journey);
@@ -539,6 +614,10 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
   const steps = [];
   let lane = 'Technical file';
   let headline = 'Gather Data to keep the planning file moving.';
+
+  if (journey.isComplete) {
+    return { lane: 'Approved', headline: 'The District Manager has approved the FSP and the first Forest Operations Map.', steps };
+  }
 
   if (journey.plan.phase === 'data_gathering') {
     lane = 'Technical file';
@@ -574,7 +653,7 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
         lane = 'Values lane';
         headline = valueHint?.headline || 'Values Workshop to recover the blocked values.';
         pushPlanningGuideStep(steps, valueHint?.followUp || 'Recover the weakest value before reopening the engagement lane.');
-        pushPlanningGuideStep(steps, 'Stakeholder Session stays blocked until every value clears 25%.');
+        pushPlanningGuideStep(steps, `Stakeholder Session stays blocked until every value clears ${PLANNING_VALUES_FLOOR}%.`);
         return { lane, headline, steps };
       }
 
@@ -639,6 +718,22 @@ function buildPlanningActionGuidance(journey, seasonInfo = null) {
     const adminLabel = professional?.registrationActive ? 'Compliance Admin' : 'Renew Registration';
     headline = `${adminLabel} to clear ${professionalIssues[0]} before the package goes to the District Manager.`;
     pushPlanningGuideStep(steps, 'The DM will not accept a plan sealed by someone whose registration is not current.');
+    return { lane, headline, steps };
+  }
+
+  const holds = getPlanningDecisionHolds(journey);
+  if (!deficits.length && holds.length > 0) {
+    // A scrutiny hold has a remedy today; an open regulator file only lands
+    // on its day, so the headline leads with the one the player can act on.
+    const hold = holds.find((entry) => entry.key === 'scrutiny') || holds[0];
+    lane = 'District file';
+    headline = hold.headline;
+    for (const other of holds) {
+      if (other !== hold) pushPlanningGuideStep(steps, other.headline);
+    }
+    if (hold.key === 'open_file') {
+      pushPlanningGuideStep(steps, 'Pre-submission meetings and the other gates can still move while you wait.');
+    }
     return { lane, headline, steps };
   }
 
@@ -726,7 +821,7 @@ export function buildPlanningActionReceipt(before, journey) {
 
   const budgetDelta = after.budget - before.budget;
   if (budgetDelta !== 0) {
-    parts.push(`Budget ${budgetDelta > 0 ? '+' : '-'}$${Math.abs(Math.round(budgetDelta)).toLocaleString()} → $${Math.round(after.budget).toLocaleString()}`);
+    parts.push(`Budget ${budgetDelta > 0 ? '+' : '-'}$${Math.abs(Math.round(budgetDelta)).toLocaleString()} → ${formatDollars(after.budget)}`);
   }
   const politicalDelta = after.political - before.political;
   if (politicalDelta !== 0) parts.push(`District goodwill ${signed(politicalDelta)} → ${Math.round(after.political)}`);
@@ -754,11 +849,18 @@ function actionNeedsReceipt(actionValue) {
 export async function runPlanningDay(game) {
   const { ui, journey } = game;
   const seasonInfo = journey.season ? getCurrentSeasonInfo(journey.season) : null;
-  const progressBeforeDay = getOperationalProgress(journey);
+  // A reload mid-day picks up after the last settled decision instead of
+  // replaying the morning (js/journey/deskMechanics.js).
+  const resumed = resumingDeskDay(journey);
+  const progressBeforeDay = resumed?.progressBeforeDay ?? getOperationalProgress(journey);
   ensurePlanningProfessionalState(journey);
+  // The debrief measures spending against what the file started with.
+  if (!Number.isFinite(journey.budgetStart)) journey.budgetStart = journey.resources?.budget || 0;
+  // A follow-up that fired before the day opened can spend the last of it.
+  if (endsFileNow(game)) return;
 
   // Morning at the office: the season outside the window, coffee inside.
-  if (typeof ui.playScene === 'function') {
+  if (!resumed && typeof ui.playScene === 'function') {
     await ui.playScene(buildOfficeWindowFrames({
       weatherId: journey.weather?.id,
       season: journey.season?.currentSeason,
@@ -766,17 +868,21 @@ export async function runPlanningDay(game) {
     }), { delay: 140, holdLastFrame: false, ambient: 'work' });
   }
 
-  startDay(journey);
+  startDay(journey, { resuming: Boolean(resumed) });
 
-  // Periodic real-data block decision: selected block influences events and values.
-  await maybePromptForBlockSelection(game, seasonInfo);
+  if (!resumed) {
+    // Periodic real-data block decision: selected block influences events and values.
+    await maybePromptForBlockSelection(game, seasonInfo);
 
-  // Apply daily values consequences (Phase 4.1)
-  applyValuesConsequences(journey);
+    // Apply daily values consequences (Phase 4.1)
+    applyValuesConsequences(journey);
+  } else if (resumed.situation) {
+    journey.recentSituationContext = { day: journey.day, ...resumed.situation };
+  }
 
   // Check for event at start of day. Day 1 stays event-free so the player meets
   // the normal planning loop before the game starts throwing disruptions.
-  const event = journey.day > 1 ? checkForEvent(journey) : null;
+  const event = !resumed && journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     const daysLeft = Number.isFinite(journey.deadline)
       ? Math.max(0, journey.deadline - journey.day)
@@ -790,15 +896,27 @@ export async function runPlanningDay(game) {
           getPlanningPhaseLabel(journey.plan.phase),
           daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
           `DM readiness ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
-          `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
+          `budget ${formatDollars((journey.resources.budget || 0) / 1000)}k`,
         ]),
         onRender: () => updatePlanningMissionStatus(ui, journey, seasonInfo),
+        onResolved: ({ spendsDay, setAside }) => {
+          if (spendsDay) spendDay(journey);
+          checkpointDeskDay(game, {
+            progressBeforeDay,
+            situation: { title: event.title || 'the situation', setAside },
+          });
+        },
       },
       setAsideDescription: 'Not today. Keep the day for the file.',
     });
     if (outcome.gameOver) return;
+    // A situation that spends the last of the goodwill or the budget ends the
+    // file there. The outcome has already said "the file stops here"; a full
+    // day's work after it (and a meeting that won the goodwill back) made
+    // that a lie.
+    if (endsFileNow(game)) return;
     // A situation worth a day is the day — the action menu below never opens.
-    if (outcome.spendsDay) spendDay(journey);
+    // (Spent as it resolved, so the checkpoint already knows.)
   }
 
   // Check protagonist energy
@@ -839,7 +957,7 @@ export async function runPlanningDay(game) {
         getPlanningPhaseLabel(journey.plan.phase),
         daysLeft === null ? null : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
         `DM readiness ${Math.round(journey.plan.ministerialConfidence || 0)}%`,
-        `budget $${Math.round((journey.resources.budget || 0) / 1000)}k`,
+        `budget ${formatDollars((journey.resources.budget || 0) / 1000)}k`,
       ]),
       label: 'AT THE DESK',
       title: 'THE FILE, AS IT STANDS',
@@ -870,7 +988,13 @@ export async function runPlanningDay(game) {
 
     ui.write('');
     const actionBefore = capturePlanningActionState(journey);
-    await processAction(game, action.value, seasonInfo);
+    const outcome = await processAction(game, action.value, seasonInfo);
+    if (outcome?.cancelled) {
+      // Backed out of a submenu: nothing happened, the day is still open.
+      if (settleDayPass(journey, freeChoices, ui)) break;
+      continue;
+    }
+    if (dayIsSpent(journey)) checkpointDeskDay(game, { progressBeforeDay });
 
     ui.updateAllStatus(journey);
     updatePlanningMissionStatus(ui, journey, seasonInfo);
@@ -906,6 +1030,7 @@ export async function runPlanningDay(game) {
   checkGameOver(game);
 
   ui.updateAllStatus(journey);
+  updatePlanningMissionStatus(ui, journey, seasonInfo);
 
   const milestoneMessages = [];
   recordProgressMilestones(journey, progressBeforeDay, milestoneMessages, Math.max(1, journey.day - 1));
@@ -913,8 +1038,11 @@ export async function runPlanningDay(game) {
     ui.writePositive(message);
   }
 
-  // Contextual continue (Phase 6.1)
-  const continueLabel = `Continue... (Phase: ${getPlanningPhaseLabel(journey.plan.phase)}, Day ${journey.day})`;
+  // Contextual continue (Phase 6.1). On the night the file closes, the
+  // button says so instead of promising another day.
+  const continueLabel = journey.isGameOver
+    ? 'The work stops here...'
+    : `Continue... (Phase: ${getPlanningPhaseLabel(journey.plan.phase)}, Day ${journey.day})`;
   await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
 }
 
@@ -945,10 +1073,25 @@ export function updatePlanningMissionStatus(ui, journey, seasonInfo = null) {
     label: `${gate.label} ${gate.current}% of ${gate.target}%`,
     done: gate.current >= gate.target
   }));
+  const weakest = getWeakestPlanningValue(journey);
+  checklist.push({
+    label: `Weakest value: ${weakest.label} ${weakest.value}% (needs ${PLANNING_VALUES_FLOOR}%)`,
+    done: weakest.value >= PLANNING_VALUES_FLOOR
+  });
   checklist.push({
     label: `FOM ${describeReviewState(fom).toLowerCase()}`,
     done: fom?.status === 'closed'
   });
+  // The District Manager's own conditions: an exposed file, or a regulator's
+  // open file on the plan, holds the decision whatever the meters say.
+  const scrutinyNow = Math.round(Number(journey.scrutiny) || 0);
+  checklist.push({
+    label: `Scrutiny ${scrutinyNow}% (the District Manager decides under ${PLANNING_SCRUTINY_GATE}%)`,
+    done: scrutinyNow < PLANNING_SCRUTINY_GATE
+  });
+  for (const hold of getPlanningDecisionHolds(journey).filter((entry) => entry.key === 'open_file')) {
+    checklist.push({ label: `Open file: ${hold.reason}`, done: false });
+  }
   // The guidance headline is the one recommendation; the alerts only carry
   // the clocks and blockers the headline cannot hold.
   const alerts = [];
@@ -1010,13 +1153,13 @@ function displayPlanningBriefing(ui, journey, seasonInfo) {
   if (guidance.steps.length > 0) {
     ui.write(`Follow-up: ${guidance.steps.join(' -> ')}`);
   }
-  ui.write(`Values: Habitat ${journey.values.biodiversity}% | Timber ${journey.values.timberSupply}% | Community ${journey.values.communityNeeds}% | First Nations ${journey.values.firstNationsValues}%`);
+  ui.write(`Values: ${formatPlanningValues(journey)}`);
   const moods = describeStakeholderMoods(journey);
   if (moods) ui.write(`Stakeholder mood: ${moods}`);
   if (Number.isFinite(journey.scrutiny)) {
     const scrutiny = Math.round(journey.scrutiny);
     const scrutinyLevel = scrutiny > 70 ? 'HIGH' : scrutiny > 40 ? 'MODERATE' : 'LOW';
-    ui.write(`Scrutiny: ${scrutiny}% (${scrutinyLevel})`);
+    ui.write(`Scrutiny: ${scrutiny}% (${scrutinyLevel}; the District Manager decides under ${PLANNING_SCRUTINY_GATE}%)`);
   }
   const areaSituation = getAreaSituationSummary(journey);
   if (areaSituation) {
@@ -1122,14 +1265,18 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
   ui.write('');
 
   const triageChoice = await ui.promptChoice('Constraint triage:', triage.options);
-  const triageDelta = getPlanningTriageScrutinyDelta(triageChoice.value);
+  const triageDelta = applyTriageScrutinyShift(journey, triageChoice.value);
   if (triageDelta !== 0) {
-    journey.scrutiny = clampValue((journey.scrutiny || 0) + triageDelta);
     const direction = triageDelta > 0 ? 'rises' : 'eases';
     ui.write(`Scrutiny ${direction} to ${Math.round(journey.scrutiny)}% as you choose ${getPlanningTriageLabel(triageChoice.value)}.`);
+  } else if (reopened && getPlanningTriageScrutinyDelta(triageChoice.value) !== 0) {
+    ui.write(`Scrutiny holds at ${Math.round(journey.scrutiny)}%: the file already carries the ${getPlanningTriageLabel(triageChoice.value)} posture.`);
   }
   ui.write('');
 
+  // The pool is never empty (areas without a block snapshot get area-profile
+  // placeholders), so the set always locks here and the question does not
+  // come back the next morning.
   const options = pickPlanningBlockOptions(journey.areaId, plannerState.history, 3, triageChoice.value, journey.area, seasonInfo);
   if (!options.length) return;
 
@@ -1156,6 +1303,26 @@ async function maybePromptForBlockSelection(game, seasonInfo) {
   if (water.block) {
     ui.write(`Water gate for the set: ${water.gateLabel} — ${water.note}`);
   }
+}
+
+/**
+ * Apply the triage posture's scrutiny shift and return the change. The shift
+ * is a standing position, not a reward for answering: it lands once, and when
+ * an event reopens the block question only the difference between the old
+ * posture and the new one moves scrutiny. Re-picking the same posture moves
+ * nothing, so the triage cannot be farmed.
+ */
+export function applyTriageScrutinyShift(journey, triageKey) {
+  const state = journey?.blockPlanning;
+  if (!state) return 0;
+  // Saves from before this field recorded the posture only on the locked set.
+  const previous = state.scrutinyTriage ?? state.activeTriage ?? null;
+  const delta = getPlanningTriageScrutinyDelta(triageKey) - getPlanningTriageScrutinyDelta(previous);
+  state.scrutinyTriage = triageKey;
+  if (delta === 0) return 0;
+  const before = journey.scrutiny || 0;
+  journey.scrutiny = clampValue(before + delta);
+  return journey.scrutiny - before;
 }
 
 /**
@@ -1199,22 +1366,63 @@ function clampValue(value) {
 /**
  * Apply daily consequences from values imbalance (Phase 4.1)
  */
-function applyValuesConsequences(journey) {
-  // Low values create daily penalties
-  if (journey.values.biodiversity < 30) {
+export function applyValuesConsequences(journey) {
+  // An objective the draft does not answer costs the file every day it stays
+  // unanswered, and the people who hold that value say so.
+  if (journey.values.biodiversity < PLANNING_VALUES_FLOOR) {
+    // ENV and the naturalists' groups file against the draft.
     journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 2);
   }
-  if (journey.values.timberSupply < 30) {
+  if (journey.values.timberSupply < PLANNING_VALUES_FLOOR) {
     // The mill's planning lead stops returning calls.
     journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 1);
   }
-  if (journey.values.firstNationsValues < 30 && (journey.plan.phase === 'stakeholder_review' || journey.plan.phase === 'ministerial_approval')) {
+  if (journey.values.firstNationsValues < PLANNING_VALUES_FLOOR && (journey.plan.phase === 'stakeholder_review' || journey.plan.phase === 'ministerial_approval')) {
     // A Nation that is not engaged stalls both the engagement and the decision.
     journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 3);
+    journey.plan.ministerialConfidence = Math.max(0, (journey.plan.ministerialConfidence || 0) - 2);
   }
-  if (journey.values.communityNeeds < 30 && journey.protagonist) {
+  if (journey.values.communityNeeds < PLANNING_VALUES_FLOOR && journey.protagonist) {
     journey.protagonist.stress = Math.min(100, journey.protagonist.stress + 3);
   }
+}
+
+/**
+ * What a day's lane work does to the balance. The analysis is built on the
+ * timber supply model, so a day of it firms up timber and leaves the
+ * non-timber results and strategies thinner; a Timber Supply Analysis does
+ * that harder. A Stakeholder Session writes the community's and the Nation's
+ * concerns into the record. The Values Workshop is where the rest is won back.
+ */
+const LANE_VALUE_DRIFT = {
+  analyze: { timberSupply: 1, biodiversity: -1, firstNationsValues: -1 },
+  timber: { timberSupply: 12, biodiversity: -3, communityNeeds: -2 },
+  stakeholder: { communityNeeds: 2, firstNationsValues: 2 },
+};
+
+export function applyLaneValueDrift(journey, actionValue) {
+  const drift = LANE_VALUE_DRIFT[actionValue];
+  if (!drift || !journey.values) return;
+  for (const [key, delta] of Object.entries(drift)) {
+    journey.values[key] = clampValue((journey.values[key] ?? 50) + delta);
+  }
+}
+
+function getPlanningValueEntries(journey) {
+  const values = journey?.values || {};
+  return Object.entries(PLANNING_VALUE_LABELS).map(([key, label]) => ({
+    key,
+    label,
+    value: Math.round(values[key] ?? 0),
+  }));
+}
+
+export function getWeakestPlanningValue(journey) {
+  return getPlanningValueEntries(journey).reduce((weakest, entry) => (entry.value < weakest.value ? entry : weakest));
+}
+
+export function formatPlanningValues(journey) {
+  return getPlanningValueEntries(journey).map((entry) => `${entry.label} ${entry.value}%`).join(' | ');
 }
 
 /**
@@ -1250,7 +1458,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (valuesOk) {
       actionOptions.push({
         label: 'Stakeholder Session',
-        description: 'Engagement record: hear concerns, record responses and agree follow-up actions',
+        description: `Engagement record: hear concerns, record responses and agree follow-up actions | $700, district goodwill -${SESSION_GOODWILL_COST}`,
         value: 'stakeholder'
       });
     } else {
@@ -1285,7 +1493,7 @@ function buildActionOptions(journey, seasonInfo = null) {
     if (valuesOk) {
       actionOptions.push({
         label: 'Stakeholder Session',
-        description: 'Lane: engagement recovery | Rebuild buy-in before the final package',
+        description: `Lane: engagement recovery | Rebuild buy-in before the final package | $700, district goodwill -${SESSION_GOODWILL_COST}`,
         value: 'stakeholder'
       });
     } else {
@@ -1303,17 +1511,23 @@ function buildActionOptions(journey, seasonInfo = null) {
     const valuesOk = deficits.length === 0;
     const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
     const professionalIssues = getPlanningProfessionalIssues(journey);
-    if (valuesOk && submissionReadiness.ready && professionalIssues.length === 0 && approvalGaps.length === 0) {
+    const holds = getPlanningDecisionHolds(journey);
+    if (valuesOk && submissionReadiness.ready && professionalIssues.length === 0 && approvalGaps.length === 0 && holds.length === 0) {
+      const gain = getSubmissionConfidenceGain(submissionReadiness);
+      const readinessNow = Math.round(journey.plan.ministerialConfidence || 0);
       actionOptions.push({
         label: 'Prepare Submission',
-        description: `Lane: submission package | Put the FSP and FOM on the District Manager's desk; +${getSubmissionConfidenceGain(submissionReadiness)} DM readiness`,
+        description: isSubmissionPremature(journey, submissionReadiness)
+          ? `Lane: submission package | DM readiness ${readinessNow}%: filed below ${getOutreachReadinessCap(submissionReadiness)}% the package comes back unread and readiness drops. Meet the district first`
+          : `Lane: submission package | Put the FSP and FOM on the District Manager's desk; +${gain} DM readiness carries it to ${Math.min(100, readinessNow + gain)}%`,
         value: 'submit'
       });
     } else {
       const guidance = buildPlanningActionGuidance(journey, seasonInfo);
+      const needs = [...new Set([deficits.length ? formatValuesGateDeficits(deficits) : null, ...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons, ...professionalIssues, ...holds.map((hold) => hold.reason)].filter(Boolean))];
       actionOptions.push({
         label: 'Prepare Submission (BLOCKED)',
-        description: `Needs: ${[deficits.length ? formatValuesGateDeficits(deficits) : null, ...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons, ...professionalIssues].filter(Boolean).join(' | ')} | Next: ${guidance.headline}`,
+        description: `Needs: ${needs.join(' | ')} | Next: ${guidance.headline}`,
         value: 'submit_blocked'
       });
     }
@@ -1327,7 +1541,8 @@ function buildActionOptions(journey, seasonInfo = null) {
       pieces.push(`registration ${professional.registrationStatus} (your licence to sign off is not current)`);
     }
     if (professional?.cpdGap > 0) {
-      pieces.push(`CPD ${professional.cpdHours}/${professional.cpdTarget}h logged this season`);
+      const logged = professional.registrationStatus !== 'active' ? 8 : 6;
+      pieces.push(`CPD ${professional.cpdHours}/${professional.cpdTarget}h logged this season (a day logs ${logged}h)`);
     }
     if ((professional?.paperworkLoad || 0) >= PAPERWORK_FLAG_THRESHOLD) {
       pieces.push(`filing backlog high (the next audit will find it)`);
@@ -1335,9 +1550,17 @@ function buildActionOptions(journey, seasonInfo = null) {
     actionOptions.push({
       label,
       description: pieces.length
-        ? `Lane: professional file | Clears: ${pieces.join(' | ')}`
+        ? `Lane: professional file | Works on: ${pieces.join(' | ')}`
         : 'Lane: professional file | Renew registration, log CPD, and clear the filing backlog',
       value: 'professional_admin'
+    });
+  }
+
+  if ((Number(journey.scrutiny) || 0) >= PLANNING_SCRUTINY_GATE) {
+    actionOptions.push({
+      label: 'District Compliance Review',
+      description: `Lane: district file | Walk district compliance staff through every open question on the file; scrutiny -${COMPLIANCE_REVIEW_SCRUTINY} (the District Manager decides under ${PLANNING_SCRUTINY_GATE}%) | ${formatDollars(COMPLIANCE_REVIEW_COST)}`,
+      value: 'compliance_review'
     });
   }
 
@@ -1372,9 +1595,10 @@ function buildActionOptions(journey, seasonInfo = null) {
 
   // Values workshop - now with tradeoffs (Phase 4.1)
   {
+    const weakest = getWeakestPlanningValue(journey);
     actionOptions.push({
       label: 'Values Workshop',
-      description: 'Lane: values file | Balance competing interests with explicit tradeoffs',
+      description: `Lane: values file | Weakest: ${weakest.label} ${weakest.value}% (each needs ${PLANNING_VALUES_FLOOR}%) | Write the results and strategies for the objectives the draft is thin on`,
       value: 'values'
     });
   }
@@ -1383,7 +1607,7 @@ function buildActionOptions(journey, seasonInfo = null) {
   {
     actionOptions.push({
       label: 'Timber Supply Analysis',
-      description: 'Lane: timber file | Timber supply analysis (+timber; costs a day of analysis time)',
+      description: 'Lane: timber file | +12 timber, -3 biodiversity, -2 community; costs a day of analysis time',
       value: 'timber'
     });
   }
@@ -1445,6 +1669,7 @@ function buildPlanningContextLines(journey, seasonInfo) {
     `Analysis ${Math.round(plan.analysisQuality || 0)}% of 80%`,
     `Buy-in ${Math.round(plan.stakeholderBuyIn || 0)}% of 75%`,
     `DM readiness ${Math.round(plan.ministerialConfidence || 0)}% of ${PLANNING_DECISION_GATE}%`,
+    `Values (each needs ${PLANNING_VALUES_FLOOR}%): ${formatPlanningValues(journey)}`,
   ];
   const fom = journey.blockPlanning?.fom;
   if (fom?.status) lines.push(`FOM: ${describeReviewState(fom)}`);
@@ -1514,7 +1739,8 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 15, stress: 12 });
       applyPlanningProfessionalWork(journey, { paperworkLoad: recoveryRun ? 1 : 2, competenceRisk: -1, auditExposure: 1 });
-      ui.write(`Analysis progressed. Draft plan quality: ${journey.plan.analysisQuality}%`);
+      applyLaneValueDrift(journey, 'analyze');
+      ui.write(`Analysis progressed. Draft plan quality: ${journey.plan.analysisQuality}%. The draft leans on the timber supply model; the non-timber results and strategies are thinner for it.`);
       if (!recoveryRun && journey.plan.analysisQuality >= 80) {
         journey.plan.phase = 'stakeholder_review';
         ui.writePositive('Draft plan complete. Moving to Engagement & Public Review.');
@@ -1534,12 +1760,14 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       const mood = getStakeholderMoodAverage(journey);
       if (mood !== null && mood >= 60) {
         journey.plan.stakeholderBuyIn = Math.min(100, journey.plan.stakeholderBuyIn + 2);
-        ui.write('The room was already warm; the session landed well (+2 buy-in).');
+        ui.write('The stakeholders came in warm; the session landed well (+2 buy-in).');
       } else if (mood !== null && mood <= 40) {
         journey.plan.stakeholderBuyIn = Math.max(0, journey.plan.stakeholderBuyIn - 2);
         ui.write('The room came in sour; the session spent its first hour on old grievances (-2 buy-in).');
       }
-      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 3);
+      const goodwillBefore = readGoodwill(journey);
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - SESSION_GOODWILL_COST);
+      for (const line of describeGoodwillChange(journey, goodwillBefore)) ui.write(line);
       journey.resources.budget = Math.max(0, journey.resources.budget - 700);
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 20, stress: 16 });
@@ -1548,6 +1776,7 @@ export async function processAction(game, actionValue, seasonInfo = null) {
         journey.protagonist.reputation = Math.min(100, journey.protagonist.reputation + 3);
       }
       journey.plan.ministerialConfidence = Math.min(100, (journey.plan.ministerialConfidence || 0) + SESSION_READINESS_LIFT);
+      applyLaneValueDrift(journey, 'stakeholder');
       ui.write(`Buy-in improved to ${journey.plan.stakeholderBuyIn}%. The district reads the engagement record too (DM readiness +${SESSION_READINESS_LIFT}).`);
       if (!recoveryRun && journey.plan.stakeholderBuyIn >= 75) {
         journey.plan.phase = 'ministerial_approval';
@@ -1579,6 +1808,10 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       if (!isFomBlocked && submissionReadiness.reasons.length > 0) {
         ui.write(`Planning gate: ${submissionReadiness.reasons.join(' | ')}.`);
       }
+      const decisionHolds = actionValue === 'submit_blocked' ? getPlanningDecisionHolds(journey) : [];
+      if (decisionHolds.length > 0) {
+        ui.write(`District Manager's conditions: ${decisionHolds.map((hold) => hold.reason).join(' | ')}.`);
+      }
       ui.write(`Lane Focus: ${guidance.lane}`);
       ui.write(`Next Best Move: ${guidance.headline}`);
       if (guidance.steps.length > 0) {
@@ -1594,32 +1827,44 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       break;
     }
 
-    case 'submit':
-      {
-        const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
-        const approvalGaps = getPlanningApprovalGaps(journey);
-        if (!submissionReadiness.ready || approvalGaps.length > 0) {
-          ui.writeWarning(`Submission blocked: ${[...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons].join(' | ')}.`);
-          break;
-        }
-        const confidenceGain = getSubmissionConfidenceGain(submissionReadiness);
-        journey.plan.ministerialConfidence = Math.min(100, journey.plan.ministerialConfidence + confidenceGain);
+    case 'submit': {
+      const submissionReadiness = getPlanningSubmissionReadiness(journey, seasonInfo);
+      const approvalGaps = getPlanningApprovalGaps(journey);
+      const valueDeficits = getValuesGateDeficits(journey);
+      const decisionHolds = getPlanningDecisionHolds(journey);
+      if (!submissionReadiness.ready || approvalGaps.length > 0 || valueDeficits.length > 0 || decisionHolds.length > 0) {
+        ui.writeWarning(`Submission blocked: ${[...(valueDeficits.length ? [formatValuesGateDeficits(valueDeficits)] : []), ...approvalGaps.map((gap) => gap.reason), ...submissionReadiness.reasons, ...decisionHolds.map((hold) => hold.reason)].join(' | ')}.`);
+        break;
       }
       spendDay(journey);
       journey.resources.budget = Math.max(0, journey.resources.budget - 2200);
-      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
       applyProtagonistCost(journey, { energy: 25, stress: 20 });
       applyPlanningProfessionalWork(journey, { paperworkLoad: 3, competenceRisk: -2, auditExposure: 2 });
+
+      if (isSubmissionPremature(journey, submissionReadiness)) {
+        // The package is complete, but the district has not walked it: the
+        // District Manager's office returns it rather than decide it cold.
+        const cap = getOutreachReadinessCap(submissionReadiness);
+        const before = Math.round(journey.plan.ministerialConfidence || 0);
+        journey.plan.ministerialConfidence = Math.max(0, before - RETURNED_SUBMISSION_READINESS_COST);
+        journey.plan.submissionsReturned = (journey.plan.submissionsReturned || 0) + 1;
+        journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 3);
+        journey.scrutiny = clampValue((journey.scrutiny || 0) + 2);
+        ui.writeWarning(`The District Manager's office returns the package unread: the district has not walked the draft, and nobody decides an FSP cold. DM readiness -${before - journey.plan.ministerialConfidence} → ${journey.plan.ministerialConfidence}%.`);
+        ui.write(`Pre-submission meetings bring the file to ${cap}%; the submission carries it from there.`);
+        break;
+      }
+
+      journey.plan.ministerialConfidence = Math.min(100, journey.plan.ministerialConfidence + getSubmissionConfidenceGain(submissionReadiness));
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
       progressPlanningPaperworkChain(journey, 'fom', 1);
       ui.write(`Submission filed with the district. DM readiness: ${journey.plan.ministerialConfidence}%`);
       if (isPlanningApprovalReady(journey)) {
         journey.isComplete = true;
         journey.endReason = 'FSP and Forest Operations Map approved by the District Manager.';
-      } else {
-        const gap = Math.max(0, PLANNING_DECISION_GATE - journey.plan.ministerialConfidence);
-        ui.write(`Still ${gap} point${gap === 1 ? '' : 's'} short — the District Manager wants another pre-submission meeting before deciding.`);
       }
       break;
+    }
 
     case 'fom_review': {
       const activeBlock = journey.blockPlanning?.activeBlock;
@@ -1715,6 +1960,25 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       break;
     }
 
+    case 'compliance_review': {
+      if ((Number(journey.scrutiny) || 0) < PLANNING_SCRUTINY_GATE) {
+        ui.write(`Scrutiny is under ${PLANNING_SCRUTINY_GATE}%: the district has nothing it needs walked through.`);
+        break;
+      }
+      const before = Math.round(Number(journey.scrutiny) || 0);
+      journey.scrutiny = clampValue(before - COMPLIANCE_REVIEW_SCRUTINY);
+      journey.resources.budget = Math.max(0, journey.resources.budget - COMPLIANCE_REVIEW_COST);
+      spendDay(journey);
+      applyProtagonistCost(journey, { energy: 8, stress: 8 });
+      applyPlanningProfessionalWork(journey, { paperworkLoad: 2, auditExposure: -2 });
+      const after = Math.round(journey.scrutiny);
+      ui.write(`You walk district compliance staff through every open question on the file: the survey records, the engagement log, the support-site permits. Scrutiny -${before - after} → ${after}%.`);
+      ui.write(after >= PLANNING_SCRUTINY_GATE
+        ? `Still at ${PLANNING_SCRUTINY_GATE}% or more: the District Manager is not signing yet.`
+        : `Under ${PLANNING_SCRUTINY_GATE}%: the District Manager will decide the file on its merits.`);
+      break;
+    }
+
     case 'outreach': {
       const previousConfidence = journey.plan.ministerialConfidence;
       // A pre-submission meeting tops out short of the decision gate: only
@@ -1751,13 +2015,18 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       });
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 5, stress: 4 });
-      if (didRenewal) {
+      if (didRenewal && professional?.registrationStatus !== 'active') {
+        // An open complaint file is not a lapsed renewal.
+        ui.write('The renewal is filed and the CPD logged, but the FPBC complaint file is still open: your registration stays under review until it is decided.');
+      } else if (didRenewal) {
         ui.write('FPBC registration renewal filed and active status is restored. CPD logged for the season.');
       } else {
         ui.write('Compliance admin logged the season\'s CPD and trimmed the filing backlog.');
       }
-      if (chainProgress?.stage) {
-        ui.write(`Registration chain advanced to: ${chainProgress.stage}.`);
+      const cpd = ensurePlanningProfessionalState(journey);
+      if (cpd) ui.write(`CPD logged this season: ${cpd.cpdHours}/${cpd.cpdTarget}h.`);
+      if (didRenewal && chainProgress?.stage) {
+        ui.write('Registration is current again; the renewal is on file.');
       }
       break;
     }
@@ -1767,7 +2036,10 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       // same day; Balanced Approach is the one that costs you personally,
       // because holding four interests level in one session is a long day.
       const choices = buildValuesWorkshopChoices();
-      const pick = await ui.promptChoice('Choose values focus:', choices);
+      const pick = await ui.promptChoice(`Values now: ${formatPlanningValues(journey)}. Each needs ${PLANNING_VALUES_FLOOR}% before the engagement and the submission go ahead. Choose the focus:`, choices);
+      if (!pick || pick.value === 'values_back' || !pick.value) {
+        return { cancelled: true };
+      }
 
       switch (pick.value) {
         case 'bio':
@@ -1799,19 +2071,24 @@ export async function processAction(game, actionValue, seasonInfo = null) {
       }
 
       spendDay(journey);
-      applyProtagonistCost(journey, { energy: 10, stress: 5 });
+      applyProtagonistCost(journey, VALUES_WORKSHOP_COST);
       applyPlanningProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 1 });
-      ui.write('Values workshop completed. Balance updated.');
+      ui.write(`Values workshop completed: ${formatPlanningValues(journey)}.`);
+      const stillShort = getValuesGateDeficits(journey);
+      if (stillShort.length) {
+        ui.writeWarning(`Still under ${PLANNING_VALUES_FLOOR}%: ${formatValuesGateDeficits(stillShort)}.`);
+      }
       break;
     }
 
     case 'timber':
-      // Timber supply analysis: a day of analysis time buys timber standing.
-      journey.values.timberSupply = Math.min(100, journey.values.timberSupply + 12);
+      // Timber supply analysis: a day of analysis time buys timber standing,
+      // and the volume it finds comes out of the other objectives.
+      applyLaneValueDrift(journey, 'timber');
       spendDay(journey);
       applyProtagonistCost(journey, { energy: 10, stress: 5 });
       applyPlanningProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 1 });
-      ui.write(`Timber supply analysis completed. Timber: ${journey.values.timberSupply}%. The day came out of the analysis calendar.`);
+      ui.write(`Timber supply analysis completed: ${formatPlanningValues(journey)}. The day came out of the analysis calendar.`);
       break;
 
     case 'email': {
@@ -1868,26 +2145,34 @@ export async function processAction(game, actionValue, seasonInfo = null) {
  * out of you on top.
  */
 export const BALANCED_WORKSHOP_SURCHARGE = { energy: 8, stress: 6 };
+/** What any workshop day costs the planner. */
+export const VALUES_WORKSHOP_COST = { energy: 10, stress: 5 };
 
 /**
  * Build the Values Workshop sub-menu. Every emphasis is one day's session, so
  * all five are always on the table — Balanced Approach pays for its spread in
- * energy and stress instead of in hours.
+ * energy and stress instead of in hours. Each line carries the whole day's
+ * cost, and Back leaves the day unspent.
  * @returns {Array<{label: string, description: string, value: string}>}
  */
 export function buildValuesWorkshopChoices() {
+  const dayCost = `-${VALUES_WORKSHOP_COST.energy} energy, +${VALUES_WORKSHOP_COST.stress} stress`;
   const choices = [
-    { label: 'Emphasize Biodiversity', description: '+8 bio, -3 timber', value: 'bio' },
-    { label: 'Emphasize Timber Supply', description: '+8 timber, -3 bio', value: 'timber_v' },
-    { label: 'Emphasize Community', description: '+8 community, -2 timber (viewscape and access commitments cost volume)', value: 'community' },
-    { label: 'Emphasize First Nations', description: '+8 First Nations values, -2 timber (heritage and referral commitments cost volume)', value: 'fn' }
+    { label: 'Emphasize Biodiversity', description: `+8 biodiversity, -3 timber | ${dayCost}`, value: 'bio' },
+    { label: 'Emphasize Timber Supply', description: `+8 timber, -3 biodiversity | ${dayCost}`, value: 'timber_v' },
+    { label: 'Emphasize Community', description: `+8 community, -2 timber (viewscape and access commitments cost volume) | ${dayCost}`, value: 'community' },
+    { label: 'Emphasize First Nations', description: `+8 First Nations values, -2 timber (heritage and referral commitments cost volume) | ${dayCost}`, value: 'fn' }
   ];
 
+  const balancedEnergy = VALUES_WORKSHOP_COST.energy + BALANCED_WORKSHOP_SURCHARGE.energy;
+  const balancedStress = VALUES_WORKSHOP_COST.stress + BALANCED_WORKSHOP_SURCHARGE.stress;
   choices.push({
     label: 'Balanced Approach',
-    description: `+3 all values, but a long day: -${BALANCED_WORKSHOP_SURCHARGE.energy} energy, +${BALANCED_WORKSHOP_SURCHARGE.stress} stress`,
+    description: `+3 all values, but a long day | -${balancedEnergy} energy, +${balancedStress} stress`,
     value: 'balanced'
   });
+
+  choices.push({ label: 'Back', description: 'Return to the day', value: 'values_back' });
 
   return choices;
 }
@@ -1902,19 +2187,13 @@ function applyProtagonistCost(journey, costs) {
   }
 }
 
-function getValuesGateDeficits(journey) {
-  const values = journey?.values || {};
-  return [
-    { label: 'Bio', value: values.biodiversity ?? 0 },
-    { label: 'Timber', value: values.timberSupply ?? 0 },
-    { label: 'Community', value: values.communityNeeds ?? 0 },
-    { label: 'FN', value: values.firstNationsValues ?? 0 }
-  ].filter((entry) => entry.value < 25);
+export function getValuesGateDeficits(journey) {
+  return getPlanningValueEntries(journey).filter((entry) => entry.value < PLANNING_VALUES_FLOOR);
 }
 
 function formatValuesGateDeficits(deficits) {
   if (!deficits.length) return 'all values ready';
-  return deficits.map((entry) => `${entry.label} ${entry.value}%`).join(', ');
+  return deficits.map((entry) => `${entry.label} ${entry.value}%/${PLANNING_VALUES_FLOOR}%`).join(', ');
 }
 
 async function advanceToNextDay(game) {
@@ -1927,10 +2206,15 @@ async function advanceToNextDay(game) {
   const daysRemainingBeforeAdvance = Number.isFinite(journey.deadline)
     ? journey.deadline - journey.day
     : null;
-  if (daysRemainingBeforeAdvance !== null && daysRemainingBeforeAdvance <= 4 && journey.plan.phase !== 'ministerial_approval') {
-    journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
-    if (journey.protagonist) {
-      journey.protagonist.stress = Math.min(100, journey.protagonist.stress + 6);
+  // A file at the District Manager is not an approved one: the old FSP runs
+  // out on the same date either way, so the warning stands. The licensee's
+  // pressure lands on a file that has not yet reached the district.
+  if (daysRemainingBeforeAdvance !== null && daysRemainingBeforeAdvance <= 4 && !journey.isComplete) {
+    if (journey.plan.phase !== 'ministerial_approval') {
+      journey.resources.politicalCapital = Math.max(0, journey.resources.politicalCapital - 2);
+      if (journey.protagonist) {
+        journey.protagonist.stress = Math.min(100, journey.protagonist.stress + 6);
+      }
     }
     ui.writeWarning('The current FSP expires soon. Every day without a replacement is a day the licence cannot apply for new cutting permits.');
   }
@@ -1958,6 +2242,7 @@ async function advanceToNextDay(game) {
   }
 
   journey.day++;
+  closeDeskDay(journey);
   startDay(journey);
 
   // Protagonist recovery
@@ -1997,6 +2282,15 @@ async function advanceToNextDay(game) {
   }
 
   ui.write(`Planning team burn: -$${PLANNING_DAILY_BURN}.`);
+}
+
+/**
+ * Close the file on the spot if what it runs on is gone.
+ * @returns {boolean} true when the run has ended
+ */
+function endsFileNow(game) {
+  checkGameOver(game);
+  return Boolean(game.journey.isGameOver);
 }
 
 function checkGameOver(game) {

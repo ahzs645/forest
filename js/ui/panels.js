@@ -5,8 +5,9 @@
 
 import { progressBar, box, PROGRESS } from '../ascii.js';
 import { getCrewDisplayInfo, getActiveCrewCount, getAverageMorale } from '../crew.js';
-import { FIELD_RESOURCES, DESK_RESOURCES, getResourcePercentage } from '../resources.js';
+import { FIELD_RESOURCES, DESK_RESOURCES, formatDollars, getResourcePercentage } from '../resources.js';
 import { getOperationalProgress } from '../journey.js';
+import { withShortcutWatch } from '../events/shortcutRecord.js';
 
 function escapeHtml(text) {
   return String(text ?? '')
@@ -35,7 +36,9 @@ export const PanelsMixin = {
    * @param {Array}  status.alerts - [{ level: 'ok'|'warn'|'danger', text }]
    */
   setMissionStatus(status) {
-    this._missionStatus = status || null;
+    // What the run's shortcuts left standing (watch flags, open files, a
+    // determination on its way) rides on every mode's panel.
+    this._missionStatus = withShortcutWatch(status || null, this._currentJourney);
     this._renderMissionPanel();
   },
 
@@ -299,7 +302,7 @@ export const PanelsMixin = {
   /**
    * Update the resources panel
    * @param {Object} resources - Current resources
-   * @param {string} journeyType - 'field' or 'desk'
+   * @param {string} journeyType - 'field', 'desk' or 'manager'
    */
   updateResourcesPanel(resources, journeyType) {
     if (!this.resourcesPanel) return;
@@ -325,8 +328,15 @@ export const PanelsMixin = {
       const row = document.createElement('div');
       row.className = 'resource-row';
 
-      const displayLabel = key === 'food' ? 'FOOD (PD)' : def.shortLabel;
-      const displayValue = key === 'food' ? `${Math.round(value)} pd` : Math.round(value);
+      // The desk calls this meter district goodwill everywhere else; only
+      // the GM's board speaks of political capital.
+      const displayLabel = key === 'food' ? 'FOOD (PD)'
+        : key === 'politicalCapital' && journeyType !== 'manager' ? 'GOODWILL'
+          : def.shortLabel;
+      const rounded = Math.round(value);
+      const displayValue = key === 'food' ? `${rounded} pd`
+        : key === 'budget' ? `${rounded < 0 ? '-' : ''}$${Math.abs(rounded).toLocaleString('en-CA')}`
+          : rounded;
       row.innerHTML = `
         <span class="resource-label">${displayLabel}</span>
         <span class="resource-bar-text ${fillClass}">${progressBar(percentage, 10, false)}</span>
@@ -364,7 +374,7 @@ export const PanelsMixin = {
       ${data.terrain ? `<div class="location-info">Terrain: ${data.terrain}</div>` : ''}
       ${data.weather ? `<div class="location-weather">Weather: ${data.weather}</div>` : ''}
       ${data.phase ? `<div class="location-info">Phase: ${data.phase}</div>` : ''}
-      ${data.hazards?.length ? `<div class="location-info">Hazards: ${data.hazards.join(', ')}</div>` : ''}
+      ${data.hazards?.length ? `<div class="location-info">Hazards: ${data.hazards.map((hazard) => String(hazard).replace(/_/g, ' ')).join(', ')}</div>` : ''}
     `;
   },
 
@@ -420,7 +430,7 @@ export const PanelsMixin = {
       `Weather: ${journey.weather?.name || 'Clear'}`,
       '',
       `Progress: ${progressBarText} ${progress}%`,
-      `Traverse: ${Math.round(journey.distanceTraveled)}/${journey.totalDistance} km`,
+      `Traverse: ${Number((journey.distanceTraveled || 0).toFixed(1))}/${journey.totalDistance} km`,
       '',
       `Crew: ${getActiveCrewCount(journey.crew)}/${journey.crew.length} active`,
       `Morale: ${Math.round(getAverageMorale(journey.crew))}%`
@@ -467,7 +477,7 @@ export const PanelsMixin = {
 
     lines.push('');
     lines.push(`Team: ${getActiveCrewCount(journey.crew)}/${journey.crew?.length || 0} active`);
-    lines.push(`Budget: $${Math.round(journey.resources.budget).toLocaleString()}`);
+    lines.push(`Budget: ${formatDollars(journey.resources.budget)}`);
 
     return box(lines, { double: true, title: 'STATUS' });
   },

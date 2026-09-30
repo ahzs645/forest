@@ -4,6 +4,7 @@
  */
 
 import { JOURNEY_MILESTONES, MILESTONE_COPY } from './constants.js';
+import { assessSilvicultureProgram } from '../data/silvicultureProgram.js';
 
 export function clampRatio(value) {
   return Math.max(0, Math.min(1, value));
@@ -48,12 +49,10 @@ export function getOperationalProgress(journey) {
       return Math.round(safeProgressRatio(journey.distanceTraveled, journey.totalDistance) * 100);
     }
 
-    case 'silviculture': {
-      const plantingRatio = safeProgressRatio(journey?.planting?.blocksPlanted, journey?.planting?.blocksToPlant);
-      const surveyRatio = safeProgressRatio(journey?.surveys?.freeGrowingComplete, journey?.surveys?.freeGrowingTarget);
-      const brushingRatio = safeProgressRatio(journey?.brushing?.hectaresComplete, journey?.brushing?.hectaresTarget);
-      return Math.round((plantingRatio * 0.65 + surveyRatio * 0.25 + brushingRatio * 0.10) * 100);
-    }
+    case 'silviculture':
+      // The one definition of delivered the win and the grade use, so a
+      // milestone cannot fire on planting alone.
+      return Math.round(assessSilvicultureProgram(journey).delivered * 100);
 
     case 'planning': {
       const plan = journey?.plan || {};
@@ -71,15 +70,11 @@ export function getOperationalProgress(journey) {
       return Math.round(safeProgressRatio(journey?.permits?.approved, journey?.permits?.target) * 100);
 
     case 'manager': {
-      // The GM's term is mostly time served, partly how healthy the company
-      // looks while serving it: 60% term progress, 40% average metric health.
-      const termRatio = safeProgressRatio(journey?.day, journey?.deadline);
-      const metricValues = Object.values(journey?.metrics || {})
-        .filter((value) => Number.isFinite(value));
-      const metricRatio = metricValues.length
-        ? clampRatio(metricValues.reduce((sum, value) => sum + value, 0) / metricValues.length / 100)
-        : 0;
-      return Math.round(clampRatio(termRatio * 0.6 + metricRatio * 0.4) * 100);
+      // The GM's year is the calendar: months closed over the term. Mixing in
+      // metric health fired "Mid-year review" after May and "Entering Q4"
+      // after November; the company's health is on the pane and the board.
+      const monthsClosed = Math.max(0, (Number(journey?.day) || 1) - 1);
+      return Math.round(safeProgressRatio(monthsClosed, journey?.deadline) * 100);
     }
 
     default:

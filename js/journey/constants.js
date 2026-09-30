@@ -8,6 +8,15 @@ export const FIELD_DISTANCE_SCALE = 0.5;
 // day on the road rather than four hours of it wedged around camp chores.
 export const BASE_DAILY_TRAVEL_KM = 12;
 export const DAILY_TRAVEL_VARIANCE = 0.12;
+// A leg that ends this close to the next stop finishes it. Nobody camps a
+// few hundred metres short of the landing and burns a whole shift, a tank
+// of diesel and a day of food on the last walk in.
+export const ARRIVAL_SNAP_KM = 1.5;
+// The most ground an event can bank toward the next leg: a good road, a
+// sling load flown ahead, a trapper's route notes. One day's travel at most.
+export const MAX_EVENT_TRAVEL_BONUS_KM = BASE_DAILY_TRAVEL_KM;
+// Days on an empty food box before the crew drives itself out.
+export const STARVATION_WALKOFF_DAYS = 6;
 
 // Role to journey type mapping
 export const ROLE_JOURNEY_TYPES = {
@@ -42,7 +51,7 @@ export const MILESTONE_COPY = {
   planning: {
     25: 'The inventory wall has shape now. The operating area no longer feels theoretical.',
     50: 'Half the plan is standing. The Nations and the public can finally see where this is headed.',
-    75: 'The FSP binder has shape. The District Manager\'s decision is in sight.',
+    75: 'The FSP binder has shape. What is left is earning the District Manager\'s confidence in it.',
     90: 'Last mile to sign-off. One clean submission could carry the plan over the line.'
   },
   permitting: {
@@ -168,3 +177,15 @@ export const DESK_ACTIONS = {
  */
 export const PLANNING_DECISION_GATE = 80;
 export const PLANNING_PRE_SUBMISSION_CAP = 66;
+/**
+ * The District Manager does not sign a plan whose file is this exposed:
+ * scrutiny at or above this, or a regulator's open file on one of the
+ * plan's own shortcuts, holds the decision until it is dealt with.
+ */
+export const PLANNING_SCRUTINY_GATE = 75;
+/**
+ * Every value the plan balances (biodiversity, timber, community, First
+ * Nations) has to clear this before the engagement and the submission go
+ * ahead: an FSP answers every objective government has set, not only timber.
+ */
+export const PLANNING_VALUES_FLOOR = 40;

@@ -12,8 +12,8 @@ import {
 // A modest but representative matrix: every role × every area × every strategy
 // across a handful of seeds. Kept deterministic so the assertions are stable.
 const SEEDS = 8;
-// Re-picked after the Outstanding gate moved to a 67 weighted average.
-const WITNESS_SEED = 1003;
+// Re-picked after the 2026-09 playtest balance pass.
+const WITNESS_SEED = 5;
 const MATRIX = simulateMatrix({
   roles: listSeasonalRoleIds(),
   areas: listAreaIds(),
@@ -31,7 +31,8 @@ test("Outstanding is reachable under a known seed", () => {
   // Regression guard for the reachable-Outstanding tuning pass. The witness
   // seed is re-picked whenever draw-order changes shift the RNG stream (last:
   // the 2026-09 realism pass — region gating, event-pool trims, fallout
-  // resolution led by authored weights).
+  // resolution led by authored weights; then the tier consolidation and
+  // shortcut-economics pass).
   const run = simulateRun({
     roleId: "permitter",
     areaId: "fort-st-john-plateau",
@@ -78,4 +79,14 @@ test("no single issue dominates the matrix beyond a cap", () => {
     share <= 0.45,
     `top issue ${topId} appeared in ${(100 * share).toFixed(1)}% of runs (cap 45%)`,
   );
+});
+
+test("the harness starts neighbouring seeds on unrelated streams", async () => {
+  const { mixSeed } = await import("../js/engine/simulate.js");
+  const { makeRng } = await import("../js/engine/rng.js");
+  const firstDraws = Array.from({ length: 50 }, (_, i) => makeRng(mixSeed(1000 + i))());
+  assert.ok(Math.min(...firstDraws) < 0.1 && Math.max(...firstDraws) > 0.9, "seeds 1000-1049 should not share an opening draw");
+  // Unscrambled, the same 50 seeds open within a fraction of a percent of each other.
+  const raw = Array.from({ length: 50 }, (_, i) => makeRng(1000 + i)());
+  assert.ok(Math.max(...raw) - Math.min(...raw) < 0.05);
 });

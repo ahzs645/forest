@@ -168,6 +168,12 @@
   &.tag-risky {
     color: var(--danger);
   }
+
+  // A shortcut option: it breaks a rule, whatever the odds say.
+  &.tag-off-book {
+    color: var(--danger);
+    text-decoration: underline;
+  }
 }
 
 // Keyboard hint row under the options list
@@ -211,7 +217,7 @@
   flex-direction: column;
   gap: var(--space-sm);
   padding: var(--space-md);
-  background: rgba(0, 20, 10, 0.7);
+  background: var(--card);
   border: 1px solid var(--border-color);
   border-left: 3px solid var(--border-color);
   text-align: left;
@@ -284,4 +290,27 @@
   font-size: var(--font-size-xs);
   color: var(--fg-muted);
   line-height: 1.5;
+}
+
+// An option shown for its reason rather than offered (the crew for it is on
+// days off). Dim text, no hover bar, never the selection.
+.choice-btn:disabled,
+.decision-card:disabled {
+  cursor: not-allowed;
+  color: var(--text-dim);
+
+  .choice-key,
+  .choice-label,
+  .card-label {
+    color: var(--text-dim);
+  }
+
+  &:hover {
+    background: transparent;
+    border-color: var(--border-color);
+  }
+}
+
+.decision-card:disabled:hover {
+  background: var(--card);
 }

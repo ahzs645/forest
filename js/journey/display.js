@@ -53,7 +53,9 @@ export function formatJourneyLog(journey) {
     return [];
   }
 
-  const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon' ? 'Shift' : 'Day';
+  const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon'
+    ? 'Shift'
+    : journey.journeyType === 'manager' ? 'Month' : 'Day';
   const typeIcons = {
     travel: '→',
     event: '!',

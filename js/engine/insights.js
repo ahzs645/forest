@@ -44,23 +44,44 @@ const CONSEQUENCE_INFO = {
     title: "Delivery dividend",
     cause: "Reviewers trusted the file, so referrals and reviews came back clean and the schedule got room back.",
   },
+  "steady-program": {
+    title: "Steady program",
+    cause: "No meter was left behind, so the weakest one had room to recover.",
+  },
+  // Its cause is the engine's own line, which says whether the season's
+  // calls worked on the meter or it only had room to recover.
   "comeback-window": {
     title: "Comeback window",
-    cause: "The file was still salvageable, so targeted effort steadied your weakest meter.",
   },
   "field-discipline-rebound": {
     title: "Field-discipline rebound",
-    cause: "The crew was still delivering, so pausing to clean up documentation clawed back some compliance.",
+    cause: "This season's calls put work back into the file while the program kept producing, so the clean-up clawed back some compliance.",
+    shortfallCause: "The season fell short, but its calls put work back into the file, so the clean-up clawed back some compliance.",
   },
   "stand-recovery": {
     title: "Stands recovering",
     cause: "Compliance stayed strong, so retention, riparian buffers, and regeneration had room to work.",
+    shortfallCause: "The season fell short, but the year's compliance record held, so retention, riparian buffers, and regeneration kept working.",
   },
   "ecological-strain": {
     title: "Ecological strain",
     cause: "Production stayed high while compliance sat low, and the stands are starting to show it.",
+    shortfallCause: "Compliance sat low against the year's earlier production, and the stands are starting to show it.",
   },
 };
+
+// "steady-program" → "Steady program": a consequence added to the engine
+// without copy here must still read as words, never as a bare id.
+function humanizeConsequenceId(id) {
+  const words = String(id || "").replace(/[-_]+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Season consequence";
+}
+
+// The engine logs an option as a fragment; as a cause it reads as a sentence.
+function asSentence(text) {
+  const trimmed = String(text || "").trim();
+  return !trimmed || /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
 
 function formatEffectText(effects = {}) {
   const pieces = Object.entries(effects)
@@ -73,13 +94,16 @@ function formatEffectText(effects = {}) {
  * Pair each triggered consequence id with the cause copy and the metric hit the
  * engine actually applied this round, so the UI can show a "why this happened"
  * timeline instead of a list of opaque ids.
+ *
+ * `fellShort`: the campaign season behind these meters failed. The rules read
+ * the year's meters, so a cause that says the crew was delivering would
+ * contradict the review above it; those ids carry a `shortfallCause`.
  */
-export function describeConsequences(state, ids = []) {
+export function describeConsequences(state, ids = [], { fellShort = false } = {}) {
   const round = Number(state?.round || 0);
   const history = Array.isArray(state?.history) ? state.history : [];
 
   return ids.map((id) => {
-    const info = CONSEQUENCE_INFO[id] || { title: id, cause: "" };
     const entry = [...history]
       .reverse()
       .find(
@@ -88,10 +112,14 @@ export function describeConsequences(state, ids = []) {
           && item?.id === id
           && Number(item?.round) === round,
       );
+    // Uncatalogued ids fall back to the title the engine logged, then to
+    // the id in words.
+    const info = CONSEQUENCE_INFO[id]
+      || { title: entry?.title || humanizeConsequenceId(id), cause: "" };
     return {
       id,
-      title: info.title,
-      cause: info.cause,
+      title: info?.title || entry?.title || id,
+      cause: (fellShort && info?.shortfallCause) || info?.cause || asSentence(entry?.option),
       effectText: formatEffectText(entry?.effects || {}),
     };
   });
@@ -103,9 +131,29 @@ export function describeConsequences(state, ids = []) {
  * Fall decision" connection. Returns "" when the card surfaced for other
  * reasons (area context, low metric, random operational noise).
  */
+// Refusing or reporting an offer never schedules fallout today, but the label
+// check keeps a future "report it" follow-up from reading as "you took it".
+const SHORTCUT_NOT_TAKEN = /^(decline|say no|document and report)\b/i;
+
+function isTakenShortcut(causedBy) {
+  if (causedBy.kind === "shortcut" || causedBy.shortcut === true || causedBy.tookShortcut === true) return true;
+  return causedBy.sourceType === "temptation" && !SHORTCUT_NOT_TAKEN.test(String(causedBy.option || ""));
+}
+
+// Fallout from a shortcut names the act itself ("Because you took: Fudge the
+// Species Composition — your fall shortcut."), not the generic option label
+// every offer shares; who caught it is the card's own surfaceReason. Any other
+// scheduled card names the decision that put it on the calendar.
 export function describeCardCause(card) {
   const causedBy = card?.causedBy;
   if (!causedBy) return "";
+  const shortcutTitle = isTakenShortcut(causedBy)
+    ? card.sourceTitle || causedBy.sourceTitle || causedBy.title
+    : "";
+  if (shortcutTitle) {
+    const seasonWord = String(causedBy.season || "").split(" ")[0];
+    return `Because you took: ${shortcutTitle}${seasonWord ? ` — your ${seasonWord} shortcut` : ""}.`;
+  }
   const season = causedBy.season ? `${causedBy.season} ` : "";
   const option = causedBy.option ? `“${causedBy.option}”` : "an earlier call";
   return `Connected to your ${season}decision: ${option}.`;

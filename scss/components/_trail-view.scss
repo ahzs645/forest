@@ -1,6 +1,20 @@
 // A compact, persistent diorama. The field log and choices retain their own
 // scroll areas; short phones start with the picture folded away.
+//
+// TUI dark keeps the full-colour picture; the phosphor themes see it in their
+// own light (js/ui/trailView.js paints the canvas from the same tokens), the
+// way the career forest does.
 .trail-view {
+  --tv-bg: #12242c;
+  --tv-fg: #d3dfcc;
+  --tv-muted: #9cbbac;
+  --tv-caption: #bdcec5;
+  --tv-rule: #36504f;
+  --tv-hover: #27423f;
+  --tv-focus: #edc977;
+  --tv-track: #28423e;
+  --tv-fill: #c5d899;
+
   flex: 0 0 clamp(180px, 27dvh, 250px);
   min-height: 140px;
   max-height: 65%;
@@ -10,8 +24,8 @@
   overflow: hidden;
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  background: #12242c;
-  color: #d3dfcc;
+  background: var(--tv-bg);
+  color: var(--tv-fg);
 
   &[hidden] { display: none; }
   &.is-collapsed { flex: 0 0 44px; min-height: 44px; }
@@ -21,27 +35,42 @@
     min-height: 44px;
     padding: 0 10px;
     border: 0;
-    border-left: 1px solid #36504f;
+    border-left: 1px solid var(--tv-rule);
     background: transparent;
-    color: #d3dfcc;
+    color: var(--tv-fg);
     font: inherit;
     font-size: 11px;
     cursor: pointer;
-    &:hover { background: #27423f; }
-    &:focus-visible { outline: 2px solid #edc977; outline-offset: -3px; }
+    &:hover { background: var(--tv-hover); }
+    &:focus-visible { outline: 2px solid var(--tv-focus); outline-offset: -3px; }
   }
 }
-.trail-view-bar { display: flex; flex: 0 0 44px; align-items: stretch; border-bottom: 1px solid #36504f; }
+body[data-theme='green'],
+body[data-theme='amber'],
+body[data-theme='ice'] {
+  .trail-view {
+    --tv-bg: var(--surface-inset);
+    --tv-fg: var(--text);
+    --tv-muted: var(--text-muted);
+    --tv-caption: var(--text-muted);
+    --tv-rule: var(--border);
+    --tv-hover: var(--selection);
+    --tv-focus: var(--accent);
+    --tv-track: var(--border);
+    --tv-fill: var(--accent);
+  }
+}
+.trail-view-bar { display: flex; flex: 0 0 44px; align-items: stretch; border-bottom: 1px solid var(--tv-rule); }
 .trail-view-heading { flex: 1; min-width: 0; padding: 5px 10px; display: flex; flex-direction: column; justify-content: center; }
-.trail-view-kicker { font-size: 9px; letter-spacing: 2px; color: #9cbbac; }
+.trail-view-kicker { font-size: 9px; letter-spacing: 2px; color: var(--tv-muted); }
 .trail-view-title { font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .trail-picture {
   min-height: 0; flex: 1; display: flex; flex-direction: column;
   &[hidden] { display: none; }
   canvas { display: block; width: 100%; flex: 1; min-height: 0; height: 150px; }
 }
-.trail-caption { flex: 0 0 20px; padding: 0 10px; font-size: 10px; color: #bdcec5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.trail-progress { flex: 0 0 3px; background: #28423e; span { display: block; height: 3px; background: #c5d899; } }
+.trail-caption { flex: 0 0 20px; padding: 0 10px; font-size: 10px; color: var(--tv-caption); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trail-progress { flex: 0 0 3px; background: var(--tv-track); span { display: block; height: 3px; background: var(--tv-fill); } }
 .terminal { min-height: 0; }
 @media (max-width: 600px) {
   .trail-view { margin: 3px 6px 0; flex-basis: 190px; max-height: 65%; }
@@ -58,4 +87,16 @@
   }
   .game-screen:has(.trail-view:not(.is-collapsed):not([hidden])) .action-area { flex-shrink: 0; }
   .trail-view { max-height: 65%; min-height: 140px; }
+}
+
+// A shortcut or its fallout is a legal call, and its pitch and odds are the
+// part that must be read. While one is on screen the picture folds to its
+// bar and gives the log its height; the next card brings it back.
+.terminal-window:has(.term-shortcut.term-anchor) .trail-view:not(.is-collapsed):not([hidden]) {
+  flex: 0 0 44px;
+  min-height: 44px;
+
+  .trail-picture,
+  .trail-caption,
+  .trail-progress { display: none; }
 }

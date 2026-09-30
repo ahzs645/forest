@@ -22,7 +22,12 @@ test('campaign plays all four seasons through the year-end review', async ({ pag
   await page.waitForLoadState('networkidle');
   await page.click('#campaign-btn');
 
-  const skip = /Glossary|Intel|Status|Help|Restart|Review the|More context|locked|NEEDS|Never mind|Program Binder|Consult|Briefing$|Camp & Support/i;
+  // "Choose another method" backs out of a costed confirmation (the release
+  // invoice); its "Back to the release options" would otherwise win on
+  // /Back to/ below and loop the bot between the two prompts all spring.
+  // "Waits for <crew>, on days off until day N" is an option the card shows
+  // but cannot run today (it says why): a player passes it over, so the bot does.
+  const skip = /Glossary|Intel|Status|Help|Restart|Review the|More context|locked|NEEDS|Never mind|Program Binder|Consult|Briefing$|Camp & Support|Choose another method|Waits for|days off until/i;
   // Objective-focused priorities keep the bot from wandering: close packages,
   // travel the mainline, and always take flow-advancing prompts.
   const prefer = [
@@ -54,9 +59,15 @@ test('campaign plays all four seasons through the year-end review', async ({ pag
       break;
     }
 
+    // A disabled row (a crew on days off) is on the card, not a choice. Keep
+    // each label's position among all the buttons: indexing the filtered
+    // list into the unfiltered one clicked the disabled row above the
+    // intended option, and the bot waited out the click every pass.
     const buttons = page.locator('#choices button');
-    const labels = await buttons.evaluateAll((nodes) =>
-      nodes.filter((n) => n.offsetParent !== null && !n.disabled).map((n) => n.innerText.replace(/\s+/g, ' ').trim()));
+    const choices = await buttons.evaluateAll((nodes) => nodes
+      .map((n, at) => ({ at, live: n.offsetParent !== null && !n.disabled, label: n.innerText.replace(/\s+/g, ' ').trim() }))
+      .filter((choice) => choice.live));
+    const labels = choices.map((choice) => choice.label);
     if (!labels.length) continue;
 
     if (travelDestination) {
@@ -99,7 +110,7 @@ test('campaign plays all four seasons through the year-end review', async ({ pag
     // Travel labels read "Move on to <stop> | Waypoint — …" or "| Next block on the file; …".
     const destination = labels[index].match(/Move on to (.+?) (?:Waypoint —|Next block on the file|Cover ground)/);
     if (destination) travelDestination = destination[1];
-    await buttons.nth(index).click({ timeout: 3000 }).catch(() => {});
+    await buttons.nth(choices[index].at).click({ timeout: 3000 }).catch(() => {});
   }
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);

@@ -24,6 +24,8 @@ test('scheduled issue delay counts down and issue becomes drawable', () => {
 
   assert.deepEqual(state.pendingIssues, [{ id: 'pine-beetle-escalation', delay: 1 }]);
 
+  // Flights intensify in summer: the follow-up lands in the next season's draw.
+  state.round = 2;
   const firstDraw = drawIssue(state, () => 0);
   assert.equal(firstDraw?.id, 'pine-beetle-escalation');
   assert.deepEqual(state.pendingIssues, []);

@@ -19,7 +19,7 @@ export const DESK_EVENTS = [...eventsData, ...(managerEventsData || []), ...(leg
  * @param {string} phase - Current desk phase
  * @returns {Object[]} Filtered events
  */
-export function getApplicableDeskEvents(phase) {
+export function getApplicableDeskEvents(_phase) {
   // All events are generally applicable
   return DESK_EVENTS;
 }
@@ -31,21 +31,21 @@ export function getApplicableDeskEvents(phase) {
  * @returns {Object|null} Selected event or null
  */
 export function selectRandomDeskEvent(events, modifiers = {}) {
-  const { stressModifier = 1, crisisMode = false, typeMultipliers = {} } = modifiers;
+  const { stressModifier = 1, crisisMode = false, typeMultipliers = {}, rng = Math.random } = modifiers;
 
   // In crisis mode, negative events more likely
   const crisisMultiplier = crisisMode ? 1.5 : 1;
 
   // Shuffle before rolling — see selectRandomFieldEvent: file order must not
   // decide which events dominate.
-  for (const event of shuffle(events)) {
+  for (const event of shuffle(events, rng)) {
     const typeMultiplier = Number(typeMultipliers?.[event.type]) || 1;
     let adjustedProb = event.probability * stressModifier * typeMultiplier;
     if (event.severity !== 'positive') {
       adjustedProb *= crisisMultiplier;
     }
     adjustedProb = Math.max(0, Math.min(0.95, adjustedProb));
-    if (Math.random() < adjustedProb) {
+    if (rng() < adjustedProb) {
       return event;
     }
   }
@@ -53,10 +53,10 @@ export function selectRandomDeskEvent(events, modifiers = {}) {
   return null;
 }
 
-function shuffle(items) {
+function shuffle(items, rng = Math.random) {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;

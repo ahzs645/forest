@@ -31,10 +31,11 @@ test('road permit choice shows the next real paperwork stage after each complete
   journey.area = { id: 'fraser-plateau', tags: ['road'] };
   journey.professional.chains.roadPermit.stepIndex = 0;
   for (const stage of ['Road screen', 'Road map exhibits', 'Road submission', 'Maintenance conditions']) {
-    const { primary: options } = buildActionOptions(journey);
-    const admin = options.find((option) => option.value === 'professional_admin');
-    assert.ok(admin, 'the road file action should be offered');
-    assert.ok(admin.description.includes(`Stage: ${stage}`), admin.description);
+    const { primary, support } = buildActionOptions(journey);
+    const lane = support.find((option) => option.value === 'lane_file');
+    assert.ok(lane, 'the road file action should be offered');
+    assert.ok(lane.description.includes(`Next step: ${stage}`), lane.description);
+    assert.ok(primary.some((option) => option.value === 'professional_admin'), 'Compliance Admin stays on the menu beside it');
     advanceProfessionalComplianceChain(journey, 'roadPermit');
   }
 });
@@ -64,25 +65,18 @@ test('a travel delay survives local work and is consumed only by the next travel
   assert.equal(journey.travelSetback, 0);
 });
 
-test('planting preview and outcome name the same contractor when using support outside its specialty', async () => {
+test('a saw crew does not plant: with no planting crew the task waits, and says why', async () => {
   const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
   const contractor = journey.contractors.find((entry) => entry.specialty === 'brushing');
   assert.ok(contractor);
   contractor.isActive = true;
   journey.contractors = [contractor];
-  const messages = [];
-  let preview = '';
+  let plant = null;
   const noop = () => {};
   const ui = {
-    clear: noop, writeHeader: noop, writeWarning: noop, writeDanger: noop, updateAllStatus: noop,
-    write(message) { messages.push(message); },
-    writePositive(message) { messages.push(message); },
+    clear: noop, write: noop, writeHeader: noop, writeWarning: noop, writeDanger: noop, writePositive: noop, updateAllStatus: noop,
     async promptChoice(_prompt, options) {
-      const plant = options.find((option) => option.value === 'plant');
-      if (plant) {
-        preview = plant.description;
-        return plant;
-      }
+      plant ||= options.find((option) => option.value === 'plant') || null;
       return options.find((option) => option.value === 'end') || options[0];
     },
   };
@@ -93,7 +87,7 @@ test('planting preview and outcome name the same contractor when using support o
   } finally {
     Math.random = random;
   }
-  assert.ok(preview.includes(`on the block: ${contractor.name}`), preview);
-  assert.ok(messages.includes(`Working crew: ${contractor.name}.`));
-  assert.ok(journey.planting.seedlingsPlanted > 0);
+  assert.ok(plant?.disabled, 'planting is on the card, disabled');
+  assert.equal(plant.description, 'No planting crew on the program.');
+  assert.equal(journey.planting.seedlingsPlanted, 0);
 });

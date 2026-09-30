@@ -3,8 +3,9 @@ import { humanizeLabel, normalizeBudgetDelta } from "./shared.js";
 export const VALID_RISK_CLASSES = ["routine", "calculated", "unethical"];
 export const GENERIC_BC_AREA_TAG = "bc-wide";
 
+// One-way: a "bc-wide" card is eligible in the north, but a card tagged
+// "northern-bc" never leaks south just because every area is "bc-wide".
 const GENERIC_AREA_TAG_COMPATIBILITY = {
-  "northern-bc": [GENERIC_BC_AREA_TAG],
   [GENERIC_BC_AREA_TAG]: ["northern-bc"],
 };
 
@@ -296,7 +297,7 @@ const PRESSURED_METRIC_PROMPTS = {
 const SEASONAL_TASK_PROMPTS = {
   spring: "How do you set the season up?",
   summer: "How do you play it with the season running?",
-  fall: "What do you lock in before freeze-up?",
+  fall: "What do you lock in before winter?",
   winter: "What do you square away before spring?",
 };
 

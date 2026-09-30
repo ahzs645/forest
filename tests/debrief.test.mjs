@@ -28,6 +28,7 @@ function makeStubUi({ pickIndex = () => 0 } = {}) {
     writeDivider(text) { calls.push({ fn: 'writeDivider', text }); },
     writePositive(text) { calls.push({ fn: 'writePositive', text }); },
     writeWarning(text) { calls.push({ fn: 'writeWarning', text }); },
+    writeDanger(text) { calls.push({ fn: 'writeDanger', text }); },
     async promptChoice(prompt, options) {
       calls.push({ fn: 'promptChoice', prompt, options: options.map((o) => o.value) });
       return options[pickIndex(options)] || options[0];
@@ -37,7 +38,7 @@ function makeStubUi({ pickIndex = () => 0 } = {}) {
 
 function textOf(ui) {
   return ui.calls
-    .filter((c) => ['writeHeader', 'write', 'writeDivider', 'writePositive', 'writeWarning'].includes(c.fn))
+    .filter((c) => ['writeHeader', 'write', 'writeDivider', 'writePositive', 'writeWarning', 'writeDanger'].includes(c.fn))
     .map((c) => c.text)
     .join('\n');
 }
@@ -268,7 +269,7 @@ test('planning victory: runFinalDebrief renders every stage through to the servi
   // actually folded and saved -- a stronger signal than merely seeing the
   // "SERVICE RECORD" header, which would still print even if the save step
   // were skipped.
-  assert.match(text, /Career expeditions: 1/, 'stage 5 wrote a persisted career line');
+  assert.match(text, /Career runs on record: 1/, 'stage 5 wrote a persisted career line');
 });
 
 test('planning defeat: runFinalDebrief also renders every stage (parity with victory)', async () => {
@@ -289,8 +290,78 @@ test('planning defeat: runFinalDebrief also renders every stage (parity with vic
 
   const text = textOf(ui);
   assert.match(text, /THE WORK STOPS HERE/, 'stage 1: defeat sign-off framing');
+  // The reason the run ended is the first thing said, before the archive
+  // prompt - not two screens later.
+  const reasonAt = ui.calls.findIndex((c) => c.fn === 'writeDanger' && c.text === 'Budget exhausted');
+  const promptAt = ui.calls.findIndex((c) => c.fn === 'promptChoice');
+  assert.ok(reasonAt !== -1 && reasonAt < promptAt, 'the loss reason is shown before the first prompt');
   assert.match(text, /EXPEDITION FAILED/, 'stage 2: defeat screen');
   assert.match(text, /FINAL STATISTICS/, 'stage 2: final statistics');
   assert.match(text, /PERFORMANCE REVIEW/, 'stage 4: performance review');
   assert.match(text, /SERVICE RECORD/, 'stage 5: service record');
+});
+
+test('a failed planning or permitting file is handed over, not sealed or archived as a finished year', () => {
+  const planning = getFinalReportPrompt('planning', { victory: false });
+  assert.doesNotMatch(planning.prompt, /seal/i);
+  assert.match(planning.prompt, /did not get through/);
+  assert.ok(planning.options.every((option) => !/\bSeal\b/.test(option.label)));
+  assert.deepEqual(planning.options.map((option) => option.value).sort(), ['integrity', 'people', 'spin']);
+
+  const permitting = getFinalReportPrompt('permitting', { victory: false });
+  assert.match(permitting.prompt, /someone else/);
+  assert.doesNotMatch(permitting.prompt, /archive the year/);
+
+  assert.match(getFinalReportPrompt('planning').prompt, /seal/, 'an approved plan is still sealed');
+  assert.match(getFinalReportPrompt('permitting', { victory: true }).prompt, /archive the year/);
+});
+
+test('desk roles get their own narration for spin and people, not the field season\'s', () => {
+  for (const journeyType of ['planning', 'permitting']) {
+    const journey = { journeyType, crew: [] };
+    const lines = [
+      ...resolveFinalReport('spin', journey, () => 0.99).lines,
+      ...resolveFinalReport('spin', journey, () => 0.0).lines,
+      ...resolveFinalReport('people', journey).lines,
+    ].join(' ');
+    assert.doesNotMatch(lines, /check survey|tidy operation/, journeyType);
+  }
+  assert.doesNotMatch(resolveFinalReport('people', { journeyType: 'planning', crew: [] }).lines[0], /thank-you notes/);
+});
+
+test('the debrief shows a failed planner the hand-over prompt', async () => {
+  const ui = makeStubUi();
+  const journey = makePlanningJourney({
+    day: 34,
+    deadline: 33,
+    plan: { phase: 'ministerial_approval', dataCompleteness: 90, analysisQuality: 85, stakeholderBuyIn: 80, ministerialConfidence: 40 },
+  });
+  await runFinalDebrief(ui, journey, false);
+  const prompts = ui.calls.filter((call) => call.fn === 'promptChoice').map((call) => call.prompt).join('\n');
+  assert.doesNotMatch(prompts, /needs your seal/);
+  assert.match(prompts, /did not get through/);
+});
+
+test('on a desk the straight record beats the thank-you notes, and spin loses on average', () => {
+  const rolls = Array.from({ length: 100 }, (_, index) => (index + 0.5) / 100);
+  for (const journeyType of ['planning', 'permitting']) {
+    for (const scrutiny of [0, 30, 70]) {
+      const journey = { journeyType, crew: [], scrutiny };
+      const integrity = resolveFinalReport('integrity', journey).delta;
+      const people = resolveFinalReport('people', journey).delta;
+      const spin = rolls.reduce((sum, roll) => sum + resolveFinalReport('spin', journey, () => roll).delta, 0) / rolls.length;
+      assert.ok(integrity > people, `${journeyType} at ${scrutiny}: integrity ${integrity} vs people ${people}`);
+      assert.ok(spin < 0, `${journeyType} at ${scrutiny}: spin EV ${spin}`);
+    }
+  }
+});
+
+test('spinning an approved plan is not narrated as a failed file', () => {
+  const journey = { journeyType: 'planning', crew: [], scrutiny: 10 };
+  const bust = resolveFinalReport('spin', journey, () => 0.99, { victory: true }).lines.join(' ');
+  assert.doesNotMatch(bust, /beside their own file/);
+  const failed = resolveFinalReport('spin', journey, () => 0.99, { victory: false }).lines.join(' ');
+  assert.match(failed, /beside their own file/);
+  const archive = getFinalReportPrompt('permitting', { victory: true }).options.map((option) => option.label).join(' ');
+  assert.doesNotMatch(archive, /stragglers/, 'a finished queue has no stragglers to fast-close');
 });

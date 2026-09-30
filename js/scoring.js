@@ -3,6 +3,15 @@
  * Calculates a letter grade (A-F) based on journey performance
  */
 
+import { assessSilvicultureProgram } from './data/silvicultureProgram.js';
+import { summarizeIntegrity } from './modes/silvicultureIntegrity.js';
+import { listShortcutsTaken } from './events/shortcutRecord.js';
+import { badBandFloorFor } from './events/selection.js';
+import { ILLEGAL_ACTS } from './data/illegalActs.js';
+import { PLANNING_DECISION_GATE, PLANNING_SCRUTINY_GATE, PLANNING_VALUES_FLOOR } from './journey/constants.js';
+import { getPackageTarget, getPackagesFinalized } from './journey/packages.js';
+import { formatDollars } from './resources.js';
+
 /**
  * Calculate final score for a completed journey
  * @param {Object} journey - Journey state at end of game
@@ -17,34 +26,34 @@ export function calculateScore(journey, victory) {
   switch (journey.journeyType) {
     case 'recon':
     case 'field':
-      components.speed = scoreReconSpeed(journey);
-      components.crewWelfare = scoreCrewWelfare(journey);
+      components.speed = scoreReconSpeed(journey, victory);
+      components.crewWelfare = scoreReconCrewWelfare(journey);
       components.resourceEfficiency = scoreResourceEfficiency(journey);
       components.objectives = scoreReconObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
       break;
 
     case 'silviculture':
-      components.speed = scoreSilvicultureSpeed(journey);
+      components.speed = scoreSilvicultureSpeed(journey, victory);
       components.crewWelfare = scoreCrewWelfare(journey);
-      components.resourceEfficiency = scoreDeskResourceEfficiency(journey);
+      components.resourceEfficiency = scoreSilvicultureResources(journey);
       components.objectives = scoreSilvicultureObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
       break;
 
     case 'planning':
-      components.speed = scorePlanningSpeed(journey);
-      components.crewWelfare = { score: 50, label: 'N/A' }; // No crew
-      components.resourceEfficiency = scoreDeskResourceEfficiency(journey);
+      components.speed = scorePlanningSpeed(journey, victory);
+      components.crewWelfare = scoreProtagonistWelfare(journey, victory);
+      components.resourceEfficiency = scoreDeskResourceEfficiency(journey, victory);
       components.objectives = scorePlanningObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
       break;
 
     case 'permitting':
     case 'desk':
-      components.speed = scorePermittingSpeed(journey);
-      components.crewWelfare = { score: 50, label: 'N/A' };
-      components.resourceEfficiency = scoreDeskResourceEfficiency(journey);
+      components.speed = scorePermittingSpeed(journey, victory);
+      components.crewWelfare = scoreProtagonistWelfare(journey, victory);
+      components.resourceEfficiency = scoreDeskResourceEfficiency(journey, victory);
       components.objectives = scorePermittingObjectives(journey, victory);
       components.compliance = scoreSituationsClosedClean(journey);
       break;
@@ -54,7 +63,7 @@ export function calculateScore(journey, victory) {
       components.crewWelfare = scoreCrewWelfare(journey);
       components.resourceEfficiency = scoreManagerResources(journey);
       components.objectives = scoreManagerObjectives(journey, victory);
-      components.compliance = scoreSituationsClosedClean(journey);
+      components.compliance = scoreManagerCompliance(journey);
       break;
   }
 
@@ -71,12 +80,148 @@ export function calculateScore(journey, victory) {
   // reconciles with the total (a silent +10 made "A (100/100)" contradict
   // components that summed to ~94).
   const baseScore = Math.round(weighted);
-  const victoryBonus = victory ? Math.min(10, 100 - baseScore) : 0;
+  // A GM's win is already scored inside the components (the cut-control
+  // band, the issued certificate, the reputation bar), so the flat bonus is
+  // half: at ten it padded every competent year to 100, and the operating
+  // posture and the certificate never showed in the grade. A recon win
+  // already carries its weight in Objectives (a closed file against a partial
+  // one), so it gets no flat bonus at all: +10 on top put every careful
+  // season at 100/100.
+  const bonusless = journey.journeyType === 'recon' || journey.journeyType === 'field';
+  const victoryBonusCap = journey.journeyType === 'manager' ? 5 : 10;
+  const victoryBonus = victory && !bonusless ? Math.min(victoryBonusCap, 100 - baseScore) : 0;
   const scrutinyPenalty = scoreScrutinyPenalty(journey);
-  const totalScore = Math.max(0, baseScore + victoryBonus - scrutinyPenalty);
+  const integrityPenalty = scoreIntegrityPenalty(journey);
+  const scoreCap = scoreFailureCap(journey, victory);
+  const totalScore = Math.min(scoreCap ?? 100, Math.max(0, baseScore + victoryBonus - scrutinyPenalty - integrityPenalty));
   const grade = getLetterGrade(totalScore);
+  const integrityLabel = DESK_ROLES.has(journey.journeyType) ? 'for shortcuts that were noticed or caught' : null;
 
-  return { totalScore, grade, components, victory, baseScore, victoryBonus, scrutinyPenalty };
+  return { totalScore, grade, components, victory, baseScore, victoryBonus, scrutinyPenalty, integrityPenalty, integrityLabel, scoreCap };
+}
+
+/**
+ * Grade points a caught shortcut costs, by how serious the act is
+ * (js/events/selection.js badBandFloorFor: serious harm or a criminal or
+ * federal catcher, a core act, a grey or comic one).
+ */
+const CAUGHT_SHORTCUT_PENALTY = { serious: 12, core: 8, minor: 4 };
+
+/**
+ * What a run's caught shortcuts cost, on top of scrutiny and the
+ * determination's own bill. A silviculture program keeps its own ledger
+ * (js/modes/silvicultureIntegrity.js: a falsified declaration is the file).
+ * Every other role pays per shortcut the institution caught, whether the
+ * determination landed in season or settled at the debrief: on a desk file
+ * closed on day 15 the letter used to arrive after the win and trim a point
+ * or two, so taking every shortcut still graded A.
+ * @param {Object} journey
+ * @returns {number}
+ */
+export function scoreIntegrityPenalty(journey) {
+  if (DESK_ROLES.has(journey?.journeyType)) {
+    // A desk file answers for its off-book calls: a shortcut somebody noticed
+    // is on the record, one that was caught is a finding, and a serious catch
+    // costs more than a minor one. Taking every shortcut on offer used to
+    // grade A 97-98.
+    const conduct = summarizeDeskConduct(journey);
+    const shortcuts = listShortcutsTaken(journey);
+    const caughtShortcuts = shortcuts.filter((shortcut) => shortcut.band === 'caught');
+    // Off-book answers on ordinary cards are caught too, at the flat rate.
+    const otherCaught = Math.max(0, conduct.caught - caughtShortcuts.length);
+    const caughtPoints = caughtShortcuts.reduce((sum, shortcut) => sum + caughtShortcutPoints(shortcut), 0);
+    return Math.min(DESK_INTEGRITY_CAP, conduct.noticed * DESK_INTEGRITY_NOTICED + caughtPoints + otherCaught * DESK_INTEGRITY_CAUGHT);
+  }
+  if (journey?.journeyType === 'silviculture') return summarizeIntegrity(journey).penalty;
+  return listShortcutsTaken(journey)
+    .filter((shortcut) => shortcut.band === 'caught')
+    .reduce((sum, shortcut) => sum + caughtShortcutPoints(shortcut), 0);
+}
+
+/** What one caught shortcut costs the grade: serious offences most. */
+function caughtShortcutPoints(shortcut) {
+  const act = ILLEGAL_ACTS.find((entry) => entry?.id === shortcut.actId) || null;
+  const floor = badBandFloorFor(act);
+  return floor >= 0.15 ? CAUGHT_SHORTCUT_PENALTY.serious
+    : floor >= 0.1 ? CAUGHT_SHORTCUT_PENALTY.core
+      : CAUGHT_SHORTCUT_PENALTY.minor;
+}
+
+const DESK_ROLES = new Set(['planning', 'permitting', 'desk']);
+const DESK_INTEGRITY_NOTICED = 3;
+const DESK_INTEGRITY_CAUGHT = 8;
+const DESK_INTEGRITY_CAP = 20;
+const CONDUCT_BANDS = { good: 'clean', partial: 'noticed', bad: 'caught' };
+
+/**
+ * How a desk run was conducted, beyond its meters: the off-book calls it
+ * made and how they landed, what it reported, and where the file ended up.
+ * The closing lines of the debrief and the integrity charge both read this,
+ * so a run that took every shortcut is not remembered as the one the district
+ * calls when something has to be done properly.
+ * @param {Object} journey
+ * @returns {{taken: number, noticed: number, caught: number, reported: number,
+ *   situations: number, clean: number, setAside: number, scrutiny: number,
+ *   goodwillShare: number, spin: boolean}}
+ */
+export function summarizeDeskConduct(journey) {
+  const events = (journey?.log || []).filter((entry) => entry?.type === 'event');
+  // Shortcut cards are read by their take label; an unlawful answer on an
+  // ordinary card is logged off-book with the band it landed in.
+  const bands = listShortcutsTaken(journey).map((shortcut) => shortcut.band);
+  for (const entry of events) {
+    if (entry.offBook && !String(entry.eventId || '').startsWith('temptation_')) {
+      bands.push(CONDUCT_BANDS[entry.band] || 'clean');
+    }
+  }
+  const goodwill = journey?.resources?.politicalCapital;
+  return {
+    taken: bands.length,
+    noticed: bands.filter((band) => band === 'noticed').length,
+    caught: bands.filter((band) => band === 'caught').length,
+    reported: events.filter((entry) => entry.optionLabel === 'Document and report').length,
+    situations: events.length,
+    clean: events.filter(isSituationClosedClean).length,
+    setAside: events.filter((entry) => entry.setAside).length,
+    scrutiny: Math.round(Number(journey?.scrutiny ?? journey?.heat ?? 0)),
+    // A journey with no goodwill meter has spent none of it.
+    goodwillShare: typeof goodwill === 'number' ? goodwill / startingAmount(journey, 'politicalCapital', 50) : 1,
+    spin: journey?.finalReport?.style === 'spin',
+  };
+}
+
+/**
+ * The run's conduct in one word: `clean` took no shortcut and kept the file
+ * defensible, `compromised` was caught, made a habit of it, or left the file
+ * at the District Manager's scrutiny gate, and `mixed` is everything between.
+ * @param {ReturnType<typeof summarizeDeskConduct>} conduct
+ * @returns {'clean'|'mixed'|'compromised'}
+ */
+export function rateDeskConduct(conduct) {
+  if (conduct.caught > 0 || conduct.taken >= 2 || conduct.scrutiny >= PLANNING_SCRUTINY_GATE) return 'compromised';
+  if (conduct.taken > 0 || conduct.spin || conduct.scrutiny >= 55 || conduct.goodwillShare < 0.35) return 'mixed';
+  return 'clean';
+}
+
+/**
+ * The ceiling on a field season that was not delivered. Crew welfare, a clean
+ * file and unspent stores are easy to keep by doing nothing, so a failed
+ * silviculture program or recon season tops out at D, and one that delivered
+ * under half of its obligations at F. A recon crew that stood down until the
+ * food ran out used to grade D 50 on a file of set-aside cards.
+ * @returns {number|null}
+ */
+export function scoreFailureCap(journey, victory) {
+  if (victory) return null;
+  if (journey?.journeyType === 'silviculture') {
+    return assessSilvicultureProgram(journey).delivered < 0.5 ? 40 : 54;
+  }
+  if (journey?.journeyType === 'recon') {
+    const target = getPackageTarget(journey);
+    const share = target > 0 ? getPackagesFinalized(journey) / target : 0;
+    return share < 0.5 ? 40 : 54;
+  }
+  return null;
 }
 
 /**
@@ -113,39 +258,68 @@ export function getLetterGrade(score) {
 
 // --- Speed Scoring ---
 
-function scoreReconSpeed(journey) {
+/**
+ * Recon pace against the season. Two shifts a package and a shift a leg is a
+ * clean run with nothing going wrong: full marks at or under it. Every shift
+ * over it costs, measured against the clean run rather than the whole window,
+ * down to a floor of 40 once the season has run 60% over; a 40-shift window
+ * made seven extra shifts on an 18-shift route cost almost nothing.
+ * A season that was not delivered earns no Time: collapsing on shift 13 used
+ * to read as the fastest season on record.
+ */
+function scoreReconSpeed(journey, victory = true) {
   const daysUsed = journey.day - 1;
-  // Two shifts a block plus the legs between stops is the competent pace.
   const totalBlocks = journey.blocks?.length || 10;
-  const packages = Number.isFinite(journey.packageTarget) ? journey.packageTarget : totalBlocks;
+  const packages = journey.journeyType === 'recon' ? getPackageTarget(journey) : 0;
   const optimalDays = journey.journeyType === 'recon'
-    ? Math.ceil(packages * 2 + Math.max(0, totalBlocks - 1) * 0.8)
+    ? Math.ceil(packages * 2 + Math.max(0, totalBlocks - 1))
     : Math.ceil(totalBlocks * 0.8);
-  const ratio = optimalDays / Math.max(1, daysUsed);
-  const score = Math.min(100, Math.round(ratio * 80));
-  return { score, label: `${daysUsed} shifts (optimal: ~${optimalDays})` };
+  if (!victory) {
+    return { score: 0, label: `${daysUsed} shifts; season not delivered` };
+  }
+  const deadline = Number.isFinite(journey.deadline) && journey.deadline > optimalDays
+    ? journey.deadline
+    : Math.round(optimalDays * 1.6);
+  const over = Math.max(0, Math.min(1, (daysUsed - optimalDays) / Math.max(1, optimalDays * 0.6)));
+  const score = Math.round(100 - over * 60);
+  return { score, label: `${daysUsed} shifts (clean run: ~${optimalDays}, window: ${deadline})` };
 }
 
-function scoreSilvicultureSpeed(journey) {
+// Pace only counts for work that got done: a program that ran out the season
+// having delivered a third of itself was not fast, it was short.
+function scoreSilvicultureSpeed(journey, victory) {
   const daysUsed = journey.day - 1;
   const optimalDays = 30;
   const ratio = optimalDays / Math.max(1, daysUsed);
-  const score = Math.min(100, Math.round(ratio * 75));
-  return { score, label: `${daysUsed} days` };
+  const pace = Math.min(100, Math.round(ratio * 75));
+  if (victory) return { score: pace, label: `${daysUsed} days` };
+  const delivered = assessSilvicultureProgram(journey).delivered;
+  return { score: Math.round(pace * delivered), label: `${daysUsed} days, program not delivered` };
 }
 
-function scorePlanningSpeed(journey) {
+/**
+ * Days spent only count for something when the file was delivered. Scoring
+ * the unused calendar of a run that failed made being pulled off the file on
+ * day 11 worth more Time than winning on day 18.
+ */
+function undeliveredSpeed(daysUsed, deadline) {
+  return { score: 0, label: `${daysUsed}/${deadline} days used; not delivered` };
+}
+
+function scorePlanningSpeed(journey, victory = true) {
   const daysUsed = journey.day - 1;
   const deadline = journey.deadline || 18;
+  if (!victory) return undeliveredSpeed(daysUsed, deadline);
   const optimalDays = Math.max(8, Math.round(deadline * 0.75));
   const ratio = optimalDays / Math.max(1, daysUsed);
   const score = Math.min(100, Math.round(ratio * 75));
   return { score, label: `${daysUsed}/${deadline} days used` };
 }
 
-function scorePermittingSpeed(journey) {
+function scorePermittingSpeed(journey, victory = true) {
   const daysUsed = journey.day - 1;
   const deadline = journey.deadline || 30;
+  if (!victory) return undeliveredSpeed(daysUsed, deadline);
   const daysRemaining = Math.max(0, deadline - daysUsed);
   const score = Math.min(100, Math.round((daysRemaining / deadline) * 100) + 20);
   return { score: Math.min(100, score), label: `${daysUsed}/${deadline} days used` };
@@ -192,18 +366,104 @@ function scoreCrewWelfare(journey) {
   return { score, label };
 }
 
+/**
+ * A recon crew's season, not just how it looked on the last shift. Everyone
+ * home on their own feet and in good heart is full marks; what the season
+ * cost them comes off it: an evacuation, a quit, a crew that drove out when
+ * the food ran out, each injury the log recorded, and whatever health and
+ * morale they finish short of. The old scale started at 80 for anyone not
+ * evacuated, so a crew that spent the season hurt still read 95.
+ * @param {Object} journey
+ * @returns {{score: number, label: string}}
+ */
+function scoreReconCrewWelfare(journey) {
+  const crew = journey.crew || [];
+  if (crew.length === 0) return { score: 50, label: 'No crew' };
+
+  const walkedOff = Boolean(journey.crewWalkedOff);
+  const active = walkedOff ? [] : crew.filter((m) => m.isActive);
+  const evacuated = crew.filter((m) => !m.isActive && !m.hasQuit);
+  const left = walkedOff ? crew.filter((m) => m.isActive || m.hasQuit) : crew.filter((m) => m.hasQuit);
+  const injuries = (journey.log || []).filter((entry) => entry.victimId || entry.victimName).length;
+
+  let score = 100 - evacuated.length * 25 - left.length * 15 - Math.min(15, injuries * 3);
+  if (active.length > 0) {
+    const avgHealth = active.reduce((sum, m) => sum + m.health, 0) / active.length;
+    const avgMorale = active.reduce((sum, m) => sum + m.morale, 0) / active.length;
+    score -= Math.max(0, 100 - avgHealth) * 0.4 + Math.max(0, 100 - avgMorale) * 0.4;
+  }
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  const parts = walkedOff
+    ? [`the crew drove out when the food ran out (${left.length} of ${crew.length})`]
+    : [`${active.length}/${crew.length} active`, `${evacuated.length} evacuated`];
+  if (!walkedOff && left.length) parts.push(`${left.length} quit`);
+  if (injuries) parts.push(`${injuries} hurt on the job`);
+  return { score, label: parts.join(', ') };
+}
+
+/**
+ * The desk roles have no crew; the person carrying the file is the one whose
+ * welfare the season spends. Stress that ends high and energy that ends low
+ * both cost. A file that was not delivered scales the same way its unspent
+ * budget does: being pulled off the file on day 11, or holding the line
+ * from day 16, is not a restful season well spent.
+ */
+function scoreProtagonistWelfare(journey, victory = true) {
+  if (journey.crew?.length) return scoreCrewWelfare(journey);
+  const protagonist = journey.protagonist;
+  if (!protagonist) return { score: 50, label: 'N/A' };
+  const stress = Math.max(0, Math.min(100, Number(protagonist.stress) || 0));
+  const energy = Math.max(0, Math.min(100, Number(protagonist.energy ?? 100)));
+  let score = Math.max(0, Math.min(100, Math.round(100 - stress * 0.6 - Math.max(0, 50 - energy) * 0.6)));
+  const deskRole = ['planning', 'permitting', 'desk'].includes(journey.journeyType);
+  const undelivered = deskRole && !victory;
+  if (undelivered) score = Math.round(score * deskDeliveredShare(journey));
+  return {
+    score,
+    label: `Your stress ${Math.round(stress)}%, energy ${Math.round(energy)}%${undelivered ? '; file not delivered' : ''}`,
+    name: 'Wellbeing',
+  };
+}
+
+/** Share of the desk's job that got done, 0-1. */
+function deskDeliveredShare(journey) {
+  if (journey.journeyType === 'planning') {
+    const plan = journey.plan || {};
+    const fomClosed = journey.blockPlanning?.fom?.status === 'closed' ? 1 : 0;
+    return (Math.min(1, (plan.dataCompleteness || 0) / 80)
+      + Math.min(1, (plan.analysisQuality || 0) / 80)
+      + Math.min(1, (plan.stakeholderBuyIn || 0) / 75)
+      + Math.min(1, (plan.ministerialConfidence || 0) / PLANNING_DECISION_GATE)
+      + fomClosed) / 5;
+  }
+  const permits = journey.permits || {};
+  return permits.target > 0 ? Math.min(1, (permits.approved || 0) / permits.target) : 0;
+}
+
 // --- Resource Efficiency Scoring ---
+
+// What the run started with. Journeys record it at creation (and after the
+// difficulty multipliers); older saves fall back to today's normal-difficulty
+// stores. The old fixed divisors (fuel 320, food 40, budgets of 35-100k) were
+// a fraction of the real starting stocks, so every run scored full marks.
+function startingAmount(journey, key, fallback) {
+  const start = Number(journey?.startingResources?.[key]);
+  return start > 0 ? start : fallback;
+}
+
+const DESK_BUDGET_FALLBACK = { silviculture: 380000, planning: 82000, permitting: 58000 };
 
 function scoreResourceEfficiency(journey) {
   const r = journey.resources || {};
-  let score = 50;
+  // A crew that comes home with a margin on every store scores full marks.
+  let score = 60;
 
-  // Remaining resources are good (didn't waste), but having too much means journey was too easy
-  const fuelPct = (r.fuel || 0) / 320;
-  const foodPct = (r.food || 0) / 40;
-  const equipPct = (r.equipment || 0) / 85;
+  const fuelPct = (r.fuel || 0) / startingAmount(journey, 'fuel', 520);
+  const foodPct = (r.food || 0) / startingAmount(journey, 'food', 80);
+  const equipPct = (r.equipment || 0) / startingAmount(journey, 'equipment', 90);
 
-  // Sweet spot: 10-40% remaining
+  // Share of the starting stores still on hand (see scoreSweetSpot).
   score += scoreSweetSpot(fuelPct) * 15;
   score += scoreSweetSpot(foodPct) * 15;
   score += scoreSweetSpot(equipPct) * 10;
@@ -216,39 +476,62 @@ function scoreResourceEfficiency(journey) {
   return { score, label: `Fuel: ${Math.round(r.fuel || 0)} L, Food: ${Math.round(r.food || 0)} person-days` };
 }
 
-function scoreDeskResourceEfficiency(journey) {
+function scoreDeskResourceEfficiency(journey, victory = true) {
   const r = journey.resources || {};
   let score = 50;
 
-  const budgetStart = journey.journeyType === 'silviculture' ? 100000 :
-                      journey.journeyType === 'planning' ? 50000 : 35000;
+  const budgetStart = Number.isFinite(journey.budgetStart) && journey.budgetStart > 0
+    ? journey.budgetStart
+    : startingAmount(journey, 'budget', DESK_BUDGET_FALLBACK[journey.journeyType] || 35000);
   const budgetPct = (r.budget || 0) / budgetStart;
   score += scoreSweetSpot(budgetPct) * 25;
 
-  const polCapPct = (r.politicalCapital || 0) / 40;
+  const polCapPct = (r.politicalCapital || 0) / startingAmount(journey, 'politicalCapital', 40);
   score += scoreSweetSpot(polCapPct) * 15;
 
   if (r.budget <= 0) score -= 20;
   if (r.politicalCapital <= 0) score -= 20;
 
+  // Money left on a file that was never delivered was not saved, it was
+  // unspent: an idle season kept its whole budget.
+  const deskRole = ['planning', 'permitting', 'desk'].includes(journey.journeyType);
+  if (deskRole && !victory) score *= deskDeliveredShare(journey);
+
   score = Math.max(0, Math.min(100, Math.round(score)));
-  return { score, label: `Budget: $${Math.round(r.budget || 0).toLocaleString()}` };
+  return { score, label: `Budget: ${formatDollars(r.budget || 0)}` };
 }
 
+// The program budget against what it bought. Money left because the work
+// was never done is not efficiency, so the margin is scaled by delivery.
+function scoreSilvicultureResources(journey) {
+  const budget = Number(journey.resources?.budget) || 0;
+  const start = Number(journey.program?.budgetStart) || 380000;
+  const delivered = assessSilvicultureProgram(journey).delivered;
+  const margin = budget <= 0 ? 0 : 40 + scoreSweetSpot(budget / start) * 60;
+  return {
+    score: Math.max(0, Math.min(100, Math.round(margin * delivered))),
+    label: `Budget: ${formatDollars(budget)} of ${formatDollars(start)} left`,
+  };
+}
+
+
+// The treasury against the one the year opened with: a GM who ends the year
+// where they started is average, half again is full marks, half gone is none.
 function scoreManagerResources(journey) {
   const r = journey.resources || {};
   let score = 50;
 
-  const budgetPct = (r.budget || 0) / 500000;
-  score += scoreSweetSpot(budgetPct) * 25;
+  const start = Number(journey.ledger?.startTreasury) || startingAmount(journey, 'budget', 850000);
+  const ratio = (r.budget || 0) / start;
+  score += Math.max(-25, Math.min(25, Math.round((ratio - 1) * 50)));
 
-  const polCapPct = (r.politicalCapital || 0) / 100;
+  const polCapPct = (r.politicalCapital || 0) / startingAmount(journey, 'politicalCapital', 100);
   score += scoreSweetSpot(polCapPct) * 15;
 
   if (r.budget <= 0) score -= 20;
 
   score = Math.max(0, Math.min(100, Math.round(score)));
-  return { score, label: `Budget: $${Math.round(r.budget || 0).toLocaleString()}` };
+  return { score, label: `Budget: ${formatDollars(r.budget || 0)}` };
 }
 
 // Returns 0-1. Running out is the failure; carrying margin home is good
@@ -262,31 +545,31 @@ export function scoreSweetSpot(pct) {
 
 // --- Objectives Scoring ---
 
+// The recon file is its packages. Ground covered without them is driving; a
+// season that closed none of them scores nothing here, however far it got.
 function scoreReconObjectives(journey, victory) {
-  let score = victory ? 70 : 20;
   const progress = journey.totalDistance > 0
-    ? journey.distanceTraveled / journey.totalDistance
+    ? Math.min(1, journey.distanceTraveled / journey.totalDistance)
     : 0;
-  score += Math.round(progress * 30);
-  score = Math.min(100, score);
-  return { score, label: `${Math.round(progress * 100)}% traversed` };
+  if (journey.journeyType !== 'recon') {
+    const score = Math.min(100, (victory ? 70 : 20) + Math.round(progress * 30));
+    return { score, label: `${Math.round(progress * 100)}% traversed` };
+  }
+  const target = getPackageTarget(journey);
+  const closed = getPackagesFinalized(journey);
+  const share = target > 0 ? closed / target : 0;
+  const score = victory ? 100 : Math.round(share * 70);
+  return { score, label: `${closed}/${target} packages, ${Math.round(progress * 100)}% traversed` };
 }
 
-function scoreSilvicultureObjectives(journey, victory) {
-  let score = victory ? 45 : 10;
-  const p = journey.planting || {};
-  const s = journey.surveys || {};
-  const b = journey.brushing || {};
-  const plantPct = p.blocksToPlant > 0 ? p.blocksPlanted / p.blocksToPlant : 0;
-  const surveyPct = s.freeGrowingTarget > 0 ? s.freeGrowingComplete / s.freeGrowingTarget : 0;
-  const brushPct = b.hectaresTarget > 0 ? b.hectaresComplete / b.hectaresTarget : 0;
-  score += Math.round(plantPct * 25);
-  score += Math.round(surveyPct * 15);
-  score += Math.round(brushPct * 15);
-  score = Math.min(100, score);
+// Every obligation on the program counts: planting and its plots, fill,
+// release, the declarations, and how well the trees went in
+// (PROGRAM_TRACK_WEIGHTS in js/data/silvicultureProgram.js).
+function scoreSilvicultureObjectives(journey) {
+  const assessment = assessSilvicultureProgram(journey);
   return {
-    score,
-    label: `${p.blocksPlanted}/${p.blocksToPlant} planted, ${s.freeGrowingComplete}/${s.freeGrowingTarget} surveys, ${Math.round(brushPct * 100)}% brush`,
+    score: Math.max(0, Math.min(100, Math.round(assessment.delivered * 100))),
+    label: assessment.label,
   };
 }
 
@@ -297,8 +580,18 @@ function scorePlanningObjectives(journey, victory) {
   score += Math.round((plan.analysisQuality || 0) / 10);
   score += Math.round((plan.stakeholderBuyIn || 0) / 10);
   score += Math.round((plan.ministerialConfidence || 0) / 10);
-  score = Math.min(100, score);
-  return { score, label: `Decision-maker readiness: ${plan.ministerialConfidence || 0}%` };
+  // A plan that answers every objective is a better plan than one that
+  // clears the gate on timber alone; a package the District Manager's office
+  // sent back unread is on the file.
+  const values = journey.values || {};
+  const weakest = Math.min(...['biodiversity', 'timberSupply', 'communityNeeds', 'firstNationsValues']
+    .map((key) => Number(values[key] ?? 50)));
+  score += Math.round((weakest - PLANNING_VALUES_FLOOR) / 4);
+  const returned = plan.submissionsReturned || 0;
+  score -= returned * 3;
+  score = Math.max(0, Math.min(100, score));
+  const returnedLabel = returned ? `, ${returned} submission${returned === 1 ? '' : 's'} returned` : '';
+  return { score, label: `DM readiness ${Math.round(plan.ministerialConfidence || 0)}%, weakest value ${Math.round(weakest)}%${returnedLabel}` };
 }
 
 function scorePermittingObjectives(journey, victory) {
@@ -310,19 +603,48 @@ function scorePermittingObjectives(journey, victory) {
   return { score, label: `${permits.approved}/${permits.target} approved` };
 }
 
+// Cut control is the GM's statutory objective: the band is worth a quarter
+// of the objectives score, a finding a third of that, and a year that broke
+// the limit nothing. Only a certificate the auditors actually issued counts;
+// one that was withdrawn or suspended costs.
+const MANAGER_CUT_POINTS = { in_band: 25, undercut: 8, overcut: 8, severe_undercut: 0, severe_overcut: 0 };
+
 function scoreManagerObjectives(journey, victory) {
-  let score = victory ? 55 : 10;
+  let score = victory ? 45 : 10;
   const reputation = journey.metrics?.reputation ?? 50;
-  score += Math.round((reputation / 100) * 25);
-  score += Math.min(20, (journey.certifications?.length || 0) * 10);
-  score = Math.min(100, score);
-  const certLabel = journey.certifications?.length
-    ? `, ${journey.certifications.length} certification${journey.certifications.length > 1 ? 's' : ''}`
+  score += Math.round((reputation / 100) * 20);
+  const ledger = journey.ledger || {};
+  const cutStatus = ledger.cutControlStatus;
+  score += MANAGER_CUT_POINTS[cutStatus] ?? 0;
+  const certs = journey.certifications || [];
+  const certified = certs.filter((cert) => (cert.status || 'certified') === 'certified');
+  const lost = certs.filter((cert) => ['withdrawn', 'suspended'].includes(cert.status));
+  score += certified.length ? 10 : 0;
+  score -= lost.length * 5;
+  score = Math.max(0, Math.min(100, score));
+  const cutLabel = ledger.cutControl ? `, cut ${ledger.cutControl}` : '';
+  const certLabel = certs.length
+    ? `, ${certs.map((cert) => `${cert.id || cert.name} ${cert.status || 'certified'}`).join(', ')}`
     : '';
-  return { score, label: `Reputation ${Math.round(reputation)}%${certLabel}` };
+  return { score, label: `Reputation ${Math.round(reputation)}%${cutLabel}${certLabel}` };
 }
 
 // --- Compliance Scoring ---
+
+/**
+ * A GM answers for the licensee's file, not only the situations that crossed
+ * the desk: half the component is the compliance meter the auditors and C&E
+ * read, so a clean-looking run of decisions over a caught offence and an
+ * overcut cannot score near the top.
+ */
+function scoreManagerCompliance(journey) {
+  const situations = scoreSituationsClosedClean(journey);
+  const meter = Math.round(Math.max(0, Math.min(100, journey.metrics?.compliance ?? 50)));
+  return {
+    score: Math.round((situations.score + meter) / 2),
+    label: `${situations.label}; compliance ${meter}%`,
+  };
+}
 
 /**
  * A situation is "closed clean" when the way it was handled cost no
@@ -374,7 +696,7 @@ export function formatScoreDisplay(scoreResult) {
   for (const key of Object.keys(labels)) {
     const component = components[key];
     if (!component) continue;
-    const name = labels[key] || key;
+    const name = component.name || labels[key] || key;
     const weight = weights[key] || 0;
     const bar = makeBar(component.score, 10);
     lines.push(`  ${name.padEnd(14)} [${bar}] ${component.score}/100 (${weight}%) - ${component.label}`);
@@ -386,6 +708,15 @@ export function formatScoreDisplay(scoreResult) {
 
   if (scoreResult.scrutinyPenalty > 0) {
     lines.push(`  ${'Scrutiny'.padEnd(14)} -${scoreResult.scrutinyPenalty} for what the file carries`);
+  }
+
+  if (scoreResult.integrityPenalty > 0) {
+    lines.push(`  ${'Integrity'.padEnd(14)} -${scoreResult.integrityPenalty} ${scoreResult.integrityLabel || 'for shortcuts the district found'}`);
+  }
+
+  if (Number.isFinite(scoreResult.scoreCap)) {
+    const what = scoreResult.components?.objectives?.label?.includes('packages') ? 'a season' : 'a program';
+    lines.push(`  ${'Not delivered'.padEnd(14)} ${what} that missed its obligations grades no higher than ${getLetterGrade(scoreResult.scoreCap)}`);
   }
 
   return lines;

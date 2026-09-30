@@ -14,11 +14,17 @@ import {
 import { ILLEGAL_ACTS } from '../data/illegalActs.js';
 
 const ROLE_IDS = ['planner', 'permitter', 'recce', 'silviculture'];
+// The obligation an Intel role card leads with, where the most specific one
+// is shared: a permitter's own exposure is the referral that never went out.
+const ROLE_SIGNATURE_OBLIGATION = {
+  permitter: 'referral-and-notification-duty',
+};
 const ROLE_LABELS = {
   planner: 'Planner',
   permitter: 'Permitter',
   recce: 'Recce',
   silviculture: 'Silviculture',
+  manager: 'General Manager',
 };
 
 const ENFORCEMENT_CASEFILES_BY_ID = ENFORCEMENT_CASEFILES.reduce((map, item) => {
@@ -34,6 +40,17 @@ function normalizeSearchText(value) {
   return String(value || '').toLowerCase();
 }
 
+function sourceHost(url) {
+  try {
+    const { hostname, pathname } = new URL(url);
+    const host = hostname.replace(/^www\d*\./, '');
+    const section = pathname.split('/').filter(Boolean).pop()?.replace(/[-_]+/g, ' ');
+    return section && /[a-z]{3}/i.test(section) ? `${host}: ${section}` : host;
+  } catch {
+    return 'link';
+  }
+}
+
 function getEntrySourceLinks(entry) {
   const links = [];
   const seen = new Set();
@@ -42,7 +59,9 @@ function getEntrySourceLinks(entry) {
     if (!url || seen.has(url)) continue;
     seen.add(url);
     links.push({
-      label: 'Official source',
+      // Name where the link goes: a list of identical "Official source"
+      // links is useless to a screen reader.
+      label: `Official source (${sourceHost(url)})`,
       url,
     });
   }
@@ -69,9 +88,24 @@ function getEntryPattern(entry) {
     return basisTitles.join(' · ');
   }
 
-  const tags = Array.isArray(entry?.tags) ? entry.tags.slice(0, 3) : [];
-  return tags.length ? tags.join(' · ') : 'General compliance risk';
+  // No catalogued basis: name the subject from the tags, never the raw role
+  // ids ("permitter · recce · crossings" read as debug output).
+  const subjects = (Array.isArray(entry?.tags) ? entry.tags : [])
+    .filter((tag) => !ROLE_LABELS[tag])
+    .slice(0, 2)
+    .map((tag) => String(tag).replace(/[_-]+/g, ' '));
+  return subjects.length
+    ? subjects.map((tag) => tag.split(' ')
+      .map((word, index) => (TAG_ACRONYMS.has(word) ? word.toUpperCase()
+        : index === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+      .join(' ')).join(' · ')
+    : 'General compliance risk';
 }
+
+// Tags that are acronyms read as acronyms: "AAC · Fraud", not "Aac · Fraud".
+const TAG_ACRONYMS = new Set([
+  'aac', 'aoa', 'bwbs', 'cwh', 'fom', 'fsp', 'gis', 'gps', 'ich', 'idf', 'qep', 'rup', 'sbs', 'swb', 'vqo', 'wtp',
+]);
 
 const HIGH_RISK_TAGS = new Set(['fraud', 'forgery', 'bribery', 'illegal-works', 'blatant', 'sabotage', 'coverup', 'laundering', 'noncompliance', 'deception', 'tampering']);
 const ELEVATED_RISK_TAGS = new Set(['compliance', 'records', 'risk', 'ethics', 'paperwork', 'reporting', 'regulatory']);
@@ -201,7 +235,8 @@ export const ModalMixin = {
       for (const action of actions) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `modal-btn ${action.primary ? 'primary' : ''}`.trim();
+        btn.className = ['modal-btn', action.primary && 'primary', action.danger && 'danger']
+          .filter(Boolean).join(' ');
         btn.textContent = action.label;
         btn.addEventListener('click', () => {
           if (action.onSelect) action.onSelect();
@@ -294,10 +329,25 @@ export const ModalMixin = {
           <p>[↑]/[↓] or [J]/[K] - Move through options, [ENTER] confirms</p>
           <p>[S] - Status panel &nbsp; [G] - Glossary &nbsp; [L] - Journey log</p>
           <p>[P] - Compliance intel &nbsp; [?] - This screen</p>
+          <p>[O] - Settings: display mode and colour theme</p>
           <p>[R] or [ESC] - Leave the run / close panels</p>
+          <br>
+          <p><strong>Saving:</strong></p>
+          <p>Every mode saves as you play. Leaving a run keeps it on file; pick it back up from LOAD DATA at the district office.</p>
         `;
       },
-      actions: [{ label: 'Got it!', primary: true, onSelect: () => this.closeModal() }]
+      actions: [
+        { label: 'Got it!', primary: true, onSelect: () => this.closeModal() },
+        // The one route to Settings on a phone grid, whose tap row has no
+        // room for the button.
+        {
+          label: 'Settings',
+          onSelect: () => {
+            this.closeModal();
+            this.showSettingsModal();
+          }
+        }
+      ]
     });
   },
 
@@ -319,7 +369,7 @@ export const ModalMixin = {
           <div class="settings-label">DISPLAY MODE</div>
           <div class="settings-toggle-group">
             <button type="button" class="settings-toggle-btn ${displayMode.mode === 'classic' ? 'active' : ''}" data-mode="classic">
-              <span class="toggle-icon">[T]</span>
+              <span class="toggle-icon" aria-hidden="true">&gt;_</span>
               <span class="toggle-label">Classic</span>
               <span class="toggle-desc">Terminal style</span>
             </button>
@@ -329,7 +379,7 @@ export const ModalMixin = {
               <span class="toggle-desc">Character canvas</span>
             </button>
             <button type="button" class="settings-toggle-btn ${displayMode.mode === 'modern' ? 'active' : ''}" data-mode="modern">
-              <span class="toggle-icon">[C]</span>
+              <span class="toggle-icon" aria-hidden="true">▤</span>
               <span class="toggle-label">Modern</span>
               <span class="toggle-desc">Card layout</span>
             </button>
@@ -488,7 +538,11 @@ export const ModalMixin = {
         container.appendChild(wrapper);
 
         render('');
-        setTimeout(() => input.focus(), 0);
+        // Typing straight into the search is handy on a keyboard; on a phone
+        // it throws the on-screen keyboard over the glossary it just opened.
+        if (!window.matchMedia?.('(pointer: coarse)').matches) {
+          setTimeout(() => input.focus(), 0);
+        }
       },
       actions: [{ label: 'Close', primary: true, onSelect: () => this.closeModal() }]
     });
@@ -640,22 +694,35 @@ export const ModalMixin = {
           grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
           grid.style.gap = '10px';
 
+          const usedSignatures = new Set();
           for (const roleId of ROLE_IDS) {
+            // Full lists, not the one-item preview: the cards compare roles
+            // by these counts, and every card used to read "1 obligations".
             const context = getRoleProfessionalContext(roleId, {
-              obligationCount: 1,
-              paperworkCount: 1,
-              enforcementCount: 1,
-              breachCount: 1,
+              obligationCount: Infinity,
+              paperworkCount: Infinity,
+              enforcementCount: Infinity,
+              breachCount: Infinity,
               areaId: resolvedAreaId,
             });
+            const count = (n, noun) => `${n} ${noun}${n === 1 ? '' : 's'}`;
+            // Lead with the obligation most specific to this role; the shared
+            // ones come first in the catalogue, so every card showed the same.
+            // A role's own pick comes first, and no two cards lead alike.
+            const ranked = [...context.obligations]
+              .sort((a, b) => (a.roles?.length || 0) - (b.roles?.length || 0));
+            const signature = ranked.find((entry) => entry.id === ROLE_SIGNATURE_OBLIGATION[roleId])
+              || ranked.find((entry) => !usedSignatures.has(entry.id))
+              || ranked[0];
+            if (signature) usedSignatures.add(signature.id);
 
             const card = document.createElement('button');
             card.type = 'button';
             card.style.textAlign = 'left';
-            card.style.border = '1px solid rgba(255,255,255,0.14)';
+            card.style.border = '1px solid var(--border)';
             card.style.borderRadius = '10px';
             card.style.padding = '12px';
-            card.style.background = selectedRoleId === roleId ? 'rgba(120, 156, 84, 0.18)' : 'rgba(255,255,255,0.04)';
+            card.style.background = selectedRoleId === roleId ? 'var(--selection)' : 'var(--surface)';
             card.style.color = 'inherit';
             card.style.cursor = 'pointer';
 
@@ -674,13 +741,18 @@ export const ModalMixin = {
 
             const stats = document.createElement('p');
             stats.className = 'detail-note';
-            stats.textContent = `${context.obligations.length} obligations | ${context.paperwork.length} process hooks | ${context.enforcement.length} enforcement patterns | ${context.breaches.length} failure patterns`;
+            stats.textContent = [
+              count(context.obligations.length, 'obligation'),
+              count(context.paperwork.length, 'process hook'),
+              count(context.enforcement.length, 'enforcement pattern'),
+              count(context.breaches.length, 'failure pattern'),
+            ].join(' | ');
             card.appendChild(stats);
 
-            if (context.obligations[0]) {
+            if (signature) {
               const note = document.createElement('p');
               note.className = 'detail-note';
-              note.textContent = context.obligations[0].summary;
+              note.textContent = signature.summary;
               card.appendChild(note);
             }
 
@@ -922,10 +994,10 @@ export const ModalMixin = {
 
           acts.slice(0, 80).forEach((entry) => {
             const card = document.createElement('article');
-            card.style.border = '1px solid rgba(255,255,255,0.14)';
+            card.style.border = '1px solid var(--border)';
             card.style.borderRadius = '12px';
             card.style.padding = '12px';
-            card.style.background = 'rgba(255,255,255,0.04)';
+            card.style.background = 'var(--surface)';
             card.style.display = 'grid';
             card.style.gap = '8px';
 
@@ -1004,8 +1076,8 @@ export const ModalMixin = {
             const isActive = roleId === selectedRoleId;
             button.classList.toggle('active', isActive);
             button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-            button.style.border = isActive ? '1px solid rgba(120, 156, 84, 0.9)' : '1px solid rgba(255,255,255,0.12)';
-            button.style.background = isActive ? 'rgba(120, 156, 84, 0.22)' : 'rgba(255,255,255,0.06)';
+            button.style.border = isActive ? '1px solid var(--accent)' : '1px solid var(--border)';
+            button.style.background = isActive ? 'var(--selection)' : 'var(--surface)';
             button.style.color = 'inherit';
           }
 
@@ -1017,7 +1089,10 @@ export const ModalMixin = {
         render();
         container.appendChild(wrapper);
 
-        setTimeout(() => search.focus(), 0);
+        // As in the glossary: a phone keeps its keyboard down until asked.
+        if (!window.matchMedia?.('(pointer: coarse)').matches) {
+          setTimeout(() => search.focus(), 0);
+        }
       },
       actions: [{ label: 'Close', primary: true, onSelect: () => this.closeModal() }]
     });

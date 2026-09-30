@@ -143,9 +143,10 @@ test('responsible play is viable while aggressive play collapses into weaker end
   // first-option turtle whose weak meter is progress, and any change to the
   // draw stream moves one or two scenarios across the Solid gate in either
   // direction. Re-picked with the 2026-09 realism pass (region gating and
-  // event-pool trims shifted every draw).
+  // event-pool trims shifted every draw), and again when the shortcut offer
+  // stopped rolling its own payoff off the draw stream.
   const responsibleRuns = scenarios.map(([roleId, areaId], index) =>
-    playSeason(roleId, areaId, 'responsible', 20260401 + index),
+    playSeason(roleId, areaId, 'responsible', 20260403 + index),
   );
   const aggressiveRuns = scenarios.map(([roleId, areaId], index) =>
     playSeason(roleId, areaId, 'aggressive', 20260511 + index),

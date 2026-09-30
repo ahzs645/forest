@@ -23,6 +23,11 @@ export function getApplicableFieldEvents(conditions = {}) {
         return false;
       }
     }
+    // A fair-weather card ("the evening sky puts on a show") has no place on
+    // a day the storm grounded.
+    if (Array.isArray(event.notInWeather) && conditions.weather && event.notInWeather.includes(conditions.weather)) {
+      return false;
+    }
     return true;
   });
 }
@@ -34,14 +39,14 @@ export function getApplicableFieldEvents(conditions = {}) {
  * @returns {Object|null} Selected event or null
  */
 export function selectRandomFieldEvent(events, modifiers = {}) {
-  const { paceModifier = 1, terrainModifier = 1, typeMultipliers = {} } = modifiers;
+  const { paceModifier = 1, terrainModifier = 1, typeMultipliers = {}, rng = Math.random } = modifiers;
 
   // Shuffle before rolling: iterating in file order gives the first events in
   // the JSON an outsized share of triggers across runs.
-  for (const event of shuffle(events)) {
+  for (const event of shuffle(events, rng)) {
     const typeMultiplier = Number(typeMultipliers?.[event.type]) || 1;
     const adjustedProb = event.probability * paceModifier * terrainModifier * typeMultiplier;
-    if (Math.random() < adjustedProb) {
+    if (rng() < adjustedProb) {
       return event;
     }
   }
@@ -49,10 +54,10 @@ export function selectRandomFieldEvent(events, modifiers = {}) {
   return null;
 }
 
-function shuffle(items) {
+function shuffle(items, rng = Math.random) {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;

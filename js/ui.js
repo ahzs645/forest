@@ -95,6 +95,7 @@ export class TerminalUI {
     this.glossaryBtn = document.getElementById('glossary-btn');
     this.intelBtn = document.getElementById('intel-btn');
     this.restartBtn = document.getElementById('restart-btn');
+    this.gameSettingsBtn = document.getElementById('game-settings-btn');
     this.closePanel = document.getElementById('close-panel');
 
     // Modal elements
@@ -249,6 +250,9 @@ export class TerminalUI {
       this.intelBtn.addEventListener('click', () => this.showProfessionalComplianceIntel());
     }
 
+    // Display mode and theme mid-run, from Classic and Grid (Modern has ≡)
+    this.gameSettingsBtn?.addEventListener('click', () => this.showSettingsModal());
+
     if (this.complianceIntelLandingBtn) {
       this.complianceIntelLandingBtn.addEventListener('click', () => this.showProfessionalComplianceIntel());
     }
@@ -303,7 +307,10 @@ export class TerminalUI {
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (this.isModalOpen() && e.key === 'Tab') this._trapModalFocus(e);
-      const canUseGameplayShortcuts = this._canUseGameplayShortcuts();
+      // Ctrl/Cmd/Alt chords belong to the browser (print, save, find, reload);
+      // Shift stays allowed since '?' needs it.
+      const canUseGameplayShortcuts = !(e.ctrlKey || e.metaKey || e.altKey)
+        && this._canUseGameplayShortcuts();
 
       // Number keys for choices (works in both classic and modern mode).
       // 1-9 map directly; 0 is the accelerator for a 10th option so menus that
@@ -345,6 +352,12 @@ export class TerminalUI {
       if (canUseGameplayShortcuts && !this.isModalOpen() && e.key === '?' && !this._isInputFocused()) {
         e.preventDefault();
         this.showHelp();
+      }
+
+      // O for options: display mode and theme
+      if (canUseGameplayShortcuts && e.key === 'o' && !this._isInputFocused()) {
+        e.preventDefault();
+        this.showSettingsModal();
       }
 
       // R for restart — same context-aware prompt as the header button
@@ -442,7 +455,9 @@ export class TerminalUI {
     }
 
     // Resource panel type mapping
-    const resourceType = (journey.journeyType === 'field' || journey.journeyType === 'recon') ? 'field' : 'desk';
+    const resourceType = (journey.journeyType === 'field' || journey.journeyType === 'recon')
+      ? 'field'
+      : journey.journeyType === 'manager' ? 'manager' : 'desk';
     this.updateResourcesPanel(journey.resources, resourceType);
 
     // Location panel varies by journey type
@@ -502,6 +517,17 @@ export class TerminalUI {
           season: journey.season
         });
         break;
+
+      case 'manager': {
+        const monthsLeft = Math.max(0, journey.deadline - journey.day);
+        this.updateLocationPanel({
+          name: `Month ${Math.min(journey.day, journey.deadline)} of ${journey.deadline}`,
+          description: `${monthsLeft} month${monthsLeft === 1 ? '' : 's'} left after this one`,
+          phase: journey.currentPhase,
+          season: journey.season
+        });
+        break;
+      }
 
       case 'permitting':
       case 'desk':

@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 
 import { createSilvicultureJourney } from '../js/journey/factory.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
+import { calculateScore, formatScoreDisplay } from '../js/scoring.js';
+import { resolveFinalReport } from '../js/game/debrief.js';
+import { recordTemptationOutcome, runSeasonCloseAudit, summarizeIntegrity } from '../js/modes/silvicultureIntegrity.js';
+import { runPolicy } from '../scripts/simulate-silviculture-policies.mjs';
 
 // Deterministic PRNG so these tests never flake on Math.random().
 function seededRandomFactory(seed) {
@@ -243,12 +247,16 @@ test('recovering contractors cannot be assigned fieldwork; rest makes work avail
     ui.promptChoice = async (_prompt, options = []) => {
       if (options.some((o) => o.value === 'end')) {
         if (!checkedFirstMenu) {
-          assert.equal(options.some((o) => ['plant', 'fill', 'brush', 'inspect', 'survey'].includes(o.value)), false);
+          const fieldTasks = options.filter((o) => ['plant', 'fill', 'brush', 'inspect', 'survey'].includes(o.value));
+          assert.equal(fieldTasks.some((o) => !o.disabled), false);
+          // Shown, not hidden: each waits on its crew, with the day it is back.
+          assert.ok(fieldTasks.length > 0);
+          for (const task of fieldTasks) assert.match(task.description, /^Waits for .+, on days off until day \d+\./);
           assert.ok(options.some((o) => o.label === 'Rest crews and plan tomorrow'));
           checkedFirstMenu = true;
           sawRest = true;
         } else {
-          sawAvailablePlanting ||= options.some((o) => o.value === 'plant');
+          sawAvailablePlanting ||= options.some((o) => o.value === 'plant' && !o.disabled);
         }
         return options.find((o) => o.value === 'end');
       }
@@ -259,4 +267,171 @@ test('recovering contractors cannot be assigned fieldwork; rest makes work avail
     assert.ok(sawRest);
     assert.ok(sawAvailablePlanting, 'field tasks should return after recovery');
   });
+});
+
+// ── Grade, integrity and the final report ────────────────────────────────────
+
+function deliveredJourney() {
+  const journey = createSilvicultureJourney({ areaId: 'fraser-plateau' });
+  journey.planting.blocksPlanted = journey.planting.blocksToPlant;
+  journey.planting.seedlingsPlanted = journey.planting.seedlingsAllocated;
+  for (const block of journey.program.blocks) { block.planted = block.trees; block.status = 'inspected'; block.quality = 93; }
+  journey.planting.qualityAverage = 93;
+  for (const opening of journey.program.fill) opening.done = true;
+  for (const opening of journey.program.brush) opening.treated = opening.ha;
+  journey.brushing.hectaresComplete = journey.brushing.hectaresTarget;
+  journey.surveys.freeGrowingComplete = journey.surveys.freeGrowingTarget;
+  journey.day = 31;
+  journey.resources.budget = 120000;
+  return journey;
+}
+
+/** Put a taken temptation in the log the way the event resolver does, and ledger it. */
+function takenShortcut(journey, actId, band) {
+  const option = {
+    label: 'Take the shortcut',
+    outcome: 'Clean.',
+    partialOutcome: 'Noticed.',
+    failureOutcome: 'It does not hold.',
+  };
+  const event = { id: `temptation_${actId}`, temptationActId: actId, title: actId, options: [{ label: 'Say no' }, option] };
+  const outcomes = { caught: option.failureOutcome, noticed: option.partialOutcome, clean: option.outcome };
+  journey.log.push({ type: 'event', day: journey.day, eventId: event.id, optionLabel: option.label, outcome: outcomes[band] });
+  return recordTemptationOutcome(journey, event);
+}
+
+test('a delivered program with a clean file grades A; fill counts toward it', () => {
+  const journey = deliveredJourney();
+  assert.equal(calculateScore(journey, true).grade, 'A');
+  const skippedFill = deliveredJourney();
+  for (const opening of skippedFill.program.fill) opening.done = false;
+  const withoutFill = calculateScore(skippedFill, false);
+  assert.ok(withoutFill.components.objectives.score <= 85, `fill counts in the objectives (${withoutFill.components.objectives.score})`);
+  assert.ok(withoutFill.totalScore <= 54, 'and a program that skipped it did not deliver');
+});
+
+test('a caught falsification costs twenty points on top of scrutiny; two pull the program', () => {
+  const journey = deliveredJourney();
+  const record = takenShortcut(journey, 'silvi-fake-free-growing', 'caught');
+  assert.equal(record.kind, 'false-record');
+  assert.equal(record.status, 'caught');
+  const after = calculateScore(journey, true);
+  const ledger = journey.programIntegrity;
+  delete journey.programIntegrity;
+  const unledgered = calculateScore(journey, true);
+  journey.programIntegrity = ledger;
+  assert.equal(after.integrityPenalty, 20);
+  assert.equal(after.totalScore, unledgered.totalScore - 20, 'the penalty is not folded into the capped scrutiny line');
+  assert.ok(formatScoreDisplay(after).some((line) => /Integrity\s+-20 for shortcuts the district found/.test(line)));
+
+  const spill = takenShortcut(journey, 'silvi-dump-chemicals', 'caught');
+  assert.equal(spill.kind, 'shortcut', 'a caught field shortcut is not a false record');
+  assert.equal(summarizeIntegrity(journey).penalty, 26);
+  assert.equal(summarizeIntegrity(journey).programPulled, false);
+  takenShortcut(journey, 'silvi-misreport-planting', 'caught');
+  assert.equal(summarizeIntegrity(journey).programPulled, true);
+});
+
+test('the season-close check finds falsified records, and repeated falsification takes the win away', async () => {
+  const journey = createSilvicultureJourney({ areaId: 'fraser-plateau', scale: 'campaign' });
+  journey.planting.blocksPlanted = journey.planting.blocksToPlant;
+  journey.planting.seedlingsPlanted = journey.planting.seedlingsAllocated;
+  for (const block of journey.program.blocks) { block.planted = block.trees; block.status = 'inspected'; block.quality = 93; }
+  for (const opening of journey.program.fill) opening.done = true;
+  for (const opening of journey.program.brush) opening.treated = opening.ha;
+  journey.brushing.hectaresComplete = journey.brushing.hectaresTarget;
+  for (const opening of journey.program.freeGrowing) { opening.needsRelease = false; opening.fgPlotPct = 95; }
+  journey.surveys.freeGrowingComplete = journey.surveys.freeGrowingTarget - 1;
+  journey.program.freeGrowing[0].surveyed = true;
+  journey.program.freeGrowing[0].result = 'pass';
+  journey.scrutiny = 70;
+  takenShortcut(journey, 'silvi-fake-free-growing', 'noticed');
+  takenShortcut(journey, 'silvi-misreport-planting', 'noticed');
+
+  const lines = [];
+  const noop = () => {};
+  const record = (text) => lines.push(text);
+  const ui = {
+    write: record, writeHeader: record, writeWarning: record, writeDanger: record,
+    writePositive: noop, clear: noop, updateAllStatus: noop, playEventVignette: noop,
+    async promptChoice(prompt, options) {
+      return options.find((o) => o.value === 'survey') || options.find((o) => o.value === 'set_aside')
+        || options.find((o) => o.value === 'end') || options[0];
+    },
+  };
+  const original = Math.random;
+  Math.random = () => 0.05;
+  try {
+    await runSilvicultureDay({ ui, journey, gameOver: false });
+  } finally {
+    Math.random = original;
+  }
+  assert.ok(lines.includes('SEASON CLOSE: DISTRICT CHECK'));
+  assert.equal(summarizeIntegrity(journey).caughtFalseRecords, 2);
+  assert.equal(journey.isComplete, false, 'the declarations are under review, so the program is not delivered');
+  assert.equal(journey.isGameOver, true);
+  assert.match(journey.gameOverReason, /licensee pulls you off the program/);
+  assert.equal(runSeasonCloseAudit(journey).length, 0, 'the season is checked once');
+});
+
+test('reporting as surveyed is never the losing play, and the spin reads the run it is written about', () => {
+  const clean = deliveredJourney();
+  const integrity = resolveFinalReport('integrity', clean).delta;
+  const people = resolveFinalReport('people', clean).delta;
+  const rolls = Array.from({ length: 100 }, (_, i) => (i + 0.5) / 100);
+  const spinEv = (journey) => rolls.reduce((sum, roll) => sum + resolveFinalReport('spin', journey, () => roll).delta, 0) / rolls.length;
+  assert.equal(integrity, 4);
+  assert.ok(integrity > people);
+  assert.ok(integrity > spinEv(clean), `spin expectation ${spinEv(clean)} vs ${integrity}`);
+
+  const dirty = deliveredJourney();
+  dirty.scrutiny = 85;
+  takenShortcut(dirty, 'silvi-fake-free-growing', 'clean');
+  assert.ok(spinEv(dirty) < spinEv(clean), 'a file under scrutiny with a false record in it spins worse');
+  assert.ok(resolveFinalReport('integrity', dirty).delta >= 0);
+});
+
+test('a scripted no-planting run fails and grades F, not C', async () => {
+  const result = await runPolicy('neglect', 'kootenay-wetbelt', 31337);
+  assert.equal(result.won, false);
+  assert.equal(result.grade, 'F', `neglect graded ${result.grade} (${result.score})`);
+  assert.match(result.reason, /program short: 8 of 8 blocks unplanted/);
+});
+
+test('competent, neglectful and fraudulent supervisors separate cleanly across the zones', async () => {
+  const areas = ['kootenay-wetbelt', 'okanagan-shuswap-drybelt', 'fort-st-john-plateau', 'vancouver-island-coast'];
+  const seeds = [4000, 4053];
+  const results = { competent: [], neglect: [], shortcuts: [], fraud: [] };
+  for (const policy of Object.keys(results)) {
+    for (const area of areas) {
+      for (const seed of seeds) results[policy].push(await runPolicy(policy, area, seed));
+    }
+  }
+  const mean = (list) => list.reduce((sum, result) => sum + result.score, 0) / list.length;
+  for (const result of results.competent) {
+    assert.equal(result.won, true, `${result.area}/${result.seed}: ${result.reason}`);
+    assert.equal(result.grade, 'A', `${result.area}/${result.seed} graded ${result.grade}`);
+  }
+  for (const result of results.neglect) {
+    assert.equal(result.won, false);
+    assert.equal(result.grade, 'F');
+  }
+  for (const result of results.fraud) {
+    assert.equal(result.won, false, 'skipping fill and half the release is not a delivered program');
+    assert.ok(['D', 'F'].includes(result.grade), `${result.area}/${result.seed} fraud graded ${result.grade}`);
+  }
+  // The season-close read runs at the odds the card printed, so a season of
+  // shortcuts can, rarely, stay buried; it still grades well under any
+  // competent season.
+  const found = results.shortcuts.filter((result) => result.integrity.caughtFalseRecords + result.integrity.caughtShortcuts > 0);
+  assert.ok(found.length >= results.shortcuts.length - 2, `${found.length} of ${results.shortcuts.length} shortcut seasons found`);
+  // Every shortcut season grades under every competent one, and all but a
+  // lucky one (five takes, four never found) by more than 15.
+  const worstCompetent = Math.min(...results.competent.map((result) => result.score));
+  const scores = results.shortcuts.map((result) => result.score);
+  assert.ok(scores.every((score) => score < worstCompetent), `shortcut seasons ${scores} vs competent ${worstCompetent}`);
+  assert.ok(scores.filter((score) => score >= worstCompetent - 15).length <= 1,
+    `shortcut seasons ${scores} vs competent ${worstCompetent}`);
+  assert.ok(mean(results.shortcuts) < mean(results.competent) - 30,
+    `shortcuts ${mean(results.shortcuts)} vs competent ${mean(results.competent)}`);
 });

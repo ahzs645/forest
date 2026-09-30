@@ -4,8 +4,13 @@ import assert from 'node:assert/strict';
 import { createPlanningJourney } from '../js/journey/factory.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 import {
+  PLANNING_VALUES_FLOOR,
+  RETURNED_SUBMISSION_READINESS_COST,
   WSA_REVIEW_READINESS,
   applySelectedBlockImpact,
+  getOutreachReadinessCap,
+  isSubmissionPremature,
+  runPlanningDay,
   getEffectiveWaterGate,
   getPlanningLeadBlocks,
   getPlanningLeadWaterContext,
@@ -24,7 +29,7 @@ import {
   formatPlanningBlockTriageEvidence,
 } from '../js/data/planningBlocks.js';
 import { resolveEvent } from '../js/events/resolution.js';
-import { PLANNING_PRE_SUBMISSION_CAP } from '../js/journey/constants.js';
+import { PLANNING_DECISION_GATE, PLANNING_PRE_SUBMISSION_CAP } from '../js/journey/constants.js';
 import { startDay } from '../js/journey/dayPlan.js';
 
 function makeJourney(areaId = 'fraser-plateau') {
@@ -96,7 +101,7 @@ test('explicit data / analysis / buyIn keys land on their own tracks and suppres
   assert.equal(journey.plan.phase, 'analysis');
 });
 
-test('generic progress in the decision phase is capped below the gate so only Prepare Submission crosses it', () => {
+test('generic progress in the decision phase never touches DM readiness; only Prepare Submission crosses the gate', () => {
   const journey = makeJourney();
   journey.day = 20;
   journey.plan.phase = 'ministerial_approval';
@@ -110,8 +115,16 @@ test('generic progress in the decision phase is capped below the gate so only Pr
     label: 'Ride it',
     effects: { progress: 40 },
   });
-  assert.equal(journey.plan.ministerialConfidence, PLANNING_PRE_SUBMISSION_CAP);
+  assert.equal(journey.plan.ministerialConfidence, 60);
+  assert.ok(journey.plan.ministerialConfidence < PLANNING_PRE_SUBMISSION_CAP);
   assert.equal(journey.isComplete, false);
+
+  resolveEvent(journey, { id: 'grant_application', title: 'Unexpected Grant' }, {
+    label: 'Drop everything and apply',
+    effects: { progress: -8 },
+  });
+  assert.equal(journey.plan.ministerialConfidence, 60, 'a grant application is not the DM losing confidence');
+  assert.equal(journey.plan.stakeholderBuyIn, 80);
 });
 
 test('a relationship event does not advance the engagement phase; only a Stakeholder Session does', async () => {
@@ -236,4 +249,164 @@ test('heritage/referral load replaces reserve proximity on the block lines and i
   const engagement = triage.options.find((option) => option.value === 'community');
   assert.equal(engagement.label, 'Engagement-led sequencing');
   assert.match(engagement.description, /heritage screen is clean/);
+});
+
+// ── The submission gate: spam, the meeting cap, and values ─────────────────
+// These drive processAction and the day runner directly and never resolve an
+// event, so they hold whatever the event layer does to the gates.
+
+function makeReadyFile(areaId = 'fraser-plateau') {
+  const journey = makeJourney(areaId);
+  const pool = getPlanningAreaBlockPool(journey.areaId);
+  applySelectedBlockImpact(journey, pool[0], 'access', null, []);
+  journey.day = 14;
+  journey.plan.phase = 'ministerial_approval';
+  journey.plan.dataCompleteness = 90;
+  journey.plan.analysisQuality = 90;
+  journey.plan.stakeholderBuyIn = 80;
+  journey.plan.ministerialConfidence = 0;
+  journey.values = { biodiversity: 55, timberSupply: 55, communityNeeds: 55, firstNationsValues: 55 };
+  journey.resources.budget = 200000;
+  journey.resources.politicalCapital = 100;
+  journey.professional.registrationStatus = 'active';
+  journey.professional.cpdHours = journey.professional.cpdTarget;
+  const fom = syncFomStateFromActiveBlock(journey, null);
+  fom.status = 'closed';
+  fom.commentLoad = 0;
+  fom.reviewDaysRemaining = 0;
+  fom.hydrologyReadiness = 100;
+  return journey;
+}
+
+/** A UI that records the day card's options and then holds the line. */
+function makeCardProbe() {
+  const probe = { ui: null, options: null };
+  probe.ui = {
+    ...makeUi(),
+    async promptChoice(prompt, choices) {
+      if (!probe.options && choices?.some((choice) => choice.value === 'end')) probe.options = choices;
+      return choices?.find((choice) => choice.value === 'end') || choices?.[0] || { value: undefined };
+    },
+  };
+  return probe;
+}
+
+async function withQuietDay(fn) {
+  // Day 1 is event-free; keep the file's own day number but let no event in.
+  const original = Math.random;
+  Math.random = () => 0.999;
+  try {
+    return await fn();
+  } finally {
+    Math.random = original;
+  }
+}
+
+test('Prepare Submission filed from 0% readiness is returned every time: six filings never approve the file', async () => {
+  const journey = makeReadyFile();
+  assert.ok(getPlanningSubmissionReadiness(journey, null).ready, 'every other gate is clean');
+  const ui = makeUi();
+  const goodwillBefore = journey.resources.politicalCapital;
+  for (let filing = 0; filing < 6; filing += 1) {
+    startDay(journey);
+    await processAction({ ui, journey }, 'submit', null);
+    assert.equal(journey.actionsRemaining, 0, 'a returned filing still costs the day');
+  }
+  assert.equal(journey.isComplete, false);
+  assert.equal(journey.plan.ministerialConfidence, 0, 'a returned filing never lifts readiness');
+  assert.equal(journey.plan.submissionsReturned, 6);
+  assert.ok(journey.resources.politicalCapital < goodwillBefore, 'the district notices the spam');
+  assert.ok(ui.lines.some((line) => /returns the package unread/.test(line)));
+});
+
+test('a returned filing costs readiness the meetings had built', async () => {
+  const journey = makeReadyFile();
+  journey.plan.ministerialConfidence = 40;
+  const ui = makeUi();
+  startDay(journey);
+  await processAction({ ui, journey }, 'submit', null);
+  assert.equal(journey.plan.ministerialConfidence, 40 - RETURNED_SUBMISSION_READINESS_COST);
+  assert.equal(journey.isComplete, false);
+});
+
+test('the pre-submission meetings are the only way to the cap, and the one filing after them approves the file', async () => {
+  const journey = makeReadyFile();
+  const ui = makeUi();
+  const readiness = getPlanningSubmissionReadiness(journey, null);
+  const cap = getOutreachReadinessCap(readiness);
+  let meetings = 0;
+  while (journey.plan.ministerialConfidence < cap && meetings < 12) {
+    startDay(journey);
+    await processAction({ ui, journey }, 'outreach', null);
+    meetings += 1;
+    assert.ok(journey.plan.ministerialConfidence <= cap, 'a meeting never carries readiness past the cap');
+  }
+  assert.equal(journey.plan.ministerialConfidence, cap);
+  startDay(journey);
+  await processAction({ ui, journey }, 'outreach', null);
+  assert.equal(journey.plan.ministerialConfidence, cap, 'a meeting at the cap adds nothing');
+  assert.equal(isSubmissionPremature(journey, readiness), false);
+
+  startDay(journey);
+  await processAction({ ui, journey }, 'submit', null);
+  assert.ok(journey.plan.ministerialConfidence >= PLANNING_DECISION_GATE);
+  assert.equal(journey.isComplete, true);
+  assert.equal(journey.plan.submissionsReturned || 0, 0);
+});
+
+test('the Prepare Submission card says whether the package will land or come back', async () => {
+  await withQuietDay(async () => {
+    const journey = makeReadyFile();
+    journey.plan.ministerialConfidence = 30;
+    const probe = makeCardProbe();
+    await runPlanningDay({ ui: probe.ui, journey, gameOver: false });
+    const early = probe.options.find((option) => option.value === 'submit');
+    assert.ok(early, 'the filing is offered once the gates are clean');
+    assert.match(early.description, /comes back unread/);
+    assert.match(early.description, /Meet the district first/);
+
+    const ready = makeReadyFile();
+    ready.plan.ministerialConfidence = getOutreachReadinessCap(getPlanningSubmissionReadiness(ready, null));
+    const probe2 = makeCardProbe();
+    await runPlanningDay({ ui: probe2.ui, journey: ready, gameOver: false });
+    const landing = probe2.options.find((option) => option.value === 'submit');
+    assert.match(landing.description, /carries it to \d+%/);
+  });
+});
+
+test('a value under the floor blocks the submission however ready the district is', async () => {
+  const journey = makeReadyFile();
+  journey.plan.ministerialConfidence = 70;
+  journey.values.biodiversity = PLANNING_VALUES_FLOOR - 1;
+  const ui = makeUi();
+  startDay(journey);
+  await processAction({ ui, journey }, 'submit', null);
+  assert.equal(journey.isComplete, false);
+  assert.equal(journey.plan.ministerialConfidence, 70, 'a blocked filing is not a filing');
+  assert.equal(journey.actionsRemaining, 1, 'and does not cost the day');
+  assert.ok(ui.lines.some((line) => /Submission blocked: Biodiversity 39%\/40%/.test(line)));
+});
+
+test('the blocked Prepare Submission card names each gap once', async () => {
+  await withQuietDay(async () => {
+    const journey = makeReadyFile();
+    journey.professional.registrationStatus = 'under-review';
+    const probe = makeCardProbe();
+    await runPlanningDay({ ui: probe.ui, journey, gameOver: false });
+    const blocked = probe.options.find((option) => option.value === 'submit_blocked');
+    assert.ok(blocked);
+    const needs = blocked.description.split(' | Next:')[0];
+    assert.equal((needs.match(/registration is under-review/g) || []).length, 1, needs);
+  });
+});
+
+test('the FSP-expiry warning still sounds while the file waits at the District Manager', async () => {
+  await withQuietDay(async () => {
+    const journey = makeReadyFile();
+    journey.plan.ministerialConfidence = 20;
+    journey.day = journey.deadline - 2;
+    const ui = makeUi();
+    await runPlanningDay({ ui, journey, gameOver: false });
+    assert.ok(ui.lines.some((line) => /current FSP expires soon/.test(line)));
+  });
 });

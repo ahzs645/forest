@@ -5,6 +5,7 @@ import {
   applyRoundConsequences,
   createInitialState,
   deriveTier,
+  describeConsequences,
   scoreRiskLoad,
 } from "../js/engine.js";
 
@@ -83,9 +84,77 @@ test("comeback window steadies the weakest meter late in a salvageable run", () 
   const state = makeState("recce");
   state.round = 3;
   state.metrics = { progress: 30, forestHealth: 50, relationships: 50, compliance: 50, budget: 50 };
+  // The season's own calls worked on the schedule: that is the effort it credits.
+  state.history.push({ type: "issue", id: "push", round: 3, effects: { progress: 2 } });
   const consequences = applyRoundConsequences(state);
   assert.ok(consequences.includes("comeback-window"));
   assert.equal(state.metrics.progress, 35);
+});
+
+test("comeback window credits no effort the season never made", () => {
+  const turtled = () => {
+    const state = makeState("recce");
+    state.round = 3;
+    state.metrics = { progress: 30, forestHealth: 50, relationships: 50, compliance: 50, budget: 50 };
+    state.history.push({ type: "issue", id: "idle", round: 3, effects: { progress: -1, compliance: 2 } });
+    return state;
+  };
+  // Seasonal play keeps the catch-up, but says it is room, not effort.
+  const seasonal = turtled();
+  assert.ok(applyRoundConsequences(seasonal).includes("comeback-window"));
+  const [why] = describeConsequences(seasonal, ["comeback-window"]);
+  assert.equal(why.cause, "The file was still salvageable, so Progress had room to recover.");
+
+  // A campaign review reports what the deployment did: no effort, no rebound.
+  const campaign = turtled();
+  campaign.seasonOutcome = { fellShort: true };
+  assert.ok(!applyRoundConsequences(campaign).includes("comeback-window"));
+  const worked = turtled();
+  worked.seasonOutcome = { fellShort: false };
+  worked.history.push({ type: "event", id: "push", round: 3, effects: { progress: 4 } });
+  assert.ok(applyRoundConsequences(worked).includes("comeback-window"));
+  assert.match(describeConsequences(worked, ["comeback-window"])[0].cause, /this season's calls went into Progress/);
+});
+
+test("a campaign season that delivered, noticed shortcut and all, can steady a slipping meter; one that fell short cannot", () => {
+  // The average campaign year: random calls, a shortcut somebody noticed,
+  // Compliance under the Mixed floor, but the deployment got its job done.
+  const middling = (seasonOutcome) => {
+    const state = makeState("recce");
+    state.round = 3;
+    state.metrics = { progress: 90, forestHealth: 52, relationships: 52, compliance: 40, budget: 55 };
+    state.history.push({ type: "temptation", id: "act", round: 3, band: "noticed", effects: { progress: 6, compliance: -2 } });
+    state.seasonOutcome = seasonOutcome;
+    return state;
+  };
+  const delivered = middling({ fellShort: false, shortcutsSeen: 1, shortcutsCaught: 0 });
+  assert.ok(applyRoundConsequences(delivered).includes("comeback-window"));
+  assert.equal(delivered.metrics.compliance, 45, "steadied back over the Mixed floor");
+  assert.equal(describeConsequences(delivered, ["comeback-window"])[0].cause, "The file was still salvageable, so Compliance had room to recover.");
+
+  const short = middling({ fellShort: true, shortcutsSeen: 1, shortcutsCaught: 0 });
+  assert.ok(!applyRoundConsequences(short).includes("comeback-window"));
+});
+
+test("slipping standing can be repaired from the second season; a thin schedule waits", () => {
+  const slipping = makeState("planner");
+  slipping.round = 2;
+  slipping.metrics = { progress: 50, forestHealth: 55, relationships: 41, compliance: 75, budget: 50 };
+  slipping.history.push({ type: "event", id: "mend", round: 2, effects: { relationships: 3 } });
+  assert.ok(applyRoundConsequences(slipping).includes("comeback-window"));
+  assert.equal(slipping.metrics.relationships, 46);
+
+  // A turtled file's thin Progress is not refunded before the back half.
+  const turtled = makeState("planner");
+  turtled.round = 2;
+  turtled.metrics = { progress: 30, forestHealth: 60, relationships: 70, compliance: 80, budget: 50 };
+  assert.ok(!applyRoundConsequences(turtled).includes("comeback-window"));
+});
+
+test("Mixed sits just above the consequence lines: a middling year that never collapsed is not Stumbled", () => {
+  assert.equal(deriveTier({ progress: 40, forestHealth: 50, relationships: 41, compliance: 44, budget: 40 }), "mixed");
+  assert.equal(deriveTier({ progress: 40, forestHealth: 50, relationships: 34, compliance: 44, budget: 38 }), "stumbled");
+  assert.equal(deriveTier({ progress: 40, forestHealth: 50, relationships: 45, compliance: 39, budget: 38 }), "stumbled");
 });
 
 test("comeback window stays shut when the run is already collapsing", () => {

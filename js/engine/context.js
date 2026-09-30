@@ -16,6 +16,9 @@ import { getRoleOperationState } from "./seasonalContract.js";
 const SEASON_IDS = ["spring", "summer", "fall", "winter"];
 const SEASON_THEMES = ["foundation", "operations", "pressure", "closeout"];
 
+// Flags buildSeasonContext derives from the professional file and the land.
+export const SEASON_CONTEXT_FLAGS = Object.freeze(["professionalAuditActive", "regenReviewNeeded"]);
+
 export function getSeasonTheme(round) {
   const index = Math.max(0, Math.min(SEASON_THEMES.length - 1, Number(round || 1) - 1));
   return SEASON_THEMES[index];

@@ -149,7 +149,7 @@ export const InputMixin = {
 
       // Risk-tag chip (parsed from the " [SAFE]"-style suffix some modes
       // append to labels; shown as a chip instead of inline noise).
-      const TAG_RE = /\s*\[(SAFE|RISKY|TRADEOFF)\]\s*/;
+      const TAG_RE = /\s*\[(SAFE|RISKY|TRADEOFF|OFF-BOOK)\]\s*/;
       let labelText = String(option.label ?? '');
       const tagMatch = labelText.match(TAG_RE);
       const tag = tagMatch ? tagMatch[1] : null;
@@ -231,7 +231,16 @@ export const InputMixin = {
         }
       }
 
+      // A disabled option is shown with its reason as the hint, and is not
+      // a choice: no click, no number key, no arrow stop.
+      if (option.disabled) {
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+        btn.classList.add('is-disabled');
+      }
+
       btn.addEventListener('click', () => {
+        if (option.disabled) return;
         // Save handler before hiding choices (which clears it)
         const handler = this._choiceHandler;
         this.write(`> ${option.label}`, 'term-dim');
@@ -255,7 +264,7 @@ export const InputMixin = {
       if (!isDown && !isUp) return;
 
       const buttons = Array.from(
-        this.choices.querySelectorAll('.choice-btn, .decision-card')
+        this.choices.querySelectorAll('.choice-btn:not(:disabled), .decision-card:not(:disabled)')
       );
       if (!buttons.length) return;
 
@@ -275,7 +284,7 @@ export const InputMixin = {
     }
 
     // Focus first button
-    const firstBtn = this.choices.querySelector('.choice-btn, .decision-card');
+    const firstBtn = this.choices.querySelector('.choice-btn:not(:disabled), .decision-card:not(:disabled)');
     if (firstBtn) firstBtn.focus();
 
     this._watchChoiceOverflow();
@@ -328,6 +337,9 @@ export const InputMixin = {
     }
     this._choiceHandler = null;
     this._currentOptions = null;
+    // A card's anchor holds the log only while its choices are up; once they
+    // are gone, whatever is written next scrolls in as usual.
+    this._scrollAnchor = null;
   },
 
   /**

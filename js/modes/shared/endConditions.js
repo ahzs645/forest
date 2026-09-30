@@ -5,6 +5,9 @@
 
 import { getSurveyedBlockCount } from '../../journey.js';
 import { allPackagesFinalized, getPackagesFinalized, getPackageTarget } from '../../journey/packages.js';
+import { assessSilvicultureProgram } from '../../data/silvicultureProgram.js';
+import { CUT_CONTROL } from '../../data/managerRoles.js';
+import { PLANNING_SCRUTINY_GATE } from '../../journey/constants.js';
 
 /**
  * Whether a FOM's public comment period has closed. Older saves recorded the
@@ -27,7 +30,18 @@ export function isPlanningApprovalReady(journey) {
     (plan.analysisQuality || 0) >= 80 &&
     (plan.stakeholderBuyIn || 0) >= 75 &&
     (plan.ministerialConfidence || 0) >= 80 &&
-    isFomCommentPeriodClosed(journey);
+    isFomCommentPeriodClosed(journey) &&
+    !hasPlanningDecisionHold(journey);
+}
+
+/**
+ * Whether the District Manager is holding the decision: the file's scrutiny
+ * is at the gate, or a regulator has an open file on one of its shortcuts
+ * whose finding has not landed yet (js/modes/planning.js names them).
+ */
+export function hasPlanningDecisionHold(journey) {
+  if ((Number(journey?.scrutiny) || 0) >= PLANNING_SCRUTINY_GATE) return true;
+  return (journey?.temptationMemory?.pendingCatches || []).length > 0;
 }
 
 /**
@@ -54,12 +68,12 @@ export function checkReconEndConditions(journey) {
   // Nobody left in the field. Nobody died — they were flown out, driven out,
   // or walked — but the season cannot be finished from town.
   if (crewBasedMode && activeCrewCount === 0) {
-    return { gameOver: true, reason: 'The crew is off the block: nobody left in the field to finish the season' };
+    return { gameOver: true, reason: 'The crew is off the block: nobody left in the field to finish the season.' };
   }
 
   // Game over: Stranded (no fuel, no food)
   if (journey.resources.fuel <= 0 && journey.resources.food <= 0) {
-    return { gameOver: true, reason: 'Stranded with no supplies' };
+    return { gameOver: true, reason: 'Stranded with no supplies.' };
   }
 
   const lastStopIndex = (journey.blocks?.length || 0) - 1;
@@ -68,7 +82,7 @@ export function checkReconEndConditions(journey) {
       journey.currentBlockIndex >= lastStopIndex &&
       surveyedBlocks < totalBlocks &&
       (journey.resources.fuel <= 0 || journey.resources.equipment <= 0)) {
-    return { gameOver: true, reason: 'Recon package stalled on the final block with no mobility left' };
+    return { gameOver: true, reason: 'Recon package stalled on the final block with no mobility left.' };
   }
 
   // The layout deadline. Checked last so a package finished on the final
@@ -77,7 +91,7 @@ export function checkReconEndConditions(journey) {
   // this branch while the mission pane advertised "Days left", which is why
   // no recon day ever competed with any other day.
   if (Number.isFinite(journey.deadline) && journey.day > journey.deadline) {
-    return { gameOver: true, reason: 'The layout deadline passed with blocks still unassessed — the cutting permit goes in without them' };
+    return { gameOver: true, reason: 'The layout deadline passed with blocks still unassessed — the cutting permit goes in without them.' };
   }
 
   return null;
@@ -97,9 +111,11 @@ export function checkSilvicultureEndConditions(journey) {
     return { gameOver: true, reason: 'All crew members lost' };
   }
 
-  // Victory: this year's blocks planted, this year's declarations in RESULTS
-  if (journey.planting.blocksPlanted >= journey.planting.blocksToPlant &&
-      journey.surveys.freeGrowingComplete >= journey.surveys.freeGrowingTarget) {
+  // Victory: the whole program - this year's blocks planted and inspected,
+  // last year's openings filled, the release queue treated, and this year's
+  // declarations in RESULTS (js/data/silvicultureProgram.js).
+  const assessment = assessSilvicultureProgram(journey);
+  if (assessment.complete) {
     return { victory: true, reason: 'Planting program delivered and this year\'s free-growing declarations submitted to RESULTS.' };
   }
 
@@ -119,7 +135,7 @@ export function checkSilvicultureEndConditions(journey) {
   // mode-specific deadline was not authored.
   const programDeadline = Number.isFinite(journey.deadline) ? journey.deadline : 120;
   if (journey.day > programDeadline) {
-    return { gameOver: true, reason: 'Silviculture program fell short of its targets' };
+    return { gameOver: true, reason: `The season closed with the program short: ${assessment.shortfalls.join(', ')}.` };
   }
 
   return null;
@@ -164,18 +180,31 @@ export function checkPlanningEndConditions(journey) {
  * @returns {Object|null} End condition result or null
  */
 export function checkManagerEndConditions(journey) {
-  // Victory: the operating year is run with the books solvent and the board onside
+  // Year end: the books, the cut-control statement (js/modes/manager.js
+  // records its status against CUT_CONTROL) and the board's confidence.
   if (journey.day > journey.deadline) {
-    if (journey.resources.budget > 0 && (journey.metrics.reputation ?? 50) > 40) {
-      return { victory: true, reason: 'The operating year is delivered with the books solvent and the board onside.' };
-    } else {
-      return { gameOver: true, reason: 'Term ended with poor performance' };
+    const reputation = Math.round(journey.metrics.reputation ?? 50);
+    const cutControl = journey.ledger?.cutControlStatus;
+    if (cutControl === 'severe_overcut') {
+      return { gameOver: true, reason: `Overcut past ${Math.round(CUT_CONTROL.limitHigh * 100)}% of the AAC: the C&E file and the cut it will cost next year end the term.` };
     }
+    if (cutControl === 'severe_undercut') {
+      return { gameOver: true, reason: `Cut under ${Math.round(CUT_CONTROL.limitLow * 100)}% of the AAC: the board will not carry a GM who leaves that much wood in the bush.` };
+    }
+    if (journey.resources.budget <= 0) {
+      return { gameOver: true, reason: 'Budget exhausted - the bank calls the covenant and operations halt.' };
+    }
+    if (reputation <= 40) {
+      return { gameOver: true, reason: `The board's confidence is gone: reputation ${reputation}% at the year-end review, and it needed to be above 40%.` };
+    }
+    return cutControl && cutControl !== 'in_band'
+      ? { victory: true, reason: 'The operating year closes solvent with the board onside, but the cut-control statement goes in with a finding.' }
+      : { victory: true, reason: 'The operating year is delivered inside the cut-control band, with the books solvent and the board onside.' };
   }
 
   // Game over: treasury gone
   if (journey.resources.budget <= 0) {
-    return { gameOver: true, reason: 'Budget exhausted - the bank calls the covenant and operations halt' };
+    return { gameOver: true, reason: 'Budget exhausted - the bank calls the covenant and operations halt.' };
   }
 
   // Game over: Poor reputation
@@ -197,13 +226,11 @@ export function checkPermittingEndConditions(journey) {
     return { victory: true, reason: 'Every permit the season needed is issued.' };
   }
 
-  // Deadline handling
+  // The deadline is the season's: the mill needs every permit by then. A
+  // four-in-five consolation win meant no desk could lose to the calendar -
+  // a competent one always had twelve of fifteen, and so did a reckless one.
   if (journey.day > journey.deadline) {
-    if (journey.permits.approved >= journey.permits.target * 0.8) {
-      return { victory: true, reason: 'Deadline reached with enough permits issued to keep the mill supplied' };
-    } else {
-      return { gameOver: true, reason: 'Failed to meet deadline' };
-    }
+    return { gameOver: true, reason: `Failed to meet deadline: ${journey.permits.approved} of ${journey.permits.target} permits issued.` };
   }
 
   // Game over: Budget depleted

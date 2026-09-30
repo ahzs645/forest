@@ -14,6 +14,8 @@
 import { TuiGameController } from '../../tui/controller.js';
 import { makeRng } from '../engine/rng.js';
 import { formatMetricName } from '../engine/shared.js';
+import { recordTieredRun } from '../career.js';
+import { formatMetricDelta } from '../engine/effects.js';
 
 const METRIC_ORDER = ['progress', 'forestHealth', 'relationships', 'compliance', 'budget'];
 const METRIC_SHORT = {
@@ -52,10 +54,15 @@ export function renderMetricStrip(ui, gameState = {}) {
     if (season) facts.unshift({ label: 'Season', value: season });
     if (role) facts.push({ label: 'Role', value: role });
 
-    const alerts = (strip?.risks || []).map((risk) => ({
-      level: 'warn',
-      text: risk.label || `${formatMetricName(risk.metric)} at risk`
-    }));
+    // The worst risk already reads as the guidance line; listing it again as
+    // an alert chip showed every warning twice.
+    const guidance = strip?.pressure || null;
+    const alerts = (strip?.risks || [])
+      .map((risk) => risk.label || `${formatMetricName(risk.metric)} at risk`)
+      .filter((text) => text !== guidance)
+      .map((text) => ({ level: 'warn', text }));
+    // A noticed shortcut's watch stands for the rest of the year.
+    if (strip?.watch) alerts.push({ level: 'warn', text: strip.watch });
 
     const goal = strip?.goal
       ? (strip.winCondition ? `${strip.goal} Win: ${strip.winCondition}.` : strip.goal)
@@ -66,7 +73,7 @@ export function renderMetricStrip(ui, gameState = {}) {
         ? { label: 'Progress', value: Math.round(metrics.progress), text: `${Math.round(metrics.progress)}%` }
         : null,
       facts,
-      guidance: strip?.pressure || null,
+      guidance,
       alerts
     });
     return;
@@ -87,6 +94,40 @@ function riskTag(detail) {
   return '';
 }
 
+/**
+ * The offer's terms, in reading order, for a shortcut card: what it pays, the
+ * odds it holds this season, and that refusing is free. Empty for any other
+ * card.
+ */
+export function collectShortcutLines(contentData = {}) {
+  const shortcut = contentData.shortcut;
+  if (!shortcut) return [];
+  const odds = [shortcut.oddsText, shortcut.declineText].filter(Boolean).join('. ');
+  return [
+    shortcut.offerText ? { text: shortcut.offerText, className: 'term-shortcut-offer' } : null,
+    odds ? { text: odds.endsWith('.') ? odds : `${odds}.`, className: 'term-shortcut-odds' } : null,
+  ].filter(Boolean);
+}
+
+// The terminal re-anchors to its bottom after every write, so on a short
+// screen a long offer scrolled its own banner and title out of view. Pin the
+// first of `selectors` that still leaves `endSelector` on screen (the banner,
+// else the title) to the top, when the card would not otherwise fit.
+function anchorCardTop(ui, selectors, endSelector) {
+  const terminal = ui?.terminal;
+  if (!terminal || typeof terminal.querySelector !== 'function') return;
+  const offset = (el) => el.getBoundingClientRect().top - terminal.getBoundingClientRect().top + terminal.scrollTop;
+  const end = endSelector ? terminal.querySelector(endSelector) : null;
+  const endBottom = end ? offset(end) + end.getBoundingClientRect().height : terminal.scrollHeight;
+  const anchors = selectors.map((selector) => terminal.querySelector(selector)).filter(Boolean);
+  if (!anchors.length) return;
+  const anchor = anchors.find((el) => endBottom - offset(el) <= terminal.clientHeight) || anchors[anchors.length - 1];
+  const top = offset(anchor);
+  if (top < terminal.scrollTop || endBottom > terminal.scrollTop + terminal.clientHeight) {
+    terminal.scrollTop = Math.max(0, top - 4);
+  }
+}
+
 export function collectDetailLines(contentData = {}) {
   const lines = [];
   const context = contentData.context;
@@ -102,6 +143,65 @@ export function collectDetailLines(contentData = {}) {
   if (contentData.surfaceReason) lines.push(contentData.surfaceReason);
   if (contentData.sourceLabel) lines.push(`Source: ${contentData.sourceLabel}`);
   return lines.filter((line, i, all) => line && all.indexOf(line) === i);
+}
+
+// The controller builds multi-line bodies (the "Why This Happened" bullets
+// with their Why: / This season: sub-lines); one ui.write per line keeps them
+// from running together into a single paragraph.
+function writeLines(ui, text, className) {
+  for (const line of String(text).split('\n')) {
+    if (line.trim()) ui.write(line, className);
+  }
+}
+
+// The first card's onboarding brief: the same goal / how to play / role /
+// win the classic view shows in its "Your mission" panel.
+function writeMission(ui, mission) {
+  if (Array.isArray(mission)) {
+    for (const line of mission) ui.write(line, 'term-dim');
+    return;
+  }
+  if (typeof mission === 'string') {
+    if (mission) ui.write(mission, 'term-dim');
+    return;
+  }
+  if (!mission || typeof mission !== 'object') return;
+  ui.write('');
+  ui.writeDivider('YOUR MISSION');
+  if (mission.goal) ui.write(`Goal: ${mission.goal}`);
+  for (const step of mission.steps || []) ui.write(`• ${step}`, 'term-dim');
+  if (mission.mandate) ui.write(`Your role: ${mission.mandate}`);
+  if (mission.win) ui.write(`Win: ${mission.win}`);
+}
+
+/**
+ * The seasonal year as Journey Log rows, for the hub's [L] Log. The log the
+ * modal normally reads belongs to the expedition journey, which a seasonal
+ * run does not have.
+ */
+const LOG_ICONS = {
+  assignment: '●',
+  event: '!',
+  issue: '!',
+  temptation: '$',
+  consequence: '×',
+  recovery: '+',
+};
+
+export function buildSeasonalLogEntries(gameState) {
+  return (gameState?.history || [])
+    .filter((entry) => entry?.title)
+    .map((entry) => {
+      const delta = formatMetricDelta(entry.effects || {});
+      return {
+        day: entry.round ?? '',
+        dayLabel: 'Season',
+        icon: LOG_ICONS[entry.type] || '·',
+        type: entry.type === 'consequence' ? 'event' : 'action',
+        summary: entry.title,
+        detail: [entry.option, delta].filter(Boolean).join(' — '),
+      };
+    });
 }
 
 function writeNotice(ui, notice) {
@@ -126,29 +226,44 @@ function writeNotice(ui, notice) {
  */
 export async function promptSeasonalCard(ui, contentData = {}, options = [], gameState = null) {
   const details = contentData.optionDetails || [];
-  const detailLines = collectDetailLines(contentData);
+  const shortcut = contentData.shortcut || null;
+  // An offer prints its whole brief up front; its context block only
+  // restated the role's standing objective, so it gets no More context.
+  const detailLines = shortcut ? [] : collectDetailLines(contentData);
   let showDetail = false;
 
   for (;;) {
     ui.clear();
-    if (gameState) {
+    if (gameState?.metrics) {
       renderMetricStrip(ui, gameState);
       ui.write('');
+    } else if (gameState === null) {
+      // Setup and resume cards (the controller's null snapshot) have no run
+      // yet: never leave the last year's meters standing beside them.
+      ui.clearMissionStatus?.();
     }
 
     writeNotice(ui, contentData.notice);
 
     const title = contentData.title || contentData.heading || contentData.text || '';
-    if (contentData.cardLabel) ui.write(contentData.cardLabel, 'term-dim');
-    if (title) ui.writeHeader(title);
-    if (contentData.headline && contentData.headline !== title) ui.write(contentData.headline);
-    const body = contentData.description || contentData.body || '';
-    if (body) ui.write(body);
-    if (Array.isArray(contentData.mission)) {
-      for (const line of contentData.mission) ui.write(line, 'term-dim');
-    } else if (typeof contentData.mission === 'string' && contentData.mission) {
-      ui.write(contentData.mission, 'term-dim');
+    if (shortcut) {
+      ui.write(shortcut.banner, 'term-shortcut-banner');
+    } else if (contentData.cardLabel) {
+      ui.write(contentData.cardLabel, 'term-dim');
     }
+    if (title) ui.writeHeader(title);
+    // A card scheduled by an earlier choice says which one, right under its
+    // title rather than behind More context.
+    if (contentData.provenance) ui.write(contentData.provenance, 'term-provenance');
+    if (contentData.headline && contentData.headline !== title) {
+      ui.write(contentData.headline, shortcut ? 'term-shortcut-headline' : '');
+    }
+    if (contentData.subtitle) ui.write(contentData.subtitle, 'term-dim');
+    if (contentData.note) ui.write(contentData.note, 'term-dim');
+    const body = contentData.description || contentData.body || '';
+    if (body) writeLines(ui, body);
+    for (const line of collectShortcutLines(contentData)) ui.write(line.text, line.className);
+    writeMission(ui, contentData.mission);
 
     if (showDetail && detailLines.length) {
       ui.writeDivider('CONTEXT');
@@ -169,7 +284,10 @@ export async function promptSeasonalCard(ui, contentData = {}, options = [], gam
       choices.push({ label: 'More context', description: 'Background on this card (free)', value: 'detail' });
     }
 
-    const picked = await ui.promptChoice(contentData.decisionPrompt || '', choices);
+    const pending = ui.promptChoice(contentData.decisionPrompt || '', choices);
+    if (shortcut) anchorCardTop(ui, ['.term-shortcut-banner', '.term-shortcut-banner + .term-header'], '.term-shortcut-odds');
+    else if (contentData.provenance) anchorCardTop(ui, ['.term-header', '.term-provenance'], '.term-provenance');
+    const picked = await pending;
     if (picked.value === 'detail') {
       showDetail = true;
       continue;
@@ -191,7 +309,7 @@ export async function promptSummaryCard(ui, contentData = {}, options = [], game
     if (contentData.tier) {
       ui.write(`ENDING: ${String(contentData.tier).toUpperCase()}${contentData.score != null ? ` · SCORE ${contentData.score}/100` : ''}`);
     }
-    if (contentData.body) ui.write(contentData.body);
+    if (contentData.body) writeLines(ui, contentData.body);
     for (const reason of contentData.scoreReasons || []) ui.write(`• ${reason}`);
     if (contentData.style?.label) {
       ui.write(`Style: ${contentData.style.label} — ${contentData.style.tendency || ''}`, 'term-dim');
@@ -242,6 +360,8 @@ export async function promptSummaryCard(ui, contentData = {}, options = [], game
  * @param {{companyName: string, roleIndex: number, areaIndex: number}} [options.preset]
  *   - skip the controller's setup cards (used by the campaign)
  * @param {string} [options.saveKey] - override the controller autosave slot
+ * @param {Function} [options.onLogAvailable] - receives a function that returns
+ *   the year so far as Journey Log rows (the hub's [L] Log).
  * @param {Function} [options.onExitAvailable] - receives an exit function the
  *   host can call (the Escape modal's "Save & return"); it unblocks the
  *   pending card and unwinds the run, leaving the boundary autosave on file.
@@ -289,6 +409,10 @@ async function runSeasonalGameInner(ui, options = {}) {
     onExit: () => { exitRequested = true; },
   });
 
+  if (typeof options.onLogAvailable === 'function') {
+    options.onLogAvailable(() => buildSeasonalLogEntries(controller.gs));
+  }
+
   if (typeof options.onExitAvailable === 'function') {
     options.onExitAvailable(() => {
       // The season-boundary autosave is already parked; unblocking the
@@ -318,6 +442,8 @@ async function runSeasonalGameInner(ui, options = {}) {
     const { mode, contentData } = view;
 
     if (mode === 'setup-name') {
+      // Play Again lands here with last year's meters still in the pane.
+      ui.clearMissionStatus?.();
       ui.clear();
       ui.writeHeader('SEASONAL STRATEGY');
       ui.write('Four seasons, five meters, one operating area. Decisions echo.');
@@ -330,6 +456,12 @@ async function runSeasonalGameInner(ui, options = {}) {
 
     if (mode === 'end') {
       const summary = contentData;
+      // A finished year (or crisis debrief) plants its tree in the career
+      // forest. Filed on arrival at the summary: the controller has already
+      // cleared its autosave, so a reload here cannot replay and refile it.
+      if (summary?.tier) {
+        recordTieredRun(controller.gs?.gameMode === 'crisis-command' ? 'crisis-command' : 'seasonal', summary);
+      }
       const optionLabels = view.options || [];
       if (optionLabels.length) {
         const index = await promptSummaryCard(ui, contentData, optionLabels, view.gameState);

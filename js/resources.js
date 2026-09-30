@@ -253,7 +253,7 @@ export function calculateFieldConsumption(conditions = {}, crewCount = 5) {
  * @returns {Object} Resource consumption/changes
  */
 export function calculateDeskConsumption(conditions = {}) {
-  const { overtime = 0, meetings = 0, crisisMode = false } = conditions;
+  const { overtime = 0, crisisMode = false } = conditions;
   const consumption = {};
 
   // Budget consumption
@@ -367,7 +367,7 @@ export function getFormattedResourceStatus(resources, definitions) {
     // Format display value
     let display;
     if (def.unit === '$') {
-      display = '$' + Math.round(value).toLocaleString();
+      display = formatDollars(value);
     } else if (def.unit === '%') {
       display = Math.round(value) + '%';
     } else {
@@ -453,7 +453,7 @@ function getDefaultPrice(resourceId) {
  * @param {string} locationId - Current location
  * @returns {Object[]} Array of purchasable items
  */
-export function getSupplyStoreItems(journeyType, locationId = null) {
+export function getSupplyStoreItems(journeyType, _locationId = null) {
   if (journeyType === 'field') {
     return [
       {
@@ -598,6 +598,17 @@ export function getResourcePercentage(current, definition) {
 }
 
 /**
+ * Whole dollars with the sign in front of the dollar sign: an overdrawn
+ * budget reads "-$858", never "$-858".
+ * @param {number} value
+ * @returns {string}
+ */
+export function formatDollars(value) {
+  const rounded = Math.round(Number(value) || 0);
+  return `${rounded < 0 ? '-' : ''}$${Math.abs(rounded).toLocaleString('en-CA')}`;
+}
+
+/**
  * Format resource value for display
  * @param {string} resourceId - Resource ID
  * @param {number} value - Current value
@@ -609,7 +620,7 @@ export function formatResourceValue(resourceId, value, definitions) {
   if (!def) return String(value);
 
   if (def.unit === '$') {
-    return '$' + Math.round(value).toLocaleString();
+    return formatDollars(value);
   }
   if (def.unit === '%') {
     return Math.round(value) + '%';

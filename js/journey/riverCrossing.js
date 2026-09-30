@@ -24,8 +24,37 @@ export const CROSSING_HAZARDS = new Set([
 /** Water level at which nobody walks a crew or a truck into the channel. */
 export const FLOOD_GAUGE_INDEX = 3;
 
-/** Printed by the caller whenever the gauge reads FLOOD. */
+/** Printed by the caller whenever the gauge reads FLOOD at a ford. */
 export const FLOOD_HOLD_MESSAGE = 'Nobody walks a crew into that. Wait it out, go around, or call it.';
+
+/**
+ * What FLOOD means depends on what is there. The crew is not in the water on
+ * a bridge or a ferry, so the ford line would contradict the options offered.
+ */
+const FLOOD_HOLD_BY_MODE = {
+  ford: FLOOD_HOLD_MESSAGE,
+  bridge: 'The river is in flood under the deck. Nobody drives it until the structure and the approach fill have been looked at.',
+  ferry: 'The operator has the cable up. Nobody crosses on the ferry in this water.',
+  culvert: 'Water is over the road prism. Nothing drives that fill today.',
+};
+
+/** Block hazards and features that mean fish in the channel. */
+const FISH_STREAM_HAZARDS = new Set(['fish_timing']);
+const FISH_STREAM_FEATURES = new Set(['salmon_river', 'salmon_stream', 'fish_habitat', 'spawning_channel']);
+
+/**
+ * Least-risk in-stream work window. For most interior and northern BC fish
+ * streams the reduced-risk window for work in and about a stream is mid- to
+ * late summer, after freshet and before the fall spawners; outside it,
+ * putting trucks through the channel is the kind of thing DFO and the
+ * Water Sustainability Act notification exist for.
+ */
+function inFishWindow(journey) {
+  return journey?.season?.currentSeason === 'summer';
+}
+
+/** Scrutiny for driving trucks through a fish stream, by window. */
+const FISH_FORD_SCRUTINY = { inWindow: 0, outOfWindow: 2 };
 
 const GAUGE_LEVELS = [
   { id: 'low', label: 'LOW', description: 'Gravel bars showing. Low water, easy wheel tracks.', baseRisk: 0.03 },
@@ -33,6 +62,23 @@ const GAUGE_LEVELS = [
   { id: 'high', label: 'HIGH', description: 'Thigh-deep, fast, and cold. Anything not chained down swims.', baseRisk: 0.30 },
   { id: 'flood', label: 'FLOOD', description: 'Brown water carrying debris. This is a river with opinions.', baseRisk: 0.58 },
 ];
+
+// A deck or a pipe reads the same gauge differently: nobody is wading a
+// bridge, so "thigh-deep, anything not chained down swims" belongs to a ford.
+const GAUGE_COPY_BY_MODE = {
+  bridge: {
+    low: 'Low water under the deck; the abutments are dry.',
+    moderate: 'Steady flow under the deck, well clear of the stringers.',
+    high: 'High and fast under the deck, a metre off the stringers. Scour at the abutments is the worry.',
+    flood: 'Brown water and debris hammering the piers. This is a river with opinions.',
+  },
+  culvert: {
+    low: 'A trickle through the pipe.',
+    moderate: 'The pipe running half full.',
+    high: 'The pipe running full and the inlet starting to back up.',
+    flood: 'The inlet is plugged and water is over the road at the fill.',
+  },
+};
 
 /** What a crossing physically is, read off the block's features. */
 export const CROSSING_MODES = {
@@ -133,6 +179,9 @@ export function getCrossingContext(journey, block) {
 
   const flood = gaugeIndex >= FLOOD_GAUGE_INDEX;
   const high = gaugeIndex === 2;
+  const features = new Set((block?.features || []).map((f) => String(f || '').toLowerCase()));
+  const fishStream = mode === 'ford'
+    && ([...hazards].some((h) => FISH_STREAM_HAZARDS.has(h)) || [...features].some((f) => FISH_STREAM_FEATURES.has(f)));
 
   // What the crew may physically attempt today. A vehicle ford at HIGH only
   // after a scout; nothing enters a channel at FLOOD; a ferry is the
@@ -150,7 +199,7 @@ export function getCrossingContext(journey, block) {
     gaugeIndex,
     gaugeId: gauge.id,
     gaugeLabel: gauge.label,
-    gaugeDescription: gauge.description,
+    gaugeDescription: GAUGE_COPY_BY_MODE[mode]?.[gauge.id] || gauge.description,
     risk: Math.min(0.85, risk),
     scouted,
     undercut,
@@ -160,7 +209,9 @@ export function getCrossingContext(journey, block) {
     canWinch: mode === 'ford' && !flood
       && (journey?.resources?.equipment || 0) > 10
       && (journey?.resources?.fuel || 0) > WINCH_FUEL_L,
-    holdMessage: flood ? FLOOD_HOLD_MESSAGE : null,
+    holdMessage: flood ? (FLOOD_HOLD_BY_MODE[mode] || FLOOD_HOLD_MESSAGE) : null,
+    fishStream,
+    fishWindow: fishStream ? inFishWindow(journey) : null,
   };
 }
 
@@ -175,9 +226,12 @@ export function getCrossingOptions(ctx) {
   if (!ctx) return options;
 
   if (ctx.mode === 'ferry') {
-    options.push(ctx.flood
-      ? { label: 'Radio the ferry operator', description: 'The cable is up in this water. Nobody crosses today.', value: 'ferry' }
-      : { label: 'Wait for the ferry window', description: 'The reaction ferry runs on the current; the trucks go over chained down', value: 'ferry' });
+    // At FLOOD the cable is up (the hold message says so). An option the
+    // operator can only refuse sent the crew round the same prompt forever;
+    // the only move left is to camp on the landing.
+    if (!ctx.flood) {
+      options.push({ label: 'Wait for the ferry window', description: 'The reaction ferry runs on the current; the trucks go over chained down', value: 'ferry' });
+    }
   } else if (ctx.mode === 'bridge') {
     if (ctx.condemned) {
       options.push({ label: 'Look at the bridge', description: 'It is off the list for loaded traffic. Nothing to inspect.', value: 'noop' });
@@ -221,12 +275,17 @@ export function getCrossingOptions(ctx) {
       value: 'reroute',
     });
   } else {
+    // Trucks in a fish stream outside the least-risk window are a file
+    // problem whatever the water does; the option says so up front.
+    const fishNote = ctx.fishStream && !ctx.fishWindow
+      ? `; fish stream outside the work window (scrutiny +${FISH_FORD_SCRUTINY.outOfWindow})`
+      : '';
     if (ctx.canCross) {
       options.push({
         label: ctx.gaugeIndex >= 2 ? 'Take the trucks across the bar' : 'Ford it',
-        description: ctx.gaugeIndex >= 2
+        description: (ctx.gaugeIndex >= 2
           ? 'Low range, spotter on the hood, one truck in the other’s wheel tracks'
-          : 'Take the crossing as it stands',
+          : 'Take the crossing as it stands') + fishNote,
         value: 'ford',
       });
     }
@@ -240,7 +299,7 @@ export function getCrossingOptions(ctx) {
     if (ctx.canWinch) {
       options.push({
         label: 'Rig a winch line (fuel & gear)',
-        description: 'Slow and costly, but the water never gets a vote',
+        description: `Slow and costly, but the water never gets a vote${fishNote}`,
         value: 'winch',
       });
     }
@@ -560,6 +619,26 @@ export function rerouteCrossing(journey, ctx) {
 }
 
 /**
+ * Trucks went through a fish stream. Inside the least-risk window it is a
+ * note for the road file; outside it, the file notices.
+ * @param {Object} journey
+ * @param {Object} ctx
+ * @param {Object} result - a ford or winch result
+ * @returns {Object} the same result, with the fisheries line added
+ */
+export function noteFishStreamCrossing(journey, ctx, result) {
+  if (!ctx?.fishStream || !result?.crossed) return result;
+  if (ctx.fishWindow) {
+    result.messages.push('Fish stream, inside the least-risk work window. You note the crossing point and the sediment for the road file.');
+    return result;
+  }
+  const scrutiny = FISH_FORD_SCRUTINY.outOfWindow;
+  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + scrutiny);
+  result.messages.push(`Fish stream, outside the least-risk work window. Trucks through the channel now is sediment on the redds and a question from DFO. Scrutiny +${scrutiny}.`);
+  return result;
+}
+
+/**
  * Resolve a chosen crossing action against its mode.
  * @param {Object} journey
  * @param {Object} ctx
@@ -572,9 +651,9 @@ export function resolveCrossingChoice(journey, ctx, value, rand = Math.random) {
     case 'scout':
       return { ...scoutCrossing(journey, ctx), mishap: false, crossed: false, severity: 'scouted', victimName: null };
     case 'winch':
-      return winchCrossing(journey, ctx, rand);
+      return noteFishStreamCrossing(journey, ctx, winchCrossing(journey, ctx, rand));
     case 'ford':
-      return fordCrossing(journey, ctx, rand);
+      return noteFishStreamCrossing(journey, ctx, fordCrossing(journey, ctx, rand));
     case 'cross':
       return ctx.mode === 'bridge' ? bridgeCrossing(journey, ctx, rand) : culvertCrossing(journey, ctx, rand);
     case 'ferry':

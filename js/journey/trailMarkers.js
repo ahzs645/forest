@@ -10,7 +10,23 @@
 
 const TRAIL_MARKERS_KEY = 'bcft.trailMarkers.v1';
 const MAX_MARKERS = 60;
-const MAX_EPITAPH = 48;
+/** The longest line a marker carries; the prompt says so. */
+export const MAX_EPITAPH = 48;
+
+/**
+ * A marker line that fits the board: a longer one is cut at a word and says
+ * so with an ellipsis, rather than stopping mid-word with nothing to show a
+ * line was lost.
+ * @param {string} text
+ * @returns {string}
+ */
+export function fitMarkerLine(text) {
+  const line = String(text || '').trim().replace(/\s+/g, ' ');
+  if (line.length <= MAX_EPITAPH) return line;
+  const cut = line.slice(0, MAX_EPITAPH - 1);
+  const atWord = cut.lastIndexOf(' ');
+  return `${(atWord > MAX_EPITAPH / 2 ? cut.slice(0, atWord) : cut).replace(/[\s,;:.-]+$/, '')}…`;
+}
 
 export function loadTrailMarkers() {
   try {
@@ -45,7 +61,7 @@ export function saveTrailMarkers(markers) {
 export function recordTrailMarker(marker) {
   const stored = {
     name: String(marker.name || 'Unknown').slice(0, 24),
-    epitaph: String(marker.epitaph || 'Watch your footing here.').slice(0, MAX_EPITAPH),
+    epitaph: fitMarkerLine(marker.epitaph || 'Watch your footing here.'),
     areaId: marker.areaId || null,
     blockId: marker.blockId || null,
     blockName: String(marker.blockName || '').slice(0, 32),

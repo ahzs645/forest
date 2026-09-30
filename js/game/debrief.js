@@ -9,7 +9,9 @@
 
 import { ASCII_ART } from '../ascii_art.js';
 import { getCrewDisplayInfo } from '../crew.js';
-import { calculateScore, formatScoreDisplay, getLetterGrade } from '../scoring.js';
+import { calculateScore, formatScoreDisplay, getLetterGrade, rateDeskConduct, summarizeDeskConduct } from '../scoring.js';
+import { resolveSilvicultureFinalReport } from '../modes/silvicultureIntegrity.js';
+import { settleOutstandingFallout } from '../events/shortcutRecord.js';
 import {
   foldRunIntoRecord,
   loadServiceRecord,
@@ -32,10 +34,14 @@ import {
  *   integrity — file it straight; the file holds if anyone ever pulls it
  *   spin      — dress it up; small score gamble in keeping with risk plays
  *   people    — put the crew/partners first; warms the epilogues
+ * A desk file that failed is not sealed or archived as a finished year; it is
+ * handed over, and the same three stances apply to the hand-over.
  * @param {string} journeyType
+ * @param {{victory?: boolean}} [context]
  * @returns {{prompt: string, options: Array}}
  */
-export function getFinalReportPrompt(journeyType) {
+export function getFinalReportPrompt(journeyType, { victory = true } = {}) {
+  if (!victory && HANDOVER_PROMPTS[journeyType]) return HANDOVER_PROMPTS[journeyType];
   switch (journeyType) {
     case 'recon':
     case 'field':
@@ -51,8 +57,8 @@ export function getFinalReportPrompt(journeyType) {
       return {
         prompt: 'The regeneration report heads to the district office. How do you frame it?',
         options: [
-          { label: 'Report survival rates exactly as surveyed', hint: 'Free-growing obligations stay honest, whatever the numbers say.', value: 'integrity' },
-          { label: 'Project optimistic survival from the best plots', hint: 'Risky. A check survey could unpick the projection.', value: 'spin' },
+          { label: 'Report stocking and free-growing exactly as surveyed', hint: 'Free-growing obligations stay honest, whatever the numbers say.', value: 'integrity' },
+          { label: 'Project the stocking from the best plots', hint: 'Risky. A check survey could unpick the projection, and a file already under scrutiny is the one they check.', value: 'spin' },
           { label: 'Highlight the contractor crews who beat the weather', hint: 'Good contractors remember who spoke up for them.', value: 'people' },
         ],
       };
@@ -71,7 +77,7 @@ export function getFinalReportPrompt(journeyType) {
         prompt: 'Time to close out the files. How do you archive the year?',
         options: [
           { label: 'Archive everything with full referral records attached', hint: 'Future you — or the Forest Practices Board — will find exactly what happened.', value: 'integrity' },
-          { label: 'Fast-close the stragglers with minimal documentation', hint: 'Risky. Thin files have a way of resurfacing.', value: 'spin' },
+          { label: 'Archive summaries only; leave the referral records in your inbox', hint: 'Risky. Thin files have a way of resurfacing.', value: 'spin' },
           { label: 'Send personal thanks to every agency contact who moved a file', hint: 'Next year’s referrals will move faster.', value: 'people' },
         ],
       };
@@ -82,11 +88,80 @@ export function getFinalReportPrompt(journeyType) {
         options: [
           { label: 'Open the books — every win and write-down on one slide', hint: 'Boards forgive bad quarters. They don’t forgive surprises.', value: 'integrity' },
           { label: 'Spin the quarter with creative accounting categories', hint: 'Risky. Auditors read footnotes.', value: 'spin' },
-          { label: 'Give the floor to your CEO and crew leads', hint: 'Credit shared is loyalty earned.', value: 'people' },
+          { label: 'Give the floor to your executive team and division leads', hint: 'Credit shared is loyalty earned.', value: 'people' },
         ],
       };
   }
 }
+
+const PLANNING_HANDOVER = {
+  prompt: 'The FSP did not get through. The file goes to whoever picks it up next. How do you hand it over?',
+  options: [
+    { label: 'Write the hand-over memo with every open gap and comment on the record', hint: 'The next planner starts from the truth, and so does the District Manager.', value: 'integrity' },
+    { label: 'Tell the licensee the district sat on it', hint: 'Risky. The district’s file shows what was filed and when.', value: 'spin' },
+    { label: 'Walk the Nation’s referral staff through where the file stands', hint: 'The next planner inherits the relationship, not just the binder.', value: 'people' },
+  ],
+};
+
+const PERMITTING_HANDOVER = {
+  prompt: 'The queue is someone else’s now. How do you hand it over?',
+  options: [
+    { label: 'Hand over every file with its clock, letter and referral record', hint: 'Whoever sits at this desk next knows exactly where each permit stands.', value: 'integrity' },
+    { label: 'Close out the stragglers with minimal notes', hint: 'Risky. Thin files have a way of resurfacing.', value: 'spin' },
+    { label: 'Call each agency contact to say who has the files now', hint: 'The referrals keep moving when the name on the desk changes.', value: 'people' },
+  ],
+};
+
+// A silviculture program that was not delivered, or that the licensee
+// pulled, has no regeneration report of yours to frame: it is handed over.
+const SILVICULTURE_HANDOVER = {
+  prompt: 'The program goes to whoever picks it up next. How do you hand it over?',
+  options: [
+    { label: 'Hand over every plot card, survey card and treatment record as it stands', hint: 'The next supervisor, and anyone from C&E, starts from what is on the ground.', value: 'integrity' },
+    { label: 'Tell the licensee the shortfall was the contractors’', hint: 'Risky. The plot cards and the invoices say who signed what.', value: 'spin' },
+    { label: 'Walk the incoming supervisor and the foremen through each block', hint: 'The crews keep working when the name on the binder changes.', value: 'people' },
+  ],
+};
+
+const HANDOVER_PROMPTS = {
+  silviculture: SILVICULTURE_HANDOVER,
+  planning: PLANNING_HANDOVER,
+  permitting: PERMITTING_HANDOVER,
+  desk: PERMITTING_HANDOVER,
+};
+
+/**
+ * What the spin and people stances read like for the desk roles; the default
+ * lines are written for a field season.
+ */
+const PLANNING_REPORT_LINES = {
+  spinWin: 'The licensee takes your version. The district’s own file says what it says.',
+  spinBust: 'District staff set your account beside their own file. The gap is noted, and your name is on it.',
+  // An approved plan has no gap with the district's file; what the spin
+  // leaves behind is a sealed rationale that says less than the plan does.
+  approvedSpinWin: 'The summary reads the way the licensee wanted. The conditions are still in the plan, if anyone reads that far.',
+  approvedSpinBust: 'The first FPB complaint pulls the summary and the plan side by side. The caveats you left out are in the plan, and your seal is on both.',
+  people: 'The Nation’s referral staff hear it from you first. The next referral starts warmer.',
+};
+const PERMITTING_REPORT_LINES = {
+  spinWin: 'The files close. On paper, the queue was tidy.',
+  spinBust: 'A complaint to the Forest Practices Board pulls one of the thin files. The gaps show, and your name is on it.',
+  people: 'The thank-you notes cost nothing, and next year’s referrals come back a little faster.',
+};
+// The GM's closing presentation is read against the audited statements and
+// the management letter; the silviculture bust line (a check survey) was
+// the one it used to print.
+const MANAGER_REPORT_LINES = {
+  spinWin: 'The board takes the closing deck as presented. The audited statements are in the pack, in smaller type.',
+  spinBust: 'The audit chair sets the closing deck beside the audited statements. The gap is minuted, and your name is on it.',
+  people: 'The division leads present their own numbers. The board meets the people who cut the wood, and next year starts with them in the room.',
+};
+const DESK_REPORT_LINES = {
+  planning: PLANNING_REPORT_LINES,
+  permitting: PERMITTING_REPORT_LINES,
+  desk: PERMITTING_REPORT_LINES,
+  manager: MANAGER_REPORT_LINES,
+};
 
 /**
  * Resolve the final report stance into a score adjustment and narration.
@@ -96,19 +171,24 @@ export function getFinalReportPrompt(journeyType) {
  * @param {Function} rng - random source, defaults to Math.random
  * @returns {{delta: number, lines: string[]}}
  */
-export function resolveFinalReport(style, journey, rng = Math.random) {
+export function resolveFinalReport(style, journey, rng = Math.random, { victory = true } = {}) {
+  // Silviculture's report is read against the plot cards and the check
+  // survey, so its odds come from the run (js/modes/silvicultureIntegrity.js).
+  if (journey?.journeyType === 'silviculture') return resolveSilvicultureFinalReport(style, journey, rng);
+  const deskLines = DESK_REPORT_LINES[journey?.journeyType] || null;
+  if (deskLines) return resolveDeskFinalReport(style, journey, rng, deskLines, victory);
   const hasCrew = Boolean(journey.crew?.length);
   switch (style) {
     case 'spin': {
       if (rng() < 0.65) {
         return {
           delta: 6,
-          lines: ['The framing lands. On paper, this was a tidy operation.'],
+          lines: [deskLines?.spinWin || 'The framing lands. On paper, this was a tidy operation.'],
         };
       }
       return {
         delta: -10,
-        lines: ['A check survey unpicks the framing line by line. The file gets flagged, and your name is on it.'],
+        lines: [deskLines?.spinBust || 'A check survey unpicks the framing line by line. The file gets flagged, and your name is on it.'],
       };
     }
     case 'people':
@@ -117,13 +197,48 @@ export function resolveFinalReport(style, journey, rng = Math.random) {
         lines: [
           hasCrew
             ? 'Word gets around that you put your people first. Next season’s signup sheet fills fast.'
-            : 'The thank-you notes cost nothing and buy goodwill money can’t.',
+            : deskLines?.people || 'The thank-you notes cost nothing and buy goodwill money can’t.',
         ],
       };
     case 'integrity':
     default:
       return {
         delta: 2,
+        lines: ['Nothing comes of it, which is the point. If anyone ever pulls the file, it holds.'],
+      };
+  }
+}
+
+/** What the desk's report stances are worth: see resolveDeskFinalReport. */
+export const DESK_REPORT_DELTAS = { integrity: 4, people: 2, spinWin: 4, spinBust: -10 };
+
+/**
+ * The desk roles' closing report. The straight record is worth the most for
+ * certain; thanks are worth something; a thin record is a gamble whose odds
+ * shrink with the scrutiny already on the file, and it loses on average
+ * even on a clean one. The old flat odds made spin a small positive bet and
+ * a thank-you note worth more than an honest file.
+ */
+function resolveDeskFinalReport(style, journey, rng, lines, victory) {
+  const planningApproved = journey?.journeyType === 'planning' && victory;
+  switch (style) {
+    case 'spin': {
+      const scrutiny = Math.max(0, Math.min(100, Number(journey?.scrutiny) || 0));
+      // A GM whose quarters the year-end audit already restated is spinning
+      // to a board that has read the management letter.
+      const restated = Array.isArray(journey?.flags?.restatedQuarters) ? journey.flags.restatedQuarters.length : 0;
+      const odds = Math.max(restated ? 0.1 : 0.2, 0.55 - scrutiny / 150 - 0.15 * restated);
+      if (rng() < odds) {
+        return { delta: DESK_REPORT_DELTAS.spinWin, lines: [planningApproved ? lines.approvedSpinWin : lines.spinWin] };
+      }
+      return { delta: DESK_REPORT_DELTAS.spinBust, lines: [planningApproved ? lines.approvedSpinBust : lines.spinBust] };
+    }
+    case 'people':
+      return { delta: DESK_REPORT_DELTAS.people, lines: [lines.people] };
+    case 'integrity':
+    default:
+      return {
+        delta: DESK_REPORT_DELTAS.integrity,
         lines: ['Nothing comes of it, which is the point. If anyone ever pulls the file, it holds.'],
       };
   }
@@ -142,17 +257,32 @@ const SEVERITY_RANK = { severe: 4, major: 3, moderate: 2, minor: 1, positive: 1 
  * @returns {Array<{day: number, title: string, choice: string, victimName?: string}>}
  */
 export function pickKeyMoments(journey, limit = 3) {
-  const entries = (journey.log || []).filter((e) => e.type === 'event' && e.eventTitle);
+  // A situation set aside is not a moment that mattered; it is one that
+  // didn't, unless leaving it stopped the work (a GM's stop-work).
+  const entries = (journey.log || []).filter((e) => e.type === 'event' && e.eventTitle && (!e.setAside || e.stoppedWork));
   return entries
     .map((e) => ({
       day: e.day,
       title: e.eventTitle,
       choice: e.optionLabel,
       victimName: e.victimName,
-      rank: (SEVERITY_RANK[e.severity] || 0) + (e.victimName ? 2 : 0),
+      rank: (SEVERITY_RANK[e.severity] || 0) + (e.victimName ? 2 : 0) + (e.stoppedWork ? 2 : 0),
     }))
     .sort((a, b) => b.rank - a.rank || a.day - b.day)
     .slice(0, limit);
+}
+
+/**
+ * One remembered moment as the debrief prints it. An option label that ends
+ * in its own punctuation ("Make up time!") gets no second full stop.
+ * @param {{day: number, title: string, choice: string, victimName?: string}} moment
+ * @param {string} dayLabel - "Shift", "Day" or "Month"
+ * @returns {string}
+ */
+export function formatKeyMoment(moment, dayLabel) {
+  const choice = String(moment.choice ?? '');
+  const injury = moment.victimName ? ` ${moment.victimName} carries the scar.` : '';
+  return `${dayLabel} ${moment.day} — ${moment.title}. You chose: ${choice}${/[.!?]$/.test(choice) ? '' : '.'}${injury}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -171,82 +301,267 @@ const TRAIT_EPILOGUES = {
   clumsy: 'buys the first round as apology for the gear they broke',
 };
 
+// What a hand who finished the season strong asks for next, by the job they
+// did. A crew of five used to read the same line five times.
+const STRONG_BY_ROLE = {
+  faller: 'Came back stronger than they left. Asks to hang the next boundary themselves.',
+  bucker: 'Came home with every plot card legible. Signs on for the fall cruise.',
+  spotter: 'Asks to run the compass on the next traverse instead of the chain.',
+  driver: 'Knows every soft spot on the mainline now. Already booked to drive the fall crew.',
+  mechanic: 'Kept the trucks rolling all season and has opinions about next year\'s fleet.',
+  checker: 'Plots came back tight all season. Asks for the hardest contract next spring.',
+  surveyor: 'Wants the free-growing surveys again next year, on the same blocks.',
+};
+
+const STRONG_LINES = [
+  'Came back stronger than they left. Asks to run point next year.',
+  'Tells the office they want the same crew next season, and means it.',
+  'Signs on for next season before the trucks are unloaded.',
+];
+const WORN_LINES = [
+  'Healing up over the winter. The stories are worth the scars, they say.',
+  'Takes a month off to let the knees argue it out. Back for spring.',
+  'Sleeps most of October. Says the season was worth it and the body disagrees.',
+];
+const LOW_MORALE_WIN_LINES = [
+  'Glad it is done. Takes the winter to decide whether the bush is still the job.',
+  'Banks the season and does not answer the phone until March.',
+];
+const STEADY_WIN_LINES = [
+  'Banks the season and books two weeks somewhere with no trees.',
+  'Puts the season\'s pay on the truck loan and sleeps for a week.',
+  'Spends the fall back in the same country, hunting on their own time.',
+  'Takes the cheque home and fixes the porch they have been putting off.',
+];
+const DEFEAT_STEADY_LINES = [
+  'Shrugs it off. "Some years the bush wins." Already asking about next season.',
+  'Says the plan was sound and the season was not. Wants another go at the same ground.',
+  'Takes a winter contract and keeps the field book. Next time they will see it coming.',
+];
+const DEFEAT_LOW_LINES = [
+  'Quietly updating a resume, but hasn’t handed it in yet.',
+  'Takes a town job for the winter and does not say whether they will be back.',
+];
+// The crew that drove out when the food box ran dry did not finish the season.
+const WALKED_OFF_LINES = [
+  'Drove out with the crew when the food ran out. Tells every new crew lead to check the grub box before the fuel gauge.',
+  'Rode out in the crummy with an empty cooler. Took a planting contract two valleys over.',
+  'Walked off hungry and says so plainly. Would work for you again, with a cook on the payroll.',
+  'Went home and ate for three days. Has not decided about next season.',
+  'Signed on with another outfit before the week was out. They feed their crews.',
+];
+const EVACUATED_LINES = [
+  'Off the crew for the season; the WorkSafeBC file is still open. Sends the crew a photo from physio.',
+  'Spent the rest of the season on modified duties in town. Checks the crew\'s progress on the office board every morning.',
+  'Home and healing. The claim is closing; they want the first shift of next season.',
+];
+const QUIT_LOW_LINES = [
+  'Last seen driving south. The resignation letter was one sentence long.',
+  'Gone before the season closed. Left their caulks by the cook shack door.',
+];
+const QUIT_LINES = [
+  'Took a town job with regular hours. Sends the crew fish pictures.',
+  'Took a mill job closer to home. Still texts the crew on the first day of every season.',
+];
+
+// A GM's crew is the executive team: no caulks, crew-boss tickets or truck
+// loans, and the woodlands manager's own line is the posture's
+// (buildManagerEpilogue).
+const EXECUTIVE_STRONG_LINES = [
+  'Signs on for another year and has next January\'s plan half drafted.',
+  'Takes the board\'s thanks and a week at the lake. Back for the operating plan.',
+  'Lets a recruiter\'s call from a bigger licensee go to voicemail.',
+];
+const EXECUTIVE_STEADY_WIN_LINES = [
+  'Closes the year-end binder and takes the holidays off, phone and all.',
+  'Stays on for another year and asks for a bigger budget in January.',
+  'Books two weeks somewhere with no cell service and no cutblocks.',
+  'Signs off the year and comes back in January with a list.',
+];
+const EXECUTIVE_LOW_MORALE_LINES = [
+  'Glad the year is done. Takes the winter to decide whether head office is still the job.',
+  'Stays through the audit, then stops answering email until the new year.',
+];
+const EXECUTIVE_WORN_LINES = [
+  'Takes a month off on the doctor\'s advice. Back for the operating plan.',
+];
+const EXECUTIVE_DEFEAT_STEADY_LINES = [
+  'Says the plan was sound and the year was not. Stays on to hand the files over properly.',
+  'Stays on under whoever the board brings in, and keeps the files straight.',
+];
+const EXECUTIVE_DEFEAT_LOW_LINES = [
+  'Quietly updating a resume, but hasn\'t sent it yet.',
+  'Takes a job with a competitor in the spring and does not say why.',
+];
+
+/** A stable number from a crew member's id, so one member keeps one line. */
+function memberSeed(member) {
+  const key = String(member?.id ?? member?.name ?? '');
+  let hash = 0;
+  for (const char of key) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return hash;
+}
+
 /**
- * One-line epilogue for a crew member, based on fate, traits and condition.
+ * The first line in `lines` nobody else on this crew has been given yet,
+ * starting at this member's own place in the pool. `context.used` carries
+ * the lines already handed out; without it the pick is still stable.
+ */
+function pickFresh(lines, member, context) {
+  const used = context.used;
+  const start = memberSeed(member) % lines.length;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[(start + i) % lines.length];
+    if (!used?.has(line)) {
+      used?.add(line);
+      return line;
+    }
+  }
+  return lines[start];
+}
+
+/**
+ * One-line epilogue for a crew member, based on fate, role, traits and
+ * condition. Lines already given to someone else on the crew are skipped.
  * @param {Object} member - Crew member
- * @param {Object} context - { victory, reportStyle }
+ * @param {Object} context - { victory, reportStyle, injuredAt, used, walkedOff, treatedCalls }
  * @returns {string}
  */
 export function buildCrewEpilogue(member, context = {}) {
   const { victory = false, reportStyle = 'integrity' } = context;
   const info = getCrewDisplayInfo(member);
   const name = `${info.name} (${info.role})`;
+  const say = (lines) => `${name}: ${pickFresh(lines, member, context)}`;
 
   if (member.isDead || (!member.isActive && !member.hasQuit)) {
-    return `${name}: Off the crew for the season; the WorkSafeBC file is still open. Sends the crew a photo from physio.`;
-  }
-  // Survivors who took an injury during a logged event remember exactly where
-  if (member.isActive && context.injuredAt?.has(member.id)) {
-    const where = context.injuredAt.get(member.id);
-    return `${name}: Still favours the side they hurt during ${where}. Tells the story like it was a fair trade.`;
+    return say(EVACUATED_LINES);
   }
   if (member.hasQuit) {
-    return member.morale < 30
-      ? `${name}: Last seen driving south. The resignation letter was one sentence long.`
-      : `${name}: Took a town job with regular hours. Sends the crew fish pictures.`;
+    // Someone who left for a named reason keeps it: a woodlands manager
+    // poached to Alberta did not take "a mill job closer to home".
+    if (member.epilogue) return `${name}: ${member.epilogue}`;
+    return say(member.morale < 30 ? QUIT_LOW_LINES : QUIT_LINES);
   }
+  if (context.executive) return say(executiveLines(member, victory));
   if (!member.isActive) {
     return `${name}: Recovering well. The doctors say next season is realistic.`;
   }
+  // Still on the roster when the food ran out: they drove out with the rest.
+  if (context.walkedOff) {
+    return say(WALKED_OFF_LINES);
+  }
+  // Survivors who took an injury during a logged event remember exactly where
+  if (context.injuredAt?.has(member.id)) {
+    const where = context.injuredAt.get(member.id);
+    return `${name}: Still favours the side they hurt during ${where}. Tells the story like it was a fair trade.`;
+  }
 
-  // Active survivors: trait flavour first, then condition buckets
+  // Active survivors: trait flavour first, then role and condition
   for (const traitId of member.traits || []) {
-    if (TRAIT_EPILOGUES[traitId]) {
-      return `${name}: ${capitalize(TRAIT_EPILOGUES[traitId])}.`;
+    const line = TRAIT_EPILOGUES[traitId] && `${capitalize(TRAIT_EPILOGUES[traitId])}.`;
+    if (line && !context.used?.has(line)) {
+      context.used?.add(line);
+      return `${name}: ${line}`;
     }
   }
 
   if (!victory) {
-    return member.morale >= 50
-      ? `${name}: Shrugs it off. "Some years the bush wins." Already asking about next season.`
-      : `${name}: Quietly updating a resume, but hasn’t handed it in yet.`;
+    return say(member.morale >= 50 ? DEFEAT_STEADY_LINES : DEFEAT_LOW_LINES);
   }
-  if (member.health > 80 && member.morale > 70) {
-    return `${name}: Came back stronger than they left. Asks to run point next year.`;
+  if (member.health < 40) return say(WORN_LINES);
+  if (member.morale < 40) return say(LOW_MORALE_WIN_LINES);
+  // The attendant's season is the calls they answered.
+  const calls = Number(context.treatedCalls) || 0;
+  const own = member.role === 'medic'
+    ? (calls > 0
+      ? `Wrote up all ${calls} first-aid call${calls === 1 ? '' : 's'} this season and renews the OFA 3 early.`
+      : 'Opened the kit for blisters and a splinter all season. Renews the OFA 3 anyway.')
+    : (member.health > 80 && member.morale > 70 ? STRONG_BY_ROLE[member.role] : null);
+  if (own && !context.used?.has(own)) {
+    context.used?.add(own);
+    return `${name}: ${own}`;
   }
-  if (member.health < 40) {
-    return `${name}: Healing up over the winter. The stories are worth the scars, they say.`;
+  if (member.health > 80 && member.morale > 70) return say(STRONG_LINES);
+  const appendix = 'Saw their name in the report appendix and bought a frame for it.';
+  if (reportStyle === 'people' && !context.used?.has(appendix)) {
+    context.used?.add(appendix);
+    return `${name}: ${appendix}`;
   }
-  if (reportStyle === 'people') {
-    return `${name}: Saw their name in the report appendix and bought a frame for it.`;
-  }
-  return `${name}: Banks the season and books two weeks somewhere with no trees.`;
+  return say(STEADY_WIN_LINES);
+}
+
+/** The executive pool for a member still in the seat at year end. */
+function executiveLines(member, victory) {
+  if (!victory) return member.morale >= 50 ? EXECUTIVE_DEFEAT_STEADY_LINES : EXECUTIVE_DEFEAT_LOW_LINES;
+  if (member.health < 40) return EXECUTIVE_WORN_LINES;
+  if (member.morale < 40) return EXECUTIVE_LOW_MORALE_LINES;
+  return member.health > 80 && member.morale > 70 ? EXECUTIVE_STRONG_LINES : EXECUTIVE_STEADY_WIN_LINES;
 }
 
 /**
  * Epilogue for protagonist (no-crew) journeys: planning & permitting.
+ *
+ * Read from how the run was conducted first (js/scoring.js
+ * summarizeDeskConduct: the off-book calls and how they landed, the scrutiny
+ * left on the file, the goodwill spent, the closing report) and from stress
+ * second. Keyed on stress alone it told a run that took every shortcut its
+ * name came up "when the district needs something done properly", and gave
+ * the clean runs, which file on the last day and end stressed, the flinch.
  * @param {Object} journey
  * @param {boolean} victory
  * @returns {string[]}
  */
 export function buildProtagonistEpilogue(journey, victory) {
   const stress = journey.protagonist?.stress ?? 0;
+  const conduct = summarizeDeskConduct(journey);
+  const rating = rateDeskConduct(conduct);
   const lines = [];
 
-  if (victory && stress < 50) {
-    lines.push('One year later: your name comes up when the district needs something done properly. You let the reputation do the talking.');
-  } else if (victory) {
-    lines.push('One year later: the file closed clean, but you still flinch when the phone rings after 5pm. The win cost something.');
+  if (victory) {
+    if (rating === 'clean') {
+      lines.push(stress < 60
+        ? 'One year later: your name comes up when the district needs something done properly. You let the reputation do the talking.'
+        : 'One year later: your file is the one the district hands new staff as the example. You took two weeks off after it, and you were right to.');
+    } else if (rating === 'mixed') {
+      lines.push(conduct.taken > 0
+        ? 'One year later: the file closed and most of it holds up. There is one folder you hope nobody asks for.'
+        : 'One year later: the file closed, but the district still reads everything with your name on it twice.');
+    } else {
+      lines.push(conduct.caught > 0
+        ? 'One year later: the file closed, and so did the finding with your name on it. You still flinch when the phone rings after 5pm.'
+        : 'One year later: the file closed. Nobody has pulled the folders yet, and you still flinch when the phone rings after 5pm.');
+    }
+  } else if (rating === 'compromised') {
+    lines.push('One year later: the file is someone else’s now, and so is explaining what is in it. Your name still comes up, not the way you wanted.');
   } else if (stress >= 70) {
     lines.push('One year later: you took the winter off. The forest didn’t notice, and that turned out to be the lesson.');
   } else {
-    lines.push('One year later: the file is someone else’s problem now, but you kept your field notes. Next time you’ll see it coming.');
+    lines.push('One year later: the file is someone else’s problem now, but you kept your notes. Next time you’ll see it coming.');
   }
   return lines;
 }
 
 /**
- * Epilogue lines for manager journeys: CEO and certifications.
+ * How the woodlands manager spends the next year, by the posture they ran.
+ */
+const MANAGER_POSTURE_EPILOGUES = {
+  conservative: 'methodical as ever',
+  'relationship-focused': 'still keeping the engagement table warm',
+  'aggressive-growth': "already scouting next year's BCTS sales",
+  'cost-cutting': 'already reopening the haul rates',
+};
+
+const CERTIFICATION_EPILOGUES = {
+  certified: 'The certificate hangs in reception, and buyers notice.',
+  suspended: 'Suspended at the surveillance audit. The buyers remember the letter.',
+  withdrawn: 'Withdrawn after the re-audit. The system binder is on a shelf.',
+  corrective: 'Still working through the corrective-action request.',
+  pending: 'The registration audit never happened on your watch.',
+};
+
+/**
+ * Epilogue lines for manager journeys: the woodlands manager who ran the
+ * posture, and how each certification came through its audits.
  * @param {Object} journey
  * @param {boolean} victory
  * @returns {string[]}
@@ -254,15 +569,21 @@ export function buildProtagonistEpilogue(journey, victory) {
 export function buildManagerEpilogue(journey, victory) {
   const lines = [];
   if (journey.ceo) {
-    const style = journey.ceo.decision_making_style === 'conservative'
-      ? 'methodical as ever'
-      : 'already pitching the next venture';
+    const style = MANAGER_POSTURE_EPILOGUES[journey.ceo.decision_making_style] || 'methodical as ever';
+    // A successor who stepped up mid-year is confirmed, not renewed.
+    const acting = (journey.crew || []).some((member) => member.role === 'woodlands' && member.actingFor && member.isActive !== false && member.name === journey.ceo.name);
     lines.push(victory
-      ? `Woodlands manager ${journey.ceo.name}: renewed for another year, ${style}.`
-      : `Woodlands manager ${journey.ceo.name}: moved on to a competitor. The handshake was firm, the exit interview firmer.`);
+      ? acting
+        ? `Acting woodlands manager ${journey.ceo.name}: confirmed in the job for next year, ${style}.`
+        : `Woodlands manager ${journey.ceo.name}: renewed for another year, ${style}.`
+      : `${acting ? 'Acting woodlands manager' : 'Woodlands manager'} ${journey.ceo.name}: moved on to a competitor. The handshake was firm, the exit interview firmer.`);
   }
   for (const cert of journey.certifications || []) {
-    lines.push(`${cert.name}: ${victory ? 'The certificate hangs in reception, and buyers notice.' : 'The audit binder outlived the tenure.'}`);
+    const status = cert.status || 'certified';
+    const line = status === 'certified' && !victory
+      ? 'The audit binder outlived the tenure.'
+      : CERTIFICATION_EPILOGUES[status] || CERTIFICATION_EPILOGUES.certified;
+    lines.push(`${cert.name}: ${line}`);
   }
   return lines;
 }
@@ -280,6 +601,22 @@ export function buildManagerEpilogue(journey, victory) {
  * @returns {Object} Updated record
  */
 export function updateServiceRecord(record, journey, scoreResult, victory) {
+  return foldRunIntoRecord(record, journey.journeyType || 'field', {
+    score: scoreResult.totalScore,
+    grade: scoreResult.grade,
+    victory: Boolean(victory),
+  }, getCareerDeltas(journey, victory));
+}
+
+/**
+ * The lifetime field-record counters one deployment adds (km surveyed,
+ * seedlings planted, ...). Shared with the campaign, whose seasons are
+ * deployments too.
+ * @param {Object} journey
+ * @param {boolean} victory
+ * @returns {Object}
+ */
+export function getCareerDeltas(journey, victory) {
   const type = journey.journeyType || 'field';
 
   const careerDeltas = {};
@@ -302,12 +639,7 @@ export function updateServiceRecord(record, journey, scoreResult, victory) {
       careerDeltas.daysInTheChair = Math.max(0, (journey.day || 1) - 1);
       break;
   }
-
-  return foldRunIntoRecord(record, type, {
-    score: scoreResult.totalScore,
-    grade: scoreResult.grade,
-    victory: Boolean(victory),
-  }, careerDeltas);
+  return careerDeltas;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,11 +670,25 @@ export async function runFinalDebrief(ui, journey, victory) {
   // --- Stage 1: Final report decision ---
   ui.clear();
   ui.writeHeader(victory ? 'THE WORK IS DONE' : 'THE WORK STOPS HERE');
+  // Why the run ended, before anything else is asked. A goodwill loss used
+  // to surface only after the archive prompt, two screens later.
+  if (journey.endReason) {
+    if (victory) ui.write(journey.endReason, 'term-dim');
+    else ui.writeDanger(journey.endReason);
+  }
+  // A caught shortcut whose determination had not landed when the run ended
+  // lands now, before anything is scored (js/events/shortcutRecord.js).
+  const lateFallout = settleOutstandingFallout(journey);
+  if (lateFallout.length) {
+    ui.write('');
+    ui.writeDivider('AFTER THE SEASON');
+    for (const line of lateFallout) ui.writeWarning(line);
+  }
   ui.write('');
-  const report = getFinalReportPrompt(journey.journeyType);
+  const report = getFinalReportPrompt(journey.journeyType, { victory });
   const choice = await ui.promptChoice(report.prompt, report.options);
   const reportStyle = choice.value || 'integrity';
-  const reportResult = resolveFinalReport(reportStyle, journey);
+  const reportResult = resolveFinalReport(reportStyle, journey, Math.random, { victory });
   ui.write('');
   for (const line of reportResult.lines) {
     ui.write(line);
@@ -350,9 +696,15 @@ export async function runFinalDebrief(ui, journey, victory) {
   journey.finalReport = { style: reportStyle, delta: reportResult.delta };
   await next(ui);
 
+  // The grade is settled now; the banner and the grade line follow it, so
+  // a delivered run that grades D or F is not announced as a success.
+  const scoreResult = calculateScore(journey, victory);
+  scoreResult.totalScore = Math.max(0, Math.min(100, scoreResult.totalScore + reportResult.delta));
+  scoreResult.grade = getLetterGrade(scoreResult.totalScore);
+
   // --- Stage 2: The road home ---
   ui.clear();
-  ui.writeHeader(victory ? 'EXPEDITION SUCCESSFUL' : 'EXPEDITION FAILED');
+  ui.writeHeader(getEndBanner(victory, scoreResult.grade));
   ui.writeBox(pickEndArt(journey, victory));
   ui.write(victory
     ? buildVictoryNarrative(journey, areaName, crewName, daysUsed)
@@ -361,15 +713,13 @@ export async function runFinalDebrief(ui, journey, victory) {
   ui.writeDivider('FINAL STATISTICS');
   writeFinalStatistics(ui, journey);
 
-  const moments = pickKeyMoments(journey);
+  // Picked by weight, told in the order they happened.
+  const moments = pickKeyMoments(journey).sort((a, b) => a.day - b.day);
   if (moments.length) {
     ui.write('');
     ui.writeDivider('MOMENTS THAT MATTERED');
-    const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon' ? 'Shift' : 'Day';
-    for (const m of moments) {
-      const injury = m.victimName ? ` ${m.victimName} carries the scar.` : '';
-      ui.write(`${dayLabel} ${m.day} — ${m.title}. You chose: ${m.choice}.${injury}`);
-    }
+    const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon' ? 'Shift' : journey.journeyType === 'manager' ? 'Month' : 'Day';
+    for (const m of moments) ui.write(formatKeyMoment(m, dayLabel));
   }
   await next(ui);
 
@@ -380,10 +730,22 @@ export async function runFinalDebrief(ui, journey, victory) {
       injuredAt.set(entry.victimId, entry.eventTitle);
     }
   }
-  const epilogueContext = { victory, reportStyle, injuredAt };
+  const epilogueContext = {
+    victory,
+    reportStyle,
+    injuredAt,
+    // One crew, one set of lines: nobody gets a line someone else already has.
+    used: new Set(),
+    walkedOff: Boolean(journey.crewWalkedOff),
+    treatedCalls: (journey.log || []).filter((entry) => entry.victimId).length,
+  };
   const epilogues = [];
+  const manager = journey.journeyType === 'manager';
+  if (manager) epilogueContext.executive = true;
   if (journey.crew?.length) {
     for (const member of journey.crew) {
+      // The woodlands manager in the seat gets the posture's line below, not a second, contradicting one.
+      if (manager && journey.ceo && member.role === 'woodlands' && member.isActive !== false && member.name === journey.ceo.name) continue;
       epilogues.push(buildCrewEpilogue(member, epilogueContext));
     }
   }
@@ -405,10 +767,6 @@ export async function runFinalDebrief(ui, journey, victory) {
   }
 
   // --- Stage 4: Performance review ---
-  const scoreResult = calculateScore(journey, victory);
-  scoreResult.totalScore = Math.max(0, Math.min(100, scoreResult.totalScore + reportResult.delta));
-  scoreResult.grade = getLetterGrade(scoreResult.totalScore);
-
   ui.clear();
   ui.writeDivider('PERFORMANCE REVIEW');
   const scoreLines = formatScoreDisplay(scoreResult);
@@ -420,7 +778,7 @@ export async function runFinalDebrief(ui, journey, victory) {
   const deltaLabel = reportResult.delta >= 0 ? `+${reportResult.delta}` : `${reportResult.delta}`;
   ui.write(`  ${'Final Report'.padEnd(14)} ${reportStyleLabel(reportStyle)} (${deltaLabel} pts)`);
   ui.write('');
-  if (victory) {
+  if (victory && !isFailingGrade(scoreResult.grade)) {
     // An A-grade run earns the sky.
     if (String(scoreResult.grade).startsWith('A') && typeof ui.playScene === 'function') {
       const { buildFireworksFrames } = await import('../scene/textmode/scenes.js');
@@ -439,11 +797,12 @@ export async function runFinalDebrief(ui, journey, victory) {
   ui.clear();
   ui.writeDivider('SERVICE RECORD');
   ui.write('');
-  if (updated.isBest) {
+  // A failing grade is not a best worth announcing, even on a first run.
+  if (updated.isBest && scoreResult.grade !== 'F') {
     ui.writePositive(`New personal best for ${ROLE_LABELS[journey.journeyType] || journey.journeyType}!`);
     ui.write('');
   }
-  ui.write(`Career expeditions: ${updated.runs}`);
+  ui.write(`Career runs on record: ${updated.runs}`);
   for (const [type, stats] of Object.entries(updated.byRole)) {
     const label = ROLE_LABELS[type] || type;
     ui.write(`  ${label}: ${stats.runs} run${stats.runs > 1 ? 's' : ''}, best ${stats.bestGrade ?? '-'} (${stats.bestScore >= 0 ? stats.bestScore : '-'}/100), ${stats.victories} win${stats.victories === 1 ? '' : 's'}`);
@@ -457,6 +816,23 @@ export async function runFinalDebrief(ui, journey, victory) {
     }
   }
   ui.write('');
+}
+
+/** D and F: the work may be done, but the run is not a success. */
+function isFailingGrade(grade) {
+  return /^[DF]/.test(String(grade || ''));
+}
+
+/**
+ * The end-of-run banner: success only when the work was delivered and the
+ * grade says it was done well enough to call it one.
+ * @param {boolean} victory
+ * @param {string} grade
+ * @returns {string}
+ */
+export function getEndBanner(victory, grade) {
+  if (!victory) return 'EXPEDITION FAILED';
+  return isFailingGrade(grade) ? 'EXPEDITION COMPLETE' : 'EXPEDITION SUCCESSFUL';
 }
 
 function reportStyleLabel(style) {

@@ -1,5 +1,6 @@
 import { FORESTER_ROLES, OPERATING_AREAS, getRoleAreaBriefing } from "../js/data/index.js";
 import {
+  adaptIllegalActTemptation,
   buildSeasonContext,
   createInitialState,
   applyOptionOutcome,
@@ -23,6 +24,11 @@ import {
   SEASONS,
 } from "../js/engine.js";
 import { formatMetricName } from "../js/engine/shared.js";
+import { applyEffects } from "../js/engine/effects.js";
+import { describeSeasonalShortcutWatch, drawCalendarReminder } from "../js/engine/content.js";
+import { riskBandOdds, riskBandPercents } from "../js/risk.js";
+import { ILLEGAL_ACTS } from "../js/data/illegalActs.js";
+import { SEASONAL_SAVE_KEY, validateSeasonalSave } from "../js/game/saveLoad.js";
 import { detectArt } from "./art.js";
 import {
   getRoleDisplayName,
@@ -47,7 +53,7 @@ const INITIAL_CONTENT = {
 // tab, a phone call mid-commute). We snapshot at every season boundary so the
 // player can pick the year back up from the start of the current season.
 const SAVE_VERSION = 1;
-const DEFAULT_SAVE_KEY = "bc-forestry-trail/seasonal-run/v1";
+const DEFAULT_SAVE_KEY = SEASONAL_SAVE_KEY;
 
 // Resolve a Web Storage target without assuming the browser exists (sims and
 // node tests run with no localStorage), mirroring the existing js/game pattern.
@@ -117,7 +123,10 @@ export function peekSeasonalSave(storage, saveKey = DEFAULT_SAVE_KEY) {
   } catch {
     return null;
   }
-  if (!save || save.version !== SAVE_VERSION || !save.state?.role || !save.state?.metrics) {
+  // A partial or older save (no area, no history, a role id where the role
+  // object belongs) used to reach resumeSavedRun and throw on the first card.
+  // Boot names the problem and offers to discard it (findUnreadableSaves).
+  if (validateSeasonalSave(save)) {
     return null;
   }
   // A finished (or over-run) save has nothing left to resume.
@@ -160,20 +169,37 @@ function outcomeAcknowledgement(cardType, round) {
   return "Decision logged";
 }
 
-function buildOutcomeNotice(option, outcomeResult, cardType = null, round = null) {
+// A teaser names fallout for a later season. In the last season there is no
+// later season, so a "likely fallout" guess could never land; it is only
+// shown when the engine commits to the card (a teaser naming the `issueId`
+// it will deliver, or carrying `lands: true`).
+export function landingTeaser(teaser, gs) {
+  if (!teaser?.text) return null;
+  if (teaser.lands === false || teaser.willLand === false) return null;
+  const finalSeason = gs && Number(gs.round || 0) >= Number(gs.totalRounds || SEASONS.length);
+  const committed = teaser.lands === true || teaser.willLand === true || Boolean(teaser.issueId);
+  if (finalSeason && !committed) return null;
+  // "…Ministry Data Audit. schedule strain made…": sentence-case the joins.
+  return { ...teaser, text: teaser.text.replace(/([.!?]\s+)([a-z])/g, (_, stop, letter) => stop + letter.toUpperCase()) };
+}
+
+function buildOutcomeNotice(option, outcomeResult, cardType = null, round = null, gs = null) {
   const riskResult = outcomeResult?.riskResult ?? null;
   const outcomeText = outcomeResult?.outcome ?? option?.outcome ?? "";
   const deltaText = formatMetricDelta(outcomeResult?.effects || {});
-  const scheduledIssuePreview = outcomeResult?.scheduledIssueTeaser ?? null;
+  const scheduledIssuePreview = landingTeaser(outcomeResult?.scheduledIssueTeaser, gs);
   const scheduledIssueText = scheduledIssuePreview?.text ?? "";
   const body = [outcomeText, deltaText ? `Effects: ${deltaText}` : "", scheduledIssueText]
     .filter(Boolean)
     .join("\n\n");
 
   if (riskResult) {
-    const tone = riskResult.success ? "positive" : scheduledIssuePreview?.severity || "danger";
+    // Three bands: clean lands, noticed lands with somebody watching, caught.
+    const band = riskResult.band || (riskResult.success ? "clean" : "caught");
+    const tone = band === "clean" ? "positive" : band === "noticed" ? "warning" : scheduledIssuePreview?.severity || "danger";
+    const word = band === "clean" ? "Success" : band === "noticed" ? "Noticed" : "Caught";
     return {
-      heading: riskResult.success ? `Success: ${option.label}` : `Caught: ${option.label}`,
+      heading: `${word}: ${option.label}`,
       body,
       tone,
     };
@@ -200,6 +226,8 @@ function buildLastDecision(option, outcomeResult) {
     effectText: formatMetricDelta(effects),
     // null for a plain decision; true/false for a gamble that resolved.
     success: riskResult ? Boolean(riskResult.success) : null,
+    // clean | noticed | caught for a gamble; null otherwise.
+    band: riskResult ? riskResult.band || (riskResult.success ? "clean" : "caught") : null,
   };
 }
 
@@ -218,6 +246,51 @@ function buildMissionBriefing(gs) {
     mandate: objective?.mandate || null,
     win: objective?.signatureWin || null,
   };
+}
+
+// Banners that name a kind of card rather than a subject. A season may carry
+// several of these; a specific banner ("Compliance flag") twice reads as the
+// game repeating itself, and the type shuffle below cannot fix three of them.
+const GENERIC_CARD_LABELS = new Set([
+  "Operational update",
+  "Operational issue",
+  "Operational constraint",
+  "Seasonal task",
+  "Shortcut offer",
+]);
+
+/** Ids of the cards of one type (issue, event) already answered this year. */
+export function collectDealtIds(gs, type) {
+  const ids = new Set();
+  for (const entry of gs?.history || []) {
+    if (entry?.type === type && entry.id) ids.add(entry.id);
+  }
+  return [...ids];
+}
+
+/**
+ * Draw a card whose specific banner is not already on this season's queue.
+ * Re-draws (without ticking the pending-event clocks again) a few times, and
+ * settles for the last draw when nothing distinct is left in the pool. Cards
+ * scheduled by an earlier choice (`scheduled`) are always kept.
+ */
+export function drawDistinctLabel(draw, queue, start, excludeIds = []) {
+  const taken = new Set(
+    queue.slice(start)
+      .map((entry) => entry?.data?.cardLabel)
+      .filter((label) => label && !GENERIC_CARD_LABELS.has(label)),
+  );
+  let card = draw(excludeIds, true);
+  const skipped = [...excludeIds];
+  // A scheduled follow-up (a caught shortcut's fallout, a chain payoff) has
+  // already left the pending list once drawn: it is never redrawn away.
+  for (let attempt = 0; attempt < 4 && card && !card.scheduled && !card.causedBy && taken.has(card.cardLabel); attempt += 1) {
+    skipped.push(card.id);
+    const next = draw(skipped, false);
+    if (!next) break;
+    card = next;
+  }
+  return card;
 }
 
 /**
@@ -257,7 +330,11 @@ function separateAdjacentCardTypes(queue, start, previousType = null) {
     // Seeded with the previous season's closing card, so the guard holds
     // across the season boundary too — a fall that ends on a contested call
     // and a winter that opens on one still read as two of the same thing.
-    const priorType = ordered.length ? ordered[ordered.length - 1].type : previousType;
+    const priorCard = ordered.length ? ordered[ordered.length - 1] : null;
+    const priorType = priorCard ? priorCard.type : previousType;
+    // Two different cards under the same banner ("Compliance flag") back to
+    // back read as a repeat, so the same label counts as a match too.
+    const priorLabel = priorCard?.data?.cardLabel || null;
 
     // Spend the most-repeated kind first. Taking merely the earliest
     // non-matching card is short-sighted: with one event and two contested
@@ -270,6 +347,7 @@ function separateAdjacentCardTypes(queue, start, previousType = null) {
     let bestCount = -1;
     for (let i = 0; i < remaining.length; i += 1) {
       if (remaining[i].type === priorType) continue;
+      if (priorLabel && remaining[i].data?.cardLabel === priorLabel) continue;
       const count = counts.get(remaining[i].type);
       if (count > bestCount) {
         bestCount = count;
@@ -313,6 +391,25 @@ function buildCardHeadline(gs, item) {
   return seasonShort ? `${seasonShort}: ${tail}` : tail;
 }
 
+// The generic headline reads the card's metric swing across all three
+// options, so on an offer it called the report option's compliance gain "the
+// upside". An offer is framed by what it is and who checks.
+function buildShortcutFraming(gs, item, shortcut) {
+  const season = SEASONS[(gs?.round || 1) - 1] || "";
+  const seasonShort = season ? `${String(season).split(" ")[0]}: ` : "";
+  const stakes = `This breaks the rules, and ${shortcut.catcher || "somebody"} is who checks.`;
+  const decisionPrompt = "Turn it down, take it, or put it on the record?";
+  return {
+    headline: `${seasonShort}${stakes}`,
+    decisionPrompt,
+    context: {
+      ...(item?.context || {}),
+      stakes,
+      objective: decisionPrompt,
+    },
+  };
+}
+
 // Running cause/effect feed for the dashboard: the last few choices *and* the
 // fallout they triggered, newest first, so the world visibly responds to the
 // player instead of feeling random. Built from the engine's decision history,
@@ -334,14 +431,15 @@ function buildDecisionTrail(gs, limit = 5) {
 // Turn a raw effects delta into a concrete tradeoff hint shown *before* the
 // player commits. Exact magnitudes and time costs keep two "safe" options from
 // looking accidentally dominated when their real strengths differ.
-export function summarizeEffects(effects, option = null) {
+export function summarizeEffects(effects, option = null, tapers = null) {
   if (!effects || typeof effects !== "object") return null;
 
   const changes = [];
   for (const [key, value] of Object.entries(effects)) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric === 0 || key === "timeUsed") continue;
-    changes.push(`${formatMetricName(key)} ${numeric > 0 ? "+" : ""}${numeric}`);
+    const taper = tapers?.[key] ? ` (tapered: ${tapers[key]})` : "";
+    changes.push(`${formatMetricName(key)} ${numeric > 0 ? "+" : ""}${numeric}${taper}`);
   }
 
   const timeUsed = Number.isFinite(Number(option?.timeUsed))
@@ -352,6 +450,239 @@ export function summarizeEffects(effects, option = null) {
   }
 
   return changes.length ? changes.join(" · ") : null;
+}
+
+/**
+ * What an effects delta will actually move on the meters as they stand.
+ * applyEffects tapers gains on a meter at 75+ (and trims relationship gains
+ * under a trust deficit, budget gains under a loan), so previewing the
+ * authored number promised "+4" and delivered "+2". Runs applyEffects itself
+ * against a scratch copy, so the preview cannot drift from the engine.
+ * @returns {{ effects: Object, tapers: Object }} applied deltas in authored
+ *   order (timeUsed kept), and a reason per metric whose gain was cut
+ */
+export function projectAppliedEffects(gs, effects) {
+  if (!effects || typeof effects !== "object") return { effects: {}, tapers: {} };
+  if (!gs?.metrics) return { effects: { ...effects }, tapers: {} };
+  const scratch = { metrics: { ...gs.metrics }, flags: { ...(gs.flags || {}) }, history: [] };
+  const applied = applyEffects(scratch, effects);
+  const projected = {};
+  const tapers = {};
+  for (const [key, value] of Object.entries(effects)) {
+    if (!(key in applied)) {
+      projected[key] = value;
+      continue;
+    }
+    projected[key] = applied[key];
+    if (Number(value) > applied[key]) {
+      tapers[key] = Number(gs.metrics[key]) >= 75
+        ? "meter high"
+        : key === "relationships" && gs.flags?.trustDeficitActive
+          ? "trust deficit"
+          : key === "budget" && gs.flags?.budgetLoanActive ? "loan repayments" : "reduced";
+    }
+  }
+  return { effects: projected, tapers };
+}
+
+function summarizeProjectedEffects(gs, effects, option = null) {
+  const { effects: projected, tapers } = projectAppliedEffects(gs, effects);
+  return summarizeEffects(projected, option, tapers);
+}
+
+// ── Shortcut offers ─────────────────────────────────────────────────────────
+// A shortcut is a legal and ethical call, not another operational card, so it
+// is presented on its own terms: who checks, the odds it holds this season,
+// what it pays, what a catch costs, and that saying no is free. The engine
+// carries the odds, payoff, catcher and band effects on the card
+// (js/engine/content.js adaptIllegalActTemptation); a card without them is
+// priced from js/risk.js and the act itself.
+
+const SHORTCUT_CATCHERS = {
+  "C&E": "Compliance and Enforcement (C&E)",
+  FPB: "the Forest Practices Board",
+  FPBC: "Forest Professionals BC",
+  WorkSafeBC: "WorkSafeBC",
+  BCWS: "BC Wildfire Service",
+  COS: "the Conservation Officer Service",
+  ENV: "the Ministry of Environment",
+  DFO: "Fisheries and Oceans Canada",
+  "Archaeology Branch": "the Archaeology Branch",
+  "Timber Pricing": "Timber Pricing Branch",
+  "Revenue Branch": "the Revenue Branch",
+  "the Nation": "the Nation",
+  RCMP: "the RCMP",
+  CVSE: "Commercial Vehicle Safety and Enforcement",
+  "Transport Canada": "Transport Canada",
+  "internal audit": "your company's internal audit",
+  "the contractor": "the contractor",
+};
+
+const ILLEGAL_ACTS_BY_ID = new Map(ILLEGAL_ACTS.map((act) => [act.id, act]));
+
+function findShortcutAct(item) {
+  const id = item?.shortcut?.actId || item?.actId || String(item?.id || "").replace(/^temptation:/, "");
+  return ILLEGAL_ACTS_BY_ID.get(id) || null;
+}
+
+// The offer is drawn when the season opens, but the season's earlier cards
+// move the meters its odds, catch cost and fallout are read from. Rebuilt from
+// the act on the file as it stands, what the card prints is what the roll
+// applies.
+function repriceShortcutOffer(gs, item, queue = []) {
+  const act = item?.shortcut ? findShortcutAct(item) : null;
+  return act ? adaptIllegalActTemptation(act, gs, { avoidIssueIds: queuedIssueIds(queue) }) : item;
+}
+
+/** Ids of the ordinary issue cards still waiting in this season's queue. */
+function queuedIssueIds(queue) {
+  return (queue || [])
+    .filter((entry) => entry?.type === "issue" && entry.data?.id && !entry.data.causedBy && !entry.data.scheduled)
+    .map((entry) => entry.data.id);
+}
+
+/**
+ * A caught shortcut promises its determination for next season. When the
+ * same card is already queued later in this season as an ordinary issue, it
+ * was dealt twice: now, unlinked, and again next season as the fallout. The
+ * unlinked copy gives way to a fresh card, so the determination is dealt
+ * once, with its "Because you took" line.
+ * @param {Array} queue - the controller queue (the season's remaining cards)
+ * @param {Object} gs
+ * @param {Function} redraw - (excludeIds) => a replacement issue or null
+ */
+export function dropQueuedFalloutDuplicates(queue, gs, redraw) {
+  const promised = new Set((Array.isArray(gs?.pendingIssues) ? gs.pendingIssues : [])
+    .filter((pending) => pending?.causedBy?.kind === "shortcut" && pending.id)
+    .map((pending) => pending.id));
+  if (!promised.size) return 0;
+  let dropped = 0;
+  for (let index = 0; index < queue.length; index += 1) {
+    const entry = queue[index];
+    if (entry?.type !== "issue" || entry.data?.causedBy || entry.data?.scheduled || !promised.has(entry.data?.id)) continue;
+    const exclude = [...collectDealtIds(gs, "issue"), ...promised, ...queuedIssueIds(queue)];
+    const replacement = redraw(exclude);
+    if (replacement) queue[index] = { ...entry, data: replacement };
+    else queue.splice(index--, 1);
+    dropped += 1;
+  }
+  return dropped;
+}
+
+// The bands as whole percentages. The engine puts the odds it will roll on
+// the offer (fractions, from js/risk.js riskBandOdds); a card without them is
+// priced by that same function, never by a local restatement of the modifiers.
+// `noticed` is 0 on a two-band roll.
+function readShortcutOdds(gs, item, option) {
+  const carried = option?.odds || item?.odds;
+  if (carried && Number.isFinite(Number(carried.clean))) return riskBandPercents(carried);
+  if (!option?.risk || !Number.isFinite(Number(option.risk.baseSuccess)) || !gs?.metrics) return null;
+  return riskBandPercents(riskBandOdds(gs, option.risk));
+}
+
+export function formatShortcutOdds(odds) {
+  if (!odds) return "";
+  return odds.noticed
+    ? `clean ${odds.clean}% · noticed ${odds.noticed}% · caught ${odds.caught}%`
+    : `holds ${odds.clean}% · caught ${odds.caught}%`;
+}
+
+function isFreeRefusal(option) {
+  if (!option || option.risk) return false;
+  return !Object.entries(option.effects || {})
+    .some(([key, value]) => key !== "timeUsed" && Number(value) !== 0);
+}
+
+/**
+ * Everything the offer card shows beyond its title and pitch. Null when the
+ * card carries no shortcut roll (nothing to price).
+ */
+export function buildShortcutBrief(gs, item) {
+  const options = Array.isArray(item?.options) ? item.options : [];
+  const takeIndex = options.findIndex((option) => option?.risk);
+  if (takeIndex < 0) return null;
+  const take = options[takeIndex];
+  const act = findShortcutAct(item);
+  const odds = readShortcutOdds(gs, item, take);
+  const catcherKey = take.institution || take.risk?.institution || item?.institution || act?.catch?.by || null;
+  const catcher = catcherKey ? SHORTCUT_CATCHERS[catcherKey] || catcherKey : null;
+  const payoffLine = take.payoffLine || take.payoff?.line || item?.payoffLine || act?.payoff?.line || "";
+  // The chip states the payoff as it will land: a gain on a meter already at
+  // 75+ tapers, so "Progress +7" can arrive as +4.
+  const payoffEffects = take.payoffEffects || item?.payoffEffects;
+  const payoffChip = (payoffEffects && summarizeProjectedEffects(gs, payoffEffects))
+    || take.payoffChip || item?.payoffChip || "";
+  const finalSeason = Number(gs?.round || 0) >= Number(gs?.totalRounds || SEASONS.length);
+  // Fallout scheduled in the last season has no season left to land in,
+  // unless the engine promises where it lands (next year's file).
+  const promised = take.bands?.caught?.fallout || item?.promisedFallout;
+  const followUp = !take.risk?.failScheduleIssues
+    ? ""
+    : !finalSeason ? "follow-up review" : promised ? "follow-up on next year's file" : "";
+  // Each band's effects: the engine's own band map when the card has one,
+  // else the risk's branches.
+  const bandEffects = (band, fallback) => take.bands?.[band]?.effects || fallback || {};
+  const describe = (effects) => summarizeProjectedEffects(gs, effects) || "no meter change";
+  const cleanText = describe(bandEffects("clean", take.risk?.successEffects));
+  const caughtText = [summarizeProjectedEffects(gs, bandEffects("caught", take.risk?.failEffects)), followUp]
+    .filter(Boolean).join(" · ") || "no meter change";
+  const bands = [];
+  if (odds?.noticed) {
+    bands.push({ tone: "positive", text: `Clean ${odds.clean}%: ${cleanText}` });
+    bands.push({ tone: "warning", text: `Noticed ${odds.noticed}%: ${describe(bandEffects("noticed", take.risk?.partialEffects || take.risk?.successEffects))}` });
+    bands.push({ tone: "danger", text: `Caught ${odds.caught}%: ${caughtText}` });
+  } else if (odds) {
+    bands.push({ tone: "positive", text: `Holds ${odds.clean}%: ${cleanText}` });
+    bands.push({ tone: "danger", text: `Caught ${odds.caught}%: ${caughtText}` });
+  } else {
+    bands.push({ tone: "positive", text: `If it holds: ${cleanText}` });
+    bands.push({ tone: "danger", text: `If caught: ${caughtText}` });
+  }
+  const declineIndex = options.findIndex((option, index) => index !== takeIndex && /^(decline|say no)\b/i.test(option?.label || ""));
+  // The reason ends its own sentence; the views close the line (and add
+  // "Saying no costs nothing."), which printed "strong.. Saying no".
+  const oddsReason = String(take.oddsReason || item?.oddsReason || "").replace(/\.\s*$/, "");
+  const oddsLine = odds ? `Odds this season: ${formatShortcutOdds(odds)}` : "";
+
+  return {
+    takeIndex,
+    banner: "Shortcut offer · off the books",
+    odds,
+    // Why the odds moved from the tier's usual line (js/engine/content.js
+    // describeIllegalActOddsShifts), so a 32% clean never goes unexplained.
+    oddsText: oddsLine && oddsReason ? `${oddsLine} — ${oddsReason}` : oddsLine,
+    // The same, in two parts, for a view that sets the reason on its own
+    // line (the classic card, where a wrapped reason pushed the odds out of
+    // the panel at 1280x720).
+    oddsLine,
+    oddsReason: odds ? oddsReason : "",
+    catcher,
+    catcherText: catcher ? `Who checks: ${catcher}` : "",
+    payoffLine,
+    payoffChip,
+    // "On offer: $8,000 out of the planters' cheques (Budget +6)".
+    offerText: payoffLine
+      ? `On offer: ${payoffLine}${payoffChip ? ` (${payoffChip})` : ""}`
+      : payoffChip ? `On offer: ${payoffChip}` : "",
+    declineText: declineIndex >= 0 && isFreeRefusal(options[declineIndex]) ? "Saying no costs nothing." : "",
+    bands,
+    preview: bands.map((band) => band.text).join(" | "),
+  };
+}
+
+// The act description ends with a "Pressure points:" line built from the
+// act's raw tags (other roles' ids, "Illegal", "Fsp"), which read as framing
+// the card does not mean. The brief's odds, catcher and offer lines replace it.
+function stripShortcutTagLine(description) {
+  return String(description || "")
+    .split(/\n{2,}/)
+    .filter((paragraph) => !/^Pressure points:/i.test(paragraph.trim()))
+    .join("\n\n");
+}
+
+// "Adapted desk event • Weather" is an internal provenance tag, not copy.
+function playerFacingFlavor(flavor) {
+  return /^Adapted\b/i.test(String(flavor || "").trim()) ? "" : flavor;
 }
 
 // Classify an option's downside into one readable risk band — SAFE / TRADEOFF /
@@ -401,11 +732,12 @@ export function deriveRiskLevel(option, { danger = false } = {}) {
   return "medium";
 }
 
-function presentOption(option) {
+function presentOption(option, gs = null) {
   return {
     label: option.label,
-    // Authored hint wins; otherwise derive a neutral tradeoff from the effects.
-    preview: option.preview ?? summarizeEffects(option.effects, option),
+    // Authored hint wins; otherwise derive a neutral tradeoff from the
+    // effects as they will actually apply to these meters.
+    preview: option.preview ?? summarizeProjectedEffects(gs, option.effects, option),
     // Kept for the post-choice result notice and danger-issue copy tests.
     outcome: option.outcome,
     // Surfaced for headless strategy policies (sims/tests). The browser UI
@@ -418,15 +750,22 @@ function presentOption(option) {
   };
 }
 
-function buildPresentedOptions(item, phaseType) {
+function buildPresentedOptions(item, phaseType, gs = null, shortcut = null) {
   const options = Array.isArray(item?.options) ? item.options : [];
   if (phaseType === "issue" && item?.surfaceSeverity === "danger") {
-    return options.map((option, index) => presentDangerIssueOption(item, option, index));
+    return options.map((option, index) => presentDangerIssueOption(item, option, index, gs));
   }
-  return options.map(presentOption);
+  return options.map((option, index) => {
+    const presented = presentOption(option, gs);
+    // The take option prices each band with the same odds the card shows.
+    if (shortcut && index === shortcut.takeIndex) {
+      return { ...presented, preview: shortcut.preview, bands: shortcut.bands, shortcut: true };
+    }
+    return presented;
+  });
 }
 
-function presentDangerIssueOption(item, option, index) {
+function presentDangerIssueOption(item, option, index, gs = null) {
   if (item?.id === "formal-investigation") {
     const crisisCopy = [
       {
@@ -446,7 +785,7 @@ function presentDangerIssueOption(item, option, index) {
     if (crisisCopy) {
       return {
         ...crisisCopy,
-        preview: summarizeEffects(option?.effects, option),
+        preview: summarizeProjectedEffects(gs, option?.effects, option),
         riskLevel: deriveRiskLevel(option, { danger: true }),
       };
     }
@@ -454,7 +793,7 @@ function presentDangerIssueOption(item, option, index) {
 
   return {
     label: option?.label || `Option ${index + 1}`,
-    preview: option?.preview ?? summarizeEffects(option?.effects, option),
+    preview: option?.preview ?? summarizeProjectedEffects(gs, option?.effects, option),
     outcome: option?.outcome,
     riskLevel: deriveRiskLevel(option, { danger: true }),
   };
@@ -522,13 +861,20 @@ function snapshotGameState(gs) {
         : null,
     // Live "what am I trying to do right now" strip: mandate + at-risk meters +
     // the single most pressing pressure, recomputed from current metrics.
-    objectiveStrip: gs.role?.id ? buildObjectiveStrip(gs) : null,
+    objectiveStrip: gs.role?.id ? withShortcutWatch(buildObjectiveStrip(gs), gs) : null,
     // The player's most recent choice + its effects, for the Last Decision panel.
     lastDecision: gs.lastDecision ?? null,
     // Persistent choice → fallout feed for the dashboard, so consequences stay
     // visible across cards instead of scrolling away with the outcome notice.
     decisionTrail: buildDecisionTrail(gs),
   };
+}
+
+// A noticed take leaves the institution watching the file for the rest of
+// the year; the strip says so on every card, as the Expedition panel does.
+function withShortcutWatch(strip, gs) {
+  const watch = describeSeasonalShortcutWatch(gs);
+  return strip && watch ? { ...strip, watch } : strip;
 }
 
 function cloneStateForPreview(gs) {
@@ -601,7 +947,11 @@ export class TuiGameController {
       {
         type: "confirm",
         heading: "Return to the main menu?",
-        body: "Your seasonal run is autosaved — you can resume it later from the menu.",
+        // Crisis Command never writes the seasonal autosave (see
+        // persistSeasonalSave), so it must not promise one.
+        body: this.gs.gameMode === "crisis-command"
+          ? "Crisis Command isn't saved — returning to the main menu ends this incident."
+          : "Your seasonal run is autosaved — you can resume it later from the menu.",
       },
       ["Continue run", "Main menu"],
       (idx) => {
@@ -841,7 +1191,13 @@ export class TuiGameController {
     // consume from the main stream (and so the real draw reproduces the peek on
     // a crisis round).
     const previewRng = isForkableRng(this.rng) ? this.rng.fork() : this.rng;
-    const issuePreview = drawIssue(cloneStateForPreview(gs), previewRng);
+    // Issues and events already dealt this year stay out of the draw: a card
+    // answered in spring does not come back in winter. Follow-ups an earlier
+    // choice scheduled resolve from the pending lists before the pool is
+    // read, so they are never held back by this.
+    const dealtIssues = collectDealtIds(gs, "issue");
+    const dealtEvents = collectDealtIds(gs, "event");
+    const issuePreview = drawIssue(cloneStateForPreview(gs), previewRng, { excludeIds: dealtIssues });
     const isCrisisRound = issuePreview?.surfaceSeverity === "danger";
 
     this.queue.push({
@@ -857,7 +1213,7 @@ export class TuiGameController {
     });
 
     if (isCrisisRound) {
-      const issue = drawIssue(gs, this.rng);
+      const issue = drawIssue(gs, this.rng, { excludeIds: dealtIssues });
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
         gs.lastSeasonCardType = "issue";
@@ -880,12 +1236,20 @@ export class TuiGameController {
         this.queue.push({ type: "assignment", data: assignment });
       }
 
-      const event = drawSeasonalEvent(gs, this.rng);
+      // A year short of fresh cards falls back to the whole pool rather
+      // than leave the slot empty.
+      const event = drawSeasonalEvent(gs, this.rng, { excludeIds: dealtEvents })
+        || drawSeasonalEvent(gs, this.rng, { advancePending: false });
       if (event) {
         this.queue.push({ type: "event", data: event });
       }
 
-      const issue = drawIssue(gs, this.rng);
+      const issue = drawDistinctLabel(
+        (exclude, advancePending) => drawIssue(gs, this.rng, { advancePending, excludeIds: exclude }),
+        this.queue,
+        seasonCardStart,
+        dealtIssues,
+      ) || drawIssue(gs, this.rng, { advancePending: false });
       if (issue) {
         this.queue.push({ type: "issue", data: issue });
       }
@@ -896,18 +1260,22 @@ export class TuiGameController {
       }
 
       if (gs.round <= 2) {
-        const secondEvent = drawSeasonalEvent(gs, this.rng, {
-          advancePending: false,
-          excludeIds: event ? [event.id] : [],
-        });
+        const secondEvent = drawDistinctLabel(
+          (exclude) => drawSeasonalEvent(gs, this.rng, { advancePending: false, excludeIds: exclude }),
+          this.queue,
+          seasonCardStart,
+          [...dealtEvents, ...(event ? [event.id] : [])],
+        );
         if (secondEvent) {
           this.queue.push({ type: "event", data: secondEvent });
         }
       } else {
-        const secondIssue = drawIssue(gs, this.rng, {
-          advancePending: false,
-          excludeIds: issue ? [issue.id] : [],
-        });
+        const secondIssue = drawDistinctLabel(
+          (exclude) => drawIssue(gs, this.rng, { advancePending: false, excludeIds: exclude }),
+          this.queue,
+          seasonCardStart,
+          [...dealtIssues, ...(issue ? [issue.id] : [])],
+        );
         if (secondIssue) {
           this.queue.push({ type: "issue", data: secondIssue });
         }
@@ -918,6 +1286,14 @@ export class TuiGameController {
         seasonCardStart,
         gs.lastSeasonCardType ?? null,
       );
+    }
+
+    // A calendar reminder (the CPD log) comes after the season's own cards,
+    // as an extra card: it never takes one of their slots.
+    const reminder = drawCalendarReminder(gs);
+    if (reminder) {
+      this.queue.push({ type: "issue", data: reminder });
+      gs.lastSeasonCardType = "issue";
     }
 
     this.queue.push({
@@ -1042,19 +1418,24 @@ export class TuiGameController {
       || phase.type === "event"
       || phase.type === "temptation"
     ) {
-      const item = phase.data;
+      const item = phase.type === "temptation" ? repriceShortcutOffer(gs, phase.data, this.queue) : phase.data;
       const isCrisisIssue = phase.type === "issue" && item.surfaceSeverity === "danger";
-      const presentedOptions = buildPresentedOptions(item, phase.type);
+      const shortcut = phase.type === "temptation" ? buildShortcutBrief(gs, item) : null;
+      const presentedOptions = buildPresentedOptions(item, phase.type, gs, shortcut);
+      const framing = shortcut ? buildShortcutFraming(gs, item, shortcut) : null;
       this.present(
         {
           type: phase.type,
           title: item.title,
-          headline: buildCardHeadline(gs, item),
-          description: item.description ?? item.prompt ?? "",
+          headline: framing?.headline ?? buildCardHeadline(gs, item),
+          description: shortcut
+            ? stripShortcutTagLine(item.description ?? item.prompt)
+            : item.description ?? item.prompt ?? "",
           cardLabel: item.cardLabel,
-          context: item.context,
-          decisionPrompt: item.decisionPrompt,
-          flavor: item.flavor,
+          context: framing?.context ?? item.context,
+          decisionPrompt: framing?.decisionPrompt ?? item.decisionPrompt,
+          flavor: playerFacingFlavor(item.flavor),
+          shortcut: shortcut || undefined,
           sourceLabel: item.sourceLabel,
           whyNow: item.whyNow,
           surfaceReason: item.surfaceReason,
@@ -1075,12 +1456,22 @@ export class TuiGameController {
             option: option.label,
             round: gs.round,
             stance: option.stance,
+            // A follow-up an earlier choice put on the calendar.
+            ...(item.scheduled ? { scheduled: true } : {}),
           }, this.rng);
+
+          if (phase.type === "temptation") {
+            dropQueuedFalloutDuplicates(this.queue, gs, (exclude) => drawIssue(gs, this.rng, {
+              advancePending: false,
+              drainPending: false,
+              excludeIds: exclude,
+            }));
+          }
 
           gs.lastDecision = buildLastDecision(option, outcomeResult);
           this.emit();
 
-          this.processNext(buildOutcomeNotice(option, outcomeResult, phase.type, gs.round));
+          this.processNext(buildOutcomeNotice(option, outcomeResult, phase.type, gs.round, gs));
         },
         artText,
       );
@@ -1157,6 +1548,10 @@ export class TuiGameController {
           type: "setup",
           heading: "Select your Specialization",
           subtitle: "Choose the work stream you will be judged on this year.",
+          note: FORESTER_ROLES
+            .filter((role) => role.seasonalEnabled === false && role.seasonalDisabledNote)
+            .map((role) => role.seasonalDisabledNote)
+            .join(" ") || undefined,
           optionDetails: [
             ...playableRoles.map((role) => ({
               label: getRoleDisplayName(role),

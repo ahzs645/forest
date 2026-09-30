@@ -171,7 +171,7 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "The province issues an emergency access restriction (a GAR order) around a caribou maternal pen overlapping your BWBS and SWB tenure.",
+    "description": "The province issues an emergency access restriction (a GAR order) around a caribou maternal pen overlapping your tenure.",
     "options": [
       {
         "label": "Shift development to alternate watersheds",
@@ -208,7 +208,7 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "Lheidli T'enneh firekeepers request support for a cultural burn on SBS interface blocks to reduce ladder fuels before summer.",
+    "description": "The Nation's firekeepers request support for a cultural burn on SBS interface blocks to reduce ladder fuels before summer.",
     "options": [
       {
         "label": "Fund planning and integrate burn objectives",
@@ -245,7 +245,7 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "An atmospheric river scours a fish-bearing creek along your Skeena access road, leaving gear stranded beyond the washout.",
+    "description": "An atmospheric river scours a fish-bearing creek along your access road, leaving gear stranded beyond the washout.",
     "options": [
       {
         "label": "Install a temporary Bailey bridge with habitat oversight",
@@ -288,7 +288,7 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "Wildfires to the south trap smoke over the SBS plateau, pushing particulate levels past safe work thresholds for a week.",
+    "description": "Wildfires to the south trap smoke in the valleys, pushing particulate levels past safe work thresholds for a week.",
     "options": [
       {
         "label": "Move crews to remote sensing and planning tasks",
@@ -401,7 +401,9 @@
     "type": "issue",
     "severity": "moderate",
     "probability": 0.004,
-    "description": "A reconnaissance crew in the Skeena-Nass plateau uncovers a karst cave with cultural features in the planned cutblock.",
+    "stopKinds": ["block"],
+    "needsOpenPackage": true,
+    "description": "A reconnaissance crew on the karst plateau uncovers a karst cave with cultural features in the planned cutblock.",
     "options": [
       {
         "label": "Commission karst and cultural inventories",
@@ -510,7 +512,8 @@
     ],
     "areaTags": [
       "wildfire"
-    ]
+    ],
+    "seasons": ["summer"]
   },
   {
     "id": "contractor-bankruptcy_field",
@@ -601,7 +604,7 @@
     "options": [
       {
         "label": "Launch sanitation crews immediately",
-        "outcome": "You fall trap-trees and chip hotspots, buying valuable time against the beetles.",
+        "outcome": "You fall and burn the green-attack trees and chip the hotspots, buying valuable time against the beetles.",
         "effects": {
           "progress": -4,
           "budget": -750,

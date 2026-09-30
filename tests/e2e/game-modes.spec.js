@@ -59,7 +59,7 @@ for (const run of TEST_RUNS) {
 
     expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([]);
     expect(result.ended).toBeTruthy();
-    expect(result.terminalText).toMatch(/EXPEDITION (SUCCESSFUL|FAILED)/);
+    expect(result.terminalText).toMatch(/EXPEDITION (SUCCESSFUL|COMPLETE|FAILED)/);
     expect(extractElapsedDays(result.terminalText)).toBeGreaterThan(0);
     assertModeSpecificExpectations(run.name, result.terminalText);
   });
@@ -123,7 +123,8 @@ async function autoPlayToEnd(page, strategyName, maxSteps = 900) {
     }
 
     await page.waitForSelector('#choices button', { timeout: 15000 });
-    const buttons = page.locator('#choices button');
+    // A disabled option (a crew on days off) is on the card, not a choice.
+    const buttons = page.locator('#choices button:not([disabled])');
     const labels = await buttons.evaluateAll((nodes) =>
       nodes.map((node) => node.innerText.replace(/\s+/g, ' ').trim())
     );
@@ -265,7 +266,7 @@ function pickReconChoice(labels, terminalText) {
 
   if (terminalText.includes('RESUPPLY')) {
     if (food <= 18) {
-      return findFirstMatching(labels, ['Rations Crate', 'Fuel Drum', 'Field Repair', 'First Aid Kit', 'Done']);
+      return findFirstMatching(labels, ['Rations crate', 'Rations Crate', 'Fuel Drum', 'Field Repair', 'First Aid Kit', 'Done']);
     }
     if (fuel <= 30) {
       return findFirstMatching(labels, ['Fuel Drum', 'Rations Crate', 'Field Repair', 'First Aid Kit', 'Done']);
@@ -279,8 +280,11 @@ function pickReconChoice(labels, terminalText) {
     return findFirstMatching(labels, ['Done']);
   }
 
+  // An empty food box ends the run now, so a hungry crew gets fed: the
+  // supply point if the crew is at one, else a grocery run or the cache
+  // from behind Camp & crew.
   if (food <= 12) {
-    return findFirstMatching(labels, ['Resupply', 'Retrieve Cached Rations', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Stand Down']);
+    return findFirstMatching(labels, ['Run into the supply point', 'Pull the emergency crate', 'Grocery run', 'Camp & crew', 'Resupply', 'Retrieve Cached Rations', 'Ground-Truth Access', 'Values Sweep', 'Field Notebook', 'Standard Recon', 'Cautious Recon', 'Maintenance', 'Scout Ahead', 'Triage', 'Stand Down']);
   }
 
   if (fuel <= 25 || equipment <= 35) {
@@ -377,7 +381,7 @@ function getPlanningPriorities(terminalText) {
 }
 
 function isEndScreen(text) {
-  return text.includes('EXPEDITION SUCCESSFUL') || text.includes('EXPEDITION FAILED');
+  return text.includes('EXPEDITION SUCCESSFUL') || text.includes('EXPEDITION COMPLETE') || text.includes('EXPEDITION FAILED');
 }
 
 function extractElapsedDays(text) {
@@ -388,9 +392,9 @@ function extractElapsedDays(text) {
 function assertModeSpecificExpectations(modeName, terminalText) {
   switch (modeName) {
     case 'planner': {
-      expect(terminalText).toMatch(/Final Phase:\s*(data_gathering|analysis|stakeholder_review|ministerial_approval)/);
+      expect(terminalText).toMatch(/Final Phase:\s*(Inventory & Data|Analysis & Draft Plan|Engagement & Public Review|District Manager Decision)/);
       if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
-        expect(terminalText).toMatch(/Final Phase:\s*ministerial_approval/);
+        expect(terminalText).toMatch(/Final Phase:\s*District Manager Decision/);
         expect(extractStat(terminalText, 'Data Completeness')).toBeGreaterThanOrEqual(80);
         expect(extractStat(terminalText, 'Analysis Quality')).toBeGreaterThanOrEqual(80);
         expect(extractStat(terminalText, 'Stakeholder Buy-in')).toBeGreaterThanOrEqual(75);
@@ -411,7 +415,8 @@ function assertModeSpecificExpectations(modeName, terminalText) {
       break;
     }
     case 'recce': {
-      const surveyed = extractPair(terminalText, 'Blocks Surveyed');
+      // Recon prints packages, not "Blocks Surveyed" (js/game/endScreen.js).
+      const surveyed = extractPair(terminalText, 'Packages Finalized');
       expect(surveyed.current).toBeLessThanOrEqual(surveyed.total);
       if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
         expect(surveyed.current).toBe(surveyed.total);
@@ -425,11 +430,12 @@ function assertModeSpecificExpectations(modeName, terminalText) {
       const surveys = extractPair(terminalText, 'Free-Growing Surveys');
       expect(planted.current).toBeLessThanOrEqual(planted.total);
       expect(surveys.current).toBeLessThanOrEqual(surveys.total);
-      if (terminalText.includes('EXPEDITION SUCCESSFUL')) {
+      // A delivered program that grades D or F is COMPLETE, not SUCCESSFUL.
+      if (terminalText.includes('EXPEDITION SUCCESSFUL') || terminalText.includes('EXPEDITION COMPLETE')) {
         expect(planted.current).toBeGreaterThanOrEqual(planted.total);
         expect(surveys.current).toBeGreaterThanOrEqual(surveys.total);
       } else {
-        expect(terminalText).toMatch(/fell short of its targets|Budget exhausted|No contractor capacity/i);
+        expect(terminalText).toMatch(/fell short of its targets|pulled you off|Budget exhausted|No contractor capacity/i);
         expect(planted.current).toBeLessThanOrEqual(planted.total);
       }
       break;

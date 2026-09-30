@@ -3,24 +3,36 @@
  * Travel calculations and field day execution
  */
 
-import { PACE_OPTIONS, BASE_DAILY_TRAVEL_KM, DAILY_TRAVEL_VARIANCE } from './constants.js';
+import {
+  PACE_OPTIONS,
+  BASE_DAILY_TRAVEL_KM,
+  DAILY_TRAVEL_VARIANCE,
+  ARRIVAL_SNAP_KM,
+  MAX_EVENT_TRAVEL_BONUS_KM,
+  STARVATION_WALKOFF_DAYS
+} from './constants.js';
 import {
   getCurrentBlock,
   getNextBlock,
   advanceBlocksForDistance,
-  getCumulativeDistanceToIndex,
   getCurrentSegmentLength,
   getDistanceIntoCurrentSegment
 } from './blockNav.js';
-import { ensureRouteConstraints, getActiveRouteConstraint } from './routeConstraints.js';
+import { ensureRouteConstraints, getActiveRouteConstraint, isRouteObstructionEvent } from './routeConstraints.js';
 import { getOperationalProgress, recordProgressMilestones } from './progress.js';
 import {
   applyRandomInjury,
   applyStatusEffect,
+  describeDeparture,
+  evacuateIfInjuryRequires,
   getActiveCrewCount,
   getTotalWorkCapacity,
+  hasActiveFirstAidAttendant,
   processDailyUpdate
 } from '../crew.js';
+import { getDayRng } from '../events/dayRng.js';
+import { checkScheduledEvents } from '../events/scheduled.js';
+import { getCrossingContext } from './riverCrossing.js';
 import {
   calculateFieldConsumption,
   applyConsumption,
@@ -31,7 +43,7 @@ import { TERRAIN_TYPES, getRandomWeather, getTemperature } from '../data/blocks.
 import { advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
 import { addDiscoveryTags, inferDiscoveryTagsFromAccess } from '../data/discoveryTags.js';
 import { JOURNEY_MILESTONES, MILESTONE_COPY } from './constants.js';
-import { allPackagesFinalized, getPackageProgress } from './packages.js';
+import { allPackagesFinalized, getPackageProgress, isPackageBlock } from './packages.js';
 
 // The road verdict is about the road: fill, grade, crossings, drainage. Values
 // constraints — moose winter range, caribou, VQO, CMTs, a Nation's protocol —
@@ -220,13 +232,23 @@ function classifyRoadLifecycle(score) {
   ]);
 }
 
-function classifyCrossingCondition(score) {
-  return getLifecycleBand(score, [
-    { max: 6, id: 'clear_window', label: 'Clear Window' },
-    { max: 14, id: 'timing_sensitive', label: 'Timing Sensitive' },
-    { max: 24, id: 'high_water', label: 'High Water' },
-    { max: 100, id: 'restricted', label: 'Restricted' }
-  ]);
+const CROSSING_CONDITION_BANDS = [
+  { max: 6, id: 'clear_window', label: 'Clear Window' },
+  { max: 14, id: 'timing_sensitive', label: 'Timing Sensitive' },
+  { max: 24, id: 'high_water', label: 'High Water' },
+  { max: 100, id: 'restricted', label: 'Restricted' }
+];
+
+/**
+ * The crossing's condition from its wear, and never milder than the water
+ * the crossing beat reads on the gauge (js/journey/riverCrossing.js): an
+ * arrival read "Crossing: Clear Window" beside "GAUGE: HIGH".
+ */
+function classifyCrossingCondition(score, gaugeIndex = null) {
+  const band = getLifecycleBand(score, CROSSING_CONDITION_BANDS);
+  if (!Number.isInteger(gaugeIndex)) return band;
+  const gaugeBand = CROSSING_CONDITION_BANDS[Math.max(0, Math.min(CROSSING_CONDITION_BANDS.length - 1, gaugeIndex))];
+  return CROSSING_CONDITION_BANDS.indexOf(gaugeBand) > CROSSING_CONDITION_BANDS.indexOf(band) ? gaugeBand : band;
 }
 
 function classifyWatershedPressure(score) {
@@ -367,7 +389,7 @@ function buildFieldInfrastructureProfile(block, weather, journey, existingState 
   watershedPressure = clampObservationScore(watershedPressure);
 
   const roadLifecycle = classifyRoadLifecycle(roadWear);
-  const crossingCondition = classifyCrossingCondition(crossingWear);
+  const crossingCondition = classifyCrossingCondition(crossingWear, getCrossingContext(journey, block)?.gaugeIndex ?? null);
   const watershedCondition = classifyWatershedPressure(watershedPressure);
 
   let scrutinyDelta = 0;
@@ -737,7 +759,7 @@ export function applyAccessVerdictPressure(journey, verdict, context = {}) {
 
   if (delta !== 0) {
     const current = Number(journey.scrutiny ?? journey.heat ?? 0);
-    const next = Math.max(0, current + delta);
+    const next = Math.max(0, Math.min(100, current + delta));
     journey.scrutiny = next;
     if (Object.prototype.hasOwnProperty.call(journey, 'heat')) {
       journey.heat = next;
@@ -745,6 +767,34 @@ export function applyAccessVerdictPressure(journey, verdict, context = {}) {
   }
 
   return delta;
+}
+
+const ACCESS_SCRUTINY_REASONS = {
+  winter_only: 'the road only carries trucks frozen',
+  heli_only: 'the block is walk-in or helicopter only',
+  no_go: 'the road is closed to trucks',
+};
+
+/**
+ * Why an arrival's road check moved scrutiny, for the line that says it did:
+ * "Scrutiny rises by 2" on its own read as a penalty from nowhere.
+ * @param {Object} verdict - the recorded access verdict
+ * @param {string} stance - 'cautious', 'observe' or 'aggressive'
+ * @param {number} delta - what applyAccessVerdictPressure applied
+ * @returns {string} the whole line, or '' when nothing moved
+ */
+export function describeAccessScrutiny(verdict, stance, delta) {
+  if (!delta) return '';
+  if (delta < 0) return `Scrutiny eases by ${Math.abs(delta)}: you took it slow and wrote up what you found.`;
+  const reasons = [];
+  if (ACCESS_SCRUTINY_REASONS[verdict?.id]) reasons.push(ACCESS_SCRUTINY_REASONS[verdict.id]);
+  if (['repair_needed', 'out_of_service'].includes(verdict?.roadLifecycleId)) reasons.push(`the road reads ${String(verdict.roadLifecycleLabel).toLowerCase()}`);
+  if (['high_water', 'restricted'].includes(verdict?.crossingConditionId)) reasons.push(`the crossing reads ${String(verdict.crossingConditionLabel).toLowerCase()}`);
+  if (verdict?.watershedPressureId === 'critical') reasons.push('the watershed is under critical pressure');
+  if (normalizeAccessToken(stance) === 'aggressive') reasons.push('you pushed hard to get here');
+  return reasons.length
+    ? `Scrutiny rises by ${delta}: ${reasons.join('; ')}.`
+    : `Scrutiny rises by ${delta}.`;
 }
 
 export function formatAccessVerdict(verdict) {
@@ -795,7 +845,254 @@ function travelDistanceForDay(journey, paceId) {
   const timeModifier = 1 - setback;
   const variance = 1 + (Math.random() * 2 - 1) * DAILY_TRAVEL_VARIANCE;
   const distance = BASE_DAILY_TRAVEL_KM * pace.distanceMultiplier * terrain.speed * weatherMod * variance * timeModifier * routeMod * crewTravelMod * seasonMod;
-  return Math.max(0, distance);
+  // Ground an event banked for this leg (applyEventTravelEffect). It is added
+  // here, before the leg is clamped to the next stop, so a good road can
+  // never carry the crew past a stop, a crossing or a road check.
+  const bonus = crewTravelMod > 0 ? Math.max(0, Math.min(MAX_EVENT_TRAVEL_BONUS_KM, journey.travelBonusKm || 0)) : 0;
+  return Math.max(0, distance + bonus);
+}
+
+const EVENT_EFFECT_BANDS = ['effects', 'partialEffects', 'failureEffects'];
+
+/**
+ * Fit a card to the road that is left. At the last stop there is no next leg,
+ * so "+5 km on the next leg" is a promise the season cannot keep and "the
+ * next leg will be slower" a cost it never pays: the km come off every band.
+ * A card about the road ahead (`needsNextLeg`: a trapper's route notes, a
+ * grader for the spur) or with an option that offers nothing but ground is
+ * not dealt there at all. Anywhere else the card is returned untouched.
+ * @param {Object} journey
+ * @param {Object|null} event
+ * @returns {Object|null}
+ */
+export function fitEventToRemainingRoute(journey, event) {
+  if (!event || !Array.isArray(event.options) || getNextBlock(journey)) return event;
+  // A shortcut's payoff is sized and shown by its own builder
+  // (js/events/selection.js buildTemptationPayoff); it is not rewritten here.
+  if (event.type === 'temptation') return event;
+  // A slide or washout across the road ahead blocks a road nobody still
+  // needs: "turn back and report" paid compliance for it at the last block.
+  if (event.needsNextLeg || isRouteObstructionEvent(event)) return null;
+  const kmOnly = event.options.some((option) => {
+    const effects = option?.effects || {};
+    return Number(effects.progress) > 0
+      && Object.entries(effects).every(([key, value]) => key === 'progress' || key === 'progressMode' || !value);
+  });
+  if (kmOnly) return null;
+  let changed = false;
+  const options = event.options.map((option) => {
+    if (!option) return option;
+    // Ground and delay both land on the next leg (a timeUsed is a setback).
+    const bands = EVENT_EFFECT_BANDS.filter((band) => option[band]
+      && ('progress' in option[band] || 'timeUsed' in option[band]));
+    if (!bands.length && !('timeUsed' in option)) return option;
+    changed = true;
+    const { timeUsed: _time, ...fitted } = option;
+    for (const band of bands) {
+      const { progress: _progress, progressMode: _mode, timeUsed: _bandTime, ...rest } = option[band];
+      fitted[band] = rest;
+    }
+    return fitted;
+  });
+  return changed ? { ...event, options } : event;
+}
+
+/** Field roles whose day runner deals a follow-up as the day's own situation. */
+const FOLLOW_UP_AS_SITUATION = new Set(['recon', 'field', 'silviculture']);
+
+/**
+ * Hand a follow-up an earlier card scheduled (js/events/scheduled.js) to the
+ * field day that is about to run, instead of playing it ahead of the day.
+ * Played ahead, it skipped everything the mode does to a card it draws: the
+ * silviculture program fit (a "-20 L fuel" chip applied nothing), the crew
+ * and route fits, set-aside, and the day it says it takes. The game loop
+ * calls this; the mode takes it back with `takeDueFollowUp`.
+ * @param {Object} journey
+ * @param {Object|null} event - the follow-up, as checkScheduledEvents gives it
+ * @returns {boolean} whether the day runner will deal it
+ */
+export function holdFollowUpForDay(journey, event) {
+  if (!event || !FOLLOW_UP_AS_SITUATION.has(journey?.journeyType)) return false;
+  journey.dueFollowUp = event;
+  return true;
+}
+
+/**
+ * Today's follow-up, if one is due: the one the game loop held for the day,
+ * else the next one on the schedule (a runner driven without the game loop,
+ * as the simulations are).
+ * @param {Object} journey
+ * @returns {Object|null}
+ */
+export function takeDueFollowUp(journey) {
+  const held = journey?.dueFollowUp || null;
+  if (held) {
+    delete journey.dueFollowUp;
+    return held;
+  }
+  return journey ? checkScheduledEvents(journey) : null;
+}
+
+/** Each band's crew effect, with the text that narrates it. */
+const CREW_EFFECT_BANDS = [
+  ['crewEffect', 'outcome'],
+  ['partialCrewEffect', 'partialOutcome'],
+  ['failureCrewEffect', 'failureOutcome'],
+];
+
+/** What the card calls each recon role when it names the one hurt. */
+const RECON_ROLE_NOUNS = {
+  faller: 'layout tech',
+  bucker: 'timber cruiser',
+  spotter: 'compassman',
+  driver: 'driver-swamper',
+  medic: 'OFA 3 attendant',
+  mechanic: 'mechanic',
+};
+
+/** Who runs a saw on a recon crew: the line clearers and the truck hands. */
+const SAW_HANDS = new Set(['faller', 'driver', 'mechanic']);
+
+function hurtsSomeone(crewEffect) {
+  return Boolean(crewEffect && (crewEffect.injury || crewEffect.evacuate));
+}
+
+/**
+ * The one an injury card hurts, named on the day's dice: never the attendant
+ * who treats them unless nobody else is out there, never the hand who radioed
+ * it in if anyone else could be, and a saw hand when a saw kicked back.
+ */
+function pickCasualty(journey, event) {
+  const active = (journey.crew || []).filter((member) => member.isActive);
+  const field = active.filter((member) => member.role !== 'medic');
+  let pool = field.length ? field : active;
+  const others = pool.filter((member) => member.id !== event.reporter?.id);
+  if (others.length) pool = others;
+  if (event.id === 'chainsaw_cut') {
+    const saws = pool.filter((member) => SAW_HANDS.has(member.role));
+    if (saws.length) pool = saws;
+  }
+  if (!pool.length) return null;
+  const rng = getDayRng(journey, `casualty:${event.id || 'event'}`);
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+/**
+ * Fit a card to the crew on the roster.
+ *
+ * "Send out your sick crew member" on a crew with nobody sick evacuated no
+ * one and paid its morale anyway; the option is not offered until someone is
+ * carrying a condition.
+ *
+ * An injury card names the one hurt, and every band lands on them: the
+ * medevac used to fly out a random hand, the attendant who was treating the
+ * bleed included. The way they leave follows the option taken (a medevac is
+ * flown out, an ETV run goes in the ETV), and with the attendant gone the
+ * options stop calling on them. The authored event is left alone.
+ * @param {Object} journey
+ * @param {Object|null} event
+ * @returns {Object|null}
+ */
+export function fitEventToCrew(journey, event) {
+  if (!event || !Array.isArray(event.options)) return event;
+  const crew = journey?.crew || [];
+  const someoneSick = crew.some((member) => member.isActive && (member.statusEffects?.length || 0) > 0);
+  const options = someoneSick ? event.options : event.options.filter((option) => !option?.crewEffect?.evacuate_sick);
+  if (!options.length) return null;
+  const fitted = options.length === event.options.length ? event : { ...event, options };
+  return fitCasualty(journey, fitted);
+}
+
+function fitCasualty(journey, event) {
+  if (event.type === 'temptation') return event;
+  const crew = journey.crew || [];
+  const attendant = hasActiveFirstAidAttendant(crew);
+  const hurts = event.options.some((option) => CREW_EFFECT_BANDS.some(([key]) => hurtsSomeone(option?.[key])));
+  if (!hurts && attendant) return event;
+  const victim = hurts ? pickCasualty(journey, event) : null;
+  const rename = (text) => (attendant || typeof text !== 'string'
+    ? text
+    : text.replace(/\b([Tt])he OFA 3\b/g, (match, t) => `${t}he crew's OFA 1`));
+
+  const fitted = { ...event };
+  if (victim) {
+    const who = `${victim.name}, your ${RECON_ROLE_NOUNS[victim.role] || String(victim.roleName || 'crew').toLowerCase()}`;
+    const description = String(event.description || '');
+    fitted.description = /^A crew member\b/.test(description)
+      ? description.replace(/^A crew member\b/, `${who},`)
+      : /^A saw kicks back on the block\./.test(description)
+        ? description.replace(/^A saw kicks back on the block\./, `A saw kicks back on the block: ${who}.`)
+        : `${description} It is ${who}.`.trim();
+  }
+  fitted.options = event.options.map((option) => {
+    if (!option) return option;
+    const copy = { ...option };
+    for (const key of ['label', 'outcome', 'partialOutcome', 'failureOutcome', 'description']) {
+      if (typeof option[key] === 'string') copy[key] = rename(option[key]);
+    }
+    if (!victim) return copy;
+    for (const [key, textKey] of CREW_EFFECT_BANDS) {
+      if (!hurtsSomeone(option[key])) continue;
+      const withAttendant = attendant && victim.role !== 'medic';
+      copy[key] = {
+        ...option[key],
+        victimId: victim.id,
+        departure: describeDeparture(String(option[textKey] || option.outcome || ''), withAttendant),
+      };
+    }
+    return copy;
+  });
+  return fitted;
+}
+
+/**
+ * Route an event's "+/- N km traverse" through the travel system instead of
+ * moving the crew directly.
+ *
+ * Moving `distanceTraveled` from an event used to teleport the crew past
+ * stops: no arrival, no road check, no river crossing, and then a penalty on
+ * the next leg for the road check the jump itself skipped. Ground gained is
+ * banked for the next leg, which still stops at the next stop. Ground lost
+ * slows the next leg. A turn-back pulls the crew back along the current
+ * segment only, never behind the stop it last reached.
+ * @param {Object} journey
+ * @param {number} km - authored progress, in km of traverse
+ * @param {Object} [options]
+ * @param {boolean} [options.turnBack] - the authored option drives the crew back
+ * @returns {string[]} messages for the outcome
+ */
+export function applyEventTravelEffect(journey, km, { turnBack = false } = {}) {
+  const amount = Math.round(Math.abs(Number(km) || 0) * 10) / 10;
+  if (!journey || amount === 0) return [];
+  const messages = [];
+
+  if (km > 0) {
+    const nextBlock = getNextBlock(journey);
+    if (!nextBlock) return ['There is no leg left on the traverse for it to shorten.'];
+    journey.travelBonusKm = Math.min(MAX_EVENT_TRAVEL_BONUS_KM, (journey.travelBonusKm || 0) + amount);
+    messages.push(`Worth about ${amount} km on the next leg. The crew still stops at ${nextBlock.name} for the road check.`);
+    return messages;
+  }
+
+  // At the last stop there is no leg left to slow down, and saying there is
+  // tells the player something false about the end of the season.
+  if (!turnBack && !getNextBlock(journey)) return messages;
+
+  let setbackKm = amount;
+  if (turnBack) {
+    const pulledBack = Math.round(Math.min(amount, getDistanceIntoCurrentSegment(journey)) * 10) / 10;
+    if (pulledBack > 0) {
+      journey.distanceTraveled = Math.max(0, journey.distanceTraveled - pulledBack);
+      messages.push(`The crew pulls back ${pulledBack} km to ${getCurrentBlock(journey)?.name || 'the last stop'}.`);
+    }
+    setbackKm = Math.round((amount - pulledBack) * 10) / 10;
+  }
+  if (setbackKm > 0) {
+    const setback = Math.min(0.75, setbackKm / 16);
+    journey.travelSetback = Math.min(0.75, (journey.travelSetback || 0) + setback);
+    messages.push(`The next leg will be slower (about ${setbackKm} km less ground).`);
+  }
+  return messages;
 }
 
 /**
@@ -821,7 +1118,13 @@ export function calculateTravelDistance(journey, paceId) {
   // "Covered 4.399999999999999 km", while a fractional leg still lands on
   // its boundary exactly.
   const remaining = Math.round(Math.max(0, segmentLength - distanceIntoSegment) * 100) / 100;
-  const clampedDistance = remaining > 0 ? Math.min(distance, remaining) : 0;
+  // A leg that runs out within ARRIVAL_SNAP_KM of the stop walks the rest in.
+  // Decided on the tenth of a kilometre the player is shown: a 7.46 km leg
+  // prints "Walked 7.5 km" and leaves 1.5 km, and that has to snap too.
+  const shownDistance = Math.round(distance * 10) / 10;
+  const shownLeftover = Math.round((remaining - shownDistance) * 10) / 10;
+  const snapsToStop = shownDistance > 0 && remaining > 0 && shownLeftover <= ARRIVAL_SNAP_KM;
+  const clampedDistance = remaining > 0 ? (snapsToStop ? remaining : Math.min(shownDistance, remaining)) : 0;
   const reachesBlock = clampedDistance >= remaining && remaining > 0;
 
   return {
@@ -883,12 +1186,18 @@ export function executeFieldAction(journey, paceId) {
   if (travelInfo.distance > 0) {
     // A layout crew's traverse is walked line and road location between
     // stops, not a drive measured in shifts.
+    // A leg to a bridge, a camp or a yard is road driven, not line walked.
     const toward = nextBlockAtStart?.name ? ` toward ${nextBlockAtStart.name}` : '';
-    messages.push(`Walked ${travelInfo.distance} km of line and road location${toward} at ${pace.name} pace.`);
+    messages.push(nextBlockAtStart && !isPackageBlock(nextBlockAtStart)
+      ? `Covered ${travelInfo.distance} km of road${toward} at ${pace.name} pace.`
+      : `Walked ${travelInfo.distance} km of line and road location${toward} at ${pace.name} pace.`);
     journey.travelSetback = 0;
+    journey.travelBonusKm = 0;
   } else {
     if (effectivePaceId === 'resting') {
-      messages.push('The crew stood down and recovered this shift.');
+      messages.push(journey.resources.food <= 0
+        ? 'The crew stood down this shift, but nobody recovers on an empty food box.'
+        : 'The crew stood down and recovered this shift.');
     } else {
       messages.push('The shift ends without a travel leg.');
     }
@@ -919,14 +1228,10 @@ export function executeFieldAction(journey, paceId) {
       const infrastructureStatus = formatInfrastructureStatus(accessVerdict);
       if (infrastructureStatus) messages.push(infrastructureStatus);
 
-      const scrutinyDelta = applyAccessVerdictPressure(journey, accessVerdict, {
-        stance: getAccessStance(routePlan, effectivePaceId)
-      });
-      if (scrutinyDelta > 0) {
-        messages.push(`Scrutiny rises by ${scrutinyDelta}.`);
-      } else if (scrutinyDelta < 0) {
-        messages.push(`Scrutiny eases by ${Math.abs(scrutinyDelta)}.`);
-      }
+      const stance = getAccessStance(routePlan, effectivePaceId);
+      const scrutinyDelta = applyAccessVerdictPressure(journey, accessVerdict, { stance });
+      const scrutinyLine = describeAccessScrutiny(accessVerdict, stance, scrutinyDelta);
+      if (scrutinyLine) messages.push(scrutinyLine);
     }
   }
 
@@ -969,28 +1274,36 @@ export function executeFieldAction(journey, paceId) {
   // Add consumption warnings. Litres print whole; person-days keep a tenth.
   const printStock = (entry) => (entry.unit === 'L' ? Math.round(entry.value) : Math.round(entry.value * 10) / 10);
   for (const warning of consumptionResult.warnings) {
-    messages.push(`Warning: ${warning.resource} is running low (${printStock(warning)} ${warning.unit}).`);
+    messages.push(warning.value <= 0
+      ? `Warning: ${warning.resource} at zero.`
+      : `Warning: ${warning.resource} is running low (${printStock(warning)} ${warning.unit}).`);
   }
   for (const critical of consumptionResult.critical) {
     messages.push(`CRITICAL: ${critical.resource} is almost gone! (${printStock(critical)} ${critical.unit})`);
   }
 
-  // Process crew daily updates
+  // Process crew daily updates. A crew with nothing in the food box does not
+  // recover on a rest day; it just gets hungrier more slowly.
+  const starving = journey.resources.food <= 0;
   const conditions = {
     restDay: effectivePaceId === 'resting',
     gruelingPace: effectivePaceId === 'grueling',
-    shortRations: journey.rationPlan?.mode === 'short',
+    shortRations: journey.rationPlan?.mode === 'short' && !starving,
     lowFood: journey.resources.food <= 5,
+    starving,
     coldWeather: journey.temperature === 'cold' || journey.temperature === 'freezing',
     currentDay: journey.day
   };
 
   for (const member of journey.crew) {
+    // Someone sent out on the ETV or gone home is not on the hill: the pace
+    // and the weather are not theirs.
+    if (!member.isActive) continue;
     // Apply pace effects
-    if (pace.healthBonus !== 0) {
+    if (pace.healthBonus !== 0 && !(starving && pace.healthBonus > 0)) {
       member.health = Math.max(0, Math.min(100, member.health + pace.healthBonus));
     }
-    if (pace.moraleBonus !== 0) {
+    if (pace.moraleBonus !== 0 && !(starving && pace.moraleBonus > 0)) {
       member.morale = Math.max(0, Math.min(100, member.morale + pace.moraleBonus));
     }
 
@@ -1018,6 +1331,15 @@ export function executeFieldAction(journey, paceId) {
   const resourceStatus = checkResourceStatus(journey.resources, FIELD_RESOURCES);
   applyFieldHardships(journey, resourceStatus, messages);
 
+  if (!journey.isGameOver && Number(journey.resourcePressure?.hungryDays || 0) >= STARVATION_WALKOFF_DAYS) {
+    journey.isGameOver = true;
+    // Whoever was still on the roster left with the trucks: the review and
+    // the epilogues read this rather than a crew that looks "5/5 active".
+    journey.crewWalkedOff = true;
+    journey.gameOverReason = `NO FOOD - After ${journey.resourcePressure.hungryDays} shifts on an empty food box the crew drove themselves out. Nobody is left in the field to finish the season.`;
+    messages.push(journey.gameOverReason);
+  }
+
   if (resourceStatus.depleted.some(d => d.id === 'fuel') && (PACE_OPTIONS[effectivePaceId]?.distanceMultiplier ?? 1) > 0) {
     journey.isGameOver = true;
     journey.gameOverReason = 'OUT OF FUEL - The crew is stranded.';
@@ -1030,7 +1352,14 @@ export function executeFieldAction(journey, paceId) {
   // hand the player a loss for a file they had just closed.
   if (getActiveCrewCount(journey.crew) === 0 && !(journey.journeyType === 'recon' && allPackagesFinalized(journey))) {
     journey.isGameOver = true;
-    journey.gameOverReason = 'ALL CREW LOST - The crew is off the block: nobody left in the field to finish the season.';
+    // Nobody died: they quit or went out on the ETV. Say which.
+    const quit = journey.crew.filter((member) => member.hasQuit).length;
+    const sentOut = journey.crew.filter((member) => !member.isActive && !member.hasQuit).length;
+    const how = [
+      quit ? `${quit} quit` : null,
+      sentOut ? `${sentOut} ${sentOut === 1 ? 'was' : 'were'} sent out injured or ill` : null,
+    ].filter(Boolean).join(' and ');
+    journey.gameOverReason = `NO CREW LEFT - ${how || 'The crew is off the block'}. Nobody is left in the field to finish the season.`;
     messages.push(journey.gameOverReason);
   }
 
@@ -1090,8 +1419,11 @@ export function endFieldDay(journey) {
   journey.travelSetback = Math.min(0.75, Math.max(0, journey.travelSetback || 0) + Math.max(0, journey.pendingTravelSetback || 0));
   journey.pendingTravelSetback = 0;
   journey.routePlan = null;
-  if (journey.rationPlan) {
-    journey.rationPlan.mode = 'normal';
+  // Rations are a standing order, like the pace (Set the tempo): they hold
+  // until the player changes them. The streak counts the days on short
+  // rations, which the event odds and the mission panel read.
+  if (journey.rationPlan?.mode === 'short') {
+    journey.rationPlan.shortRationStreak = Number(journey.rationPlan.shortRationStreak || 0) + 1;
   }
   return journey;
 }
@@ -1144,6 +1476,9 @@ function applyRoutePlanConsequences(journey, routePlan, paceId, fromBlock, toBlo
       const severity = actualRisk >= 0.4 ? 'severe' : actualRisk >= 0.2 ? 'moderate' : 'minor';
       const result = applyRandomInjury(victim, severity);
       messages.push(`Route mishap! ${result.message}`);
+      // The crew's end-of-shift pass has already run; a fracture goes out on
+      // the ETV now, not after a night in camp and a kit spent on it.
+      evacuateIfInjuryRequires(victim, journey.day ?? null, messages);
     }
   }
 }
@@ -1170,7 +1505,42 @@ function applyFieldHardships(journey, resourceStatus, messages) {
       : 0;
   }
 
-  if (pressure.food >= 2) {
+  // An empty food box is its own failure path, not a louder version of a
+  // thin one. Each shift on nothing costs more than the last, rest does not
+  // offset it (executeFieldAction), and STARVATION_WALKOFF_DAYS of it ends
+  // the season.
+  const starving = journey.resources.food <= 0;
+  pressure.hungryDays = starving ? Number(pressure.hungryDays || 0) + 1 : 0;
+  // The season total, for the campaign review: a box left empty is not thrift.
+  if (starving) pressure.hungryShifts = Number(pressure.hungryShifts || 0) + 1;
+  if (starving) {
+    const days = pressure.hungryDays;
+    const healthLoss = Math.min(14, 4 + days * 2);
+    const moraleLoss = Math.min(16, 6 + days * 2);
+    for (const member of journey.crew) {
+      if (!member.isActive) continue;
+      member.health = Math.max(0, member.health - healthLoss);
+      member.morale = Math.max(0, member.morale - moraleLoss);
+      if (days >= 2) {
+        // Still on nothing: the exhaustion does not wear off overnight, and it
+        // is announced once rather than every morning.
+        let worn = member.statusEffects?.find((effect) => effect.effectId === 'exhaustion');
+        if (!worn) {
+          const result = applyStatusEffect(member, 'exhaustion');
+          if (result.message) messages.push(result.message);
+          worn = member.statusEffects.find((effect) => effect.effectId === 'exhaustion');
+        }
+        if (worn) worn.daysRemaining = Math.max(worn.daysRemaining || 0, 3);
+      }
+    }
+    messages.push(days === 1
+      ? `Nothing in the food box. The crew goes to bed hungry: health -${healthLoss}, morale -${moraleLoss} each.`
+      : `Shift ${days} with no food. The crew is weakening fast: health -${healthLoss}, morale -${moraleLoss} each.`);
+    const left = STARVATION_WALKOFF_DAYS - days;
+    if (left > 0 && left <= 2) {
+      messages.push(`The crew has said it plainly: ${left === 1 ? 'one more shift' : 'two more shifts'} on nothing and they drive out.`);
+    }
+  } else if (pressure.food >= 2) {
     messages.push('Rationing has set in. The crew is visibly weakening from sustained shortages.');
     for (const member of journey.crew) {
       if (!member.isActive) continue;

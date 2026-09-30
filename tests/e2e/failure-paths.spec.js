@@ -7,7 +7,7 @@ const FAILURE_RUNS = [
     areaIndex: 0,
     difficultyLabel: 'Old Growth',
     seed: 7004,
-    expectedReason: /(Lost the district's goodwill|The FSP expired before the replacement was approved|Budget exhausted)/i
+    expectedReason: /(Lost the district's goodwill|The FSP expired before the replacement was approved|Budget exhausted|Burnout)/i
   },
   {
     name: 'permitter',
@@ -23,7 +23,12 @@ const FAILURE_RUNS = [
     areaIndex: 2,
     difficultyLabel: 'Old Growth',
     seed: 7000,
-    expectedReason: /(ALL CREW LOST|OUT OF FUEL|stranded)/i
+    // Any of the field collapses: crew gone, fuel gone, or food gone
+    // (js/journey/fieldMechanics.js). This bot never leaves the Telkwa
+    // bridge and never buys food, so on this seed the box empties and the
+    // crew drives out (NO FOOD, shift 20) - a starvation collapse, not the
+    // short-rations order that used to walk a supplied crew off the job.
+    expectedReason: /(NO CREW LEFT|OUT OF FUEL|stranded|NO FOOD)/i
   },
   {
     name: 'silviculture',
@@ -93,7 +98,8 @@ async function autoPlayToEnd(page, modeName, strategy, maxSteps = 420) {
     }
 
     await page.waitForSelector('#choices button', { timeout: 15000 });
-    const buttons = page.locator('#choices button');
+    // A disabled option (a crew on days off) is on the card, not a choice.
+    const buttons = page.locator('#choices button:not([disabled])');
     const labels = await buttons.evaluateAll((nodes) =>
       nodes.map((node) => node.innerText.replace(/\s+/g, ' ').trim())
     );
@@ -201,5 +207,5 @@ function findFirstMatching(labels, priorities) {
 }
 
 function isEndScreen(text) {
-  return text.includes('EXPEDITION SUCCESSFUL') || text.includes('EXPEDITION FAILED');
+  return text.includes('EXPEDITION SUCCESSFUL') || text.includes('EXPEDITION COMPLETE') || text.includes('EXPEDITION FAILED');
 }

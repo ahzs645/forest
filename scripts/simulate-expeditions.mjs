@@ -11,6 +11,15 @@
  *   node scripts/simulate-expeditions.mjs                  # all roles, full length
  *   node scripts/simulate-expeditions.mjs --scale campaign # campaign-season deployments
  *   node scripts/simulate-expeditions.mjs --role recon --runs 12 --verbose
+ *   node scripts/simulate-expeditions.mjs --role planning --area all --compare
+ *   node scripts/simulate-expeditions.mjs --role recon --area all --difficulty all
+ *
+ * --area picks the operating area (an id, or `all` for every area). --policy
+ * reckless swaps in a player who cuts every corner (planner and permitter
+ * only), and --compare runs both side by side with the mean grade, which is
+ * how the desk roles are checked to separate good play from bad everywhere.
+ * --difficulty (easy, normal, hard or `all`) applies the same resource
+ * multipliers the new-game screen does; the default is normal.
  *
  * Exits non-zero when a role's win rate falls under --min-win-rate, so it can
  * gate a rebalance.
@@ -29,12 +38,17 @@ import { runPermittingDay } from '../js/modes/permitting.js';
 import { runSilvicultureDay } from '../js/modes/silviculture.js';
 import { runManagerDay } from '../js/modes/manager.js';
 import { checkEndConditions } from '../js/modes/shared/endConditions.js';
+import { PLANNING_SCRUTINY_GATE, PLANNING_VALUES_FLOOR } from '../js/journey/constants.js';
+import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
+import { calculateScore, rateDeskConduct, summarizeDeskConduct } from '../js/scoring.js';
+import { applyDifficultyMultipliers } from '../js/game/ForestryTrailGame.js';
+import { POLICIES as SILVICULTURE_POLICIES } from './simulate-silviculture-policies.mjs';
 
 const DEFAULT_AREA = 'fraser-plateau';
 const HARD_DAY_CAP = 150;
 
 function parseArgs(argv) {
-  const args = { runs: 8, scale: undefined, role: null, verbose: false, minWinRate: 0 };
+  const args = { runs: 8, scale: undefined, role: null, verbose: false, minWinRate: 0, area: DEFAULT_AREA, policy: 'competent', compare: false, difficulty: 'normal' };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--runs') args.runs = Number(argv[++i]);
@@ -43,6 +57,10 @@ function parseArgs(argv) {
     else if (flag === '--verbose') args.verbose = true;
     else if (flag === '--transcript') args.transcript = true;
     else if (flag === '--min-win-rate') args.minWinRate = Number(argv[++i]);
+    else if (flag === '--area') args.area = argv[++i];
+    else if (flag === '--policy') args.policy = argv[++i];
+    else if (flag === '--compare') args.compare = true;
+    else if (flag === '--difficulty') args.difficulty = argv[++i];
   }
   return args;
 }
@@ -93,7 +111,9 @@ function makeUi(journey, policy, tally, trace = null) {
     playTravelStrip: noop, playRadioAction: noop, setMissionStatus: noop,
     clearMissionStatus: noop, writeSuccess: write,
     async promptText() { return 'They loved this country'; },
-    async promptChoice(prompt, options = []) {
+    async promptChoice(prompt, allOptions = []) {
+      // A disabled row is on screen but is not a choice (js/ui/input.js).
+      const options = allOptions.filter((option) => !option?.disabled);
       if (!options.length) return { value: undefined };
       if (options.length === 1) return options[0];
       const picked = policy(journey, options, String(prompt || ''));
@@ -173,11 +193,16 @@ export const POLICY_VOCABULARY = {
 
 // ── Role policies ───────────────────────────────────────────────────────────
 
-function reconPolicy(journey, options, prompt) {
+function reconPolicy(journey, options, _prompt) {
   const crew = journey.crew || [];
   const hurting = crew.filter((member) => member.isActive && member.health < 45).length;
   const food = journey.resources?.food ?? 0;
+  const fuel = journey.resources?.fuel ?? 0;
   const equipment = journey.resources?.equipment ?? 100;
+  // A leg burns 15-20 L and a bad day can take a barrel; a competent lead
+  // tops up before the tank is a gamble, not after the trucks stop.
+  // Only worth a shift when the card can pay for the run.
+  const fuelLow = fuel <= 140 && (journey.resources?.budget ?? 0) >= 300;
   // The quiet-shift card is the only prompt carrying 'set_tempo'. Detect on
   // that rather than on 'end_shift', which lives in the camp submenu now.
   const atQuietCard = options.some((option) => option.value === 'set_tempo');
@@ -193,6 +218,7 @@ function reconPolicy(journey, options, prompt) {
     if (hurting >= 2) wanted.push('end_shift', 'triage');
     else if (hurting >= 1) wanted.push('triage', 'end_shift');
     if (food <= 12) wanted.push('food_cache', 'grocery_run');
+    if (fuelLow) wanted.push('fuel_run');
     if (equipment <= 30) wanted.push('maintain');
     wanted.push('maintain', 'triage', 'food_cache', 'scout', 'end_shift');
     return pick(options, wanted) || options[0];
@@ -212,16 +238,26 @@ function reconPolicy(journey, options, prompt) {
     // A crossing is scouted first, then crossed by whatever it physically is
     // (ford, bridge, ferry, culvert); a crossing that refuses the crew is
     // gone around rather than waited out.
+    // At the supply point, buy what is actually short before anything else.
+    const shopping = options.some((option) => option.value === 'fuel_drum' || option.value === 'rations');
     const sub = pick(options, [
+      // Food first: an empty box ends a season in six shifts; a thin tank
+      // still has a fuel run.
+      ...(shopping && food <= 60 ? ['rations'] : []),
+      ...(shopping && fuel <= 250 ? ['fuel_drum'] : []),
       'detour', 'mainline', 'scout', 'ford', 'cross', 'ferry', 'reroute', 'keep',
-      'rations', 'done', 'cancel', 'lean', 'skip', 'next', 'continue'
+      ...(shopping ? [] : ['rations']), 'done', 'cancel', 'lean', 'skip', 'next', 'continue'
     ]);
     if (sub) return sub;
     // An authored event card. A competent crew lead does not deal with
     // everything: when the season is running ahead of the file, they drive on
     // and wear the scrutiny. Model that, or the policy spends every day of the
     // run answering the radio and finishes three blocks out of eleven.
-    const setAside = maybeSetAside(
+    // Except when somebody is hurt: nobody competent leaves a bleeding saw
+    // cut on the radio to make ground, and the card lands its cost anyway.
+    const onTheRadio = journey.activeReconShift?.pendingEvent;
+    const someoneHurt = ['injury', 'illness'].includes(onTheRadio?.type);
+    const setAside = someoneHurt ? null : maybeSetAside(
       journey,
       options,
       (journey.blocksAssessed || 0) / (journey.blocks?.length || 1)
@@ -238,9 +274,20 @@ function reconPolicy(journey, options, prompt) {
     const care = pick(options, ['camp_menu']);
     if (care) return care;
   }
-  if (food <= 12) {
-    const feed = pick(options, ['resupply', 'camp_menu']);
+  if (food <= 12 || fuelLow) {
+    // With no cash the supply point sells nothing; the camp menu still has
+    // the ration cache.
+    const cash = journey.resources?.budget ?? 0;
+    const feed = pick(options, cash >= 250 ? ['resupply', 'camp_menu'] : ['camp_menu']);
     if (feed) return feed;
+  }
+  // Standing at a supply point with the box or the tank half gone: stock up
+  // here rather than burn a shift on a run to town later.
+  // The thresholds match what the shop policy above will actually buy, or
+  // the crew spends shift after shift walking in and out of the store.
+  if ((food <= 50 || fuel <= 250) && (journey.resources?.budget ?? 0) >= 400) {
+    const stock = pick(options, ['resupply']);
+    if (stock) return stock;
   }
 
   // Otherwise: finish the package under foot, then cover ground. Never picks
@@ -301,6 +348,19 @@ function planningPolicy(journey, options, prompt) {
       : ['network', 'email', 'rest'];
     return pick(options, wanted) || options[0];
   }
+  // The workshop: write up whichever objective the draft is thinnest on.
+  if (options.some((option) => option.value === 'values_back')) {
+    const focus = { biodiversity: 'bio', timberSupply: 'timber_v', communityNeeds: 'community', firstNationsValues: 'fn' };
+    const [weakest] = Object.entries(journey.values || {}).sort((a, b) => a[1] - b[1]);
+    return pick(options, [focus[weakest?.[0]], 'balanced']) || options[0];
+  }
+  // An objective the draft does not answer blocks the engagement and the
+  // submission, and costs the file every day: answer it first.
+  const values = Object.values(journey.values || {});
+  if (values.length && Math.min(...values) < PLANNING_VALUES_FLOOR) {
+    const workshop = pick(options, ['values']);
+    if (workshop) return workshop;
+  }
   // The FOM comment period is the long pole: publish the map the day it is
   // allowed, keep answering comments while it runs, and republish when the
   // comments come back. Nothing reaches the District Manager without it.
@@ -318,6 +378,12 @@ function planningPolicy(journey, options, prompt) {
     && (professional.registrationStatus !== 'active' || (professional.cpdHours || 0) < (professional.cpdTarget || 0))) {
     const admin = pick(options, ['professional_admin']);
     if (admin) return admin;
+  }
+  // The District Manager does not decide an exposed file: a competent
+  // planner brings scrutiny back under the gate before filing.
+  if (plan.phase === 'ministerial_approval' && (journey.scrutiny || 0) >= PLANNING_SCRUTINY_GATE) {
+    const review = pick(options, ['compliance_review']);
+    if (review) return review;
   }
   // Prepare Submission is the step that carries the file across the decision
   // gate; filed early it is $2,200 for a partial lift. Meet the district first.
@@ -393,61 +459,16 @@ function permittingPolicy(journey, options, prompt) {
   return pick(options, [...wanted, 'support_menu', 'end_day', 'next', 'continue']);
 }
 
+/**
+ * The silviculture supervisor is the competent player from
+ * scripts/simulate-silviculture-policies.mjs, so the balance gate here and the
+ * policy comparison there measure the same player. This harness used to carry
+ * its own copy that surveyed before it released; once a failed free-growing
+ * survey started waiting out its resurvey interval that copy burned its
+ * declaration candidates and lost most seasons through no engine regression.
+ */
 function silviculturePolicy(journey, options, prompt) {
-  const planting = journey.planting || {};
-  const setAside = maybeSetAside(
-    journey,
-    options,
-    (planting.blocksPlanted || 0) / (planting.blocksToPlant || 1)
-  );
-  if (setAside) return setAside;
-
-  if (prompt.startsWith('Stand down ')) {
-    return pick(options, ['cancel']) || options[0];
-  }
-  if (prompt === 'Adjust which contractor?') {
-    const ready = options.find((option) => /^(ready|available)/.test(option.description || ''));
-    return ready || pick(options, ['cancel']) || options[options.length - 1];
-  }
-  if (prompt === 'Meet with which contractor?') {
-    let best = options[0];
-    let lowest = Infinity;
-    for (const option of options) {
-      const contractor = journey.contractors?.find((candidate) => candidate.id === option.value);
-      if (contractor && contractor.morale < lowest) { lowest = contractor.morale; best = option; }
-    }
-    return best;
-  }
-  if (prompt === 'How do you respond?') {
-    // Contractor calls: retrain on a quality dispute, inspect the camp on a
-    // sickness call, back a stand-down, pay a re-price rather than lose half
-    // the crew. Never sign plot cards you did not walk.
-    return pick(options, ['inspect', 'inspect_camp', 'rest', 'pay']) || options[0];
-  }
-  if (prompt.startsWith('Release treatment on ')) {
-    // Manual release when the budget carries it, glyphosate under the PMP
-    // when it does not - the call a supervisor makes with the ledger open.
-    const remainingHa = Math.max(0, (journey.brushing?.hectaresTarget || 0) - (journey.brushing?.hectaresComplete || 0));
-    const remainingTrees = Math.max(0, (journey.planting?.seedlingsAllocated || 0) - (journey.planting?.seedlingsPlanted || 0));
-    const daysLeft = Math.max(0, (journey.deadline || 42) - (journey.day || 1));
-    const restOfProgram = remainingTrees * 0.36 + daysLeft * 550 + 4 * 1800 + 15000;
-    const manualCost = remainingHa * 900;
-    const budget = journey.resources?.budget || 0;
-    const wanted = budget > manualCost + restOfProgram ? ['manual', 'glyphosate', 'sheep'] : ['glyphosate', 'manual', 'sheep'];
-    return pick(options, wanted) || options[0];
-  }
-
-  const canDeploy = (journey.contractors || []).some((contractor) => {
-    const state = contractor.silvicultureState;
-    return !contractor.isActive && state?.status !== 'recovering' && !(state?.cooldownDays > 0);
-  });
-  // Plots before the planters move on, then this year's blocks, then the
-  // surveyor onto any opening that is ready (the older stands read better
-  // before the brush gets ahead of the calendar), then fill and release.
-  const wanted = ['inspect', 'plant', 'survey', 'fill', 'brush'];
-  if (canDeploy) wanted.push('rotation');
-  wanted.push('meeting', 'team_briefing', 'end', 'next', 'continue');
-  return pick(options, wanted);
+  return SILVICULTURE_POLICIES.competent.choose(journey, options, prompt, {});
 }
 
 /**
@@ -459,13 +480,104 @@ function managerPolicy(journey, options) {
   const treasury = journey.resources?.budget || 0;
   const start = journey.ledger?.startTreasury || 850000;
   const setAside = options.find((option) => option.value === 'set_aside');
-  if (setAside && treasury < start * 0.4) return setAside;
+  // Not when the set-aside line says the division stops work over it.
+  if (setAside && treasury < start * 0.4 && !/stop-work/.test(setAside.description || '')) return setAside;
+  // The cut schedule: take the woodlands manager's recommendation.
+  const pace = options.find((option) => String(option.value).startsWith('pace:') && option.recommended);
+  if (pace) return pace;
   return pick(options, [
     'steady', 'none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', 'next', 'continue'
   ]);
 }
 
-const ROLES = {
+// ── Reckless policies (desk roles) ─────────────────────────────────────────
+// The player the grade has to catch: declines every situation, files before
+// the district is ready, runs the file timber-first, never answers the FOM
+// comments or looks after the professional file, and fast-tracks every letter.
+
+function recklessPlanningPolicy(journey, options, prompt) {
+  if (prompt === 'Constraint triage:') return pick(options, ['timber']) || options[0];
+  if (prompt === 'Select the lead block:') return options[0];
+  const setAside = pick(options, ['set_aside']);
+  if (setAside) return setAside;
+  if (options.some((option) => option.value === 'values_back')) return pick(options, ['timber_v']) || options[0];
+  if (options.some((option) => option.value === 'desk_back')) return pick(options, ['network']) || options[0];
+  const fom = journey.blockPlanning?.fom || {};
+  const wanted = ['submit'];
+  if (fom.status === 'draft') wanted.push('fom_review');
+  if ((journey.day || 1) % 4 === 0) wanted.push('timber');
+  wanted.push('gather_data', 'analyze', 'stakeholder', 'outreach', 'timber', 'end', 'next', 'continue');
+  return pick(options, wanted) || options[0];
+}
+
+function recklessPermittingPolicy(journey, options, prompt) {
+  if (prompt === 'Who do you meet?') return pick(options, ['ministry']) || options[0];
+  const setAside = pick(options, ['set_aside']);
+  if (setAside) return setAside;
+  if (options.some((option) => option.value === 'support_back')) return pick(options, ['support_back']) || options[0];
+  const fastTrack = options.find((option) => /^revise_permit:.*:fast$/.test(String(option.value)));
+  const queue = pick(options, ['process_permits']);
+  if (queue) return queue;
+  if (fastTrack) return fastTrack;
+  return pick(options, ['end_day', 'next', 'continue']) || options[0];
+}
+
+/**
+ * Competent on the file, unscrupulous on the calls: every option chipped
+ * OFF-BOOK (a shortcut card's take, an unlawful answer on an ordinary card)
+ * is taken; everything else is the competent policy.
+ */
+function shortcutTaker(policy) {
+  return (journey, options, prompt) => {
+    const offBook = options.find((option) => /\[OFF-BOOK\]/.test(String(option?.label || '')));
+    return offBook || policy(journey, options, prompt);
+  };
+}
+
+const RECKLESS_POLICIES = {
+  planning: recklessPlanningPolicy,
+  permitting: recklessPermittingPolicy,
+};
+
+// ── Idle policy (recon) ────────────────────────────────────────────────────
+// The run the grade must not reward: the crew stands down every shift, never
+// buys food, and sets every card aside until the pantry runs out.
+function idleReconPolicy(_journey, options) {
+  if (options.some((option) => option.value === 'camp_back')) {
+    return pick(options, ['end_shift']) || options[0];
+  }
+  if (options.some((option) => option.value === 'set_tempo')) {
+    return pick(options, ['camp_menu']) || options[0];
+  }
+  return pick(options, ['set_aside', 'normal', 'full', 'done', 'cancel', 'keep', 'next', 'continue']) || options[0];
+}
+
+// ── Careful policy (recon) ─────────────────────────────────────────────────
+// The competent crew lead who answers every card instead of setting the
+// behind-schedule ones aside: the run the grade should put in the high 80s
+// and low 90s, below a flawless season but well above the competent one.
+// Careful means the careful answer, too: the [SAFE] line, else a [TRADEOFF],
+// never the shortcut. Taking whatever option came first bought $2,000
+// helicopter slings and cut saw bypasses on an Old Growth budget, which
+// measured a reckless crew that happened to answer the radio.
+function carefulReconPolicy(journey, options, prompt) {
+  const answered = options.filter((option) => option.value !== 'set_aside');
+  if (answered.length < options.length) {
+    const tagged = (tag) => answered.find((option) => typeof option.value === 'number' && String(option.label).endsWith(`[${tag}]`));
+    const careful = tagged('SAFE') || tagged('TRADEOFF');
+    if (careful) return careful;
+  }
+  return reconPolicy(journey, answered.length ? answered : options, prompt);
+}
+
+const ALT_POLICIES = {
+  reckless: RECKLESS_POLICIES,
+  shortcuts: { planning: shortcutTaker(planningPolicy), permitting: shortcutTaker(permittingPolicy) },
+  careful: { recon: carefulReconPolicy },
+  idle: { recon: idleReconPolicy },
+};
+
+export const ROLES = {
   recon: { create: createReconJourney, run: runReconDay, policy: reconPolicy, roleId: 'recce' },
   planning: { create: createPlanningJourney, run: runPlanningDay, policy: planningPolicy, roleId: 'planner' },
   permitting: { create: createPermittingJourney, run: runPermittingDay, policy: permittingPolicy, roleId: 'permitter' },
@@ -504,13 +616,20 @@ function summarizeState(journey) {
   return '';
 }
 
-export async function simulateRun(roleName, seed, scale, trace = null) {
+export async function simulateRun(roleName, seed, scale, trace = null, { areaId = DEFAULT_AREA, policy = 'competent', difficulty = 'normal', onDay = null } = {}) {
   const role = ROLES[roleName];
+  const policyFn = policy === 'competent' ? role.policy : ALT_POLICIES[policy]?.[roleName];
+  if (!policyFn) throw new Error(`no ${policy} policy for ${roleName}`);
   return withSeed(seed, async () => {
-    const journey = role.create({ areaId: DEFAULT_AREA, roleId: role.roleId, scale });
+    const area = OPERATING_AREAS.find((candidate) => candidate.id === areaId) || null;
+    const journey = role.create({ areaId, area, roleId: role.roleId, scale });
+    if (difficulty && difficulty !== 'normal') {
+      journey.difficulty = difficulty;
+      applyDifficultyMultipliers(journey, difficulty);
+    }
     const tally = {};
     const game = {
-      ui: makeUi(journey, role.policy, tally, trace),
+      ui: makeUi(journey, policyFn, tally, trace),
       journey,
       gameOver: false,
       checkpoint() {}
@@ -530,19 +649,80 @@ export async function simulateRun(roleName, seed, scale, trace = null) {
         break;
       }
       days += 1;
+      onDay?.(journey);
       outcome = checkEndConditions(journey);
     }
 
+    const graded = calculateScore(journey, Boolean(outcome?.victory));
     return {
       seed,
       days,
       deadline: Number.isFinite(journey.deadline) ? journey.deadline : null,
       won: Boolean(outcome?.victory),
+      score: graded.totalScore,
+      breakdown: Object.entries(graded.components)
+        .map(([key, component]) => `${key} ${component.score} (${component.label})`).join('; ')
+        + (graded.scrutinyPenalty ? `; scrutiny -${graded.scrutinyPenalty}` : ''),
       reason: outcome?.reason || (error ? `error: ${error}` : null),
       state: summarizeState(journey),
+      // How the desk roles conducted the file (js/scoring.js), for the
+      // shortcut and epilogue checks.
+      conduct: journey.protagonist ? rateDeskConduct(summarizeDeskConduct(journey)) : null,
+      scrutiny: Math.round(Number(journey.scrutiny) || 0),
       tally
     };
   });
+}
+
+/** Print one batch of runs; returns its win rate. */
+function reportRuns(label, results, args) {
+  const wins = results.filter((result) => result.won);
+  const winRate = wins.length / results.length;
+  const winDays = wins.map((result) => result.days).sort((a, b) => a - b);
+  const median = winDays.length ? winDays[Math.floor(winDays.length / 2)] : null;
+  const meanScore = Math.round(results.reduce((sum, result) => sum + result.score, 0) / results.length);
+  const width = Math.max(26, label.length + 1);
+
+  console.log(
+    `${label.padEnd(width)} win ${String(wins.length).padStart(2)}/${results.length}`
+    + `  days ${winDays.length ? `${winDays[0]}-${winDays[winDays.length - 1]} (median ${median})` : '—'}`
+    + `  deadline ${results[0].deadline ?? '—'}  mean grade ${meanScore}`
+  );
+
+  if (args.verbose) {
+    for (const result of results) {
+      const top = Object.entries(result.tally)
+        .sort((a, b) => b[1] - a[1]).slice(0, 6)
+        .map(([key, count]) => `${key}:${count}`).join(' ');
+      console.log(`  seed ${result.seed} days=${result.days} won=${result.won} score=${result.score} ${result.reason || ''}`);
+      console.log(`    ${result.state}`);
+      console.log(`    ${result.breakdown}`);
+      console.log(`    ${top}`);
+    }
+  } else {
+    const losses = results.filter((result) => !result.won);
+    const reasons = [...new Set(losses.map((result) => result.reason || 'ran out of days'))];
+    if (reasons.length) console.log(`${' '.repeat(width)} losses: ${reasons.join(' | ')}`);
+  }
+
+  // A blind policy reads as a balance regression, so say it out loud. Every
+  // decision the policy failed to recognise was answered by taking the first
+  // option on the list, which is not a competent player and not a measurement
+  // of anything.
+  const blind = results.reduce((sum, result) => sum + (result.tally.__fellThrough || 0), 0);
+  const decisions = results.reduce((sum, result) => sum + (result.tally.__namedDecisions || 0), 0);
+  const blindRate = decisions > 0 ? blind / decisions : 0;
+  if (blind > 0) {
+    const pct = (blindRate * 100).toFixed(1);
+    console.log(`${' '.repeat(width)} POLICY BLIND on ${blind}/${decisions} decisions (${pct}%) — option values likely renamed underneath it`);
+    // Reported, not enforced. Some fall-through is legitimate: block-selection
+    // and triage sub-prompts carry dynamic values (block ids, contractor ids)
+    // that no fixed vocabulary can cover, and taking the first option there is
+    // a reasonable default rather than a bug. The hard guard against a
+    // renamed option is tests/policyVocabulary.test.mjs, which drives the real
+    // modes and names the missing value.
+  }
+  return winRate;
 }
 
 async function main() {
@@ -562,57 +742,35 @@ async function main() {
       console.log(`${roleName.padEnd(26)} skipped: runs an operating year, not a campaign season`);
       continue;
     }
-    const results = [];
-    for (let i = 0; i < args.runs; i += 1) {
-      results.push(await simulateRun(roleName, 1000 + i * 37, args.scale, args.transcript ? console.log : null));
-    }
-
-    const wins = results.filter((result) => result.won);
-    const winRate = wins.length / results.length;
-    const winDays = wins.map((result) => result.days).sort((a, b) => a - b);
-    const median = winDays.length ? winDays[Math.floor(winDays.length / 2)] : null;
-    const label = `${roleName}${args.scale ? ` (${args.scale})` : ''}`;
-
-    console.log(
-      `${label.padEnd(26)} win ${String(wins.length).padStart(2)}/${results.length}`
-      + `  days ${winDays.length ? `${winDays[0]}-${winDays[winDays.length - 1]} (median ${median})` : '—'}`
-      + `  deadline ${results[0].deadline ?? '—'}`
-    );
-
-    if (args.verbose) {
-      for (const result of results) {
-        const top = Object.entries(result.tally)
-          .sort((a, b) => b[1] - a[1]).slice(0, 6)
-          .map(([key, count]) => `${key}:${count}`).join(' ');
-        console.log(`  seed ${result.seed} days=${result.days} won=${result.won} ${result.reason || ''}`);
-        console.log(`    ${result.state}`);
-        console.log(`    ${top}`);
+    const areaIds = args.area === 'all' ? OPERATING_AREAS.map((area) => area.id) : [args.area];
+    const difficulties = args.difficulty === 'all' ? ['easy', 'normal', 'hard'] : [args.difficulty];
+    // --compare runs the competent player beside every other policy the role has.
+    const policies = args.compare
+      ? ['competent', ...Object.keys(ALT_POLICIES).filter((name) => ALT_POLICIES[name][roleName])]
+      : [args.policy];
+    for (const difficulty of difficulties) {
+    for (const areaId of areaIds) {
+      for (const policy of policies) {
+        if (policy !== 'competent' && !ALT_POLICIES[policy]?.[roleName]) {
+          console.log(`${roleName.padEnd(26)} skipped: no ${policy} policy`);
+          continue;
+        }
+        const results = [];
+        for (let i = 0; i < args.runs; i += 1) {
+          results.push(await simulateRun(roleName, 1000 + i * 37, args.scale, args.transcript ? console.log : null, { areaId, policy, difficulty }));
+        }
+        const label = [
+          roleName,
+          args.scale ? `(${args.scale})` : null,
+          difficulties.length > 1 || difficulty !== 'normal' ? difficulty : null,
+          areaIds.length > 1 || areaId !== DEFAULT_AREA ? areaId : null,
+          policy !== 'competent' || policies.length > 1 ? policy : null,
+        ].filter(Boolean).join(' ');
+        const winRate = reportRuns(label, results, args);
+        if (policy === 'competent' && winRate < args.minWinRate) failed = true;
       }
-    } else {
-      const losses = results.filter((result) => !result.won);
-      const reasons = [...new Set(losses.map((result) => result.reason || 'ran out of days'))];
-      if (reasons.length) console.log(`${' '.repeat(26)} losses: ${reasons.join(' | ')}`);
     }
-
-    // A blind policy reads as a balance regression, so say it out loud. Every
-    // decision the policy failed to recognise was answered by taking the first
-    // option on the list, which is not a competent player and not a measurement
-    // of anything.
-    const blind = results.reduce((sum, result) => sum + (result.tally.__fellThrough || 0), 0);
-    const decisions = results.reduce((sum, result) => sum + (result.tally.__namedDecisions || 0), 0);
-    const blindRate = decisions > 0 ? blind / decisions : 0;
-    if (blind > 0) {
-      const pct = (blindRate * 100).toFixed(1);
-      console.log(`${' '.repeat(26)} POLICY BLIND on ${blind}/${decisions} decisions (${pct}%) — option values likely renamed underneath it`);
-      // Reported, not enforced. Some fall-through is legitimate: block-selection
-      // and triage sub-prompts carry dynamic values (block ids, contractor ids)
-      // that no fixed vocabulary can cover, and taking the first option there is
-      // a reasonable default rather than a bug. The hard guard against a
-      // renamed option is tests/policyVocabulary.test.mjs, which drives the real
-      // modes and names the missing value.
     }
-
-    if (winRate < args.minWinRate) failed = true;
   }
 
   if (failed) process.exitCode = 1;

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="theme-color" content="#0a0e14" />
     <title>BC Forestry Trail — District Terminal</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icon-180.png" />
@@ -78,7 +79,7 @@
                  ?experimental=1 or localStorage forestExperimental=1. -->
             <button id="crisis-mode-btn" class="landing-btn secondary experimental" type="button" hidden>
               <span class="btn-icon">&gt;</span>
-              <span class="btn-text">[C]RISIS COMMAND</span>
+              <span class="btn-text">CRISIS COMMAND</span>
               <span class="landing-btn-badge">EXPERIMENTAL</span>
             </button>
             <button id="load-game-btn" class="landing-btn secondary" type="button">
@@ -317,6 +318,9 @@
             </button>
             <button id="restart-btn" class="header-btn" type="button" aria-label="Restart game" title="Restart game">
               <span class="header-btn-key">[R]</span><span class="header-btn-label">Restart</span>
+            </button>
+            <button id="game-settings-btn" class="header-btn" type="button" aria-label="Settings: display mode and theme" title="Settings">
+              <span class="header-btn-key">[O]</span><span class="header-btn-label">Settings</span>
             </button>
           </div>
         </header>

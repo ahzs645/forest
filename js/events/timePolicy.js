@@ -21,6 +21,8 @@ export function optionSpendsDay(event, option, journeyType = 'field') {
 
 export function formatOptionTimeCost(event, option, journeyType = 'field') {
   if (journeyType === 'manager') return '';
+  // A day the weather already took: whatever the answer, nobody leaves camp.
+  if (event?.heldInCamp) return String(event.heldInCamp);
   return optionSpendsDay(event, option, journeyType)
     ? 'uses this day'
     : 'brief response; work continues';

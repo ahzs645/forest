@@ -166,3 +166,25 @@ test('repeated seeded keyboard-only runs stay deterministic', async ({ page }) =
     await secondPage.close();
   }
 });
+
+test('a crisis played from the landing link files one tree in the career forest', async ({ page }) => {
+  await seedBrowser(page, 4242);
+  await page.addInitScript(() => localStorage.setItem('bcForestry_theme', 'amber'));
+  await page.goto('/tui.html?mode=crisis-command');
+  // The page wears the theme chosen under Settings on the main site.
+  await expect(page.locator('body')).toHaveAttribute('data-theme', 'amber');
+
+  // Not every crisis beat has a heading; read the page instead.
+  const shell = page.locator('main');
+  for (let step = 0; step < 60 && !/Crisis Debrief/.test(await shell.innerText()); step += 1) {
+    await page.keyboard.press('Enter');
+  }
+  await expect(page.locator('.tui-heading').first()).toContainText('Debrief');
+  const record = () => page.evaluate(() => JSON.parse(localStorage.getItem('bcft.serviceRecord.v1') || 'null'));
+  await expect.poll(async () => (await record())?.byRole?.['crisis-command']?.runs).toBe(1);
+
+  // Moving around the debrief (a panel, back) does not file it again.
+  await page.keyboard.press('g');
+  await page.keyboard.press('Escape');
+  expect((await record()).runs).toBe(1);
+});

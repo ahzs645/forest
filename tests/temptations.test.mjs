@@ -11,6 +11,7 @@ import {
 } from '../js/data/illegalActs.js';
 import {
   actMatchesTemptationContext,
+  buildCaughtEffects,
   buildShortcutOption,
   buildTemptationEvent,
   buildTemptationPayoff,
@@ -24,6 +25,7 @@ import { matchesOddsCondition } from '../js/events/odds.js';
 import { applySetAsideCost, situationCostsTheDay } from '../js/journey/daySituation.js';
 import { buildEventCardContent } from '../js/journey/dayCard.js';
 import { createJourney } from '../js/journey.js';
+import { ensurePermitFiles } from '../js/journey/permitPipeline.js';
 import { adaptIllegalActTemptation, drawSeasonalTemptation } from '../js/engine/content.js';
 import { createInitialState } from '../js/engine/state.js';
 
@@ -129,7 +131,9 @@ test('a silviculture supervisor is not offered layout work, and a recce lead is 
   const planting = ILLEGAL_ACTS.find((act) => act.id === 'silvi-misreport-planting');
   assert.equal(actMatchesTemptationContext(ribbon, silvi), false);
   assert.equal(actMatchesTemptationContext(planting, recce), false);
-  assert.equal(actMatchesTemptationContext(planting, silvi), true);
+  // On a 1,600 sph prescription: "report the 1,600 the prescription calls for".
+  assert.equal(actMatchesTemptationContext(planting, silvi), false, 'a 1,400 sph program has no 1,600 to report');
+  assert.equal(actMatchesTemptationContext(planting, journeyFor('silviculture', { areaId: 'fort-st-john-plateau' })), true);
 });
 
 test('season, area and difficulty gates apply to acts', () => {
@@ -163,8 +167,11 @@ test('the comic tier lands about 15% of the pool weight and grey acts weigh 60% 
   const total = pool.reduce((sum, entry) => sum + entry.weight, 0);
   const comic = pool.filter((entry) => entry.act.tier === 'comic').reduce((sum, entry) => sum + entry.weight, 0);
   assert.ok(Math.abs(comic / total - 0.15) < 0.01, `comic share ${comic / total}`);
-  const grey = pool.find((entry) => entry.act.tier === 'grey' && !entry.act.rare);
-  const core = pool.find((entry) => entry.act.tier === 'core' && !entry.act.rare);
+  // The GM has no grey acts left (they were a registrant's); a planner does.
+  const planner = journeyFor('planner');
+  const deskPool = weightTemptationPool(ILLEGAL_ACTS.filter((act) => actMatchesTemptationContext(act, planner)));
+  const grey = deskPool.find((entry) => entry.act.tier === 'grey' && !entry.act.rare);
+  const core = deskPool.find((entry) => entry.act.tier === 'core' && !entry.act.rare);
   assert.equal(grey.weight / core.weight, 0.6);
 });
 
@@ -209,10 +216,12 @@ test('the take option shows the payoff in the role currency and the odds for thi
   const take = formatted.options[1];
   assert.equal(take.label, 'Take the shortcut');
   assert.match(take.hint, /offer: a day of layout, and a straight mainline/);
-  assert.match(take.hint, /km traverse/);
-  assert.match(take.hint, /\d+% clean, \d+% badly wrong for you today/);
+  assert.match(take.hint, /km on the next leg/);
+  // All three bands, named, and first: a narrow screen clips the tail.
+  assert.match(take.hint, /^today: \d+% clean · \d+% noticed · \d+% caught by C&E/);
+  assert.ok(take.hint.indexOf('km on the next leg') < take.hint.indexOf('offer:'), 'the gain comes before the pitch');
   assert.doesNotMatch(take.hint, /-\d+h/);
-  assert.equal(take.tag, 'RISKY');
+  assert.equal(take.tag, 'OFF-BOOK');
 });
 
 // ── Payoff in the role's currency ───────────────────────────────────────────
@@ -229,16 +238,33 @@ test('payoff lands in progress for field roles, files for permitters, and money 
   const seedlings = ILLEGAL_ACTS.find((act) => act.id === 'seedling-switcheroo');
   assert.equal(buildTemptationPayoff(seedlings, journeyFor('silviculture')).effects.budget, 9000);
 
+  // A permitter is paid in permit clock-days, never more than the queue has
+  // running: two files is four clock-days when four are there to take.
   const referral = ILLEGAL_ACTS.find((act) => act.id === 'rogue-referral-autoresponder');
-  const permitterFiles = buildTemptationPayoff(referral, journeyFor('permitter'));
-  assert.equal(permitterFiles.effects.progress, 20, 'two files moved is twenty pipeline points');
+  const permitter = journeyFor('permitter');
+  ensurePermitFiles(permitter);
+  for (const file of permitter.permits.files) file.clockCloses = null;
+  permitter.permits.files[0].lane = 'referral';
+  permitter.permits.files[0].pausedBy = null;
+  permitter.permits.files[0].clockCloses = permitter.day + 10;
+  const permitterFiles = buildTemptationPayoff(referral, permitter);
+  assert.equal(permitterFiles.effects.progress, 20, 'two files moved is four clock-days');
+  for (const file of permitter.permits.files) file.clockCloses = null;
+  const idleQueue = buildTemptationPayoff(referral, permitter);
+  assert.equal(idleQueue.deliverable, false, 'nothing on a clock: nothing to bring forward, so no offer');
 
+  // A planner is paid in the gate the plan is working on.
   const maps = ILLEGAL_ACTS.find((act) => act.id === 'black-market-timber-maps');
-  assert.ok(buildTemptationPayoff(maps, journeyFor('planner')).effects.progress >= 12, 'a planner is paid in analysis');
+  const planner = journeyFor('planner');
+  planner.plan.phase = 'analysis';
+  assert.ok(buildTemptationPayoff(maps, planner).effects.analysis >= 12, 'a planner in analysis is paid in analysis');
+  planner.plan.phase = 'data_gathering';
+  assert.ok(buildTemptationPayoff(maps, planner).effects.data >= 12, 'a planner gathering data is paid in data');
 
+  // A GM is paid the sum the pitch names, not a multiple of it.
   const recode = ILLEGAL_ACTS.find((act) => act.id === 'phantom-budget-recode');
   const gm = buildTemptationPayoff(recode, managerJourney());
-  assert.equal(gm.effects.budget, Math.min(60000, 35000 * 3));
+  assert.equal(gm.effects.budget, 35000);
 });
 
 // ── Refusing is free; set-aside costs nothing ───────────────────────────────
@@ -369,33 +395,52 @@ test('every caught band names the institution that caught it, in both variants',
   }
 });
 
+// What the institution decides, whether it lands today or later.
+const determinationOf = (option) => ({
+  effects: option.failureFallout?.effects || option.failureEffects,
+  flags: option.failureFallout ? option.failureFallout.flags : option.failureFlags,
+});
+
 test('the caught band pays in the institution currency and leaves the right flag', () => {
   const recce = journeyFor('recce');
   const ce = buildShortcutOption(ILLEGAL_ACTS.find((act) => act.id === 'recce-move-riparian-ribbon'), recce);
-  assert.ok(ce.failureEffects.compliance < 0 && ce.failureEffects.budget < 0 && ce.failureEffects.scrutiny > 0);
-  assert.deepEqual(ce.failureFlags, ['ce_watching']);
+  const ceDecision = determinationOf(ce);
+  assert.ok(ceDecision.effects.compliance < 0 && ceDecision.effects.budget < 0 && ceDecision.effects.scrutiny > 0);
+  assert.deepEqual(ceDecision.flags, ['ce_watching']);
+  assert.deepEqual(ce.failureFlags, ['ce_watching'], 'the finding itself starts the watch');
   assert.deepEqual(ce.partialFlags, ['ce_watching']);
 
   const worksafe = buildShortcutOption(ILLEGAL_ACTS.find((act) => act.id === 'recce-ignore-danger-tree'), recce);
-  assert.ok(worksafe.failureEffects.progress < 0, 'a stop-work day');
-  assert.ok(worksafe.failureEffects.crew_morale < 0);
-  assert.deepEqual(worksafe.failureFlags, ['worksafe_watching']);
+  assert.ok(determinationOf(worksafe).effects.progress < 0, 'a stop-work day');
+  assert.ok(determinationOf(worksafe).effects.crew_morale < 0);
+  assert.deepEqual(determinationOf(worksafe).flags, ['worksafe_watching']);
   assert.equal(worksafe.riskInjury, 0.15);
 
   const nation = buildShortcutOption(ILLEGAL_ACTS.find((act) => act.id === 'courtesy-flag-bribes'), recce);
-  assert.deepEqual(nation.failureFlags, ['fn_watching', 'locals_soured']);
-  assert.ok(nation.failureEffects.relationships < 0);
+  assert.deepEqual(determinationOf(nation).flags, ['fn_watching', 'locals_soured']);
+  assert.ok(determinationOf(nation).effects.relationships < 0);
 
   const fpbc = buildShortcutOption(ILLEGAL_ACTS.find((act) => act.id === 'borrowed-rpf-stamp'), journeyFor('planner'));
-  assert.deepEqual(fpbc.failureFlags, ['ce_watching', 'fpbc_file_open']);
+  assert.deepEqual(determinationOf(fpbc).flags, ['fpbc_watching', 'fpbc_file_open'], 'an FPBC finding is FPBC\'s watch, not C&E\'s');
 
   const rcmp = buildShortcutOption(ILLEGAL_ACTS.find((act) => act.id === 'midnight-variance-forgery'), journeyFor('permitter'));
-  assert.deepEqual(rcmp.failureFlags, ['ce_watching', 'rcmp_file']);
-  assert.ok(rcmp.failureEffects.compliance <= -16);
+  assert.deepEqual(determinationOf(rcmp).flags, ['rcmp_watching', 'rcmp_file']);
+  assert.ok(determinationOf(rcmp).effects.compliance <= -16);
 
   const contractor = buildShortcutOption(ILLEGAL_ACTS.find((act) => act.id === 'silvi-falsify-planting-quality'), journeyFor('silviculture'));
-  assert.deepEqual(contractor.failureFlags, ['contractor_owns_you']);
+  assert.deepEqual(determinationOf(contractor).flags, ['contractor_owns_you']);
   assert.doesNotMatch(contractor.partialOutcome, /Money changes hands/);
+});
+
+test('every catching institution has a cost mix that touches money or the role\'s own work', () => {
+  for (const by of CATCH_INSTITUTIONS) {
+    const act = ILLEGAL_ACTS.find((entry) => entry.catch?.by === by);
+    for (const journey of [journeyFor('recce'), journeyFor('planner'), journeyFor('silviculture'), managerJourney()]) {
+      const effects = buildCaughtEffects(act, journey);
+      assert.ok(effects.budget < 0 || effects.progress < 0, `${by} for ${journey.journeyType}: ${JSON.stringify(effects)}`);
+      assert.ok(effects.scrutiny > 0, `${by} raises scrutiny`);
+    }
+  }
 });
 
 test('an FPBC file puts the registration under review the next day', () => {
@@ -425,11 +470,18 @@ test('the seasonal card refuses for free, names the institution when caught, and
   const card = adaptIllegalActTemptation(act, state, () => 0.5);
   assert.equal(card.options[0].label, 'Say no');
   assert.deepEqual(card.options[0].effects, {});
-  assert.equal(card.options[0].outcome, 'The file stays yours. Nothing else changes.');
+  assert.equal(card.options[0].outcome, 'Not on your ticket. Nothing else changes.');
   const risky = card.options.find((option) => option.risk);
-  assert.match(risky.label, /C&E/);
+  assert.equal(risky.label, 'Take the shortcut');
+  assert.equal(risky.institution, 'C&E');
+  assert.match(risky.oddsLine, /^\d+% clean, \d+% noticed, \d+% caught by C&E$/);
+  assert.match(risky.preview, /caught by C&E/);
   assert.match(risky.risk.failOutcome, /NRO/);
   assert.doesNotMatch(risky.preview, /equipment|crew_morale|politicalCapital|Political Capital|Crew Morale/i);
+  // The success band pays the act's own payoff (a day of layout) in the role's currency.
+  assert.ok(risky.risk.successEffects.progress > 0, 'a clean take pays progress');
+  assert.equal(risky.payoffChip, `Progress +${risky.risk.successEffects.progress}`);
+  assert.equal(card.payoffLine, act.payoff.line);
   assert.match(card.description, /The layout contractor: “My guys can walk right past/);
   const report = card.options[2];
   assert.ok(report.effects.compliance > 0);

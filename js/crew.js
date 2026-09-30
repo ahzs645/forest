@@ -14,6 +14,18 @@ import {
 } from './data/crewNames.js';
 
 let crewIdCounter = 0;
+// The counter restarts on every page load, so a resumed run that hires a
+// replacement would mint crew_1 beside the saved crew_1 (and triage or an
+// injury follow-up could land on the wrong person). A per-load prefix keeps
+// ids unique across saves. It deliberately avoids Math.random so seeded runs
+// (tests, replays) draw the same stream as before.
+const CREW_ID_SESSION = makeSessionPrefix();
+
+function makeSessionPrefix() {
+  const stamp = Date.now().toString(36);
+  const bytes = globalThis.crypto?.getRandomValues?.(new Uint16Array(1));
+  return bytes ? `${stamp}${bytes[0].toString(36)}` : stamp;
+}
 const INJURY_EFFECT_IDS = new Set(['broken_leg', 'broken_arm', 'sprained_ankle', 'concussion']);
 const ILLNESS_EFFECT_IDS = new Set(['flu', 'cold', 'food_poisoning', 'dysentery', 'hypothermia', 'exhaustion', 'infection']);
 
@@ -39,7 +51,7 @@ const STATUS_FITNESS_CAPS = {
  * @returns {string} Unique ID
  */
 function generateId() {
-  return `crew_${++crewIdCounter}`;
+  return `crew_${CREW_ID_SESSION}_${++crewIdCounter}`;
 }
 
 /**
@@ -179,8 +191,8 @@ export function hasActiveFirstAidAttendant(crew) {
  * Take a crew member off the crew for the season.
  *
  * The worst thing that happens to anyone on this crew is a medevac or an ETV
- * run to town: they are gone for the season, WorkSafeBC is notified, and the
- * shift stops. Nobody dies.
+ * run to town: they are gone for the season and WorkSafeBC is notified.
+ * Nobody dies.
  * @param {Object} member
  * @param {Object} [options]
  * @param {number|null} [options.day] - journey day of the evacuation
@@ -202,6 +214,48 @@ export function evacuateCrewMember(member, { day = null, reason = 'injury', mess
     : DEPARTURE_MESSAGES.evacuated_injury;
   const template = message || pickRandom(pool || []) || '{name} is evacuated for medical care.';
   return { member, message: template.replace('{name}', member.name) };
+}
+
+/**
+ * How someone goes out, read from the words of the band that sends them
+ * rather than drawn at random: a medevac is flown out, not sent off in the
+ * ETV. The line for `evacuateCrewMember`'s `message`.
+ * @param {string} text - the band's outcome copy
+ * @param {boolean} withAttendant - your own attendant rides out with them
+ * @returns {string}
+ */
+export function describeDeparture(text, withAttendant) {
+  if (/helicopter|medevac|air ambulance|flown|flight/i.test(text)) return '{name} is flown out. WorkSafeBC is notified.';
+  if (/\bETV\b/.test(text)) {
+    return withAttendant
+      ? '{name} goes out in the ETV with the attendant. WorkSafeBC gets the call from the truck.'
+      : '{name} goes out in the ETV. WorkSafeBC gets the call from the truck.';
+  }
+  if (/supply run|to town|driven|truck/i.test(text)) return '{name} is driven to town. The doctor pulls them for the season.';
+  return '{name} is off the crew for the season. WorkSafeBC is notified.';
+}
+
+/**
+ * Send someone out the moment they carry an injury that is an ETV run (a
+ * fracture, a deep cut: `evacuate` in statusEffects.json), rather than at the
+ * next end-of-shift pass. Returns true when they went.
+ * @param {Object} member
+ * @param {number|null} day
+ * @param {string[]} messages - receives the evacuation line
+ * @returns {boolean}
+ */
+export function evacuateIfInjuryRequires(member, day = null, messages = []) {
+  if (!member?.isActive) return false;
+  const evacuatingEffect = (member.statusEffects || []).find((e) => STATUS_EFFECTS[e.effectId]?.evacuate);
+  if (!evacuatingEffect) return false;
+  const def = STATUS_EFFECTS[evacuatingEffect.effectId];
+  const evac = evacuateCrewMember(member, {
+    day,
+    reason: 'injury',
+    message: `{name}: ${def.description} WorkSafeBC is notified.`
+  });
+  if (evac.message) messages.push(evac.message);
+  return true;
 }
 
 /**
@@ -246,7 +300,6 @@ export function removeStatusEffect(member, effectId) {
   const index = member.statusEffects.findIndex(e => e.effectId === effectId);
   if (index === -1) return { member, message: null };
 
-  const effect = STATUS_EFFECTS[effectId];
   member.statusEffects.splice(index, 1);
 
   const messageTemplate = pickRandom(RECOVERY_MESSAGES);
@@ -348,12 +401,14 @@ export function processDailyUpdate(member, conditions = {}) {
     member.health = Math.max(0, member.health - 2);
   }
 
-  if (!hasSeriousEffect && member.health < member.maxHealth) {
+  // Nobody heals on an empty stomach, and a rest day with nothing to eat is
+  // not a rest (js/journey/fieldMechanics.js applies the hunger itself).
+  if (!hasSeriousEffect && !conditions.starving && member.health < member.maxHealth) {
     member.health = Math.min(member.maxHealth, member.health + (conditions.restDay ? 7 : 5));
   }
 
   // Morale adjustments based on conditions
-  if (conditions.restDay) {
+  if (conditions.restDay && !conditions.starving) {
     member.morale = Math.min(100, member.morale + 10);
   }
   if (conditions.gruelingPace) {
@@ -372,15 +427,7 @@ export function processDailyUpdate(member, conditions = {}) {
   }
 
   // A fracture or a deep cut is an ETV run, not a week of rest in camp.
-  const evacuatingEffect = member.statusEffects.find((e) => STATUS_EFFECTS[e.effectId]?.evacuate);
-  if (evacuatingEffect) {
-    const def = STATUS_EFFECTS[evacuatingEffect.effectId];
-    const evac = evacuateCrewMember(member, {
-      day: conditions.currentDay ?? null,
-      reason: 'injury',
-      message: `{name}: ${def.description} WorkSafeBC is notified.`
-    });
-    if (evac.message) messages.push(evac.message);
+  if (evacuateIfInjuryRequires(member, conditions.currentDay ?? null, messages)) {
     return { member, messages };
   }
 
@@ -510,7 +557,7 @@ export function crewHasRole(crew, roleId) {
  * @param {string} severity - 'minor', 'moderate', or 'severe'
  * @returns {Object} Result with member and message
  */
-export function applyRandomInjury(member, severity = 'moderate') {
+export function applyRandomInjury(member, severity = 'moderate', rng = Math.random) {
   const injuries = {
     minor: ['sprained_ankle', 'cold'],
     moderate: ['broken_arm', 'flu', 'exhaustion'],
@@ -518,7 +565,9 @@ export function applyRandomInjury(member, severity = 'moderate') {
   };
 
   const options = injuries[severity] || injuries.moderate;
-  const injuryId = pickRandom(options);
+  // The day's dice when an event rolls this (js/events/dayRng.js), so a
+  // reloaded day breaks the same arm.
+  const injuryId = options[Math.floor(rng() * options.length)];
 
   return applyStatusEffect(member, injuryId);
 }
@@ -564,10 +613,37 @@ export function treatCrewCondition(member, effectId, currentDay = null) {
   const effectDef = STATUS_EFFECTS[effectId];
   const isSevere = effectDef && (effectDef.healthDrain >= 3 || effectDef.canTravel === false);
 
+  // A fracture or a concussion is treated once — splinted, or checked and
+  // watched — and then it is time. A second kit does nothing for a bone, so
+  // it is not spent (kitUsed: false).
+  if (effectDef?.healsWithTime && status.treated) {
+    const days = status.daysRemaining;
+    return {
+      member,
+      cleared: false,
+      kitUsed: false,
+      healsWithTime: true,
+      message: `${member.name}'s ${effectDef.name.toLowerCase()} is already treated. It needs about ${days} more shift${days === 1 ? '' : 's'}, not another kit.`
+    };
+  }
+
   if (currentDay !== null) {
     member.lastTreatedDay = currentDay;
   }
   member.untreatedSeriousDays = 0;
+
+  if (effectDef?.healsWithTime) {
+    status.treated = true;
+    status.daysRemaining = Math.max(1, status.daysRemaining - (effectDef.treatedDays || 0));
+    member.morale = Math.min(100, member.morale + 3);
+    return {
+      member,
+      cleared: false,
+      kitUsed: true,
+      healsWithTime: true,
+      message: `${member.name}: ${effectDef.treatmentNote || `${effectDef.name} treated; it needs time now.`} About ${status.daysRemaining} shift${status.daysRemaining === 1 ? '' : 's'} to clear.`
+    };
+  }
 
   if (isSevere && status.daysRemaining > 1) {
     status.daysRemaining -= 1;
@@ -585,6 +661,20 @@ export function treatCrewCondition(member, effectId, currentDay = null) {
     cleared: true,
     message: removed.message || `${member.name}'s condition has stabilized.`
   };
+}
+
+/**
+ * Whether a kit would do this crew member any good today: hurt, or carrying
+ * a condition a kit still treats. A splinted arm that only needs time does
+ * not count, so the camp menu does not offer a day of triage for nothing.
+ * @param {Object} member
+ * @returns {boolean}
+ */
+export function needsTreatment(member) {
+  if (!member?.isActive) return false;
+  if (member.health < 85) return true;
+  return (member.statusEffects || []).some((effect) =>
+    !(effect.treated && STATUS_EFFECTS[effect.effectId]?.healsWithTime));
 }
 
 /**

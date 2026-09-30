@@ -15,6 +15,12 @@
   --cf-bloom-bright: #f0b7cf;
   --cf-ground: #22492d;
   --cf-ground-deep: #18361f;
+}
+
+// On body too, so it resolves against the theme's --text-dim (see the
+// legacy aliases in abstracts/_variables.scss).
+:root,
+body {
   --cf-star: var(--text-dim);
 }
 

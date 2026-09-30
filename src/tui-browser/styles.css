@@ -7,9 +7,9 @@ body,
 
 body {
   background:
-    radial-gradient(circle at 18% 18%, rgba(86, 212, 221, 0.12), transparent 28%),
-    linear-gradient(135deg, #182030 0%, #0c1218 48%, #132018 100%);
-  color: #c9d1d9;
+    radial-gradient(circle at 18% 18%, rgba(var(--tui-accent-rgb, 86, 212, 221), 0.12), transparent 28%),
+    linear-gradient(135deg, var(--tui-bg-1, #182030) 0%, var(--tui-bg-2, #0c1218) 48%, var(--tui-bg-3, #132018) 100%);
+  color: var(--tui-text, #c9d1d9);
   font-family: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
@@ -30,12 +30,12 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(86, 212, 221, 0.34);
+  border: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.34);
   border-radius: 6px;
-  background: rgba(8, 12, 17, 0.95);
+  background: rgba(var(--tui-bg-rgb, 8, 12, 17), 0.95);
   box-shadow:
     0 34px 100px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(86, 212, 221, 0.08) inset;
+    0 0 0 1px rgba(var(--tui-accent-rgb, 86, 212, 221), 0.08) inset;
 }
 
 .tui-header {
@@ -43,9 +43,9 @@ body {
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.95rem;
-  background: linear-gradient(90deg, rgba(45, 80, 22, 0.95), rgba(13, 17, 23, 0.96));
-  border-bottom: 1px solid rgba(86, 212, 221, 0.28);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.65), 0 0 36px rgba(63, 185, 80, 0.08) inset;
+  background: linear-gradient(90deg, rgba(var(--tui-band-rgb, 45, 80, 22), 0.95), rgba(var(--tui-bg-rgb, 13, 17, 23), 0.96));
+  border-bottom: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.28);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.65), 0 0 36px rgba(var(--tui-ok-rgb, 63, 185, 80), 0.08) inset;
 }
 
 .tui-header-title {
@@ -66,7 +66,7 @@ body {
 
 .tui-header-brand {
   margin: 0;
-  color: #e6edf3;
+  color: var(--tui-bright, #e6edf3);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -74,7 +74,7 @@ body {
 
 .tui-header-tag,
 .tui-header-help {
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
   opacity: 0.75;
   font-size: 0.9rem;
 }
@@ -83,7 +83,7 @@ body {
 .tui-action-button {
   border: 1px solid currentColor;
   background: transparent;
-  color: #e6edf3;
+  color: var(--tui-bright, #e6edf3);
   font: inherit;
   padding: 0.5rem 0.75rem;
   cursor: pointer;
@@ -91,7 +91,7 @@ body {
 
 .tui-header-button:hover,
 .tui-action-button:hover {
-  background: rgba(230, 237, 243, 0.08);
+  background: rgba(var(--tui-bright-rgb, 230, 237, 243), 0.08);
 }
 
 .tui-main {
@@ -111,23 +111,23 @@ body {
 }
 
 .tui-panel {
-  border: 1px solid rgba(86, 212, 221, 0.56);
-  background: rgba(13, 17, 23, 0.88);
+  border: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.56);
+  background: rgba(var(--tui-bg-rgb, 13, 17, 23), 0.88);
   min-width: 0;
-  box-shadow: 0 0 0 1px rgba(86, 212, 221, 0.05) inset;
+  box-shadow: 0 0 0 1px rgba(var(--tui-accent-rgb, 86, 212, 221), 0.05) inset;
 }
 
 .tui-panel-title {
   padding: 0.45rem 0.75rem;
   border-bottom: 1px solid currentColor;
-  color: #e6edf3;
+  color: var(--tui-bright, #e6edf3);
   font-weight: 700;
 }
 
 .tui-dashboard {
   width: 28ch;
   padding: 0.35rem 0.75rem 0.75rem;
-  border-color: rgba(63, 185, 80, 0.55);
+  border-color: rgba(var(--tui-ok-rgb, 63, 185, 80), 0.55);
 }
 
 .tui-dashboard-body {
@@ -145,12 +145,12 @@ body {
 }
 
 .tui-dashboard-label {
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
   flex: 0 0 auto;
 }
 
 .tui-dashboard-value {
-  color: #e6edf3;
+  color: var(--tui-bright, #e6edf3);
   flex: 1;
   min-width: 0;
   text-align: right;
@@ -169,7 +169,7 @@ body {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -177,12 +177,12 @@ body {
 }
 
 .tui-dashboard-tab:hover {
-  color: #e6edf3;
+  color: var(--tui-bright, #e6edf3);
 }
 
 .tui-dashboard-tab.active {
-  color: #e6edf3;
-  border-bottom-color: #3fb950;
+  color: var(--tui-bright, #e6edf3);
+  border-bottom-color: var(--tui-ok, #3fb950);
 }
 
 .tui-area-briefing .tui-heading {
@@ -207,7 +207,7 @@ body {
   gap: 0.55rem;
   padding-bottom: 0.2rem;
   margin-bottom: 0.2rem;
-  border-bottom: 1px solid rgba(86, 212, 221, 0.18);
+  border-bottom: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.18);
 }
 
 .tui-metric {
@@ -224,7 +224,7 @@ body {
 }
 
 .tui-metric-label {
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
 }
 
 .tui-metric-figs {
@@ -244,8 +244,8 @@ body {
 
 .tui-metric-track {
   height: 0.4rem;
-  border: 1px solid rgba(86, 212, 221, 0.22);
-  background: rgba(8, 12, 17, 0.85);
+  border: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.22);
+  background: rgba(var(--tui-bg-rgb, 8, 12, 17), 0.85);
   overflow: hidden;
 }
 
@@ -260,11 +260,11 @@ body {
   gap: 0.25rem;
   padding-top: 0.5rem;
   margin-top: 0.35rem;
-  border-top: 1px solid rgba(86, 212, 221, 0.18);
+  border-top: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.18);
 }
 
 .tui-dashboard-section-title {
-  color: #56d4dd;
+  color: var(--tui-accent, #56d4dd);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -291,21 +291,21 @@ body {
 .tui-season-log-headline {
   flex: 1;
   min-width: 0;
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
   font-size: 0.82rem;
   overflow-wrap: anywhere;
 }
 
 .tone-yellow {
-  color: #d29922;
+  color: var(--tui-warn, #d29922);
 }
 
 .tone-green {
-  color: #3fb950;
+  color: var(--tui-ok, #3fb950);
 }
 
 .tone-blue {
-  color: #58a6ff;
+  color: var(--tui-blue, #58a6ff);
 }
 
 .tone-magenta {
@@ -313,13 +313,13 @@ body {
 }
 
 .tone-red {
-  color: #f85149;
+  color: var(--tui-danger, #f85149);
 }
 
 .tui-field-radio {
   flex: 1;
   min-height: 0;
-  border-color: #d29922;
+  border-color: var(--tui-warn, #d29922);
 }
 
 .tui-field-layout {
@@ -341,7 +341,7 @@ body {
 }
 
 .tui-heading {
-  color: #e6edf3;
+  color: var(--tui-bright, #e6edf3);
   font-weight: 700;
 }
 
@@ -358,7 +358,7 @@ body {
 }
 
 .tui-source-label {
-  color: #56d4dd;
+  color: var(--tui-accent, #56d4dd);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -366,7 +366,7 @@ body {
 }
 
 .tui-subheading {
-  color: #56d4dd;
+  color: var(--tui-accent, #56d4dd);
   font-weight: 700;
 }
 
@@ -377,9 +377,9 @@ body {
   flex-direction: column;
   gap: 0.2rem;
   padding: 0.5rem 0.7rem;
-  border: 1px solid rgba(86, 212, 221, 0.35);
+  border: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.35);
   border-left-width: 3px;
-  background: rgba(86, 212, 221, 0.06);
+  background: rgba(var(--tui-accent-rgb, 86, 212, 221), 0.06);
 }
 
 .tui-objective-strip-row {
@@ -391,7 +391,7 @@ body {
 
 .tui-objective-strip-key {
   flex: 0 0 6.5rem;
-  color: #56d4dd;
+  color: var(--tui-accent, #56d4dd);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -400,7 +400,7 @@ body {
 
 .tui-objective-strip-val {
   flex: 1;
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
 }
 
 .tui-objective .tui-copy {
@@ -410,7 +410,7 @@ body {
 .tui-notice {
   border: 1px solid currentColor;
   padding: 0.7rem 0.8rem;
-  background: rgba(210, 153, 34, 0.08);
+  background: rgba(var(--tui-warn-rgb, 210, 153, 34), 0.08);
 }
 
 .tui-notice-heading {
@@ -421,12 +421,12 @@ body {
 .tui-copy {
   margin: 0;
   line-height: 1.55;
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
   overflow-wrap: anywhere;
 }
 
 .tui-copy.dim {
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
 }
 
 .tui-copy.preserve {
@@ -446,12 +446,12 @@ body {
 }
 
 .tui-detail-label {
-  color: #56d4dd;
+  color: var(--tui-accent, #56d4dd);
   overflow-wrap: anywhere;
 }
 
 .tui-detail-copy {
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
   padding-left: 1.5rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -470,12 +470,12 @@ body {
   align-items: baseline;
   gap: 0.7rem;
   padding: 0.35rem 0.55rem;
-  border: 1px solid rgba(210, 153, 34, 0.62);
-  background: rgba(210, 153, 34, 0.08);
+  border: 1px solid rgba(var(--tui-warn-rgb, 210, 153, 34), 0.62);
+  background: rgba(var(--tui-warn-rgb, 210, 153, 34), 0.08);
 }
 
 .tui-scenario-title {
-  color: #e6edf3;
+  color: var(--tui-bright, #e6edf3);
   font-weight: 700;
 }
 
@@ -494,19 +494,19 @@ body {
 
 .tui-tui-window,
 .tui-mini-panel {
-  border: 1px solid rgba(63, 185, 80, 0.48);
+  border: 1px solid rgba(var(--tui-ok-rgb, 63, 185, 80), 0.48);
   padding: 0.75rem;
   min-width: 0;
   min-height: 0;
-  background: rgba(16, 29, 18, 0.36);
+  background: rgba(var(--tui-band-rgb, 16, 29, 18), 0.36);
   overflow: auto;
 }
 
 .tui-window-title {
   margin: -0.2rem -0.25rem 0.65rem;
   padding-bottom: 0.35rem;
-  border-bottom: 1px solid rgba(86, 212, 221, 0.34);
-  color: #56d4dd;
+  border-bottom: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.34);
+  color: var(--tui-accent, #56d4dd);
   font-weight: 700;
   letter-spacing: 0.08em;
   font-size: 0.78rem;
@@ -534,7 +534,7 @@ body {
 
 .tui-scenario-map {
   margin: 0;
-  color: #3fb950;
+  color: var(--tui-ok, #3fb950);
   white-space: pre;
   overflow: auto;
   line-height: 1.22;
@@ -557,13 +557,13 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.35rem;
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
 }
 
 .tui-map-controls button {
-  border: 1px solid rgba(88, 166, 255, 0.55);
-  background: rgba(88, 166, 255, 0.08);
-  color: #e6edf3;
+  border: 1px solid rgba(var(--tui-blue-rgb, 88, 166, 255), 0.55);
+  background: rgba(var(--tui-blue-rgb, 88, 166, 255), 0.08);
+  color: var(--tui-bright, #e6edf3);
   font: inherit;
   min-width: 2rem;
   min-height: 1.7rem;
@@ -573,7 +573,7 @@ body {
 
 .tui-map-controls button:hover,
 .tui-map-controls button:focus-visible {
-  background: rgba(88, 166, 255, 0.2);
+  background: rgba(var(--tui-blue-rgb, 88, 166, 255), 0.2);
   outline: none;
 }
 
@@ -581,11 +581,11 @@ body {
   flex: 1;
   min-height: 18rem;
   overflow: hidden;
-  border: 1px solid rgba(63, 185, 80, 0.24);
+  border: 1px solid rgba(var(--tui-ok-rgb, 63, 185, 80), 0.24);
   background:
-    linear-gradient(rgba(63, 185, 80, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(63, 185, 80, 0.04) 1px, transparent 1px),
-    rgba(4, 12, 8, 0.42);
+    linear-gradient(rgba(var(--tui-ok-rgb, 63, 185, 80), 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--tui-ok-rgb, 63, 185, 80), 0.04) 1px, transparent 1px),
+    rgba(var(--tui-bg-rgb, 4, 12, 8), 0.42);
   background-size: 1.35rem 1.35rem;
 }
 
@@ -611,7 +611,7 @@ body {
 }
 
 .tui-map-legend {
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
   font-size: 0.82rem;
   line-height: 1.35;
 }
@@ -626,7 +626,7 @@ body {
   grid-template-columns: 1.6rem minmax(0, 1fr);
   gap: 0.45rem;
   align-items: start;
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
 }
 
 .tui-action-number {
@@ -634,15 +634,15 @@ body {
   place-items: center;
   min-width: 1.35rem;
   height: 1.35rem;
-  border: 1px solid rgba(88, 166, 255, 0.75);
-  color: #58a6ff;
+  border: 1px solid rgba(var(--tui-blue-rgb, 88, 166, 255), 0.75);
+  color: var(--tui-blue, #58a6ff);
 }
 
 .tui-name-input,
 .tui-art {
   margin: 0;
   white-space: pre;
-  color: #238636;
+  color: var(--tui-ok, #238636);
   overflow: auto;
 }
 
@@ -653,7 +653,7 @@ body {
 }
 
 .tui-input-label {
-  color: #56d4dd;
+  color: var(--tui-accent, #56d4dd);
   font-size: 0.9rem;
 }
 
@@ -666,19 +666,19 @@ body {
 .tui-text-input {
   flex: 1;
   min-width: 0;
-  border: 1px solid #56d4dd;
-  background: rgba(13, 17, 23, 0.92);
-  color: #e6edf3;
+  border: 1px solid var(--tui-accent, #56d4dd);
+  background: rgba(var(--tui-bg-rgb, 13, 17, 23), 0.92);
+  color: var(--tui-bright, #e6edf3);
   font: inherit;
   padding: 0.6rem 0.75rem;
 }
 
 .tui-text-input::placeholder {
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
 }
 
 .tui-options {
-  border-color: #58a6ff;
+  border-color: var(--tui-blue, #58a6ff);
 }
 
 .tui-options .tui-panel-title {
@@ -703,7 +703,7 @@ body {
   font-weight: 400;
   font-size: 0.78rem;
   letter-spacing: 0.04em;
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
 }
 
 .tui-options-list {
@@ -719,7 +719,7 @@ body {
   gap: 0.55rem;
   border: 1px solid transparent;
   background: transparent;
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
   width: 100%;
   text-align: left;
   font: inherit;
@@ -732,8 +732,8 @@ body {
   min-width: 1.5rem;
   padding: 0 0.25rem;
   text-align: center;
-  border: 1px solid rgba(88, 166, 255, 0.55);
-  color: #58a6ff;
+  border: 1px solid rgba(var(--tui-blue-rgb, 88, 166, 255), 0.55);
+  color: var(--tui-blue, #58a6ff);
   font-size: 0.85rem;
   line-height: 1.5;
 }
@@ -753,14 +753,14 @@ body {
 }
 
 .tui-option-preview {
-  color: #8b949e;
+  color: var(--tui-muted, #8b949e);
   font-size: 0.85rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
 .tui-option.selected .tui-option-preview {
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
 }
 
 /* Risk band tag (SAFE / TRADEOFF / RISKY) pinned to the right of a decision
@@ -782,7 +782,7 @@ body {
 /* Last Decision panel: a compact, persistent readout of the player's most
    recent call and its metric swing. */
 .tui-last-decision {
-  border-color: rgba(86, 212, 221, 0.5);
+  border-color: rgba(var(--tui-accent-rgb, 86, 212, 221), 0.5);
   flex: 0 0 auto;
 }
 
@@ -797,7 +797,7 @@ body {
   display: inline-block;
   min-width: 4.5rem;
   margin-right: 0.5rem;
-  color: #56d4dd;
+  color: var(--tui-accent, #56d4dd);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -805,7 +805,7 @@ body {
 }
 
 .tui-last-decision-choice {
-  color: #e6edf3;
+  color: var(--tui-bright, #e6edf3);
   font-weight: 600;
 }
 
@@ -818,7 +818,7 @@ body {
 }
 
 .tui-last-decision-effects {
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
 }
 
 /* Mission briefing: one-screen onboarding shown beside the first season's
@@ -828,13 +828,13 @@ body {
   flex-direction: column;
   gap: 0.4rem;
   padding: 0.7rem 0.8rem;
-  border: 1px solid rgba(86, 212, 221, 0.4);
+  border: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.4);
   border-left-width: 3px;
-  background: rgba(86, 212, 221, 0.06);
+  background: rgba(var(--tui-accent-rgb, 86, 212, 221), 0.06);
 }
 
 .tui-mission-title {
-  color: #56d4dd;
+  color: var(--tui-accent, #56d4dd);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -859,7 +859,7 @@ body {
 .tui-mission-val {
   flex: 1;
   min-width: 0;
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
   overflow-wrap: anywhere;
 }
 
@@ -877,10 +877,10 @@ body {
    the player reads before the four-question body. */
 .tui-card-headline {
   margin: 0;
-  color: #e6edf3;
+  color: var(--tui-bright, #e6edf3);
   font-weight: 600;
   line-height: 1.5;
-  border-left: 3px solid #d29922;
+  border-left: 3px solid var(--tui-warn, #d29922);
   padding: 0.1rem 0 0.1rem 0.6rem;
   overflow-wrap: anywhere;
 }
@@ -889,7 +889,7 @@ body {
 .tui-options-risk-help {
   margin: 0;
   padding: 0 0.75rem 0.7rem;
-  color: #7d8590;
+  color: var(--tui-muted, #7d8590);
   font-size: 0.78rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -914,13 +914,15 @@ body {
 .tui-trail-text {
   flex: 1;
   min-width: 0;
-  color: #c9d1d9;
+  color: var(--tui-text, #c9d1d9);
   font-size: 0.82rem;
   overflow-wrap: anywhere;
 }
 
+/* A four-meter swing is wider than the 28ch dashboard: it wraps inside the
+   row rather than running over the stage (and widening a phone's page). */
 .tui-trail-effect {
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 /* Mobile-only sticky metric strip. Hidden on desktop, where the dashboard is
@@ -930,28 +932,28 @@ body {
 }
 
 .tui-option:hover {
-  background: rgba(61, 90, 31, 0.18);
+  background: rgba(var(--tui-band-rgb, 61, 90, 31), 0.18);
 }
 
 /* Selection is keyboard *focus*, not a verdict. Use a neutral ring so the
    first (default-selected) option doesn't read as the "correct answer". */
 .tui-option.selected {
-  background: rgba(88, 166, 255, 0.08);
-  color: #e6edf3;
-  border-color: #56d4dd;
+  background: rgba(var(--tui-blue-rgb, 88, 166, 255), 0.08);
+  color: var(--tui-bright, #e6edf3);
+  border-color: var(--tui-accent, #56d4dd);
 }
 
 .tui-option.selected .tui-option-number {
-  border-color: #56d4dd;
-  color: #e6edf3;
+  border-color: var(--tui-accent, #56d4dd);
+  color: var(--tui-bright, #e6edf3);
 }
 
 .tui-overlay {
-  border-color: #3fb950;
+  border-color: var(--tui-ok, #3fb950);
 }
 
 .tui-overlay .tui-panel-title {
-  border-bottom-color: #3fb950;
+  border-bottom-color: var(--tui-ok, #3fb950);
 }
 
 .tui-terminal-footer {
@@ -960,8 +962,8 @@ body {
   gap: 0.35rem;
   min-height: 2.15rem;
   padding: 0 0.9rem;
-  color: #c9d1d9;
-  background: rgba(5, 8, 12, 0.96);
+  color: var(--tui-text, #c9d1d9);
+  background: rgba(var(--tui-bg-rgb, 5, 8, 12), 0.96);
   border-top: 1px solid rgba(255, 255, 255, 0.09);
   white-space: nowrap;
   overflow: hidden;
@@ -973,7 +975,7 @@ body {
   width: 0.62rem;
   height: 1.05rem;
   display: inline-block;
-  background: #3fb950;
+  background: var(--tui-ok, #3fb950);
   animation: cursor-blink 1s steps(1, end) infinite;
 }
 
@@ -1118,8 +1120,8 @@ body {
     top: 0;
     z-index: 5;
     padding: 0.5rem 0.7rem;
-    border: 1px solid rgba(86, 212, 221, 0.45);
-    background: rgba(8, 12, 17, 0.97);
+    border: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.45);
+    background: rgba(var(--tui-bg-rgb, 8, 12, 17), 0.97);
   }
 
   .tui-mobile-metric {
@@ -1129,7 +1131,7 @@ body {
   }
 
   .tui-mobile-metric-key {
-    color: #7d8590;
+    color: var(--tui-muted, #7d8590);
     font-size: 0.74rem;
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -1145,3 +1147,344 @@ body {
   }
 }
 
+
+/* ── Shortcut offers ────────────────────────────────────────────────────────
+   A legal and ethical call, set apart from operational cards: a danger banner,
+   the pitch, then its terms (what it pays, the odds, that no is free). */
+.tui-shortcut-card {
+  gap: 0.4rem;
+}
+
+.tui-shortcut-card .tui-copy {
+  line-height: 1.42;
+}
+
+.tui-shortcut-banner {
+  align-self: flex-start;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--tui-danger, #f85149);
+  border-left-width: 4px;
+  background: rgba(var(--tui-danger-rgb, 248, 81, 73), 0.12);
+  color: var(--tui-danger, #ff7b72);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+}
+
+.tui-card-headline.tui-shortcut-headline {
+  border-left-color: var(--tui-danger, #f85149);
+  color: var(--tui-danger, #ffa198);
+}
+
+.tui-shortcut-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(var(--tui-warn-rgb, 210, 153, 34), 0.55);
+  border-left-width: 3px;
+  background: rgba(var(--tui-warn-rgb, 210, 153, 34), 0.07);
+}
+
+.tui-shortcut-offer,
+.tui-shortcut-odds {
+  margin: 0;
+  line-height: 1.32;
+  overflow-wrap: anywhere;
+}
+
+.tui-shortcut-offer {
+  color: var(--tui-bright, #e6edf3);
+}
+
+.tui-shortcut-odds {
+  color: var(--tui-warn, #e3b341);
+  font-weight: 600;
+}
+
+.tui-shortcut-free {
+  color: var(--tui-ok, #3fb950);
+}
+
+/* Why the odds moved, under them and a size down: at the odds line's weight
+   a two-reason line wrapped to three and clipped the panel at 1280x720. */
+.tui-shortcut-reason {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--tui-warn, #e3b341);
+  overflow-wrap: anywhere;
+}
+
+.tui-odds-meter {
+  margin-right: 0.5rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.tui-option-band.band-positive {
+  color: var(--tui-ok, #56d364);
+}
+
+.tui-option-band.band-warning {
+  color: var(--tui-warn, #e3b341);
+}
+
+.tui-option-band.band-danger {
+  color: var(--tui-danger, #ff7b72);
+}
+
+/* "Because you took: …" under a fallout card's title. */
+.tui-provenance {
+  margin: 0;
+  padding: 0.3rem 0.6rem;
+  border-left: 3px solid var(--tui-warn, #d29922);
+  background: rgba(var(--tui-warn-rgb, 210, 153, 34), 0.08);
+  color: var(--tui-warn, #e3b341);
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* ── Panels: [S]tatus [G]lossary [L]og [P] Intel [?] help ──────────────── */
+.tui-header-panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tui-header-panel {
+  border: 1px solid rgba(var(--tui-accent-rgb, 86, 212, 221), 0.35);
+  background: transparent;
+  color: var(--tui-text, #c9d1d9);
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+}
+
+.tui-header-panel:hover,
+.tui-header-panel:focus-visible {
+  border-color: var(--tui-accent, #56d4dd);
+  color: var(--tui-bright, #e6edf3);
+}
+
+.tui-header-panel-key {
+  margin-right: 0.3rem;
+  color: var(--tui-accent, #56d4dd);
+}
+
+.tui-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(var(--tui-bg-rgb, 3, 6, 10), 0.72);
+}
+
+.tui-overlay-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: min(640px, calc(100vh - 2rem));
+  max-height: min(640px, calc(100dvh - 2rem));
+  background: rgba(var(--tui-bg-rgb, 10, 14, 20), 0.98);
+}
+
+.tui-overlay-panel:focus {
+  outline: none;
+}
+
+.tui-overlay-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tui-overlay-close {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.82rem;
+}
+
+.tui-overlay-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  overflow: auto;
+}
+
+.tui-overlay-search {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tui-overlay-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tui-overlay-entry-title {
+  color: var(--tui-bright, #e6edf3);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tui-overlay-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tui-overlay-key-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.tui-overlay-key {
+  flex: 0 0 7.5rem;
+  color: var(--tui-accent, #56d4dd);
+  font-weight: 700;
+}
+
+/* A laptop screen (1280×720 and similar) gives the stage its margin back, so
+   a whole decision card and its options fit without scrolling. */
+@media (min-width: 721px) and (max-height: 800px) {
+  .tui-app-shell {
+    padding: 0.5rem;
+  }
+
+  .tui-shell {
+    width: calc(100vw - 1rem);
+    height: calc(100vh - 1rem);
+    min-height: 0;
+  }
+
+  .tui-header {
+    padding: 0.3rem 0.8rem;
+  }
+
+  .tui-main {
+    padding: 0.55rem;
+    gap: 0.55rem;
+  }
+
+  .tui-stage {
+    gap: 0.45rem;
+  }
+
+  .tui-field-main {
+    padding: 0.55rem 0.7rem;
+  }
+
+  .tui-options-list {
+    gap: 0.2rem;
+    padding: 0.4rem 0.6rem 0.5rem;
+  }
+
+  .tui-option {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .tui-shortcut-card {
+    gap: 0.3rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .tui-header {
+    flex-wrap: wrap;
+  }
+
+  .tui-header-panels {
+    order: 3;
+    width: 100%;
+  }
+
+  .tui-header-panel {
+    flex: 1 1 auto;
+    min-height: 36px;
+  }
+
+  .tui-header-panel-key {
+    display: none;
+  }
+}
+
+/*
+ * Colour themes. The page reads the same Settings choice as the main site
+ * (js/theme.js puts it on body[data-theme]); TUI dark is the fallback in
+ * every var() above, so it needs no block of its own.
+ */
+body[data-theme='green'] {
+  --tui-bright: #8cff8c;
+  --tui-text: #4ddb4d;
+  --tui-muted: #3f9c3f;
+  --tui-accent: #2fe680;
+  --tui-ok: #52e685;
+  --tui-warn: #e6c14d;
+  --tui-danger: #f0554d;
+  --tui-blue: #2fe680;
+  --tui-bg-1: #0a120a;
+  --tui-bg-2: #050805;
+  --tui-bg-3: #0a120a;
+  --tui-accent-rgb: 47, 230, 128;
+  --tui-ok-rgb: 82, 230, 133;
+  --tui-warn-rgb: 230, 193, 77;
+  --tui-danger-rgb: 240, 85, 77;
+  --tui-blue-rgb: 47, 230, 128;
+  --tui-bg-rgb: 5, 8, 5;
+  --tui-band-rgb: 20, 60, 20;
+  --tui-bright-rgb: 140, 255, 140;
+}
+
+body[data-theme='amber'] {
+  --tui-bright: #ffd484;
+  --tui-text: #e6a23c;
+  --tui-muted: #b57e2c;
+  --tui-accent: #ffb347;
+  --tui-ok: #a8d94d;
+  --tui-warn: #ffd23d;
+  --tui-danger: #f0554d;
+  --tui-blue: #ffb347;
+  --tui-bg-1: #140d04;
+  --tui-bg-2: #0a0602;
+  --tui-bg-3: #140d04;
+  --tui-accent-rgb: 255, 179, 71;
+  --tui-ok-rgb: 168, 217, 77;
+  --tui-warn-rgb: 255, 210, 61;
+  --tui-danger-rgb: 240, 85, 77;
+  --tui-blue-rgb: 255, 179, 71;
+  --tui-bg-rgb: 10, 6, 2;
+  --tui-band-rgb: 70, 44, 10;
+  --tui-bright-rgb: 255, 212, 132;
+}
+
+body[data-theme='ice'] {
+  --tui-bright: #b3e2ff;
+  --tui-text: #6db8e0;
+  --tui-muted: #4e8cad;
+  --tui-accent: #47c2ff;
+  --tui-ok: #52e6a4;
+  --tui-warn: #e6c14d;
+  --tui-danger: #f0554d;
+  --tui-blue: #47c2ff;
+  --tui-bg-1: #0a1218;
+  --tui-bg-2: #04070a;
+  --tui-bg-3: #0a1218;
+  --tui-accent-rgb: 71, 194, 255;
+  --tui-ok-rgb: 82, 230, 164;
+  --tui-warn-rgb: 230, 193, 77;
+  --tui-danger-rgb: 240, 85, 77;
+  --tui-blue-rgb: 71, 194, 255;
+  --tui-bg-rgb: 4, 7, 10;
+  --tui-band-rgb: 16, 48, 68;
+  --tui-bright-rgb: 179, 226, 255;
+}

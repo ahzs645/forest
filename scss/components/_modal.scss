@@ -121,6 +121,11 @@
     color: var(--text-bright);
     font-weight: bold;
   }
+
+  // Destructive choices (delete a save) read as such and never lead the row.
+  &.danger:not(:hover, :focus-visible) {
+    color: var(--danger);
+  }
 }
 
 // Glossary modal list

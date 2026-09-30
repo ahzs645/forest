@@ -57,6 +57,26 @@ const PROTAGONIST_CALM = [
   () => 'A clean call. The kind you used to second-guess and now just make.',
 ];
 
+// After a call that went badly the inner voice does not congratulate itself.
+const PROTAGONIST_SETBACK = [
+  () => 'You write down what happened, and what you would do differently. The second list is longer.',
+  () => 'You move the folder back to the top of the pile. It will be there tomorrow.',
+  () => 'Not the call you hoped it would be. You note it in the file and keep going.',
+];
+
+// After a shortcut: nobody in the world praises it, including you.
+const PROTAGONIST_COMPROMISED = [
+  () => 'You close the file faster than usual and do not read it back.',
+  () => 'You tell yourself everyone does it. You do not write that down either.',
+  () => 'The coffee goes cold. You do not go back and reread what you agreed to.',
+];
+
+const CEO_COMPROMISED = [
+  (name) => `${name} reads it twice and asks, carefully, whether legal has seen it.`,
+  (name) => `${name} puts nothing about it in writing, which is its own kind of memo.`,
+  (name) => `${name}: "I did not hear this from you. I would rather not hear it at all."`,
+];
+
 const PROTAGONIST_STRESSED = [
   () => 'You write the decision down twice — once for the file, once to convince yourself.',
   () => 'The inbox refills as you watch. One file at a time. One file at a time.',
@@ -83,14 +103,20 @@ function pick(deck, rng) {
  * @param {Object} journey - Journey state
  * @param {Object} option - The chosen option (reserved for tone hooks)
  * @param {Function} rng - random source, injectable for tests
+ * @param {Object} [context]
+ * @param {string} [context.band] - the resolved outcome band (good/partial/bad)
  * @returns {string|null}
  */
-export function buildEventReaction(journey, option, rng = Math.random) {
+export function buildEventReaction(journey, option, rng = Math.random, { band } = {}) {
+  if (option?.reactionTone === 'silent') return null;
   if (rng() > 0.45) return null;
+  const compromised = option?.reactionTone === 'compromised';
 
   // Manager: CEO speaks half the time, crew otherwise
   if (journey.journeyType === 'manager' && journey.ceo && rng() < 0.5) {
-    const deck = journey.ceo.decision_making_style === 'conservative' ? CEO_CONSERVATIVE : CEO_BOLD;
+    const deck = compromised
+      ? CEO_COMPROMISED
+      : journey.ceo.decision_making_style === 'conservative' ? CEO_CONSERVATIVE : CEO_BOLD;
     return pick(deck, rng)(journey.ceo.name);
   }
 
@@ -115,7 +141,14 @@ export function buildEventReaction(journey, option, rng = Math.random) {
 
   // Protagonist modes (planning/permitting): inner voice by stress
   if (journey.protagonist) {
-    const deck = (journey.protagonist.stress ?? 0) >= 60 ? PROTAGONIST_STRESSED : PROTAGONIST_CALM;
+    // A run that just ended gets no coda: the next thing on screen is the
+    // hand-over, not "future-you will appreciate the paper trail".
+    if (typeof journey.resources?.politicalCapital === 'number' && journey.resources.politicalCapital <= 0) return null;
+    const deck = compromised
+      ? PROTAGONIST_COMPROMISED
+      : band === 'bad' || band === 'partial'
+        ? PROTAGONIST_SETBACK
+      : (journey.protagonist.stress ?? 0) >= 60 ? PROTAGONIST_STRESSED : PROTAGONIST_CALM;
     return pick(deck, rng)();
   }
 

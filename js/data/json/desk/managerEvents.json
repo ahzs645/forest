@@ -11,7 +11,7 @@
     "options": [
       {
         "label": "Curtail with the mill and park the crews",
-        "outcome": "Logging stops on the mainline blocks. The contractors send crews home on standby rates and the deck inventory stays sane. Next month's delivery will be thin, and everybody knows it.",
+        "outcome": "Logging stops on the mainline blocks. The contractors send crews home on standby rates and the deck inventory stays sane. This month's deliveries will be thin, and everybody knows it.",
         "effects": { "progress": -6, "crew_morale": -4, "budget": -35000 }
       },
       {

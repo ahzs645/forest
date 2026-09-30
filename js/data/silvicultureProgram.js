@@ -28,12 +28,45 @@ export const SUPERVISOR_OVERHEAD_PER_DAY = 550;
 
 /** Contractor economics the roster and the ledger print. */
 export const BRUSH_RATES = {
-  manual: 900,      // $/ha, saw crews
+  manual: 900,      // $/ha, saw crews brushing the whole opening
+  cylinder: 560,    // $/ha, saw crews clearing a ring round each crop tree
   glyphosate: 350,  // $/ha, backpack or aerial under the PMP
   sheep: 450,       // $/ha, herder contract where the ground allows it
 };
+
+/**
+ * Hectares the brushing outfit treats in a good day, before productivity,
+ * site fit and the season. Four saw crews of six brush a little over a
+ * hectare a cutter on a broadcast release; a cylinder release walks every
+ * crop tree, so it covers less ground for less money; a helicopter covers
+ * the most; a band of sheep grazes slowly.
+ */
+export const BRUSH_DAILY_HA = {
+  manual: 30,
+  cylinder: 24,
+  glyphosate: 80,
+  sheep: 18,
+};
 export const FILL_PRICE_PREMIUM = 0.06; // $/tree over the block price for fill work
 export const SURVEY_DAY_RATE = 1800;     // $/day, accredited survey contractor
+
+/**
+ * The free-growing list carries one more opening than the year must declare:
+ * not every stand reads free-growing when the surveyor walks it, and a stand
+ * that fails waits out its resurvey interval rather than going back on the
+ * list the next morning.
+ */
+export const FG_SPARE_CANDIDATES = 1;
+
+/** A stand that fails free-growing is prescribed treatment and resurveyed later. */
+export const FG_RESURVEY_YEARS = 2;
+
+/**
+ * Days before a released stand reads as released to a surveyor. Cut brush is
+ * down the day after the saws; grazed brush needs the flock to come back
+ * through; sprayed brush stands green for weeks before it browns out.
+ */
+export const RELEASE_TAKES_DAYS = { manual: 1, cylinder: 1, sheep: 3, glyphosate: 10 };
 
 function rand(min, max) {
   return min + Math.random() * (max - min);
@@ -90,6 +123,7 @@ export function buildSilvicultureProgram(journey) {
   const seedlingsAllocated = Math.max(1000, Number(journey?.planting?.seedlingsAllocated) || 0);
   const brushTarget = Math.max(10, Number(journey?.brushing?.hectaresTarget) || 0);
   const fgTarget = Math.max(1, Number(journey?.surveys?.freeGrowingTarget) || 1);
+  const fgCandidates = fgTarget + FG_SPARE_CANDIDATES;
   const campaign = blocksToPlant <= 4;
 
   let nextNumber = 20 + Math.floor(Math.random() * 6);
@@ -110,6 +144,7 @@ export function buildSilvicultureProgram(journey) {
     status: 'pending',      // pending -> planting -> planted -> inspected
     quality: null,
     holdback: 0,
+    plantedDay: null,
     inspectedDay: null,
   }));
 
@@ -131,12 +166,13 @@ export function buildSilvicultureProgram(journey) {
     });
   }
 
-  // Free-growing candidates: 8–15 year old openings. One of them is still
-  // under brush and has to be released before the surveyor will pass it.
+  // Free-growing candidates: 8–15 year old openings, one more than the year
+  // must declare. One of them is still under brush and has to be released
+  // before the surveyor will pass it.
   const [fgMin, fgMax] = standard.fgWindow;
   const freeGrowing = [];
-  const releaseIndex = Math.floor(Math.random() * fgTarget);
-  for (let i = 0; i < fgTarget; i += 1) {
+  const releaseIndex = Math.floor(Math.random() * fgCandidates);
+  for (let i = 0; i < fgCandidates; i += 1) {
     const age = Math.round(rand(fgMin, fgMax));
     const needsRelease = i === releaseIndex;
     freeGrowing.push({
@@ -146,12 +182,15 @@ export function buildSilvicultureProgram(journey) {
       wellSpacedSph: Math.round(standard.mss * rand(1.15, 1.95)),
       // The stand's real condition: share of plots that would read
       // free-growing today. Under brush it fails on competition.
-      fgPlotPct: needsRelease ? Math.round(rand(46, 66)) : Math.round(rand(82, 96)),
+      fgPlotPct: needsRelease ? Math.round(rand(46, 66)) : Math.round(rand(84, 96)),
       needsRelease,
       released: false,
+      releasedDay: null,
       surveyed: false,
       result: null,
       attempts: 0,
+      // Program year the stand can next be surveyed after a failed survey.
+      resurveyYear: null,
     });
   }
 
@@ -162,6 +201,9 @@ export function buildSilvicultureProgram(journey) {
   const brushCount = campaign ? 3 : 6;
   const releaseHa = releaseCandidate ? Math.min(releaseCandidate.ha, Math.round(brushTarget * 0.25)) : 0;
   if (releaseCandidate) {
+    // The whole opening is released, so the survey and the release queue
+    // name the same stand at the same size.
+    releaseCandidate.ha = releaseHa;
     brush.push({
       id: releaseCandidate.id,
       year: releaseCandidate.year,
@@ -191,24 +233,36 @@ export function buildSilvicultureProgram(journey) {
     fill,
     brush,
     freeGrowing,
+    // What the program started with, so the grade can read what it cost.
+    budgetStart: Number(journey?.resources?.budget) || null,
     // Free-form notes the mode appends to (spray maps, replant orders).
     notes: [],
   };
 }
 
+// Local outfits by zone: planters, brushers, surveyors. Northern Interior
+// names on the coast or in the southern valleys read as the wrong province.
+const CONTRACTOR_NAMES_BY_ZONE = {
+  CWH: ['Salal Coast Planting', 'Alder Flats Brushing', 'Tidewater Regen Surveys'],
+  ICH: ['Cedar Draw Planters', 'Wetbelt Brushing Co', 'Columbia Regen Surveys'],
+  IDF: ['Benchland Planters', 'Bunchgrass Vegetation Management', 'Drybelt Regen Surveys'],
+};
+const DEFAULT_CONTRACTOR_NAMES = ['Mountain Pine Planters', 'Northern Regen Co', 'Boreal Silviculture'];
+
 /**
  * Contractor roster with real economics. Three outfits: production planters
  * paid per tree with a holdback, a brushing outfit with saw crews and a PMP
  * applicator ticket, and an accredited survey contractor on a day rate.
- * @param {string} becCode - sets the per-tree price band
+ * @param {string} becCode - sets the per-tree price band and the local outfits
  */
 export function generateSilvicultureContractors(becCode) {
   const standard = getStockingStandard(becCode);
   const basePrice = standard.pricePerTree;
+  const names = CONTRACTOR_NAMES_BY_ZONE[standard.zone] || DEFAULT_CONTRACTOR_NAMES;
   return [
     {
       id: 'contractor_1',
-      name: 'Mountain Pine Planters',
+      name: names[0],
       productivity: 80 + Math.floor(Math.random() * 20),
       morale: 70 + Math.floor(Math.random() * 20),
       crewSize: 12,
@@ -222,11 +276,11 @@ export function generateSilvicultureContractors(becCode) {
     },
     {
       id: 'contractor_2',
-      name: 'Northern Regen Co',
+      name: names[1],
       productivity: 80 + Math.floor(Math.random() * 20),
       morale: 70 + Math.floor(Math.random() * 20),
-      crewSize: 18,
-      sawCrews: 3,
+      crewSize: 24,
+      sawCrews: 4,
       specialty: 'brushing',
       ratePerHa: BRUSH_RATES.manual,
       herbicideRatePerHa: BRUSH_RATES.glyphosate,
@@ -235,7 +289,7 @@ export function generateSilvicultureContractors(becCode) {
     },
     {
       id: 'contractor_3',
-      name: 'Boreal Silviculture',
+      name: names[2],
       productivity: 80 + Math.floor(Math.random() * 20),
       morale: 70 + Math.floor(Math.random() * 20),
       crewSize: 4,
@@ -262,7 +316,7 @@ export function ensureContractorEconomics(contractor, becCode) {
   } else if (specialty === 'brushing') {
     contractor.ratePerHa ??= BRUSH_RATES.manual;
     contractor.herbicideRatePerHa ??= BRUSH_RATES.glyphosate;
-    contractor.sawCrews ??= 3;
+    contractor.sawCrews ??= 4;
     contractor.certs ??= ['saw', 'OFA3', 'PMP-applicator'];
   } else {
     contractor.dayRate ??= SURVEY_DAY_RATE;
@@ -311,4 +365,159 @@ export function summarizeProgram(program) {
     fgDone: fg.filter((opening) => opening.surveyed && opening.result === 'pass').length,
     fgTotal: fg.length,
   };
+}
+
+/**
+ * Whether a free-growing candidate can go in front of a surveyor today: not
+ * already declared, not waiting out a resurvey interval, and not under brush
+ * or under a release treatment that has not taken yet.
+ * @param {Object} opening - free-growing candidate
+ * @param {Object} [context] - { year, day } of the program today
+ */
+export function isFreeGrowingSurveyable(opening, { year = PROGRAM_YEAR, day = 1 } = {}) {
+  if (!opening) return false;
+  if (opening.surveyed && opening.result === 'pass') return false;
+  if (Number.isFinite(opening.resurveyYear) && opening.resurveyYear > year) return false;
+  if (!opening.needsRelease) return true;
+  if (!opening.released) return false;
+  return !Number.isFinite(opening.releaseReadyDay) || day >= opening.releaseReadyDay;
+}
+
+/** Trees a planting crew puts in on a normal day, for the cost estimate. */
+const ESTIMATE_TREES_PER_DAY = 14000;
+
+/**
+ * What the rest of the program will cost, and what the release queue still
+ * open costs by each method: the sums a supervisor runs before deciding how
+ * to release the older stands. Everything but the release is committed -
+ * planting and fill at the contract price, holdbacks still owed, the
+ * declarations still to survey, and overhead for the days that work takes.
+ * @param {Object} journey - silviculture journey
+ * @returns {{budget: number, committed: number, releaseHa: number, release: Object<string, number>, freeForRelease: number}}
+ */
+export function estimateProgramCosts(journey) {
+  const program = journey?.program || {};
+  const standard = getStockingStandard(program.becCode || journey?.area?.becCode);
+  const contractors = Array.isArray(journey?.contractors) ? journey.contractors : [];
+  const planters = contractors.find((contractor) => contractor.specialty === 'planting');
+  const surveyors = contractors.find((contractor) => contractor.specialty === 'survey');
+  const price = Number(planters?.pricePerTree) || standard.pricePerTree;
+  const blocks = Array.isArray(program.blocks) ? program.blocks : [];
+
+  const treesLeft = Math.max(0, (Number(journey?.planting?.seedlingsAllocated) || 0) - (Number(journey?.planting?.seedlingsPlanted) || 0));
+  const fillOpen = (program.fill || []).filter((opening) => !opening.done);
+  const fillTrees = fillOpen.reduce((sum, opening) => sum + (Number(opening.trees) || 0), 0);
+  const holdbacksOwed = blocks.reduce((sum, block) => sum + (Number(block.holdback) || 0), 0);
+  const surveysLeft = Math.max(0, (Number(journey?.surveys?.freeGrowingTarget) || 0) - (Number(journey?.surveys?.freeGrowingComplete) || 0));
+  const releaseHa = (program.brush || []).reduce((sum, opening) => sum + Math.max(0, (Number(opening.ha) || 0) - (Number(opening.treated) || 0)), 0);
+  const workDays = Math.ceil(treesLeft / ESTIMATE_TREES_PER_DAY)
+    + blocks.filter((block) => block.status !== 'inspected').length
+    + fillOpen.length
+    + surveysLeft
+    + Math.ceil(releaseHa / BRUSH_DAILY_HA.manual);
+
+  const committed = Math.round(treesLeft * price
+    + fillTrees * (price + FILL_PRICE_PREMIUM)
+    + holdbacksOwed
+    + surveysLeft * (Number(surveyors?.dayRate) || SURVEY_DAY_RATE)
+    + workDays * SUPERVISOR_OVERHEAD_PER_DAY);
+  const release = Object.fromEntries(Object.entries(BRUSH_RATES)
+    .map(([method, rate]) => [method, Math.round(releaseHa * rate)]));
+  const budget = Math.round(Number(journey?.resources?.budget) || 0);
+  return { budget, committed, releaseHa, release, freeForRelease: budget - committed };
+}
+
+/** Share of the stocking component a planting-quality average earns. */
+function qualityShare(quality) {
+  if (!Number.isFinite(quality)) return 0;
+  if (quality >= 90) return 1;
+  if (quality >= 85) return 0.5 + (quality - 85) / 10;
+  if (quality >= 80) return (quality - 80) / 10;
+  return 0;
+}
+
+/**
+ * Weights of each track in what "the program delivered" means. The year's
+ * planting carries the most, but fill, release and the declarations are each
+ * obligations on the licensee, and the plot cards say how well the trees
+ * went in.
+ */
+export const PROGRAM_TRACK_WEIGHTS = {
+  planting: 0.25,
+  inspection: 0.10,
+  fill: 0.15,
+  release: 0.20,
+  freeGrowing: 0.20,
+  stocking: 0.10,
+};
+
+/**
+ * Read the whole program against its obligations. This is the one
+ * definition of "delivered" that the win condition, the grade and the
+ * progress meter share.
+ * @param {Object} journey - silviculture journey
+ * @returns {{complete: boolean, delivered: number, parts: Object, shortfalls: string[], label: string}}
+ */
+export function assessSilvicultureProgram(journey) {
+  const program = journey?.program || {};
+  const planting = journey?.planting || {};
+  const surveys = journey?.surveys || {};
+  const brushing = journey?.brushing || {};
+  const blocks = Array.isArray(program.blocks) ? program.blocks : [];
+  const blocksToPlant = Math.max(1, Number(planting.blocksToPlant) || blocks.length || 1);
+  const blocksPlanted = Math.min(blocksToPlant, Number(planting.blocksPlanted) || 0);
+  const inspected = blocks.length
+    ? Math.min(blocksToPlant, blocks.filter((block) => block.status === 'inspected').length)
+    : blocksPlanted;
+
+  const fill = Array.isArray(program.fill) ? program.fill : [];
+  const fillTotal = fill.length || Number(planting.fillTarget) || 0;
+  const fillDone = fill.length
+    ? fill.filter((opening) => opening.done).length
+    : Math.min(fillTotal, Number(planting.fillComplete) || 0);
+
+  const brush = Array.isArray(program.brush) ? program.brush : [];
+  const releaseTotal = brush.length
+    ? brush.reduce((sum, opening) => sum + (Number(opening.ha) || 0), 0)
+    : Number(brushing.hectaresTarget) || 0;
+  const releaseDone = brush.length
+    ? brush.reduce((sum, opening) => sum + Math.min(Number(opening.ha) || 0, Number(opening.treated) || 0), 0)
+    : Math.min(releaseTotal, Number(brushing.hectaresComplete) || 0);
+  const releaseOpen = brush.filter((opening) => (Number(opening.treated) || 0) < (Number(opening.ha) || 0)).length;
+
+  const fgTarget = Math.max(1, Number(surveys.freeGrowingTarget) || 1);
+  const fgDone = Math.min(fgTarget, Number(surveys.freeGrowingComplete) || 0);
+  const quality = Number.isFinite(planting.qualityAverage) ? planting.qualityAverage : null;
+
+  const parts = {
+    planting: blocksPlanted / blocksToPlant,
+    inspection: inspected / blocksToPlant,
+    fill: fillTotal ? fillDone / fillTotal : 1,
+    release: releaseTotal ? Math.min(1, releaseDone / releaseTotal) : 1,
+    freeGrowing: fgDone / fgTarget,
+    stocking: qualityShare(quality) * (inspected / blocksToPlant),
+  };
+  const delivered = Object.entries(PROGRAM_TRACK_WEIGHTS)
+    .reduce((sum, [track, weight]) => sum + (parts[track] || 0) * weight, 0);
+
+  const shortfalls = [];
+  if (blocksPlanted < blocksToPlant) shortfalls.push(`${blocksToPlant - blocksPlanted} of ${blocksToPlant} blocks unplanted`);
+  else if (inspected < blocksToPlant) shortfalls.push(`${blocksToPlant - inspected} planted block${blocksToPlant - inspected === 1 ? '' : 's'} never inspected`);
+  if (fillDone < fillTotal) shortfalls.push(`fill ${fillDone}/${fillTotal}`);
+  // Floored, so an open stand never reads as "release 100%".
+  if (releaseOpen > 0 || releaseDone < releaseTotal) shortfalls.push(`release ${Math.floor(parts.release * 100)}% of ${Math.round(releaseTotal)} ha`);
+  if (fgDone < fgTarget) shortfalls.push(`free-growing ${fgDone}/${fgTarget}`);
+
+  const complete = blocksPlanted >= blocksToPlant
+    && inspected >= blocksToPlant
+    && fillDone >= fillTotal
+    && releaseOpen === 0
+    && releaseDone >= releaseTotal
+    && fgDone >= fgTarget;
+
+  const label = `${blocksPlanted}/${blocksToPlant} planted (${inspected} inspected), fill ${fillDone}/${fillTotal}, `
+    + `release ${Math.round(parts.release * 100)}%, FG ${fgDone}/${fgTarget}`
+    + (quality !== null ? `, quality ${quality}%` : '');
+
+  return { complete, delivered, parts, shortfalls, label };
 }

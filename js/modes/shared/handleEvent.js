@@ -13,12 +13,7 @@ import { formatEventForDisplay, resolveEvent } from '../../events.js';
 import { crewHasRole } from '../../crew.js';
 import { presentDayCard, buildEventCardContent } from '../../journey/dayCard.js';
 import { optionSpendsDay } from '../../events/timePolicy.js';
-
-function formatRoleName(roleId) {
-  if (!roleId) return 'specialist';
-  const formatted = roleId.replace(/[_-]+/g, ' ').trim();
-  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
-}
+import { getOptionShortfall, formatShortfall } from '../../events/affordability.js';
 
 /**
  * Present an event, gather the player's decision, and resolve it.
@@ -28,6 +23,8 @@ function formatRoleName(roleId) {
  * @param {string} [frame.dayHeader] - "SHIFT 6 - HIGHWAY CAMP"
  * @param {string} [frame.statusLine] - the day's drumbeat line
  * @param {string[]} [frame.context] - free background behind "More context"
+ * @param {Function} [frame.onResolved] - called once the chosen option's
+ *   effects are applied, before the outcome is acknowledged
  * @param {Array} [frame.extraOptions] - mode-supplied ways out of the situation
  *   that are not authored event options (recon's "leave it and keep moving").
  *   Their values must not be numbers, which is how they are told apart from
@@ -37,7 +34,7 @@ function formatRoleName(roleId) {
  */
 export async function handleEvent(game, event, frame = {}) {
   const { ui, journey } = game;
-  const formatted = formatEventForDisplay(event, journey.journeyType);
+  const formatted = formatEventForDisplay(event, journey.journeyType, journey);
 
   const hasCrew = Array.isArray(journey.crew) && journey.crew.length > 0;
 
@@ -52,15 +49,27 @@ export async function handleEvent(game, event, frame = {}) {
     raw: event.options[index] || {},
     index
   }));
-  const actionable = entries.filter(({ raw }) => !isUnavailable(raw));
+  // An option the crew cannot pay for is left off too, but the card says so:
+  // unlike a missing specialist, the player may want to know what cash buys.
+  const staffed = entries.filter(({ raw }) => !isUnavailable(raw));
+  const actionable = staffed.filter(({ raw }) => !getOptionShortfall(journey, raw));
   // Defensive: no event ships with every option gated, but never leave the
   // player with zero choices if one somehow did.
   const usable = actionable.length ? actionable : entries;
+  const unpaid = actionable.length
+    ? staffed
+      .filter(({ raw }) => getOptionShortfall(journey, raw))
+      .map(({ opt, raw }) => formatShortfall(opt.label, getOptionShortfall(journey, raw)))
+    : [];
 
   const content = buildEventCardContent(formatted, event, usable);
   const card = {
     ...content,
-    label: journey.journeyType === 'manager' && event.reporter ? 'OPS ESCALATION' : content.label,
+    notes: unpaid,
+    // A planner or permitter has no radio: the day's situation lands on the desk.
+    label: journey.journeyType === 'manager' && event.reporter ? 'OPS ESCALATION'
+      : ['planning', 'permitting'].includes(journey.journeyType) && !event.cardLabel ? 'ON YOUR DESK'
+        : content.label,
     options: [...content.options, ...(frame.extraOptions || [])],
     dayHeader: frame.dayHeader || null,
     statusLine: frame.statusLine || null,
@@ -87,7 +96,10 @@ export async function handleEvent(game, event, frame = {}) {
   const result = resolveEvent(journey, event, selectedOption);
   // The outcome acknowledgement is still inside the current decision. Saving
   // its effects here would replay them on reload (or repeat a manager's
-  // strategic spending). The runner saves after finishing the decision or day.
+  // strategic spending). The runner saves after finishing the decision or day;
+  // a runner that can resume past the situation checkpoints here instead, so
+  // a reload cannot take the choice back once its outcome is known.
+  frame.onResolved?.({ spendsDay, setAside: false });
   ui.updateAllStatus?.(journey);
   frame.onRender?.();
 
@@ -107,9 +119,11 @@ export async function handleEvent(game, event, frame = {}) {
   // the very consequence that makes this decision meaningful.
   await ui.promptChoice('', [{
     label: 'Acknowledge outcome and continue',
-    description: spendsDay
-      ? 'Close the outcome and move to day closeout'
-      : 'Return to the day after reviewing the result',
+    description: journey.journeyType === 'manager'
+      ? 'Back to the month'
+      : (spendsDay || event.heldInCamp)
+        ? 'Close the outcome and move to day closeout'
+        : 'Return to the day after reviewing the result',
     value: 'continue'
   }]);
 

@@ -142,6 +142,33 @@ function uniqueHistoryIds(history, type) {
 }
 
 /**
+ * Scramble a seed before it starts an LCG stream. Neighbouring seeds fed
+ * straight in start on nearly the same stream: a 1000-1049 sweep opened
+ * every year on the same first draw, and the random policy took the first
+ * option most of the time on some seeds and rarely on others, so "random"
+ * measured whichever seed block a report happened to use. (murmur3 fmix32)
+ */
+export function mixSeed(seed) {
+  let h = Number(seed) >>> 0;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+/** FNV-1a over a string, for keying a stream on more than a number. */
+function hashString(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/**
  * Run one deterministic seasonal year and return a flat, report-friendly record.
  */
 export function simulateRun({ roleId, areaId, strategy = "balanced", seed = 1, companyName = "Sim Co" }) {
@@ -149,10 +176,14 @@ export function simulateRun({ roleId, areaId, strategy = "balanced", seed = 1, c
     throw new Error(`Unknown strategy: ${strategy}`);
   }
 
-  const rng = makeRng(seed);
+  const rng = makeRng(mixSeed(seed));
   // Independent stream for the policy's own randomness (random strategy,
-  // tie-breaks) so content draws and decisions never perturb each other.
-  const strategyRng = makeRng(((Number(seed) >>> 0) ^ 0x9e3779b9) >>> 0);
+  // tie-breaks) so content draws and decisions never perturb each other. It is
+  // keyed on the role and area too: with one stream per seed, every role and
+  // area replayed the same run of picks, so a seed that drew mostly third
+  // options stumbled in all 36 combos and a 50-seed "random" sweep was really
+  // 50 samples, not 1,800.
+  const strategyRng = makeRng(mixSeed(hashString(`${roleId}|${areaId}|${seed}`) ^ 0x9e3779b9));
   const controller = new TuiGameController({ rng, onExit: () => {} });
 
   controller.setInputText(companyName);
@@ -189,7 +220,32 @@ export function simulateRun({ roleId, areaId, strategy = "balanced", seed = 1, c
     consequences: uniqueHistoryIds(gs.history, "consequence"),
     seasonHeadlines: (gs.seasonTimeline || []).map((entry) => entry.headline).filter(Boolean),
     issuesSeen: uniqueHistoryIds(gs.history, "issue"),
+    eventsSeen: uniqueHistoryIds(gs.history, "event"),
+    ...describeDealing(gs.history),
     completed: view.mode === "end",
+  };
+}
+
+/** How the year was dealt: issue ids per round, and any card dealt twice. */
+function describeDealing(history = []) {
+  const issuesByRound = {};
+  const counts = { issue: new Map(), event: new Map() };
+  const scheduledIssues = new Set();
+  for (const entry of history) {
+    if (entry?.type !== "issue" && entry?.type !== "event") continue;
+    const seen = counts[entry.type];
+    seen.set(entry.id, (seen.get(entry.id) || 0) + 1);
+    if (entry.type === "issue") {
+      (issuesByRound[entry.round] ||= []).push(entry.id);
+      if (entry.scheduled) scheduledIssues.add(entry.id);
+    }
+  }
+  const repeated = (map) => [...map].filter(([, count]) => count > 1).map(([id]) => id);
+  return {
+    issuesByRound,
+    repeatedIssues: repeated(counts.issue),
+    repeatedEvents: repeated(counts.event),
+    scheduledIssues: [...scheduledIssues],
   };
 }
 

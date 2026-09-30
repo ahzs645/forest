@@ -5867,6 +5867,4173 @@
           "summary": "Planned cutblock in Coast Mountains Natural Resource District | 2.3 ha | species HM/HW | proj. age 27 | WHA no-harvest nearby"
         }
       ]
+    },
+    "vancouver-island-coast": {
+      "id": "vancouver-island-coast",
+      "name": "Vancouver Island Coast",
+      "bbox4326": [
+        -125.4,
+        48.95,
+        -124,
+        49.55
+      ],
+      "communities": [
+        "Port Alberni",
+        "Nanaimo"
+      ],
+      "options": [
+        {
+          "id": "fta-1634234",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 923 44/923 153222",
+          "mapLabel": "TFL44 923 44/923 153222",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "153222",
+          "openingId": 1804758,
+          "timberMark": "44/923",
+          "areaHa": 5.4,
+          "plannedHarvestDate": "2029-01-01",
+          "plannedHarvestYear": 2029,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.135482,
+            "lat": 49.162617
+          },
+          "indicators": {
+            "ogmaNearby": true,
+            "whaNoHarvestNearby": true,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 50,
+            "speciesCd2": "CW",
+            "speciesPct2": 40,
+            "projectedAge": 331,
+            "quadDiam125": 39.206,
+            "quadDiam175": 40.667,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 30.159999999999997,
+            "biodiversitySensitivity": 98,
+            "firstNationsSensitivity": 22,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": -5,
+            "timberSupply": -2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.129,
+            "compliance": 1.724,
+            "technical": 1.125,
+            "political": 1.066,
+            "policy": 1.429,
+            "issue": 1.427
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 5.4 ha | species HW/CW | proj. age 331 | OGMA nearby | WHA no-harvest nearby | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1625466",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 926 TAJULA 973127",
+          "mapLabel": "TFL44 926 TAJULA 973127",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "973127",
+          "openingId": 1794937,
+          "timberMark": "TAJULA",
+          "areaHa": 4.2,
+          "plannedHarvestDate": "2029-01-01",
+          "plannedHarvestYear": 2029,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.775325,
+            "lat": 48.9546
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 50,
+            "speciesCd2": "BA",
+            "speciesPct2": 40,
+            "projectedAge": 331,
+            "quadDiam125": 40.406,
+            "quadDiam175": 41.712,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 51.68,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.2,
+            "technical": 1.092,
+            "political": 1.149,
+            "policy": 1.171,
+            "issue": 1.193
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 4.2 ha | species HW/BA | proj. age 331"
+        },
+        {
+          "id": "fta-1625467",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 926 44/926 973127",
+          "mapLabel": "TFL44 926 44/926 973127",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "973127",
+          "openingId": 1794937,
+          "timberMark": "44/926",
+          "areaHa": 1.2,
+          "plannedHarvestDate": "2029-01-01",
+          "plannedHarvestYear": 2029,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.775544,
+            "lat": 48.955085
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 50,
+            "speciesCd2": "BA",
+            "speciesPct2": 40,
+            "projectedAge": 331,
+            "quadDiam125": 40.406,
+            "quadDiam175": 41.712,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 50.480000000000004,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.2,
+            "technical": 1.092,
+            "political": 1.144,
+            "policy": 1.171,
+            "issue": 1.193
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 1.2 ha | species HW/BA | proj. age 331"
+        },
+        {
+          "id": "fta-1664745",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 939 44/939 964425",
+          "mapLabel": "TFL44 939 44/939 964425",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "964425",
+          "openingId": null,
+          "timberMark": "44/939",
+          "areaHa": 14,
+          "plannedHarvestDate": "2027-10-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.833929,
+            "lat": 48.986477
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 90,
+            "speciesCd2": "HW",
+            "speciesPct2": 10,
+            "projectedAge": 2,
+            "quadDiam125": 0,
+            "quadDiam175": 0,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 47.6,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.133,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 14 ha | species FDC/HW | proj. age 2"
+        },
+        {
+          "id": "fta-1655850",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2899  A2899 F015C3T0",
+          "mapLabel": "TA2899  A2899 F015C3T0",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "F015C3T0",
+          "openingId": null,
+          "timberMark": "A2899",
+          "areaHa": 28.4,
+          "plannedHarvestDate": "2027-06-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.058607,
+            "lat": 49.161404
+          },
+          "indicators": {
+            "ogmaNearby": true,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 55,
+            "speciesCd2": "CW",
+            "speciesPct2": 25,
+            "projectedAge": 203,
+            "quadDiam125": 62.671,
+            "quadDiam175": 62.772,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 51.36,
+            "biodiversitySensitivity": 81,
+            "firstNationsSensitivity": 22,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": -4,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.129,
+            "compliance": 1.63,
+            "technical": 1.125,
+            "political": 1.148,
+            "policy": 1.368,
+            "issue": 1.37
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 28.4 ha | species HW/CW | proj. age 203 | OGMA nearby | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1663755",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 779 44/779 974415",
+          "mapLabel": "TFL44 779 44/779 974415",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "974415",
+          "openingId": null,
+          "timberMark": "44/779",
+          "areaHa": 19.9,
+          "plannedHarvestDate": "2027-06-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.614316,
+            "lat": 48.99119
+          },
+          "indicators": {
+            "ogmaNearby": true,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 55,
+            "speciesCd2": "BA",
+            "speciesPct2": 45,
+            "projectedAge": 171,
+            "quadDiam125": 55.928,
+            "quadDiam175": 56.164,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 47.96,
+            "biodiversitySensitivity": 81,
+            "firstNationsSensitivity": 22,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": -4,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.129,
+            "compliance": 1.63,
+            "technical": 1.125,
+            "political": 1.134,
+            "policy": 1.368,
+            "issue": 1.37
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 19.9 ha | species HW/BA | proj. age 171 | OGMA nearby | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1664742",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 939 44/939 964410",
+          "mapLabel": "TFL44 939 44/939 964410",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "964410",
+          "openingId": null,
+          "timberMark": "44/939",
+          "areaHa": 9.8,
+          "plannedHarvestDate": "2027-06-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.828963,
+            "lat": 48.991201
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 90,
+            "speciesCd2": "HW",
+            "speciesPct2": 10,
+            "projectedAge": 2,
+            "quadDiam125": 0,
+            "quadDiam175": 0,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 45.92,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.127,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 9.8 ha | species FDC/HW | proj. age 2"
+        },
+        {
+          "id": "fta-1663756",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 779 TALWAB 974415",
+          "mapLabel": "TFL44 779 TALWAB 974415",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "974415",
+          "openingId": null,
+          "timberMark": "TALWAB",
+          "areaHa": 2.8,
+          "plannedHarvestDate": "2027-06-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.609296,
+            "lat": 48.989799
+          },
+          "indicators": {
+            "ogmaNearby": true,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 60,
+            "speciesCd2": "BA",
+            "speciesPct2": 25,
+            "projectedAge": 26,
+            "quadDiam125": 17.03,
+            "quadDiam175": 20.642,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 43.120000000000005,
+            "biodiversitySensitivity": 71,
+            "firstNationsSensitivity": 22,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": -3,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.129,
+            "compliance": 1.574,
+            "technical": 1.125,
+            "political": 1.116,
+            "policy": 1.332,
+            "issue": 1.337
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 2.8 ha | species HW/BA | proj. age 26 | OGMA nearby | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1655849",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2899  A2899 ALNA5SP",
+          "mapLabel": "TA2899  A2899 ALNA5SP",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "ALNA5SP",
+          "openingId": null,
+          "timberMark": "A2899",
+          "areaHa": 2.8,
+          "plannedHarvestDate": "2027-06-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.071703,
+            "lat": 49.159988
+          },
+          "indicators": {
+            "ogmaNearby": true,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 60,
+            "speciesCd2": "YC",
+            "speciesPct2": 25,
+            "projectedAge": 203,
+            "quadDiam125": 69.18,
+            "quadDiam175": 69.225,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 41.120000000000005,
+            "biodiversitySensitivity": 81,
+            "firstNationsSensitivity": 22,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": -4,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.129,
+            "compliance": 1.63,
+            "technical": 1.125,
+            "political": 1.108,
+            "policy": 1.368,
+            "issue": 1.37
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 2.8 ha | species HW/YC | proj. age 203 | OGMA nearby | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1664744",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 939 44/939 162208",
+          "mapLabel": "TFL44 939 44/939 162208",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "162208",
+          "openingId": null,
+          "timberMark": "44/939",
+          "areaHa": 7.8,
+          "plannedHarvestDate": "2027-02-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.802613,
+            "lat": 49.105706
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 55,
+            "speciesCd2": "FDC",
+            "speciesPct2": 40,
+            "projectedAge": 91,
+            "quadDiam125": 30.378,
+            "quadDiam175": 33.251,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 63.120000000000005,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.193,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 7.8 ha | species HW/FDC | proj. age 91 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1668342",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99819 004 JR8004 171127B",
+          "mapLabel": "A99819 004 JR8004 171127B",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "171127B",
+          "openingId": null,
+          "timberMark": "JR8004",
+          "areaHa": 12.2,
+          "plannedHarvestDate": "2026-09-07",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.788835,
+            "lat": 49.101228
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 60,
+            "speciesCd2": "HW",
+            "speciesPct2": 20,
+            "projectedAge": 14,
+            "quadDiam125": 0,
+            "quadDiam175": 0,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 46.88,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.13,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 12.2 ha | species FDC/HW | proj. age 14"
+        },
+        {
+          "id": "fta-1668084",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99819 001 JR8001 171127A",
+          "mapLabel": "A99819 001 JR8001 171127A",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "171127A",
+          "openingId": null,
+          "timberMark": "JR8001",
+          "areaHa": 10.7,
+          "plannedHarvestDate": "2026-09-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.785673,
+            "lat": 49.105471
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 60,
+            "speciesCd2": "HW",
+            "speciesPct2": 20,
+            "projectedAge": 14,
+            "quadDiam125": 0,
+            "quadDiam175": 0,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 46.28,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.128,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 10.7 ha | species FDC/HW | proj. age 14"
+        },
+        {
+          "id": "fta-1657836",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 937 44/937 152239",
+          "mapLabel": "TFL44 937 44/937 152239",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "152239",
+          "openingId": null,
+          "timberMark": "44/937",
+          "areaHa": 8.2,
+          "plannedHarvestDate": "2026-09-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.03015,
+            "lat": 49.118445
+          },
+          "indicators": {
+            "ogmaNearby": true,
+            "whaNoHarvestNearby": true,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "H",
+            "speciesPct1": 35,
+            "speciesCd2": "YC",
+            "speciesPct2": 25,
+            "projectedAge": 203,
+            "quadDiam125": 56.042,
+            "quadDiam175": 56.274,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 31.28,
+            "biodiversitySensitivity": 95,
+            "firstNationsSensitivity": 16,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": -5,
+            "timberSupply": -2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.094,
+            "compliance": 1.708,
+            "technical": 1.092,
+            "political": 1.07,
+            "policy": 1.396,
+            "issue": 1.39
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 8.2 ha | species H/YC | proj. age 203 | OGMA nearby | WHA no-harvest nearby"
+        },
+        {
+          "id": "fta-1668350",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99749 001 JS3001 1",
+          "mapLabel": "A99749 001 JS3001 1",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "JS3001",
+          "areaHa": 12.4,
+          "plannedHarvestDate": "2026-08-07",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.034878,
+            "lat": 49.32085
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 60,
+            "speciesCd2": "CW",
+            "speciesPct2": 30,
+            "projectedAge": 51,
+            "quadDiam125": 30.112,
+            "quadDiam175": 31.576,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 64.96000000000001,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.2,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 12.4 ha | species FDC/CW | proj. age 51"
+        },
+        {
+          "id": "fta-1668354",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99749 002 JS3002 3",
+          "mapLabel": "A99749 002 JS3002 3",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "3",
+          "openingId": null,
+          "timberMark": "JS3002",
+          "areaHa": 6.4,
+          "plannedHarvestDate": "2026-08-07",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.021227,
+            "lat": 49.313701
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 85,
+            "speciesCd2": "HW",
+            "speciesPct2": 10,
+            "projectedAge": 63,
+            "quadDiam125": 39.97,
+            "quadDiam175": 40.394,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 62.56,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.191,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 6.4 ha | species FDC/HW | proj. age 63 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1668353",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99749 002 JS3002 2",
+          "mapLabel": "A99749 002 JS3002 2",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "2",
+          "openingId": null,
+          "timberMark": "JS3002",
+          "areaHa": 5.9,
+          "plannedHarvestDate": "2026-08-07",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.023851,
+            "lat": 49.318177
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 60,
+            "speciesCd2": "CW",
+            "speciesPct2": 30,
+            "projectedAge": 51,
+            "quadDiam125": 30.112,
+            "quadDiam175": 31.576,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 62.36,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.19,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 5.9 ha | species FDC/CW | proj. age 51 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1668351",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99749 001 JS3001 4",
+          "mapLabel": "A99749 001 JS3001 4",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "4",
+          "openingId": null,
+          "timberMark": "JS3001",
+          "areaHa": 5.1,
+          "plannedHarvestDate": "2026-08-07",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.013106,
+            "lat": 49.31422
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 85,
+            "speciesCd2": "HW",
+            "speciesPct2": 10,
+            "projectedAge": 63,
+            "quadDiam125": 39.97,
+            "quadDiam175": 40.394,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 62.04,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.189,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 5.1 ha | species FDC/HW | proj. age 63 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1668355",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99749 002 JS3002 3A",
+          "mapLabel": "A99749 002 JS3002 3A",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "3A",
+          "openingId": null,
+          "timberMark": "JS3002",
+          "areaHa": 2,
+          "plannedHarvestDate": "2026-08-07",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.021916,
+            "lat": 49.31559
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 85,
+            "speciesCd2": "HW",
+            "speciesPct2": 10,
+            "projectedAge": 63,
+            "quadDiam125": 39.97,
+            "quadDiam175": 40.394,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 60.8,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.184,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 2 ha | species FDC/HW | proj. age 63 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1665510",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98970  98970 1",
+          "mapLabel": "A98970  98970 1",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "98970",
+          "areaHa": 0.7,
+          "plannedHarvestDate": "2026-08-05",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -125.136398,
+            "lat": 49.256775
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 0,
+            "speciesCd2": "HW",
+            "speciesPct2": 0,
+            "projectedAge": 0,
+            "quadDiam125": 0,
+            "quadDiam175": 0,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 42.28,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.113,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 0.7 ha | species FDC/HW | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1665482",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99819 003 JR8003 171130",
+          "mapLabel": "A99819 003 JR8003 171130",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "171130",
+          "openingId": null,
+          "timberMark": "JR8003",
+          "areaHa": 11,
+          "plannedHarvestDate": "2026-08-03",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.773887,
+            "lat": 49.071443
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 49,
+            "speciesCd2": "HW",
+            "speciesPct2": 33,
+            "projectedAge": 13,
+            "quadDiam125": 0,
+            "quadDiam175": 0,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 46.4,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.128,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 11 ha | species FDC/HW | proj. age 13"
+        },
+        {
+          "id": "fta-1665347",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99819 002 JR8002 073322",
+          "mapLabel": "A99819 002 JR8002 073322",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "073322",
+          "openingId": null,
+          "timberMark": "JR8002",
+          "areaHa": 9.5,
+          "plannedHarvestDate": "2026-08-03",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.771354,
+            "lat": 49.084656
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 80,
+            "speciesCd2": "DR",
+            "speciesPct2": 10,
+            "projectedAge": 19,
+            "quadDiam125": 17.218,
+            "quadDiam175": 21.512,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 45.8,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.126,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 9.5 ha | species FDC/DR | proj. age 19"
+        },
+        {
+          "id": "fta-1665346",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A99819 002 JR8002 171128",
+          "mapLabel": "A99819 002 JR8002 171128",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "171128",
+          "openingId": null,
+          "timberMark": "JR8002",
+          "areaHa": 1.7,
+          "plannedHarvestDate": "2026-08-03",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.777407,
+            "lat": 49.102485
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "CW",
+            "speciesPct1": 50,
+            "speciesCd2": "HW",
+            "speciesPct2": 30,
+            "projectedAge": 411,
+            "quadDiam125": 40.108,
+            "quadDiam175": 42.569,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 50.68,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.2,
+            "technical": 1.092,
+            "political": 1.145,
+            "policy": 1.171,
+            "issue": 1.193
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 1.7 ha | species CW/HW | proj. age 411"
+        },
+        {
+          "id": "fta-1664289",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98835  98835 THOBURN6",
+          "mapLabel": "A98835  98835 THOBURN6",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "THOBURN6",
+          "openingId": null,
+          "timberMark": "98835",
+          "areaHa": 4.4,
+          "plannedHarvestDate": "2026-07-13",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.768555,
+            "lat": 49.097326
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "CW",
+            "speciesPct1": 50,
+            "speciesCd2": "HW",
+            "speciesPct2": 30,
+            "projectedAge": 411,
+            "quadDiam125": 40.108,
+            "quadDiam175": 42.569,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 51.760000000000005,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.2,
+            "technical": 1.092,
+            "political": 1.149,
+            "policy": 1.171,
+            "issue": 1.193
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 4.4 ha | species CW/HW | proj. age 411"
+        },
+        {
+          "id": "fta-1661039",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TFL44 934 44/934 062408",
+          "mapLabel": "TFL44 934 44/934 062408",
+          "adminDistrict": "South Island Natural Resource District",
+          "cutBlockId": "062408",
+          "openingId": null,
+          "timberMark": "44/934",
+          "areaHa": 38,
+          "plannedHarvestDate": "2026-07-02",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -124.824921,
+            "lat": 49.047799
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDC",
+            "speciesPct1": 80,
+            "speciesCd2": "HW",
+            "speciesPct2": 20,
+            "projectedAge": 61,
+            "quadDiam125": 27.434,
+            "quadDiam175": 29.377,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 75.2,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 28
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 4,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.117,
+            "political": 1.239,
+            "policy": 1.107,
+            "issue": 1.153
+          },
+          "summary": "Planned cutblock in South Island Natural Resource District | 38 ha | species FDC/HW | proj. age 61"
+        }
+      ],
+      "generatedAt": "2026-09-29T15:38:12.451Z",
+      "dataWindow": {
+        "oneYearAgo": "2025-09-29",
+        "fiveYearsAhead": "2031-09-28"
+      }
+    },
+    "kootenay-wetbelt": {
+      "id": "kootenay-wetbelt",
+      "name": "Kootenay Wetbelt",
+      "bbox4326": [
+        -117.9,
+        49,
+        -116.4,
+        50.3
+      ],
+      "communities": [
+        "Nelson",
+        "Creston"
+      ],
+      "options": [
+        {
+          "id": "fta-1661919",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA3007  A3007 2",
+          "mapLabel": "TA3007  A3007 2",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "2",
+          "openingId": null,
+          "timberMark": "A3007",
+          "areaHa": 46.8,
+          "plannedHarvestDate": "2027-05-20",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.021872,
+            "lat": 50.278005
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 50,
+            "speciesCd2": "HW",
+            "speciesPct2": 20,
+            "projectedAge": 140,
+            "quadDiam125": 36.242,
+            "quadDiam175": 36.784,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 68.72,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 36
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.15,
+            "political": 1.214,
+            "policy": 1.229,
+            "issue": 1.273
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 46.8 ha | species FDI/HW | proj. age 140 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1661920",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA3007  A3007 1",
+          "mapLabel": "TA3007  A3007 1",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "A3007",
+          "areaHa": 42.7,
+          "plannedHarvestDate": "2027-05-20",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.033643,
+            "lat": 50.300087
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "LW",
+            "speciesPct1": 60,
+            "speciesCd2": "FDI",
+            "speciesPct2": 40,
+            "projectedAge": 90,
+            "quadDiam125": 29.361,
+            "quadDiam175": 30.12,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 77.08,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 36
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 4,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.15,
+            "political": 1.246,
+            "policy": 1.193,
+            "issue": 1.24
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 42.7 ha | species LW/FDI | proj. age 90 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1652419",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A30171 424 FE5424 7",
+          "mapLabel": "A30171 424 FE5424 7",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "7",
+          "openingId": null,
+          "timberMark": "FE5424",
+          "areaHa": 44.5,
+          "plannedHarvestDate": "2027-05-03",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -116.999318,
+            "lat": 50.326882
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 80,
+            "speciesCd2": "HW",
+            "speciesPct2": 10,
+            "projectedAge": 110,
+            "quadDiam125": 34.296,
+            "quadDiam175": 35.025,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 77.8,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 36
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 4,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.15,
+            "political": 1.249,
+            "policy": 1.193,
+            "issue": 1.24
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 44.5 ha | species FDI/HW | proj. age 110 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1652417",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A30171 424 FE5424 4",
+          "mapLabel": "A30171 424 FE5424 4",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "4",
+          "openingId": null,
+          "timberMark": "FE5424",
+          "areaHa": 20.3,
+          "plannedHarvestDate": "2027-05-03",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.014006,
+            "lat": 50.336781
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "CW",
+            "speciesPct1": 60,
+            "speciesCd2": "AC",
+            "speciesPct2": 40,
+            "projectedAge": 150,
+            "quadDiam125": 47.717,
+            "quadDiam175": 48.09,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 58.120000000000005,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.174,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 20.3 ha | species CW/AC | proj. age 150 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1652418",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A30171 424 FE5424 5",
+          "mapLabel": "A30171 424 FE5424 5",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "5",
+          "openingId": null,
+          "timberMark": "FE5424",
+          "areaHa": 8.3,
+          "plannedHarvestDate": "2027-05-03",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -116.997601,
+            "lat": 50.319618
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 80,
+            "speciesCd2": "HW",
+            "speciesPct2": 10,
+            "projectedAge": 110,
+            "quadDiam125": 34.296,
+            "quadDiam175": 35.025,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 63.32,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.194,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 8.3 ha | species FDI/HW | proj. age 110 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1666906",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2777  A2777 4",
+          "mapLabel": "TA2777  A2777 4",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "4",
+          "openingId": null,
+          "timberMark": "A2777",
+          "areaHa": 47,
+          "plannedHarvestDate": "2027-05-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.022226,
+            "lat": 49.173413
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "SE",
+            "speciesPct1": 70,
+            "speciesCd2": "CW",
+            "speciesPct2": 20,
+            "projectedAge": 118,
+            "quadDiam125": 42.925,
+            "quadDiam175": 43.143,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 78.8,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 28
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 4,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.117,
+            "political": 1.253,
+            "policy": 1.107,
+            "issue": 1.153
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 47 ha | species SE/CW | proj. age 118"
+        },
+        {
+          "id": "fta-1666904",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2777  A2777 2",
+          "mapLabel": "TA2777  A2777 2",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "2",
+          "openingId": null,
+          "timberMark": "A2777",
+          "areaHa": 37.2,
+          "plannedHarvestDate": "2027-05-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.007142,
+            "lat": 49.148154
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 60,
+            "speciesCd2": "SE",
+            "speciesPct2": 20,
+            "projectedAge": 98,
+            "quadDiam125": 35.669,
+            "quadDiam175": 36.261,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 74.88,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 28
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 4,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.117,
+            "political": 1.238,
+            "policy": 1.107,
+            "issue": 1.153
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 37.2 ha | species FDI/SE | proj. age 98"
+        },
+        {
+          "id": "fta-1666907",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2777  A2777 1",
+          "mapLabel": "TA2777  A2777 1",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "A2777",
+          "areaHa": 33.9,
+          "plannedHarvestDate": "2027-05-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.98348,
+            "lat": 49.130307
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "LW",
+            "speciesPct1": 79,
+            "speciesCd2": "AT",
+            "speciesPct2": 11,
+            "projectedAge": 98,
+            "quadDiam125": 37.598,
+            "quadDiam175": 37.761,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 73.56,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 28
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 4,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.117,
+            "political": 1.233,
+            "policy": 1.107,
+            "issue": 1.153
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 33.9 ha | species LW/AT | proj. age 98"
+        },
+        {
+          "id": "fta-1666905",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2777  A2777 3",
+          "mapLabel": "TA2777  A2777 3",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "3",
+          "openingId": null,
+          "timberMark": "A2777",
+          "areaHa": 32.9,
+          "plannedHarvestDate": "2027-05-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.016002,
+            "lat": 49.161043
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 53,
+            "speciesCd2": "LW",
+            "speciesPct2": 21,
+            "projectedAge": 138,
+            "quadDiam125": 43.093,
+            "quadDiam175": 43.273,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 63.16,
+            "biodiversitySensitivity": 28,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 28
+          },
+          "valueEffects": {
+            "biodiversity": 2,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.156,
+            "technical": 1.117,
+            "political": 1.193,
+            "policy": 1.143,
+            "issue": 1.187
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 32.9 ha | species FDI/LW | proj. age 138"
+        },
+        {
+          "id": "fta-1652420",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A30171 424 FE5424 1",
+          "mapLabel": "A30171 424 FE5424 1",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "FE5424",
+          "areaHa": 44.9,
+          "plannedHarvestDate": "2027-04-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.067591,
+            "lat": 50.312094
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 70,
+            "speciesCd2": "SE",
+            "speciesPct2": 10,
+            "projectedAge": 100,
+            "quadDiam125": 31.121,
+            "quadDiam175": 32.281,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 77.96000000000001,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 36
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 4,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.15,
+            "political": 1.25,
+            "policy": 1.193,
+            "issue": 1.24
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 44.9 ha | species FDI/SE | proj. age 100 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1668597",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2712  A2712 2",
+          "mapLabel": "TA2712  A2712 2",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "2",
+          "openingId": null,
+          "timberMark": "A2712",
+          "areaHa": 26.4,
+          "plannedHarvestDate": "2027-04-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.896573,
+            "lat": 49.311399
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PLI",
+            "speciesPct1": 80,
+            "speciesCd2": "FDI",
+            "speciesPct2": 10,
+            "projectedAge": 37,
+            "quadDiam125": 15.78,
+            "quadDiam175": 19.627,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 62.56,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.191,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 26.4 ha | species PLI/FDI | proj. age 37"
+        },
+        {
+          "id": "fta-1668598",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2712  A2712 4",
+          "mapLabel": "TA2712  A2712 4",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "4",
+          "openingId": null,
+          "timberMark": "A2712",
+          "areaHa": 21.3,
+          "plannedHarvestDate": "2027-04-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.878895,
+            "lat": 49.32126
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 30,
+            "speciesCd2": "LW",
+            "speciesPct2": 20,
+            "projectedAge": 20,
+            "quadDiam125": 15.317,
+            "quadDiam175": 19.769,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 60.519999999999996,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.183,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 21.3 ha | species FDI/LW | proj. age 20 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1652421",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A30171 424 FE5424 3",
+          "mapLabel": "A30171 424 FE5424 3",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "3",
+          "openingId": null,
+          "timberMark": "FE5424",
+          "areaHa": 18.2,
+          "plannedHarvestDate": "2027-04-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.059999,
+            "lat": 50.322591
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 50,
+            "speciesCd2": "CW",
+            "speciesPct2": 40,
+            "projectedAge": 50,
+            "quadDiam125": 24.074,
+            "quadDiam175": 29.04,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 67.28,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.209,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 18.2 ha | species HW/CW | proj. age 50 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1668596",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2712  A2712 1",
+          "mapLabel": "TA2712  A2712 1",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "A2712",
+          "areaHa": 8.7,
+          "plannedHarvestDate": "2027-04-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.890937,
+            "lat": 49.296908
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "SE",
+            "speciesPct1": 62,
+            "speciesCd2": "LW",
+            "speciesPct2": 21,
+            "projectedAge": 118,
+            "quadDiam125": 39.448,
+            "quadDiam175": 39.82,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 63.480000000000004,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.194,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 8.7 ha | species SE/LW | proj. age 118"
+        },
+        {
+          "id": "fta-1668595",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2712  A2712 3",
+          "mapLabel": "TA2712  A2712 3",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "3",
+          "openingId": null,
+          "timberMark": "A2712",
+          "areaHa": 3.5,
+          "plannedHarvestDate": "2027-04-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.798169,
+            "lat": 49.298603
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 40,
+            "speciesCd2": "CW",
+            "speciesPct2": 20,
+            "projectedAge": 11,
+            "quadDiam125": 0,
+            "quadDiam175": 0,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 43.4,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 0,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.117,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 3.5 ha | species FDI/CW | proj. age 11 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1639418",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2714  A2714 1",
+          "mapLabel": "TA2714  A2714 1",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "A2714",
+          "areaHa": 30.1,
+          "plannedHarvestDate": "2027-03-15",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.264752,
+            "lat": 49.029229
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "LW",
+            "speciesPct1": 70,
+            "speciesCd2": "FDI",
+            "speciesPct2": 20,
+            "projectedAge": 88,
+            "quadDiam125": 30.686,
+            "quadDiam175": 31.288,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 72.03999999999999,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 36
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.15,
+            "political": 1.227,
+            "policy": 1.193,
+            "issue": 1.24
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 30.1 ha | species LW/FDI | proj. age 88 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1639417",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2714  A2714 3",
+          "mapLabel": "TA2714  A2714 3",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "3",
+          "openingId": null,
+          "timberMark": "A2714",
+          "areaHa": 21.4,
+          "plannedHarvestDate": "2027-03-15",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.243315,
+            "lat": 49.029885
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 40,
+            "speciesCd2": "LW",
+            "speciesPct2": 30,
+            "projectedAge": 88,
+            "quadDiam125": 51.054,
+            "quadDiam175": 51.1,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 68.56,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.214,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 21.4 ha | species FDI/LW | proj. age 88 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1639416",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2714  A2714 2",
+          "mapLabel": "TA2714  A2714 2",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "2",
+          "openingId": null,
+          "timberMark": "A2714",
+          "areaHa": 18.8,
+          "plannedHarvestDate": "2027-03-15",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.252742,
+            "lat": 49.023577
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "LW",
+            "speciesPct1": 40,
+            "speciesCd2": "FDI",
+            "speciesPct2": 30,
+            "projectedAge": 88,
+            "quadDiam125": 50.161,
+            "quadDiam175": 50.173,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 67.52000000000001,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.21,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 18.8 ha | species LW/FDI | proj. age 88 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1669587",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA3049  A3049 1",
+          "mapLabel": "TA3049  A3049 1",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "A3049",
+          "areaHa": 48,
+          "plannedHarvestDate": "2027-01-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -117.020269,
+            "lat": 50.25764
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 60,
+            "speciesCd2": "LW",
+            "speciesPct2": 20,
+            "projectedAge": 140,
+            "quadDiam125": 47.515,
+            "quadDiam175": 47.6,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 69.2,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 36
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.15,
+            "political": 1.216,
+            "policy": 1.229,
+            "issue": 1.273
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 48 ha | species FDI/LW | proj. age 140 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1669510",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA3006  A3006 3",
+          "mapLabel": "TA3006  A3006 3",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "3",
+          "openingId": null,
+          "timberMark": "A3006",
+          "areaHa": 13.5,
+          "plannedHarvestDate": "2027-01-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -116.978637,
+            "lat": 50.340023
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "HW",
+            "speciesPct1": 40,
+            "speciesCd2": "CW",
+            "speciesPct2": 30,
+            "projectedAge": 160,
+            "quadDiam125": 28.525,
+            "quadDiam175": 33.054,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 55.4,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.163,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 13.5 ha | species HW/CW | proj. age 160 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1669645",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2603  A2603 1",
+          "mapLabel": "TA2603  A2603 1",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "A2603",
+          "areaHa": 18.5,
+          "plannedHarvestDate": "2026-12-15",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.055049,
+            "lat": 49.384198
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 80,
+            "speciesCd2": "CW",
+            "speciesPct2": 10,
+            "projectedAge": 108,
+            "quadDiam125": 37.632,
+            "quadDiam175": 38.068,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 67.4,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.209,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 18.5 ha | species FDI/CW | proj. age 108 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1669644",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2603  A2603 2",
+          "mapLabel": "TA2603  A2603 2",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "2",
+          "openingId": null,
+          "timberMark": "A2603",
+          "areaHa": 10.9,
+          "plannedHarvestDate": "2026-12-15",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.050332,
+            "lat": 49.392715
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 80,
+            "speciesCd2": "CW",
+            "speciesPct2": 10,
+            "projectedAge": 108,
+            "quadDiam125": 37.632,
+            "quadDiam175": 38.068,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 64.36,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.198,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 10.9 ha | species FDI/CW | proj. age 108 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1669646",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2603  A2603 3",
+          "mapLabel": "TA2603  A2603 3",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "3",
+          "openingId": null,
+          "timberMark": "A2603",
+          "areaHa": 6.5,
+          "plannedHarvestDate": "2026-12-15",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.047858,
+            "lat": 49.398383
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 40,
+            "speciesCd2": "EP",
+            "speciesPct2": 30,
+            "projectedAge": 128,
+            "quadDiam125": 46.354,
+            "quadDiam175": 46.457,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 52.6,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.152,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 6.5 ha | species FDI/EP | proj. age 128 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1654196",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A20213 151 FB9151 805",
+          "mapLabel": "A20213 151 FB9151 805",
+          "adminDistrict": "Selkirk Natural Resource District",
+          "cutBlockId": "805",
+          "openingId": null,
+          "timberMark": "FB9151",
+          "areaHa": 27.4,
+          "plannedHarvestDate": "2026-12-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -116.771482,
+            "lat": 49.048915
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "LW",
+            "speciesPct1": 50,
+            "speciesCd2": "FDI",
+            "speciesPct2": 35,
+            "projectedAge": 90,
+            "quadDiam125": 34.745,
+            "quadDiam175": 35.029,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 70.96000000000001,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.223,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Selkirk Natural Resource District | 27.4 ha | species LW/FDI | proj. age 90 | species-at-risk nearby"
+        }
+      ],
+      "generatedAt": "2026-09-29T15:38:12.451Z",
+      "dataWindow": {
+        "oneYearAgo": "2025-09-29",
+        "fiveYearsAhead": "2031-09-28"
+      }
+    },
+    "okanagan-shuswap-drybelt": {
+      "id": "okanagan-shuswap-drybelt",
+      "name": "Okanagan/Shuswap Drybelt",
+      "bbox4326": [
+        -119.9,
+        49.8,
+        -118.9,
+        50.9
+      ],
+      "communities": [
+        "Vernon",
+        "Salmon Arm"
+      ],
+      "options": [
+        {
+          "id": "fta-1651914",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "K1P 071 K1P071 415",
+          "mapLabel": "K1P 071 K1P071 415",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "415",
+          "openingId": null,
+          "timberMark": "K1P071",
+          "areaHa": 9.3,
+          "plannedHarvestDate": "2027-11-15",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.951045,
+            "lat": 49.818374
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PL",
+            "speciesPct1": 53,
+            "speciesCd2": "SE",
+            "speciesPct2": 42,
+            "projectedAge": 169,
+            "quadDiam125": 28.647,
+            "quadDiam175": 28.998,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 53.72,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.157,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 9.3 ha | species PL/SE | proj. age 169 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1651916",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "K1P 071 K1P071 418",
+          "mapLabel": "K1P 071 K1P071 418",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "418",
+          "openingId": null,
+          "timberMark": "K1P071",
+          "areaHa": 8.4,
+          "plannedHarvestDate": "2027-11-15",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.936856,
+            "lat": 49.812243
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PL",
+            "speciesPct1": 53,
+            "speciesCd2": "SE",
+            "speciesPct2": 42,
+            "projectedAge": 169,
+            "quadDiam125": 28.647,
+            "quadDiam175": 28.998,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 53.36,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.155,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 8.4 ha | species PL/SE | proj. age 169 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1651912",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "K1P 071 K1P071 414",
+          "mapLabel": "K1P 071 K1P071 414",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "414",
+          "openingId": null,
+          "timberMark": "K1P071",
+          "areaHa": 8.1,
+          "plannedHarvestDate": "2027-11-15",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.961987,
+            "lat": 49.812345
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PL",
+            "speciesPct1": 69,
+            "speciesCd2": "S",
+            "speciesPct2": 22,
+            "projectedAge": 48,
+            "quadDiam125": 16.597,
+            "quadDiam175": 20.333,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 55.239999999999995,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.162,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 8.1 ha | species PL/S | proj. age 48 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1651913",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "K1P 071 K1P071 416",
+          "mapLabel": "K1P 071 K1P071 416",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "416",
+          "openingId": null,
+          "timberMark": "K1P071",
+          "areaHa": 5,
+          "plannedHarvestDate": "2027-11-15",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.943613,
+            "lat": 49.816658
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PL",
+            "speciesPct1": 53,
+            "speciesCd2": "SE",
+            "speciesPct2": 42,
+            "projectedAge": 169,
+            "quadDiam125": 28.647,
+            "quadDiam175": 28.998,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 52,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.15,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 5 ha | species PL/SE | proj. age 169 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1651915",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "K1P 071 K1P071 417",
+          "mapLabel": "K1P 071 K1P071 417",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "417",
+          "openingId": null,
+          "timberMark": "K1P071",
+          "areaHa": 2.4,
+          "plannedHarvestDate": "2027-11-15",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.93828,
+            "lat": 49.81722
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PL",
+            "speciesPct1": 53,
+            "speciesCd2": "SE",
+            "speciesPct2": 42,
+            "projectedAge": 169,
+            "quadDiam125": 28.647,
+            "quadDiam175": 28.998,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 50.96,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.146,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 2.4 ha | species PL/SE | proj. age 169 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1666966",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "K1P 088 K1P088 319",
+          "mapLabel": "K1P 088 K1P088 319",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "319",
+          "openingId": null,
+          "timberMark": "K1P088",
+          "areaHa": 45.5,
+          "plannedHarvestDate": "2027-01-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -119.702991,
+            "lat": 49.938851
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "SX",
+            "speciesPct1": 42,
+            "speciesCd2": "BL",
+            "speciesPct2": 32,
+            "projectedAge": 138,
+            "quadDiam125": 26.682,
+            "quadDiam175": 28.722,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 68.2,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 36
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.15,
+            "political": 1.212,
+            "policy": 1.229,
+            "issue": 1.273
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 45.5 ha | species SX/BL | proj. age 138 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1663784",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A18669 778 ER6778 1",
+          "mapLabel": "A18669 778 ER6778 1",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "ER6778",
+          "areaHa": 38.7,
+          "plannedHarvestDate": "2027-01-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.747334,
+            "lat": 50.884516
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "SE",
+            "speciesPct1": 60,
+            "speciesCd2": "BL",
+            "speciesPct2": 40,
+            "projectedAge": 198,
+            "quadDiam125": 27.64,
+            "quadDiam175": 29.47,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 65.48,
+            "biodiversitySensitivity": 28,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 28
+          },
+          "valueEffects": {
+            "biodiversity": 2,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.156,
+            "technical": 1.117,
+            "political": 1.202,
+            "policy": 1.143,
+            "issue": 1.187
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 38.7 ha | species SE/BL | proj. age 198"
+        },
+        {
+          "id": "fta-1666965",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "K1P 088 K1P088 318",
+          "mapLabel": "K1P 088 K1P088 318",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "318",
+          "openingId": null,
+          "timberMark": "K1P088",
+          "areaHa": 17.6,
+          "plannedHarvestDate": "2027-01-01",
+          "plannedHarvestYear": 2027,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -119.705853,
+            "lat": 49.946345
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PL",
+            "speciesPct1": 50,
+            "speciesCd2": "BL",
+            "speciesPct2": 30,
+            "projectedAge": 94,
+            "quadDiam125": 21.206,
+            "quadDiam175": 23.009,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 67.03999999999999,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.208,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 17.6 ha | species PL/BL | proj. age 94 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657112",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98363 204 HY8204 TB05",
+          "mapLabel": "A98363 204 HY8204 TB05",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "TB05",
+          "openingId": null,
+          "timberMark": "HY8204",
+          "areaHa": 17.8,
+          "plannedHarvestDate": "2026-12-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.852708,
+            "lat": 50.435545
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 100,
+            "speciesCd2": null,
+            "speciesPct2": 0,
+            "projectedAge": 144,
+            "quadDiam125": 28.948,
+            "quadDiam175": 30.51,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 57.12,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.17,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 17.8 ha | species FDI | proj. age 144 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657110",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98363 204 HY8204 TB04",
+          "mapLabel": "A98363 204 HY8204 TB04",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "TB04",
+          "openingId": null,
+          "timberMark": "HY8204",
+          "areaHa": 16.9,
+          "plannedHarvestDate": "2026-12-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.857489,
+            "lat": 50.440951
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 30,
+            "speciesCd2": "EP",
+            "speciesPct2": 20,
+            "projectedAge": 23,
+            "quadDiam125": 16.111,
+            "quadDiam175": 20.586,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 58.76,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.176,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 16.9 ha | species FDI/EP | proj. age 23 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657111",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98363 204 HY8204 TB03",
+          "mapLabel": "A98363 204 HY8204 TB03",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "TB03",
+          "openingId": null,
+          "timberMark": "HY8204",
+          "areaHa": 6.4,
+          "plannedHarvestDate": "2026-12-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.861165,
+            "lat": 50.432306
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FD",
+            "speciesPct1": 60,
+            "speciesCd2": "E",
+            "speciesPct2": 30,
+            "projectedAge": 133,
+            "quadDiam125": 44.027,
+            "quadDiam175": 44.18,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 52.56,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.152,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 6.4 ha | species FD/E | proj. age 133 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657113",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98363 204 HY8204 TB06",
+          "mapLabel": "A98363 204 HY8204 TB06",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "TB06",
+          "openingId": null,
+          "timberMark": "HY8204",
+          "areaHa": 5,
+          "plannedHarvestDate": "2026-12-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.827147,
+            "lat": 50.413525
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 70,
+            "speciesCd2": "LW",
+            "speciesPct2": 20,
+            "projectedAge": 124,
+            "quadDiam125": 30.814,
+            "quadDiam175": 32.024,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 52,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.15,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 5 ha | species FDI/LW | proj. age 124 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657117",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98363 204 HY8204 TB11",
+          "mapLabel": "A98363 204 HY8204 TB11",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "TB11",
+          "openingId": null,
+          "timberMark": "HY8204",
+          "areaHa": 3.7,
+          "plannedHarvestDate": "2026-12-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.844558,
+            "lat": 50.439452
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 40,
+            "speciesCd2": "CW",
+            "speciesPct2": 30,
+            "projectedAge": 144,
+            "quadDiam125": 32.651,
+            "quadDiam175": 33.582,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 51.480000000000004,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.148,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 3.7 ha | species FDI/CW | proj. age 144 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657115",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98363 204 HY8204 TB09",
+          "mapLabel": "A98363 204 HY8204 TB09",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "TB09",
+          "openingId": null,
+          "timberMark": "HY8204",
+          "areaHa": 3.6,
+          "plannedHarvestDate": "2026-12-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.864415,
+            "lat": 50.429337
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FD",
+            "speciesPct1": 60,
+            "speciesCd2": "E",
+            "speciesPct2": 30,
+            "projectedAge": 133,
+            "quadDiam125": 44.027,
+            "quadDiam175": 44.18,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 51.44,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.148,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 3.6 ha | species FD/E | proj. age 133 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657116",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98363 204 HY8204 TB10",
+          "mapLabel": "A98363 204 HY8204 TB10",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "TB10",
+          "openingId": null,
+          "timberMark": "HY8204",
+          "areaHa": 2.5,
+          "plannedHarvestDate": "2026-12-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.854509,
+            "lat": 50.429592
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 40,
+            "speciesCd2": "CW",
+            "speciesPct2": 20,
+            "projectedAge": 139,
+            "quadDiam125": 28.784,
+            "quadDiam175": 30.38,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 51,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.146,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 2.5 ha | species FDI/CW | proj. age 139 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657114",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98363 204 HY8204 TB07",
+          "mapLabel": "A98363 204 HY8204 TB07",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "TB07",
+          "openingId": null,
+          "timberMark": "HY8204",
+          "areaHa": 0.7,
+          "plannedHarvestDate": "2026-12-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.841035,
+            "lat": 50.418255
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 40,
+            "speciesCd2": "CW",
+            "speciesPct2": 20,
+            "projectedAge": 139,
+            "quadDiam125": 28.784,
+            "quadDiam175": 30.38,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 50.28,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.143,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 0.7 ha | species FDI/CW | proj. age 139 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1665442",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2372  A2372 K9M1",
+          "mapLabel": "TA2372  A2372 K9M1",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "K9M1",
+          "openingId": null,
+          "timberMark": "A2372",
+          "areaHa": 26.1,
+          "plannedHarvestDate": "2026-10-15",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -118.888546,
+            "lat": 50.664391
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "SE",
+            "speciesPct1": 50,
+            "speciesCd2": "CW",
+            "speciesPct2": 20,
+            "projectedAge": 218,
+            "quadDiam125": 33.677,
+            "quadDiam175": 34.518,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 60.44,
+            "biodiversitySensitivity": 28,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 2,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.156,
+            "technical": 1.092,
+            "political": 1.182,
+            "policy": 1.143,
+            "issue": 1.167
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 26.1 ha | species SE/CW | proj. age 218"
+        },
+        {
+          "id": "fta-1665584",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA1338  A1338 K703",
+          "mapLabel": "TA1338  A1338 K703",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "K703",
+          "openingId": null,
+          "timberMark": "A1338",
+          "areaHa": 34.2,
+          "plannedHarvestDate": "2026-10-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -119.670011,
+            "lat": 50.500825
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PLI",
+            "speciesPct1": 50,
+            "speciesCd2": "LW",
+            "speciesPct2": 20,
+            "projectedAge": 20,
+            "quadDiam125": 14.827,
+            "quadDiam175": 19.396,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 65.68,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 36
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.15,
+            "political": 1.203,
+            "policy": 1.193,
+            "issue": 1.24
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 34.2 ha | species PLI/LW | proj. age 20 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1665585",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA1338  A1338 K8RF",
+          "mapLabel": "TA1338  A1338 K8RF",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "K8RF",
+          "openingId": null,
+          "timberMark": "A1338",
+          "areaHa": 21.2,
+          "plannedHarvestDate": "2026-10-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -119.655989,
+            "lat": 50.50532
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 90,
+            "speciesCd2": "PLI",
+            "speciesPct2": 10,
+            "projectedAge": 3,
+            "quadDiam125": 0,
+            "quadDiam175": 0,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 50.480000000000004,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.144,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 21.2 ha | species FDI/PLI | proj. age 3 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657297",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2460  A2460 KS-001",
+          "mapLabel": "TA2460  A2460 KS-001",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "KS-001",
+          "openingId": null,
+          "timberMark": "A2460",
+          "areaHa": 12.9,
+          "plannedHarvestDate": "2026-09-25",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -119.272304,
+            "lat": 50.162375
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PLI",
+            "speciesPct1": 78,
+            "speciesCd2": "FDI",
+            "speciesPct2": 22,
+            "projectedAge": 108,
+            "quadDiam125": 22.623,
+            "quadDiam175": 24.093,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 65.16,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.201,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 12.9 ha | species PLI/FDI | proj. age 108 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1668714",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "A98954  98954 1",
+          "mapLabel": "A98954  98954 1",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "98954",
+          "areaHa": 3.1,
+          "plannedHarvestDate": "2026-09-10",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -119.502398,
+            "lat": 50.938006
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": true
+          },
+          "forestData": {
+            "speciesCd1": "PLI",
+            "speciesPct1": 64,
+            "speciesCd2": "FDI",
+            "speciesPct2": 30,
+            "projectedAge": 94,
+            "quadDiam125": 23.428,
+            "quadDiam175": 24.668,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 61.239999999999995,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 56,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": -2
+          },
+          "eventBias": {
+            "stakeholder": 1.529,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.186,
+            "policy": 1.329,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 3.1 ha | species PLI/FDI | proj. age 94 | species-at-risk nearby | First Nations reserve nearby"
+        },
+        {
+          "id": "fta-1662318",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "W1568 HH WBAGHH 1",
+          "mapLabel": "W1568 HH WBAGHH 1",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "1",
+          "openingId": null,
+          "timberMark": "WBAGHH",
+          "areaHa": 0.7,
+          "plannedHarvestDate": "2026-09-01",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -119.255866,
+            "lat": 50.550979
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": false,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "CW",
+            "speciesPct1": 40,
+            "speciesCd2": "FDI",
+            "speciesPct2": 20,
+            "projectedAge": 110,
+            "quadDiam125": 24.783,
+            "quadDiam175": 28.894,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 60.28,
+            "biodiversitySensitivity": 18,
+            "firstNationsSensitivity": 12,
+            "technicalComplexity": 22
+          },
+          "valueEffects": {
+            "biodiversity": 3,
+            "timberSupply": 2,
+            "communityNeeds": 0,
+            "firstNationsValues": 3
+          },
+          "eventBias": {
+            "stakeholder": 1.071,
+            "compliance": 1.1,
+            "technical": 1.092,
+            "political": 1.182,
+            "policy": 1.107,
+            "issue": 1.133
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 0.7 ha | species CW/FDI | proj. age 110"
+        },
+        {
+          "id": "fta-1657295",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2460  A2460 KS-003",
+          "mapLabel": "TA2460  A2460 KS-003",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "KS-003",
+          "openingId": null,
+          "timberMark": "A2460",
+          "areaHa": 8.4,
+          "plannedHarvestDate": "2026-08-14",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -119.277466,
+            "lat": 50.155842
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "FDI",
+            "speciesPct1": 83,
+            "speciesCd2": "PLI",
+            "speciesPct2": 17,
+            "projectedAge": 148,
+            "quadDiam125": 29.482,
+            "quadDiam175": 32.551,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 53.36,
+            "biodiversitySensitivity": 46,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 0,
+            "timberSupply": 1,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.256,
+            "technical": 1.125,
+            "political": 1.155,
+            "policy": 1.229,
+            "issue": 1.253
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 8.4 ha | species FDI/PLI | proj. age 148 | species-at-risk nearby"
+        },
+        {
+          "id": "fta-1657296",
+          "source": "forest-tenure-cutblock-polygons-fta-4-0",
+          "sourceType": "planned-cutblock",
+          "label": "TA2460  A2460 KS-002",
+          "mapLabel": "TA2460  A2460 KS-002",
+          "adminDistrict": "Okanagan Shuswap Natural Resource District",
+          "cutBlockId": "KS-002",
+          "openingId": null,
+          "timberMark": "A2460",
+          "areaHa": 17.2,
+          "plannedHarvestDate": "2026-08-13",
+          "plannedHarvestYear": 2026,
+          "approveDate": null,
+          "approveYear": null,
+          "centroid": {
+            "lon": -119.287678,
+            "lat": 50.154775
+          },
+          "indicators": {
+            "ogmaNearby": false,
+            "whaNoHarvestNearby": false,
+            "speciesAtRiskNearby": true,
+            "firstNationsReserveNearby": false
+          },
+          "forestData": {
+            "speciesCd1": "PLI",
+            "speciesPct1": 70,
+            "speciesCd2": "FDI",
+            "speciesPct2": 20,
+            "projectedAge": 88,
+            "quadDiam125": 21.041,
+            "quadDiam175": 23.058,
+            "quadDiam225": 0
+          },
+          "metrics": {
+            "timberOpportunity": 66.88,
+            "biodiversitySensitivity": 36,
+            "firstNationsSensitivity": 18,
+            "technicalComplexity": 30
+          },
+          "valueEffects": {
+            "biodiversity": 1,
+            "timberSupply": 3,
+            "communityNeeds": 0,
+            "firstNationsValues": 2
+          },
+          "eventBias": {
+            "stakeholder": 1.106,
+            "compliance": 1.2,
+            "technical": 1.125,
+            "political": 1.207,
+            "policy": 1.193,
+            "issue": 1.22
+          },
+          "summary": "Planned cutblock in Okanagan Shuswap Natural Resource District | 17.2 ha | species PLI/FDI | proj. age 88 | species-at-risk nearby"
+        }
+      ],
+      "generatedAt": "2026-09-29T15:38:12.451Z",
+      "dataWindow": {
+        "oneYearAgo": "2025-09-29",
+        "fiveYearsAhead": "2031-09-28"
+      }
     }
   }
 }

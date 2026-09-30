@@ -7,7 +7,10 @@ import { getCrewDisplayInfo } from '../crew.js';
 import { getSurveyedBlockCount } from '../journey/progress.js';
 import { getPackagesFinalized, getPackageTarget } from '../journey/packages.js';
 import { getCurrentSeasonInfo } from '../season.js';
-import { calculateScore, formatScoreDisplay } from '../scoring.js';
+import { calculateScore, formatScoreDisplay, rateDeskConduct, summarizeDeskConduct } from '../scoring.js';
+import { summarizeIntegrity } from '../modes/silvicultureIntegrity.js';
+import { getPlanningPhaseLabel } from '../modes/planning.js';
+import { formatDollars } from '../resources.js';
 
 /**
  * Show the end-of-game screen
@@ -129,23 +132,23 @@ export function writeFinalStatistics(ui, journey) {
       ui.write(`Brushing Complete: ${Math.round(journey.brushing.hectaresComplete)}/${journey.brushing.hectaresTarget} ha`);
       ui.write(`Free-Growing Surveys: ${journey.surveys.freeGrowingComplete}/${journey.surveys.freeGrowingTarget}`);
       ui.write(`Days Elapsed: ${daysUsed}`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      ui.write(`Budget Remaining: ${formatDollars(journey.resources.budget)}`);
       break;
     }
     case 'planning':
-      ui.write(`Final Phase: ${journey.plan.phase}`);
+      ui.write(`Final Phase: ${getPlanningPhaseLabel(journey.plan.phase)}`);
       ui.write(`Data Completeness: ${journey.plan.dataCompleteness}%`);
       ui.write(`Analysis Quality: ${journey.plan.analysisQuality}%`);
       ui.write(`Stakeholder Buy-in: ${journey.plan.stakeholderBuyIn}%`);
       ui.write(`DM Readiness: ${journey.plan.ministerialConfidence}%`);
       ui.write(`FOM: ${journey.blockPlanning?.fom?.status === 'closed' || journey.blockPlanning?.fom?.status === 'approved' ? 'comment period closed' : (journey.blockPlanning?.fom?.status || 'draft').replaceAll('_', ' ')}`);
       ui.write(`Days Elapsed: ${daysUsed}`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      ui.write(`Budget Remaining: ${formatDollars(journey.resources.budget)}`);
       break;
 
     case 'manager':
       ui.write(`Term Served: ${daysUsed}/${journey.deadline} months`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      ui.write(`Budget Remaining: ${formatDollars(journey.resources.budget)}`);
       ui.write(`Reputation: ${Math.round(journey.metrics?.reputation ?? 50)}%`);
       if (journey.ledger?.aac) {
         ui.write(`Delivered: ${Math.round(journey.ledger.deliveredYtd || 0).toLocaleString()}/${journey.ledger.aac.toLocaleString()} m³ of AAC${journey.ledger.cutControl ? ` (${journey.ledger.cutControl})` : ''}`);
@@ -154,7 +157,7 @@ export function writeFinalStatistics(ui, journey) {
         ui.write(`Operating posture: ${journey.ceo.posture || journey.ceo.name}${journey.ceo.posture ? ` (woodlands manager ${journey.ceo.name})` : ''}`);
       }
       if (journey.certifications?.length) {
-        ui.write(`Certifications: ${journey.certifications.map((c) => c.name).join(', ')}`);
+        ui.write(`Certifications: ${journey.certifications.map((c) => `${c.name}${c.status ? ` - ${c.status}` : ''}`).join('; ')}`);
       }
       break;
 
@@ -163,7 +166,7 @@ export function writeFinalStatistics(ui, journey) {
     default:
       ui.write(`Permits Issued: ${journey.permits?.approved ?? 0}/${journey.permits?.target ?? 0}`);
       ui.write(`Days Used: ${daysUsed}/${journey.deadline ?? daysUsed}`);
-      ui.write(`Budget Remaining: $${Math.round(journey.resources.budget).toLocaleString()}`);
+      ui.write(`Budget Remaining: ${formatDollars(journey.resources.budget)}`);
       break;
   }
 }
@@ -182,36 +185,99 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
       // so only claim the traverse when the odometer backs it up.
       const traverseDone = journey.totalDistance > 0
         && journey.distanceTraveled >= journey.totalDistance;
+      // Said from the run, not a stock phrase: every ending used to close
+      // "as summer settled in".
+      const shiftsLeft = Number.isFinite(journey.deadline) ? Math.max(0, journey.deadline - daysUsed) : null;
+      const when = shiftsLeft === null
+        ? `in the ${seasonName} window`
+        : shiftsLeft === 0
+          ? `on the last shift of the ${seasonName} window`
+          : `with ${shiftsLeft} shift${shiftsLeft === 1 ? '' : 's'} left in the ${seasonName} window`;
       const opening = traverseDone
-        ? `${crewName} completed the ${journey.totalDistance} km traverse through ${areaName} as ${seasonName} settled in.`
-        : `${crewName} closed out every block package in ${areaName} as ${seasonName} settled in.`;
+        ? `${crewName} completed the ${journey.totalDistance} km traverse through ${areaName} ${when}.`
+        : `${crewName} closed out every block package in ${areaName} ${when}.`;
       return `${opening} ` +
         `${activeCrew} crew members finalized all ${blocksCount} block packages over ${daysUsed} shifts. ` +
         `The layout and recon data go to the planning file and the cutting permit application.`;
     }
-    case 'silviculture':
+    case 'silviculture': {
+      // Delivered is not the same as clean: caught shortcuts stay on the file.
+      const caught = summarizeIntegrity(journey);
+      const onFile = caught.caughtFalseRecords + caught.caughtShortcuts;
       return `After ${daysUsed} days, the silviculture program in ${areaName} is delivered: ` +
         `${journey.planting.blocksPlanted} blocks planted and inspected, ${journey.surveys.freeGrowingComplete} free-growing declaration${journey.surveys.freeGrowingComplete === 1 ? '' : 's'} submitted. ` +
-        `The year's program is in the ground and in RESULTS.`;
-    case 'planning':
-      return `The Forest Stewardship Plan and first Forest Operations Map for ${areaName} were approved by the District Manager after ${daysUsed} days of analysis, ` +
-        `engagement with the Nations and the public, and careful balancing of competing values. ` +
-        `The plan will shape the licensee's operations in the area for the next five years.`;
+        (onFile > 0
+          ? `The year's program is in the ground and in RESULTS, and the district has ${onFile} caught shortcut${onFile === 1 ? '' : 's'} on the file with your signature.`
+          : `The year's program is in the ground and in RESULTS.`);
+    }
+    case 'planning': {
+      // The praise is for a file that earned it: not one approved over a
+      // caught shortcut, or after a Nation wrote that engagement was inadequate.
+      const rating = rateDeskConduct(summarizeDeskConduct(journey));
+      if (rating === 'clean' && !hasRelationshipRupture(journey)) {
+        return `The Forest Stewardship Plan and first Forest Operations Map for ${areaName} were approved by the District Manager after ${daysUsed} days of analysis, ` +
+          `engagement with the Nations and the public, and careful balancing of competing values. ` +
+          `The plan will shape the licensee's operations in the area for the next five years.`;
+      }
+      return `The Forest Stewardship Plan and first Forest Operations Map for ${areaName} were approved by the District Manager after ${daysUsed} days. ` +
+        `The plan will shape the licensee's operations in the area for the next five years, ` +
+        (rating === 'compromised'
+          ? 'and what is on the file about how it got there will follow it.'
+          : 'and the district\'s file on how it got there is thicker than it needed to be.');
+    }
     case 'permitting':
-    case 'desk':
-      return `${journey.permits?.approved ?? 0} permits issued out of ${journey.permits?.target ?? 0} the season needed. ` +
-        `The queue at the district office in ${areaName} is moving after ${daysUsed} days of clean files ` +
-        `and relationships kept warm.`;
-    case 'manager':
+    case 'desk': {
+      const rating = rateDeskConduct(summarizeDeskConduct(journey));
+      const issued = `${journey.permits?.approved ?? 0} permits issued out of ${journey.permits?.target ?? 0} the season needed. `;
+      if (rating === 'clean' && !hasRelationshipRupture(journey)) {
+        return `${issued}The queue at the district office in ${areaName} is moving after ${daysUsed} days of clean files ` +
+          `and relationships kept warm.`;
+      }
+      return `${issued}The queue at the district office in ${areaName} is moving after ${daysUsed} days` +
+        (rating === 'compromised' ? ', and not every file in it would survive a second read.' : ', with more on the record than a clean season leaves.');
+    }
+    case 'manager': {
+      const ledger = journey.ledger || {};
+      const pct = ledger.aac ? `${(Math.round((ledger.deliveredYtd / ledger.aac) * 1000) / 10).toFixed(1)}%` : '';
+      if (ledger.cutControlStatus === 'overcut') {
+        return `${crewName} closed out the operating year in ${areaName} after ${daysUsed} months with the books balanced and the board's confidence intact. ` +
+          `The cut-control statement goes in at ${pct} of the AAC with a C&E penalty attached, and next year's plan starts behind.`;
+      }
+      if (ledger.cutControlStatus === 'undercut') {
+        return `${crewName} closed out the operating year in ${areaName} after ${daysUsed} months with the books balanced and the board's confidence intact. ` +
+          `The cut-control statement goes in at ${pct} of the AAC; the wood left standing is lost to the period.`;
+      }
       return `${crewName} closed out the operating year in ${areaName} after ${daysUsed} months with the cut delivered, the books balanced ` +
         `and the board's confidence intact. The cut-control statement goes to the District Manager without a covering letter.`;
+    }
     default:
       return journey.endReason || 'Expedition completed successfully.';
   }
 }
 
+/**
+ * Whether the run left a documented rupture on the record: a situation that
+ * cost the relationships ten or more at once (a Nation writing that
+ * engagement was inadequate, an Elder declined, a ceremonial site blamed on
+ * the map). A relationship lost on the defensible call is conduct, not a
+ * rupture: rejecting a contractor's overage and citing the contract left a
+ * clean A-100 plan with a scolding approval line while its epilogue held it
+ * up as the example.
+ */
+function hasRelationshipRupture(journey) {
+  return (journey?.log || []).some((entry) => entry?.type === 'event'
+    && Number(entry.effects?.relationships) <= -10
+    && !(Number(entry.effects?.compliance) > 0));
+}
+
+/** An end reason as a sentence: most are written as labels, without a full stop. */
+function asSentence(text) {
+  const trimmed = String(text || '').trim();
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
 export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
-  const reason = journey.endReason || journey.gameOverReason || 'The expedition ground to a halt.';
+  const reason = asSentence(journey.endReason || journey.gameOverReason || 'The expedition ground to a halt.');
 
   switch (journey.journeyType) {
     case 'recon':
@@ -220,18 +286,25 @@ export function buildDefeatNarrative(journey, areaName, crewName, daysUsed) {
         ? Math.round((journey.distanceTraveled / journey.totalDistance) * 100) : 0;
       const lastBlock = journey.blocks?.[journey.currentBlockIndex]?.name || 'an unknown location';
       return `The expedition stalled at ${lastBlock}, ${progress}% of the way through the traverse. ` +
-        `${reason} After ${daysUsed} shifts, ${crewName} could go no further.`;
+        `${reason} After ${daysUsed} shifts, ${String(crewName).replace(/^The /, 'the ')} could go no further.`;
     }
-    case 'silviculture':
-      return `The silviculture program in ${areaName} fell short of its targets after ${daysUsed} days. ` +
-        `${reason} The unplanted blocks roll into next year's program and the nursery invoices for the stock either way.`;
+    case 'silviculture': {
+      const planted = (journey.planting?.blocksPlanted || 0) >= (journey.planting?.blocksToPlant || 0);
+      const aftermath = planted
+        ? 'The blocks are in the ground; what the program still owes rolls into next year\'s.'
+        : 'The unplanted blocks roll into next year\'s program and the nursery invoices for the stock either way.';
+      if (summarizeIntegrity(journey).programPulled) {
+        return `The licensee pulled you off the silviculture program in ${areaName} after ${daysUsed} days. ${reason} ${aftermath}`;
+      }
+      return `The silviculture program in ${areaName} fell short of its targets after ${daysUsed} days. ${reason} ${aftermath}`;
+    }
     case 'planning':
-      return `The FSP replacement for ${areaName} failed to achieve approval after ${daysUsed} days. ` +
+      return `The FSP replacement for ${areaName} failed to achieve approval after ${daysUsed} day${daysUsed === 1 ? '' : 's'}. ` +
         `${reason} The planning process will need to restart with a new approach.`;
     case 'permitting':
     case 'desk':
       return `The licensee's permitting desk in ${areaName} could not get the season's permits issued. ` +
-        `${reason} After ${daysUsed} days, the backlog remains.`;
+        `${reason} After ${daysUsed} day${daysUsed === 1 ? '' : 's'}, ${journey.permits?.approved || 0} of ${journey.permits?.target || 0} are issued; the rest go to whoever takes the desk.`;
     case 'manager':
       return `${crewName}'s tenure leading the ${areaName} operation ended after ${daysUsed} months. ` +
         `${reason} The board is already interviewing replacements.`;

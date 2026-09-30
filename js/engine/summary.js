@@ -29,6 +29,13 @@ export function buildSummary(state) {
   if (state.flags?.budgetLoanActive) {
     messages.push("[$] Emergency loan repayments trimmed future budget gains by 20%.");
   }
+  // Fallout from a shortcut caught too late in the year to be dealt as a card
+  // is still owed; the review says so by name.
+  for (const entry of Array.isArray(state.history) ? state.history : []) {
+    if (entry?.type === "consequence" && entry.id === "unlanded-fallout" && entry.title) {
+      messages.push(`[!] ${entry.title}. ${entry.option || ""}`.trim());
+    }
+  }
 
   const score = scoreRun(state);
   const overall = {
@@ -47,7 +54,7 @@ export function buildSummary(state) {
   const highlights = topDecisions(state.history);
   const style = computeManagementStyle(state);
   const achievements = buildAchievements(metrics, trends, style);
-  const projection = futureOutlook(metrics, trends, area);
+  const projection = futureOutlook(metrics, trends, area, role);
   const roleLens = buildRoleLens(state);
 
   return {
@@ -136,12 +143,16 @@ function buildAchievements(metrics, trends, style) {
   return medals;
 }
 
-function futureOutlook(metrics, trends, area) {
+function futureOutlook(metrics, trends, area, role) {
   const pieces = [];
   if (metrics.forestHealth < 45) {
     pieces.push("Forest health indicators need restorative investment to avoid long-term decline.");
   } else if (trends.forestHealth > 5) {
-    pieces.push("Stocking is on track; free-growing looks reachable on schedule.");
+    // Stocking and free-growing are the silviculture file; other roles read
+    // the same trend through the blocks they planned or walked.
+    pieces.push(role?.id === "silviculture"
+      ? "Stocking is on track; free-growing looks reachable on schedule."
+      : "The blocks you touched this year came through in better shape than they started.");
   }
   if (metrics.relationships < 40) {
     pieces.push("Community rapport is strained; invest early in dialogue with Nations and municipalities.");

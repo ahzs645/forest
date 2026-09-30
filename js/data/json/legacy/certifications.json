@@ -1,17 +1,17 @@
 {
   "category": "Forest Certifications",
-  "description": "Third-party forest management certifications a BC licensee can hold. Costs are the audit and system costs; the premium is what certified fibre earns on the log price.",
+  "description": "Third-party forest management certifications a BC licensee can hold. The up-front cost is the system build and the registration audit; the annual cost is running the system (a certification coordinator, internal audits, the advisory group) and the auditors' fees, billed monthly. The premium is what certified fibre earns per m³ once the certificate is issued: small, because certification mostly buys market access. In the year it is booked a standard costs more than it earns; what it pays for is the certificate, the reputation and the buyers.",
   "certifications": [
     {
       "id": "FSC",
       "name": "Forest Stewardship Council (FSC)",
       "initial_cost": 150000,
-      "annual_cost": 25000,
-      "revenue_premium": 0.2,
-      "reputation_bonus": 0.15,
+      "annual_cost": 120000,
+      "premium_per_m3": 2,
+      "reputation_bonus": 0.1,
       "requirements": {
-        "reputation_minimum": 0.6,
-        "biodiversity_minimum": 0.5
+        "compliance": 55,
+        "relationships": 55
       },
       "description": "Most demanding standard, highest market premium; the Nation's consent provisions are part of the audit."
     },
@@ -19,11 +19,12 @@
       "id": "CSA",
       "name": "CSA Z809 (PEFC-endorsed)",
       "initial_cost": 100000,
-      "annual_cost": 18000,
-      "revenue_premium": 0.15,
-      "reputation_bonus": 0.1,
+      "annual_cost": 90000,
+      "premium_per_m3": 1,
+      "reputation_bonus": 0.07,
       "requirements": {
-        "reputation_minimum": 0.4
+        "compliance": 50,
+        "relationships": 45
       },
       "description": "The Canadian sustainable forest management standard; public advisory group, endorsed by PEFC for export markets."
     },
@@ -31,18 +32,21 @@
       "id": "SFI",
       "name": "Sustainable Forestry Initiative (SFI)",
       "initial_cost": 80000,
-      "annual_cost": 15000,
-      "revenue_premium": 0.12,
-      "reputation_bonus": 0.08,
+      "annual_cost": 60000,
+      "premium_per_m3": 0.5,
+      "reputation_bonus": 0.05,
       "requirements": {
-        "reputation_minimum": 0.3
+        "compliance": 45
       },
       "description": "North American standard, the common entry point; annual surveillance audits."
     }
   ],
   "mechanics": {
-    "audit_compliance": "Annual audits check if requirements still met",
-    "loss_penalty": "Losing certification causes 0.3 reputation loss",
-    "stacking": "Multiple certifications can be held simultaneously"
+    "registration_audit_month": 5,
+    "surveillance_audit_month": 10,
+    "audit_compliance": "The registration audit in May issues the certificate when every requirement is met; the premium and the reputation bonus start then. A failed registration gets a corrective-action request and one re-audit in October. A held certificate faces its surveillance audit in October.",
+    "loss_penalty_reputation": 5,
+    "loss_penalty": "A withdrawn application or a suspended certificate costs reputation, and a suspension also gives back the bonus the certificate earned.",
+    "stacking": "One standard per operating year: buyers pay for certified fibre once, whichever standard it carries."
   }
 }

@@ -32,11 +32,6 @@ function scaleLegacyBudget(value) {
   return clampInt(value / 20, -6000, 6000);
 }
 
-function scaleFieldCashFromDollars(value) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 0;
-  return clampInt(value / 20, -6000, 6000);
-}
-
 function scaleDeskBudgetFromDollars(value) {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0;
   return clampInt(value / 10, -20000, 20000);
@@ -389,14 +384,11 @@ async function main() {
   await mkdir(path.dirname(path.resolve('docs/legacy_archive/import-report.json')), { recursive: true });
   await writeFile(path.resolve('docs/legacy_archive/import-report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8');
 
-  // eslint-disable-next-line no-console
   console.log(`Imported ${fieldEvents.length} field events and ${deskEvents.length} desk events into ${outDir}`);
-  // eslint-disable-next-line no-console
   console.log(`Archived source datasets into ${archiveRoot}`);
 }
 
 main().catch((error) => {
-  // eslint-disable-next-line no-console
   console.error(error?.message || String(error));
   process.exitCode = 1;
 });

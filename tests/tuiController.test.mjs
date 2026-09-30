@@ -276,7 +276,10 @@ test('scheduled fallout issues expose why they surfaced in the issue card', () =
   assert.equal(state.contentData.type, 'issue');
   assert.equal(state.contentData.title, 'Heritage Protocol Gap Identified');
   assert.equal(state.contentData.surfaceSeverity, 'warning');
-  assert.match(state.contentData.surfaceReason || '', /relationship damage/i);
+  assert.match(state.contentData.surfaceReason || '', /you took the shortcut “Grease the Layout Crew”.*the Nation caught it/i);
+  // Provenance names the act under the title; who caught it is the
+  // surface reason's to say, so the two lines do not repeat each other.
+  assert.equal(state.contentData.provenance, 'Because you took: Grease the Layout Crew.');
 });
 
 test('temptation outcome notices preview the most likely fallout branch', () => {
@@ -312,8 +315,7 @@ test('temptation outcome notices preview the most likely fallout branch', () => 
   assert.equal(state.contentData.type, 'message');
   assert.match(state.contentData.notice?.heading || '', /^Caught:/);
   assert.equal(state.contentData.notice?.tone, 'warning');
-  assert.match(state.contentData.notice?.body || '', /Likely fallout \(manageable\): Heritage Protocol Gap Identified/i);
-  assert.match(state.contentData.notice?.body || '', /relationship damage/i);
+  assert.match(state.contentData.notice?.body || '', /Fallout \(manageable\): Heritage Protocol Gap Identified\. It lands next season\./i);
 });
 
 test('serious fallout previews keep danger tone on the outcome notice', () => {
@@ -348,7 +350,7 @@ test('serious fallout previews keep danger tone on the outcome notice', () => {
   const state = controller.getState();
   assert.equal(state.contentData.type, 'message');
   assert.equal(state.contentData.notice?.tone, 'danger');
-  assert.match(state.contentData.notice?.body || '', /Likely fallout \(serious\): Formal Investigation/i);
+  assert.match(state.contentData.notice?.body || '', /Fallout \(serious\): Formal Investigation\. It lands next season\./i);
 });
 
 test('serious fallout issues carry danger severity on the issue card', () => {
@@ -866,4 +868,29 @@ test('risk bands honour authored levels and treat deferred fallout as exposure',
   assert.equal(deriveRiskLevel({ effects: { progress: 5, compliance: 2 } }), 'low');
   assert.equal(deriveRiskLevel({ effects: { progress: 5, compliance: -6 } }), 'high');
   assert.equal(deriveRiskLevel({ effects: { progress: 5 }, risk: { chance: 0.5 } }), 'high');
+});
+
+test('a season never deals two cards under the same specific banner, but a scheduled follow-up is always kept', async () => {
+  const { drawDistinctLabel } = await import('../tui/controller.js');
+  const queue = [{ type: 'event', data: { id: 'a', cardLabel: 'Compliance flag' } }];
+  const draws = [];
+  const deal = (cards) => (exclude, advancePending) => {
+    draws.push({ exclude: [...exclude], advancePending });
+    return cards.find((card) => !exclude.includes(card.id)) || null;
+  };
+
+  // A repeated specific banner is redrawn, without ticking the clocks again.
+  const repeated = { id: 'b', cardLabel: 'Compliance flag' };
+  const fresh = { id: 'c', cardLabel: 'Operational issue' };
+  assert.equal(drawDistinctLabel(deal([repeated, fresh]), queue, 0), fresh);
+  assert.equal(draws.at(-1).advancePending, false);
+
+  // A generic banner may repeat.
+  const generic = { id: 'd', cardLabel: 'Operational issue' };
+  queue.push({ type: 'issue', data: generic });
+  assert.equal(drawDistinctLabel(deal([generic]), queue, 0), generic);
+
+  // A caught shortcut's follow-up has already left the pending list: keep it.
+  const followUp = { id: 'e', cardLabel: 'Compliance flag', scheduled: true };
+  assert.equal(drawDistinctLabel(deal([followUp, fresh]), queue, 0), followUp);
 });

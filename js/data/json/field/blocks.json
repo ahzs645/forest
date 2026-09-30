@@ -696,7 +696,7 @@
       "id": "thl-4",
       "name": "Tahltan Village Camp",
       "kind": "waypoint",
-      "description": "Camp near the Tahltan village. Elders walk the cedar harvest boundaries with the crew each season.",
+      "description": "Camp near the Tahltan village. Elders walk the harvest boundaries with the crew each season.",
       "distance": 14,
       "terrain": "flat",
       "hasSupply": true,
@@ -729,12 +729,12 @@
       "id": "thl-7",
       "name": "Block TH-07 - Ealue Lake",
       "kind": "block",
-      "description": "Fly-in block on Ealue Lake with a supply cache on the shore. The bush plane drops gear when the ceiling lifts; the lakeshore reserve will be wide.",
+      "description": "Road-end block at Ealue Lake, east of Highway 37 on the Ealue Lake road. The cache on the shore is stocked by float plane when the ceiling lifts; the lakeshore reserve will be wide.",
       "distance": 20,
       "terrain": "hilly",
       "hasSupply": true,
-      "hazards": ["weather_delay"],
-      "features": ["remote_camp", "bush_plane", "lake", "spruce_forest"]
+      "hazards": ["grade"],
+      "features": ["lake", "float_plane_cache", "spruce_forest"]
     },
     {
       "id": "thl-8",
@@ -773,12 +773,414 @@
       "id": "thl-11",
       "name": "Block TH-11 - Highland Bench",
       "kind": "block",
-      "description": "The last block on the file, on a subarctic bench. The most remote timber in the province, bar none.",
+      "description": "The last block on the file, on a subarctic bench, about as far from a mill as timber gets.",
       "distance": 15,
       "terrain": "cutblock",
       "hasSupply": true,
       "hazards": [],
       "features": ["destination", "remote", "subalpine_forest", "creek"]
+    }
+  ],
+  "vancouver-island-coast": [
+    {
+      "id": "vic-1",
+      "name": "Port Alberni Log Yard",
+      "kind": "waypoint",
+      "description": "Dryland sort on the Alberni Inlet waterfront. Half the crew came over on the Nanaimo ferry last night; the trucks fuel up where the log haulers do.",
+      "distance": 0,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["town", "log_sort"]
+    },
+    {
+      "id": "vic-2",
+      "name": "Stamp River Bridge",
+      "kind": "waypoint",
+      "description": "Log-stringer bridge over the Stamp. Chinook and sockeye hold in the pool below, and nothing touches the water outside the in-stream window.",
+      "distance": 12,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["river_crossing", "fish_timing", "bridge_weight"],
+      "features": ["river", "bridge", "salmon_river"]
+    },
+    {
+      "id": "vic-3",
+      "name": "Block VI-03 - Second-Growth Bench",
+      "kind": "block",
+      "description": "Sixty-year-old Douglas-fir and hemlock on a south-facing bench. The last cut edge went down in a November southeaster; this boundary has to be windfirm.",
+      "distance": 14,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["windthrow", "hang_ups"],
+      "features": ["blowdown", "creek"]
+    },
+    {
+      "id": "vic-4",
+      "name": "Sproat Lake Camp",
+      "kind": "waypoint",
+      "description": "Crew camp on the Sproat Lake side. The Tseshaht and Hupačasath referral contacts both know the crew is out here and want a call before any ribbon goes up near the lake.",
+      "distance": 16,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["first_nation", "base_camp", "lake"]
+    },
+    {
+      "id": "vic-5",
+      "name": "Block VI-05 - Cedar Draw",
+      "kind": "block",
+      "description": "Old-growth redcedar and hemlock in a steep draw off the lake. Bark-stripped cedar on the lower boundary and moss platforms on the big limbs: the CMT survey and the murrelet habitat call will both move the line.",
+      "distance": 15,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["grade", "falling_timber"],
+      "features": ["old_growth", "cedar_stand", "culturally_modified_trees", "murrelet_habitat", "creek"]
+    },
+    {
+      "id": "vic-6",
+      "name": "Franklin River Main",
+      "kind": "waypoint",
+      "description": "Radio-assisted mainline. Call your kilometres on the road channel or meet a loaded logging truck on a blind corner.",
+      "distance": 16,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["traffic", "narrow"],
+      "features": ["road_junction", "radio_repeater"]
+    },
+    {
+      "id": "vic-7",
+      "name": "Block VI-07 - Gully Fan",
+      "kind": "block",
+      "description": "Steep second growth above an alluvial fan. The gully has run twice since the last harvest; the terrain stability assessment decides whether this block has a lower boundary at all.",
+      "distance": 14,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["debris_flow", "erosion", "grade"],
+      "features": ["creek", "fish_habitat"]
+    },
+    {
+      "id": "vic-8",
+      "name": "Block VI-08 - Watershed Bench",
+      "kind": "block",
+      "description": "Upslope of a community water intake. Every crossing gets a sediment plan, and the water purveyor wants to read it before the district does.",
+      "distance": 13,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["water_intake", "erosion"],
+      "features": ["community_water", "watershed", "creek"]
+    },
+    {
+      "id": "vic-9",
+      "name": "Km 38 Fuel Cache",
+      "kind": "waypoint",
+      "description": "Contractor fuel cache and a repeater at Km 38 on the Nahmint Main. The mainline dispatcher logs you in and out.",
+      "distance": 15,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["fuel_cache", "radio_repeater"]
+    },
+    {
+      "id": "vic-10",
+      "name": "Summit Pull-out",
+      "kind": "waypoint",
+      "description": "The mainline tops out in cloud. The rain gauge up here reads double what town gets, and a cougar has been using the road as a game trail.",
+      "distance": 14,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["fog", "grade", "cougar"],
+      "features": ["viewpoint", "coastal_influence"]
+    },
+    {
+      "id": "vic-11",
+      "name": "Block VI-11 - Highway Viewscape",
+      "kind": "block",
+      "description": "Hemlock-fir slope in full view of Highway 4 and the lake traffic. Partial retention VQO, and Roosevelt elk trails through the lower draw.",
+      "distance": 16,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["visual_constraint", "wildlife"],
+      "features": ["visual_quality_zone", "elk_range", "creek"]
+    },
+    {
+      "id": "vic-12",
+      "name": "Block VI-12 - Inlet Headland",
+      "kind": "block",
+      "description": "The last block on the file, above the inlet. Salal to your waist, a salmon stream at the toe, and a southwesterly up the channel every afternoon.",
+      "distance": 15,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": ["wind"],
+      "features": ["destination", "coastal_influence", "salmon_stream", "old_growth"]
+    }
+  ],
+  "kootenay-wetbelt": [
+    {
+      "id": "kw-1",
+      "name": "Nelson Works Yard",
+      "kind": "waypoint",
+      "description": "Contractor yard on the edge of Nelson. The avalanche transceivers stay in the truck until the high roads melt out.",
+      "distance": 0,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["town", "mill_yard"]
+    },
+    {
+      "id": "kw-2",
+      "name": "Salmo River Bridge",
+      "kind": "waypoint",
+      "description": "Concrete bridge over the Salmo. Freshet runs brown and high into late June off the snowpack above, and the bull trout people watch every crossing.",
+      "distance": 13,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["river_crossing", "flood"],
+      "features": ["river", "bridge", "fish_habitat"]
+    },
+    {
+      "id": "kw-3",
+      "name": "Block KW-03 - Cedar-Hemlock Flats",
+      "kind": "block",
+      "description": "Valley-bottom ICH: redcedar and hemlock with devil's club in every seep. Root rot in the old hemlock means the danger-tree calls take longer than the ribbon.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["falling_timber", "hang_ups"],
+      "features": ["old_growth", "cedar_stand", "creek"]
+    },
+    {
+      "id": "kw-4",
+      "name": "Block KW-04 - Intake Slope",
+      "kind": "block",
+      "description": "A dozen household water licences and an orchard take water from the creek below. The water users want the hydrology assessment before they want to meet you.",
+      "distance": 12,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["water_intake", "erosion"],
+      "features": ["community_water", "watershed", "creek"]
+    },
+    {
+      "id": "kw-5",
+      "name": "Sheep Creek Camp",
+      "kind": "waypoint",
+      "description": "Crew camp at the old mining townsite up the Sheep Creek FSR. Good water, bad cell service, and a propane fridge that works when it wants to.",
+      "distance": 15,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["base_camp", "creek"]
+    },
+    {
+      "id": "kw-6",
+      "name": "Block KW-06 - Avalanche Chute",
+      "kind": "block",
+      "description": "Subalpine fir and spruce at the ESSF edge above the cedar. The upper corner stops where the slide path starts, and the snow avalanche assessment draws that line, not the cruiser.",
+      "distance": 16,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["avalanche", "grade", "rockslide"],
+      "features": ["subalpine_forest", "creek"]
+    },
+    {
+      "id": "kw-7",
+      "name": "Kootenay Pass Pull-out",
+      "kind": "waypoint",
+      "description": "Highway 3 at the summit. The slide paths above the road are bare green scars in summer, and cloud can close the pass to a crawl in any month.",
+      "distance": 12,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["fog", "grade", "avalanche"],
+      "features": ["pass", "viewpoint"]
+    },
+    {
+      "id": "kw-8",
+      "name": "Block KW-08 - Larch-Fir Bench",
+      "kind": "block",
+      "description": "Western larch and Douglas-fir on a sunny bench. The biggest larch are fire-scarred veterans, and they are the retention.",
+      "distance": 14,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["snag_hazard"],
+      "features": ["fire_veterans", "creek"]
+    },
+    {
+      "id": "kw-9",
+      "name": "Summit Creek Cache",
+      "kind": "waypoint",
+      "description": "Fuel cache and a radio repeater at the bottom of the east side. The Creston valley opens up below, all orchards and wetland.",
+      "distance": 13,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["fuel_cache", "radio_repeater"]
+    },
+    {
+      "id": "kw-10",
+      "name": "Spur 4 Culvert",
+      "kind": "waypoint",
+      "description": "Spur 4 off the Summit Creek FSR crosses a steep creek on a culvert the spring runoff half undercut. The fill is soft and the inlet is packed with debris.",
+      "distance": 15,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["washout", "erosion"],
+      "features": ["creek", "culvert"]
+    },
+    {
+      "id": "kw-11",
+      "name": "Block KW-11 - Huckleberry Slope",
+      "kind": "block",
+      "description": "An old burn gone to huckleberry above the block: grizzlies in August, pickers in September. The wildlife danger assessment comes before the boundary.",
+      "distance": 14,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["grizzly", "grade"],
+      "features": ["wildlife", "wildfire_scar"]
+    },
+    {
+      "id": "kw-12",
+      "name": "Block KW-12 - Valley Edge",
+      "kind": "block",
+      "description": "The last block on the file, on the benchland above the Creston flats. It is in Ktunaxa territory, and yaqan nuʔkiy's lands staff have asked for the archaeology overview before the boundary is final.",
+      "distance": 14,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": ["cultural_protocol"],
+      "features": ["destination", "first_nation", "creek"]
+    }
+  ],
+  "okanagan-shuswap-drybelt": [
+    {
+      "id": "os-1",
+      "name": "Vernon Contractor Yard",
+      "kind": "waypoint",
+      "description": "Gravel yard off Highway 97 on the north edge of Vernon. The fire danger board at the gate reads HIGH before the coffee is poured.",
+      "distance": 0,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["town"]
+    },
+    {
+      "id": "os-2",
+      "name": "Range Unit Gate",
+      "kind": "waypoint",
+      "description": "Cattle guard and range fence where the bunchgrass meets the first fir. The range tenure holder's cows are on this unit until September; close the gate.",
+      "distance": 12,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["cattle", "ranch_interface", "dust"],
+      "features": ["ranch", "grassland"]
+    },
+    {
+      "id": "os-3",
+      "name": "Block OS-03 - Fir Benchland",
+      "kind": "block",
+      "description": "Open Douglas-fir benchland with ponderosa pine on the south slopes. The mule deer winter range order caps what comes out, and the big fire-scarred veterans are the retention.",
+      "distance": 15,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["snag_hazard"],
+      "features": ["fire_veterans", "mule_deer_winter_range", "dry_conditions"]
+    },
+    {
+      "id": "os-4",
+      "name": "Block OS-04 - Interface Fuel Break",
+      "kind": "block",
+      "description": "Thinning-from-below behind a subdivision. The prescription is a fuel break as much as a harvest, and the homeowners have the FOM bookmarked.",
+      "distance": 13,
+      "terrain": "flat",
+      "hasSupply": false,
+      "hazards": ["visual_constraint"],
+      "features": ["community_interface", "wildfire_resilience", "visual_quality_zone"]
+    },
+    {
+      "id": "os-5",
+      "name": "Harris Creek Camp",
+      "kind": "waypoint",
+      "description": "Crew camp on the Harris Creek FSR. The Okanagan Indian Band's referral staff asked for a call before any ribbon goes up near the old trail network.",
+      "distance": 14,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["first_nation", "base_camp", "creek"]
+    },
+    {
+      "id": "os-6",
+      "name": "Block OS-06 - Burn Edge",
+      "kind": "block",
+      "description": "Salvage along the edge of a recent wildfire. Fire-killed fir and pine stand in rows, and the danger-tree assessor walks ahead of the ribbon.",
+      "distance": 16,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["snag_hazard", "falling_timber"],
+      "features": ["wildfire_scar", "dry_conditions"]
+    },
+    {
+      "id": "os-7",
+      "name": "Shuswap River Bridge",
+      "kind": "waypoint",
+      "description": "Steel bridge over the Shuswap. Chinook hold in the pools below in late summer, and the in-stream window is written into every road permit.",
+      "distance": 14,
+      "terrain": "river",
+      "hasSupply": false,
+      "hazards": ["river_crossing", "fish_timing"],
+      "features": ["river", "bridge", "salmon_river"]
+    },
+    {
+      "id": "os-8",
+      "name": "Initial Attack Cache",
+      "kind": "waypoint",
+      "description": "Fire suppression cache and a water tender where the pavement ends on the Creighton Valley Road. The fire danger rating and the shutdown hours are posted on the door.",
+      "distance": 13,
+      "terrain": "flat",
+      "hasSupply": true,
+      "hazards": [],
+      "features": ["fire_cache", "fuel_cache"]
+    },
+    {
+      "id": "os-9",
+      "name": "Block OS-09 - Ponderosa Face",
+      "kind": "block",
+      "description": "A steep south face of ponderosa pine and bunchgrass in the highway's line of sight. The soils ravel on the skid trails, and the VQO wants a boundary that follows the landform.",
+      "distance": 15,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["grade", "erosion", "visual_constraint"],
+      "features": ["visual_quality_zone", "dry_conditions"]
+    },
+    {
+      "id": "os-10",
+      "name": "Block OS-10 - Intake Draw",
+      "kind": "block",
+      "description": "The one wet draw on the file, above a community water intake. Cottonwood and birch along the creek, and everybody downstream watching it.",
+      "distance": 12,
+      "terrain": "hilly",
+      "hasSupply": false,
+      "hazards": ["water_intake", "erosion"],
+      "features": ["community_water", "watershed", "creek"]
+    },
+    {
+      "id": "os-11",
+      "name": "Lookout Ridge",
+      "kind": "waypoint",
+      "description": "Old fire lookout road on the ridge. In August the smoke from somebody else's fire sits in the valley below you.",
+      "distance": 14,
+      "terrain": "steep",
+      "hasSupply": false,
+      "hazards": ["exposure", "grade"],
+      "features": ["viewpoint", "ridge"]
+    },
+    {
+      "id": "os-12",
+      "name": "Block OS-12 - Shuswap Benchlands",
+      "kind": "block",
+      "description": "The last block on the file, on the benches toward the Shuswap. It is in Splatsin territory, and their referral asks for a joint walk of the draw before the boundary is final.",
+      "distance": 15,
+      "terrain": "cutblock",
+      "hasSupply": true,
+      "hazards": ["cultural_protocol"],
+      "features": ["destination", "first_nation", "creek"]
     }
   ]
 }

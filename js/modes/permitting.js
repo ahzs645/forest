@@ -6,6 +6,7 @@
  */
 
 import { checkForEvent } from '../events.js';
+import { getDayRng } from '../events/dayRng.js';
 import { runDaySituation } from '../journey/daySituation.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { buildOfficeWindowFrames, buildStampFrames } from '../scene/textmode/scenes.js';
@@ -15,6 +16,10 @@ import { getOperationalProgress, recordProgressMilestones } from '../journey.js'
 import { getDiscoveryTagNotes, getJourneyDiscoveryTags } from '../data/discoveryTags.js';
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
+import { checkPermittingEndConditions } from './shared/endConditions.js';
+import { describeGoodwillChange, readGoodwill } from '../events/resolution.js';
+import { fpbcReviewDaysLeft } from '../events/selection.js';
+import { checkpointDeskDay, closeDeskDay, dropDuplicateDeskEnergy, resumingDeskDay } from '../journey/deskMechanics.js';
 import {
   DAILY_PERMIT_THROUGHPUT,
   PERMIT_TYPES,
@@ -24,6 +29,7 @@ import {
   ensurePermitFiles,
   formatPermitClockLines,
   getChaseableFiles,
+  getDecisionMaker,
   getPermitFileById,
   getPermitFiles,
   getPermitFilesInLane,
@@ -64,6 +70,16 @@ function sentence(text) {
  * actually missing from the file; `summary` takes the file it is about so the
  * letter reads like one about that block, road, or camp rather than a form.
  */
+// What a completeness screen bounces, by permit type. Appraisal data is a
+// cutting-permit item; a road use permit on an existing FSR is about the haul.
+const PACKAGE_COMPLETENESS_GAPS = {
+  CP: ['the FOM consistency statement', 'the appraisal data submission'],
+  RP: ['the Exhibit A road location map', 'the FOM consistency statement'],
+  RUP: ['the haul period', 'the vehicle configurations'],
+  SUP: ['the occupancy map', 'the site plan for the camp footprint'],
+  HCA: ['the project description', 'the assessment methodology'],
+};
+
 const PERMIT_REVISION_PROFILES = [
   {
     id: 'fish-passage',
@@ -120,8 +136,13 @@ const PERMIT_REVISION_PROFILES = [
   },
   {
     id: 'consultation',
-    title: 'Referral response outstanding',
-    summary: (file, ctx) => `Referral response from ${ctx.nation} is outstanding; the ${ctx.referralCalendarDays}-day window closes Day ${ctx.referralClosesDay}. Engagement record does not show the site visit that was promised.`,
+    title: 'Consultation record incomplete',
+    // A letter lands on a file the district has already referred and decided
+    // on, so its referral window is behind it: the gap is in the record, not
+    // an outstanding response with a closing date nobody set.
+    summary: (file, ctx) => (file?.type === 'HCA'
+      ? `The application does not show ${ctx.nation}'s input on the site, or the site visit that was promised.`
+      : `The consultation record does not show how ${ctx.nation}'s referral response was addressed, or the site visit that was promised.`),
     tags: ['nations', 'cultural', 'archaeology', 'consultation', 'values'],
     types: ['CP', 'SUP', 'HCA', 'RP'],
     pressure: {
@@ -141,6 +162,33 @@ const PERMIT_REVISION_PROFILES = [
       compliance: 1,
       politicalCapital: -2,
       relationships: { nations: -2 }
+    }
+  },
+  {
+    // The Archaeology Branch's own letter: an HCA permit is decided on the
+    // archaeology, not on sightlines or culvert sizing.
+    id: 'heritage-assessment',
+    title: 'Archaeological assessment detail',
+    summary: (file) => `The Archaeology Branch wants the shovel-test results and the site boundaries mapped against ${file?.blockLabel || 'the block'}; the assessment report cites them but does not attach them.`,
+    tags: ['archaeology', 'cultural', 'nations'],
+    types: ['HCA'],
+    pressure: {
+      publicReview: 1
+    },
+    clean: {
+      label: 'Attach the assessment detail',
+      note: 'You attach the shovel-test logs and the site-boundary mapping, and show where the layout stays off the features.',
+      scrutiny: -3,
+      compliance: 4,
+      relationships: { nations: 1, agencies: 1 }
+    },
+    fast: {
+      label: 'Refile with the summary table',
+      note: 'The file moves, but the Branch reads a table where it asked for the data.',
+      scrutiny: 4,
+      compliance: 1,
+      politicalCapital: -1,
+      relationships: { agencies: -1 }
     }
   },
   {
@@ -173,7 +221,7 @@ const PERMIT_REVISION_PROFILES = [
     title: 'Access engineering',
     summary: () => 'Exhibit A map does not show the deactivation intent; terrain stability field assessment is referenced but not attached.',
     tags: ['road', 'access', 'steep', 'karst', 'winter-road'],
-    types: ['RP', 'RUP', 'CP'],
+    types: ['RP', 'CP'],
     pressure: {
       engineering: 4,
       hydrology: 1,
@@ -196,9 +244,38 @@ const PERMIT_REVISION_PROFILES = [
     }
   },
   {
+    id: 'road-use-terms',
+    title: 'Road use terms',
+    summary: () => 'The district wants the haul period, the truck configurations and a maintenance arrangement with the road\'s primary user before it issues the road use permit.',
+    tags: ['road', 'access', 'winter-road'],
+    types: ['RUP'],
+    pressure: {
+      engineering: 2,
+      timing: 2
+    },
+    clean: {
+      label: 'Settle the road use terms',
+      note: 'You file the haul schedule and truck configurations and sign the maintenance-sharing arrangement with the primary user.',
+      scrutiny: -2,
+      compliance: 3,
+      relationships: { ministry: 1 }
+    },
+    fast: {
+      label: 'Send the haul schedule, sort maintenance later',
+      note: 'The file moves, but the maintenance question stays open on the district\'s desk.',
+      scrutiny: 3,
+      compliance: 1,
+      politicalCapital: -1,
+      relationships: { ministry: -1 }
+    }
+  },
+  {
     id: 'package-completeness',
     title: 'Application incomplete',
-    summary: () => 'Application is missing the FOM consistency statement and the appraisal data submission; district will not start the referral clock until they are attached.',
+    summary: (file) => {
+      const missing = PACKAGE_COMPLETENESS_GAPS[file?.type] || PACKAGE_COMPLETENESS_GAPS.CP;
+      return `The package is missing ${missing.join(' and ')}; ${file?.type === 'HCA' ? 'the Archaeology Branch' : 'the district'} will not start the ${file?.type === 'RUP' || file?.type === 'HCA' ? 'file' : 'referral clock'} until they are attached.`;
+    },
     tags: [],
     types: ['CP', 'RP', 'RUP', 'SUP', 'HCA'],
     completeness: true,
@@ -209,7 +286,7 @@ const PERMIT_REVISION_PROFILES = [
     },
     clean: {
       label: 'Complete the package',
-      note: 'You attach the FOM consistency statement and the appraisal data submission and refile.',
+      note: (file) => `You attach ${(PACKAGE_COMPLETENESS_GAPS[file?.type] || PACKAGE_COMPLETENESS_GAPS.CP).join(' and ')} and refile.`,
       scrutiny: -2,
       compliance: 3,
       relationships: { ministry: 1, agencies: 1 }
@@ -313,8 +390,7 @@ function formatPermittingStageLabel(stage, chainId = null) {
  * the next click will do — the same step the outcome names as completed once
  * it has been clicked — so the day card and the outcome line never disagree.
  */
-function getPermittingLaneAction(journey) {
-  const chainId = getPermittingPaperworkChainId(journey);
+function getPermittingLaneAction(journey, chainId = getPermittingPaperworkChainId(journey)) {
   const professional = getPermittingProfessionalSnapshot(journey);
   const chain = professional?.[`${chainId}Chain`] || null;
   const stepIndex = chain
@@ -350,8 +426,14 @@ function getPermittingLaneAction(journey) {
   };
 }
 
-function getPermittingLaneProgressSummary(laneAction, permits) {
-  return `${laneAction.actionLabel}: ${laneAction.stageIndex}/${laneAction.stageCount} | Backlog ${permits?.backlog || 0} | Drafted ${permits?.drafting || 0} | Screening ${permits?.submitted || 0} | Referral ${permits?.inReferral || 0} | Decision ${permits?.inReview || 0}`;
+/** The professional file's own action: Compliance Admin, or Renew Registration when it has lapsed. */
+function getComplianceAdminLabel(journey) {
+  return getPermittingProfessionalSnapshot(journey)?.registrationActive === false ? 'Renew Registration' : 'Compliance Admin';
+}
+
+/** The stage to show beside a lane: only the area's paperwork lane has steps. */
+function getLaneStageLabel(laneAction, lane) {
+  return laneAction.chainId !== 'registration' && lane === laneAction.laneLabel ? laneAction.stageLabel : null;
 }
 
 function progressPermittingPaperworkChain(journey, chainId, stepCount = 1) {
@@ -632,12 +714,24 @@ function buildPermittingActionGuidance(journey) {
   const queueWork = describeQueueWork(journey);
   const steps = [];
   let lane = laneAction.laneLabel;
-  let headline = `${laneAction.actionLabel} to keep the active file moving.`;
+  let headline = `${laneAction.chainId === 'registration' ? getComplianceAdminLabel(journey) : laneAction.actionLabel} to keep the active file moving.`;
+
+  // The last day: a clean answer is decided after the deadline (see
+  // buildActionOptions), so the guide does not call it the move.
+  if (revisionQueue.length > 0 && (journey.day || 1) >= journey.deadline) {
+    const ticket = revisionQueue[0];
+    const file = getPermitFileById(journey, ticket.fileId);
+    lane = 'Deficiency letters';
+    headline = file?.deficiencyProfileId === 'package-completeness'
+      ? `Last day: ${ticket.fileLabel || ticket.id} goes back through screening either way, so no answer reaches the District Manager before the deadline.`
+      : `Last day: a clean response on ${ticket.fileLabel || ticket.id} is decided after the deadline; only a fast-track reaches the District Manager tonight, and a thin answer is likelier to come back.`;
+    return { lane, headline, steps };
+  }
 
   if (revisionQueue.length > 0 && !queueWork) {
     const ticket = revisionQueue[0];
     lane = 'Deficiency letters';
-    headline = `Clean response: ${ticket.fileLabel || ticket.id} (${ticket.title}). Nothing is moving in the district queue until the deficiency letters are answered.`;
+    headline = `Clean response: ${ticket.fileLabel || ticket.id} (${ticket.title}). The letters are the only work on your desk; the district's clocks run on their own.`;
     pushPermittingGuideStep(steps, ticket.summary);
     return { lane, headline, steps };
   }
@@ -688,7 +782,7 @@ function buildPermittingActionGuidance(journey) {
 
   if (professionalIssues.length > 0) {
     lane = 'Professional file';
-    headline = `${laneAction.actionLabel} to clear ${professionalIssues[0]} before more scrutiny lands on the queue.`;
+    headline = `${getComplianceAdminLabel(journey)} to clear ${professionalIssues[0]} before more scrutiny lands on the queue.`;
     pushPermittingGuideStep(steps, 'Registration and filing drag both feed scrutiny.');
     return { lane, headline, steps };
   }
@@ -831,7 +925,7 @@ function scoreRevisionProfiles(journey, file = null) {
         // one, and a file the screen bounced is incomplete by definition.
         if (profile.types && !profile.types.includes(file.type)) score -= 12;
         if (file.type === 'RP' && (profile.id === 'access-engineering' || profile.id === 'fish-passage')) score += 4;
-        if (file.type === 'RUP' && profile.id === 'access-engineering') score += 6;
+        if (file.type === 'RUP' && profile.id === 'road-use-terms') score += 6;
         if (file.touchesStream && profile.id === 'fish-passage') score += 3;
         if (file.heritageClass === 'heavy' && profile.id === 'consultation') score += 5;
         if (file.heritageClass === 'moderate' && profile.id === 'consultation') score += 2;
@@ -848,7 +942,16 @@ function scoreRevisionProfiles(journey, file = null) {
 }
 
 function pickRevisionProfile(journey, index = 0, file = null) {
-  const profiles = scoreRevisionProfiles(journey, file);
+  // A gap the licensee has already answered cleanly on this file is closed;
+  // the letter has to be about something else.
+  const resolved = new Set(file?.resolvedDeficiencies || []);
+  // A letter has to be one this kind of permit can get: scoring only
+  // discouraged the rest, and a heritage permit still drew a visual impact
+  // assessment when the coast's public-review pressure outweighed it.
+  const scored = scoreRevisionProfiles(journey, file)
+    .filter((profile) => !file?.type || !profile.types || profile.types.includes(file.type));
+  const open = scored.filter((profile) => !resolved.has(profile.id));
+  const profiles = open.length ? open : scored;
   if (!profiles.length) {
     return PERMIT_REVISION_PROFILES[PERMIT_REVISION_PROFILES.length - 1];
   }
@@ -858,12 +961,14 @@ function pickRevisionProfile(journey, index = 0, file = null) {
   return profiles[index % profiles.length];
 }
 
+function resolveRevisionResponse(response, file) {
+  if (!response || typeof response.note !== 'function') return response;
+  return { ...response, note: response.note(file) };
+}
+
 function buildDeficiencySummary(profile, file, journey) {
-  const referral = getReferralWindow(journey);
   const ctx = {
     nation: nationName(journey),
-    referralCalendarDays: referral.calendarDays,
-    referralClosesDay: (journey?.day || 1) + referral.deskDays,
     streamClass: file?.touchesStream ? 'S3' : 'S4',
   };
   if (typeof profile.summary === 'function') return profile.summary(file, ctx);
@@ -911,8 +1016,8 @@ function pushRevisionTicket(journey, file, source = {}) {
     completeness: Boolean(profile.completeness),
     title: profile.title,
     summary: buildDeficiencySummary(profile, file, journey),
-    clean: profile.clean,
-    fast: profile.fast,
+    clean: resolveRevisionResponse(profile.clean, file),
+    fast: resolveRevisionResponse(profile.fast, file),
     sourcePhase: journey.currentPhase || 'review',
     source: source.type || source.reason || 'review'
   };
@@ -1003,6 +1108,8 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
     energy: selectedMode === 'fast' ? 6 : 8,
     stress: selectedMode === 'fast' ? 7 : 4
   });
+  const goodwillBefore = readGoodwill(journey);
+  const scrutinyBefore = Math.round(Number(journey.scrutiny || 0));
   for (const entry of cleared) {
     applyRevisionEffects(journey, entry[selectedMode] || entry.clean);
   }
@@ -1013,7 +1120,12 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
     if (index !== -1) queue.splice(index, 1);
     const file = entry.fileId ? getPermitFileById(journey, entry.fileId) : null;
     if (file) {
-      resubmitPermitFile(journey, file.id, { completeness: Boolean(entry.completeness) });
+      resubmitPermitFile(journey, file.id, {
+        completeness: Boolean(entry.completeness),
+        clean: selectedMode === 'clean',
+        fastTracked: selectedMode === 'fast',
+        answeredProfileId: entry.profileId,
+      });
       refiled.push(file);
     }
   }
@@ -1032,17 +1144,28 @@ export function resolvePermitRevisionResponse(journey, ticketId = null, mode = '
   }
 
   if (selectedMode === 'fast') {
-    messages.push('It keeps the file moving, but it adds heat to the review trail.');
+    messages.push('It goes back on tonight\'s pile, but a thin answer is likelier to come back, and it adds heat to the review trail.');
   } else {
     messages.push('The file reads cleaner and should draw less scrutiny on the next pass.');
   }
+  // What the answers cost on the meters, said out loud: a run of fast-tracks
+  // used to spend the last of the goodwill without a line on screen.
+  const scrutinyAfter = Math.round(Number(journey.scrutiny || 0));
+  if (scrutinyAfter !== scrutinyBefore) {
+    messages.push(`Scrutiny ${scrutinyAfter > scrutinyBefore ? 'rose' : 'eased'} to ${scrutinyAfter}%.`);
+  }
+  messages.push(...describeGoodwillChange(journey, goodwillBefore));
 
   const pressure = journey?.permits?.phase3Pressure || derivePermittingConstraintState(journey);
   const roadIntel = getPermittingRoadAssetContext(journey);
-  if (ticket.profileId === 'community-watershed' && pressure.hydrology > 0) {
+  if (selectedMode === 'fast') {
+    // A lean refile has not lined anything up; say nothing it did not do.
+  } else if (ticket.profileId === 'community-watershed' && pressure.hydrology > 0) {
     messages.push('The watershed response is now lined up with the hydrology concerns on the file.');
   } else if (ticket.profileId === 'access-engineering' && roadIntel.engineering > 0) {
     messages.push('The road package now lines up with the access engineering issues on the file.');
+  } else if (ticket.fileType === 'HCA' && ['consultation', 'heritage-assessment'].includes(ticket.profileId)) {
+    messages.push('The heritage file now shows the Archaeology Branch what it asked for, and the Nation can see where its input went.');
   } else if ((ticket.profileId === 'visual-quality' || ticket.profileId === 'consultation') && pressure.publicReview > 0) {
     messages.push('The public-facing package reads more defensible for the district and for anyone who pulls the FOM.');
   } else if (ticket.profileId === 'fish-passage' && pressure.timing > 0) {
@@ -1067,37 +1190,62 @@ export async function runPermittingDay(game) {
   ensurePermitFiles(journey);
   ensurePermittingRevisionState(journey);
   ensurePermittingProfessionalState(journey);
+  dropDuplicateDeskEnergy(journey);
+  // The debrief measures spending against what the desk started with.
+  if (!Number.isFinite(journey.budgetStart)) journey.budgetStart = journey.resources?.budget || 0;
+  // A follow-up that fired before the day opened can spend the last of it.
+  if (endRunIfSpent(journey)) return;
+
+  // A reload mid-day picks up after the last settled decision instead of
+  // replaying the morning (js/journey/deskMechanics.js).
+  const resumed = resumingDeskDay(journey);
 
   // Morning at the office: the season outside the window, coffee inside.
-  if (typeof ui.playScene === 'function') {
+  if (!resumed && typeof ui.playScene === 'function') {
     await ui.playScene(buildOfficeWindowFrames({
       weatherId: journey.weather?.id,
       season: journey.season?.currentSeason,
       seed: journey.day,
     }), { delay: 140, holdLastFrame: false, ambient: 'work' });
   }
+  if (resumed) {
+    startDay(journey, { resuming: true });
+    if (resumed.situation) journey.recentSituationContext = { day: journey.day, ...resumed.situation };
+  }
 
   const daysRemaining = journey.deadline - journey.day;
-  const progressBeforeDay = getOperationalProgress(journey);
-  let meetingsToday = 0;
-  let crisisMode = daysRemaining <= 5;
+  const progressBeforeDay = resumed?.progressBeforeDay ?? getOperationalProgress(journey);
+  let meetingsToday = resumed?.meetingsToday || 0;
+  let crisisMode = Boolean(resumed?.crisisMode) || daysRemaining <= 5;
 
   // Check for random event at start of day. Day 1 is event-free onboarding so
   // the player sees the normal permitting loop before any exception arrives.
-  const event = journey.day > 1 ? checkForEvent(journey) : null;
+  const event = !resumed && journey.day > 1 ? checkForEvent(journey) : null;
   if (event) {
     const outcome = await runDaySituation(game, event, {
       frame: {
         dayHeader: buildPermittingDayHeader(journey),
         statusLine: buildPermittingStatusLine(journey),
         onRender: () => updatePermittingMissionStatus(ui, journey),
+        onResolved: ({ spendsDay, setAside }) => {
+          if (spendsDay) spendDay(journey);
+          reconcilePermitFiles(journey);
+          checkpointDeskDay(game, {
+            progressBeforeDay,
+            situation: { title: event.title || 'the situation', setAside },
+          });
+        },
       },
       setAsideDescription: 'Not today. Keep the day for the queue.',
     });
     if (outcome.gameOver) return;
-    if (outcome.spendsDay) spendDay(journey);
-    // An authored situation may have moved the counters; bring the files up.
-    reconcilePermitFiles(journey);
+    // A situation that spends the last of the goodwill or the budget ends the
+    // run there. The outcome has already said "the file stops here"; a day's
+    // work after it (and a district meeting that won the goodwill back) made
+    // that a lie.
+    if (endRunIfSpent(journey)) return;
+    // The day was spent and the counters reconciled as the situation resolved,
+    // so the checkpoint holds the settled queue.
     ensurePermittingRevisionState(journey);
   }
 
@@ -1166,6 +1314,8 @@ export async function runPermittingDay(game) {
       crisisMode = true;
     }
 
+    if (dayIsSpent(journey)) checkpointDeskDay(game, { progressBeforeDay, meetingsToday, crisisMode });
+
     // Update status panels
     ui.updateAllStatus(journey);
     settleDayPass(journey, freeChoices, ui);
@@ -1173,6 +1323,18 @@ export async function runPermittingDay(game) {
 
   // End of day processing
   await endOfDayProcessing(game, meetingsToday, crisisMode, progressBeforeDay);
+}
+
+/**
+ * End the run on the spot when goodwill, budget or the specialist is spent.
+ * @returns {boolean} true when the run has ended
+ */
+function endRunIfSpent(journey) {
+  const ended = checkPermittingEndConditions(journey);
+  if (!ended?.gameOver) return false;
+  journey.isGameOver = true;
+  journey.gameOverReason = ended.reason;
+  return true;
 }
 
 /**
@@ -1250,10 +1412,10 @@ function buildPermittingContextLines(journey) {
   const lines = [
     `Pipeline: backlog ${permits.backlog || 0} | drafted ${permits.drafting || 0} | screening ${permits.submitted || 0} | referral ${permits.inReferral || 0} | decision ${permits.inReview || 0} | deficiency ${permits.needsRevision || 0}`,
     ...formatPermitClockLines(journey, 4),
-    `Lane: ${guidance.lane} | Stage: ${laneAction.stageLabel}`,
+    [`Lane: ${guidance.lane}`, getLaneStageLabel(laneAction, guidance.lane)].filter(Boolean).join(' | Stage: '),
   ];
   if (guidance.headline) lines.push(`Next best move: ${guidance.headline}`);
-  lines.push(`Scrutiny: ${Math.round(journey.scrutiny || 0)}%`);
+  lines.push(`Scrutiny: ${Math.round(journey.scrutiny || 0)}%${describeWatchedDesk(journey)}`);
   if (Number.isFinite(journey.regulations?.complianceScore)) {
     lines.push(`Regulatory standing: ${Math.round(journey.regulations.complianceScore)}%`);
   }
@@ -1283,10 +1445,11 @@ function updatePermittingMissionStatus(ui, journey) {
   const permits = journey.permits;
   const permitProgress = Math.round((permits.approved / permits.target) * 100);
 
+  const stage = getLaneStageLabel(laneAction, guidance.lane);
   const facts = [
     { label: 'Days left', value: `${daysRemaining}`, tone: daysRemaining <= 5 ? 'danger' : daysRemaining <= 10 ? 'warn' : undefined },
     { label: 'Lane', value: guidance.lane },
-    { label: 'Stage', value: laneAction.stageLabel }
+    ...(stage ? [{ label: 'Stage', value: stage }] : []),
   ];
 
   // The pipeline is the mode's real state machine — as a checklist it reads
@@ -1307,6 +1470,9 @@ function updatePermittingMissionStatus(ui, journey) {
   }
   if (daysRemaining <= 5) {
     alerts.push({ level: 'danger', text: `Deadline pressure: ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining.` });
+  }
+  if (getWatchedDeskPenalty(journey) > 0) {
+    alerts.push({ level: 'warn', text: `Scrutiny ${Math.round(journey.scrutiny)}%${describeWatchedDesk(journey)}` });
   }
 
   ui.setMissionStatus?.({
@@ -1342,8 +1508,10 @@ function displayPermittingBriefing(ui, journey) {
   ui.write(`  Referral window this season: ${referral.calendarDays} calendar days (${referral.deskDays} desk day${referral.deskDays === 1 ? '' : 's'})`);
   ui.write(`  Scrutiny: ${Math.round(journey.scrutiny || 0)}% | Regulatory standing: ${Math.round(journey.regulations?.complianceScore || 0)}%`);
   ui.write(`  Pressure on the file: ${formatConstraintPressure(journey.permits.phase3Pressure || derivePermittingConstraintState(journey))}`);
-  ui.write(`  Lane Focus: ${guidance.lane} | Stage: ${laneAction.stageLabel}`);
-  ui.write(`  Lane Progress: ${getPermittingLaneProgressSummary(laneAction, journey.permits)}`);
+  ui.write(`  Lane Focus: ${[guidance.lane, getLaneStageLabel(laneAction, guidance.lane)].filter(Boolean).join(' | Stage: ')}`);
+  if (laneAction.chainId !== 'registration') {
+    ui.write(`  ${laneAction.laneLabel}: step ${laneAction.stageIndex}/${laneAction.stageCount} (${laneAction.stageLabel})`);
+  }
   ui.write(`  Next Best Move: ${guidance.headline}`);
   if (guidance.steps.length > 0) {
     ui.write(`  Follow-up: ${guidance.steps.join(' -> ')}`);
@@ -1377,9 +1545,17 @@ function displayPermittingBriefing(ui, journey) {
 
   ui.writeDivider('RESOURCES');
   const deskResourceStatus = getFormattedResourceStatus(journey.resources, DESK_RESOURCES);
-  for (const [, status] of Object.entries(deskResourceStatus)) {
+  for (const [key, status] of Object.entries(deskResourceStatus)) {
     const icon = status.level === 'critical' ? '!!' : status.level === 'low' ? '!' : ' ';
-    ui.write(`${icon} ${status.label}: ${status.display}`);
+    // One name for the meter: outcomes and hints call it district goodwill.
+    const label = key === 'politicalCapital' ? 'District goodwill' : status.label;
+    const display = key === 'politicalCapital' ? `${Math.round(journey.resources.politicalCapital || 0)}` : status.display;
+    ui.write(`${icon} ${label}: ${display}`);
+  }
+  // Energy and stress are yours, not the office's: the same numbers the
+  // status panel shows.
+  if (journey.protagonist) {
+    ui.write(`  Your energy: ${Math.round(journey.protagonist.energy ?? 0)}% | Your stress: ${Math.round(journey.protagonist.stress ?? 0)}%`);
   }
 
   if (journey.protagonist?.expertise) {
@@ -1409,16 +1585,22 @@ export function buildActionOptions(journey) {
 
   // When the only live work is a deficiency letter, answering it is the day.
   const lettersFirst = openRevisionTickets.length > 0 && !queueWork;
+  // A clean answer is decided the night after it goes in, so on the last day
+  // of the season it lands after the deadline: it is still the right answer
+  // for the file, but not the move that finishes the season.
+  const lastDay = (journey.day || 1) >= journey.deadline;
   openRevisionTickets.forEach((ticket, index) => {
     const bucket = index === 0 ? primary : support;
     bucket.push({
       label: `Clean response: ${ticket.fileLabel || ticket.id}`,
-      description: `${lettersFirst || openRevisionTickets.length >= 3 ? 'Best move | ' : ''}${ticket.title}: ${ticket.summary}`,
+      description: lastDay
+        ? `${ticket.title}: ${ticket.summary} (decided after the deadline)`
+        : `${lettersFirst || openRevisionTickets.length >= 3 ? 'Best move | ' : ''}${ticket.title}: ${ticket.summary}`,
       value: `revise_permit:${ticket.id}:clean`
     });
     bucket.push({
       label: `Fast-track: ${ticket.fileLabel || ticket.id}`,
-      description: `${ticket.title}: quicker resubmission, but more heat on the file`,
+      description: `${ticket.title}: decided tonight instead of tomorrow, but a thin answer is likelier to come back and draws more heat`,
       value: `revise_permit:${ticket.id}:fast`
     });
   });
@@ -1434,24 +1616,39 @@ export function buildActionOptions(journey) {
   }
 
   if ((journey.permits.inReferral || 0) > 0) {
-    const [file] = getPermitFilesInLane(journey, 'referral').sort((a, b) => a.clockCloses - b.clockCloses);
+    const file = getReferralFollowUpFile(journey);
     const warm = (journey.relationships?.nations || 0) >= REFERRAL_CHASE_RELATIONSHIP;
+    const movable = warm && file && getChaseableFiles(journey, ['referral'])[0] === file;
+    // A day early on the referral buys nothing when the WSA window holds the
+    // decision past it anyway.
+    const wsaHold = movable && Number.isFinite(file.wsaClockCloses) && file.wsaClockCloses >= file.clockCloses
+      ? ` Its WSA s.11 window holds the decision to Day ${file.wsaClockCloses} either way.`
+      : '';
     primary.push({
       label: 'Follow Up on Referrals',
       description: file
-        ? `${file.label} is with ${nationName(journey)} (${describeLane(file, journey)}). ${warm ? 'The relationship is good enough that a call can bring the response in a day early.' : 'Keep in touch; the relationship is not yet warm enough to move the clock.'}`
+        ? `${file.label} is with ${nationName(journey)} (${describeLane(file, journey)}). ${movable ? 'The relationship is good enough that a call can bring the response in a day early.' : warm ? 'The response is already due tonight; the call keeps the relationship warm.' : 'Keep in touch; the relationship is not yet warm enough to move the clock.'}${wsaHold}`
         : `Keep in touch with ${nationName(journey)} on the files out on referral`,
       value: 'follow_up_referrals'
     });
   }
 
-  // The lane action is always available, but it only earns the "Best move"
+  // Compliance Admin is always available, but it only earns the "Best move"
   // callout when admin is actually urgent — otherwise players learn to spam
-  // it every turn while the real queue sits untouched.
+  // it every turn while the real queue sits untouched. It works the
+  // professional file (registration, CPD, the filing backlog); the area's own
+  // paperwork lane is a separate job below. The lane used to replace it, so a
+  // road-heavy area had no way to log CPD and its label promised it anyway.
   {
     const professional = getPermittingProfessionalSnapshot(journey);
     const pieces = [];
-    if (professional?.registrationStatus !== 'active') {
+    // An open FPBC complaint keeps the registration under review, and no
+    // renewal clears it until the file is decided (js/events/selection.js
+    // settleTemptationFallout); the day still logs CPD and trims the backlog.
+    const reviewDays = fpbcReviewDaysLeft(journey);
+    if (professional?.registrationStatus !== 'active' && reviewDays !== null) {
+      pieces.push(`registration under review: the FPBC complaint file is decided in about ${reviewDays} day${reviewDays === 1 ? '' : 's'}; a renewal cannot clear it before then`);
+    } else if (professional?.registrationStatus !== 'active') {
       pieces.push(`registration ${professional.registrationStatus} (your licence to sign off is not current)`);
     }
     if (professional?.cpdGap > 0) {
@@ -1462,16 +1659,24 @@ export function buildActionOptions(journey) {
     }
     const adminUrgent = openRevisionTickets.length === 0 && (
       (professional?.paperworkLoad || 0) >= PAPERWORK_ADMIN_URGENT_THRESHOLD
-      || professional?.registrationStatus !== 'active'
+      || (professional?.registrationStatus !== 'active' && reviewDays === null)
     );
-    const laneDetail = `Lane: ${laneAction.laneLabel.toLowerCase()} | Stage: ${laneAction.stageLabel}`;
     const prefix = adminUrgent ? 'Best move | ' : '';
     primary.push({
-      label: laneAction.actionLabel,
+      label: getComplianceAdminLabel(journey),
       description: pieces.length
-        ? `${prefix}${laneDetail} | Clears: ${pieces.join(' | ')}`
-        : `${prefix}${laneDetail}`,
+        ? `${prefix}Professional file | Clears: ${pieces.join(' | ')}`
+        : `${prefix}Professional file | Registration current, CPD logged; files the day's paperwork`,
       value: 'professional_admin'
+    });
+  }
+  if (laneAction.chainId !== 'registration') {
+    support.push({
+      label: laneAction.actionLabel,
+      description: laneAction.chain?.complete
+        ? `${laneAction.laneLabel} | Every step done; a day here tidies the file`
+        : `${laneAction.laneLabel} | Next step: ${formatPermittingStageLabel(laneAction.stage, laneAction.chainId)} (${laneAction.stageIndex}/${laneAction.stageCount})`,
+      value: 'lane_file'
     });
   }
 
@@ -1528,6 +1733,17 @@ export function buildActionOptions(journey) {
 }
 
 /**
+ * The referral a follow-up call is about: the soonest one a call can still
+ * bring forward, or failing that the soonest to close.
+ */
+function getReferralFollowUpFile(journey) {
+  const [movable] = getChaseableFiles(journey, ['referral']);
+  if (movable) return movable;
+  return getPermitFilesInLane(journey, 'referral')
+    .sort((a, b) => (a.clockCloses ?? Infinity) - (b.clockCloses ?? Infinity))[0] || null;
+}
+
+/**
  * Collapse options that read as identical to the player (same label and
  * description) down to a single entry, keeping the first occurrence so the
  * remaining `value` still resolves a real, currently-open item.
@@ -1552,15 +1768,20 @@ function describeDraftedFiles(files) {
  * The paperwork chains move real files now: a screen or a map exhibit drafts
  * something, a submission files it, and the closing stage chases a clock.
  */
+const LANE_PERMIT_TYPES = { roadPermit: ['RP', 'RUP'], specialUse: ['SUP'], archaeology: ['CP'] };
+
 function applyPermittingLaneThroughput(journey, chainId, stage, ui) {
   if (chainId === 'roadPermit' || chainId === 'specialUse' || chainId === 'archaeology') {
+    // The lane drafts its own kind of file: a road-permit screen that then
+    // "opened CP ..." read as the paperwork doing someone else's job.
+    const types = LANE_PERMIT_TYPES[chainId];
     if (stage === 'screen') {
-      const drafted = draftPermits(journey, 1);
+      const drafted = draftPermits(journey, 1, { types });
       if (drafted.length) ui.write(`Screening opened ${describeDraftedFiles(drafted)} for drafting.`);
       return;
     }
     if (stage === 'map' || stage === 'bundle') {
-      const drafted = draftPermits(journey, 2);
+      const drafted = draftPermits(journey, 2, { types });
       if (drafted.length) ui.write(`Drafted ${describeDraftedFiles(drafted)}.`);
       return;
     }
@@ -1612,7 +1833,10 @@ export function workPermitQueue(journey) {
     for (const file of submitted) {
       const def = PERMIT_TYPES[file.type] || PERMIT_TYPES.CP;
       const tail = file.wsaClockCloses ? ` WSA s.11 notification window closes Day ${file.wsaClockCloses}.` : '';
-      messages.push(`${file.label}: ${def.screeningNote} closes Day ${file.clockCloses}${def.referral ? `, then ${getReferralWindow(journey).calendarDays}-day referral to ${nationName(journey)}` : ', then straight to the District Manager'}.${tail}`);
+      const next = def.referral
+        ? `, then ${getReferralWindow(journey).calendarDays}-day referral to ${nationName(journey)}`
+        : file.type === 'HCA' ? ', then the Archaeology Branch decides' : ', then straight to the District Manager';
+      messages.push(`${file.label}: ${def.screeningNote} closes Day ${file.clockCloses}${next}.${tail}`);
     }
     applyPermittingProfessionalWork(journey, { paperworkLoad: 3, competenceRisk: -1, auditExposure: 1 });
     return { worked: true, messages, step: 'submit', files: submitted };
@@ -1624,7 +1848,9 @@ export function workPermitQueue(journey) {
   if (warm && file) {
     shortenPermitClock(journey, ['screening', 'decision']);
     messages.push(`You walk ${file.label} over to the district in person. ${sentence(describeLane(file, journey))}.`);
+    const goodwillBefore = readGoodwill(journey);
     journey.resources.politicalCapital = Math.max(0, (journey.resources.politicalCapital || 0) - 1);
+    messages.push(...describeGoodwillChange(journey, goodwillBefore));
   } else if (file) {
     messages.push(`You call the district about ${file.label}. They are polite; the clock does not move. ${sentence(describeLane(file, journey))}.`);
     if (journey.relationships) {
@@ -1686,6 +1912,9 @@ async function processAction(game, actionId) {
         applyProtagonistCost(journey, { energy: 6, stress: 4 });
         const nation = nationName(journey);
         const warm = (journey.relationships?.nations || 0) >= REFERRAL_CHASE_RELATIONSHIP;
+        // The same file the option named: a chase moves the soonest movable
+        // clock, and the courtesy call is about that file too.
+        const named = getReferralFollowUpFile(journey) || referrals[0];
         const file = warm ? shortenPermitClock(journey, ['referral']) : null;
         if (file) {
           ui.write(`${sentence(nation)}'s referral coordinator takes the call about ${file.label}; the response is coming a day early. ${sentence(describeLane(file, journey))}.`);
@@ -1696,14 +1925,16 @@ async function processAction(game, actionId) {
           applyPermittingProfessionalWork(journey, { paperworkLoad: -1, auditExposure: -1, competenceRisk: -1 });
         } else {
           ui.write(warm
-            ? `You check in with ${nation}'s referral coordinator on ${referrals[0].label}; the response is already on its way tonight, and the relationship is warmer for the call.`
-            : `You check in with ${nation}'s referral coordinator on ${referrals[0].label}. The window runs its course, but the relationship is warmer for the call.`);
+            ? `You check in with ${nation}'s referral coordinator on ${named.label}; the response is already on its way tonight, and the relationship is warmer for the call.`
+            : `You check in with ${nation}'s referral coordinator on ${named.label}. The window runs its course, but the relationship is warmer for the call.`);
           if (journey.relationships) {
             journey.relationships.nations = Math.min(100, journey.relationships.nations + 4);
           }
           applyPermittingProfessionalWork(journey, { paperworkLoad: 1, auditExposure: 0 });
         }
+        const goodwillBefore = readGoodwill(journey);
         journey.resources.politicalCapital = Math.min(100, journey.resources.politicalCapital + 1);
+        for (const line of describeGoodwillChange(journey, goodwillBefore)) ui.write(line);
       }
       return;
     }
@@ -1724,8 +1955,9 @@ async function processAction(game, actionId) {
       return;
     }
 
-    case 'professional_admin': {
-      const chainId = getPermittingPaperworkChainId(journey);
+    case 'professional_admin':
+    case 'lane_file': {
+      const chainId = actionId === 'lane_file' ? getPermittingPaperworkChainId(journey) : 'registration';
       const chainProgress = progressPermittingPaperworkChain(journey, chainId, 1);
       const stage = chainProgress?.stage || 'renewal';
       spendDay(journey);
@@ -1734,7 +1966,10 @@ async function processAction(game, actionId) {
       const effect = getPaperworkChainStageEffect(chainId, stage);
       if (effect) {
         applyPermittingProfessionalWork(journey, effect.changes);
-        ui.write(effect.message);
+        const reviewDays = chainId === 'registration' ? fpbcReviewDaysLeft(journey) : null;
+        ui.write(reviewDays !== null
+          ? `The renewal is filed and the CPD logged, but the FPBC complaint file is still open: your registration stays under review until it is decided, in about ${reviewDays} day${reviewDays === 1 ? '' : 's'}.`
+          : effect.message);
       }
       if (chainId === 'archaeology' && stage === 'field-review' && journey.relationships) {
         journey.relationships.nations = Math.min(100, journey.relationships.nations + 2);
@@ -1872,6 +2107,7 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
 
     // Advance to next day
     journey.day++;
+    closeDeskDay(journey);
     startDay(journey);
     journey.currentPhase = getDeskPhase(journey);
 
@@ -1880,7 +2116,11 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
 
     const milestoneMessages = [];
     recordProgressMilestones(journey, progressBeforeDay, milestoneMessages, Math.max(1, journey.day - 1));
-    for (const message of milestoneMessages) {
+    // The milestones look ahead ("a few clean decisions could finish the
+    // job"); on the night the season ends, or going into its last day, they
+    // promise a calendar that is not there.
+    const seasonEnding = Boolean(checkPermittingEndConditions(journey)) || journey.day >= journey.deadline;
+    for (const message of seasonEnding ? [] : milestoneMessages) {
       ui.writePositive(message);
     }
   } catch (error) {
@@ -1892,9 +2132,16 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
   const daysLeft = journey.deadline - journey.day;
   const permitPct = journey.permits.target > 0
     ? Math.round((journey.permits.approved / journey.permits.target) * 100) : 0;
-  const continueLabel = daysLeft > 0
-    ? `Start next day... (${daysLeft} days left, ${permitPct}% issued)`
-    : 'Start next day... (DEADLINE)';
+  // The night moved the queue; the pane follows it rather than showing the
+  // morning's count beside a review that says otherwise.
+  updatePermittingMissionStatus(ui, journey);
+
+  // The night the run ends, the button says so instead of promising a day.
+  const continueLabel = checkPermittingEndConditions(journey)?.gameOver
+    ? 'The work stops here...'
+    : daysLeft > 0
+      ? `Start next day... (${daysLeft} day${daysLeft === 1 ? '' : 's'} left, ${permitPct}% issued)`
+      : 'Start next day... (DEADLINE)';
   await ui.promptChoice('', [{ label: continueLabel, value: 'next' }]);
 }
 
@@ -1919,15 +2166,58 @@ export function getPermitApprovalRate(journey) {
   const professionalPenalty = professional?.registrationActive
     ? Math.min(0.15, (professional.auditExposure / 300) + (professional.competenceRisk / 500))
     : 0.2;
-  return Math.max(0.42, 0.8 - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
+  const difficulty = PERMIT_DIFFICULTY[journey?.difficulty] || PERMIT_DIFFICULTY.normal;
+  const rate = Math.max(0.42, 0.8 + difficulty.approval - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
+  // The floor is for a hard area, not a watched desk: it held every desk in a
+  // steep area at the same odds, so taking every shortcut won as often as a
+  // clean file. What the watch costs comes off under it.
+  return rate - getWatchedDeskPenalty(journey);
 }
+
+/**
+ * Scrutiny above which the district reads every file from the desk line by
+ * line, and the most that reading costs a decision. A clean desk opens at 38
+ * and works down from there; a noticed shortcut puts it over.
+ */
+export const WATCHED_DESK_SCRUTINY = 40;
+const WATCHED_DESK_MAX_PENALTY = 0.25;
+
+/**
+ * What a watched desk costs each decision: nothing at or under the line, then
+ * four points of approval for every three of scrutiny past it.
+ * @returns {number} 0 to WATCHED_DESK_MAX_PENALTY
+ */
+export function getWatchedDeskPenalty(journey) {
+  const scrutiny = Number(journey?.scrutiny) || 0;
+  return Math.min(WATCHED_DESK_MAX_PENALTY, Math.max(0, scrutiny - WATCHED_DESK_SCRUTINY) / 75);
+}
+
+/** The watch, said where scrutiny is shown; empty for a desk under the line. */
+function describeWatchedDesk(journey) {
+  const penalty = Math.round(getWatchedDeskPenalty(journey) * 100);
+  if (penalty <= 0) return '';
+  return ` — over ${WATCHED_DESK_SCRUTINY}%, the District Manager reads every file from this desk line by line: each decision is ${penalty} points likelier to come back with a letter`;
+}
+
+/**
+ * How hard the district reads a file, by difficulty. Old Growth used to
+ * change only the budget and the event rate, so a competent Old Growth desk
+ * won as surely and as fast as a Journeyman one; the season's length is set
+ * alongside (js/game/ForestryTrailGame.js applyDifficultyMultipliers).
+ */
+const PERMIT_DIFFICULTY = {
+  easy: { approval: 0.05, completeness: -0.03 },
+  normal: { approval: 0, completeness: 0.02 },
+  hard: { approval: -0.08, completeness: 0.07 },
+};
 
 /** Share of screened files bounced as incomplete. */
 export function getPermitCompletenessReturnRate(journey) {
   const professional = getPermittingProfessionalSnapshot(journey);
   const paperwork = Math.min(0.12, (professional?.paperworkLoad || 0) / 250);
   const registration = professional?.registrationActive ? 0 : 0.1;
-  return Math.min(0.35, 0.08 + paperwork + registration);
+  const difficulty = PERMIT_DIFFICULTY[journey?.difficulty] || PERMIT_DIFFICULTY.normal;
+  return Math.min(0.35, Math.max(0, 0.08 + difficulty.completeness + paperwork + registration));
 }
 
 /**
@@ -1943,6 +2233,9 @@ function processPermitPipeline(ui, journey) {
   const result = advancePermitClocks(journey, {
     approvalRate: getPermitApprovalRate(journey),
     completenessReturnRate: getPermitCompletenessReturnRate(journey),
+    // The night rolls on the day's dice, so a reload at the "start next
+    // day" prompt replays the same decisions (js/events/dayRng.js).
+    random: getDayRng(journey, 'night'),
   });
 
   for (const entry of result.advanced) {
@@ -1950,7 +2243,7 @@ function processPermitPipeline(ui, journey) {
     if (file.lane === 'referral') {
       ui.write(`${file.label} passed the completeness screen; referred to ${nationName(journey)}. ${sentence(describeLane(file, journey))}.`);
     } else {
-      ui.write(`${file.label} is with the District Manager. ${sentence(describeLane(file, journey))}.`);
+      ui.write(`${file.label} is with ${getDecisionMaker(file)}. ${sentence(describeLane(file, journey))}.`);
     }
   }
 
@@ -1965,7 +2258,7 @@ function processPermitPipeline(ui, journey) {
       ui.playScene(buildStampFrames('ISSUED'), { delay: 110 });
     }
     for (const entry of result.issued) {
-      ui.writePositive(`${entry.file.label} ISSUED by the District Manager.`);
+      ui.writePositive(`${entry.file.label} ISSUED by ${getDecisionMaker(entry.file)}.`);
     }
   }
 

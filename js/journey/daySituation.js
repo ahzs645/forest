@@ -19,10 +19,17 @@
 import { handleEvent } from '../modes/shared/handleEvent.js';
 import { optionSpendsDay } from '../events/timePolicy.js';
 import { resolveTemptationSetAside } from '../events/selection.js';
+import { applyDeferredSituation, isCrewCasualtySituation } from '../events/deferral.js';
+import { applyEventEffects } from '../events/resolution.js';
+import { applyConsequenceFlags } from '../events/consequences.js';
+import { getDayRng } from '../events/dayRng.js';
 import {
   addRouteConstraintFromEvent,
   isRouteObstructionEvent
 } from './routeConstraints.js';
+
+/** How much a reported, reopened road still slows the first leg through it. */
+const REPORTED_CLOSURE_SETBACK = 0.25;
 
 /**
  * Whether answering this situation is the whole day.
@@ -53,47 +60,64 @@ export function situationWeight(event) {
 /**
  * Charge the player for a situation they declined to handle.
  *
- * Scrutiny always — the file notices what you did not do. The human cost lands
- * on whoever is actually carrying the run: a field crew's morale, or a desk
- * protagonist's stress. Only for things that mattered, though: a player
- * triaging well declines a dozen-plus situations in a season, and charging for
- * every deferred phone call turns judgement into an attrition spiral.
+ * Scrutiny always — the file notices what you did not do — and, sized to the
+ * situation, the people carrying the run and whatever an imposed situation
+ * lands regardless (js/events/deferral.js). The deferral is logged as a
+ * situation so the compliance tally counts it.
  *
  * @param {Object} ui
  * @param {Object} journey
  * @param {Object} event
+ * @param {Object} [options]
+ * @param {boolean} [options.imposedCost=true] - false when the mode carries
+ *   the deferral forward itself (a recon obstruction stays on the route)
  */
-export function applySetAsideCost(ui, journey, event) {
+export function applySetAsideCost(ui, journey, event, { imposedCost = true } = {}) {
   // A temptation is somebody else's proposal, not a situation the file will
   // notice you ignored. Setting it aside costs nothing on the meters; what it
   // costs is that the proposer decides what your silence meant (they drop it,
-  // ask again with a deadline, or go around you).
+  // ask again with a deadline, or go around you). The exception is a thing
+  // already done: silence about a go-around is condoning it, and that costs
+  // the file (js/events/selection.js GO_AROUND_SILENCE_COST).
   if (event?.type === 'temptation') {
-    const reply = resolveTemptationSetAside(journey, event);
+    const reply = resolveTemptationSetAside(journey, event, getDayRng(journey, `set-aside:${event.id || 'event'}`));
     ui.write('');
     ui.write(reply.message, 'term-dim');
+    if (reply.effects || reply.flags) {
+      const messages = [];
+      if (reply.effects) applyEventEffects(journey, reply.effects, messages);
+      if (reply.flags) applyConsequenceFlags(journey, reply.flags, messages);
+      for (const message of messages) ui.writeWarning(message);
+    }
     return;
   }
 
-  const weight = situationWeight(event);
-  journey.scrutiny = Math.min(100, (journey.scrutiny || 0) + weight);
-
-  const humanCost = weight >= 2 ? weight : 0;
-  if (humanCost > 0) {
-    const crew = Array.isArray(journey.crew) ? journey.crew.filter((m) => m.isActive) : [];
-    if (crew.length > 0) {
-      for (const member of crew) {
-        member.morale = Math.max(0, member.morale - humanCost);
-      }
-    } else if (journey.protagonist) {
-      journey.protagonist.stress = Math.min(100, (journey.protagonist.stress || 0) + humanCost);
-    }
-  }
-
+  const { messages } = applyDeferredSituation(journey, event, {
+    weight: situationWeight(event),
+    imposedCost,
+  });
   ui.write('');
-  ui.writeWarning(humanCost > 0
-    ? `You leave it. Scrutiny +${weight}, and it costs you something to do it.`
-    : `You leave it for another day. Scrutiny +${weight}.`);
+  for (const [index, message] of messages.entries()) {
+    if (index === 0 || index === messages.length - 1) ui.writeWarning(message);
+    else ui.write(message);
+  }
+}
+
+/**
+ * The button that closes a deferral. Without it the next card's redraw wiped
+ * the cost line before anyone could read it.
+ */
+function setAsideAcknowledgement(journey) {
+  const label = ['recon', 'field'].includes(journey.journeyType)
+    ? 'Take the shift back'
+    : journey.journeyType === 'manager'
+      ? 'Back to the month'
+      : 'Take the day back';
+  return [{
+    label,
+    description: 'Leave it where it is and get on with your own work.',
+    value: 'continue',
+  }];
 }
 
 /**
@@ -116,14 +140,21 @@ export async function runDaySituation(game, event, options = {}) {
     && isRouteObstructionEvent(event);
   const travelSetbackBefore = Number(journey.travelSetback || 0);
 
+  const goAround = event?.type === 'temptation' && event?.temptationStage === 'goaround';
   const outcome = await handleEvent(game, event, {
     ...frame,
     extraOptions: [{
       label: options.setAsideLabel || 'Set it aside',
-      description: obstruction
+      // A shortcut card says what silence means on this card (they may go
+      // around you; a determination lands anyway) before the player picks it.
+      description: event?.setAsideDescription || (obstruction
         ? 'Defer the call. The route stays blocked until you clear it or mark a detour.'
-        : options.setAsideDescription
-        || 'Not today. Take the day back and spend it on your own work.',
+        : goAround
+          ? 'Say nothing. It stands, and the file will read your silence as consent.'
+          : journey.journeyType !== 'manager' && isCrewCasualtySituation(event)
+            ? 'Leave it to the crew. The worst of the cheapest answer lands anyway, and the file notes who walked away.'
+            : options.setAsideDescription
+        || 'Not today. Take the day back and spend it on your own work.'),
       tag: 'TRADEOFF',
       value: 'set_aside',
     }],
@@ -134,7 +165,7 @@ export async function runDaySituation(game, event, options = {}) {
   }
 
   if (!outcome.resolved) {
-    applySetAsideCost(ui, journey, event);
+    applySetAsideCost(ui, journey, event, { imposedCost: !obstruction });
     if (obstruction) {
       const constraint = addRouteConstraintFromEvent(journey, event);
       if (constraint) {
@@ -146,9 +177,24 @@ export async function runDaySituation(game, event, options = {}) {
       title: event?.title || 'the situation',
       setAside: true,
     };
+    frame.onResolved?.({ spendsDay: false, setAside: true });
     ui.updateAllStatus?.(journey);
     frame.onRender?.();
+    // Keep the cost on screen until the player has read it; the quiet card
+    // that follows clears the terminal.
+    await ui.promptChoice('', setAsideAcknowledgement(journey));
     return { setAside: true, spendsDay: false, gameOver: false };
+  }
+
+  // Turning back to report an obstruction closes the road behind the call:
+  // nobody drives past it until the office has had it looked at.
+  if (obstruction && outcome.option?.effects?.progressMode === 'turn_back') {
+    addRouteConstraintFromEvent(journey, event, { reported: true });
+    // The closure is the delay: the rest of the shift is gone and the road
+    // reopens one lane and slow. The turn-back used to slow that first leg
+    // by three quarters on top, so the legal call cost about two shifts.
+    const added = Number(journey.travelSetback || 0) - travelSetbackBefore;
+    if (added > REPORTED_CLOSURE_SETBACK) journey.travelSetback = travelSetbackBefore + REPORTED_CLOSURE_SETBACK;
   }
 
   const spendsDay = optionSpendsDay(event, outcome.option, journey.journeyType);
@@ -157,7 +203,8 @@ export async function runDaySituation(game, event, options = {}) {
     journey.travelSetback = travelSetbackBefore;
     journey.pendingTravelSetback = Math.min(0.75, (journey.pendingTravelSetback || 0) + setbackDelta);
   }
-  if (!spendsDay) {
+  // A GM's month runs whatever lands on the desk; there is no day to lose.
+  if (!spendsDay && journey.journeyType !== 'manager') {
     ui.write('Handled without losing the day.', 'term-dim');
   }
   journey.recentSituationContext = {

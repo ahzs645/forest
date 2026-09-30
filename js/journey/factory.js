@@ -9,7 +9,6 @@ import { createFieldResources, createDeskResources } from "../resources.js";
 import {
   getBlocksForArea,
   getRandomWeather,
-  getTemperature,
 } from "../data/blocks.js";
 import { getPlanningCadenceDays } from "../data/planningBlocks.js";
 import { createSeasonState } from "../season.js";
@@ -38,7 +37,7 @@ const SILVICULTURE_CAMPAIGN_BUDGET = 150000;
 // prices are per m³ delivered to the mill.
 const MANAGER_TREASURY = 850000;
 const MANAGER_AAC = 240000;
-const MANAGER_MONTHLY_OVERHEAD = 290000;
+const MANAGER_MONTHLY_OVERHEAD = 270000;
 
 /**
  * Campaign-scale tuning (see docs/unified_campaign.md, section 3).
@@ -183,6 +182,13 @@ function applyCampaignScale(journey, journeyType) {
  * @returns {Object} Journey state for the appropriate type
  */
 export function createJourney(options = {}) {
+  const journey = createJourneyForRole(options);
+  // End-of-run scoring compares what is left against what the run started with.
+  journey.startingResources = { ...(journey.resources || {}) };
+  return journey;
+}
+
+function createJourneyForRole(options) {
   const roleId = options.roleId || options.role?.id;
   const journeyType = ROLE_JOURNEY_TYPES[roleId];
 
@@ -556,7 +562,9 @@ export function createPermittingJourney(options = {}) {
     season: createSeasonState(effectiveRoleId),
     scrutiny: 38,
     day: 1,
-    deadline: 30,
+    // Fifteen permits in seventeen days: a clean desk that files as it
+    // drafts lands most seasons, and one the district is watching does not.
+    deadline: 17,
     actionsRemaining: ACTIONS_PER_DAY,
     currentPhase: "planning",
 
@@ -609,16 +617,17 @@ export function createPermittingJourney(options = {}) {
       complianceScore: 80,
     },
 
-    // Resources (no crew-related)
-    resources: createDeskResources({
+    // Resources (no crew-related). Energy is the protagonist's own meter
+    // (protagonist.energy above), as on the planning file: a second copy here
+    // was scaled by difficulty and showed 80 beside the real 100.
+    resources: {
       // Same reasoning as the planning file: a longer calendar at the same
       // daily overhead. See scripts/simulate-expeditions.mjs.
       budget: 58000,
       // Same reasoning as the planning file: a longer calendar at the same
       // daily drain. See scripts/simulate-expeditions.mjs.
       politicalCapital: 66,
-      energy: 100,
-    }),
+    },
 
     discoveryTags: [],
     roadAssets: {
@@ -669,7 +678,9 @@ export function createFieldJourney(options = {}) {
 
     // Current conditions
     pace: "normal",
-    weather: getRandomWeather(blocks[0], 1, createSeasonState(roleId)?.currentSeason),
+    // The role arrives as an id from the campaign and the sims, and as an
+    // object from the new-game screen; without it day 1 rolled spring skies.
+    weather: getRandomWeather(blocks[0], 1, createSeasonState(roleId || role?.id)?.currentSeason),
     temperature: "cool",
     travelSetback: 0,
     pendingTravelSetback: 0,

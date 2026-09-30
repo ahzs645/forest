@@ -40,18 +40,61 @@ export const ODDS_PREDICATE_NAMES = [
 
 /**
  * Flags the temptation lane (js/events/selection.js) leaves behind on a
- * noticed or caught band. They have no consumer beyond shifting later odds via
- * `hasFlag:`; applyConsequenceFlags records any flag it is handed, so these
- * need no handler in js/events/consequences.js to work.
+ * noticed or caught band. They shift later odds via `hasFlag:`, the shortcut
+ * card names the ones that moved today's odds, the mission panel lists them
+ * while they stand (js/events/shortcutRecord.js), and a campaign carries
+ * them into the next season. applyConsequenceFlags prints the sentence the
+ * day a flag first lands.
  */
 export const TEMPTATION_ODDS_FLAGS = Object.freeze({
-  ce_watching: 'Somebody at the district is reading everything with your name on it.',
+  ce_watching: 'C&E is reading everything with your name on it.',
+  fpb_watching: 'The Forest Practices Board has your file on its list.',
+  fpbc_watching: 'Forest Professionals BC has a note with your name in it.',
   fn_watching: "The Nation's referrals office has a note with your name in it.",
   worksafe_watching: "WorkSafeBC's prevention officer has the site on a list.",
+  bcws_watching: 'BC Wildfire Service has the block on a list.',
+  cos_watching: 'A conservation officer has your plate number.',
+  env_watching: 'An environmental protection officer has the block on a list.',
+  dfo_watching: 'A DFO fishery officer has the crossing on a list.',
+  arch_watching: 'The Archaeology Branch has the block on a list.',
+  pricing_watching: 'Timber Pricing has your cruises and scale on the check list.',
+  rcmp_watching: 'The RCMP have a note with your name in it.',
+  cvse_watching: 'CVSE has the hauling contractor on a list.',
   contractor_owns_you: 'The person who did it for you now owns a piece of you.',
   fpbc_file_open: 'Forest Professionals BC has a file open under your name.',
   rcmp_file: 'There is an RCMP file with the company name on it.',
 });
+
+/** The same flags as a short status line: who has you on a list. */
+export const TEMPTATION_FLAG_LABELS = Object.freeze({
+  ce_watching: 'C&E is watching your files',
+  fpb_watching: 'the Forest Practices Board is watching your file',
+  fpbc_watching: 'Forest Professionals BC is watching your signature',
+  fn_watching: "the Nation's referrals office is watching",
+  worksafe_watching: 'WorkSafeBC has the site on a list',
+  bcws_watching: 'BC Wildfire Service has the block on a list',
+  cos_watching: 'the Conservation Officer Service is watching',
+  env_watching: 'ENV has the block on a list',
+  dfo_watching: 'DFO is watching the crossings',
+  arch_watching: 'the Archaeology Branch is watching the block',
+  pricing_watching: 'Timber Pricing is checking your cruises',
+  rcmp_watching: 'the RCMP have your name',
+  cvse_watching: 'CVSE is watching the trucks',
+  contractor_owns_you: 'someone who did it for you owns a piece of you',
+  fpbc_file_open: 'an FPBC complaint file is open',
+  rcmp_file: 'an RCMP file is open',
+});
+
+/**
+ * The watch flags: each institution's own, so a DFO finding does not read
+ * on the mission panel as C&E, and only the institution that would catch an
+ * act reads that act's next attempt closely. The open professional and
+ * criminal files (fpbc_file_open, rcmp_file) are not watches; they stand on
+ * their own.
+ */
+export const TEMPTATION_WATCH_FLAGS = Object.freeze(
+  Object.keys(TEMPTATION_FLAG_LABELS).filter((flag) => !['fpbc_file_open', 'rcmp_file'].includes(flag))
+);
 
 /**
  * Read a numeric threshold off a `when` string like "scrutinyAbove:55".
@@ -178,6 +221,21 @@ export function computeBandOdds(option, journey) {
     const moved = Math.min(Math.max(0, Number(modifier.move) || 0), bands[from]);
     bands[from] -= moved;
     bands[to] += moved;
+  }
+
+  // A gamble can carry its own floor on the bad band (`badFloor`): a careful
+  // record buys cover, but it cannot make burying a diesel spill safe. The
+  // floor is taken from the good band first, then the middle one, so the
+  // odds still sum to 1 and the card can print them as they are.
+  const badFloor = Math.max(0, Math.min(0.9, Number(option.badFloor) || 0));
+  if (bands.bad < badFloor) {
+    let short = badFloor - bands.bad;
+    for (const from of ['good', 'partial']) {
+      const moved = Math.min(short, bands[from]);
+      bands[from] -= moved;
+      bands.bad += moved;
+      short -= moved;
+    }
   }
 
   // Floors, so a run that has gone badly cannot make a gamble a certainty in

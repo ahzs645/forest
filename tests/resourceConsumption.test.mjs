@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import {
   applyConsumption,
   calculateFieldConsumption,
-  FIELD_RESOURCES
+  FIELD_RESOURCES,
+  formatDollars,
+  formatResourceValue
 } from '../js/resources.js';
 import { createReconJourney, executeFieldAction } from '../js/journey.js';
 
@@ -75,4 +77,12 @@ test('food (person-days) warnings render a clean one-decimal value during a real
   }
 
   assert.ok(sawFoodMessage, 'expected at least one food (person-days) warning/critical message to fire');
+});
+
+test('an overdrawn budget reads -$858, never $-858', () => {
+  assert.equal(formatDollars(-858.4), '-$858');
+  assert.equal(formatDollars(-12500), '-$12,500');
+  assert.equal(formatDollars(380000), '$380,000');
+  assert.equal(formatDollars(-0.4), '$0');
+  assert.equal(formatResourceValue('budget', -858, { budget: { unit: '$' } }), '-$858');
 });
