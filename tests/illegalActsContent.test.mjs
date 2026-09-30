@@ -17,8 +17,7 @@ import {
   buildCaughtNarrative,
   isSelfProposedAct,
 } from '../js/data/illegalActs.js';
-import { MISCHIEF_OPTIONS } from '../js/data/mischief.js';
-import { FORESTER_ROLES, ISSUE_LIBRARY, CHAINED_ISSUES, FIELD_EVENTS } from '../js/data/index.js';
+import { ISSUE_LIBRARY, CHAINED_ISSUES, FIELD_EVENTS } from '../js/data/index.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 import {
   ACT_PREMISE_CHECKS,
@@ -644,21 +643,3 @@ test('every fallout issue a caught shortcut can schedule exists', () => {
   assert.deepEqual([...ids].filter((id) => !known.has(id)), []);
 });
 
-// ── Legacy mischief ─────────────────────────────────────────────────────────
-
-test('mischief tempts with more than the honest options and never pays in compliance or goodwill', () => {
-  const tasks = new Map(FORESTER_ROLES.flatMap((role) => (role.tasks || []).map((task) => [task.id, task])));
-  for (const [taskId, mischief] of Object.entries(MISCHIEF_OPTIONS)) {
-    const task = tasks.get(taskId);
-    assert.ok(task, `${taskId} matches no role task`);
-    const { successEffects, failEffects, successOutcome, failOutcome } = mischief.risk;
-    for (const meter of ['compliance', 'relationships', 'forestHealth']) {
-      assert.ok(!(Number(successEffects[meter]) > 0), `${taskId}: a successful ${mischief.label.toLowerCase()} raises ${meter}`);
-    }
-    const honestBest = Math.max(...task.options.map((option) => Number(option.effects?.progress) || 0));
-    assert.ok(successEffects.progress > honestBest, `${taskId}: no reason to take it over the honest options`);
-    const total = (effects) => Object.values(effects).reduce((sum, value) => sum + value, 0);
-    assert.ok(total(failEffects) < -total(successEffects), `${taskId}: getting caught has to cost more than it pays`);
-    assert.doesNotMatch(`${mischief.outcome} ${successOutcome} ${failOutcome}`, /attempt something risky|band council|Environment ministry|Ministry suspends/i, taskId);
-  }
-});

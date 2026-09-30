@@ -4,7 +4,6 @@ import {
   FIELD_EVENTS,
   ILLEGAL_ACTS,
   ISSUE_LIBRARY,
-  MISCHIEF_OPTIONS,
 } from "../data/index.js";
 import {
   actFitsRole,
@@ -58,18 +57,6 @@ import {
   matchesPreconditions,
   normalizeSeasonalCard,
 } from "./seasonalContract.js";
-
-export function getRoleTasks(state) {
-  const baseTasks = state.role.tasks || [];
-  return baseTasks.map((task) => {
-    const mischief = MISCHIEF_OPTIONS[task.id];
-    if (!mischief) return task;
-    return {
-      ...task,
-      options: [...task.options, mischief],
-    };
-  });
-}
 
 // `advancePending` exists because a season now draws more than one event: the
 // pending-delay tick must happen exactly once per round or scheduled fallout
