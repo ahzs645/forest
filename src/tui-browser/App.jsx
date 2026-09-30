@@ -225,6 +225,7 @@ function ObjectiveReadout({ objective, crisisObjective, strip }) {
       {strip ? (
         <p className="tui-copy dim">{`Right now: ${strip.pressure}`}</p>
       ) : null}
+      {strip?.watch ? <p className="tui-copy tone-yellow">{strip.watch}</p> : null}
     </div>
   );
 }
@@ -391,6 +392,9 @@ function StatusPanel({ gameState }) {
       {gameState.objectiveStrip?.pressure ? (
         <p className="tui-copy dim">{`Right now: ${gameState.objectiveStrip.pressure}`}</p>
       ) : null}
+      {gameState.objectiveStrip?.watch ? (
+        <p className="tui-copy tone-yellow">{gameState.objectiveStrip.watch}</p>
+      ) : null}
     </div>
   );
 }
@@ -556,6 +560,12 @@ function ObjectiveStrip({ strip }) {
         <span className="tui-objective-strip-key">Current risk</span>
         <span className={`tui-objective-strip-val ${strip.risks?.length ? "tone-yellow" : "tone-green"}`}>{riskText}</span>
       </div>
+      {strip.watch ? (
+        <div className="tui-objective-strip-row">
+          <span className="tui-objective-strip-key">Watched</span>
+          <span className="tui-objective-strip-val tone-yellow">{strip.watch.replace(/^Watched:\s*/, "")}</span>
+        </div>
+      ) : null}
     </div>
   );
 }

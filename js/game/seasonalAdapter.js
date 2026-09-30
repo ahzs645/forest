@@ -61,6 +61,8 @@ export function renderMetricStrip(ui, gameState = {}) {
       .map((risk) => risk.label || `${formatMetricName(risk.metric)} at risk`)
       .filter((text) => text !== guidance)
       .map((text) => ({ level: 'warn', text }));
+    // A noticed shortcut's watch stands for the rest of the year.
+    if (strip?.watch) alerts.push({ level: 'warn', text: strip.watch });
 
     const goal = strip?.goal
       ? (strip.winCondition ? `${strip.goal} Win: ${strip.winCondition}.` : strip.goal)
