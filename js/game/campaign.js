@@ -13,6 +13,13 @@ import { FORESTER_ROLES, OPERATING_AREAS } from '../data/index.js';
 import { generateCrew } from '../crew.js';
 import { createJourney } from '../journey.js';
 import { checkScheduledEvents } from '../events.js';
+import { getEventById } from '../events/scheduled.js';
+import { isFieldJourney } from '../events/constants.js';
+import { pickDeferredCost } from '../events/deferral.js';
+import { applyEventEffects } from '../events/resolution.js';
+import { situationWeight } from '../journey/daySituation.js';
+import { FIELD_EVENTS } from '../data/fieldEvents.js';
+import { DESK_EVENTS } from '../data/deskEvents.js';
 import { ensureDaySeed } from '../events/dayRng.js';
 import {
   carryShortcutsIntoJourney,
@@ -223,6 +230,126 @@ export function applySeasonCarryForward(campaign, season, journey) {
     `No approved FSP from the fall: ${held} cutting permits are held until a replacement plan is approved.`,
     `The season's queue is ${permits.target} permits under the extended plan, and the district is reading every one of them closely.`,
   ];
+}
+
+/**
+ * The year meets each event card once. A deployment's no-repeat memory used
+ * to die with it, so the fall's First Nations engagement request, archaeology
+ * gap and published story came back word for word in the winter. Every card
+ * a deployment dealt goes on the year's list, and the next deployment's deck
+ * skips them until it has nothing fresh left (js/events/selection.js). A
+ * scheduled follow-up or a shortcut's determination still lands: it is
+ * delivered by name, not drawn from the deck.
+ * @param {Object} campaign
+ * @param {Object} journey - the finished deployment
+ */
+export function collectSeenEventsFromJourney(campaign, journey) {
+  const seen = new Set(campaign.seenEventIds || []);
+  for (const id of journey?.deskEventMemory?.seenIds || []) seen.add(id);
+  for (const entry of journey?.log || []) {
+    if (entry?.type === 'event' && typeof entry.eventId === 'string') seen.add(entry.eventId);
+  }
+  campaign.seenEventIds = [...seen];
+}
+
+/** Hand the year's dealt cards to the deployment about to start. */
+export function carrySeenEventsIntoJourney(campaign, journey) {
+  if (Array.isArray(campaign.seenEventIds) && campaign.seenEventIds.length) {
+    journey.campaignSeenEventIds = [...campaign.seenEventIds];
+  }
+}
+
+/** Follow-ups that are the bush, not somebody's file. */
+const NATURE_FOLLOW_UP_TYPES = new Set(['weather', 'wildlife', 'equipment', 'terrain']);
+
+/**
+ * What a follow-up can still cost once its deployment is over: the file and
+ * the money, not the next leg or the crew's food box, which went home with
+ * the season. A card is reduced to those before its least answer is priced.
+ */
+const RECORD_KEYS = ['budget', 'compliance', 'relationships', 'reputation', 'politicalCapital', 'scrutiny'];
+
+function onTheRecord(event) {
+  const keep = (effects) => (effects
+    ? Object.fromEntries(Object.entries(effects).filter(([key]) => RECORD_KEYS.includes(key)))
+    : effects);
+  return {
+    ...event,
+    options: (event.options || []).map((option) => ({
+      label: option.label,
+      riskTag: option.riskTag,
+      chanceSuccess: option.chanceSuccess,
+      chancePartial: option.chancePartial,
+      effects: keep(option.effects),
+      failureEffects: keep(option.failureEffects),
+      partialEffects: keep(option.partialEffects),
+    })),
+  };
+}
+
+/** Whether a card lives in the deck a deployment of this type draws from. */
+function eventBelongsToJourney(eventId, journeyType) {
+  const deck = isFieldJourney(journeyType) ? FIELD_EVENTS : DESK_EVENTS;
+  return deck.some((event) => event.id === eventId);
+}
+
+/**
+ * The follow-ups a closed deployment still owes ("This may have consequences
+ * later..."). They used to die with the deployment when the season closed
+ * first. One that belongs on the next seat's desk or crew is carried there
+ * and lands early; the rest (a WorkSafeBC revisit after the crew has gone
+ * home, anything owed at the end of the year) is settled here, at the least
+ * of what answering it would have cost, and the review says so.
+ * @param {Object} campaign
+ * @param {Object} journey - the finished deployment
+ * @param {Object|null} nextSeason - null in the year's last season
+ * @returns {string[]} lines for the season review
+ */
+export function settleOrCarryFollowUps(campaign, journey, nextSeason) {
+  const owed = Array.isArray(journey?.scheduledEvents) ? journey.scheduledEvents : [];
+  journey.scheduledEvents = [];
+  campaign.pendingFollowUps = [];
+  const lines = [];
+  const nextType = nextSeason ? getSeasonJourneyType(nextSeason) : null;
+  for (const entry of owed) {
+    const event = getEventById(entry?.eventId, journey.journeyType);
+    if (!event) continue;
+    if (nextType && eventBelongsToJourney(event.id, nextType)) {
+      campaign.pendingFollowUps.push({ eventId: event.id, title: event.title });
+      lines.push(`“${event.title}” was still coming back when the season closed. It follows you into ${nextSeason.label.toLowerCase()}.`);
+      continue;
+    }
+    // A storm, a wolf pack or a sick engine is nobody's file: it meets an
+    // empty camp.
+    if (NATURE_FOLLOW_UP_TYPES.has(event.type)) {
+      lines.push(`“${event.title}” came after the crew had gone home.`);
+      continue;
+    }
+    const budgetBase = Number(journey.campaignStartBudget) > 0 ? journey.campaignStartBudget : journey.resources?.budget;
+    const deferred = pickDeferredCost(onTheRecord(event), situationWeight(event), { budgetBase, journey });
+    const messages = [];
+    if (deferred) applyEventEffects(journey, deferred.effects, messages);
+    lines.push(messages.length
+      ? `“${event.title}” came back after the season closed, and the file answered it at the least of it: ${messages.map((line) => line.replace(/\.$/, '')).join('; ')}.`
+      : `“${event.title}” came back after the season closed; answered from the office, it cost the file nothing more.`);
+  }
+  return lines;
+}
+
+/**
+ * Put the follow-ups the last season still owed on this deployment's
+ * calendar, early, where a shortcut's pending determination also lands.
+ * @returns {string[]} lines for the deployment screen
+ */
+export function carryFollowUpsIntoJourney(campaign, journey) {
+  const pending = Array.isArray(campaign.pendingFollowUps) ? campaign.pendingFollowUps : [];
+  if (!pending.length) return [];
+  journey.scheduledEvents = [
+    ...(journey.scheduledEvents || []),
+    ...pending.map((entry, index) => ({ eventId: entry.eventId, triggerDay: 3 + index })),
+  ];
+  campaign.pendingFollowUps = [];
+  return pending.map((entry) => `Still coming back from last season: “${entry.title}”. It lands early this season.`);
 }
 
 function saveCampaign(state) {
@@ -870,6 +997,8 @@ async function runCampaignSeason(game, campaign, season) {
     // The year's shortcuts follow the forester into the next seat: watch
     // flags, open files, taken acts, and any determination still to land.
     carryLines.push(...carryShortcutsIntoJourney(campaign, journey));
+    carryLines.push(...carryFollowUpsIntoJourney(campaign, journey));
+    carrySeenEventsIntoJourney(campaign, journey);
     journey.campaignStartStanding = readStandingSnapshot(journey);
 
     ui.clear();
@@ -946,6 +1075,8 @@ async function runCampaignSeason(game, campaign, season) {
   // The year's last deployment settles any determination still owed, so the
   // review counts it; earlier seasons carry theirs into the next deployment.
   const settledLines = campaign.seasonIndex + 1 >= CAMPAIGN_SEASONS.length ? settleOutstandingFallout(journey) : [];
+  const followUpLines = settleOrCarryFollowUps(campaign, journey, CAMPAIGN_SEASONS[campaign.seasonIndex + 1] || null);
+  collectSeenEventsFromJourney(campaign, journey);
   const shortcutReview = collectShortcutsFromJourney(campaign, journey, season);
   const bridge = computeSeasonBridge(journey, endResult, journey.campaignStartBudget);
   const objectiveDetail = getObjectiveDetail(journey);
@@ -1052,6 +1183,10 @@ async function runCampaignSeason(game, campaign, season) {
   if (shortcutReview.lines.length || settledLines.length) {
     ui.writeDivider('SHORTCUTS');
     for (const line of [...shortcutReview.lines, ...settledLines]) ui.write(`• ${line}`, 'term-warning');
+  }
+  if (followUpLines.length) {
+    ui.writeDivider('STILL COMING BACK');
+    for (const line of followUpLines) ui.write(`• ${line}`, 'term-warning');
   }
   if (explained.length) {
     ui.writeDivider('WHY THIS HAPPENED');
