@@ -6,8 +6,12 @@ import {
   carryFollowUpsIntoJourney,
   carrySeenEventsIntoJourney,
   collectSeenEventsFromJourney,
+  computeSeasonBridge,
+  crewWasNeglected,
   settleOrCarryFollowUps,
 } from '../js/game/campaign.js';
+import { applyRoundConsequences, createInitialState } from '../js/engine.js';
+import { resolveEvent } from '../js/events/resolution.js';
 import { createPermittingJourney, createPlanningJourney, createReconJourney } from '../js/journey/factory.js';
 import { checkForEvent, checkScheduledEvents } from '../js/events.js';
 import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
@@ -94,6 +98,50 @@ test('a follow-up the next seat cannot hear is settled in the review at the leas
   assert.match(lines[0], /^“WorkSafeBC Officer Arrives” came back after the season closed/);
   assert.match(lines[1], /^“Major Storm Hits” came after the crew had gone home\.$/);
   assert.deepEqual(summer.scheduledEvents, []);
+});
+
+test('a starved crew\'s Budget charge is not refunded by the steady program', () => {
+  const season = () => {
+    const state = createInitialState({ companyName: 'T', roleId: 'recce', areaId: 'fraser-plateau' });
+    state.round = 2;
+    state.metrics = { progress: 55, forestHealth: 58, relationships: 60, compliance: 62, budget: 45 };
+    return state;
+  };
+  const kept = season();
+  kept.seasonOutcome = { fellShort: false, crewNeglected: false, shortcutsCaught: 0 };
+  assert.ok(applyRoundConsequences(kept).includes('steady-program'), 'a steady, fed season still earns it');
+
+  const starved = season();
+  starved.seasonOutcome = { fellShort: false, crewNeglected: true, shortcutsCaught: 0 };
+  assert.ok(!applyRoundConsequences(starved).includes('steady-program'));
+  assert.equal(starved.metrics.budget, 45);
+
+  const caught = season();
+  caught.seasonOutcome = { fellShort: false, crewNeglected: false, shortcutsCaught: 1 };
+  assert.ok(!applyRoundConsequences(caught).includes('steady-program'), 'nor a season whose shortcut was caught');
+});
+
+test('a crew member sent home to a family emergency is not a walk-off', () => {
+  const journey = createReconJourney({ areaId: 'fort-st-john-plateau', scale: 'campaign' });
+  journey.campaignStartBudget = Number(journey.resources.budget);
+  journey.blocksAssessed = journey.packageTarget;
+  const call = FIELD_EVENTS.find((event) => event.id === 'satellite_phone_call');
+  resolveEvent(journey, call, call.options[0]);
+  const gone = journey.crew.filter((member) => !member.isActive);
+  assert.equal(gone.length, 1);
+  assert.equal(gone[0].compassionateLeave, true);
+  assert.equal(crewWasNeglected(journey), false);
+  const budget = computeSeasonBridge(journey, { victory: true }, journey.campaignStartBudget)
+    .entries.find((entry) => entry.metric === 'budget');
+  assert.doesNotMatch(budget.reason, /walked off/);
+
+  // A crew member who quits still is.
+  const quitter = journey.crew.find((member) => member.isActive);
+  quitter.isActive = false;
+  quitter.hasQuit = true;
+  assert.equal(crewWasNeglected(journey), true);
+  assert.match(computeSeasonBridge(journey, { victory: true }, journey.campaignStartBudget)
+    .entries.find((entry) => entry.metric === 'budget').reason, /1 crew member walked off/);
 });
 
 test('the year\'s last season settles what it still owes', () => {

@@ -588,6 +588,17 @@ export function sumShortcutCash(journey) {
  * because the season ended before its work did: a desk pulled off the file
  * on day 11 spent little because it stopped, not because it was frugal.
  */
+/**
+ * Whether the deployment left its crew on an empty food box or walking off
+ * the job. The review charges it on the Budget line, and no end-of-season
+ * dividend pays it back (js/engine/effects.js steady program).
+ */
+export function crewWasNeglected(journey) {
+  const hungry = Number(journey?.resourcePressure?.hungryShifts) || 0;
+  const quits = (journey?.crew || []).filter((member) => member?.hasQuit && !member.compassionateLeave).length;
+  return hungry > 0 || quits > 0;
+}
+
 function computeBudgetEntry(journey, completion, startBudget, victory = true) {
   if (!(startBudget > 0)) return null;
   const shortcutCash = sumShortcutCash(journey);
@@ -599,7 +610,9 @@ function computeBudgetEntry(journey, completion, startBudget, victory = true) {
     parts.push(`${formatDollars(shortcutCash)} of shortcut cash is not a saving`);
   }
   const hungry = Number(journey.resourcePressure?.hungryShifts) || 0;
-  const quits = (journey.crew || []).filter((member) => member?.hasQuit).length;
+  // Letting someone go home to a family emergency is the right call, not a
+  // crew walking off: it used to cost a delivered season its thrift.
+  const quits = (journey.crew || []).filter((member) => member?.hasQuit && !member.compassionateLeave).length;
   if (hungry > 0 || quits > 0) {
     delta = Math.min(delta, 0) - Math.min(3, hungry);
     if (hungry > 0) parts.push(`the crew went ${hungry} shift${hungry === 1 ? '' : 's'} on an empty food box`);
@@ -1157,6 +1170,7 @@ async function runCampaignSeason(game, campaign, season) {
   // rebound it did not work for (js/engine/effects.js applyRoundRecoveries).
   gsSeason.seasonOutcome = {
     fellShort: !endResult.victory,
+    crewNeglected: crewWasNeglected(journey),
     shortcutsSeen: (shortcutReview.counts?.noticed || 0) + (shortcutReview.counts?.caught || 0),
     shortcutsCaught: shortcutReview.counts?.caught || 0,
   };
