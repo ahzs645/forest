@@ -180,6 +180,25 @@ function formatOddsHint(option) {
   return `${good}% clean, ${bad}% badly wrong`;
 }
 
+/** Effect keys that say how long something takes; the time hint covers them. */
+const TIME_EFFECT_KEYS = new Set(['timeUsed', 'progressMode']);
+
+/**
+ * Whether a hidden-outcome option has to print its stakes anyway: an
+ * off-book answer always does, and on a desk so does one whose good band
+ * already costs something (the chip must equal what lands).
+ */
+function hiddenOptionShowsStakes(option, journeyType) {
+  if (option.riskTag === 'OFF-BOOK') return true;
+  if (!DESK_PROTAGONIST_TYPES.has(journeyType)) return false;
+  const projected = projectAppliedEffects(option.effects, journeyType);
+  return Object.entries(projected).some(([key, raw]) => {
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value === 0 || TIME_EFFECT_KEYS.has(key)) return false;
+    return INVERTED_EFFECT_KEYS.has(key) ? value > 0 : value < 0;
+  });
+}
+
 /**
  * Generate a hint about an option's effects
  */
@@ -192,7 +211,11 @@ function getOptionHint(option, journeyType, event = null) {
   // the chanceSuccess line below could ever run, and since both options in the
   // whole corpus carrying chanceSuccess are also hiddenOutcome, the "% success
   // odds" hint was unreachable: the game rolled a number it could not show.
-  if (option.hiddenOutcome) {
+  // A hidden outcome that costs something even when it goes well, or an
+  // off-book one, prints its stakes like any other gamble (below): "Quietly
+  // bury the allegation" showed only its odds, and its clean band alone was
+  // -10 goodwill and +17 scrutiny for no payoff.
+  if (option.hiddenOutcome && !hiddenOptionShowsStakes(option, journeyType)) {
     // The meters stay close to the chest, but money the card can charge is
     // named: a bad roll billed cash the chip never showed.
     const bands = ['effects', 'partialEffects', 'failureEffects'].filter((band) => option[band]);
@@ -227,7 +250,13 @@ function getOptionHint(option, journeyType, event = null) {
   // The chips say what lands, knock-ons included (projectAppliedEffects):
   // "-4 compliance" on a permitting desk is also -6 scrutiny and -4 goodwill.
   const projected = option.effects ? projectAppliedEffects(option.effects, journeyType) : option.effects;
-  hints.push(...effectChips(projected, journeyType));
+  // One band's chips stay together, its scrutiny with them. The scrutiny used
+  // to go on the end of the whole hint, so on a gamble the good band's
+  // scrutiny printed after "if it goes wrong:" and read as a second cost of
+  // the bad one.
+  const mainBand = describeProjectedChips(projected, journeyType);
+  const oddsHint = formatOddsHint(option);
+  if (!oddsHint) hints.push(...mainBand);
 
   // Only a crew on a traverse has a next leg for ground to land on.
   const traverse = journeyType === 'field' || journeyType === 'recon';
@@ -235,7 +264,7 @@ function getOptionHint(option, journeyType, event = null) {
   // A brief response that still costs ground (js/events/resolution.js turns
   // timeUsed into a travel setback) has to say so.
   const timeUsed = Number(option.timeUsed ?? option.effects?.timeUsed);
-  if (traverse && timeUsed > 0 && !hints.some((hint) => hint.includes('slower next travel leg'))) {
+  if (traverse && timeUsed > 0 && ![...hints, ...mainBand].some((hint) => hint.includes('slower next travel leg'))) {
     hints.push('slower next travel leg');
   }
 
@@ -244,13 +273,22 @@ function getOptionHint(option, journeyType, event = null) {
     hints.push(`${riskPct}% injury risk`);
   }
 
-  const oddsHint = formatOddsHint(option);
   if (oddsHint) {
     hints.push(oddsHint);
-    // What the bad roll applies, in the same words as the chips above. A
-    // failed gamble used to charge cash and fuel the card never mentioned.
+    // Each band under its own label, in the same words as the chips. A failed
+    // gamble used to charge cash and fuel the card never mentioned.
+    // A three-band gamble names its middle band too, or the unnamed middle of
+    // "40% clean, 30% badly wrong" has no price on it.
     const worst = describeEffectChips(option.failureEffects, journeyType);
-    if (worst.length) hints.push(`if it goes wrong: ${worst.join(', ')}`);
+    const middle = typeof option.chancePartial === 'number' && option.partialEffects
+      ? describeEffectChips(option.partialEffects, journeyType)
+      : [];
+    const bands = [
+      mainBand.length ? `if it holds: ${mainBand.join(', ')}` : '',
+      middle.length ? `if it partly holds: ${middle.join(', ')}` : '',
+      worst.length ? `if it goes wrong: ${worst.join(', ')}` : '',
+    ].filter(Boolean);
+    if (bands.length) hints.push(bands.join(' / '));
   }
 
   // There is no hour clock any more (js/journey/dayPlan.js): a timeUsed is
@@ -290,7 +328,6 @@ function getOptionHint(option, journeyType, event = null) {
   if (typeof complianceRisk === 'number') {
     hints.push(`${Math.round(complianceRisk * 100)}% chance it comes back on you`);
   }
-  hints.push(...standingChips(projected));
 
   return hints.length > 0 ? hints.join(', ') : 'No direct cost';
 }
@@ -405,7 +442,8 @@ function effectChips(effects, journeyType) {
       // (js/events/resolution.js describeGoodwillChange); the hint should too.
       const unit = journeyType === 'manager' ? 'capital' : 'goodwill';
       const goodwill = Number(option.effects.politicalCapital) || 0;
-      hints.push(goodwill > 0 ? `+${goodwill} ${unit}` : `${goodwill} ${unit}`);
+      // A capital cost the compliance gain pays back nets to nothing: no chip.
+      if (goodwill !== 0) hints.push(goodwill > 0 ? `+${goodwill} ${unit}` : `${goodwill} ${unit}`);
     }
 
     if (option.effects.data !== undefined && option.effects.data !== 0) {
