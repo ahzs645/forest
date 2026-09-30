@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createJourney, createManagerJourney } from '../js/journey/factory.js';
-import { runManagerDay } from '../js/modes/manager.js';
+import { readQuarter, runManagerDay } from '../js/modes/manager.js';
 import { eventMatchesJourneyContext } from '../js/events/selection.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { FORESTER_ROLES } from '../js/data/roles.js';
-import { buildManagerEpilogue, getFinalReportPrompt } from '../js/game/debrief.js';
+import { buildCrewEpilogue, buildManagerEpilogue, getFinalReportPrompt, resolveFinalReport } from '../js/game/debrief.js';
 import { MANAGER_EXECUTIVE_ROLES, getOperatingPosture } from '../js/data/managerRoles.js';
 import certificationsData from '../js/data/json/legacy/certifications.json' with { type: 'json' };
 
@@ -323,4 +323,45 @@ test('the GM calendar gates seasonal cards: no July heat in December, no plantin
   assert.equal(eventMatchesJourneyContext(rivalry, journey), false);
   const poaching = DESK_EVENTS.find((event) => event.id === 'gm_executive_poaching');
   assert.doesNotMatch(JSON.stringify(poaching), /CEO/, 'the GM does not have a CEO to lose');
+});
+
+test('the GM\'s closing presentation is read against the file: spin is a gamble that shrinks with scrutiny and restatements', () => {
+  const journey = createManagerJourney({ areaId: 'fraser-plateau' });
+  journey.scrutiny = 30;
+  // Odds 0.55 - 30/150 = 0.35 on a file nobody restated.
+  const landed = resolveFinalReport('spin', journey, () => 0.3);
+  assert.equal(landed.delta, 4);
+  assert.match(landed.lines[0], /closing deck/);
+  const bust = resolveFinalReport('spin', journey, () => 0.4);
+  assert.equal(bust.delta, -10);
+  assert.doesNotMatch(bust.lines[0], /check survey/);
+  // The same roll after the year-end audit restated two quarters.
+  journey.flags.restatedQuarters = [3, 4];
+  assert.equal(resolveFinalReport('spin', journey, () => 0.3).delta, -10);
+  assert.ok(resolveFinalReport('integrity', journey).delta >= resolveFinalReport('spin', journey, () => 0).delta, 'the straight deck is worth at least a spin that lands');
+  assert.doesNotMatch(resolveFinalReport('people', journey).lines[0], /signup sheet/);
+});
+
+test('the executive team\'s epilogues are an executive team\'s: no caulks, crew-boss tickets or truck loans', () => {
+  const journey = createManagerJourney({ areaId: 'fraser-plateau' });
+  const used = new Set();
+  const lines = journey.crew.flatMap((member) => [true, false].map((victory) => buildCrewEpilogue(
+    { ...member, traits: ['leader', 'greenhorn', 'careful'] },
+    { victory, executive: true, used },
+  )));
+  assert.doesNotMatch(lines.join(' '), /caulks|crew-boss|truck loan|safety consultancy|signs on for next season before the trucks/i);
+});
+
+test('a quarter over plan that only brings a behind year back is not read as weak', () => {
+  const journey = createManagerJourney({ areaId: 'fraser-plateau' });
+  const ledger = journey.ledger;
+  const months = [10, 11, 12].map((month) => ({ month, planned: 20000, delivered: 24600 }));
+  const baseline = { ...journey.metrics };
+  // Behind the plan to date after the quarter: the push is the catch-up.
+  ledger.deliveredYtd = 200000;
+  journey.day = 13;
+  assert.ok(!readQuarter(journey, baseline, months, 4).reasons.some((reason) => /deliveries 123% of plan/.test(reason)));
+  // Ahead of it: the same quarter is cut-control exposure.
+  ledger.deliveredYtd = 262000;
+  assert.ok(readQuarter(journey, baseline, months, 4).reasons.some((reason) => /deliveries 123% of plan/.test(reason)));
 });

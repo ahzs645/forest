@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { createManagerJourney } from '../js/journey/factory.js';
 import { applyLedgerHooks, fitManagerEvent, projectYearEndCut, runManagerDay } from '../js/modes/manager.js';
 import { formatEventForDisplay, resolveEvent } from '../js/events/index.js';
-import { buildTemptationEvent, buildFalloutEvent } from '../js/events/selection.js';
+import { buildCaughtEffects, buildFalloutEvent, buildTemptationEvent, buildTemptationPayoff } from '../js/events/selection.js';
 import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
-import { buildManagerEpilogue } from '../js/game/debrief.js';
+import { buildCrewEpilogue, buildManagerEpilogue } from '../js/game/debrief.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { getOperatingPosture } from '../js/data/managerRoles.js';
 import managerEvents from '../js/data/json/desk/managerEvents.json' with { type: 'json' };
@@ -84,7 +84,8 @@ const RISKY_LEDGER = {
   'gm_bcts_bid:0': { good: { bonusVolume: 9000, stumpage: 1 }, bad: {} },
   'gm_softwood_duty_deposit:1': { good: { logPrice: -1 }, bad: { logPrice: -4 } },
   'gm_fn_revenue_sharing:1': { good: { costShiftPerM3: 1.5 }, bad: {} },
-  'gm_contractor_rate_renegotiation:1': { good: { costShiftPerM3: 2 }, bad: { costShiftPerM3: 3, curtailmentFactor: -0.1 } },
+  // The pulled processor is a stop-work (checked below), not a one-month curtailment.
+  'gm_contractor_rate_renegotiation:1': { good: { costShiftPerM3: 2 }, bad: { costShiftPerM3: 3 } },
   'gm_log_export_permit:0': { good: { bonusVolume: 1500 }, bad: {} },
   'gm_log_export_permit:2': { good: { bonusVolume: 1500 }, bad: {} },
 };
@@ -111,6 +112,7 @@ test('a risky option books its ledger hook only on the band whose outcome the pl
       const outcome = band === 'good' ? event.options[index].outcome : event.options[index].failureOutcome;
       assert.equal(entry.outcome, outcome);
       assert.deepEqual(changes(before, snapshot(journey.ledger)), expected[band], `${key} ${band}`);
+      assert.equal(Boolean(journey.ledger.stopWork), key === 'gm_contractor_rate_renegotiation:1' && band === 'bad', `${key} ${band} stop-work`);
       // A lost bid, a refused permit, a counter read as bad faith: nothing booked, nothing printed.
       const printed = ui.lines.filter((line) => line.startsWith('Ledger:'));
       if (!Object.keys(expected[band]).length && !/curtailment/.test(key)) assert.deepEqual(printed, [], `${key} ${band}`);
@@ -222,7 +224,12 @@ test('a woodlands manager who resigns leaves the seat, and an acting successor c
   assert.notEqual(acting[0].name, departing.name);
   assert.equal(journey.ceo.name, acting[0].name, 'the posture goes with the seat');
   assert.ok(ui.lines.some((line) => line === `${departing.name} clears out the office by month end. ${acting[0].name} steps up as acting woodlands manager and inherits the Steady delivery posture.`));
-  assert.match(buildManagerEpilogue(journey, true)[0], new RegExp(`^Woodlands manager ${acting[0].name}: renewed`));
+  // The epilogue says acting, and the departed manager went to Alberta, not to a mill job.
+  assert.match(buildManagerEpilogue(journey, true)[0], new RegExp(`^Acting woodlands manager ${acting[0].name}: confirmed in the job`));
+  const used = new Set();
+  assert.match(buildCrewEpilogue(departing, { victory: true, executive: true, used }), /Took the Alberta job/);
+  assert.equal(acting[0].epilogue, undefined, 'the successor did not go to Alberta');
+  assert.ok(!/Alberta/.test(buildCrewEpilogue(acting[0], { victory: true, executive: true, used })));
 
   // The rest of the year speaks of the successor.
   const month = makeUi((prompt, options) => options.find((o) => ['set_aside', 'plan', 'intervene', 'pace:1'].includes(o.value)));
@@ -261,4 +268,19 @@ test('each answer to the chair prints what it did to the file', async () => {
   const ui = makeUi((prompt, options) => options.find((o) => ['spin', 'plan', 'set_aside', 'pace:1'].includes(o.value)));
   await withRandom(0.99, () => runManagerDay({ ui, journey, gameOver: false, checkpoint() {} }));
   assert.ok(ui.lines.includes(`Reputation +4 -> 54, political capital -2 -> ${Math.round(journey.resources.politicalCapital)}, scrutiny +12 -> ${Math.round(scrutiny + 12)}%.`), ui.lines.filter((line) => /Reputation/.test(line)).join(' | '));
+});
+
+test('a GM caught on a paid shortcut pays at least the payoff back', () => {
+  const journey = monthJourney(6);
+  const underpriced = [];
+  for (const act of ILLEGAL_ACTS.filter((entry) => !entry.retired)) {
+    const payoff = buildTemptationPayoff(act, journey).effects.budget || 0;
+    if (payoff <= 0) continue;
+    const caught = buildCaughtEffects(act, journey).budget || 0;
+    if (-caught < Math.min(60000, payoff)) underpriced.push(`${act.title}: +$${payoff} vs ${caught}`);
+  }
+  assert.deepEqual(underpriced, []);
+  // The internal-audit family used to settle a $35,000 fraud for $9,000.
+  const recode = ILLEGAL_ACTS.find((act) => act.title === 'Recode the Road Costs');
+  assert.equal(buildCaughtEffects(recode, journey).budget, -buildTemptationPayoff(recode, journey).effects.budget);
 });

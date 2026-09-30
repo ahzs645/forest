@@ -201,7 +201,8 @@ function getOptionHint(option, journeyType, event = null) {
     const every = charges.every((charge) => charge === cash);
     const amount = effectChips({ budget: cash }, journeyType)[0];
     const cashHint = cash >= 0 ? '' : every ? amount : `up to ${amount.slice(1)} if it goes wrong`;
-    return [formatOddsHint(option) || 'Outcome uncertain', cashHint, timeHint].filter(Boolean).join(', ');
+    // So is a lasting ledger effect (a GM's stop-work): worth far more than the cash.
+    return [formatOddsHint(option) || 'Outcome uncertain', cashHint, option.ledgerHint, timeHint].filter(Boolean).join(', ');
   }
 
   // A shortcut leads with what decides it: today's odds, then what you get.
@@ -228,6 +229,9 @@ function getOptionHint(option, journeyType, event = null) {
   // "-4 compliance" on a permitting desk is also -6 scrutiny and -4 goodwill.
   const projected = option.effects ? projectAppliedEffects(option.effects, journeyType) : option.effects;
   hints.push(...effectChips(projected, journeyType));
+  // What answering does to standing sits with the other answer chips, not
+  // after the failure clause, where it read as the failure's.
+  hints.push(...standingChips(projected));
 
   // Only a crew on a traverse has a next leg for ground to land on.
   const traverse = journeyType === 'field' || journeyType === 'recon';
@@ -290,7 +294,6 @@ function getOptionHint(option, journeyType, event = null) {
   if (typeof complianceRisk === 'number') {
     hints.push(`${Math.round(complianceRisk * 100)}% chance it comes back on you`);
   }
-  hints.push(...standingChips(projected));
 
   return hints.length > 0 ? hints.join(', ') : 'No direct cost';
 }

@@ -1250,6 +1250,11 @@ export function buildCaughtEffects(act, journey) {
     for (const gate of ['data', 'analysis', 'buyIn']) {
       if (payoff[gate] > 0) determination[gate] = Math.min(determination[gate] || 0, -payoff[gate]);
     }
+  } else if (isManager) {
+    // A GM caught on a paid act pays it back: an internal audit that finds
+    // $35,000 of rigged brushing bids does not settle for $9,000.
+    const payoff = buildTemptationPayoff(act, journey).effects;
+    if (payoff.budget > 0) determination.budget = Math.min(determination.budget || 0, -Math.min(MANAGER_PENALTY_CAP, payoff.budget));
   }
   return determination;
 }

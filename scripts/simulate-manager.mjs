@@ -11,6 +11,7 @@
  *
  *   node scripts/simulate-manager.mjs                     # every style, every difficulty
  *   node scripts/simulate-manager.mjs --runs 40 --style honest --difficulty hard
+ *   node scripts/simulate-manager.mjs --runs 30 --areas   # seeds rotate through the areas
  *
  * tests/managerBalance.test.mjs imports simulateManagerYear from here.
  */
@@ -20,6 +21,7 @@ import { runManagerDay } from '../js/modes/manager.js';
 import { checkEndConditions } from '../js/modes/shared/endConditions.js';
 import { applyDifficultyMultipliers } from '../js/game/ForestryTrailGame.js';
 import { calculateScore } from '../js/scoring.js';
+import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 
 function seededRandom(seed) {
   let state = seed >>> 0;
@@ -47,11 +49,12 @@ function byTag(options, tags) {
 }
 
 /**
- * Pace: take the woodlands manager's recommendation, which is always the
- * option that steers the projection back toward the middle of the band.
+ * Pace and catch-up: take the woodlands manager's recommendation, which is
+ * always the option that steers the projection back toward the middle of the
+ * band (and logs stood-down wood unless that would overcut).
  */
 function recommendedPace(options) {
-  return options.find((option) => String(option.value).startsWith('pace:') && option.recommended) || null;
+  return options.find((option) => /^(pace|catchup):/.test(String(option.value)) && option.recommended) || null;
 }
 
 export const MANAGER_STYLES = {
@@ -152,7 +155,11 @@ export async function simulateManagerYear(seed, styleName, { difficulty = 'norma
   const original = Math.random;
   Math.random = seededRandom(seed);
   try {
-    const journey = createManagerJourney({ areaId, roleId: 'manager' });
+    // The area object, as the game passes it: area-tagged escalations (a
+    // salmon-crossing washout, beetle flights) only reach a journey that
+    // carries the area's tags.
+    const area = OPERATING_AREAS.find((entry) => entry.id === areaId);
+    const journey = createManagerJourney({ areaId, area, roleId: 'manager' });
     journey.difficulty = difficulty;
     applyDifficultyMultipliers(journey, difficulty);
     const game = { journey, ui: makeUi(journey, style, trace), gameOver: false, checkpoint() {} };
@@ -210,13 +217,14 @@ export function summarizeBatch(results) {
 }
 
 async function main() {
-  const args = { runs: 24, style: null, difficulty: null };
+  const args = { runs: 24, style: null, difficulty: null, areas: false };
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--runs') args.runs = Number(argv[++i]);
     else if (argv[i] === '--style') args.style = argv[++i];
     else if (argv[i] === '--difficulty') args.difficulty = argv[++i];
     else if (argv[i] === '--transcript') args.transcript = true;
+    else if (argv[i] === '--areas') args.areas = true;
   }
   const styles = args.style ? [args.style] : Object.keys(MANAGER_STYLES);
   const difficulties = args.difficulty ? [args.difficulty] : ['easy', 'normal', 'hard'];
@@ -226,6 +234,8 @@ async function main() {
       for (let i = 0; i < args.runs; i += 1) {
         results.push(await simulateManagerYear(2000 + i * 53, styleName, {
           difficulty,
+          // --areas: the seeds rotate through the nine operating areas.
+          ...(args.areas ? { areaId: OPERATING_AREAS[i % OPERATING_AREAS.length].id } : {}),
           trace: args.transcript ? console.log : null,
         }));
       }
