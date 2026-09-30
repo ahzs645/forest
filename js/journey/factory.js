@@ -562,7 +562,9 @@ export function createPermittingJourney(options = {}) {
     season: createSeasonState(effectiveRoleId),
     scrutiny: 38,
     day: 1,
-    deadline: 16,
+    // Fifteen permits in seventeen days: a clean desk that files as it
+    // drafts lands most seasons, and one the district is watching does not.
+    deadline: 17,
     actionsRemaining: ACTIONS_PER_DAY,
     currentPhase: "planning",
 

@@ -886,27 +886,32 @@ export function advancePermitClocks(journey, options = {}) {
 }
 
 /**
- * The queue work the desk would do today, in the order it matters: draft the
- * backlog, submit what is drafted, otherwise chase whichever clock is closest.
+ * The queue work the desk would do today, in the order it matters: submit
+ * what is drafted, draft the backlog, otherwise chase whichever clock is
+ * closest.
+ *
+ * A finished package goes in the day after it is drafted. The queue used to
+ * draft the whole backlog first, so the first files sat on the desk for a
+ * week while their screening and referral clocks could have been running,
+ * and a competent season came up one permit short on the last day.
  * @returns {{step: 'draft'|'submit'|'chase'|null, count: number, file: Object|null}}
  */
 export function planQueueWork(journey) {
   const permits = ensurePermitFiles(journey);
-  // A drafted HCA permit that is holding a cutting permit is filed before
-  // anything else is drafted: the CP cannot move until it is in.
-  const blockingHca = permits.files.find((file) => file.lane === 'drafted' && file.type === 'HCA' && file.holdsFileId);
-  if (blockingHca) {
-    const drafted = permits.files.filter((file) => file.lane === 'drafted').length;
-    return { step: 'submit', count: Math.min(drafted, DAILY_PERMIT_THROUGHPUT), file: blockingHca };
-  }
-  if ((permits.backlog || 0) > 0) {
-    return { step: 'draft', count: Math.min(permits.backlog, DAILY_PERMIT_THROUGHPUT), file: null };
-  }
   // Counted off the files: an HCA permit waiting to go in is not on the
   // counters but still has to be filed.
   const drafted = permits.files.filter((file) => file.lane === 'drafted').length;
+  // A drafted HCA permit that is holding a cutting permit is filed first:
+  // the CP cannot move until it is in.
+  const blockingHca = permits.files.find((file) => file.lane === 'drafted' && file.type === 'HCA' && file.holdsFileId);
+  if (blockingHca) {
+    return { step: 'submit', count: Math.min(drafted, DAILY_PERMIT_THROUGHPUT), file: blockingHca };
+  }
   if (drafted > 0) {
     return { step: 'submit', count: Math.min(drafted, DAILY_PERMIT_THROUGHPUT), file: null };
+  }
+  if ((permits.backlog || 0) > 0) {
+    return { step: 'draft', count: Math.min(permits.backlog, DAILY_PERMIT_THROUGHPUT), file: null };
   }
   const [file] = getChaseableFiles(journey, ['screening', 'decision']);
   if (file) return { step: 'chase', count: 1, file };
