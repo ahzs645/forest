@@ -166,12 +166,12 @@ const FSP_EXTENSION_SCRUTINY = 8;
 const FSP_EXTENSION_DISTRICT_COOLING = 6;
 
 // The fall planning file pays for the same approval gates and the same
-// authored invoices on every difficulty, and Old Growth deals more of those
-// invoices, so the hard cut to resources left a careful file "Budget
-// exhausted" on half its falls. On hard the fall allowance keeps the normal
-// allowance plus a contingency for the heavier event load; the shorter window
-// and the harsher odds still make it the hard file.
-const HARD_FALL_ALLOWANCE = 1.4;
+// authored invoices on every difficulty, so the hard cut to resources left a
+// careful file "Budget exhausted" on half its falls. On hard the fall keeps
+// the normal allowance (0.8 x 1.25): at 1.4 it was 12% richer than normal,
+// the richest file of the three difficulties. The shorter window, the
+// heavier event load and the harsher odds still make it the hard file.
+const HARD_FALL_ALLOWANCE = 1.25;
 
 /**
  * Campaign-level adjustments to a deployment's allowance, after the
@@ -1021,11 +1021,13 @@ async function runCampaignSeason(game, campaign, season) {
   }
 
   // The round-end rules credit what the season did: a deployment that fell
-  // short, or whose shortcut somebody saw, earns no dividend for a well-run
-  // file (js/engine/effects.js applyRoundRecoveries).
+  // short, or whose shortcut was caught, earns no dividend for a well-run
+  // file, and one that fell short and was seen cutting corners gets no
+  // rebound it did not work for (js/engine/effects.js applyRoundRecoveries).
   gsSeason.seasonOutcome = {
     fellShort: !endResult.victory,
     shortcutsSeen: (shortcutReview.counts?.noticed || 0) + (shortcutReview.counts?.caught || 0),
+    shortcutsCaught: shortcutReview.counts?.caught || 0,
   };
   const consequences = applyRoundConsequences(gsSeason);
   const explained = describeConsequences(gsSeason, consequences, { fellShort: !endResult.victory });

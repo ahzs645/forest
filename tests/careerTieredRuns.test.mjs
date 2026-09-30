@@ -70,6 +70,17 @@ test("seasonal and crisis debriefs file under their own buckets", () => {
   assert.equal(buildCareerStand(record).count, 3);
 });
 
+test("a crisis debrief that ends STRONG is a win on the record", async () => {
+  // The crisis debrief tiers are STRONG/MIXED/FRAGILE (tui/crisisMode.js), so
+  // 'strong' in the winning tiers is live, not a leftover.
+  const { buildCrisisSummary } = await import("../tui/crisisMode.js");
+  const stable = buildCrisisSummary({ metrics: { progress: 80, forestHealth: 80, relationships: 80, compliance: 80, budget: 60 } });
+  assert.equal(stable.tier, "STRONG");
+  withStorage();
+  const record = recordTieredRun("crisis-command", stable);
+  assert.equal(record.byRole["crisis-command"].victories, 1);
+});
+
 test("recording survives storage that is unavailable", () => {
   globalThis.window = { get localStorage() { throw new Error("SecurityError"); } };
   const record = recordTieredRun("seasonal", { tier: "solid", score: 70 });

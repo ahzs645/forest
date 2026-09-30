@@ -18,7 +18,6 @@ export {
   drawIssue,
   drawSeasonalEvent,
   drawSeasonalTemptation,
-  getRoleTasks,
   scoreIssueSelection,
 } from "./engine/content.js";
 export {

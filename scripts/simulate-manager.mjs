@@ -70,8 +70,11 @@ export const MANAGER_STYLES = {
       if ((m.compliance ?? 50) <= (m.relationships ?? 50)) return byValue(options, ['compliance']);
       return byValue(options, ['pr']);
     }
+    // Leave a situation with the division when cash is thin, unless the
+    // set-aside line says the division stops work over it.
     const setAside = byValue(options, ['set_aside']);
-    if (setAside && (journey.resources.budget || 0) < (journey.ledger?.startTreasury || 850000) * 0.35) return setAside;
+    if (setAside && !/stop-work/.test(setAside.description || '')
+      && (journey.resources.budget || 0) < (journey.ledger?.startTreasury || 850000) * 0.35) return setAside;
     return byValue(options, ['plan', 'visit', 'rehearse', 'transparent'])
       || byTag(options, ['SAFE', 'TRADEOFF']);
   },

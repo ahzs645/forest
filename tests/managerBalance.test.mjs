@@ -18,6 +18,20 @@ async function batch(style, difficulty = 'normal', seeds = SEEDS) {
   return results;
 }
 
+/**
+ * Set a situation aside, except one whose set-aside line says the division
+ * stops work over it (js/modes/manager.js): that one is answered on its safe
+ * line, so a fixture that means to ride or steer the cut is not steered by
+ * stop-works it chose.
+ */
+function leaveOrAnswer(options) {
+  const setAside = options.find((o) => o.value === 'set_aside');
+  if (!setAside) return null;
+  if (!/stop-work/.test(setAside.description || '')) return setAside;
+  return options.find((o) => typeof o.value === 'number' && /\[SAFE\]$/.test(o.label))
+    || options.find((o) => typeof o.value === 'number');
+}
+
 const mean = (list) => list.reduce((sum, value) => sum + value, 0) / list.length;
 
 test('play styles separate: competent and honest win inside the band, reckless loses on cut control, spin grades below honesty', async () => {
@@ -40,7 +54,8 @@ test('play styles separate: competent and honest win inside the band, reckless l
   // Pushing the cut and never slowing it is how a GM loses now.
   assert.ok(r.winRate <= 0.2, `reckless wins ${r.wins}/${r.runs}`);
   assert.ok(r.medianCut > 1.15, `reckless median cut ${r.medianCut}`);
-  assert.ok(reckless.filter((result) => !result.victory).every((result) => /AAC|Budget exhausted/.test(result.reason)));
+  // A reckless year whose overcut a stop-work breaks up loses the board instead.
+  assert.ok(reckless.filter((result) => !result.victory).every((result) => /AAC|Budget exhausted|board's confidence/.test(result.reason)));
 
   // Spin is a gamble, not the dominant play: it can still win, but it grades
   // below the honest year and runs a hotter file.
@@ -147,7 +162,8 @@ test('an overcut does not pay: steering Push the cut into the band ends the year
   const year = async (seed, pace) => {
     MANAGER_STYLES.__push = (journey, options, prompt) => {
       if (/operating posture/.test(prompt)) return options.find((o) => o.value === 'growth');
-      return options.find((o) => ['none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', 'set_aside', pace].includes(o.value))
+      return options.find((o) => ['none', 'hold', 'plan', 'desk', 'rehearse', 'transparent', pace].includes(o.value))
+        || leaveOrAnswer(options)
         || options.find((o) => o.recommended);
     };
     try {
@@ -179,15 +195,17 @@ test('an overcut does not pay: steering Push the cut into the band ends the year
 });
 
 test('the ledger arithmetic is exact: every printed month reconciles and the treasury closes to the dollar', async () => {
-  // A GM who spends nothing and sets every situation aside, so the only money
-  // movements are the certificate, the monthly ledgers, the year-end
-  // cut-control penalty, a cost-cutting year's silviculture provision and
-  // whatever the set-aside situations land. A clean year, an overcut year
+  // A GM who spends nothing and sets every situation aside (except one that
+  // would stop work, answered on its safe line), so the only money movements
+  // are the certificate, the monthly ledgers, the year-end cut-control
+  // penalty, a cost-cutting year's silviculture provision and whatever the
+  // situations land. A clean year, an overcut year
   // and a cost-discipline year.
   const hands = (posture, pace) => (journey, options, prompt) => {
     if (/operating posture/.test(prompt)) return options.find((o) => o.value === posture);
     if (/Certification/.test(prompt)) return options.find((o) => o.value === 'CSA');
-    return options.find((o) => ['hold', 'plan', 'desk', 'rehearse', 'transparent', 'set_aside', pace].includes(o.value))
+    return options.find((o) => ['hold', 'plan', 'desk', 'rehearse', 'transparent', pace].includes(o.value))
+      || leaveOrAnswer(options)
       || options.find((o) => o.recommended);
   };
   const cases = [['steady', null], ['growth', 'pace:1'], ['lean', null]];
@@ -206,7 +224,8 @@ test('the ledger arithmetic is exact: every printed month reconciles and the tre
     assert.ok(journey.resources.budget > 0, 'the reconciliation needs an unclamped treasury');
 
     // Setting a situation aside now lands its least cost, and that can be
-    // money: whatever a month's treasury shows beyond its net is that spend.
+    // money, as can a situation answered: whatever a month's treasury shows
+    // beyond its net is that spend.
     let treasury = ledger.startTreasury - 100000;
     let unexplained = 0;
     for (const month of ledger.months) {
@@ -218,10 +237,10 @@ test('the ledger arithmetic is exact: every printed month reconciles and the tre
       treasury = month.treasury;
     }
     assert.equal(ledger.deliveredYtd, ledger.months.reduce((sum, month) => sum + month.delivered, 0));
-    const deferredSpend = (journey.log || [])
-      .filter((entry) => entry.setAside)
+    const situationSpend = (journey.log || [])
+      .filter((entry) => entry.type === 'event')
       .reduce((sum, entry) => sum + (Number(entry.effects?.budget) || 0), 0);
-    assert.equal(unexplained, deferredSpend, 'every dollar beyond the ledgers is a set-aside charge');
+    assert.equal(unexplained, situationSpend, 'every dollar beyond the ledgers is what a situation charged');
     assert.equal(journey.resources.budget, treasury - (ledger.overcutPenalty || 0) - (ledger.silvicultureProvision || 0));
     if (posture === 'lean') {
       assert.equal(ledger.silvicultureProvision, Math.round(ledger.deliveredYtd * 0.5), 'the deferred silviculture is booked');

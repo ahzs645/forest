@@ -34,7 +34,32 @@ test("the CPD reminder lands at most once a year, only for a log let slide, and 
       assert.notEqual(run.strategy, "balanced", "a year kept to the standards is not behind on CPD");
     }
   }
-  assert.ok(years / MATRIX.length < 0.45, `the reminder came in ${years} of ${MATRIX.length} years`);
+  assert.ok(years > 0, "some year let the log slide");
+});
+
+// How often the reminder comes is a property of how the year was played, so
+// the bound is per strategy, over several seed bases. The old check was one
+// share over the whole matrix (balanced 0%, random ~30%, aggressive 100%)
+// against a 45% cap; it read 42.6% at this file's seed base and 46.6% at
+// another. A pushed year never logs CPD and always gets the card; a middling
+// year gets it in a minority of years (27-40% of 108 at six seed bases, so
+// the band below is five standard deviations wide on either side).
+test("the CPD reminder comes to every pushed year and a minority of middling ones, at any seed base", () => {
+  const share = (runs, strategy) => {
+    const played = runs.filter((run) => run.strategy === strategy);
+    const carded = played.filter((run) => Object.values(run.issuesByRound || {}).some((ids) => ids.includes("cpd-log-behind")));
+    return carded.length / played.length;
+  };
+  const bases = [
+    MATRIX,
+    simulateMatrix({ strategies: ["random", "aggressive"], runs: 3, seedBase: 2000 }),
+    simulateMatrix({ strategies: ["random", "aggressive"], runs: 3, seedBase: 5000 }),
+  ];
+  for (const [index, runs] of bases.entries()) {
+    assert.ok(share(runs, "aggressive") >= 0.9, `base ${index}: pushed years carded ${share(runs, "aggressive")}`);
+    const middling = share(runs, "random");
+    assert.ok(middling > 0.08 && middling < 0.55, `base ${index}: middling years carded ${middling}`);
+  }
 });
 
 test("an issue or event answered once is not dealt again the same year", () => {

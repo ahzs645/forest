@@ -17,8 +17,7 @@ import {
   buildCaughtNarrative,
   isSelfProposedAct,
 } from '../js/data/illegalActs.js';
-import { MISCHIEF_OPTIONS } from '../js/data/mischief.js';
-import { FORESTER_ROLES, ISSUE_LIBRARY, CHAINED_ISSUES, FIELD_EVENTS } from '../js/data/index.js';
+import { ISSUE_LIBRARY, CHAINED_ISSUES, FIELD_EVENTS } from '../js/data/index.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 import {
   ACT_PREMISE_CHECKS,
@@ -267,7 +266,12 @@ test('no act is offered while its premise is false, in any area or season', () =
   const offenders = [];
   for (const [name, { roles, breakIt }] of Object.entries(PREMISE_BROKEN)) {
     const acts = ACTIVE_ILLEGAL_ACTS.filter((act) => actPremises(act).includes(name));
-    assert.ok(acts.length > 0, `${name} gates no act`);
+    // A premise may outlive the acts it gated (relationsStrained: the
+    // blockade act is retired); it still names something in the library.
+    if (!acts.length) {
+      assert.ok(ILLEGAL_ACTS.some((act) => act.retired && actPremises(act).includes(name)), `${name} gates no act`);
+      continue;
+    }
     for (const roleId of roles) {
       const actsForRole = acts.filter((act) => act.roles.includes(roleId));
       if (!actsForRole.length) continue;
@@ -317,17 +321,23 @@ test('the playtest premise mismatches stay fixed', () => {
   analysing.plan.phase = 'analysis';
   assert.equal(offered('inventory-data-laundering', analysing), true);
   analysing.plan.analysisQuality = 100;
-  // Still offered, but the promised analysis is not paid: it falls to time back
-  // on the file (js/events/selection.js buildTemptationPayoff), never to a gate
-  // that cannot move.
+  // Still offered to a tired planner, but the promised analysis is not paid:
+  // it falls to time back on the file (js/events/selection.js
+  // buildTemptationPayoff), never to a gate that cannot move.
+  Object.assign(analysing.protagonist, { energy: 70, stress: 20 });
   const gateFull = buildTemptationPayoff(act('inventory-data-laundering'), analysing).effects;
   assert.equal(gateFull.analysis, undefined, 'no analysis is promised at a full analysis gate');
   assert.ok(gateFull.progress > 0, 'the take pays time back on the file instead');
+  assert.equal(offered('inventory-data-laundering', analysing), true);
+  // A rested planner has no time to get back: nothing lands, so it is not offered.
+  Object.assign(analysing.protagonist, { energy: 100, stress: 0 });
+  assert.deepEqual(buildTemptationPayoff(act('inventory-data-laundering'), analysing).effects, {});
+  assert.equal(offered('inventory-data-laundering', analysing), false);
 
-  // The blockade act needs a blockade's worth of bad relations.
+  // The blockade act is retired: the GM's year has no blockade to intimidate,
+  // and no other role was ever asked it.
   const gm = journeyFor('manager');
-  assert.equal(offered('drop-a-tree-near-the-blockade', gm), true);
-  PREMISE_BROKEN.relationsStrained.breakIt(gm);
+  assert.equal(findIllegalAct('drop-a-tree-near-the-blockade').retired, true);
   assert.equal(offered('drop-a-tree-near-the-blockade', gm), false);
 });
 
@@ -633,21 +643,3 @@ test('every fallout issue a caught shortcut can schedule exists', () => {
   assert.deepEqual([...ids].filter((id) => !known.has(id)), []);
 });
 
-// ── Legacy mischief ─────────────────────────────────────────────────────────
-
-test('mischief tempts with more than the honest options and never pays in compliance or goodwill', () => {
-  const tasks = new Map(FORESTER_ROLES.flatMap((role) => (role.tasks || []).map((task) => [task.id, task])));
-  for (const [taskId, mischief] of Object.entries(MISCHIEF_OPTIONS)) {
-    const task = tasks.get(taskId);
-    assert.ok(task, `${taskId} matches no role task`);
-    const { successEffects, failEffects, successOutcome, failOutcome } = mischief.risk;
-    for (const meter of ['compliance', 'relationships', 'forestHealth']) {
-      assert.ok(!(Number(successEffects[meter]) > 0), `${taskId}: a successful ${mischief.label.toLowerCase()} raises ${meter}`);
-    }
-    const honestBest = Math.max(...task.options.map((option) => Number(option.effects?.progress) || 0));
-    assert.ok(successEffects.progress > honestBest, `${taskId}: no reason to take it over the honest options`);
-    const total = (effects) => Object.values(effects).reduce((sum, value) => sum + value, 0);
-    assert.ok(total(failEffects) < -total(successEffects), `${taskId}: getting caught has to cost more than it pays`);
-    assert.doesNotMatch(`${mischief.outcome} ${successOutcome} ${failOutcome}`, /attempt something risky|band council|Environment ministry|Ministry suspends/i, taskId);
-  }
-});

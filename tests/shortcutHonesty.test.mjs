@@ -29,12 +29,13 @@ import { TEMPTATION_FLAG_LABELS, TEMPTATION_WATCH_FLAGS } from '../js/events/odd
 import { collectShortcutsFromJourney, describeShortcutWatch } from '../js/events/shortcutRecord.js';
 import { applyProfessionalComplianceShift } from '../js/engine/professional.js';
 import { calculateScore, formatScoreDisplay, scoreIntegrityPenalty } from '../js/scoring.js';
-import { recordProgramShortcut, runSeasonCloseAudit, summarizeIntegrity } from '../js/modes/silvicultureIntegrity.js';
+import { recordProgramShortcut, recordTemptationOutcome, runSeasonCloseAudit, summarizeIntegrity } from '../js/modes/silvicultureIntegrity.js';
 import { createJourney } from '../js/journey.js';
 import { createInitialState } from '../js/engine/state.js';
 import { adaptIllegalActTemptation, buildIllegalActWatchFlags, drawIssue } from '../js/engine/content.js';
 import { applyOptionOutcome, applyRoundConsequences } from '../js/engine/effects.js';
 import { CHAINED_ISSUES } from '../js/data/index.js';
+import { fitManagerEvent } from '../js/modes/manager.js';
 
 const ROLE_AREAS = {
   recce: 'fort-st-john-plateau',
@@ -145,7 +146,9 @@ test('the stakes name the knock-ons, the scrutiny of a clean take, the finding o
   const [gain, odds] = event.stakes;
   const buried = gain.match(/^Take it and you get .* \((\+\d+ scrutiny) even if it stays buried\)\. Saying no costs nothing\.$/);
   assert.ok(buried, gain);
-  assert.match(odds, /somebody notices \(-2 compliance, -2 goodwill, \+11 scrutiny, and the RCMP have your name\)/);
+  // The payoff is ten permit clock-days of work, which draws a point of
+  // scrutiny of its own when it lands in the noticed band too: +12, not +11.
+  assert.match(odds, /somebody notices \(-2 compliance, -2 goodwill, \+12 scrutiny, and the RCMP have your name\)/);
   assert.match(odds, /catches it \(no payoff; \+5 scrutiny today, then .*-16 compliance, -28 goodwill, .*\+49 scrutiny, landing about \d days? later; on your record: the RCMP have your name, an RCMP file is open\)/);
   const hint = formatEventForDisplay(event, 'permitting').options[1].hint;
   assert.ok(hint.includes(buried[1]), `${hint} vs ${buried[1]}`);
@@ -153,6 +156,104 @@ test('the stakes name the knock-ons, the scrutiny of a clean take, the finding o
   const trial = clone(journey);
   applyEventEffects(trial, event.options[1].effects, []);
   assert.equal(`+${trial.scrutiny - journey.scrutiny} scrutiny`, buried[1]);
+});
+
+/** "(-2 compliance, -2 goodwill, +12 scrutiny, and a watch)" → { compliance: -2, goodwill: -2, scrutiny: 12 } */
+function parseChips(text) {
+  const chips = {};
+  for (const chip of String(text || '').split(', ')) {
+    const match = chip.match(/^([+-]\d+(?:\.\d+)?) (scrutiny|compliance|goodwill|capital|professional standing|relations)$/);
+    if (match) chips[match[2]] = Number(match[1]);
+  }
+  return chips;
+}
+
+/** The meters a chip names, read off a journey. */
+function readMeters(journey) {
+  return {
+    scrutiny: Number(journey.scrutiny) || 0,
+    goodwill: journey.resources?.politicalCapital,
+    capital: journey.resources?.politicalCapital,
+    'professional standing': journey.protagonist?.reputation,
+    compliance: journey.journeyType === 'permitting' ? journey.regulations?.complianceScore : journey.metrics?.compliance,
+  };
+}
+
+function landed(journey, effects) {
+  const trial = clone(journey);
+  const before = readMeters(trial);
+  applyEventEffects(trial, effects || {}, []);
+  const after = readMeters(trial);
+  return Object.fromEntries(Object.keys(before).map((key) => [key, (after[key] ?? 0) - (before[key] ?? 0)]));
+}
+
+test('every shortcut\'s stakes line is what each band lands, for every act and role, a big payoff included', () => {
+  // Two desks: meters mid-range, and a planning file whose gates are all
+  // full, so its payoff is time back on the file at twelve or more points of
+  // work, which draws a point of scrutiny of its own.
+  const states = [
+    ['mid-range', (roleId) => journeyFor(roleId)],
+    ['big payoff', (roleId) => {
+      const journey = journeyFor(roleId);
+      if (journey.plan) Object.assign(journey.plan, { dataCompleteness: 98, analysisQuality: 98, stakeholderBuyIn: 98 });
+      // A tired planner, so the time back has somewhere to land.
+      if (journey.protagonist) Object.assign(journey.protagonist, { energy: 60, stress: 30 });
+      return journey;
+    }],
+  ];
+  let checked = 0;
+  let bigPayoffs = 0;
+  for (const [state, make] of states) {
+    for (const entry of ACTIVE_ILLEGAL_ACTS) {
+      for (const roleId of entry.roles.filter((role) => ROLE_AREAS[role])) {
+        const journey = make(roleId);
+        let event = buildTemptationEvent(entry, journey);
+        if (journey.journeyType === 'manager') event = fitManagerEvent(journey, event);
+        const shortcut = event.options.find((option) => option.liveOdds);
+        const where = `${entry.id} for ${roleId} (${state})`;
+        if ((shortcut.effects?.progress || 0) > 6) bigPayoffs += 1;
+        const [gain, odds] = event.stakes;
+        const clean = landed(journey, shortcut.effects);
+        const buried = gain.match(/\(([+-]\d+(?:\.\d+)?) scrutiny even if it stays buried\)/);
+        assert.equal(buried ? Number(buried[1]) : 0, clean.scrutiny, `${where} clean: ${gain}`);
+
+        const noticedText = odds.match(/somebody notices \((.*?), and [^()]*\)/)?.[1];
+        assert.ok(noticedText !== undefined, `${where}: ${odds}`);
+        const noticedChips = parseChips(noticedText);
+        const noticed = landed(journey, shortcut.partialEffects);
+        assert.equal(noticedChips.scrutiny || 0, noticed.scrutiny, `${where} noticed scrutiny: ${noticedText}`);
+        for (const unit of ['goodwill', 'capital', 'professional standing']) {
+          if (!(unit in noticedChips)) continue;
+          assert.equal(noticedChips[unit], noticed[unit] - clean[unit], `${where} noticed ${unit}: ${noticedText}`);
+        }
+
+        const caughtText = odds.match(/catches it \(no payoff; (.*)\)\.$/)?.[1] || '';
+        const [today, later] = shortcut.failureFallout ? caughtText.split(' today, then ') : ['', caughtText];
+        if (shortcut.failureFallout) {
+          assert.equal(parseChips(today).scrutiny || 0, landed(journey, shortcut.failureEffects).scrutiny, `${where} caught today: ${today}`);
+        }
+        const determination = landed(journey, shortcut.failureFallout?.effects || shortcut.failureEffects);
+        const laterChips = parseChips(later.split(/, landing |; on your record/)[0]);
+        assert.equal(laterChips.scrutiny || 0, determination.scrutiny, `${where} determination: ${later}`);
+        checked += 1;
+      }
+    }
+  }
+  assert.ok(checked > 300, `${checked} offers checked`);
+  assert.ok(bigPayoffs >= 20, `${bigPayoffs} offers paid more than six points of work`);
+});
+
+test('a planner\'s compliance chips name professional standing, at the size it lands', () => {
+  const journey = journeyFor('planner');
+  const authored = { compliance: -10, scrutiny: 15 };
+  const chips = describeEffectChips(authored, 'planning');
+  assert.ok(!chips.some((chip) => / compliance$/.test(chip)), chips.join(', '));
+  assert.ok(chips.includes('-5 professional standing'), chips.join(', '));
+  const before = journey.protagonist.reputation;
+  const messages = [];
+  applyEventEffects(journey, authored, messages);
+  assert.equal(journey.protagonist.reputation, before - 5);
+  assert.ok(messages.includes('Professional standing slipped (-5).'), messages.join(' | '));
 });
 
 test('silence about a go-around costs what its card says', () => {
@@ -249,6 +350,55 @@ test('an FPBC complaint file is decided after eight days: the registration can b
   assert.equal(journey.professional.registrationStatus, 'active', 'once decided, the renewal restores the licence');
 });
 
+test('an FPBC file saved open before the review clock existed is still decided eight days after the load', () => {
+  // The wave-2 save shape: the file settled (registration under review) but
+  // no opening day, so the review read 0 of 8 days forever.
+  const journey = journeyFor('planner');
+  journey.day = 6;
+  journey.consequenceFlags = ['fpbc_watching', 'fpbc_file_open'];
+  journey.temptationMemory = { lastDay: 3, seenActIds: [], takenActIds: [], pending: [], settledFlags: ['fpbc_file_open'] };
+  journey.professional.registrationStatus = 'under-review';
+
+  withRandom(0.99, () => checkForEvent(journey));
+  assert.equal(journey.temptationMemory.fpbcFileOpenedDay, 6, 'the clock starts at the save\'s day');
+  assert.equal(fpbcReviewDaysLeft(journey), 8);
+  for (let day = 7; day <= 14; day += 1) {
+    journey.day = day;
+    withRandom(0.99, () => checkForEvent(journey));
+  }
+  assert.equal(fpbcReviewDaysLeft(journey), null, 'decided on day 14');
+  assert.ok(!journey.consequenceFlags.includes('fpbc_file_open'));
+  assert.ok(journey.consequenceFlags.includes('fpbc_watching'));
+  applyProfessionalComplianceShift(journey, { registrationStatus: 'active' });
+  assert.equal(journey.professional.registrationStatus, 'active');
+});
+
+test('an older save\'s catch-all C&E watch is given back to the institution that noticed', () => {
+  // Before each institution kept its own watch, a DFO finding was saved as
+  // ce_watching: the panel said C&E and the next DFO act read it as generic.
+  const dfo = ACTIVE_ILLEGAL_ACTS.find((entry) => entry.roles.includes('permitter') && entry.catch?.by === 'DFO');
+  const ce = ACTIVE_ILLEGAL_ACTS.find((entry) => entry.roles.includes('permitter') && entry.catch?.by === 'C&E');
+  const legacy = (acts) => {
+    const journey = journeyFor('permitter');
+    journey.consequenceFlags = ['ce_watching'];
+    journey.temptationMemory = { lastDay: 3, seenActIds: acts.map((entry) => entry.id), takenActIds: acts.map((entry) => entry.id), pending: [] };
+    journey.log = acts.map((entry, index) => ({ day: 2 + index, type: 'event', eventId: `temptation_${entry.id}`, optionLabel: 'Take the shortcut', band: 'partial' }));
+    return journey;
+  };
+  const fresh = journeyFor('permitter');
+  const watched = legacy([dfo]);
+  const option = buildShortcutOption(dfo, watched);
+  assert.deepEqual(watched.consequenceFlags, ['dfo_watching']);
+  assert.ok(option.liveOdds.bad >= buildShortcutOption(dfo, fresh).liveOdds.bad + 0.19, 'DFO reads its own watch closely');
+  assert.ok(describeShortcutWatch(watched).some((alert) => /DFO/.test(alert.text)));
+  assert.ok(!describeShortcutWatch(watched).some((alert) => /C&E/.test(alert.text)));
+
+  // A C&E finding in the same log keeps C&E's watch beside DFO's.
+  const both = legacy([dfo, ce]);
+  buildShortcutOption(dfo, both);
+  assert.deepEqual([...both.consequenceFlags].sort(), ['ce_watching', 'dfo_watching']);
+});
+
 // ── (4) The campaign counts the last shortcut of a season ───────────────────
 
 test('a shortcut taken after the season\'s last offer check is still carried into the year', () => {
@@ -289,6 +439,30 @@ test('the season-close check reads only what somebody noticed, at the act\'s own
   assert.equal(runSeasonCloseAudit(clone(seeded)).length, first);
 });
 
+test('a silviculture card says the noticed record is read again at season close, and the close reads it at the odds the card printed', () => {
+  const journey = journeyFor('silviculture');
+  const event = buildTemptationEvent(act('silvi-misreport-planting'), journey);
+  const shortcut = event.options.find((option) => option.liveOdds);
+  const caught = Math.round(shortcut.liveOdds.bad * 100);
+  assert.match(event.stakes[1], new RegExp(`somebody notices \\([^()]*, and the district reads it again at season close: ${caught}% it is caught then\\)`));
+  assert.match(shortcut.partialOutcome, /The district will read that record again at season close\.$/);
+  // No other role's card carries the season-close line.
+  const permit = buildTemptationEvent(act('midnight-variance-forgery'), journeyFor('permitter'));
+  assert.ok(!/season close/.test(permit.stakes[1]));
+
+  // Taken and noticed: the record keeps the printed odds, and the close
+  // rolls against them even when the file's odds have moved since.
+  journey.log.push({ day: 5, type: 'event', eventId: event.id, optionLabel: shortcut.label, outcome: shortcut.partialOutcome, band: 'partial' });
+  const record = recordTemptationOutcome(journey, event);
+  assert.equal(record.status, 'noticed');
+  assert.equal(record.closeOdds, shortcut.liveOdds.bad);
+  journey.scrutiny = 90;
+  const later = clone(journey);
+  assert.equal(runSeasonCloseAudit(later, () => shortcut.liveOdds.bad + 0.01).length, 0, 'above the printed odds: nothing');
+  const found = clone(journey);
+  assert.equal(runSeasonCloseAudit(found, () => shortcut.liveOdds.bad - 0.01).length, 1, 'under the printed odds: caught');
+});
+
 // ── (6) A payoff that cannot land is not promised ───────────────────────────
 
 test('a planner is paid only what the gate can take, and a full gate pays the next one or time back', () => {
@@ -311,9 +485,20 @@ test('a planner is paid only what the gate can take, and a full gate pays the ne
 
   planner.plan.stakeholderBuyIn = 100;
   planner.plan.analysisQuality = 100;
+  Object.assign(planner.protagonist, { energy: 70, stress: 25 });
   const spent = buildTemptationPayoff(launder, planner).effects;
   assert.ok(spent.progress > 0 && spent.analysis === undefined && spent.buyIn === undefined, JSON.stringify(spent));
   assert.match(formatEventForDisplay(buildTemptationEvent(launder, planner), 'planning').options[1].hint, /time back on the file/);
+  const before = { ...planner.protagonist };
+  const messages = [];
+  applyEventEffects(planner, spent, messages);
+  assert.ok(planner.protagonist.energy > before.energy && planner.protagonist.stress < before.stress, 'the time back lands');
+
+  // Fresh and unstressed, time back would land nothing: no payoff to promise.
+  Object.assign(planner.protagonist, { energy: 100, stress: 0 });
+  const nothing = buildTemptationPayoff(launder, planner);
+  assert.deepEqual(nothing.effects, {});
+  assert.equal(nothing.deliverable, false);
 });
 
 // ── (7) A serious catch costs more than it pays ─────────────────────────────

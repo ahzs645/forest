@@ -92,7 +92,7 @@ test('recovery rules credit only what the season did', () => {
   idle.history.push({ type: 'issue', id: 'push', round: 3, effects: { progress: 3, compliance: -2 } });
   assert.ok(!applyRoundConsequences(idle).includes('field-discipline-rebound'));
 
-  // A season that fell short, or whose shortcut somebody noticed, earns no
+  // A season that fell short, or whose shortcut was caught, earns no
   // dividend for a trusted file.
   const trusted = () => {
     const state = makeState('planner');
@@ -110,10 +110,17 @@ test('recovery rules credit only what the season did', () => {
   assert.ok(!failedIds.includes('operational-dividend') && !failedIds.includes('delivery-dividend'), failedIds.join(', '));
   assert.ok(!failedIds.includes('steady-program'));
 
+  const caught = trusted();
+  caught.history.push({ type: 'temptation', id: 'act', round: 3, band: 'caught', effects: { compliance: -6 } });
+  const caughtIds = applyRoundConsequences(caught);
+  assert.ok(!caughtIds.includes('operational-dividend') && !caughtIds.includes('delivery-dividend'), caughtIds.join(', '));
+
+  // A shortcut somebody only noticed already cost the file its compliance
+  // and a watch; the dividend is not withheld on top of that.
   const noticed = trusted();
   noticed.history.push({ type: 'temptation', id: 'act', round: 3, band: 'noticed', effects: { progress: 6 } });
   const noticedIds = applyRoundConsequences(noticed);
-  assert.ok(!noticedIds.includes('delivery-dividend'), noticedIds.join(', '));
+  assert.ok(noticedIds.includes('operational-dividend') && noticedIds.includes('delivery-dividend'), noticedIds.join(', '));
 });
 
 test('buildSeasonHeadline returns the most impactful decision of a season', () => {

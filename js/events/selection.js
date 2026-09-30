@@ -29,12 +29,12 @@ import { computeBandOdds, matchesOddsCondition, TEMPTATION_FLAG_LABELS, TEMPTATI
 import { OPERATING_AREAS } from '../data/operatingAreas.js';
 import { getDiscoveryEventTypeMultipliers } from '../data/discoveryTags.js';
 import { getAreaSituationMultipliers } from '../data/areaSituations.js';
-import { describeEffectChips, formatRadioReport } from './display.js';
+import { describeEffectChips, describeProjectedChips, formatRadioReport } from './display.js';
 import { getDayRng } from './dayRng.js';
 import { getSignableFiles } from '../journey/permitPipeline.js';
 import { actFitsStop, eventFitsStop, isPackageBlock, isPackageClosed } from '../journey/packages.js';
 import { falloutLandsIn, getPendingFallout, takeDueFallout } from './fallout.js';
-import { applyEventEffects } from './resolution.js';
+import { applyEventEffects, projectAppliedEffects } from './resolution.js';
 import { applyConsequenceFlags } from './consequences.js';
 import { DESK_RESOURCES, formatDollars } from '../resources.js';
 import { getChaseableFiles } from '../journey/permitPipeline.js';
@@ -76,7 +76,7 @@ const DAY_HAS_EVENT_CHANCE = 0.65;
  * @returns {boolean}
  */
 function dayCarriesEvent(journey, rng = Math.random) {
-  const chance = Math.min(0.85, DAY_HAS_EVENT_CHANCE * getDifficultyEventModifier(journey));
+  const chance = Math.min(0.85, DAY_HAS_EVENT_CHANCE * getDifficultyEventModifier(journey, 'day'));
   return rng() < chance;
 }
 
@@ -295,11 +295,27 @@ export function escalateFieldEventForManager(event, rng = Math.random) {
   };
 }
 
-function getDifficultyEventModifier(journey) {
+// Old Growth recon counts its extra trouble once, on the day gate. At 1.35 on
+// both the gate and the card roll a hard traverse drew 23 cards a run against
+// normal's 14, and a crew lead who answered every one of them instead of
+// setting the late ones aside lost 44% of hard seasons to the layout deadline
+// (scripts/simulate-expeditions.mjs --compare, the careful policy). At 1.15 on
+// the gate alone a hard run still draws about a fifth more cards than normal
+// (17.5 a run against 14.5), on 0.8x stores, and answering every one of them
+// wins 86% of hard seasons over 648 runs; the competent lead wins 97%.
+const RECON_HARD_DAY_EVENT_MODIFIER = 1.15;
+
+/**
+ * @param {Object} journey
+ * @param {'day'|'card'} [lane] - the day gate (is there an event today) or
+ *   the card roll (which one); recon's hard pressure lives on the gate only
+ */
+export function getDifficultyEventModifier(journey, lane = 'card') {
   switch (journey?.difficulty) {
     case 'easy':
       return 0.75;
     case 'hard':
+      if (journey.journeyType === 'recon') return lane === 'day' ? RECON_HARD_DAY_EVENT_MODIFIER : 1;
       return 1.35;
     default:
       return 1;
@@ -760,6 +776,15 @@ function ensureTemptationMemory(journey) {
   if (!Number.isFinite(memory.missedEligibleDays)) memory.missedEligibleDays = 0;
   if (!Number.isFinite(memory.refuseIndex)) memory.refuseIndex = 0;
   if (!Array.isArray(memory.settledFlags)) memory.settledFlags = [];
+  // A save from before the review clock settled the FPBC file with no day on
+  // it, and the review never came due. Start the clock at the save's day.
+  if (memory.settledFlags.includes('fpbc_file_open') && !Number.isFinite(Number(memory.fpbcFileOpenedDay ?? NaN))) {
+    memory.fpbcFileOpenedDay = Number(journey?.day || 1);
+  }
+  if (!memory.watchFlagsByInstitution) {
+    memory.watchFlagsByInstitution = true;
+    remapLegacyWatchFlag(journey);
+  }
   getPendingFallout(journey);
   return memory;
 }
@@ -969,16 +994,31 @@ const PLANNING_GATE_LEVELS = {
 };
 
 /**
+ * Whether "time back on the file" would land anything: it is paid as energy
+ * up and stress down (js/events/resolution.js applyPlanningProgress), so a
+ * planner at full energy with no stress would be paid nothing but the take's
+ * scrutiny.
+ */
+function planningTimeBackLands(journey) {
+  const protagonist = journey?.protagonist;
+  if (!protagonist) return false;
+  return (Number(protagonist.energy) || 0) < 100 || (Number(protagonist.stress) || 0) > 0;
+}
+
+/**
  * Whether the payoff has something to land on today. Ground on the next leg
  * is worth nothing at the last open block, where there is no next leg that
  * matters; a planning gate that is already met, or too full to take the whole
- * payoff, is not a temptation.
+ * payoff, is not a temptation, and neither is time back for a planner who
+ * has nothing to get back.
  */
 function payoffLandsToday(act, journey) {
   const journeyType = journey?.journeyType;
   if (!['recon', 'field', 'planning'].includes(journeyType)) return true;
   const { effects } = buildTemptationPayoff(act, journey);
   if (journeyType === 'planning') {
+    // Nothing to pay: every gate full and the planner already rested.
+    if (!Object.values(effects).some((value) => Number(value) > 0)) return false;
     return Object.entries(PLANNING_GATE_LEVELS).every(([key, { metric, met }]) => {
       const gain = Number(effects[key]) || 0;
       const level = Number(journey.plan?.[metric]);
@@ -1156,7 +1196,7 @@ export function buildTemptationPayoff(act, journey) {
     const gates = [...new Set([named, PLANNING_GATE_BY_PHASE[journey?.plan?.phase]].filter(Boolean))];
     const open = gates.find((gate) => planningGateHeadroom(journey, gate) >= PLANNING_GATE_MIN_PAYOFF);
     if (open) effects[open] = Math.min(wanted, planningGateHeadroom(journey, open));
-    else effects.progress = wanted;
+    else if (planningTimeBackLands(journey)) effects.progress = wanted;
   } else if (journeyType === 'permitting' || journeyType === 'desk') {
     const wanted = kind === 'files' ? Math.round(shift * amount) : progressForShifts(shifts);
     const clockDays = Math.min(4, Math.max(1, Math.round(wanted / 5)), permitClockCapacity(journey));
@@ -1265,6 +1305,29 @@ function institutionDetermination(act, money, standing, shifts) {
 
 function watchFlagFor(act) {
   return WATCH_FLAG_BY_INSTITUTION[act?.catch?.by] || 'ce_watching';
+}
+
+/**
+ * Before each institution kept its own watch, every noticed or caught
+ * shortcut left `ce_watching`, so a DFO catch in an older save read on the
+ * panel as C&E and moved the next DFO act by the generic amount. Read the
+ * log's noticed and caught takes once and give each its institution's
+ * watch; C&E's stays when one of them was C&E's, or when the log cannot
+ * say where it came from.
+ */
+function remapLegacyWatchFlag(journey) {
+  const flags = Array.isArray(journey?.consequenceFlags) ? journey.consequenceFlags : [];
+  if (!flags.includes('ce_watching')) return;
+  const watched = new Set();
+  for (const entry of journey.log || []) {
+    if (entry?.type !== 'event' || !['partial', 'bad'].includes(entry.band)) continue;
+    const actId = String(entry.eventId || '').match(/^temptation_(?:reoffer_|goaround_)?(.+)$/)?.[1];
+    const act = actId ? getActById(actId) : null;
+    if (act) watched.add(watchFlagFor(act));
+  }
+  if (!watched.size) return;
+  const kept = watched.has('ce_watching') ? flags : flags.filter((flag) => flag !== 'ce_watching');
+  journey.consequenceFlags = [...kept, ...[...watched].filter((flag) => !kept.includes(flag))];
 }
 
 /** Who is now watching, named for the institution that noticed. */
@@ -1455,6 +1518,10 @@ function describeOddsShifts(option, journey) {
   return { worse, better };
 }
 
+// A silviculture record somebody noticed gets a second read at season close
+// (js/modes/silvicultureIntegrity.js); the noticed outcome says so.
+const SEASON_CLOSE_RECHECK_LINE = ' The district will read that record again at season close.';
+
 /**
  * The shortcut as a three-band gamble.
  *
@@ -1489,7 +1556,7 @@ export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPena
     label,
     outcome: `${clean} What you get: ${payoff.line}. Nobody asks.`,
     effects: { ...payoff.effects, scrutiny: 3 },
-    partialOutcome: `${clean} What you get: ${payoff.line}. Somebody also wrote down what they saw: ${watchSentenceFor(act)}.`,
+    partialOutcome: `${clean} What you get: ${payoff.line}. Somebody also wrote down what they saw: ${watchSentenceFor(act)}.${journey?.journeyType === 'silviculture' ? SEASON_CLOSE_RECHECK_LINE : ''}`,
     partialEffects: { ...payoff.effects, scrutiny: 8, compliance: -2 },
     partialFlags: [watchFlag],
     chanceSuccess,
@@ -1581,13 +1648,30 @@ export function describeShortcutStakes(option, journey) {
   const good = pct(odds.good);
   const bad = pct(odds.bad);
   const partial = Math.max(0, 100 - good - bad);
-  // What the noticed band costs on top of the payoff, as it lands: the
-  // authored "-2 compliance, +8 scrutiny" is +11 scrutiny once compliance
-  // moves it, and on a permitting desk -2 goodwill too.
-  const noticedCosts = Object.fromEntries(Object.entries(option.partialEffects || {})
-    .filter(([key]) => !(key in payoffEffects)));
-  const noticed = describeEffectChips(noticedCosts, journeyType);
+  // What the noticed band costs on top of the payoff, as it lands: the band
+  // is projected whole (the authored "-2 compliance, +8 scrutiny" is +11
+  // scrutiny once compliance moves it, +12 when a payoff over six points of
+  // work draws its own), less what the clean band already pays. Scrutiny is
+  // the band's own total, as the clean line prints its own.
+  const noticedBand = projectAppliedEffects(option.partialEffects || {}, journeyType);
+  const cleanBand = projectAppliedEffects(option.effects || {}, journeyType);
+  const noticedCosts = {};
+  for (const [key, value] of Object.entries(noticedBand)) {
+    if (typeof value !== 'number') {
+      if (!(key in payoffEffects)) noticedCosts[key] = value;
+      continue;
+    }
+    const extra = key === 'scrutiny' ? value : value - (Number(cleanBand[key]) || 0);
+    if (extra !== 0) noticedCosts[key] = extra;
+  }
+  const noticed = describeProjectedChips(noticedCosts, journeyType);
   const watch = TEMPTATION_FLAG_LABELS[option.partialFlags?.[0]] || 'a watch on your file';
+  // A silviculture record somebody wrote down is read again against the
+  // ground at season close, at these same caught odds
+  // (js/modes/silvicultureIntegrity.js runSeasonCloseAudit).
+  const noticedTail = journeyType === 'silviculture'
+    ? [watch, `and the district reads it again at season close: ${bad}% it is caught then`]
+    : [`and ${watch}`];
   const finding = option.failureFallout ? describeEffectChips(option.failureEffects || {}, journeyType).join(', ') : '';
   const determination = option.failureFallout?.effects || option.failureEffects || {};
   const caught = describeEffectChips(determination, journeyType).join(', ');
@@ -1601,7 +1685,7 @@ export function describeShortcutStakes(option, journey) {
 
   const lines = [
     `Take it and you get ${gain}${buried}. Saying no costs nothing.`,
-    `Odds today: ${good}% it stays buried · ${partial}% somebody notices (${[...noticed, `and ${watch}`].join(', ')}) · ${bad}% ${option.caughtBy || 'somebody'} catches it (${caughtText}).`,
+    `Odds today: ${good}% it stays buried · ${partial}% somebody notices (${[...noticed, ...noticedTail].join(', ')}) · ${bad}% ${option.caughtBy || 'somebody'} catches it (${caughtText}).`,
   ];
   const shifts = option.oddsShifts || { worse: [], better: [] };
   if (shifts.worse.length) lines.push(`Worse odds today because ${shifts.worse.join('; ')}.`);

@@ -480,7 +480,8 @@ function managerPolicy(journey, options) {
   const treasury = journey.resources?.budget || 0;
   const start = journey.ledger?.startTreasury || 850000;
   const setAside = options.find((option) => option.value === 'set_aside');
-  if (setAside && treasury < start * 0.4) return setAside;
+  // Not when the set-aside line says the division stops work over it.
+  if (setAside && treasury < start * 0.4 && !/stop-work/.test(setAside.description || '')) return setAside;
   // The cut schedule: take the woodlands manager's recommendation.
   const pace = options.find((option) => String(option.value).startsWith('pace:') && option.recommended);
   if (pace) return pace;
@@ -555,8 +556,17 @@ function idleReconPolicy(_journey, options) {
 // The competent crew lead who answers every card instead of setting the
 // behind-schedule ones aside: the run the grade should put in the high 80s
 // and low 90s, below a flawless season but well above the competent one.
+// Careful means the careful answer, too: the [SAFE] line, else a [TRADEOFF],
+// never the shortcut. Taking whatever option came first bought $2,000
+// helicopter slings and cut saw bypasses on an Old Growth budget, which
+// measured a reckless crew that happened to answer the radio.
 function carefulReconPolicy(journey, options, prompt) {
   const answered = options.filter((option) => option.value !== 'set_aside');
+  if (answered.length < options.length) {
+    const tagged = (tag) => answered.find((option) => typeof option.value === 'number' && String(option.label).endsWith(`[${tag}]`));
+    const careful = tagged('SAFE') || tagged('TRADEOFF');
+    if (careful) return careful;
+  }
   return reconPolicy(journey, answered.length ? answered : options, prompt);
 }
 

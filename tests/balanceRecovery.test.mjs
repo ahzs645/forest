@@ -116,6 +116,26 @@ test("comeback window credits no effort the season never made", () => {
   assert.match(describeConsequences(worked, ["comeback-window"])[0].cause, /this season's calls went into Progress/);
 });
 
+test("a campaign season that delivered, noticed shortcut and all, can steady a slipping meter; one that fell short cannot", () => {
+  // The average campaign year: random calls, a shortcut somebody noticed,
+  // Compliance under the Mixed floor, but the deployment got its job done.
+  const middling = (seasonOutcome) => {
+    const state = makeState("recce");
+    state.round = 3;
+    state.metrics = { progress: 90, forestHealth: 52, relationships: 52, compliance: 40, budget: 55 };
+    state.history.push({ type: "temptation", id: "act", round: 3, band: "noticed", effects: { progress: 6, compliance: -2 } });
+    state.seasonOutcome = seasonOutcome;
+    return state;
+  };
+  const delivered = middling({ fellShort: false, shortcutsSeen: 1, shortcutsCaught: 0 });
+  assert.ok(applyRoundConsequences(delivered).includes("comeback-window"));
+  assert.equal(delivered.metrics.compliance, 45, "steadied back over the Mixed floor");
+  assert.equal(describeConsequences(delivered, ["comeback-window"])[0].cause, "The file was still salvageable, so Compliance had room to recover.");
+
+  const short = middling({ fellShort: true, shortcutsSeen: 1, shortcutsCaught: 0 });
+  assert.ok(!applyRoundConsequences(short).includes("comeback-window"));
+});
+
 test("slipping standing can be repaired from the second season; a thin schedule waits", () => {
   const slipping = makeState("planner");
   slipping.round = 2;

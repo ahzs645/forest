@@ -193,7 +193,7 @@ test('a desk season that failed early earns no thrift credit for the allowance i
   assert.ok(overspent.deltas.budget < 0);
 });
 
-test('the hard fall planning file is funded for its gates, not cut below the normal allowance', () => {
+test('the hard fall planning file keeps the normal allowance: not cut below it, not richer than it', () => {
   const allowance = (difficulty) => {
     const journey = createPlanningJourney({ roleId: 'planner', areaId: AREA_ID, area, scale: 'campaign' });
     applyDifficultyMultipliers(journey, difficulty);
@@ -202,7 +202,7 @@ test('the hard fall planning file is funded for its gates, not cut below the nor
   };
   const normal = allowance('normal');
   const hard = allowance('hard');
-  assert.ok(hard.resources.budget > normal.resources.budget, `hard ${hard.resources.budget} vs normal ${normal.resources.budget}`);
+  assert.equal(hard.resources.budget, normal.resources.budget);
   assert.equal(hard.startingResources.budget, hard.resources.budget);
   assert.ok(hard.deadline < normal.deadline, 'the hard file keeps its shorter window');
   // Only the planning file: a hard permitting desk keeps the difficulty cut.

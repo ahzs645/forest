@@ -284,6 +284,9 @@ function coupledScrutiny(effects = {}) {
   return delta;
 }
 
+// Effects objects that came out of projectAppliedEffects and carry their knock-ons.
+const PROJECTED_EFFECTS = new WeakSet();
+
 /**
  * The effects as they will land, knock-ons included. An authored effects
  * object says "-10 compliance, +15 scrutiny"; on a permitting desk that is
@@ -297,20 +300,11 @@ function coupledScrutiny(effects = {}) {
  * @param {string} journeyType
  * @returns {Object} projected effects
  */
-const PROJECTED_EFFECTS = new WeakSet();
-
-/**
- * Whether an effects object already carries its knock-ons (it came out of
- * projectAppliedEffects), so a chip built from it must not add them again.
- * @param {Object} effects
- * @returns {boolean}
- */
-export function isProjectedEffects(effects) {
-  return PROJECTED_EFFECTS.has(effects);
-}
-
 export function projectAppliedEffects(effects, journeyType = 'field') {
   const source = effects && typeof effects === 'object' ? effects : {};
+  // Already projected: its knock-ons are in it, and adding them again would
+  // make the chip (or the meter) move twice.
+  if (PROJECTED_EFFECTS.has(source)) return source;
   const projected = { ...source };
   PROJECTED_EFFECTS.add(projected);
   const knockOn = coupledScrutiny(source);
@@ -686,6 +680,17 @@ function recordStanding(journey, key, delta) {
   journey.standingLedger[key] = (Number(journey.standingLedger[key]) || 0) + delta;
 }
 
+/**
+ * A planner has no compliance meter: a compliance effect on a planning file
+ * is the planner's professional standing (protagonist.reputation), at half
+ * the size. The chip and the outcome line both print this number.
+ * @param {number} delta - authored compliance
+ * @returns {number}
+ */
+export function planningStandingDelta(delta) {
+  return Math.ceil((Number(delta) || 0) / 2) || 0;
+}
+
 function applyComplianceEffects(journey, delta, messages) {
   recordStanding(journey, 'compliance', delta);
   if (journey.journeyType === 'manager' && journey.metrics) {
@@ -698,10 +703,11 @@ function applyComplianceEffects(journey, delta, messages) {
     // On a planning file, compliance is the planner's own standing: it moves
     // scrutiny (applyScrutinyEffects) and reputation, never the District
     // Manager's readiness and never the district's goodwill.
+    const standing = planningStandingDelta(delta);
     if (journey.protagonist) {
-      journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + Math.ceil(delta / 2));
+      journey.protagonist.reputation = clampPercent((journey.protagonist.reputation || 0) + standing);
     }
-    messages.push(`Professional standing ${delta > 0 ? 'improved' : 'slipped'} (${delta > 0 ? '+' : ''}${delta}).`);
+    if (standing !== 0) messages.push(`Professional standing ${standing > 0 ? 'improved' : 'slipped'} (${standing > 0 ? '+' : ''}${standing}).`);
     return;
   }
 
