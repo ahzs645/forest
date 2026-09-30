@@ -18,7 +18,7 @@ import {
   getCurrentSegmentLength,
   getDistanceIntoCurrentSegment
 } from './blockNav.js';
-import { ensureRouteConstraints, getActiveRouteConstraint } from './routeConstraints.js';
+import { ensureRouteConstraints, getActiveRouteConstraint, isRouteObstructionEvent } from './routeConstraints.js';
 import { getOperationalProgress, recordProgressMilestones } from './progress.js';
 import {
   applyRandomInjury,
@@ -32,6 +32,7 @@ import {
 } from '../crew.js';
 import { getDayRng } from '../events/dayRng.js';
 import { checkScheduledEvents } from '../events/scheduled.js';
+import { getCrossingContext } from './riverCrossing.js';
 import {
   calculateFieldConsumption,
   applyConsumption,
@@ -231,13 +232,23 @@ function classifyRoadLifecycle(score) {
   ]);
 }
 
-function classifyCrossingCondition(score) {
-  return getLifecycleBand(score, [
-    { max: 6, id: 'clear_window', label: 'Clear Window' },
-    { max: 14, id: 'timing_sensitive', label: 'Timing Sensitive' },
-    { max: 24, id: 'high_water', label: 'High Water' },
-    { max: 100, id: 'restricted', label: 'Restricted' }
-  ]);
+const CROSSING_CONDITION_BANDS = [
+  { max: 6, id: 'clear_window', label: 'Clear Window' },
+  { max: 14, id: 'timing_sensitive', label: 'Timing Sensitive' },
+  { max: 24, id: 'high_water', label: 'High Water' },
+  { max: 100, id: 'restricted', label: 'Restricted' }
+];
+
+/**
+ * The crossing's condition from its wear, and never milder than the water
+ * the crossing beat reads on the gauge (js/journey/riverCrossing.js): an
+ * arrival read "Crossing: Clear Window" beside "GAUGE: HIGH".
+ */
+function classifyCrossingCondition(score, gaugeIndex = null) {
+  const band = getLifecycleBand(score, CROSSING_CONDITION_BANDS);
+  if (!Number.isInteger(gaugeIndex)) return band;
+  const gaugeBand = CROSSING_CONDITION_BANDS[Math.max(0, Math.min(CROSSING_CONDITION_BANDS.length - 1, gaugeIndex))];
+  return CROSSING_CONDITION_BANDS.indexOf(gaugeBand) > CROSSING_CONDITION_BANDS.indexOf(band) ? gaugeBand : band;
 }
 
 function classifyWatershedPressure(score) {
@@ -378,7 +389,7 @@ function buildFieldInfrastructureProfile(block, weather, journey, existingState 
   watershedPressure = clampObservationScore(watershedPressure);
 
   const roadLifecycle = classifyRoadLifecycle(roadWear);
-  const crossingCondition = classifyCrossingCondition(crossingWear);
+  const crossingCondition = classifyCrossingCondition(crossingWear, getCrossingContext(journey, block)?.gaugeIndex ?? null);
   const watershedCondition = classifyWatershedPressure(watershedPressure);
 
   let scrutinyDelta = 0;
@@ -758,6 +769,34 @@ export function applyAccessVerdictPressure(journey, verdict, context = {}) {
   return delta;
 }
 
+const ACCESS_SCRUTINY_REASONS = {
+  winter_only: 'the road only carries trucks frozen',
+  heli_only: 'the block is walk-in or helicopter only',
+  no_go: 'the road is closed to trucks',
+};
+
+/**
+ * Why an arrival's road check moved scrutiny, for the line that says it did:
+ * "Scrutiny rises by 2" on its own read as a penalty from nowhere.
+ * @param {Object} verdict - the recorded access verdict
+ * @param {string} stance - 'cautious', 'observe' or 'aggressive'
+ * @param {number} delta - what applyAccessVerdictPressure applied
+ * @returns {string} the whole line, or '' when nothing moved
+ */
+export function describeAccessScrutiny(verdict, stance, delta) {
+  if (!delta) return '';
+  if (delta < 0) return `Scrutiny eases by ${Math.abs(delta)}: you took it slow and wrote up what you found.`;
+  const reasons = [];
+  if (ACCESS_SCRUTINY_REASONS[verdict?.id]) reasons.push(ACCESS_SCRUTINY_REASONS[verdict.id]);
+  if (['repair_needed', 'out_of_service'].includes(verdict?.roadLifecycleId)) reasons.push(`the road reads ${String(verdict.roadLifecycleLabel).toLowerCase()}`);
+  if (['high_water', 'restricted'].includes(verdict?.crossingConditionId)) reasons.push(`the crossing reads ${String(verdict.crossingConditionLabel).toLowerCase()}`);
+  if (verdict?.watershedPressureId === 'critical') reasons.push('the watershed is under critical pressure');
+  if (normalizeAccessToken(stance) === 'aggressive') reasons.push('you pushed hard to get here');
+  return reasons.length
+    ? `Scrutiny rises by ${delta}: ${reasons.join('; ')}.`
+    : `Scrutiny rises by ${delta}.`;
+}
+
 export function formatAccessVerdict(verdict) {
   if (!verdict?.id) {
     return 'Road check: routine truck access.';
@@ -831,7 +870,9 @@ export function fitEventToRemainingRoute(journey, event) {
   // A shortcut's payoff is sized and shown by its own builder
   // (js/events/selection.js buildTemptationPayoff); it is not rewritten here.
   if (event.type === 'temptation') return event;
-  if (event.needsNextLeg) return null;
+  // A slide or washout across the road ahead blocks a road nobody still
+  // needs: "turn back and report" paid compliance for it at the last block.
+  if (event.needsNextLeg || isRouteObstructionEvent(event)) return null;
   const kmOnly = event.options.some((option) => {
     const effects = option?.effects || {};
     return Number(effects.progress) > 0
@@ -1187,14 +1228,10 @@ export function executeFieldAction(journey, paceId) {
       const infrastructureStatus = formatInfrastructureStatus(accessVerdict);
       if (infrastructureStatus) messages.push(infrastructureStatus);
 
-      const scrutinyDelta = applyAccessVerdictPressure(journey, accessVerdict, {
-        stance: getAccessStance(routePlan, effectivePaceId)
-      });
-      if (scrutinyDelta > 0) {
-        messages.push(`Scrutiny rises by ${scrutinyDelta}.`);
-      } else if (scrutinyDelta < 0) {
-        messages.push(`Scrutiny eases by ${Math.abs(scrutinyDelta)}.`);
-      }
+      const stance = getAccessStance(routePlan, effectivePaceId);
+      const scrutinyDelta = applyAccessVerdictPressure(journey, accessVerdict, { stance });
+      const scrutinyLine = describeAccessScrutiny(accessVerdict, stance, scrutinyDelta);
+      if (scrutinyLine) messages.push(scrutinyLine);
     }
   }
 

@@ -10,8 +10,25 @@ import assert from 'node:assert/strict';
 
 import { createReconJourney, createSilvicultureJourney } from '../js/journey/factory.js';
 import { runReconDay } from '../js/modes/recon.js';
-import { CONTRACTOR_EVENTS, handleContractorEvent, runSilvicultureDay } from '../js/modes/silviculture.js';
-import { fitEventToCrew, holdFollowUpForDay, takeDueFollowUp } from '../js/journey/fieldMechanics.js';
+import {
+  CONTRACTOR_EVENTS,
+  adaptEventForProgram,
+  eventFitsProgramDay,
+  handleContractorEvent,
+  runSilvicultureDay,
+} from '../js/modes/silviculture.js';
+import {
+  describeAccessScrutiny,
+  fitEventToCrew,
+  fitEventToRemainingRoute,
+  getBlockAccessVerdict,
+  holdFollowUpForDay,
+  recordAccessVerdict,
+  takeDueFollowUp,
+} from '../js/journey/fieldMechanics.js';
+import { isBlockFieldworkEvent } from '../js/journey/packages.js';
+import { MAX_EPITAPH, fitMarkerLine } from '../js/journey/trailMarkers.js';
+import { formatKeyMoment } from '../js/game/debrief.js';
 import { runDaySituation } from '../js/journey/daySituation.js';
 import { checkScheduledEvents } from '../js/events.js';
 import { ensureDaySeed } from '../js/events/dayRng.js';
@@ -252,4 +269,148 @@ test('running into the supply point says it uses the shift', async () => {
   await runReconDay({ ui, journey, checkpoint() {} });
   const supply = ui.prompts.flatMap((entry) => entry.options).find((o) => o.value === 'resupply');
   assert.equal(supply.description, 'Fuel, food, repairs, kits; uses this shift');
+});
+
+// ── Low items ──────────────────────────────────────────────────────────────
+
+test('no replacement is brought up on the season\'s last day', async () => {
+  const journey = createSilvicultureJourney({ areaId: 'kootenay-wetbelt' });
+  evacuateCrewMember(journey.crew.find((member) => member.role === 'medic'), { day: 1 });
+  journey.day = journey.deadline;
+  const budget = journey.resources.budget;
+  const ui = makeRecordingUi((prompt, options) => options.find((o) => o.value === 'replace:medic')
+    || options.find((o) => o.value === 'set_aside') || options.find((o) => o.value === 'end') || options.find((o) => o.value === 'continue'));
+  await runSilvicultureDay({ ui, journey, gameOver: false });
+  const row = ui.prompts.flatMap((entry) => entry.options).find((o) => o.value === 'replace:medic');
+  assert.equal(row.disabled, true);
+  assert.equal(row.description, 'The season closes today: a replacement OFA 3 attendant would arrive with no day left to work.');
+  assert.ok(!journey.crew.some((member) => member.role === 'medic' && member.isActive));
+  assert.ok(budget - journey.resources.budget < 1200, 'nobody paid $1,200 for a hire with no day left');
+});
+
+test('the roster line leaves out empty groups', async () => {
+  const journey = createSilvicultureJourney({ areaId: 'kootenay-wetbelt' });
+  for (const c of journey.contractors) c.isActive = true;
+  const statuses = [];
+  const ui = makeRecordingUi((prompt, options) => options.find((o) => o.value === 'set_aside')
+    || options.find((o) => o.value === 'end') || options.find((o) => o.value === 'continue'));
+  ui.setMissionStatus = (status) => statuses.push(status);
+  await runSilvicultureDay({ ui, journey, gameOver: false });
+  const rosters = statuses.map((status) => status.facts.find((fact) => fact.label === 'Roster')?.value).filter(Boolean);
+  assert.ok(rosters.length, 'the panel shows the roster');
+  for (const roster of rosters) assert.doesNotMatch(roster, /\b0 (available|on days off)/, roster);
+});
+
+test('traverse stock cards and road-ahead cards stay off the silviculture program', () => {
+  for (const id of ['resupply_opportunity', 'abandoned_cache', 'good_road_conditions', 'trade_grader_operator', 'trade_trapper_intel']) {
+    assert.ok(eventById(id), id);
+    assert.equal(adaptEventForProgram(eventById(id)), null, id);
+  }
+});
+
+test('a perfect planting day needs planters on the block and trees to plant', () => {
+  const journey = createSilvicultureJourney({ areaId: 'vancouver-island-coast' });
+  const perfect = eventById('perfect_falling_day');
+  assert.equal(eventFitsProgramDay(journey, perfect), true);
+  // The planters stood down for the wind this morning.
+  for (const c of journey.contractors.filter((contractor) => contractor.specialty === 'planting')) {
+    c.silvicultureState = { ...(c.silvicultureState || {}), status: 'recovering', cooldownDays: 1 };
+  }
+  assert.equal(eventFitsProgramDay(journey, perfect), false);
+  // Every block and the fill planted.
+  const done = createSilvicultureJourney({ areaId: 'vancouver-island-coast' });
+  for (const block of done.program.blocks) block.planted = block.trees;
+  for (const opening of done.program.fill || []) opening.done = true;
+  assert.equal(eventFitsProgramDay(done, perfect), false);
+  assert.equal(eventFitsProgramDay(done, eventById('wolf_pack_sighting')), true);
+});
+
+test('a storm-grounded shift is not dealt a card out on the block\'s ground', async () => {
+  assert.equal(isBlockFieldworkEvent(eventById('story_arc_ancientGrove_stage0')), true);
+  assert.equal(isBlockFieldworkEvent(eventById('wolf_pack_sighting')), false);
+
+  const journey = createReconJourney({ areaId: 'kootenay-wetbelt' });
+  journey.day = 3;
+  ensureDaySeed(journey);
+  journey.weather = { id: 'storm', name: 'Storm', travelModifier: 0.3, dangerous: true };
+  holdFollowUpForDay(journey, eventById('story_arc_ancientGrove_stage0'));
+  const ui = makeRecordingUi((prompt, options) => options.find((o) => o.value === 'next') || options[0]);
+  await runReconDay({ ui, journey, checkpoint() {} });
+  assert.ok(ui.lines.some((line) => /has grounded all operations/.test(line)));
+  assert.ok(!ui.lines.includes('Discovery of the Ancient Grove'), ui.lines.join('\n'));
+});
+
+test('a crossing\'s condition never reads milder than its gauge, and a scrutiny rise says why', () => {
+  const journey = createReconJourney({ areaId: 'kootenay-wetbelt' });
+  journey.season = { ...(journey.season || {}), currentSeason: 'spring' };
+  const storm = { id: 'storm', name: 'Storm' };
+  journey.weather = storm;
+  const block = { id: 'outburst', name: 'Outburst Channel', terrain: 'flat', hazards: ['glacial_outburst'], features: ['culvert'] };
+  const verdict = recordAccessVerdict(journey, block, getBlockAccessVerdict(block, storm, journey), storm);
+  assert.notEqual(verdict.crossingConditionLabel, 'Clear Window');
+  assert.equal(verdict.crossingConditionId, 'restricted');
+
+  assert.equal(describeAccessScrutiny({ id: 'no_go', crossingConditionId: 'restricted', crossingConditionLabel: 'Restricted' }, 'observe', 3),
+    'Scrutiny rises by 3: the road is closed to trucks; the crossing reads restricted.');
+  assert.equal(describeAccessScrutiny({ id: 'passable_now' }, 'aggressive', 1), 'Scrutiny rises by 1: you pushed hard to get here.');
+  assert.equal(describeAccessScrutiny({ id: 'rehab_needed' }, 'cautious', 0), '');
+});
+
+test('a slide across the road is not dealt at the last block', () => {
+  const journey = createReconJourney({ areaId: 'tahltan-highland' });
+  journey.currentBlockIndex = journey.blocks.length - 1;
+  journey.distanceTraveled = journey.totalDistance;
+  assert.equal(fitEventToRemainingRoute(journey, eventById('landslide')), null);
+  journey.currentBlockIndex -= 1;
+  journey.distanceTraveled = 0;
+  assert.ok(fitEventToRemainingRoute(journey, eventById('landslide')));
+});
+
+test('a meal with the locals is one net gain on the next leg, and an hour\'s shelter costs an hour', () => {
+  const meal = eventById('helpful_locals').options.find((option) => option.label === 'Share a meal and listen');
+  assert.ok(meal.effects.progress > 0);
+  assert.ok(!('timeUsed' in meal.effects) && !('timeUsed' in meal));
+  const shelter = eventById('sudden_storm').options.find((option) => /^Take shelter/.test(option.label));
+  assert.ok(Math.abs(shelter.effects.progress) <= 2, 'an hour is not five kilometres');
+});
+
+test('a long marker line is cut at a word and says so', () => {
+  const line = fitMarkerLine('Brake on, stand clear of the load when the lines come tight');
+  assert.ok(line.length <= MAX_EPITAPH);
+  assert.match(line, /…$/);
+  assert.doesNotMatch(line, /\bo…$/);
+  assert.equal(fitMarkerLine('Watch your footing here'), 'Watch your footing here');
+});
+
+test('a remembered choice is not double-punctuated', () => {
+  assert.equal(formatKeyMoment({ day: 9, title: 'Good Road', choice: 'Make up time!' }, 'Day'), 'Day 9 — Good Road. You chose: Make up time!');
+  assert.equal(formatKeyMoment({ day: 3, title: 'Wolves', choice: 'Move camp' }, 'Shift'), 'Shift 3 — Wolves. You chose: Move camp.');
+});
+
+test('a silviculture crew member\'s stomach bug clears and they mend', async () => {
+  const journey = createSilvicultureJourney({ areaId: 'kootenay-wetbelt' });
+  const sick = journey.crew.find((member) => member.role === 'checker');
+  sick.statusEffects = [{ effectId: 'food_poisoning', daysRemaining: 2 }];
+  sick.health = 55;
+  const endDay = (prompt, options) => options.find((o) => o.value === 'set_aside') || options.find((o) => o.value === 'end') || options.find((o) => o.value === 'continue');
+  for (let day = 0; day < 4; day += 1) {
+    await runSilvicultureDay({ ui: makeRecordingUi(endDay), journey, gameOver: false });
+  }
+  assert.deepEqual(sick.statusEffects, []);
+  assert.ok(sick.health > 55 - 10, `health ${sick.health}`);
+});
+
+test('a release that finishes a stand says it is finished', async () => {
+  const journey = createSilvicultureJourney({ areaId: 'kootenay-wetbelt' });
+  const opening = journey.program.brush[0];
+  opening.treated = Math.max(0, opening.ha - 5);
+  const ui = makeRecordingUi((prompt, options) => {
+    if (prompt.startsWith('Release treatment on ')) return options.find((o) => o.value === 'manual');
+    if (prompt.startsWith('Today\'s release')) return options.find((o) => o.value === 'confirm');
+    return options.find((o) => o.value === 'brush') || options.find((o) => o.value === 'end') || options.find((o) => o.value === 'continue');
+  });
+  await runSilvicultureDay({ ui, journey, gameOver: false });
+  const line = ui.lines.find((text) => text.startsWith('Release treatment: '));
+  assert.ok(line, ui.lines.join('\n'));
+  assert.match(line, new RegExp(`${opening.id} \\(${opening.year}\\): \\d+ ha today, all ${Math.round(opening.ha)} ha treated`));
 });

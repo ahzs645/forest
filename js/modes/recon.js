@@ -21,6 +21,7 @@ import {
   getPackageProgress,
   getPackagesFinalized,
   getPackageTarget,
+  isBlockFieldworkEvent,
   isPackageBlock
 } from '../journey/packages.js';
 import { getWeatherTempC } from '../data/blocks.js';
@@ -54,7 +55,7 @@ import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journ
 import { getActiveRouteConstraint, reopenReportedConstraints, resolveRouteConstraint } from '../journey/routeConstraints.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { PACE_OPTIONS } from '../journey/constants.js';
-import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
+import { MAX_EPITAPH, recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
 import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
 import { buildCampfireFrames } from '../scene/textmode/effects.js';
 import { buildNightCampFrames } from '../scene/textmode/scenes.js';
@@ -628,6 +629,11 @@ async function runFieldDay(game) {
     displayDayHeader(ui, journey);
     ui.writeDanger(`${journey.weather.name} has grounded all operations. The crew hunkers down.`);
     ui.write('');
+    // Nobody is out on the block to find a nest tree or move a boundary.
+    if (isBlockFieldworkEvent(pendingEvent)) {
+      pendingEvent = null;
+      checkpointReconShift(game, shiftState, pendingEvent);
+    }
     if (pendingEvent) {
       ui.write('The weather does not mean the day is quiet.');
       const interruptingEvent = pendingEvent;
@@ -1209,7 +1215,7 @@ async function maybeMarkIncidents(game) {
 
     let epitaph = null;
     if (typeof ui.promptText === 'function') {
-      epitaph = (await ui.promptText('Marker line (one line):', 'Watch your footing here'))
+      epitaph = (await ui.promptText(`Marker line (one line, up to ${MAX_EPITAPH} characters):`, 'Watch your footing here'))
         || 'Watch your footing here';
     }
     const marker = recordTrailMarker({

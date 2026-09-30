@@ -17,7 +17,7 @@ import { pickDeferredCost } from '../events/deferral.js';
 import { optionSpendsDay } from '../events/timePolicy.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
-import { crewHasRole, describeDeparture, generateCrewMember, hasActiveFirstAidAttendant } from '../crew.js';
+import { crewHasRole, describeDeparture, generateCrewMember, hasActiveFirstAidAttendant, processDailyUpdate } from '../crew.js';
 import { SILVICULTURE_CREW_ROLES, SILVICULTURE_REPLACEMENT_COST } from '../data/silvicultureCrewRoles.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
@@ -317,7 +317,9 @@ export async function runSilvicultureDay(game) {
   // legible before disruptions begin. A follow-up an earlier card scheduled
   // is the day's situation when it is due, fitted to the program like any
   // card the day draws: its fuel and food are priced, its day is spent.
-  const fitToProgram = (card) => (card ? fitEventToCrew(journey, adaptEventForProgram(card)) : null);
+  const fitToProgram = (card) => (card && eventFitsProgramDay(journey, card)
+    ? fitEventToCrew(journey, adaptEventForProgram(card))
+    : null);
   const event = journey.day > 1
     ? fitToProgram(takeDueFollowUp(journey)) || fitToProgram(checkForEvent(journey))
     : null;
@@ -393,6 +395,20 @@ export async function runSilvicultureDay(game) {
   // The day's result screen shows the program after the day's work, not
   // the panel from before it.
   updateSilvicultureMissionStatus(ui, journey, seasonInfo, zoneProfile);
+
+  // Your own crew's conditions run their course and they mend: a stomach
+  // bug clears in a couple of days instead of riding the roster, at the
+  // same fitness, for the rest of the season.
+  for (const member of journey.crew || []) {
+    if (!member.isActive) continue;
+    if (!member.statusEffects?.length && !(member.health < (member.maxHealth ?? 100))) continue;
+    const { messages } = processDailyUpdate(member, { currentDay: journey.day });
+    for (const message of messages) ui.write(message);
+    if (!member.isActive) {
+      const lost = describeLostCrewRole(member);
+      if (lost) ui.writeWarning(lost);
+    }
+  }
 
   // End of day
   journey.day++;
@@ -999,12 +1015,12 @@ function buildSilvicultureActions(journey, currentSeason, seasonMods, silvicultu
   // Someone gone for the season: say what the crew can no longer do, and
   // offer the way back.
   for (const role of getVacantCrewRoles(journey)) {
-    const unaffordable = describeUnaffordableReplacement(journey, role);
+    const held = describeReplacementHold(journey, role);
     actionOptions.push({
       label: `Bring up a replacement ${role.noun}`,
-      description: unaffordable || `${role.lost} A day on the road to town and ${formatMoney(SILVICULTURE_REPLACEMENT_COST[role.id])}.`,
+      description: held || `${role.lost} A day on the road to town and ${formatMoney(SILVICULTURE_REPLACEMENT_COST[role.id])}.`,
       value: `replace:${role.id}`,
-      ...(unaffordable ? { disabled: true } : {}),
+      ...(held ? { disabled: true } : {}),
     });
   }
 
@@ -1632,7 +1648,12 @@ async function handleBrushTreatment(game, seasonMods, silvicultureState, zonePro
   journey.resources.contractorCapacity -= 2;
   journey.resources.budget -= invoice;
 
-  const openingsText = treated.map((entry) => `${entry.opening.id} (${entry.opening.year}): ${Math.round(entry.ha)} of ${Math.round(entry.opening.ha)} ha`).join(' and ');
+  // Today's hectares and where the stand now stands: "23 of 39 ha" on the
+  // day that finished it read as partial progress.
+  const openingsText = treated.map(({ opening, ha }) => {
+    const done = opening.treated >= opening.ha;
+    return `${opening.id} (${opening.year}): ${Math.round(ha)} ha today, ${done ? `all ${Math.round(opening.ha)} ha treated` : `${Math.round(opening.treated)} of ${Math.round(opening.ha)} ha treated`}`;
+  }).join(' and ');
   const yearsText = [...new Set(treated.map((entry) => entry.opening.year))].sort().join('/');
   if (method === 'manual') {
     ui.write(`Treated ${Math.round(hectares)} ha of ${yearsText} openings by manual release - ${formatReleaseTargets(standard)} cut below the seedling leaders.`);
@@ -2146,8 +2167,15 @@ const EVENT_EFFECT_BANDS = ['effects', 'partialEffects', 'failureEffects'];
 const UNTRACKED_STOCKS = ['firstAid'];
 
 // Cards written for a crew on a traverse: slinging supplies to the next
-// block, flying the route, relocating a block. There is no route here.
-const TRAVERSE_ONLY_EVENTS = new Set(['helicopter_available', 'sasquatch_sighting']);
+// block, flying the route, relocating a block. There is no route here, and
+// no fuel cache, grub box or kit count to trade into: a passing supply
+// truck's fuel, an old camp's tins and first-aid kit, or a good road that
+// saves fuel paid nothing, or cash for nothing. A card about the road ahead
+// (`needsNextLeg`) has no road ahead either.
+const TRAVERSE_ONLY_EVENTS = new Set([
+  'helicopter_available', 'sasquatch_sighting',
+  'resupply_opportunity', 'abandoned_cache', 'good_road_conditions',
+]);
 // Novelty cards from the old deck (a dance trend, a celebrity, first
 // contact) have no place in a supervisor's program either.
 const NOVELTY_EVENTS = new Set(['social_media_viral', 'celebrity_endorsement', 'alien_landing']);
@@ -2184,7 +2212,7 @@ function adaptEffects(effects) {
  * @returns {Object|null}
  */
 export function adaptEventForProgram(event) {
-  if (TRAVERSE_ONLY_EVENTS.has(event?.id) || NOVELTY_EVENTS.has(event?.id)) return null;
+  if (TRAVERSE_ONLY_EVENTS.has(event?.id) || NOVELTY_EVENTS.has(event?.id) || event?.needsNextLeg) return null;
   if (!Array.isArray(event?.options)) return event;
   const dayLost = DAY_IS_LOST.test(event.description || '');
   let changed = dayLost;
@@ -2216,6 +2244,27 @@ export function adaptEventForProgram(event) {
   });
   if (!changed) return event;
   return dayLost ? { ...event, options, dayLost } : { ...event, options };
+}
+
+/**
+ * Day cards about the planters' own day need planters on the block and
+ * trees left to plant: "no wind, every planter is hitting numbers" read wrong
+ * the morning after a wind stand-down, and after the last block was in.
+ */
+const PLANTING_DAY_EVENTS = {
+  perfect_falling_day: (facts) => (facts.plantingRemaining > 0 || facts.fillRemaining > 0) && !facts.plantersOnStandDown,
+  competing_crew: (facts) => facts.plantingRemaining > 0,
+};
+
+/**
+ * Whether the day's card fits where the program is today.
+ * @param {Object} journey
+ * @param {Object} event
+ * @returns {boolean}
+ */
+export function eventFitsProgramDay(journey, event) {
+  const fits = PLANTING_DAY_EVENTS[event?.id];
+  return !fits || fits(getSilvicultureFacts(journey));
 }
 
 // ── Program facts ───────────────────────────────────────────────────────────
@@ -2399,8 +2448,14 @@ function getVacantCrewRoles(journey) {
     && !crewHasRole(crew, role.id));
 }
 
-/** Why the program cannot bring a replacement up, or null when it can. */
-function describeUnaffordableReplacement(journey, role) {
+/**
+ * Why the program cannot bring a replacement up, or null when it can: no
+ * money for it, or no day left for them to work once they are here.
+ */
+function describeReplacementHold(journey, role) {
+  if (Number.isFinite(journey.deadline) && journey.deadline - journey.day <= 0) {
+    return `The season closes today: a replacement ${role.noun} would arrive with no day left to work.`;
+  }
   const cost = SILVICULTURE_REPLACEMENT_COST[role.id];
   const budget = Number(journey.resources?.budget) || 0;
   if (budget >= cost) return null;
@@ -2413,8 +2468,8 @@ function handleCrewReplacement(game, roleId) {
   const role = SILVICULTURE_CREW_ROLES.find((candidate) => candidate.id === roleId);
   if (!role || crewHasRole(journey.crew || [], roleId)) return false;
   const cost = SILVICULTURE_REPLACEMENT_COST[roleId];
-  const unaffordable = describeUnaffordableReplacement(journey, role);
-  if (unaffordable) return holdChosenTask(ui, journey, `replace:${roleId}`, unaffordable);
+  const held = describeReplacementHold(journey, role);
+  if (held) return holdChosenTask(ui, journey, `replace:${roleId}`, held);
   journey.resources.budget -= cost;
   const replacement = generateCrewMember('field', role);
   const names = new Set(journey.crew.map((member) => member.name));
@@ -2747,7 +2802,13 @@ function getSilvicultureContractorRoster(journey, zoneProfile) {
   }
 
   const lines = [...onBlock, ...available, ...offDays];
-  const summary = `${onBlock.length} on the block, ${available.length} available, ${offDays.length} on days off`;
+  // Only the counts that are not zero: "3 on the block, 0 available, 0 on
+  // days off" read as a roster short two groups.
+  const summary = [
+    `${onBlock.length} on the block`,
+    available.length ? `${available.length} available` : null,
+    offDays.length ? `${offDays.length} on days off` : null,
+  ].filter(Boolean).join(', ');
   const rotationSummary = onBlock.length > 0
     ? 'stand down or rest tired crews'
     : 'put available crews on the block';
