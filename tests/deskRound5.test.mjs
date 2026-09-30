@@ -7,7 +7,7 @@ import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
 import { describeEffectChips, formatEventForDisplay } from '../js/events/display.js';
 import { applyEventEffects, projectAppliedEffects } from '../js/events/resolution.js';
-import { buildTemptationEvent, buildTemptationPayoff } from '../js/events/selection.js';
+import { buildFalloutEvent, buildTemptationEvent, buildTemptationPayoff, resolveTemptationSetAside } from '../js/events/selection.js';
 import {
   draftPermits,
   ensurePermitFiles,
@@ -295,4 +295,26 @@ test('a planner\'s buy-in is paid only by a shortcut about the consultation', ()
   assert.ok(terrain.progress > 0, 'it is time back on the file');
   const faked = buildTemptationPayoff(shortcutAct('permitter-forge-fn-consultation'), planner).effects;
   assert.ok(faked.buyIn > 0, 'a faked engagement record is what fakes engagement');
+});
+
+// ── Setting fallout aside (round 5, N5-6) ─────────────────────────────────
+
+test('setting a determination aside prints the goodwill and scrutiny that land', () => {
+  const journey = makePermitter();
+  journey.day = 6;
+  journey.scrutiny = 27;
+  journey.resources.politicalCapital = 55;
+  const event = buildFalloutEvent({
+    actId: 'permitter-hide-spill-report',
+    takenDay: 5,
+    effects: { budget: -18000, compliance: -8, scrutiny: 12 },
+  }, journey);
+  const { kind, message } = resolveTemptationSetAside(journey, event, () => 0.5);
+  assert.equal(kind, 'unanswered');
+  // -8 compliance is -8 goodwill and +12 scrutiny on the desk, on top of the
+  // authored +12 and the +4 for leaving it unanswered.
+  assert.equal(journey.resources.politicalCapital, 47);
+  assert.equal(journey.scrutiny, 55);
+  assert.match(message, /District goodwill -8 → 47\./, message);
+  assert.match(message, /Scrutiny \+28 → 55%\./, message);
 });

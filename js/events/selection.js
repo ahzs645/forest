@@ -34,7 +34,7 @@ import { getDayRng } from './dayRng.js';
 import { getSignableFiles } from '../journey/permitPipeline.js';
 import { actFitsStop, eventFitsStop, isPackageBlock, isPackageClosed } from '../journey/packages.js';
 import { falloutLandsIn, getPendingFallout, takeDueFallout } from './fallout.js';
-import { applyEventEffects, projectAppliedEffects } from './resolution.js';
+import { applyEventEffects, describeGoodwillChange, projectAppliedEffects, readGoodwill } from './resolution.js';
 import { applyConsequenceFlags } from './consequences.js';
 import { DESK_RESOURCES, formatDollars } from '../resources.js';
 import { getChaseableFiles } from '../journey/permitPipeline.js';
@@ -1865,8 +1865,17 @@ export function resolveTemptationSetAside(journey, event, rng = Math.random) {
     const answer = event.options?.[0] || {};
     const effects = { ...(answer.effects || {}), scrutiny: (Number(answer.effects?.scrutiny) || 0) + 4 };
     const messages = [];
+    const scrutinyBefore = Math.round(Number(journey.scrutiny) || 0);
+    const goodwillBefore = readGoodwill(journey);
     applyEventEffects(journey, effects, messages);
     applyConsequenceFlags(journey, answer.flags || [], messages);
+    // The meters an answered card would report, reported here too: on a desk
+    // goodwill is the meter that ends the run, and it moved without a line.
+    const scrutinyDelta = Math.round(Number(journey.scrutiny) || 0) - scrutinyBefore;
+    if (scrutinyDelta !== 0) {
+      messages.push(`Scrutiny ${scrutinyDelta > 0 ? '+' : ''}${scrutinyDelta} → ${Math.round(journey.scrutiny)}%.`);
+    }
+    messages.push(...describeGoodwillChange(journey, goodwillBefore));
     const outcome = 'You leave it unanswered. It is decided without you, and that reads worse.';
     if (!journey.log) journey.log = [];
     journey.log.push({
