@@ -480,7 +480,8 @@ function managerPolicy(journey, options) {
   const treasury = journey.resources?.budget || 0;
   const start = journey.ledger?.startTreasury || 850000;
   const setAside = options.find((option) => option.value === 'set_aside');
-  if (setAside && treasury < start * 0.4) return setAside;
+  // Not when the set-aside line says the division stops work over it.
+  if (setAside && treasury < start * 0.4 && !/stop-work/.test(setAside.description || '')) return setAside;
   // The cut schedule: take the woodlands manager's recommendation.
   const pace = options.find((option) => String(option.value).startsWith('pace:') && option.recommended);
   if (pace) return pace;
