@@ -26,7 +26,7 @@ import { runDaySituation } from '../js/journey/daySituation.js';
 import { getCrossingContext } from '../js/journey/riverCrossing.js';
 import { buildVictoryNarrative, buildDefeatNarrative } from '../js/game/endScreen.js';
 import { buildCrewEpilogue } from '../js/game/debrief.js';
-import { checkForEvent } from '../js/events/selection.js';
+import { getDifficultyEventModifier } from '../js/events/selection.js';
 import { simulateRun } from '../scripts/simulate-expeditions.mjs';
 
 function withRandom(value, fn) {
@@ -297,20 +297,14 @@ test('answering every card is a style that wins at Old Growth, not a coin flip a
   assert.ok(careful.rate >= 0.8, `careful hard won ${careful.wins}/${careful.runs}`);
   assert.ok(competent.rate >= 0.9, `competent hard won ${competent.wins}/${competent.runs}`);
 
-  // A hard season still carries more trouble than a normal one.
-  const draws = (difficulty) => {
-    let events = 0;
-    for (let seed = 1; seed <= 400; seed += 1) {
-      const journey = createReconJourney({ areaId: 'fraser-plateau' });
-      journey.difficulty = difficulty;
-      journey.day = 5;
-      if (withSeed(seed, () => checkForEvent(journey))) events += 1;
-    }
-    return events;
-  };
-  const hard = draws('hard');
-  const normal = draws('normal');
-  assert.ok(hard > normal * 1.05, `hard ${hard} vs normal ${normal}`);
+  // A hard season still carries more trouble than a normal one, counted once:
+  // more shifts carry a card, and the card roll is not scaled again. Every
+  // other role keeps its hard rate.
+  const recon = (difficulty) => ({ journeyType: 'recon', difficulty });
+  assert.ok(getDifficultyEventModifier(recon('hard'), 'day') > getDifficultyEventModifier(recon('normal'), 'day'));
+  assert.equal(getDifficultyEventModifier(recon('hard'), 'card'), 1);
+  assert.equal(getDifficultyEventModifier({ journeyType: 'silviculture', difficulty: 'hard' }, 'day'), 1.35);
+  assert.equal(getDifficultyEventModifier({ journeyType: 'planning', difficulty: 'hard' }), 1.35);
 });
 
 test('standing down until the food runs out grades F, and the crew is not "5/5 active"', () => {

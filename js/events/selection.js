@@ -310,7 +310,7 @@ const RECON_HARD_DAY_EVENT_MODIFIER = 1.15;
  * @param {'day'|'card'} [lane] - the day gate (is there an event today) or
  *   the card roll (which one); recon's hard pressure lives on the gate only
  */
-function getDifficultyEventModifier(journey, lane = 'card') {
+export function getDifficultyEventModifier(journey, lane = 'card') {
   switch (journey?.difficulty) {
     case 'easy':
       return 0.75;
