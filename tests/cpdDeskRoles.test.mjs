@@ -116,6 +116,18 @@ test("the CPD reminder is a calendar card: never in the issue draw, dealt once w
   assert.equal(state.flags.cpdReminderDue, undefined, "and it does not come back the same year");
 });
 
+test("the reminder reads the log at mid-year: a log that slips only after it is left to the year end", () => {
+  const state = neutralYear();
+  const stances = { 1: "cautious", 2: "aggressive", 3: "aggressive" };
+  for (let round = 1; round <= 3; round += 1) {
+    state.round = round;
+    state.history.push({ type: "assignment", id: `a${round}`, round, stance: stances[round] });
+    applyRoundConsequences(state);
+  }
+  assert.ok(getCpdShortfall(state, 3).gap >= 10, "the log is behind by the fall");
+  assert.equal(state.flags.cpdReminderDue, undefined, "but a middling year that slipped late is not handed the card");
+});
+
 test("a reminder an older save queued as a pending issue is dealt as the extra card", () => {
   const state = neutralYear();
   state.round = 2;

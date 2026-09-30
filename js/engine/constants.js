@@ -13,6 +13,8 @@ export const DEFAULT_CPD_TARGET = 30;
 // than a season's worth, so only a log that has actually been let slide
 // draws it.
 export const CPD_CARD_GAP = 10;
+// The last round-end pass that reads the log for the reminder: mid-year.
+export const CPD_REMINDER_LAST_ROUND = 2;
 // Cards the year's calendar deals as an extra card at the end of a season,
 // once a year, when the round-end pass sets their flag. They never go through
 // the issue draw, so they cannot take a season's contested call.

@@ -42,8 +42,8 @@ test("the CPD reminder lands at most once a year, only for a log let slide, and 
 // share over the whole matrix (balanced 0%, random ~30%, aggressive 100%)
 // against a 45% cap; it read 42.6% at this file's seed base and 46.6% at
 // another. A pushed year never logs CPD and always gets the card; a middling
-// year gets it in a minority of years (27-40% of 108 at six seed bases, so
-// the band below is five standard deviations wide on either side).
+// year gets it in a minority of years. Read after the fall as well, that was
+// 27-40% of 108; judged at mid-year only it is 11-22% at these three bases.
 test("the CPD reminder comes to every pushed year and a minority of middling ones, at any seed base", () => {
   const share = (runs, strategy) => {
     const played = runs.filter((run) => run.strategy === strategy);
@@ -58,7 +58,7 @@ test("the CPD reminder comes to every pushed year and a minority of middling one
   for (const [index, runs] of bases.entries()) {
     assert.ok(share(runs, "aggressive") >= 0.9, `base ${index}: pushed years carded ${share(runs, "aggressive")}`);
     const middling = share(runs, "random");
-    assert.ok(middling > 0.08 && middling < 0.55, `base ${index}: middling years carded ${middling}`);
+    assert.ok(middling > 0.04 && middling < 0.3, `base ${index}: middling years carded ${middling}`);
   }
 });
 
