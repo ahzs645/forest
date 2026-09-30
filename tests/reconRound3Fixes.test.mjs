@@ -26,6 +26,8 @@ import { runDaySituation } from '../js/journey/daySituation.js';
 import { getCrossingContext } from '../js/journey/riverCrossing.js';
 import { buildVictoryNarrative, buildDefeatNarrative } from '../js/game/endScreen.js';
 import { buildCrewEpilogue } from '../js/game/debrief.js';
+import { checkForEvent } from '../js/events/selection.js';
+import { simulateRun } from '../scripts/simulate-expeditions.mjs';
 
 function withRandom(value, fn) {
   const original = Math.random;
@@ -270,6 +272,45 @@ test('careful play grades high 80s to low 90s; only a flawless season reaches 10
   // A rougher delivered season sits below the careful one.
   const rough = calculateScore(tahltanSeason({ shiftsUsed: 33, health: 70, morale: 60, injuries: 3 }), true);
   assert.ok(rough.totalScore < careful.totalScore - 5, `rough ${rough.totalScore} vs careful ${careful.totalScore}`);
+});
+
+test('answering every card is a style that wins at Old Growth, not a coin flip against the deadline', async () => {
+  // The careful crew lead answers every card with the safe line instead of
+  // setting the late ones aside. At hard it used to lose 44% of seasons, most
+  // of them to the layout deadline, because the hard event rate was counted
+  // on the day gate and again on the card roll.
+  const tally = async (policy) => {
+    let wins = 0;
+    let runs = 0;
+    for (const area of OPERATING_AREAS) {
+      for (let i = 0; i < 6; i += 1) {
+        const result = await simulateRun('recon', 1000 + i * 37, undefined, null, { areaId: area.id, policy, difficulty: 'hard' });
+        runs += 1;
+        if (result.won) wins += 1;
+      }
+    }
+    return { wins, runs, rate: wins / runs };
+  };
+  const careful = await tally('careful');
+  const competent = await tally('competent');
+  // Measured over 648 hard runs (six seed bases): careful 86%, competent 97%.
+  assert.ok(careful.rate >= 0.8, `careful hard won ${careful.wins}/${careful.runs}`);
+  assert.ok(competent.rate >= 0.9, `competent hard won ${competent.wins}/${competent.runs}`);
+
+  // A hard season still carries more trouble than a normal one.
+  const draws = (difficulty) => {
+    let events = 0;
+    for (let seed = 1; seed <= 400; seed += 1) {
+      const journey = createReconJourney({ areaId: 'fraser-plateau' });
+      journey.difficulty = difficulty;
+      journey.day = 5;
+      if (withSeed(seed, () => checkForEvent(journey))) events += 1;
+    }
+    return events;
+  };
+  const hard = draws('hard');
+  const normal = draws('normal');
+  assert.ok(hard > normal * 1.05, `hard ${hard} vs normal ${normal}`);
 });
 
 test('standing down until the food runs out grades F, and the crew is not "5/5 active"', () => {

@@ -555,8 +555,17 @@ function idleReconPolicy(_journey, options) {
 // The competent crew lead who answers every card instead of setting the
 // behind-schedule ones aside: the run the grade should put in the high 80s
 // and low 90s, below a flawless season but well above the competent one.
+// Careful means the careful answer, too: the [SAFE] line, else a [TRADEOFF],
+// never the shortcut. Taking whatever option came first bought $2,000
+// helicopter slings and cut saw bypasses on an Old Growth budget, which
+// measured a reckless crew that happened to answer the radio.
 function carefulReconPolicy(journey, options, prompt) {
   const answered = options.filter((option) => option.value !== 'set_aside');
+  if (answered.length < options.length) {
+    const tagged = (tag) => answered.find((option) => typeof option.value === 'number' && String(option.label).endsWith(`[${tag}]`));
+    const careful = tagged('SAFE') || tagged('TRADEOFF');
+    if (careful) return careful;
+  }
   return reconPolicy(journey, answered.length ? answered : options, prompt);
 }
 

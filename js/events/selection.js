@@ -76,7 +76,7 @@ const DAY_HAS_EVENT_CHANCE = 0.65;
  * @returns {boolean}
  */
 function dayCarriesEvent(journey, rng = Math.random) {
-  const chance = Math.min(0.85, DAY_HAS_EVENT_CHANCE * getDifficultyEventModifier(journey));
+  const chance = Math.min(0.85, DAY_HAS_EVENT_CHANCE * getDifficultyEventModifier(journey, 'day'));
   return rng() < chance;
 }
 
@@ -295,11 +295,27 @@ export function escalateFieldEventForManager(event, rng = Math.random) {
   };
 }
 
-function getDifficultyEventModifier(journey) {
+// Old Growth recon counts its extra trouble once, on the day gate. At 1.35 on
+// both the gate and the card roll a hard traverse drew 23 cards a run against
+// normal's 14, and a crew lead who answered every one of them instead of
+// setting the late ones aside lost 44% of hard seasons to the layout deadline
+// (scripts/simulate-expeditions.mjs --compare, the careful policy). At 1.15 on
+// the gate alone a hard run still draws about a fifth more cards than normal
+// (17.5 a run against 14.5), on 0.8x stores, and answering every one of them
+// wins 86% of hard seasons over 648 runs; the competent lead wins 97%.
+const RECON_HARD_DAY_EVENT_MODIFIER = 1.15;
+
+/**
+ * @param {Object} journey
+ * @param {'day'|'card'} [lane] - the day gate (is there an event today) or
+ *   the card roll (which one); recon's hard pressure lives on the gate only
+ */
+function getDifficultyEventModifier(journey, lane = 'card') {
   switch (journey?.difficulty) {
     case 'easy':
       return 0.75;
     case 'hard':
+      if (journey.journeyType === 'recon') return lane === 'day' ? RECON_HARD_DAY_EVENT_MODIFIER : 1;
       return 1.35;
     default:
       return 1;
