@@ -5,7 +5,7 @@
 
 import { isFieldJourney } from './constants.js';
 import { formatOptionTimeCost } from './timePolicy.js';
-import { FUEL_EFFECT_SCALE, isProjectedEffects, projectAppliedEffects } from './resolution.js';
+import { FUEL_EFFECT_SCALE, planningStandingDelta, projectAppliedEffects } from './resolution.js';
 
 /**
  * Give field events one consistent radio lead without making the reporter's
@@ -306,7 +306,18 @@ function getOptionHint(option, journeyType, event = null) {
  * @returns {string[]}
  */
 export function describeEffectChips(effects, journeyType = 'field') {
-  const projected = projectAppliedEffects(effects, journeyType);
+  return describeProjectedChips(projectAppliedEffects(effects, journeyType), journeyType);
+}
+
+/**
+ * Chips for effects that are already as they land: a projection, or the
+ * difference between two projected bands (a shortcut's noticed band over
+ * its clean one, js/events/selection.js describeShortcutStakes).
+ * @param {Object} projected
+ * @param {string} journeyType
+ * @returns {string[]}
+ */
+export function describeProjectedChips(projected, journeyType = 'field') {
   return [...effectChips(projected, journeyType), ...standingChips(projected)];
 }
 
@@ -325,8 +336,6 @@ function standingChips(effects) {
 
 /** Desk roles with no crew: a morale effect is the protagonist's stress. */
 const DESK_PROTAGONIST_TYPES = new Set(['planning', 'permitting']);
-/** Desk journeys where compliance also moves district goodwill. */
-const COMPLIANCE_MOVES_GOODWILL = new Set(['permitting', 'desk']);
 
 function effectChips(effects, journeyType) {
   const hints = [];
@@ -380,23 +389,23 @@ function effectChips(effects, journeyType) {
     if (option.effects.relationships !== undefined) {
       hints.push(option.effects.relationships > 0 ? `+${option.effects.relationships} relations` : `${option.effects.relationships} relations`);
     }
-    if (option.effects.compliance !== undefined) {
+    if (option.effects.compliance !== undefined && journeyType === 'planning') {
+      // A planner has no compliance meter: it lands on professional standing,
+      // at half the size (js/events/resolution.js planningStandingDelta).
+      const standing = planningStandingDelta(option.effects.compliance);
+      if (standing !== 0) hints.push(`${standing > 0 ? '+' : ''}${standing} professional standing`);
+    } else if (option.effects.compliance !== undefined) {
       hints.push(option.effects.compliance > 0 ? `+${option.effects.compliance} compliance` : `${option.effects.compliance} compliance`);
     }
-    // On a permit desk compliance lands on district goodwill one for one
-    // (js/events/resolution.js applyComplianceEffects), so the goodwill chip
-    // carries both: "+8 compliance" alone hid eight points of goodwill.
-    const complianceGoodwill = COMPLIANCE_MOVES_GOODWILL.has(journeyType) && !isProjectedEffects(option.effects)
-      ? Number(option.effects.compliance) || 0
-      : 0;
-    if (option.effects.politicalCapital !== undefined || complianceGoodwill !== 0) {
+    // On a permit desk compliance also lands on district goodwill one for
+    // one; the effects here are projected (projectAppliedEffects), so that
+    // goodwill is already in politicalCapital.
+    if (option.effects.politicalCapital !== undefined) {
       // The outcome line calls it district goodwill on a desk file
       // (js/events/resolution.js describeGoodwillChange); the hint should too.
       const unit = journeyType === 'manager' ? 'capital' : 'goodwill';
-      const goodwill = (Number(option.effects.politicalCapital) || 0) + complianceGoodwill;
-      if (goodwill !== 0 || complianceGoodwill === 0) {
-        hints.push(goodwill > 0 ? `+${goodwill} ${unit}` : `${goodwill} ${unit}`);
-      }
+      const goodwill = Number(option.effects.politicalCapital) || 0;
+      hints.push(goodwill > 0 ? `+${goodwill} ${unit}` : `${goodwill} ${unit}`);
     }
 
     if (option.effects.data !== undefined && option.effects.data !== 0) {

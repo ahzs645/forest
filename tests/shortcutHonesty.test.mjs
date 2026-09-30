@@ -35,6 +35,7 @@ import { createInitialState } from '../js/engine/state.js';
 import { adaptIllegalActTemptation, buildIllegalActWatchFlags, drawIssue } from '../js/engine/content.js';
 import { applyOptionOutcome, applyRoundConsequences } from '../js/engine/effects.js';
 import { CHAINED_ISSUES } from '../js/data/index.js';
+import { fitManagerEvent } from '../js/modes/manager.js';
 
 const ROLE_AREAS = {
   recce: 'fort-st-john-plateau',
@@ -145,7 +146,9 @@ test('the stakes name the knock-ons, the scrutiny of a clean take, the finding o
   const [gain, odds] = event.stakes;
   const buried = gain.match(/^Take it and you get .* \((\+\d+ scrutiny) even if it stays buried\)\. Saying no costs nothing\.$/);
   assert.ok(buried, gain);
-  assert.match(odds, /somebody notices \(-2 compliance, -2 goodwill, \+11 scrutiny, and the RCMP have your name\)/);
+  // The payoff is ten permit clock-days of work, which draws a point of
+  // scrutiny of its own when it lands in the noticed band too: +12, not +11.
+  assert.match(odds, /somebody notices \(-2 compliance, -2 goodwill, \+12 scrutiny, and the RCMP have your name\)/);
   assert.match(odds, /catches it \(no payoff; \+5 scrutiny today, then .*-16 compliance, -28 goodwill, .*\+49 scrutiny, landing about \d days? later; on your record: the RCMP have your name, an RCMP file is open\)/);
   const hint = formatEventForDisplay(event, 'permitting').options[1].hint;
   assert.ok(hint.includes(buried[1]), `${hint} vs ${buried[1]}`);
@@ -153,6 +156,102 @@ test('the stakes name the knock-ons, the scrutiny of a clean take, the finding o
   const trial = clone(journey);
   applyEventEffects(trial, event.options[1].effects, []);
   assert.equal(`+${trial.scrutiny - journey.scrutiny} scrutiny`, buried[1]);
+});
+
+/** "(-2 compliance, -2 goodwill, +12 scrutiny, and a watch)" → { compliance: -2, goodwill: -2, scrutiny: 12 } */
+function parseChips(text) {
+  const chips = {};
+  for (const chip of String(text || '').split(', ')) {
+    const match = chip.match(/^([+-]\d+(?:\.\d+)?) (scrutiny|compliance|goodwill|capital|professional standing|relations)$/);
+    if (match) chips[match[2]] = Number(match[1]);
+  }
+  return chips;
+}
+
+/** The meters a chip names, read off a journey. */
+function readMeters(journey) {
+  return {
+    scrutiny: Number(journey.scrutiny) || 0,
+    goodwill: journey.resources?.politicalCapital,
+    capital: journey.resources?.politicalCapital,
+    'professional standing': journey.protagonist?.reputation,
+    compliance: journey.journeyType === 'permitting' ? journey.regulations?.complianceScore : journey.metrics?.compliance,
+  };
+}
+
+function landed(journey, effects) {
+  const trial = clone(journey);
+  const before = readMeters(trial);
+  applyEventEffects(trial, effects || {}, []);
+  const after = readMeters(trial);
+  return Object.fromEntries(Object.keys(before).map((key) => [key, (after[key] ?? 0) - (before[key] ?? 0)]));
+}
+
+test('every shortcut\'s stakes line is what each band lands, for every act and role, a big payoff included', () => {
+  // Two desks: meters mid-range, and a planning file whose gates are all
+  // full, so its payoff is time back on the file at twelve or more points of
+  // work, which draws a point of scrutiny of its own.
+  const states = [
+    ['mid-range', (roleId) => journeyFor(roleId)],
+    ['big payoff', (roleId) => {
+      const journey = journeyFor(roleId);
+      if (journey.plan) Object.assign(journey.plan, { dataCompleteness: 98, analysisQuality: 98, stakeholderBuyIn: 98 });
+      return journey;
+    }],
+  ];
+  let checked = 0;
+  let bigPayoffs = 0;
+  for (const [state, make] of states) {
+    for (const entry of ACTIVE_ILLEGAL_ACTS) {
+      for (const roleId of entry.roles.filter((role) => ROLE_AREAS[role])) {
+        const journey = make(roleId);
+        let event = buildTemptationEvent(entry, journey);
+        if (journey.journeyType === 'manager') event = fitManagerEvent(journey, event);
+        const shortcut = event.options.find((option) => option.liveOdds);
+        const where = `${entry.id} for ${roleId} (${state})`;
+        if ((shortcut.effects?.progress || 0) > 6) bigPayoffs += 1;
+        const [gain, odds] = event.stakes;
+        const clean = landed(journey, shortcut.effects);
+        const buried = gain.match(/\(([+-]\d+(?:\.\d+)?) scrutiny even if it stays buried\)/);
+        assert.equal(buried ? Number(buried[1]) : 0, clean.scrutiny, `${where} clean: ${gain}`);
+
+        const noticedText = odds.match(/somebody notices \((.*?), and [^()]*\)/)?.[1];
+        assert.ok(noticedText !== undefined, `${where}: ${odds}`);
+        const noticedChips = parseChips(noticedText);
+        const noticed = landed(journey, shortcut.partialEffects);
+        assert.equal(noticedChips.scrutiny || 0, noticed.scrutiny, `${where} noticed scrutiny: ${noticedText}`);
+        for (const unit of ['goodwill', 'capital', 'professional standing']) {
+          if (!(unit in noticedChips)) continue;
+          assert.equal(noticedChips[unit], noticed[unit] - clean[unit], `${where} noticed ${unit}: ${noticedText}`);
+        }
+
+        const caughtText = odds.match(/catches it \(no payoff; (.*)\)\.$/)?.[1] || '';
+        const [today, later] = shortcut.failureFallout ? caughtText.split(' today, then ') : ['', caughtText];
+        if (shortcut.failureFallout) {
+          assert.equal(parseChips(today).scrutiny || 0, landed(journey, shortcut.failureEffects).scrutiny, `${where} caught today: ${today}`);
+        }
+        const determination = landed(journey, shortcut.failureFallout?.effects || shortcut.failureEffects);
+        const laterChips = parseChips(later.split(/, landing |; on your record/)[0]);
+        assert.equal(laterChips.scrutiny || 0, determination.scrutiny, `${where} determination: ${later}`);
+        checked += 1;
+      }
+    }
+  }
+  assert.ok(checked > 300, `${checked} offers checked`);
+  assert.ok(bigPayoffs >= 20, `${bigPayoffs} offers paid more than six points of work`);
+});
+
+test('a planner\'s compliance chips name professional standing, at the size it lands', () => {
+  const journey = journeyFor('planner');
+  const authored = { compliance: -10, scrutiny: 15 };
+  const chips = describeEffectChips(authored, 'planning');
+  assert.ok(!chips.some((chip) => / compliance$/.test(chip)), chips.join(', '));
+  assert.ok(chips.includes('-5 professional standing'), chips.join(', '));
+  const before = journey.protagonist.reputation;
+  const messages = [];
+  applyEventEffects(journey, authored, messages);
+  assert.equal(journey.protagonist.reputation, before - 5);
+  assert.ok(messages.includes('Professional standing slipped (-5).'), messages.join(' | '));
 });
 
 test('silence about a go-around costs what its card says', () => {

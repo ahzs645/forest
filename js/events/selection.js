@@ -29,12 +29,12 @@ import { computeBandOdds, matchesOddsCondition, TEMPTATION_FLAG_LABELS, TEMPTATI
 import { OPERATING_AREAS } from '../data/operatingAreas.js';
 import { getDiscoveryEventTypeMultipliers } from '../data/discoveryTags.js';
 import { getAreaSituationMultipliers } from '../data/areaSituations.js';
-import { describeEffectChips, formatRadioReport } from './display.js';
+import { describeEffectChips, describeProjectedChips, formatRadioReport } from './display.js';
 import { getDayRng } from './dayRng.js';
 import { getSignableFiles } from '../journey/permitPipeline.js';
 import { actFitsStop, eventFitsStop, isPackageBlock, isPackageClosed } from '../journey/packages.js';
 import { falloutLandsIn, getPendingFallout, takeDueFallout } from './fallout.js';
-import { applyEventEffects } from './resolution.js';
+import { applyEventEffects, projectAppliedEffects } from './resolution.js';
 import { applyConsequenceFlags } from './consequences.js';
 import { DESK_RESOURCES, formatDollars } from '../resources.js';
 import { getChaseableFiles } from '../journey/permitPipeline.js';
@@ -1602,12 +1602,23 @@ export function describeShortcutStakes(option, journey) {
   const good = pct(odds.good);
   const bad = pct(odds.bad);
   const partial = Math.max(0, 100 - good - bad);
-  // What the noticed band costs on top of the payoff, as it lands: the
-  // authored "-2 compliance, +8 scrutiny" is +11 scrutiny once compliance
-  // moves it, and on a permitting desk -2 goodwill too.
-  const noticedCosts = Object.fromEntries(Object.entries(option.partialEffects || {})
-    .filter(([key]) => !(key in payoffEffects)));
-  const noticed = describeEffectChips(noticedCosts, journeyType);
+  // What the noticed band costs on top of the payoff, as it lands: the band
+  // is projected whole (the authored "-2 compliance, +8 scrutiny" is +11
+  // scrutiny once compliance moves it, +12 when a payoff over six points of
+  // work draws its own), less what the clean band already pays. Scrutiny is
+  // the band's own total, as the clean line prints its own.
+  const noticedBand = projectAppliedEffects(option.partialEffects || {}, journeyType);
+  const cleanBand = projectAppliedEffects(option.effects || {}, journeyType);
+  const noticedCosts = {};
+  for (const [key, value] of Object.entries(noticedBand)) {
+    if (typeof value !== 'number') {
+      if (!(key in payoffEffects)) noticedCosts[key] = value;
+      continue;
+    }
+    const extra = key === 'scrutiny' ? value : value - (Number(cleanBand[key]) || 0);
+    if (extra !== 0) noticedCosts[key] = extra;
+  }
+  const noticed = describeProjectedChips(noticedCosts, journeyType);
   const watch = TEMPTATION_FLAG_LABELS[option.partialFlags?.[0]] || 'a watch on your file';
   const finding = option.failureFallout ? describeEffectChips(option.failureEffects || {}, journeyType).join(', ') : '';
   const determination = option.failureFallout?.effects || option.failureEffects || {};
