@@ -249,6 +249,29 @@ test('an FPBC complaint file is decided after eight days: the registration can b
   assert.equal(journey.professional.registrationStatus, 'active', 'once decided, the renewal restores the licence');
 });
 
+test('an FPBC file saved open before the review clock existed is still decided eight days after the load', () => {
+  // The wave-2 save shape: the file settled (registration under review) but
+  // no opening day, so the review read 0 of 8 days forever.
+  const journey = journeyFor('planner');
+  journey.day = 6;
+  journey.consequenceFlags = ['fpbc_watching', 'fpbc_file_open'];
+  journey.temptationMemory = { lastDay: 3, seenActIds: [], takenActIds: [], pending: [], settledFlags: ['fpbc_file_open'] };
+  journey.professional.registrationStatus = 'under-review';
+
+  withRandom(0.99, () => checkForEvent(journey));
+  assert.equal(journey.temptationMemory.fpbcFileOpenedDay, 6, 'the clock starts at the save\'s day');
+  assert.equal(fpbcReviewDaysLeft(journey), 8);
+  for (let day = 7; day <= 14; day += 1) {
+    journey.day = day;
+    withRandom(0.99, () => checkForEvent(journey));
+  }
+  assert.equal(fpbcReviewDaysLeft(journey), null, 'decided on day 14');
+  assert.ok(!journey.consequenceFlags.includes('fpbc_file_open'));
+  assert.ok(journey.consequenceFlags.includes('fpbc_watching'));
+  applyProfessionalComplianceShift(journey, { registrationStatus: 'active' });
+  assert.equal(journey.professional.registrationStatus, 'active');
+});
+
 // ── (4) The campaign counts the last shortcut of a season ───────────────────
 
 test('a shortcut taken after the season\'s last offer check is still carried into the year', () => {

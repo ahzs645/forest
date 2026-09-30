@@ -776,6 +776,11 @@ function ensureTemptationMemory(journey) {
   if (!Number.isFinite(memory.missedEligibleDays)) memory.missedEligibleDays = 0;
   if (!Number.isFinite(memory.refuseIndex)) memory.refuseIndex = 0;
   if (!Array.isArray(memory.settledFlags)) memory.settledFlags = [];
+  // A save from before the review clock settled the FPBC file with no day on
+  // it, and the review never came due. Start the clock at the save's day.
+  if (memory.settledFlags.includes('fpbc_file_open') && !Number.isFinite(Number(memory.fpbcFileOpenedDay ?? NaN))) {
+    memory.fpbcFileOpenedDay = Number(journey?.day || 1);
+  }
   getPendingFallout(journey);
   return memory;
 }
