@@ -34,7 +34,7 @@ import { getOptionShortfall, formatShortfall } from '../../events/affordability.
  */
 export async function handleEvent(game, event, frame = {}) {
   const { ui, journey } = game;
-  const formatted = formatEventForDisplay(event, journey.journeyType);
+  const formatted = formatEventForDisplay(event, journey.journeyType, journey);
 
   const hasCrew = Array.isArray(journey.crew) && journey.crew.length > 0;
 

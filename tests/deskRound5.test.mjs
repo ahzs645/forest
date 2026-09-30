@@ -336,3 +336,42 @@ test('a clean plan that stood on the contract with a contractor is still praised
   planner.log.push({ day: 12, type: 'event', eventId: 'first_nations_consultation', eventTitle: 'First Nations Engagement', optionLabel: 'Delay engagement (risk deteriorating relationships)', effects: { relationships: -15 } });
   assert.doesNotMatch(buildVictoryNarrative(planner, 'Fort St. John Plateau', 'You', 19), praise);
 });
+
+// ── The last of the goodwill, before the choice (round 5, N5-8) ───────────
+
+function optionHintOn(journey, event, label) {
+  const index = event.options.findIndex((option) => option.label.startsWith(label));
+  return formatEventForDisplay(event, journey.journeyType, journey).options[index].hint;
+}
+
+test('an option that could spend the last goodwill says so before it is chosen', () => {
+  const journey = makePermitter();
+  journey.day = 5;
+  const dispute = DESK_EVENTS.find((event) => event.id === 'contractor_dispute');
+  // "Pay the full amount" is a certain -5 goodwill (-5 compliance on a desk).
+  journey.resources.politicalCapital = 50;
+  assert.doesNotMatch(optionHintOn(journey, dispute, 'Pay the full amount'), /goodwill \d+ →|leaves goodwill/);
+  journey.resources.politicalCapital = 8;
+  assert.match(optionHintOn(journey, dispute, 'Pay the full amount'), /^leaves goodwill at 3 \(the run ends at 0\), /);
+  journey.resources.politicalCapital = 4;
+  assert.match(optionHintOn(journey, dispute, 'Pay the full amount'), /^ENDS THE RUN: goodwill 4 → 0, /);
+
+  // A gamble names the worst band it can land.
+  const poaching = DESK_EVENTS.find((event) => event.id === 'anonymous_tip_poaching');
+  journey.resources.politicalCapital = 12;
+  assert.match(optionHintOn(journey, poaching, 'Increase site monitoring'), /^at worst goodwill 12 → 0, and the run ends, /);
+  // An option that gains goodwill carries no warning.
+  assert.doesNotMatch(optionHintOn(journey, poaching, 'Report to Conservation Officer Service'), /run ends|ENDS THE RUN/);
+});
+
+test('a shortcut card warns when its noticed or caught band would end the run', () => {
+  const journey = makePermitter();
+  journey.day = 5;
+  journey.resources.politicalCapital = 2;
+  const event = buildTemptationEvent(shortcutAct('permitter-hide-spill-report'), journey);
+  const take = event.options.findIndex((option) => option.riskTag === 'OFF-BOOK');
+  const hints = formatEventForDisplay(event, 'permitting', journey).options.map((option) => option.hint);
+  assert.match(hints[take], /^at worst goodwill 2 → 0, and the run ends/, hints[take]);
+  hints.filter((_, index) => index !== take)
+    .forEach((hint) => assert.doesNotMatch(hint, /run ends|ENDS THE RUN/, hint));
+});

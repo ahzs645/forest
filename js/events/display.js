@@ -22,9 +22,11 @@ export function formatRadioReport(description, reporter) {
  * Format event for display
  * @param {Object} event - Event object
  * @param {string} journeyType - Journey type
+ * @param {Object} [journey] - the run, when the card can read it: a desk
+ *   option that would spend the last of the district's goodwill says so
  * @returns {Object} Display-ready event info
  */
-export function formatEventForDisplay(event, journeyType = 'field') {
+export function formatEventForDisplay(event, journeyType = 'field', journey = null) {
   const reporter = isFieldJourney(journeyType) ? event.reporter : null;
   const description = formatRadioReport(event.description, reporter);
   const title = event.title;
@@ -37,12 +39,55 @@ export function formatEventForDisplay(event, journeyType = 'field') {
     options: event.options.map((opt, index) => ({
       index: index + 1,
       label: opt.label,
-      hint: getOptionHint(opt, journeyType, event),
+      // The warning leads, so a narrow screen that clips the tail keeps it.
+      hint: [describeGoodwillStakes(opt, journey), getOptionHint(opt, journeyType, event)].filter(Boolean).join(', '),
       // An option can name its own chip: a shortcut is OFF-BOOK, which says
       // more than the RISKY every ordinary gamble carries.
       tag: opt.riskTag || deriveEventOptionTag(opt, event)
     }))
   };
+}
+
+/** Goodwill under this after a choice is a warning; at zero a desk run ends. */
+export const GOODWILL_LAST_WARNING = 5;
+
+/**
+ * Before the choice, what an option could do to the last of a desk's
+ * goodwill (js/modes/shared/endConditions.js ends the run at zero). The
+ * outcome's "nearly spent" line came only after the fact: at goodwill 2 a
+ * spill card printed its -2 and -8 goodwill bands without saying either one
+ * ends the file. Reads every band the option can land, and a caught
+ * shortcut's determination on top of its caught band.
+ * @param {Object} option
+ * @param {Object|null} journey
+ * @returns {string} empty when no band comes near
+ */
+export function describeGoodwillStakes(option, journey) {
+  if (!journey || !DESK_PROTAGONIST_TYPES.has(journey.journeyType)) return '';
+  const goodwill = Number(journey.resources?.politicalCapital);
+  if (!Number.isFinite(goodwill) || goodwill <= 0) return '';
+  const gamble = typeof option?.chanceSuccess === 'number';
+  const drop = (...bands) => bands.reduce((sum, band) => sum
+    + (band ? Number(projectAppliedEffects(band, journey.journeyType).politicalCapital) || 0 : 0), 0);
+  const outcomes = [drop(option?.effects)];
+  if (gamble && option.partialEffects) outcomes.push(drop(option.partialEffects));
+  if (gamble && (option.failureEffects || option.failureFallout)) {
+    outcomes.push(drop(option.failureEffects, option.failureFallout?.effects));
+  }
+  const worst = Math.round(goodwill + Math.min(...outcomes));
+  if (worst >= GOODWILL_LAST_WARNING || worst >= goodwill) return '';
+  // Certain when every band lands it there, not just the worst one.
+  const certain = outcomes.every((delta) => {
+    const after = Math.round(goodwill + delta);
+    return worst <= 0 ? after <= 0 : after === worst;
+  });
+  const now = Math.round(goodwill);
+  if (worst <= 0) {
+    return certain
+      ? `ENDS THE RUN: goodwill ${now} → 0`
+      : `at worst goodwill ${now} → 0, and the run ends`;
+  }
+  return `${certain ? '' : 'at worst '}leaves goodwill at ${worst} (the run ends at 0)`;
 }
 
 /**
