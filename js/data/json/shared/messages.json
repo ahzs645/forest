@@ -1,14 +1,14 @@
 {
   "departure": {
     "evacuated_injury": [
-      "{name} is flown out. WorkSafeBC is notified and the shift stops.",
+      "{name} is flown out. WorkSafeBC is notified.",
       "{name} goes out in the ETV with the attendant. WorkSafeBC gets the call from the truck.",
       "{name} is driven to town. The doctor pulls them for the season."
     ],
     "evacuated_illness": [
       "{name} is driven to town. The doctor pulls them for the season.",
       "{name} is too sick to stay in camp. One truck runs them to the clinic and they do not come back this season.",
-      "{name} is flown out. WorkSafeBC is notified and the shift stops."
+      "{name} is flown out. WorkSafeBC is notified."
     ],
     "quit_morale": [
       "{name} packed their bags and left camp.",

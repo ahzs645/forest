@@ -17,7 +17,7 @@ import { pickDeferredCost } from '../events/deferral.js';
 import { optionSpendsDay } from '../events/timePolicy.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { getCurrentSeasonInfo, advanceDay as advanceSeasonDay, getSeasonModifiers } from '../season.js';
-import { crewHasRole, generateCrewMember, hasActiveFirstAidAttendant } from '../crew.js';
+import { crewHasRole, describeDeparture, generateCrewMember, hasActiveFirstAidAttendant } from '../crew.js';
 import { SILVICULTURE_CREW_ROLES, SILVICULTURE_REPLACEMENT_COST } from '../data/silvicultureCrewRoles.js';
 import { getOperationalProgress, recordProgressMilestones } from '../journey.js';
 import { getRoleAreaBriefing } from '../data/roleAreaIntel.js';
@@ -25,6 +25,7 @@ import { addDiscoveryTags, getDiscoveryTagNotes, getJourneyDiscoveryTags } from 
 import { getAreaSituationSummary } from '../data/areaSituations.js';
 import { buildStandStrip } from '../scene/forest.js';
 import { startDay, spendDay, dayIsSpent, dayPrompt, settleDayPass } from '../journey/dayPlan.js';
+import { takeDueFollowUp } from '../journey/fieldMechanics.js';
 import { checkSilvicultureEndConditions } from './shared/endConditions.js';
 import { getStockingStandard, describeStockingStandard, formatBrushSpecies, formatReleaseTargets } from '../data/stockingStandards.js';
 import {
@@ -122,7 +123,7 @@ function otherContract(journey) {
  * stays upgraded, and an inspected kitchen buys ten days before the same bug
  * can be blamed on it again.
  */
-const CALL_SETTLED_DAYS = { camp_demand: Infinity, crew_illness: 10 };
+const CALL_SETTLED_DAYS = { camp_demand: Infinity, crew_illness: 10, reprice: Infinity };
 function callSettled(contractor, journey, callId) {
   const day = contractor?.silvicultureState?.settledCalls?.[callId];
   return Number.isFinite(day) && journey.day - day < (CALL_SETTLED_DAYS[callId] ?? 0);
@@ -189,13 +190,17 @@ export const CONTRACTOR_EVENTS = [
     ],
   },
   {
+    // One call per contract, answered either way, and only while the outfit
+    // still has trees to put in: a second call stacked a second four cents on
+    // the first, and one came after the last block and fill were planted.
     id: 'reprice',
-    trigger: (c) => c.productivity > 85 && c.specialty === 'planting',
+    trigger: (c, journey) => c.productivity > 85 && c.specialty === 'planting'
+      && !callSettled(c, journey, 'reprice') && hasWorkLeft(c, journey),
     title: 'Contractor Wants to Split the Crew',
     getText: (c, journey) => `${c.name} has another contract ${otherContract(journey)} starting early. They want to release half the crew to it, or keep the whole crew on your program at +$0.04/tree for every tree left.`,
     options: [
-      { label: 'Accept the re-price (+$0.04/tree)', description: 'Full crew stays; every tree left in the program costs four cents more', value: 'pay', cost: 0, moraleGain: 10, prodGain: 5, priceLift: 0.04 },
-      { label: 'Hold them to the contract price', description: 'Half the crew leaves for the other contract; daily output drops', value: 'wait', cost: 0, moraleGain: -5, prodGain: -10, plantersLost: 0.4 },
+      { label: 'Accept the re-price (+$0.04/tree)', description: 'Full crew stays; every tree left in the program costs four cents more', value: 'pay', cost: 0, moraleGain: 10, prodGain: 5, priceLift: 0.04, settles: ['reprice'] },
+      { label: 'Hold them to the contract price', description: 'Half the crew leaves for the other contract; daily output drops', value: 'wait', cost: 0, moraleGain: -5, prodGain: -10, plantersLost: 0.4, settles: ['reprice'] },
     ],
   },
 ];
@@ -309,9 +314,13 @@ export async function runSilvicultureDay(game) {
   }
 
   // The day's situation. Day 1 stays event-free so the program loop is
-  // legible before disruptions begin.
-  const drawn = journey.day > 1 ? checkForEvent(journey) : null;
-  const event = drawn ? fitEventToCrew(journey, adaptEventForProgram(drawn)) : null;
+  // legible before disruptions begin. A follow-up an earlier card scheduled
+  // is the day's situation when it is due, fitted to the program like any
+  // card the day draws: its fuel and food are priced, its day is spent.
+  const fitToProgram = (card) => (card ? fitEventToCrew(journey, adaptEventForProgram(card)) : null);
+  const event = journey.day > 1
+    ? fitToProgram(takeDueFollowUp(journey)) || fitToProgram(checkForEvent(journey))
+    : null;
   if (event) {
     const scrutinyBefore = Number(journey.scrutiny) || 0;
     const onCrew = (journey.crew || []).filter((member) => member.isActive);
@@ -2274,18 +2283,6 @@ const CREW_EFFECT_BANDS = [
 
 function hurtsSomeone(crewEffect) {
   return Boolean(crewEffect && (crewEffect.injury || crewEffect.evacuate));
-}
-
-/** How they go out, read from the band's own words rather than drawn at random. */
-function describeDeparture(text, withAttendant) {
-  if (/helicopter|medevac|air ambulance|flown|flight/i.test(text)) return '{name} is flown out. WorkSafeBC is notified and the shift stops.';
-  if (/\bETV\b/.test(text)) {
-    return withAttendant
-      ? '{name} goes out in the ETV with the attendant. WorkSafeBC gets the call from the truck.'
-      : '{name} goes out in the ETV. WorkSafeBC gets the call from the truck.';
-  }
-  if (/supply run|to town|driven|truck/i.test(text)) return '{name} is driven to town. The doctor pulls them for the season.';
-  return '{name} is off the crew for the season. WorkSafeBC is notified.';
 }
 
 function roleOf(member) {

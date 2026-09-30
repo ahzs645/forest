@@ -32,6 +32,7 @@ import { theme } from '../theme.js';
 import { showJourneyIntro } from './intro.js';
 import { runFinalDebrief } from './debrief.js';
 import { handleEvent } from '../modes/shared/handleEvent.js';
+import { holdFollowUpForDay } from '../journey/fieldMechanics.js';
 import { saveActiveRun, loadActiveRun, clearActiveRun, findUnreadableSaves } from './saveLoad.js';
 
 /**
@@ -722,6 +723,8 @@ export class ForestryTrailGame {
   }
 
   async _handleEvent(event) {
+    // A field crew's follow-up is the day's own situation, dealt by the mode.
+    if (holdFollowUpForDay(this.journey, event)) return;
     await handleEvent(this, event);
   }
 

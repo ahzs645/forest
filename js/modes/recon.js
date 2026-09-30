@@ -32,7 +32,8 @@ import {
   formatAccessVerdict,
   formatInfrastructureStatus,
   getBlockAccessVerdict,
-  recordAccessVerdict
+  recordAccessVerdict,
+  takeDueFollowUp
 } from '../journey/fieldMechanics.js';
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
@@ -596,10 +597,13 @@ async function runFieldDay(game) {
   // Roll the day's random event, but hold it: Oregon Trail's rhythm is that
   // trouble finds you ON the trail, so the event fires mid-travel (the strip
   // pauses for it). If the shift never travels, it lands on camp instead.
-  // The first shift teaches the base loop — nothing fires on day 1.
+  // The first shift teaches the base loop — nothing fires on day 1. A
+  // follow-up an earlier card scheduled is the shift's situation when it is
+  // due, fitted to the crew and the road left like anything the bush sends.
+  const fitToShift = (event) => fitEventToCrew(journey, fitEventToRemainingRoute(journey, event));
   let pendingEvent = resumingShift
     ? (journey.activeReconShift.pendingEvent || null)
-    : (journey.day > 1 ? fitEventToCrew(journey, fitEventToRemainingRoute(journey, checkForEvent(journey))) : null);
+    : (journey.day > 1 ? fitToShift(takeDueFollowUp(journey)) || fitToShift(checkForEvent(journey)) : null);
   const shiftState = ensureActiveReconShift(journey, pendingEvent);
   checkpointReconShift(game, shiftState, pendingEvent);
 
@@ -811,7 +815,7 @@ async function runFieldDay(game) {
     if (currentBlock?.hasSupply) {
       options.push({
         label: 'Run into the supply point',
-        description: 'Fuel, food, repairs, kits',
+        description: 'Fuel, food, repairs, kits; uses this shift',
         value: 'resupply'
       });
     }
