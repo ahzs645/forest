@@ -262,31 +262,6 @@ function eventFitsMonth(event, month) {
 }
 
 /**
- * Shared-library shortcuts written for a woodlot licensee, a community
- * forest's manager or a consulting registrant, or that need a situation a
- * GM's year never has. This GM runs a 240,000 m³ replaceable licence with a
- * board: no client, no council seat, no retired-status side business, and no
- * blockade on the road for a contractor to intimidate. They are struck from
- * the journey's draw before it happens (the act library has no tenure-size
- * gate); striking them after the draw would cost the month its offer.
- */
-const UNFIT_TEMPTATION_ACTS = [
-  'woodlot-overcut-gambit',
-  'community-forest-coasting',
-  'wear-every-hat',
-  'drop-the-ret-from-the-signature',
-  'recce-harass-protesters',
-];
-
-function retireUnfitTemptations(journey) {
-  const memory = journey.temptationMemory || (journey.temptationMemory = {});
-  if (!Array.isArray(memory.seenActIds)) memory.seenActIds = [];
-  for (const id of UNFIT_TEMPTATION_ACTS) {
-    if (!memory.seenActIds.includes(id)) memory.seenActIds.push(id);
-  }
-}
-
-/**
  * Options the shared desk deck writes for a line manager that mean
  * something else at a licensee's head office. Keyed by event id and option
  * index; the override replaces the option for the GM only.
@@ -508,7 +483,6 @@ export async function runManagerDay(game) {
 
   await runStrategicDecision(game);
 
-  retireUnfitTemptations(journey);
   const event = fitManagerEvent(journey, journey.day > 1 ? checkForEvent(journey) : null);
   if (event) {
     // The card clears the screen: hold the decision's result until it has been read.

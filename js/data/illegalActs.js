@@ -2373,6 +2373,9 @@ export const ILLEGAL_ACTS_SOURCE = [
     category: "safety",
     // Nobody blocks the road of a licensee the community still talks to.
     onlyWhen: "relationsStrained",
+    // Manager-only, and the GM's year has no blockade on the road for a
+    // contractor to intimidate: no role could ever be asked it.
+    retired: true,
     payoff: { kind: "time", amount: 3, line: "three days of haul the blockade was going to cost" },
     catch: { by: "RCMP", how: "The blockade has three phones recording. The RCMP treat it as assault with a tree.", lagDays: 2 },
     tags: ["protest", "intimidation", "harvest"],

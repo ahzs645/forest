@@ -267,7 +267,12 @@ test('no act is offered while its premise is false, in any area or season', () =
   const offenders = [];
   for (const [name, { roles, breakIt }] of Object.entries(PREMISE_BROKEN)) {
     const acts = ACTIVE_ILLEGAL_ACTS.filter((act) => actPremises(act).includes(name));
-    assert.ok(acts.length > 0, `${name} gates no act`);
+    // A premise may outlive the acts it gated (relationsStrained: the
+    // blockade act is retired); it still names something in the library.
+    if (!acts.length) {
+      assert.ok(ILLEGAL_ACTS.some((act) => act.retired && actPremises(act).includes(name)), `${name} gates no act`);
+      continue;
+    }
     for (const roleId of roles) {
       const actsForRole = acts.filter((act) => act.roles.includes(roleId));
       if (!actsForRole.length) continue;
@@ -324,10 +329,10 @@ test('the playtest premise mismatches stay fixed', () => {
   assert.equal(gateFull.analysis, undefined, 'no analysis is promised at a full analysis gate');
   assert.ok(gateFull.progress > 0, 'the take pays time back on the file instead');
 
-  // The blockade act needs a blockade's worth of bad relations.
+  // The blockade act is retired: the GM's year has no blockade to intimidate,
+  // and no other role was ever asked it.
   const gm = journeyFor('manager');
-  assert.equal(offered('drop-a-tree-near-the-blockade', gm), true);
-  PREMISE_BROKEN.relationsStrained.breakIt(gm);
+  assert.equal(findIllegalAct('drop-a-tree-near-the-blockade').retired, true);
   assert.equal(offered('drop-a-tree-near-the-blockade', gm), false);
 });
 
