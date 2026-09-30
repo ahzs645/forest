@@ -1021,11 +1021,13 @@ async function runCampaignSeason(game, campaign, season) {
   }
 
   // The round-end rules credit what the season did: a deployment that fell
-  // short, or whose shortcut somebody saw, earns no dividend for a well-run
-  // file (js/engine/effects.js applyRoundRecoveries).
+  // short, or whose shortcut was caught, earns no dividend for a well-run
+  // file, and one that fell short and was seen cutting corners gets no
+  // rebound it did not work for (js/engine/effects.js applyRoundRecoveries).
   gsSeason.seasonOutcome = {
     fellShort: !endResult.victory,
     shortcutsSeen: (shortcutReview.counts?.noticed || 0) + (shortcutReview.counts?.caught || 0),
+    shortcutsCaught: shortcutReview.counts?.caught || 0,
   };
   const consequences = applyRoundConsequences(gsSeason);
   const explained = describeConsequences(gsSeason, consequences, { fellShort: !endResult.victory });

@@ -201,10 +201,10 @@ function seasonKeptToStandards(state, round) {
     && (entry.stance === "aggressive" || (entry.type === "temptation" && entry.band)));
 }
 
-/** A shortcut taken this season that somebody noticed or caught. */
-function shortcutSeenThisRound(state, round) {
+/** A shortcut taken this season that somebody caught. */
+function shortcutCaughtThisRound(state, round) {
   return (state.history || []).some((entry) => Number(entry?.round) === round
-    && entry.type === "temptation" && (entry.band === "noticed" || entry.band === "caught"));
+    && entry.type === "temptation" && entry.band === "caught");
 }
 
 /**
@@ -488,10 +488,13 @@ function applyRoundRecoveries(state, round, consequences) {
   // season did, so each pays only when the season did it. `effort` is what
   // the season's own calls moved (in a campaign, the deployment's review
   // too); a campaign season that fell short (`seasonOutcome`), or a season
-  // whose shortcut somebody saw, earns no dividend for a well-run file.
+  // whose shortcut was caught, earns no dividend for a well-run file. A
+  // shortcut somebody only noticed has already cost the file its compliance
+  // and a watch; withholding the dividend as well charged a middling year
+  // that delivered twice for it.
   const effort = roundDecisionEffects(state, round);
   const outcome = state.seasonOutcome || {};
-  const fileTrusted = !outcome.fellShort && !outcome.shortcutsSeen && !shortcutSeenThisRound(state, round);
+  const fileTrusted = !outcome.fellShort && !(Number(outcome.shortcutsCaught) > 0) && !shortcutCaughtThisRound(state, round);
 
   // Operational dividend: a clean, well-trusted file burns far less budget on
   // rework and firefighting, so a strongly-run year recovers some budget. This
@@ -595,7 +598,7 @@ function applyRoundRecoveries(state, round, consequences) {
   // year. The schedule and the budget keep the later, lower line, so a turtled
   // file is not refunded. It says what happened: effort only when the
   // season's own calls moved that meter up. A campaign review reports what
-  // the deployment did, so there the rebound pays only for that effort; the
+  // the deployment did, so there the rebound reads the season (below); the
   // seasonal year keeps it as the catch-up that holds careful play in reach.
   if (round >= 2) {
     const values = Object.values(metrics).map((value) => Number(value) || 0);
@@ -605,7 +608,12 @@ function applyRoundRecoveries(state, round, consequences) {
     const late = round >= 3 && Number(byValue[0]?.[1]) < 35 ? byValue[0] : null;
     const weakest = standing || late;
     const worked = Boolean(weakest) && Number(effort[weakest[0]] || 0) > 0;
-    if (weakest && average >= 42 && (worked || !state.seasonOutcome)) {
+    // In a campaign it pays for the season's own work on that meter, or for
+    // a season that delivered: a middling deployment that got its job done
+    // (a noticed shortcut and all, which already cost the file) still has
+    // room to steady a slipping meter. One that fell short gets no rebound it
+    // did not work for.
+    if (weakest && average >= 42 && (worked || !state.seasonOutcome || !outcome.fellShort)) {
       const meter = formatMetricName(weakest[0]);
       applyEffects(
         state,
