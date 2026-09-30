@@ -70,8 +70,10 @@ function seededRandom(seed) {
 function scoreOption(option) {
   const text = `${option.label || ''} ${option.description || ''}`;
   let score = 0;
-  for (const match of text.matchAll(/([+-]\d+)\s*(relations|compliance|capital)/gi)) {
-    score += Number(match[1]) * (match[2].toLowerCase() === 'compliance' ? 1.5 : 1);
+  for (const match of text.matchAll(/([+-]\d+)\s*(relations|compliance|capital|professional standing)/gi)) {
+    // A planner's compliance prints as professional standing at half size.
+    const weight = { compliance: 1.5, 'professional standing': 3 }[match[2].toLowerCase()] || 1;
+    score += Number(match[1]) * weight;
   }
   for (const match of text.matchAll(/(Relationships|Compliance|Forest Health|Progress) ([+-]\d+)/g)) {
     score += Number(match[2]) * (match[1] === 'Progress' ? 0.5 : 1);
