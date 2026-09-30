@@ -148,10 +148,19 @@ const PERMITTING_REPORT_LINES = {
   spinBust: 'A complaint to the Forest Practices Board pulls one of the thin files. The gaps show, and your name is on it.',
   people: 'The thank-you notes cost nothing, and next year’s referrals come back a little faster.',
 };
+// The GM's closing presentation is read against the audited statements and
+// the management letter; the silviculture bust line (a check survey) was
+// the one it used to print.
+const MANAGER_REPORT_LINES = {
+  spinWin: 'The board takes the closing deck as presented. The audited statements are in the pack, in smaller type.',
+  spinBust: 'The audit chair sets the closing deck beside the audited statements. The gap is minuted, and your name is on it.',
+  people: 'The division leads present their own numbers. The board meets the people who cut the wood, and next year starts with them in the room.',
+};
 const DESK_REPORT_LINES = {
   planning: PLANNING_REPORT_LINES,
   permitting: PERMITTING_REPORT_LINES,
   desk: PERMITTING_REPORT_LINES,
+  manager: MANAGER_REPORT_LINES,
 };
 
 /**
@@ -215,7 +224,10 @@ function resolveDeskFinalReport(style, journey, rng, lines, victory) {
   switch (style) {
     case 'spin': {
       const scrutiny = Math.max(0, Math.min(100, Number(journey?.scrutiny) || 0));
-      const odds = Math.max(0.2, 0.55 - scrutiny / 150);
+      // A GM whose quarters the year-end audit already restated is spinning
+      // to a board that has read the management letter.
+      const restated = Array.isArray(journey?.flags?.restatedQuarters) ? journey.flags.restatedQuarters.length : 0;
+      const odds = Math.max(restated ? 0.1 : 0.2, 0.55 - scrutiny / 150 - 0.15 * restated);
       if (rng() < odds) {
         return { delta: DESK_REPORT_DELTAS.spinWin, lines: [planningApproved ? lines.approvedSpinWin : lines.spinWin] };
       }
@@ -245,15 +257,16 @@ const SEVERITY_RANK = { severe: 4, major: 3, moderate: 2, minor: 1, positive: 1 
  * @returns {Array<{day: number, title: string, choice: string, victimName?: string}>}
  */
 export function pickKeyMoments(journey, limit = 3) {
-  // A situation set aside is not a moment that mattered; it is one that didn't.
-  const entries = (journey.log || []).filter((e) => e.type === 'event' && e.eventTitle && !e.setAside);
+  // A situation set aside is not a moment that mattered; it is one that
+  // didn't, unless leaving it stopped the work (a GM's stop-work).
+  const entries = (journey.log || []).filter((e) => e.type === 'event' && e.eventTitle && (!e.setAside || e.stoppedWork));
   return entries
     .map((e) => ({
       day: e.day,
       title: e.eventTitle,
       choice: e.optionLabel,
       victimName: e.victimName,
-      rank: (SEVERITY_RANK[e.severity] || 0) + (e.victimName ? 2 : 0),
+      rank: (SEVERITY_RANK[e.severity] || 0) + (e.victimName ? 2 : 0) + (e.stoppedWork ? 2 : 0),
     }))
     .sort((a, b) => b.rank - a.rank || a.day - b.day)
     .slice(0, limit);
@@ -338,6 +351,36 @@ const QUIT_LINES = [
   'Took a mill job closer to home. Still texts the crew on the first day of every season.',
 ];
 
+// A GM's crew is the executive team: no caulks, crew-boss tickets or truck
+// loans, and the woodlands manager's own line is the posture's
+// (buildManagerEpilogue).
+const EXECUTIVE_STRONG_LINES = [
+  'Signs on for another year and has next January\'s plan half drafted.',
+  'Takes the board\'s thanks and a week at the lake. Back for the operating plan.',
+  'Lets a recruiter\'s call from a bigger licensee go to voicemail.',
+];
+const EXECUTIVE_STEADY_WIN_LINES = [
+  'Closes the year-end binder and takes the holidays off, phone and all.',
+  'Stays on for another year and asks for a bigger budget in January.',
+  'Books two weeks somewhere with no cell service and no cutblocks.',
+  'Signs off the year and comes back in January with a list.',
+];
+const EXECUTIVE_LOW_MORALE_LINES = [
+  'Glad the year is done. Takes the winter to decide whether head office is still the job.',
+  'Stays through the audit, then stops answering email until the new year.',
+];
+const EXECUTIVE_WORN_LINES = [
+  'Takes a month off on the doctor\'s advice. Back for the operating plan.',
+];
+const EXECUTIVE_DEFEAT_STEADY_LINES = [
+  'Says the plan was sound and the year was not. Stays on to hand the files over properly.',
+  'Stays on under whoever the board brings in, and keeps the files straight.',
+];
+const EXECUTIVE_DEFEAT_LOW_LINES = [
+  'Quietly updating a resume, but hasn\'t sent it yet.',
+  'Takes a job with a competitor in the spring and does not say why.',
+];
+
 /** A stable number from a crew member's id, so one member keeps one line. */
 function memberSeed(member) {
   const key = String(member?.id ?? member?.name ?? '');
@@ -381,8 +424,12 @@ export function buildCrewEpilogue(member, context = {}) {
     return say(EVACUATED_LINES);
   }
   if (member.hasQuit) {
+    // Someone who left for a named reason keeps it: a woodlands manager
+    // poached to Alberta did not take "a mill job closer to home".
+    if (member.epilogue) return `${name}: ${member.epilogue}`;
     return say(member.morale < 30 ? QUIT_LOW_LINES : QUIT_LINES);
   }
+  if (context.executive) return say(executiveLines(member, victory));
   if (!member.isActive) {
     return `${name}: Recovering well. The doctors say next season is realistic.`;
   }
@@ -428,6 +475,14 @@ export function buildCrewEpilogue(member, context = {}) {
     return `${name}: ${appendix}`;
   }
   return say(STEADY_WIN_LINES);
+}
+
+/** The executive pool for a member still in the seat at year end. */
+function executiveLines(member, victory) {
+  if (!victory) return member.morale >= 50 ? EXECUTIVE_DEFEAT_STEADY_LINES : EXECUTIVE_DEFEAT_LOW_LINES;
+  if (member.health < 40) return EXECUTIVE_WORN_LINES;
+  if (member.morale < 40) return EXECUTIVE_LOW_MORALE_LINES;
+  return member.health > 80 && member.morale > 70 ? EXECUTIVE_STRONG_LINES : EXECUTIVE_STEADY_WIN_LINES;
 }
 
 /**
@@ -502,9 +557,13 @@ export function buildManagerEpilogue(journey, victory) {
   const lines = [];
   if (journey.ceo) {
     const style = MANAGER_POSTURE_EPILOGUES[journey.ceo.decision_making_style] || 'methodical as ever';
+    // A successor who stepped up mid-year is confirmed, not renewed.
+    const acting = (journey.crew || []).some((member) => member.role === 'woodlands' && member.actingFor && member.isActive !== false && member.name === journey.ceo.name);
     lines.push(victory
-      ? `Woodlands manager ${journey.ceo.name}: renewed for another year, ${style}.`
-      : `Woodlands manager ${journey.ceo.name}: moved on to a competitor. The handshake was firm, the exit interview firmer.`);
+      ? acting
+        ? `Acting woodlands manager ${journey.ceo.name}: confirmed in the job for next year, ${style}.`
+        : `Woodlands manager ${journey.ceo.name}: renewed for another year, ${style}.`
+      : `${acting ? 'Acting woodlands manager' : 'Woodlands manager'} ${journey.ceo.name}: moved on to a competitor. The handshake was firm, the exit interview firmer.`);
   }
   for (const cert of journey.certifications || []) {
     const status = cert.status || 'certified';
@@ -671,8 +730,12 @@ export async function runFinalDebrief(ui, journey, victory) {
     treatedCalls: (journey.log || []).filter((entry) => entry.victimId).length,
   };
   const epilogues = [];
+  const manager = journey.journeyType === 'manager';
+  if (manager) epilogueContext.executive = true;
   if (journey.crew?.length) {
     for (const member of journey.crew) {
+      // The woodlands manager in the seat gets the posture's line below, not a second, contradicting one.
+      if (manager && journey.ceo && member.role === 'woodlands' && member.isActive !== false && member.name === journey.ceo.name) continue;
       epilogues.push(buildCrewEpilogue(member, epilogueContext));
     }
   }
