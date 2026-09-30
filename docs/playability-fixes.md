@@ -457,3 +457,17 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Shortcut honesty.** The noticed band's stakes project the band whole (+12 scrutiny, not +11, for a payoff over six points of work). A planner's compliance prints as professional standing at the size it lands. Silviculture cards say a noticed record is read again at season close, at the printed odds. A rested planner is not promised time back.
 - **Campaign.** A delivered season can use the comeback window again, and only a caught shortcut withholds the dividends. Average years stumbled 22/37/35% → 9/19/20%, Mixed is now the modal tier, careful tiers are unchanged, and terrible and idle years still stumble. The hard fall allowance is now equal to normal instead of 12% above it.
 - **Saves and dead content.** An old open FPBC file gets its review clock. An old catch-all C&E watch is remapped to the institution that noticed. The blockade act is retired, and the GM unfit list, the unused mischief options and `getRoleTasks` are removed. The CPD reminder test is now bounded per strategy across three seed bases.
+## 2026-09-30 — Round-5 field residuals (W5-D)
+
+- **Recon casualties.** An injury card names the one hurt: never the attendant treating them, never the hand who radioed it in, a saw hand for a kickback. Every band lands on that person, and the way they leave follows the option (a medevac is flown out). Departure lines are shared with silviculture and no longer claim the shift stops.
+- **Follow-ups are the day's situation.** A scheduled follow-up is handed to the recon or silviculture day and fitted like a drawn card. Silviculture prices its fuel and food and spends the day it says it takes, and recon fits it to the crew and the road that is left. It can be set aside. The simulations now deal follow-ups too.
+- **Re-price call.** The planters ask once per contract, whichever way you answer, and only while planting or fill is owed.
+- **Copy and state.**
+  - "Run into the supply point" says it uses the shift.
+  - A crossing's condition is never milder than its gauge, and an arrival's scrutiny rise says why.
+  - Slides are not dealt at the last block, and a grounded shift gets no card from out on the block.
+  - Silviculture no longer deals traverse stock or road-ahead cards, or a perfect planting day with the planters stood down or every tree in.
+  - No replacement is hired on the last day.
+  - Silviculture sickness clears.
+  - Other fixes: the roster line, the release line, marker lines and "Make up time!." punctuation.
+- **Sims** (`simulate-silviculture-policies.mjs`): competent and honest 162/162, neglect and fraud 0/162. Recon careful hard, 432 runs: 81% → 82% against a sim that deals follow-ups the old way. The old sim dealt none and read 87%.

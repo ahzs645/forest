@@ -326,7 +326,7 @@
     "label": "Take shelter immediately",
     "outcome": "Everyone piles into the trucks until the cell passes over. An hour of the shift goes to watching the ridge, and nobody is sorry.",
     "effects": {
-     "progress": -5
+     "progress": -2
     }
    },
    {
@@ -1641,11 +1641,10 @@
   "options": [
    {
     "label": "Share a meal and listen",
-    "outcome": "They point out a shortcut, warn about a washout ahead, and tell you which crossing the map lies about.",
+    "outcome": "The meal runs long, and it is worth it: they point out a shortcut, warn about a washout ahead, and tell you which crossing the map lies about.",
     "effects": {
      "crew_morale": 10,
-     "progress": 5,
-     "timeUsed": 2
+     "progress": 3
     }
    },
    {

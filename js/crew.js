@@ -191,8 +191,8 @@ export function hasActiveFirstAidAttendant(crew) {
  * Take a crew member off the crew for the season.
  *
  * The worst thing that happens to anyone on this crew is a medevac or an ETV
- * run to town: they are gone for the season, WorkSafeBC is notified, and the
- * shift stops. Nobody dies.
+ * run to town: they are gone for the season and WorkSafeBC is notified.
+ * Nobody dies.
  * @param {Object} member
  * @param {Object} [options]
  * @param {number|null} [options.day] - journey day of the evacuation
@@ -214,6 +214,25 @@ export function evacuateCrewMember(member, { day = null, reason = 'injury', mess
     : DEPARTURE_MESSAGES.evacuated_injury;
   const template = message || pickRandom(pool || []) || '{name} is evacuated for medical care.';
   return { member, message: template.replace('{name}', member.name) };
+}
+
+/**
+ * How someone goes out, read from the words of the band that sends them
+ * rather than drawn at random: a medevac is flown out, not sent off in the
+ * ETV. The line for `evacuateCrewMember`'s `message`.
+ * @param {string} text - the band's outcome copy
+ * @param {boolean} withAttendant - your own attendant rides out with them
+ * @returns {string}
+ */
+export function describeDeparture(text, withAttendant) {
+  if (/helicopter|medevac|air ambulance|flown|flight/i.test(text)) return '{name} is flown out. WorkSafeBC is notified.';
+  if (/\bETV\b/.test(text)) {
+    return withAttendant
+      ? '{name} goes out in the ETV with the attendant. WorkSafeBC gets the call from the truck.'
+      : '{name} goes out in the ETV. WorkSafeBC gets the call from the truck.';
+  }
+  if (/supply run|to town|driven|truck/i.test(text)) return '{name} is driven to town. The doctor pulls them for the season.';
+  return '{name} is off the crew for the season. WorkSafeBC is notified.';
 }
 
 /**

@@ -18,16 +18,21 @@ import {
   getCurrentSegmentLength,
   getDistanceIntoCurrentSegment
 } from './blockNav.js';
-import { ensureRouteConstraints, getActiveRouteConstraint } from './routeConstraints.js';
+import { ensureRouteConstraints, getActiveRouteConstraint, isRouteObstructionEvent } from './routeConstraints.js';
 import { getOperationalProgress, recordProgressMilestones } from './progress.js';
 import {
   applyRandomInjury,
   applyStatusEffect,
+  describeDeparture,
   evacuateIfInjuryRequires,
   getActiveCrewCount,
   getTotalWorkCapacity,
+  hasActiveFirstAidAttendant,
   processDailyUpdate
 } from '../crew.js';
+import { getDayRng } from '../events/dayRng.js';
+import { checkScheduledEvents } from '../events/scheduled.js';
+import { getCrossingContext } from './riverCrossing.js';
 import {
   calculateFieldConsumption,
   applyConsumption,
@@ -227,13 +232,23 @@ function classifyRoadLifecycle(score) {
   ]);
 }
 
-function classifyCrossingCondition(score) {
-  return getLifecycleBand(score, [
-    { max: 6, id: 'clear_window', label: 'Clear Window' },
-    { max: 14, id: 'timing_sensitive', label: 'Timing Sensitive' },
-    { max: 24, id: 'high_water', label: 'High Water' },
-    { max: 100, id: 'restricted', label: 'Restricted' }
-  ]);
+const CROSSING_CONDITION_BANDS = [
+  { max: 6, id: 'clear_window', label: 'Clear Window' },
+  { max: 14, id: 'timing_sensitive', label: 'Timing Sensitive' },
+  { max: 24, id: 'high_water', label: 'High Water' },
+  { max: 100, id: 'restricted', label: 'Restricted' }
+];
+
+/**
+ * The crossing's condition from its wear, and never milder than the water
+ * the crossing beat reads on the gauge (js/journey/riverCrossing.js): an
+ * arrival read "Crossing: Clear Window" beside "GAUGE: HIGH".
+ */
+function classifyCrossingCondition(score, gaugeIndex = null) {
+  const band = getLifecycleBand(score, CROSSING_CONDITION_BANDS);
+  if (!Number.isInteger(gaugeIndex)) return band;
+  const gaugeBand = CROSSING_CONDITION_BANDS[Math.max(0, Math.min(CROSSING_CONDITION_BANDS.length - 1, gaugeIndex))];
+  return CROSSING_CONDITION_BANDS.indexOf(gaugeBand) > CROSSING_CONDITION_BANDS.indexOf(band) ? gaugeBand : band;
 }
 
 function classifyWatershedPressure(score) {
@@ -374,7 +389,7 @@ function buildFieldInfrastructureProfile(block, weather, journey, existingState 
   watershedPressure = clampObservationScore(watershedPressure);
 
   const roadLifecycle = classifyRoadLifecycle(roadWear);
-  const crossingCondition = classifyCrossingCondition(crossingWear);
+  const crossingCondition = classifyCrossingCondition(crossingWear, getCrossingContext(journey, block)?.gaugeIndex ?? null);
   const watershedCondition = classifyWatershedPressure(watershedPressure);
 
   let scrutinyDelta = 0;
@@ -754,6 +769,34 @@ export function applyAccessVerdictPressure(journey, verdict, context = {}) {
   return delta;
 }
 
+const ACCESS_SCRUTINY_REASONS = {
+  winter_only: 'the road only carries trucks frozen',
+  heli_only: 'the block is walk-in or helicopter only',
+  no_go: 'the road is closed to trucks',
+};
+
+/**
+ * Why an arrival's road check moved scrutiny, for the line that says it did:
+ * "Scrutiny rises by 2" on its own read as a penalty from nowhere.
+ * @param {Object} verdict - the recorded access verdict
+ * @param {string} stance - 'cautious', 'observe' or 'aggressive'
+ * @param {number} delta - what applyAccessVerdictPressure applied
+ * @returns {string} the whole line, or '' when nothing moved
+ */
+export function describeAccessScrutiny(verdict, stance, delta) {
+  if (!delta) return '';
+  if (delta < 0) return `Scrutiny eases by ${Math.abs(delta)}: you took it slow and wrote up what you found.`;
+  const reasons = [];
+  if (ACCESS_SCRUTINY_REASONS[verdict?.id]) reasons.push(ACCESS_SCRUTINY_REASONS[verdict.id]);
+  if (['repair_needed', 'out_of_service'].includes(verdict?.roadLifecycleId)) reasons.push(`the road reads ${String(verdict.roadLifecycleLabel).toLowerCase()}`);
+  if (['high_water', 'restricted'].includes(verdict?.crossingConditionId)) reasons.push(`the crossing reads ${String(verdict.crossingConditionLabel).toLowerCase()}`);
+  if (verdict?.watershedPressureId === 'critical') reasons.push('the watershed is under critical pressure');
+  if (normalizeAccessToken(stance) === 'aggressive') reasons.push('you pushed hard to get here');
+  return reasons.length
+    ? `Scrutiny rises by ${delta}: ${reasons.join('; ')}.`
+    : `Scrutiny rises by ${delta}.`;
+}
+
 export function formatAccessVerdict(verdict) {
   if (!verdict?.id) {
     return 'Road check: routine truck access.';
@@ -827,7 +870,9 @@ export function fitEventToRemainingRoute(journey, event) {
   // A shortcut's payoff is sized and shown by its own builder
   // (js/events/selection.js buildTemptationPayoff); it is not rewritten here.
   if (event.type === 'temptation') return event;
-  if (event.needsNextLeg) return null;
+  // A slide or washout across the road ahead blocks a road nobody still
+  // needs: "turn back and report" paid compliance for it at the last block.
+  if (event.needsNextLeg || isRouteObstructionEvent(event)) return null;
   const kmOnly = event.options.some((option) => {
     const effects = option?.effects || {};
     return Number(effects.progress) > 0
@@ -852,21 +897,152 @@ export function fitEventToRemainingRoute(journey, event) {
   return changed ? { ...event, options } : event;
 }
 
+/** Field roles whose day runner deals a follow-up as the day's own situation. */
+const FOLLOW_UP_AS_SITUATION = new Set(['recon', 'field', 'silviculture']);
+
 /**
- * Fit a card to the crew on the roster. "Send out your sick crew member" on
- * a crew with nobody sick evacuated no one and paid its morale anyway; the
- * option is not offered until someone is carrying a condition.
+ * Hand a follow-up an earlier card scheduled (js/events/scheduled.js) to the
+ * field day that is about to run, instead of playing it ahead of the day.
+ * Played ahead, it skipped everything the mode does to a card it draws: the
+ * silviculture program fit (a "-20 L fuel" chip applied nothing), the crew
+ * and route fits, set-aside, and the day it says it takes. The game loop
+ * calls this; the mode takes it back with `takeDueFollowUp`.
+ * @param {Object} journey
+ * @param {Object|null} event - the follow-up, as checkScheduledEvents gives it
+ * @returns {boolean} whether the day runner will deal it
+ */
+export function holdFollowUpForDay(journey, event) {
+  if (!event || !FOLLOW_UP_AS_SITUATION.has(journey?.journeyType)) return false;
+  journey.dueFollowUp = event;
+  return true;
+}
+
+/**
+ * Today's follow-up, if one is due: the one the game loop held for the day,
+ * else the next one on the schedule (a runner driven without the game loop,
+ * as the simulations are).
+ * @param {Object} journey
+ * @returns {Object|null}
+ */
+export function takeDueFollowUp(journey) {
+  const held = journey?.dueFollowUp || null;
+  if (held) {
+    delete journey.dueFollowUp;
+    return held;
+  }
+  return journey ? checkScheduledEvents(journey) : null;
+}
+
+/** Each band's crew effect, with the text that narrates it. */
+const CREW_EFFECT_BANDS = [
+  ['crewEffect', 'outcome'],
+  ['partialCrewEffect', 'partialOutcome'],
+  ['failureCrewEffect', 'failureOutcome'],
+];
+
+/** What the card calls each recon role when it names the one hurt. */
+const RECON_ROLE_NOUNS = {
+  faller: 'layout tech',
+  bucker: 'timber cruiser',
+  spotter: 'compassman',
+  driver: 'driver-swamper',
+  medic: 'OFA 3 attendant',
+  mechanic: 'mechanic',
+};
+
+/** Who runs a saw on a recon crew: the line clearers and the truck hands. */
+const SAW_HANDS = new Set(['faller', 'driver', 'mechanic']);
+
+function hurtsSomeone(crewEffect) {
+  return Boolean(crewEffect && (crewEffect.injury || crewEffect.evacuate));
+}
+
+/**
+ * The one an injury card hurts, named on the day's dice: never the attendant
+ * who treats them unless nobody else is out there, never the hand who radioed
+ * it in if anyone else could be, and a saw hand when a saw kicked back.
+ */
+function pickCasualty(journey, event) {
+  const active = (journey.crew || []).filter((member) => member.isActive);
+  const field = active.filter((member) => member.role !== 'medic');
+  let pool = field.length ? field : active;
+  const others = pool.filter((member) => member.id !== event.reporter?.id);
+  if (others.length) pool = others;
+  if (event.id === 'chainsaw_cut') {
+    const saws = pool.filter((member) => SAW_HANDS.has(member.role));
+    if (saws.length) pool = saws;
+  }
+  if (!pool.length) return null;
+  const rng = getDayRng(journey, `casualty:${event.id || 'event'}`);
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+/**
+ * Fit a card to the crew on the roster.
+ *
+ * "Send out your sick crew member" on a crew with nobody sick evacuated no
+ * one and paid its morale anyway; the option is not offered until someone is
+ * carrying a condition.
+ *
+ * An injury card names the one hurt, and every band lands on them: the
+ * medevac used to fly out a random hand, the attendant who was treating the
+ * bleed included. The way they leave follows the option taken (a medevac is
+ * flown out, an ETV run goes in the ETV), and with the attendant gone the
+ * options stop calling on them. The authored event is left alone.
  * @param {Object} journey
  * @param {Object|null} event
  * @returns {Object|null}
  */
 export function fitEventToCrew(journey, event) {
   if (!event || !Array.isArray(event.options)) return event;
-  const someoneSick = (journey?.crew || []).some((member) => member.isActive && (member.statusEffects?.length || 0) > 0);
-  if (someoneSick) return event;
-  const options = event.options.filter((option) => !option?.crewEffect?.evacuate_sick);
-  if (options.length === event.options.length) return event;
-  return options.length ? { ...event, options } : null;
+  const crew = journey?.crew || [];
+  const someoneSick = crew.some((member) => member.isActive && (member.statusEffects?.length || 0) > 0);
+  const options = someoneSick ? event.options : event.options.filter((option) => !option?.crewEffect?.evacuate_sick);
+  if (!options.length) return null;
+  const fitted = options.length === event.options.length ? event : { ...event, options };
+  return fitCasualty(journey, fitted);
+}
+
+function fitCasualty(journey, event) {
+  if (event.type === 'temptation') return event;
+  const crew = journey.crew || [];
+  const attendant = hasActiveFirstAidAttendant(crew);
+  const hurts = event.options.some((option) => CREW_EFFECT_BANDS.some(([key]) => hurtsSomeone(option?.[key])));
+  if (!hurts && attendant) return event;
+  const victim = hurts ? pickCasualty(journey, event) : null;
+  const rename = (text) => (attendant || typeof text !== 'string'
+    ? text
+    : text.replace(/\b([Tt])he OFA 3\b/g, (match, t) => `${t}he crew's OFA 1`));
+
+  const fitted = { ...event };
+  if (victim) {
+    const who = `${victim.name}, your ${RECON_ROLE_NOUNS[victim.role] || String(victim.roleName || 'crew').toLowerCase()}`;
+    const description = String(event.description || '');
+    fitted.description = /^A crew member\b/.test(description)
+      ? description.replace(/^A crew member\b/, `${who},`)
+      : /^A saw kicks back on the block\./.test(description)
+        ? description.replace(/^A saw kicks back on the block\./, `A saw kicks back on the block: ${who}.`)
+        : `${description} It is ${who}.`.trim();
+  }
+  fitted.options = event.options.map((option) => {
+    if (!option) return option;
+    const copy = { ...option };
+    for (const key of ['label', 'outcome', 'partialOutcome', 'failureOutcome', 'description']) {
+      if (typeof option[key] === 'string') copy[key] = rename(option[key]);
+    }
+    if (!victim) return copy;
+    for (const [key, textKey] of CREW_EFFECT_BANDS) {
+      if (!hurtsSomeone(option[key])) continue;
+      const withAttendant = attendant && victim.role !== 'medic';
+      copy[key] = {
+        ...option[key],
+        victimId: victim.id,
+        departure: describeDeparture(String(option[textKey] || option.outcome || ''), withAttendant),
+      };
+    }
+    return copy;
+  });
+  return fitted;
 }
 
 /**
@@ -1052,14 +1228,10 @@ export function executeFieldAction(journey, paceId) {
       const infrastructureStatus = formatInfrastructureStatus(accessVerdict);
       if (infrastructureStatus) messages.push(infrastructureStatus);
 
-      const scrutinyDelta = applyAccessVerdictPressure(journey, accessVerdict, {
-        stance: getAccessStance(routePlan, effectivePaceId)
-      });
-      if (scrutinyDelta > 0) {
-        messages.push(`Scrutiny rises by ${scrutinyDelta}.`);
-      } else if (scrutinyDelta < 0) {
-        messages.push(`Scrutiny eases by ${Math.abs(scrutinyDelta)}.`);
-      }
+      const stance = getAccessStance(routePlan, effectivePaceId);
+      const scrutinyDelta = applyAccessVerdictPressure(journey, accessVerdict, { stance });
+      const scrutinyLine = describeAccessScrutiny(accessVerdict, stance, scrutinyDelta);
+      if (scrutinyLine) messages.push(scrutinyLine);
     }
   }
 

@@ -21,6 +21,7 @@ import {
   getPackageProgress,
   getPackagesFinalized,
   getPackageTarget,
+  isBlockFieldworkEvent,
   isPackageBlock
 } from '../journey/packages.js';
 import { getWeatherTempC } from '../data/blocks.js';
@@ -32,7 +33,8 @@ import {
   formatAccessVerdict,
   formatInfrastructureStatus,
   getBlockAccessVerdict,
-  recordAccessVerdict
+  recordAccessVerdict,
+  takeDueFollowUp
 } from '../journey/fieldMechanics.js';
 import { checkForEvent } from '../events.js';
 import { handleEvent } from './shared/handleEvent.js';
@@ -53,7 +55,7 @@ import { getCurrentSegmentLength, getDistanceIntoCurrentSegment } from '../journ
 import { getActiveRouteConstraint, reopenReportedConstraints, resolveRouteConstraint } from '../journey/routeConstraints.js';
 import { presentDayCard, formatStatusLine } from '../journey/dayCard.js';
 import { PACE_OPTIONS } from '../journey/constants.js';
-import { recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
+import { MAX_EPITAPH, recordTrailMarker, markersForBlock, formatTrailMarker } from '../journey/trailMarkers.js';
 import { buildCrossingApproachFrames, buildCrossingResolveFrames } from '../scene/crossing.js';
 import { buildCampfireFrames } from '../scene/textmode/effects.js';
 import { buildNightCampFrames } from '../scene/textmode/scenes.js';
@@ -596,10 +598,13 @@ async function runFieldDay(game) {
   // Roll the day's random event, but hold it: Oregon Trail's rhythm is that
   // trouble finds you ON the trail, so the event fires mid-travel (the strip
   // pauses for it). If the shift never travels, it lands on camp instead.
-  // The first shift teaches the base loop — nothing fires on day 1.
+  // The first shift teaches the base loop — nothing fires on day 1. A
+  // follow-up an earlier card scheduled is the shift's situation when it is
+  // due, fitted to the crew and the road left like anything the bush sends.
+  const fitToShift = (event) => fitEventToCrew(journey, fitEventToRemainingRoute(journey, event));
   let pendingEvent = resumingShift
     ? (journey.activeReconShift.pendingEvent || null)
-    : (journey.day > 1 ? fitEventToCrew(journey, fitEventToRemainingRoute(journey, checkForEvent(journey))) : null);
+    : (journey.day > 1 ? fitToShift(takeDueFollowUp(journey)) || fitToShift(checkForEvent(journey)) : null);
   const shiftState = ensureActiveReconShift(journey, pendingEvent);
   checkpointReconShift(game, shiftState, pendingEvent);
 
@@ -624,6 +629,11 @@ async function runFieldDay(game) {
     displayDayHeader(ui, journey);
     ui.writeDanger(`${journey.weather.name} has grounded all operations. The crew hunkers down.`);
     ui.write('');
+    // Nobody is out on the block to find a nest tree or move a boundary.
+    if (isBlockFieldworkEvent(pendingEvent)) {
+      pendingEvent = null;
+      checkpointReconShift(game, shiftState, pendingEvent);
+    }
     if (pendingEvent) {
       ui.write('The weather does not mean the day is quiet.');
       const interruptingEvent = pendingEvent;
@@ -811,7 +821,7 @@ async function runFieldDay(game) {
     if (currentBlock?.hasSupply) {
       options.push({
         label: 'Run into the supply point',
-        description: 'Fuel, food, repairs, kits',
+        description: 'Fuel, food, repairs, kits; uses this shift',
         value: 'resupply'
       });
     }
@@ -1205,7 +1215,7 @@ async function maybeMarkIncidents(game) {
 
     let epitaph = null;
     if (typeof ui.promptText === 'function') {
-      epitaph = (await ui.promptText('Marker line (one line):', 'Watch your footing here'))
+      epitaph = (await ui.promptText(`Marker line (one line, up to ${MAX_EPITAPH} characters):`, 'Watch your footing here'))
         || 'Watch your footing here';
     }
     const marker = recordTrailMarker({

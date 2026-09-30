@@ -259,6 +259,19 @@ export function pickKeyMoments(journey, limit = 3) {
     .slice(0, limit);
 }
 
+/**
+ * One remembered moment as the debrief prints it. An option label that ends
+ * in its own punctuation ("Make up time!") gets no second full stop.
+ * @param {{day: number, title: string, choice: string, victimName?: string}} moment
+ * @param {string} dayLabel - "Shift", "Day" or "Month"
+ * @returns {string}
+ */
+export function formatKeyMoment(moment, dayLabel) {
+  const choice = String(moment.choice ?? '');
+  const injury = moment.victimName ? ` ${moment.victimName} carries the scar.` : '';
+  return `${dayLabel} ${moment.day} — ${moment.title}. You chose: ${choice}${/[.!?]$/.test(choice) ? '' : '.'}${injury}`;
+}
+
 // ---------------------------------------------------------------------------
 // Stage 3: Where are they now — crew & protagonist epilogues
 // ---------------------------------------------------------------------------
@@ -647,10 +660,7 @@ export async function runFinalDebrief(ui, journey, victory) {
     ui.write('');
     ui.writeDivider('MOMENTS THAT MATTERED');
     const dayLabel = journey.journeyType === 'field' || journey.journeyType === 'recon' ? 'Shift' : journey.journeyType === 'manager' ? 'Month' : 'Day';
-    for (const m of moments) {
-      const injury = m.victimName ? ` ${m.victimName} carries the scar.` : '';
-      ui.write(`${dayLabel} ${m.day} — ${m.title}. You chose: ${m.choice}.${injury}`);
-    }
+    for (const m of moments) ui.write(formatKeyMoment(m, dayLabel));
   }
   await next(ui);
 

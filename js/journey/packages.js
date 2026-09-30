@@ -117,6 +117,19 @@ export function eventFitsStop(event, block, journey = null) {
 }
 
 /**
+ * Whether a situation happens out on the block's ground (a nest tree to GPS,
+ * a boundary to move), so it cannot find a crew the weather holds in camp.
+ * @param {Object|null} event
+ * @returns {boolean}
+ */
+export function isBlockFieldworkEvent(event) {
+  if (!event || event.type === 'temptation') return false;
+  if (event.needsOpenPackage) return true;
+  const kinds = Array.isArray(event.stopKinds) ? event.stopKinds : [];
+  return kinds.length > 0 && !kinds.includes('waypoint');
+}
+
+/**
  * Whether the recon crew has already finalized this stop's package. Only a
  * recon journey keeps package intel (js/modes/recon.js), so every other
  * journey reads as open.
