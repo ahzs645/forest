@@ -49,11 +49,12 @@ function byTag(options, tags) {
 }
 
 /**
- * Pace: take the woodlands manager's recommendation, which is always the
- * option that steers the projection back toward the middle of the band.
+ * Pace and catch-up: take the woodlands manager's recommendation, which is
+ * always the option that steers the projection back toward the middle of the
+ * band (and logs stood-down wood unless that would overcut).
  */
 function recommendedPace(options) {
-  return options.find((option) => String(option.value).startsWith('pace:') && option.recommended) || null;
+  return options.find((option) => /^(pace|catchup):/.test(String(option.value)) && option.recommended) || null;
 }
 
 export const MANAGER_STYLES = {

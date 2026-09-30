@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createManagerJourney } from '../js/journey/factory.js';
 import { fitManagerEvent, runManagerDay } from '../js/modes/manager.js';
 import { formatEventForDisplay, resolveEvent } from '../js/events/index.js';
+import { escalateFieldEventForManager } from '../js/events/selection.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 import { simulateManagerYear } from '../scripts/simulate-manager.mjs';
@@ -91,17 +92,26 @@ test('replacement crews in a labour dispute read as the section 68 problem they 
   assert.match(option.outcome, /section 68 of the Labour Relations Code/);
   assert.ok(option.effects.reputation < 0, 'it does not buy anything');
   assert.equal(option.effects.progress, undefined, 'the slowdown lands on the ledger, not the run rate');
-  assert.match(option.ledgerHint, /^ledger: -1,500 m³ on this month's deliveries$/);
+  // "The slowdown starts on schedule": a stop-work, priced on the chip, and no volume bonus.
+  assert.match(option.ledgerHint, /^ledger: stop-work: deliveries at 60% of plan for 2 months, -[\d,]+ m³ \(December [\d.]+% -> [\d.]+% of the AAC\), about -\$\d+k margin until caught up$/);
   assert.equal(formatEventForDisplay(fitted, 'manager').options[2].tag, 'RISKY');
   assert.deepEqual(fitted.options[0], event.options[0], 'the other options are the deck\'s');
   assert.ok(event.options[2].effects.permits_approved, 'the shared deck is untouched');
+
+  // The division's escalation of the same dispute offers the same call, and
+  // replacement hires do not arrive with 1,500 m³.
+  const field = fitManagerEvent(atMonth(9), escalateFieldEventForManager(find('labour-job-action_field'), () => 0.1));
+  assert.match(field.options[2].outcome, /section 68 of the Labour Relations Code/);
+  assert.ok(!/Replacement hires arrive/.test(field.options[2].outcome));
+  assert.match(field.options[2].ledgerHint, /^ledger: stop-work: deliveries at 60% of plan for 2 months/);
+  assert.ok(!/\+[\d,]+ m³/.test(formatEventForDisplay(field, 'manager').options[2].hint), 'no volume bonus on the chip');
 });
 
 test('a ledger-hook option says on its chip and in its outcome what it does to the rest of the year', async () => {
   const event = managerEvents.find((entry) => entry.id === 'gm_contractor_rate_renegotiation');
   const shown = formatEventForDisplay(fitManagerEvent(atMonth(6), event), 'manager');
   assert.match(shown.options[0].hint, /ledger: logging & haul \+\$2\.50\/m³ for the rest of the year/);
-  assert.match(shown.options[1].hint, /ledger if it lands: logging & haul \+\$2\/m³ for the rest of the year; if not: logging & haul \+\$3\/m³ for the rest of the year, this month's deliveries at 90% of plan/);
+  assert.match(shown.options[1].hint, /ledger if it lands: logging & haul \+\$2\/m³ for the rest of the year; if not: logging & haul \+\$3\/m³ for the rest of the year, stop-work: deliveries at 60% of plan for 2 months, -[\d,]+ m³/);
   assert.match(shown.options[2].hint, /ledger: logging & haul \+\$3\/m³ for the rest of the year/);
 
   const sharing = managerEvents.find((entry) => entry.id === 'gm_fn_revenue_sharing');

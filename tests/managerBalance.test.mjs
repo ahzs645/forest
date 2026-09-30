@@ -231,7 +231,7 @@ test('the ledger arithmetic is exact: every printed month reconciles and the tre
     for (const month of ledger.months) {
       assert.equal(month.margin, month.logPrice + month.premium - month.stumpage - month.cost);
       assert.equal(month.revenue, Math.round(month.delivered * month.margin));
-      assert.equal(month.net, month.revenue - month.overhead - month.certCost - month.standby);
+      assert.equal(month.net, month.revenue - month.overhead - month.certCost - month.standby - (month.catchUpCost || 0));
       treasury += month.net;
       unexplained += month.treasury - treasury;
       treasury = month.treasury;

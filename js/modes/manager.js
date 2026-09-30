@@ -124,7 +124,8 @@ const LEDGER_HOOKS = {
     [
       { band: 'good', costShift: 2, note: 'rate mediation' },
       // "Delivery slips ... the rate you eventually sign is higher than the one you refused."
-      { band: 'bad', costShift: 3, curtailment: 0.9, note: 'processor pulled, then the rate mediation' },
+      // The pulled processor is a stop-work (STOP_WORK_CARDS).
+      { band: 'bad', costShift: 3, note: 'processor pulled, then the rate mediation' },
     ],
     { costShift: 3, note: 'three-year logging contract with SAFE clause' },
   ],
@@ -143,8 +144,12 @@ const LEDGER_HOOKS = {
  * stayed in the job; now the seat is filled by an acting successor, who
  * carries the posture for the rest of the year.
  */
+const POACHED_TO_ALBERTA = 'Took the Alberta job. Sends the woodlands office a Christmas card with a photo of flatter cutblocks.';
 const EXECUTIVE_DEPARTURES = {
-  gm_executive_poaching: { 0: { band: 'bad', role: 'woodlands' }, 1: { band: 'bad', role: 'woodlands' } },
+  gm_executive_poaching: {
+    0: { band: 'bad', role: 'woodlands', epilogue: POACHED_TO_ALBERTA },
+    1: { band: 'bad', role: 'woodlands', epilogue: POACHED_TO_ALBERTA },
+  },
 };
 
 /**
@@ -158,65 +163,188 @@ const EXECUTIVE_DEPARTURES = {
 const OPS_POINT_M3 = 250;
 const OPS_CARD_CAP_M3 = 2500;
 
+// Cards whose `progress` is not the harvest: a planting contractor's
+// fraud is replanting capacity, not this month's deliveries, and booking it
+// as wood made the honest investigation cost more than burying the letter.
+const NOT_HARVEST_OPERATIONS = new Set(['whistleblower_allegation']);
+
 function opsVolume(points) {
   const volume = Math.round((Number(points) || 0) * OPS_POINT_M3);
   return Math.max(-OPS_CARD_CAP_M3, Math.min(OPS_CARD_CAP_M3, volume));
 }
 
 /**
- * A card that goes wrong in the bush stops the work, not a truck-week. When
- * the band the player reads is a partly or badly wrong one and it costs
- * serious operations, the division is under a stop-work: deliveries at half
- * of plan for two months, three when the card's cost is heavy. It is printed
- * on the card's ledger chip, in the monthly ledger, on the panel and in the
- * December projection, so a GM who reads it can add a shift to pull the year
- * back into the band; one who does not can lose the band to it. Before this a
- * string of wrong calls moved the year by 1% and a GM picking cards at random
- * won every easy and normal year (scripts/simulate-manager.mjs, `random`).
+ * A card whose own story stops the harvest - a contractor walks off, the
+ * Archaeology Branch opens a file on a blazed CMT, the mainline is in the
+ * creek - puts one division under a stop-work: its side stands down and the
+ * licensee's deliveries run at 60% of plan for two months (one for a smoke
+ * week, three for a burned block or a frozen harvest plan). The wood is
+ * deferred, not lost: once the stop-work lifts, the woodlands manager offers
+ * a catch-up program to log it (see runCatchUp). A stop-work never costs more
+ * than 7% of the AAC, so one click moves December by at most seven points
+ * and costs a bounded share of the
+ * year's margin; both are printed before the pick, on the chip or the
+ * set-aside line, and again in the monthly ledger, on the panel and in the
+ * December projection.
+ *
+ * Stop-works are authored, not inferred. Wave 4 put one on any card whose
+ * wrong band cost operations, so an unfunded grant, a break-room argument and
+ * a dead plotter each idled the whole licence for a quarter. A card stops
+ * work when its option carries a `stopWork` field ({ months, bands? }, bands
+ * defaulting to the badly-wrong text) or its event a `stopWorkOnSetAside`,
+ * or when it is listed in STOP_WORK_CARDS below.
  */
-const STOP_WORK_PROGRESS = -6;
-const STOP_WORK_HEAVY_PROGRESS = -10;
-const STOP_WORK_FACTOR = 0.5;
+const STOP_WORK_FACTOR = 0.6;
+const STOP_WORK_MONTHS = 2;
+const STOP_WORK_MAX_LOSS_SHARE = 0.07;
 
-function stopWorkFor(points) {
-  const progress = Number(points) || 0;
-  if (progress > STOP_WORK_PROGRESS) return null;
-  return { factor: STOP_WORK_FACTOR, months: progress <= STOP_WORK_HEAVY_PROGRESS ? 3 : 2 };
+/**
+ * The GM's cards whose text stops work, keyed by event id: `options` by
+ * option index (the band whose text says so, and for how long), `setAside`
+ * when leaving the card with the division is what stands the work down, with
+ * why when the generic reason would not say it.
+ */
+const STOP_WORK_CARDS = {
+  // "Nothing on their contract moves while it is in dispute"; "They walk off current obligations".
+  contractor_dispute: { options: { 1: { months: 2 }, 2: { months: 2 } } },
+  // "The harvest plan waits on a process you no longer control"; "The harvest plan freezes".
+  first_nations_consultation: { options: { 2: { months: 3 }, 3: { months: 3 } } },
+  // "The Nation has taken the block over your head to the district, and the file pauses."
+  angry_stakeholder: { options: { 1: { months: 2 } } },
+  // "They pull the processor and one crew mid-month", and mediation runs for months.
+  gm_contractor_rate_renegotiation: { options: { 1: { months: 2 } } },
+  // "The slowdown starts on schedule": counsel stops the replacement crews, not the union.
+  'labour-job-action_desk': { options: { 2: { months: 2, bands: ['good'] } } },
+  'labour-job-action_field': {
+    options: { 2: { months: 2, bands: ['good'] } },
+    setAside: { months: 2, why: 'Without head office at the table, the stewards start the slowdown' },
+  },
+  // "The superintendent pulls the crews off the block, the Archaeology Branch opens a file."
+  first_nations_consultation_field: {
+    options: { 1: { months: 3 } },
+    setAside: { months: 2, why: 'The block stays paused at the boundary until head office decides' },
+  },
+  // "The fire takes the block"; "equipment abandoned behind the fire line".
+  wildfire_threat: { options: { 0: { months: 3 }, 1: { months: 2 } } },
+  // The mainline is out and the ford took a truck: nothing moves until the bypass is in.
+  road_washout: { options: { 2: { months: 2 } }, setAside: { months: 2, why: 'Nothing moves on the mainline until head office signs off a fix' } },
+  'contractor-bankruptcy_field': { setAside: { months: 2, why: 'The bankrupt contractor\'s worksites sit until head office decides who finishes them' } },
+  'salmon-crossing-washout_field': { setAside: { months: 2 } },
+  'peatland-subsidence_field': { setAside: { months: 2 } },
+  'ice-road-window_field': { setAside: { months: 2 } },
+  'caribou-range-closure_field': { setAside: { months: 2, why: 'The crews inside the closure stand down until head office moves them' } },
+  'karst-cave-discovery_field': { setAside: { months: 2, why: 'The block stays stopped at the cave until head office decides' } },
+  'wildfire-heat-dome_field': { setAside: { months: 1, why: 'Without a head-office plan the division works to the fire-danger restrictions, and high-risk work stops' } },
+  'smoke-inversion_field': { setAside: { months: 1, why: 'Without head office\'s call on respirators, the crews stand down while the smoke is over the exposure limit' } },
+  'glacial-outburst-watch_field': { setAside: { months: 1, why: 'Without head office\'s call the superintendent pulls the valley crews as a precaution' } },
+};
+
+/**
+ * What leaving a card with the division means, where the generic line would
+ * be wrong: nobody waits on head office to evacuate an injured tech.
+ */
+const SET_ASIDE_LINES = {
+  chainsaw_cut: 'Leave it with the superintendent: the OFA 3 and the camp make the evacuation call on the ground, and head office reads the incident report after.',
+};
+
+function authoredStopWork(event, option, index) {
+  const spec = option?.stopWork || STOP_WORK_CARDS[event?.id]?.options?.[index];
+  return spec ? { months: Number(spec.months) || STOP_WORK_MONTHS, bands: spec.bands || ['bad'] } : null;
+}
+
+function setAsideStopWorkSpec(event) {
+  if (!event || event.type === 'temptation') return null;
+  const spec = event.stopWorkOnSetAside || STOP_WORK_CARDS[event.id]?.setAside;
+  if (!spec) return null;
+  return { months: Number(spec.months) || STOP_WORK_MONTHS, why: spec.why || 'Without head office\'s call the work stands down' };
+}
+
+/** Months left in the year, this one included: a December stop-work runs one month. */
+function monthsLeftInYear(journey) {
+  return Math.max(1, lastLedgerMonth(journey) - Math.max(1, Number(journey.day) || 1) + 1);
+}
+
+/** A stop-work as the ledger runs it: share of plan, months, and the most wood it can cost. */
+function buildStopWork(journey, months) {
+  const ledger = ensureLedger(journey);
+  return {
+    factor: STOP_WORK_FACTOR,
+    months: Math.min(months, monthsLeftInYear(journey)),
+    cap: Math.round(ledger.aac * STOP_WORK_MAX_LOSS_SHARE),
+  };
 }
 
 /**
- * An operations card the GM leaves with the division: an escalation from the
- * bush, or a moderate-or-worse desk card whose answers move wood. The
- * division sent it up because it needs head office's call; without one the
- * work it concerns stands down for the quarter. Board paper, minor desk
- * items and shortcut proposals are not operations and cost nothing on the
- * cut. The set-aside line on the card says so before the player picks it.
+ * What a stop-work starting this month does to the year, in the ledger's
+ * units: the wood it stands down, where December lands, and the margin that
+ * wood would have earned at today's prices. Merged with any stop-work
+ * already running, as startStopWork would.
  */
-const SET_ASIDE_STOP_WORK = { factor: 0.3, months: 3 };
-
-function movesWood(option) {
-  return Object.values(option?.managerLedger || {})
-    .some((hook) => hook.opsVolume || hook.stopWork || (hook.curtailment && hook.curtailment < 1));
+function stopWorkImpact(journey, stopWork) {
+  const before = projectYearEndCut(journey);
+  const after = projectYearEndCut(journey, undefined, { stopWork });
+  const lost = Math.max(0, before.volume - after.volume);
+  const cash = Math.round((lost * currentMarginPerM3(journey)) / 1000) * 1000;
+  return { lost, from: before.ratio, to: after.ratio, cash };
 }
 
-function setAsideStopWork(event) {
-  if (!event || event.type === 'temptation') return null;
-  if (event.reporter) return SET_ASIDE_STOP_WORK;
-  const severity = String(event.severity || '').toLowerCase();
-  if (!['moderate', 'severe', 'critical'].includes(severity)) return null;
-  return (event.options || []).some(movesWood) ? SET_ASIDE_STOP_WORK : null;
+function describeStopWork(stopWork) {
+  const head = `stop-work: deliveries at ${Math.round(stopWork.factor * 100)}% of plan for ${stopWork.months} month${stopWork.months === 1 ? '' : 's'}`;
+  const impact = stopWork.impact;
+  if (!impact) return head;
+  return `${head}, -${impact.lost.toLocaleString()} m³ (December ${formatCutPercent(impact.from)} -> ${formatCutPercent(impact.to)} of the AAC), about -$${Math.round(impact.cash / 1000).toLocaleString()}k margin until caught up`;
+}
+
+/** The set-aside stop-work for this card this month, priced, or null. */
+function setAsideStopWork(journey, event) {
+  const spec = setAsideStopWorkSpec(event);
+  if (!spec) return null;
+  const stopWork = buildStopWork(journey, spec.months);
+  return { ...stopWork, why: spec.why, impact: stopWorkImpact(journey, stopWork) };
+}
+
+/**
+ * The set-aside line for a card this month: a stop-work priced like the
+ * chips, or what leaving it with the division means.
+ */
+export function setAsideLine(journey, event) {
+  if (event.type === 'temptation') return 'Leave the proposal unanswered for now.';
+  const stopWork = setAsideStopWork(journey, event);
+  if (stopWork) return `Leave it with the division. ${stopWork.why} - ${describeStopWork(stopWork)}.`;
+  return SET_ASIDE_LINES[event.id] || 'Leave it with the division and keep the month for the business.';
+}
+
+/** A stop-work merged into whatever is already running: the longer, the deeper, and both caps. */
+function mergeStopWork(running, stopWork, source = null) {
+  return {
+    factor: Math.min(stopWork.factor, running?.factor ?? 1),
+    monthsLeft: Math.max(stopWork.months, running?.monthsLeft || 0),
+    cap: (Number.isFinite(stopWork.cap) ? stopWork.cap : Infinity) + (running ? stopWorkRoom(running) : 0),
+    lost: 0,
+    source: source || running?.source || 'a division\'s stop-work',
+  };
+}
+
+/** What a stop-work can still cost, in m³ (saves from before the cap had none). */
+function stopWorkRoom(stopWork) {
+  const cap = Number.isFinite(stopWork?.cap) ? stopWork.cap : Infinity;
+  return Math.max(0, cap - (Number(stopWork?.lost) || 0));
 }
 
 /** Put a division under a stop-work; a second one extends it, never shortens it. */
 function startStopWork(ui, journey, stopWork, source) {
   const ledger = ensureLedger(journey);
   const running = activeStopWork(ledger);
-  ledger.stopWork = {
-    factor: Math.min(stopWork.factor, running?.factor ?? 1),
-    monthsLeft: Math.max(stopWork.months, running?.monthsLeft || 0),
-    source: source || 'a division\'s stop-work',
-  };
-  ui?.writeWarning?.(`Ledger: stop-work on ${listSources([ledger.stopWork.source])} - deliveries at ${Math.round(ledger.stopWork.factor * 100)}% of plan for ${ledger.stopWork.monthsLeft} month${ledger.stopWork.monthsLeft === 1 ? '' : 's'}, this one included.`);
+  ledger.stopWork = mergeStopWork(running, stopWork, source);
+  ledger.stopWorkSources = [...new Set([...(running ? ledger.stopWorkSources || [running.source] : []), source].filter(Boolean))];
+  const months = ledger.stopWork.monthsLeft;
+  ui?.writeWarning?.(`Ledger: stop-work on ${listSources([source])} - deliveries at ${Math.round(ledger.stopWork.factor * 100)}% of plan for ${months} month${months === 1 ? '' : 's'}, this one included. The wood it stands down can be caught up once it lifts.`);
+  journey.log?.push({
+    day: journey.day,
+    type: 'stop_work',
+    summary: `Stop-work on ${source}`,
+    detail: `Deliveries at ${Math.round(ledger.stopWork.factor * 100)}% of plan for ${months} month${months === 1 ? '' : 's'}.`,
+  });
 }
 
 /**
@@ -261,17 +389,29 @@ function eventFitsMonth(event, month) {
   return !months || months.includes(month);
 }
 
+// Replacement workers are prohibited in a legal strike in BC, so the option
+// cannot buy volume: counsel stops it before a crew is hired, and the chip
+// prints the cost, not a bonus. The desk card and the division's escalation
+// offer the same call.
+const REPLACEMENT_CREWS = {
+  label: 'Call the bluff and line up replacement crews',
+  outcome: 'Labour-relations counsel reads you section 68 of the Labour Relations Code before the first call goes out: replacement workers cannot be used in a legal strike in BC. The union hears about the plan anyway, takes a strike vote, and the slowdown starts on schedule.',
+  effects: { budget: -25000, progress: -6, relationships: -4, politicalCapital: -4, reputation: -3 },
+};
+
 /**
  * Options the shared desk deck writes for a line manager that mean
  * something else at a licensee's head office. Keyed by event id and option
  * index; the override replaces the option for the GM only.
  */
 const MANAGER_OPTION_OVERRIDES = {
-  'labour-job-action_desk': {
-    2: {
-      label: 'Call the bluff and line up replacement crews',
-      outcome: 'Labour-relations counsel reads you section 68 of the Labour Relations Code before the first call goes out: replacement workers cannot be used in a legal strike in BC. The union hears about the plan anyway, takes a strike vote, and the slowdown starts on schedule.',
-      effects: { budget: -25000, progress: -6, relationships: -4, politicalCapital: -4, reputation: -3 },
+  'labour-job-action_desk': { 2: REPLACEMENT_CREWS },
+  'labour-job-action_field': { 2: REPLACEMENT_CREWS },
+  // The division's version of the CMT call went wrong in field-crew words
+  // ("the compassman runs line"); head office hears it from the superintendent.
+  first_nations_consultation_field: {
+    1: {
+      failureOutcome: 'Two weeks on, a contract layout crew runs a boundary through a stand of bark-stripped trees nobody flagged, because nobody looked, and blazes two of them. A fresh blaze in a CMT is a Heritage Conservation Act problem, not a misunderstanding. The superintendent pulls the crews off the block, the Archaeology Branch opens a file, and the Elder does not come back to talk.',
     },
   },
 };
@@ -286,7 +426,7 @@ function describeLedgerHook(hook) {
   if (hook.curtailment && hook.curtailment < 1) parts.push(`this month's deliveries at ${Math.round(hook.curtailment * 100)}% of plan`);
   if (hook.monthCostShift) parts.push(`+$${formatRate(hook.monthCostShift)}/m³ haul this month`);
   if (hook.opsVolume) parts.push(`${hook.opsVolume > 0 ? '+' : '-'}${Math.abs(hook.opsVolume).toLocaleString()} m³ on this month's deliveries`);
-  if (hook.stopWork) parts.push(`stop-work: deliveries at ${Math.round(hook.stopWork.factor * 100)}% of plan for ${hook.stopWork.months} months`);
+  if (hook.stopWork) parts.push(describeStopWork(hook.stopWork));
   return parts.join(', ');
 }
 
@@ -319,11 +459,12 @@ function withoutProgress(effects) {
 
 /**
  * What each band of an option does to the ledger: the authored hooks for the
- * band the player reads, and the card's operations as this month's wood.
- * Cards with an authored hook table carry their operations in the hooks (a
+ * band the player reads, an authored stop-work on the band whose text stops
+ * the work, and otherwise the card's operations as this month's wood. Cards
+ * with an authored hook table carry their operations in the hooks (a
  * curtailment, a sale), so their `progress` is not counted twice.
  */
-function ledgerByBand(option, authored, hookedEvent) {
+function ledgerByBand(option, authored, hookedEvent, stopWorkSpec = null, stopWork = null, notHarvest = false) {
   const hooks = (Array.isArray(authored) ? authored : [authored]).filter(Boolean);
   const byBand = {};
   for (const band of OUTCOME_BANDS) {
@@ -332,9 +473,8 @@ function ledgerByBand(option, authored, hookedEvent) {
     for (const { band: only, ...fields } of hooks) {
       if (!only || only === shown) Object.assign(hook, fields);
     }
-    const progress = hookedEvent ? 0 : bandEffects(option, band)?.progress;
-    const stopWork = band !== 'good' && shown !== 'good' ? stopWorkFor(progress) : null;
-    if (stopWork) hook.stopWork = stopWork;
+    const progress = hookedEvent || notHarvest ? 0 : bandEffects(option, band)?.progress;
+    if (stopWork && stopWorkSpec.bands.includes(shown)) hook.stopWork = stopWork;
     else if (opsVolume(progress)) hook.opsVolume = opsVolume(progress);
     byBand[band] = hook;
   }
@@ -343,13 +483,15 @@ function ledgerByBand(option, authored, hookedEvent) {
 
 /**
  * The ledger chip: one line when every band lands the same, else what it
- * does if it lands and if it does not. Only the bands the option can roll.
+ * does if it lands and if it does not. Only the bands the option can roll;
+ * a partly and a badly wrong band that land the same are said once.
  */
 function describeLedgerBands(option, byBand) {
   const risky = typeof option.chanceSuccess === 'number';
-  const bands = !risky ? ['good'] : typeof option.chancePartial === 'number' ? OUTCOME_BANDS : ['good', 'bad'];
+  let bands = !risky ? ['good'] : typeof option.chancePartial === 'number' ? OUTCOME_BANDS : ['good', 'bad'];
   const text = Object.fromEntries(bands.map((band) => [band, describeLedgerHook(byBand[band])]));
   if (bands.every((band) => text[band] === text.good)) return text.good ? `ledger: ${text.good}` : '';
+  if (bands.length === 3 && text.partial === text.bad) bands = ['good', 'bad'];
   const phrase = bands.length === 3
     ? { good: 'if clean', partial: 'if partly wrong', bad: 'if badly wrong' }
     : { good: 'if it lands', bad: 'if not' };
@@ -360,14 +502,21 @@ function describeLedgerBands(option, byBand) {
  * The GM's operations on a generic card, as this month's wood (see
  * OPS_POINT_M3), and the executive seats kept: a card's "someone leaves" is
  * somebody below the executive team, so it does not empty a seat at random.
+ * An authored stop-work is priced for this month (stopWorkImpact), so the
+ * chip says what it costs before the pick.
  */
-function fitOperations(option, authored, hookedEvent) {
+function fitOperations(journey, option, authored, hookedEvent, stopWorkSpec = null, notHarvest = false) {
   const hasProgress = ['effects', 'partialEffects', 'failureEffects'].some((key) => typeof option[key]?.progress === 'number');
   const leaves = (effect) => Boolean(effect?.lose_member || effect?.leave);
   const crewKeys = ['crewEffect', 'partialCrewEffect', 'failureCrewEffect'].filter((key) => leaves(option[key]));
-  if (!hasProgress && !authored && !crewKeys.length) return option;
+  if (!hasProgress && !authored && !crewKeys.length && !stopWorkSpec) return option;
 
-  const byBand = ledgerByBand(option, authored, hookedEvent);
+  let stopWork = null;
+  if (stopWorkSpec) {
+    stopWork = buildStopWork(journey, stopWorkSpec.months);
+    stopWork.impact = stopWorkImpact(journey, stopWork);
+  }
+  const byBand = ledgerByBand(option, authored, hookedEvent, stopWorkSpec, stopWork, notHarvest);
   const fitted = { ...option };
   for (const key of Object.values(BAND_EFFECT_KEYS)) {
     if (option[key]) fitted[key] = withoutProgress(option[key]);
@@ -448,7 +597,9 @@ export function fitManagerEvent(journey, event) {
   let changed = false;
   const options = (event.options || []).map((option, index) => {
     let fitted = overrides?.[index] ? { ...option, ...overrides[index] } : option;
-    fitted = shortcut ? priceShortcutOperations(journey, fitted) : fitOperations(fitted, hooks?.[index], Boolean(hooks));
+    fitted = shortcut
+      ? priceShortcutOperations(journey, fitted)
+      : fitOperations(journey, fitted, hooks?.[index], Boolean(hooks), authoredStopWork(event, fitted, index), NOT_HARVEST_OPERATIONS.has(event.id));
     if (departures?.[index]) fitted = { ...fitted, executiveDeparture: departures[index] };
     if (fitted !== option) changed = true;
     return fitted;
@@ -479,6 +630,8 @@ export async function runManagerDay(game) {
 
   writeCertificationWatch(ui, journey);
 
+  await runCatchUp(game);
+
   await maybeFlagCutProjection(game);
 
   await runStrategicDecision(game);
@@ -505,17 +658,18 @@ export async function runManagerDay(game) {
         // An escalation left with the division stops its work; say so before
         // the player takes the month back.
         onResolved: ({ setAside }) => {
-          const stopWork = setAside ? setAsideStopWork(event) : null;
-          if (stopWork) startStopWork(ui, journey, stopWork, event.title);
+          const stopWork = setAside ? setAsideStopWork(journey, event) : null;
+          if (!stopWork) return;
+          startStopWork(ui, journey, stopWork, event.title);
+          // The debrief remembers the set-aside that stopped the work.
+          const entry = [...journey.log].reverse().find((item) => item.type === 'event' && item.setAside && item.eventId === event.id);
+          if (entry) entry.stoppedWork = true;
         },
       },
       // Setting a proposal aside is leaving it unanswered, not handing it to
-      // someone; setting a situation aside leaves it where it landed.
-      setAsideDescription: event.type === 'temptation'
-        ? 'Leave the proposal unanswered for now.'
-        : setAsideStopWork(event)
-          ? `Leave it with the division. Without head office's call the work stands down: stop-work, deliveries at ${Math.round(setAsideStopWork(event).factor * 100)}% of plan for ${setAsideStopWork(event).months} months.`
-          : 'Leave it with the division and keep the month for the business.',
+      // someone; setting a situation aside leaves it where it landed, and
+      // when that stands the work down the line prices it.
+      setAsideDescription: setAsideLine(journey, event),
     });
     if (outcome.gameOver) return;
     // Manager months have no dayPlan action budget - the board period runs
@@ -871,25 +1025,46 @@ function runRate(journey, pace = journey.ledger?.pace) {
  * @param {number} [pace] - cut schedule factor to project with
  * @returns {{volume: number, ratio: number, status: string}}
  */
-export function projectYearEndCut(journey, pace = journey.ledger?.pace) {
+export function projectYearEndCut(journey, pace = journey.ledger?.pace, { stopWork: extraStopWork = null, catchUp: extraCatchUp = null } = {}) {
   const ledger = ensureLedger(journey);
   const firstMonth = Math.max(1, Number(journey.day) || 1);
   const rate = runRate(journey, pace);
-  const stopWork = activeStopWork(ledger);
+  const running = activeStopWork(ledger);
+  const stopWork = extraStopWork ? mergeStopWork(running, extraStopWork) : running;
+  let room = stopWork ? stopWorkRoom(stopWork) : 0;
   let volume = ledger.deliveredYtd + (ledger.bonusVolume || 0) + (ledger.opsVolume || 0);
   for (let month = firstMonth; month <= lastLedgerMonth(journey); month += 1) {
-    const stopped = stopWork && month - firstMonth < stopWork.monthsLeft ? stopWork.factor : 1;
-    const curtailment = Math.min(month === firstMonth ? (ledger.curtailmentFactor || 1) : 1, stopped);
-    volume += ledger.monthlyPlan * deliveryCurve(ledger)[month - 1] * rate * curtailment;
+    const full = ledger.monthlyPlan * deliveryCurve(ledger)[month - 1] * rate;
+    const curtailment = month === firstMonth ? (ledger.curtailmentFactor || 1) : 1;
+    let delivered = full * curtailment;
+    if (stopWork && month - firstMonth < stopWork.monthsLeft) {
+      const loss = Math.min(room, stopWorkLoss(full, curtailment, stopWork.factor));
+      room -= loss;
+      delivered -= loss;
+    }
+    volume += delivered;
   }
+  volume += catchUpStillToCome(ledger, firstMonth, journey) + (Number(extraCatchUp?.volume) || 0);
   const ratio = ledger.aac ? volume / ledger.aac : 1;
   return { volume: Math.round(volume), ratio, status: classifyCutControl(ratio) };
+}
+
+/** Wood a stop-work stands down in a month: what it takes below any curtailment already on. */
+function stopWorkLoss(full, curtailment, factor) {
+  return Math.max(0, full * (curtailment - Math.min(curtailment, factor)));
+}
+
+/** The catch-up volume still to be logged this year. */
+function catchUpStillToCome(ledger, firstMonth, journey) {
+  const catchUp = ledger.catchUp;
+  if (!catchUp || !(catchUp.volume > 0)) return 0;
+  return firstMonth <= lastLedgerMonth(journey) ? catchUp.volume : 0;
 }
 
 /** The stop-work still running on the ledger, or null. */
 function activeStopWork(ledger) {
   const stopWork = ledger?.stopWork;
-  return stopWork && stopWork.monthsLeft > 0 && stopWork.factor < 1 ? stopWork : null;
+  return stopWork && stopWork.monthsLeft > 0 && stopWork.factor < 1 && stopWorkRoom(stopWork) > 0 ? stopWork : null;
 }
 
 function plannedToDate(ledger, throughMonth) {
@@ -980,7 +1155,11 @@ function updateManagerMissionStatus(ui, journey) {
   }
   const stopWork = yearOver ? null : activeStopWork(ledger);
   if (stopWork) {
-    alerts.push({ level: 'warn', text: `Stop-work on ${listSources([stopWork.source])}: deliveries at ${Math.round(stopWork.factor * 100)}% of plan for ${stopWork.monthsLeft} more month${stopWork.monthsLeft === 1 ? '' : 's'}.` });
+    const room = stopWorkRoom(stopWork);
+    alerts.push({ level: 'warn', text: `Stop-work on ${listSources(ledger.stopWorkSources || [stopWork.source])}: deliveries at ${Math.round(stopWork.factor * 100)}% of plan for ${stopWork.monthsLeft} more month${stopWork.monthsLeft === 1 ? '' : 's'}${Number.isFinite(room) ? `, at most ${Math.round(room).toLocaleString()} m³ more stood down` : ''}. The wood can be caught up once it lifts.` });
+  }
+  if (!yearOver && ledger.catchUp?.volume > 0) {
+    alerts.push({ level: 'ok', text: `Catch-up running: ${Math.round(ledger.catchUp.volume).toLocaleString()} m³ still to log at +$${formatRate(ledger.catchUp.costPerM3)}/m³ overtime.` });
   }
 
   ui.setMissionStatus?.({
@@ -1038,6 +1217,69 @@ async function runCutSchedule(game, prompt) {
   }
   journey.flags.paceSetMonth = journey.day;
   journey.decisions.push({ day: journey.day, type: 'cut_schedule', choice: pace.id });
+}
+
+// Overtime, a second side on the stood-down blocks and the extra lowbed
+// moves, on each m³ caught up; the margin on the wood still comes back.
+const CATCH_UP_COST_PER_M3 = 4;
+const CATCH_UP_MONTHS = 2;
+// Less than a few truckloads is not worth a program.
+const CATCH_UP_MINIMUM_M3 = 500;
+
+/**
+ * Month start, once a stop-work has lifted: the wood it stood down is still
+ * on the stump. The woodlands manager offers to log it over the next two
+ * months at an overtime rate, with where December lands either way, and
+ * recommends the catch-up unless it would carry the year past the band.
+ */
+async function runCatchUp(game) {
+  const { journey, ui } = game;
+  const ledger = ensureLedger(journey);
+  const deferred = Math.round(Number(ledger.deferredVolume) || 0);
+  if (deferred < CATCH_UP_MINIMUM_M3 || activeStopWork(ledger) || ledger.catchUp) return;
+  const sources = ledger.deferredSources || [];
+  ledger.deferredVolume = 0;
+  ledger.deferredSources = [];
+  const months = Math.min(CATCH_UP_MONTHS, monthsLeftInYear(journey));
+  const cost = Math.round(deferred * CATCH_UP_COST_PER_M3);
+  const margin = Math.round((deferred * (currentMarginPerM3(journey) - CATCH_UP_COST_PER_M3)) / 1000) * 1000;
+  const leave = projectYearEndCut(journey);
+  const run = projectYearEndCut(journey, undefined, { catchUp: { volume: deferred } });
+  const runRecommended = run.ratio <= CUT_CONTROL.bandHigh - 0.01;
+  const woodlands = capitalize(executiveName(journey, 'woodlands', 'woodlands manager'));
+  const window = months === 1 ? monthName(journey.day) : `${monthName(journey.day)} and ${monthName(journey.day + 1)}`;
+
+  ui.writeDivider('CATCH-UP');
+  ui.write(`${woodlands}: the stop-work on ${listSources(sources)} has lifted, and the ${deferred.toLocaleString()} m³ it stood down is still on the stump.`);
+  const options = [
+    {
+      label: `Run the catch-up${runRecommended ? ' (recommended)' : ''}`,
+      description: `+${deferred.toLocaleString()} m³ over ${window}, overtime at +$${CATCH_UP_COST_PER_M3}/m³ (-$${cost.toLocaleString()}), about ${margin >= 0 ? '+' : '-'}$${Math.abs(Math.round(margin / 1000)).toLocaleString()}k net | December ${run.volume.toLocaleString()} m³ (${formatCutPercent(run.ratio)} of AAC)`,
+      value: 'catchup:run',
+      recommended: runRecommended,
+    },
+    {
+      label: `Leave it standing${runRecommended ? '' : ' (recommended)'}`,
+      description: `No overtime; the wood waits for next year's plan | December ${leave.volume.toLocaleString()} m³ (${formatCutPercent(leave.ratio)} of AAC)`,
+      value: 'catchup:leave',
+      recommended: !runRecommended,
+    },
+  ];
+  const choice = await ui.promptChoice('The stood-down wood:', runRecommended ? options : [options[1], options[0]]);
+  if (choice.value === 'catchup:run') {
+    ledger.catchUp = { volume: deferred, monthsLeft: months, costPerM3: CATCH_UP_COST_PER_M3, source: sources.at(-1) || 'the stop-work' };
+    ui.writeSuccess(`${woodlands} puts a second side on the stood-down blocks: ${deferred.toLocaleString()} m³ over ${window}.`);
+  } else {
+    ui.writeInfo(`${woodlands} leaves the ${deferred.toLocaleString()} m³ on the stump for next year's plan.`);
+  }
+  journey.decisions.push({ day: journey.day, type: 'catch_up', choice: choice.value, volume: deferred });
+  journey.log.push({
+    day: journey.day,
+    type: 'decision',
+    summary: choice.value === 'catchup:run' ? `Catch-up: ${deferred.toLocaleString()} m³ over ${window}` : `Catch-up declined: ${deferred.toLocaleString()} m³ left standing`,
+    detail: options.find((option) => option.value === choice.value)?.description || '',
+  });
+  ui.write('');
 }
 
 /**
@@ -1370,7 +1612,7 @@ export function applyLedgerHooks(ui, journey, event, logBefore) {
   const option = (event.options || []).find((candidate) => candidate.label === entry.optionLabel);
   const band = entry.band || 'good';
   if (option?.executiveDeparture && shownBand(option, band) === option.executiveDeparture.band) {
-    replaceExecutive(ui, journey, option.executiveDeparture.role);
+    replaceExecutive(ui, journey, option.executiveDeparture.role, option.executiveDeparture.epilogue);
   }
   const hook = option?.managerLedger?.[band];
   if (!hook || !Object.keys(hook).length) return;
@@ -1400,11 +1642,12 @@ export function applyLedgerHooks(ui, journey, event, logBefore) {
  * executive carried (the woodlands manager carries the year's posture). The
  * name is drawn on the month's dice, so a reload names the same successor.
  */
-function replaceExecutive(ui, journey, roleId) {
+function replaceExecutive(ui, journey, roleId, epilogue = null) {
   const departing = findExecutive(journey, roleId);
   if (!departing) return;
   departing.isActive = false;
   departing.hasQuit = true;
+  if (epilogue) departing.epilogue = epilogue;
   const taken = new Set((journey.crew || []).map((member) => member.name));
   const names = FIRST_NAMES.filter((name) => !taken.has(name));
   const rng = monthRng(journey, `successor:${roleId}`);
@@ -1421,6 +1664,7 @@ function replaceExecutive(ui, journey, roleId) {
     isActive: true,
     hasQuit: false,
     status: 'active',
+    epilogue: undefined,
     actingFor: departing.name,
   };
   journey.crew.push(successor);
@@ -1516,19 +1760,45 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
   let opsSources = [];
   let curtailed = false;
   let stopped = null;
+  let catchUp = 0;
+  let catchUpSource = '';
+  let catchUpCost = 0;
   if (carryIn) {
     delivered = Math.round(planned * JANUARY_CARRY_IN);
   } else {
     const rng = monthRng(journey, 'ledger', month);
     const noise = 0.94 + rng() * 0.12;
+    const base = planned * runRate(journey);
+    const full = base * noise;
+    delivered = Math.round(base * ledger.curtailmentFactor * noise);
     const stopWork = activeStopWork(ledger);
     if (stopWork) {
-      stopped = { source: stopWork.source, monthsLeft: stopWork.monthsLeft - 1, factor: stopWork.factor };
+      // The division's side stands down; what it would have logged is
+      // deferred, up to the stop-work's cap, for a catch-up once it lifts.
+      const loss = Math.round(Math.min(stopWorkRoom(stopWork), stopWorkLoss(full, ledger.curtailmentFactor, stopWork.factor)));
+      delivered -= loss;
+      stopWork.lost = (Number(stopWork.lost) || 0) + loss;
       stopWork.monthsLeft -= 1;
-      if (stopWork.monthsLeft <= 0) ledger.stopWork = null;
+      const lifted = stopWork.monthsLeft <= 0 || stopWorkRoom(stopWork) <= 0;
+      stopped = { source: stopWork.source, monthsLeft: lifted ? 0 : stopWork.monthsLeft, factor: stopWork.factor, loss };
+      ledger.deferredVolume = (Number(ledger.deferredVolume) || 0) + loss;
+      ledger.deferredSources = [...new Set([...(ledger.deferredSources || []), ...(ledger.stopWorkSources || [stopWork.source])])];
+      if (lifted) {
+        ledger.stopWork = null;
+        ledger.stopWorkSources = [];
+      }
     }
-    const curtailment = Math.min(ledger.curtailmentFactor, stopped?.factor ?? 1);
-    delivered = Math.round(planned * runRate(journey) * curtailment * noise);
+    // A catch-up program logs the deferred wood at an overtime rate.
+    if (ledger.catchUp?.volume > 0) {
+      const months = Math.max(1, Math.min(ledger.catchUp.monthsLeft || 1, lastLedgerMonth(journey) - month + 1));
+      catchUp = Math.round(ledger.catchUp.volume / months);
+      catchUpSource = ledger.catchUp.source;
+      catchUpCost = Math.round(catchUp * ledger.catchUp.costPerM3);
+      delivered += catchUp;
+      ledger.catchUp.volume -= catchUp;
+      ledger.catchUp.monthsLeft = months - 1;
+      if (ledger.catchUp.volume <= 0 || ledger.catchUp.monthsLeft <= 0) ledger.catchUp = null;
+    }
     bonus = Math.round(ledger.bonusVolume || 0);
     bonusSource = ledger.bonusSource || 'the extra volume';
     delivered += bonus;
@@ -1566,7 +1836,7 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
   const revenue = Math.round(delivered * margin);
   const certCost = Math.round(activeCertifications(journey).reduce((sum, cert) => sum + (Number(cert.annual_cost) || 0), 0) / 12);
   const standby = pace.standbyPerMonth;
-  const net = revenue - ledger.overhead - certCost - standby;
+  const net = revenue - ledger.overhead - certCost - standby - catchUpCost;
 
   ledger.deliveredYtd += delivered;
   // What the treasury could not cover, so a bankrupt month still reconciles on screen.
@@ -1574,12 +1844,13 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
   journey.resources.budget = Math.max(0, journey.resources.budget + net);
   ledger.months.push({
     month, planned, delivered, logPrice: ledger.logPrice, premium, stumpage, cost,
-    margin, revenue, overhead: ledger.overhead, certCost, standby, net,
+    margin, revenue, overhead: ledger.overhead, certCost, standby, catchUpCost, net,
     treasury: Math.round(journey.resources.budget),
   });
 
   const volumeNotes = [
-    stopped ? `stop-work on ${listSources([stopped.source])} at ${Math.round(stopped.factor * 100)}%, ${stopped.monthsLeft ? `${stopped.monthsLeft} more month${stopped.monthsLeft === 1 ? '' : 's'}` : 'lifted at month end'}` : null,
+    stopped ? `less ${stopped.loss.toLocaleString()} m³ stood down by the stop-work on ${listSources([stopped.source])}, ${stopped.monthsLeft ? `${stopped.monthsLeft} more month${stopped.monthsLeft === 1 ? '' : 's'}` : 'lifted at month end'}` : null,
+    catchUp ? `incl. ${catchUp.toLocaleString()} m³ caught up on ${listSources([catchUpSource])}` : null,
     curtailed ? 'curtailed' : null,
     bonus ? `incl. ${bonus.toLocaleString()} m³ from ${bonusSource}` : null,
     ops > 0 ? `incl. ${ops.toLocaleString()} m³ from ${listSources(opsSources)}` : null,
@@ -1588,7 +1859,7 @@ function runMonthlyLedger(ui, journey, { carryIn = false } = {}) {
   ].filter(Boolean);
   const deliveredLine = `Delivered: ${delivered.toLocaleString()} m³ (plan ${planned.toLocaleString()}${volumeNotes.length ? `, ${volumeNotes.join(', ')}` : ''}; year to date ${Math.round(ledger.deliveredYtd).toLocaleString()} / ${ledger.aac.toLocaleString()} m³ AAC)`;
   const marginLine = `Log price $${ledger.logPrice}${premium ? ` + $${formatRate(premium)} certified premium` : ''} - stumpage $${stumpage} - logging & haul $${formatRate(cost)} = ${margin < 0 ? '-' : ''}$${formatRate(Math.abs(margin))}/m³ margin -> ${formatSignedDollars(revenue)}`;
-  const chargesLine = `Overhead -$${ledger.overhead.toLocaleString()}${certCost ? ` · certification -$${certCost.toLocaleString()}` : ''}${standby ? ` · standby -$${standby.toLocaleString()}` : ''}`;
+  const chargesLine = `Overhead -$${ledger.overhead.toLocaleString()}${certCost ? ` · certification -$${certCost.toLocaleString()}` : ''}${standby ? ` · standby -$${standby.toLocaleString()}` : ''}${catchUpCost ? ` · catch-up overtime -$${catchUpCost.toLocaleString()}` : ''}`;
   const netLine = `Net ${formatSignedDollars(net)} -> treasury ${formatDollars(journey.resources.budget)}${shortfall ? ` (${formatDollars(shortfall)} it could not cover)` : ''}`;
   ui.write(deliveredLine);
   ui.write(marginLine);
@@ -1793,12 +2064,16 @@ function applyPostureInitiative(ui, journey) {
  * meters sliding on more than one front: one bad meter is a normal quarter,
  * and breakup is in the plan.
  */
-function readQuarter(journey, baseline, quarterMonths, quarter) {
+export function readQuarter(journey, baseline, quarterMonths, quarter) {
   const reasons = [];
   const ledger = journey.ledger || {};
   const planned = quarterMonths.reduce((sum, entry) => sum + (entry.planned || 0), 0);
   const delivered = quarterMonths.reduce((sum, entry) => sum + (entry.delivered || 0), 0);
-  if (planned > 0 && (delivered < planned * 0.9 || delivered > planned * 1.15)) {
+  // A quarter over plan that only brings a behind year back toward it is the
+  // catch-up doing its job, not exposure.
+  const lastMonth = quarterMonths.reduce((latest, entry) => Math.max(latest, entry.month || 0), 0);
+  const catchingUp = (ledger.deliveredYtd || 0) <= plannedToDate(ledger, lastMonth);
+  if (planned > 0 && (delivered < planned * 0.9 || (delivered > planned * 1.15 && !catchingUp))) {
     reasons.push(`deliveries ${Math.round((delivered / planned) * 100)}% of plan`);
   }
   if (quarter === 4 && ledger.cutControlStatus) {
@@ -2020,6 +2295,7 @@ function runYearEndAudit(ui, journey) {
   const scrutinyBefore = journey.scrutiny || 0;
   journey.scrutiny = clampPercentValue(scrutinyBefore + 8 * caught.length);
   const scrutinyAdded = Math.round(journey.scrutiny) - Math.round(scrutinyBefore);
+  journey.flags.restatedQuarters = [...caught];
   const restated = caught.map((q) => `Q${q}`);
   const restatedList = restated.length > 1 ? `${restated.slice(0, -1).join(', ')} and ${restated.at(-1)}` : restated[0];
   const fileCost = [
