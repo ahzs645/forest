@@ -743,7 +743,7 @@ const WATCH_SENTENCE_BY_INSTITUTION = {
  * schedules, with its severity). The take option carries the same odds,
  * chips and a `bands` map of every outcome's effects and text.
  */
-export function adaptIllegalActTemptation(act, state) {
+export function adaptIllegalActTemptation(act, state, { avoidIssueIds = [] } = {}) {
   const profile = getTemptationProfile(state);
   const roleId = state?.role?.id;
   const isDeskRole = roleId === "planner" || roleId === "permitter" || roleId === "manager";
@@ -755,7 +755,7 @@ export function adaptIllegalActTemptation(act, state) {
   const failFlags = buildIllegalActFailFlags(act);
   const cleanLine = act?.cleanOutcome || CATEGORY_CLEAN_OUTCOMES[act?.category] || CATEGORY_CLEAN_OUTCOMES.corporate;
   const watchSentence = WATCH_SENTENCE_BY_INSTITUTION[institution] || WATCH_SENTENCE_BY_INSTITUTION["C&E"];
-  const failScheduleIssues = buildIllegalActFailScheduleIssues(act, state);
+  const failScheduleIssues = buildIllegalActFailScheduleIssues(act, state, avoidIssueIds);
   const promisedFallout = describePromisedFallout(state, failScheduleIssues);
   const tierOdds = SHORTCUT_BAND_ODDS[act?.tier] || SHORTCUT_BAND_ODDS.core;
   const shortcut = {
@@ -1785,6 +1785,24 @@ function buildIllegalActFailFlags(act) {
   return flags;
 }
 
+/**
+ * The standing line for a file somebody is watching, after a noticed take:
+ * "Watched: Timber Pricing has your cruises on the check list. Shortcut odds
+ * are worse." The Expedition panel has always said so; a seasonal year only
+ * showed the one line in the outcome notice and then went quiet.
+ * @param {Object} state
+ * @returns {string} empty when nobody is watching
+ */
+export function describeSeasonalShortcutWatch(state) {
+  const watchers = Object.entries(state?.flags || {})
+    .filter(([flag, on]) => on && flag.startsWith("watched:"))
+    .map(([flag]) => flag.slice("watched:".length));
+  if (!watchers.length) return "";
+  const sentences = [...new Set(watchers.map((by) => WATCH_SENTENCE_BY_INSTITUTION[by]
+    || `${by} is watching your file`))];
+  return `Watched: ${sentences.join("; ")}. Shortcut odds are worse.`;
+}
+
 // The noticed band's flag: the catching institution's watch, keyed by who it
 // is ("watched:DFO"). It moves the odds on the next act that institution
 // would catch (isAlreadyWatched) and opens no chained issue, so a noticed
@@ -1972,7 +1990,7 @@ const FALLOUT_DELAY_ROUNDS = 1;
  * gates are open in the season it lands. The rest stay behind it as
  * fallbacks, in case that card's gates close before it is dealt.
  */
-function buildIllegalActFailScheduleIssues(act, state) {
+function buildIllegalActFailScheduleIssues(act, state, avoidIssueIds = []) {
   const roleId = state?.role?.id;
   const category = act?.category || "corporate";
   const institution = act?.catch?.by;
@@ -2007,10 +2025,22 @@ function buildIllegalActFailScheduleIssues(act, state) {
   };
   const ordered = () => Array.from(candidates.values()).sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id));
 
-  let promised = ordered().find(landsThere) || null;
+  // A card the player already answered this year, or one already dealt
+  // further down this season, reads as a repeat when it comes back as the
+  // determination: a fresh card is promised when one lands there.
+  const seen = new Set([
+    ...(Array.isArray(state?.history) ? state.history : [])
+      .filter((entry) => entry?.type === "issue" && entry.id)
+      .map((entry) => entry.id),
+    ...avoidIssueIds,
+  ]);
+  const pick = () => ordered().find((candidate) => landsThere(candidate) && !seen.has(candidate.id))
+    || ordered().find(landsThere)
+    || null;
+  let promised = pick();
   if (!promised) {
     for (const [id, weight, boosts] of FALLOUT_LAST_RESORT) addCandidate(id, weight, boosts);
-    promised = ordered().find(landsThere) || null;
+    promised = pick();
   }
 
   const weightedCandidates = ordered();

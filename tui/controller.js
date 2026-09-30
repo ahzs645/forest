@@ -25,7 +25,7 @@ import {
 } from "../js/engine.js";
 import { formatMetricName } from "../js/engine/shared.js";
 import { applyEffects } from "../js/engine/effects.js";
-import { drawCalendarReminder } from "../js/engine/content.js";
+import { describeSeasonalShortcutWatch, drawCalendarReminder } from "../js/engine/content.js";
 import { riskBandOdds, riskBandPercents } from "../js/risk.js";
 import { ILLEGAL_ACTS } from "../js/data/illegalActs.js";
 import { SEASONAL_SAVE_KEY, validateSeasonalSave } from "../js/game/saveLoad.js";
@@ -529,9 +529,44 @@ function findShortcutAct(item) {
 // move the meters its odds, catch cost and fallout are read from. Rebuilt from
 // the act on the file as it stands, what the card prints is what the roll
 // applies.
-function repriceShortcutOffer(gs, item) {
+function repriceShortcutOffer(gs, item, queue = []) {
   const act = item?.shortcut ? findShortcutAct(item) : null;
-  return act ? adaptIllegalActTemptation(act, gs) : item;
+  return act ? adaptIllegalActTemptation(act, gs, { avoidIssueIds: queuedIssueIds(queue) }) : item;
+}
+
+/** Ids of the ordinary issue cards still waiting in this season's queue. */
+function queuedIssueIds(queue) {
+  return (queue || [])
+    .filter((entry) => entry?.type === "issue" && entry.data?.id && !entry.data.causedBy && !entry.data.scheduled)
+    .map((entry) => entry.data.id);
+}
+
+/**
+ * A caught shortcut promises its determination for next season. When the
+ * same card is already queued later in this season as an ordinary issue, it
+ * was dealt twice: now, unlinked, and again next season as the fallout. The
+ * unlinked copy gives way to a fresh card, so the determination is dealt
+ * once, with its "Because you took" line.
+ * @param {Array} queue - the controller queue (the season's remaining cards)
+ * @param {Object} gs
+ * @param {Function} redraw - (excludeIds) => a replacement issue or null
+ */
+export function dropQueuedFalloutDuplicates(queue, gs, redraw) {
+  const promised = new Set((Array.isArray(gs?.pendingIssues) ? gs.pendingIssues : [])
+    .filter((pending) => pending?.causedBy?.kind === "shortcut" && pending.id)
+    .map((pending) => pending.id));
+  if (!promised.size) return 0;
+  let dropped = 0;
+  for (let index = 0; index < queue.length; index += 1) {
+    const entry = queue[index];
+    if (entry?.type !== "issue" || entry.data?.causedBy || entry.data?.scheduled || !promised.has(entry.data?.id)) continue;
+    const exclude = [...collectDealtIds(gs, "issue"), ...promised, ...queuedIssueIds(queue)];
+    const replacement = redraw(exclude);
+    if (replacement) queue[index] = { ...entry, data: replacement };
+    else queue.splice(index--, 1);
+    dropped += 1;
+  }
+  return dropped;
 }
 
 // The bands as whole percentages. The engine puts the odds it will roll on
@@ -604,6 +639,10 @@ export function buildShortcutBrief(gs, item) {
     bands.push({ tone: "danger", text: `If caught: ${caughtText}` });
   }
   const declineIndex = options.findIndex((option, index) => index !== takeIndex && /^(decline|say no)\b/i.test(option?.label || ""));
+  // The reason ends its own sentence; the views close the line (and add
+  // "Saying no costs nothing."), which printed "strong.. Saying no".
+  const oddsReason = String(take.oddsReason || item?.oddsReason || "").replace(/\.\s*$/, "");
+  const oddsLine = odds ? `Odds this season: ${formatShortcutOdds(odds)}` : "";
 
   return {
     takeIndex,
@@ -611,9 +650,12 @@ export function buildShortcutBrief(gs, item) {
     odds,
     // Why the odds moved from the tier's usual line (js/engine/content.js
     // describeIllegalActOddsShifts), so a 32% clean never goes unexplained.
-    oddsText: odds
-      ? `Odds this season: ${formatShortcutOdds(odds)}${take.oddsReason || item?.oddsReason ? ` — ${take.oddsReason || item.oddsReason}` : ""}`
-      : "",
+    oddsText: oddsLine && oddsReason ? `${oddsLine} — ${oddsReason}` : oddsLine,
+    // The same, in two parts, for a view that sets the reason on its own
+    // line (the classic card, where a wrapped reason pushed the odds out of
+    // the panel at 1280x720).
+    oddsLine,
+    oddsReason: odds ? oddsReason : "",
     catcher,
     catcherText: catcher ? `Who checks: ${catcher}` : "",
     payoffLine,
@@ -819,13 +861,20 @@ function snapshotGameState(gs) {
         : null,
     // Live "what am I trying to do right now" strip: mandate + at-risk meters +
     // the single most pressing pressure, recomputed from current metrics.
-    objectiveStrip: gs.role?.id ? buildObjectiveStrip(gs) : null,
+    objectiveStrip: gs.role?.id ? withShortcutWatch(buildObjectiveStrip(gs), gs) : null,
     // The player's most recent choice + its effects, for the Last Decision panel.
     lastDecision: gs.lastDecision ?? null,
     // Persistent choice → fallout feed for the dashboard, so consequences stay
     // visible across cards instead of scrolling away with the outcome notice.
     decisionTrail: buildDecisionTrail(gs),
   };
+}
+
+// A noticed take leaves the institution watching the file for the rest of
+// the year; the strip says so on every card, as the Expedition panel does.
+function withShortcutWatch(strip, gs) {
+  const watch = describeSeasonalShortcutWatch(gs);
+  return strip && watch ? { ...strip, watch } : strip;
 }
 
 function cloneStateForPreview(gs) {
@@ -1369,7 +1418,7 @@ export class TuiGameController {
       || phase.type === "event"
       || phase.type === "temptation"
     ) {
-      const item = phase.type === "temptation" ? repriceShortcutOffer(gs, phase.data) : phase.data;
+      const item = phase.type === "temptation" ? repriceShortcutOffer(gs, phase.data, this.queue) : phase.data;
       const isCrisisIssue = phase.type === "issue" && item.surfaceSeverity === "danger";
       const shortcut = phase.type === "temptation" ? buildShortcutBrief(gs, item) : null;
       const presentedOptions = buildPresentedOptions(item, phase.type, gs, shortcut);
@@ -1410,6 +1459,14 @@ export class TuiGameController {
             // A follow-up an earlier choice put on the calendar.
             ...(item.scheduled ? { scheduled: true } : {}),
           }, this.rng);
+
+          if (phase.type === "temptation") {
+            dropQueuedFalloutDuplicates(this.queue, gs, (exclude) => drawIssue(gs, this.rng, {
+              advancePending: false,
+              drainPending: false,
+              excludeIds: exclude,
+            }));
+          }
 
           gs.lastDecision = buildLastDecision(option, outcomeResult);
           this.emit();

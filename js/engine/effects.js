@@ -7,6 +7,7 @@ import {
   BUDGET_ATTRITION_THRESHOLD,
   COMPLIANCE_AUDIT_THRESHOLD,
   CPD_CARD_GAP,
+  CPD_REMINDER_LAST_ROUND,
   DEFAULT_CPD_TARGET,
   RELATIONSHIP_TRUST_THRESHOLD,
 } from "./constants.js";
@@ -335,10 +336,13 @@ export function applyRoundConsequences(state) {
     } else if (professional.competenceRisk > 0) {
       professional.competenceRisk = clamp(professional.competenceRisk - 1, 0, 100);
     }
-    // A log let slide more than a season behind puts its own card on the
-    // desk, once a year: an extra card at the end of next season
-    // (CALENDAR_REMINDERS), never the season's contested call.
-    if (cpdGap >= CPD_CARD_GAP && !flags.cpdReminderSent && round < (Number(state.totalRounds) || 4)) {
+    // A log let slide more than a season behind by mid-year puts its own
+    // card on the desk, once a year: an extra card at the end of the next
+    // season (CALENDAR_REMINDERS), never the season's contested call. Judged
+    // at mid-year only: read again after the fall it reached 26-40% of
+    // middling years (any two pushed seasons out of three), where mid-year
+    // takes the first two both pushed (11-22%). Careful years never see it.
+    if (cpdGap >= CPD_CARD_GAP && !flags.cpdReminderSent && round <= CPD_REMINDER_LAST_ROUND) {
       flags.cpdReminderSent = true;
       flags.cpdReminderDue = true;
     }
@@ -568,8 +572,10 @@ function applyRoundRecoveries(state, round, consequences) {
   // recover. Paid only in a season no dividend already rewarded, and from a
   // weakest meter of 35 up: a middling year with one thin meter is the file
   // this is for. Not a campaign season that fell short: that meter was left
-  // behind.
-  if (round >= 2 && consequences.length === firedBefore && !outcome.fellShort) {
+  // behind. Not a season whose shortcut was caught, nor one that left its
+  // crew hungry or walking off: "no meter was left behind" refunded the
+  // Budget the review had just charged for a starved crew.
+  if (round >= 2 && consequences.length === firedBefore && fileTrusted && !outcome.crewNeglected) {
     const values = Object.values(metrics).map((value) => Number(value) || 0);
     const weakest = Object.entries(metrics).sort((a, b) => a[1] - b[1])[0];
     const spread = Math.max(...values) - Math.min(...values);

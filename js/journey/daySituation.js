@@ -19,7 +19,7 @@
 import { handleEvent } from '../modes/shared/handleEvent.js';
 import { optionSpendsDay } from '../events/timePolicy.js';
 import { resolveTemptationSetAside } from '../events/selection.js';
-import { applyDeferredSituation } from '../events/deferral.js';
+import { applyDeferredSituation, isCrewCasualtySituation } from '../events/deferral.js';
 import { applyEventEffects } from '../events/resolution.js';
 import { applyConsequenceFlags } from '../events/consequences.js';
 import { getDayRng } from '../events/dayRng.js';
@@ -151,7 +151,9 @@ export async function runDaySituation(game, event, options = {}) {
         ? 'Defer the call. The route stays blocked until you clear it or mark a detour.'
         : goAround
           ? 'Say nothing. It stands, and the file will read your silence as consent.'
-          : options.setAsideDescription
+          : journey.journeyType !== 'manager' && isCrewCasualtySituation(event)
+            ? 'Leave it to the crew. The worst of the cheapest answer lands anyway, and the file notes who walked away.'
+            : options.setAsideDescription
         || 'Not today. Take the day back and spend it on your own work.'),
       tag: 'TRADEOFF',
       value: 'set_aside',

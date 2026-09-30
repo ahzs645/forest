@@ -426,7 +426,7 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
   Planner Journeyman: competent 100 → 100, shortcuts 92 → 89 (grade 91 → 79), reckless 0 → 0.
 ## 2026-09-29 — Wave 3: seasonal engine and campaign
 
-- **CPD reminder.** It no longer takes the summer contested call. A season kept to the standards (no aggressive stance on the planned work, no shortcut) logs its share of the 30-hour FPBC year, so careful desk and field years keep pace. The "CPD Log Behind" card comes once a year, only when the log is more than a season behind. It is an extra card after the season's own (`CALENDAR_REMINDERS`), never an issue draw. It was in 100% of years; now it is in 6–9% (the pushed ones). Round 2 now deals 48 distinct issues, up from 2. The summer-only heat dome, herbicide drift, camp flooding and beetle escalation cards are all dealt again. `lint:seasonal` checks calendar cards and that no round-end pass queues into an issue slot, and a matrix test covers every one-season issue.
+- **CPD reminder.** It no longer takes the summer contested call. A season kept to the standards (no aggressive stance on the planned work, no shortcut) logs its share of the 30-hour FPBC year, so careful desk and field years keep pace. The "CPD Log Behind" card comes once a year, only when the log is more than a season behind. It is an extra card after the season's own (`CALENDAR_REMINDERS`), never an issue draw. It was in 100% of years; now it is in 6–9% (the pushed ones). (Corrected 2026-09-30: it was in 26–40% of middling years; see Wave 5 below.) Round 2 now deals 48 distinct issues, up from 2. The summer-only heat dome, herbicide drift, camp flooding and beetle escalation cards are all dealt again. `lint:seasonal` checks calendar cards and that no round-end pass queues into an issue slot, and a matrix test covers every one-season issue.
 - **No repeats in a year.** The seasonal deal keeps a per-year memory of the issues and events already answered. Scheduled follow-ups, including shortcut fallout, are exempt. Years with a repeated issue fell from 16–30% to under 1%.
 - **Recoveries credit what the season did.** The documentation rebound needs compliance work that season. The comeback window says whether the calls went into the meter; in a campaign it pays only for that work. A campaign season that fell short gets no dividend and no steady-program top-up, and neither does any season with a noticed or caught shortcut. A season that fell short earns no thrift credit for unspent allowance.
 - **Hard fall file.** On hard, the fall planning allowance is the normal allowance plus a contingency (`HARD_FALL_ALLOWANCE`). Careful play now clears the hard fall in 93% of runs, up from 48%, and careless play still fails it.
@@ -483,3 +483,20 @@ No style reaches Outstanding in the sim. Forest Health tops out near 64, below t
 - **Chips.** Each gamble band prints under its own label with its own scrutiny ("if it holds: … / if it partly holds: … / if it goes wrong: …"). Knock-on scrutiny is whole points, with a half rounded up. Hidden off-book options now show their stakes, and so do hidden desk options that cost something even when they hold. No "0 goodwill" chip prints.
 - **Payoffs land on what they name.** Padding the CPD record logs CPD hours. Nothing at the desk moves an HCA permit's clock. A planner's buy-in comes only from consultation shortcuts.
 - **Printing.** A fallout set-aside prints the goodwill and scrutiny it lands. A desk option that could take goodwill under 5 leads with the warning ("ENDS THE RUN: goodwill 4 → 0"). The approval line no longer scolds a clean plan for the defensible call that cost a contractor relationship.
+## 2026-09-30 — Wave 5: campaign, seasonal and shortcut premises
+
+- **Set-aside on a casualty.** Setting aside an injury or illness card lands the least answer's worst band in full, evacuation or injury included, and the button says so. A WorkSafeBC investigation set aside is priced at its cheapest answer in full. The chainsaw set-aside used to be the cheapest line on the card.
+- **Campaign year memory.** Each deployment's dealt cards carry into the next, so the deck no longer repeats a card within the year. Simulated years with a cross-season repeat went from 36/36 (3.0 a year) to 0/36. "This comes back" follow-ups still owed when a season closes are carried into the next seat if it can hear them. Otherwise they are settled in the review under STILL COMING BACK.
+- **Campaign budget lines.** The steady program no longer pays a season that starved its crew, lost walk-offs, or had a shortcut caught. A crew member sent home to a family emergency is leave, not a walk-off.
+- **Seasonal shortcuts.**
+  - A caught take's promised fallout is dealt once, with its link. Early unlinked copies went from 5 of 56 catches to 0.
+  - The odds line no longer prints "..".
+  - A noticed take puts a standing "Watched: …" line on the dashboard, the Status panel, the decision card's strip and the hub alerts.
+  - The CPD reminder reads the log at mid-year only. It now comes in 0% of careful years, 11–22% of middling ones and 100% of years pushed from the start. The sim's card count fell from 3,433 to 2,646 of 12,600.
+- **Classic card fit.** The odds reason sits on its own smaller line, and the pitch loses its blank line. 0 of 80 seeded offers clip at 1280×720, down from 9 of 40.
+- **Premises.**
+  - "Pay for 1,200 Stems and Report 1,600" needs a 1,600 sph block (`plantingDense`).
+  - The venting-index burn needs an unstarted block (`pilesStanding`).
+  - The temporary-design bridge is found on the drawing.
+  - The approaching-wildfire card is spring to fall on a deployment (`deploymentSeasons`).
+

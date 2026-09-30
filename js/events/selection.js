@@ -398,6 +398,13 @@ export function eventMatchesJourneyContext(event, journey, options = {}) {
       return false;
     }
   }
+  // The same gate for a deployment's seat only (`deploymentSeasons`): no
+  // approaching wildfire on a winter permitting desk. A GM plays calendar
+  // months and gates fire weather by month itself (js/modes/manager.js).
+  if (Array.isArray(event.deploymentSeasons) && currentSeason && journey?.journeyType !== 'manager'
+    && !event.deploymentSeasons.includes(currentSeason)) {
+    return false;
+  }
 
   const becCode = journey?.area?.becCode;
   if (Array.isArray(event.becCodes) && event.becCodes.length > 0) {
@@ -441,6 +448,8 @@ function checkFieldEvent(journey, { managerLane = false, rng = Math.random } = {
         && eventMatchesJourneyContext(event, journey, { currentBlock })
     )
   );
+  // A campaign deployment skips what the year already dealt in earlier seasons.
+  applicableEvents = filterYearSeenEvents(journey, applicableEvents);
 
   if (managerLane) {
     const pool = applicableEvents.filter(isManagerFieldEscalation);
@@ -522,7 +531,19 @@ function checkDeskEvent(journey, rng = Math.random) {
  * whole deck.
  */
 function filterSeenDeskEvents(journey, events = []) {
-  const seen = new Set(journey?.deskEventMemory?.seenIds || []);
+  const seen = new Set([...(journey?.deskEventMemory?.seenIds || []), ...(journey?.campaignSeenEventIds || [])]);
+  if (!seen.size) return events;
+  const fresh = events.filter((event) => event?.id && !seen.has(event.id));
+  return fresh.length ? fresh : events;
+}
+
+/**
+ * A campaign year meets each card once across its four deployments
+ * (js/game/campaign.js carries the dealt ids). A field deck still repeats
+ * inside one season; it only skips what earlier seasons dealt.
+ */
+function filterYearSeenEvents(journey, events = []) {
+  const seen = new Set(journey?.campaignSeenEventIds || []);
   if (!seen.size) return events;
   const fresh = events.filter((event) => event?.id && !seen.has(event.id));
   return fresh.length ? fresh : events;
@@ -939,6 +960,20 @@ export const ACT_PREMISE_CHECKS = {
   plantedSome: (journey) => (silvicultureRun(journey)
     ? (Number(journey.planting.blocksPlanted) || 0) > 0 || (Number(journey.planting.seedlingsPlanted) || 0) > 0
     : null),
+  // "Pay for 1,200 stems and report 1,600" needs a 1,600 prescription: on a
+  // 1,200 sph block the card had the prescription asking for what it does not.
+  plantingDense: (journey) => {
+    if (!silvicultureRun(journey) || !Array.isArray(journey.program?.blocks)) return null;
+    return journey.program.blocks.some((block) => ['pending', 'planting'].includes(block?.status)
+      && (Number(block.sph) || 0) >= 1600);
+  },
+  // A pile burn comes before the planting: a block nobody has started still
+  // has its landing piles. Once every block is planted or under way, there is
+  // no burn on the program to register.
+  pilesStanding: (journey) => {
+    if (!silvicultureRun(journey) || !Array.isArray(journey.program?.blocks)) return null;
+    return journey.program.blocks.some((block) => block?.status === 'pending');
+  },
   plotsDue: (journey) => {
     if (!silvicultureRun(journey) || !Array.isArray(journey.program?.blocks)) return null;
     return journey.program.blocks.some((block) => block?.status === 'planted');

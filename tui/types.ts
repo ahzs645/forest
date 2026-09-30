@@ -9,6 +9,8 @@ export type ShortcutBrief = {
   banner: string;
   odds: { clean: number; noticed: number; caught: number } | null;
   oddsText: string;
+  oddsLine?: string;
+  oddsReason?: string;
   catcher: string | null;
   offerText: string;
   declineText: string;

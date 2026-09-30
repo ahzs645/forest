@@ -52,6 +52,8 @@ function meetPremises(journey) {
   if (journey.journeyType === 'silviculture') {
     journey.planting.seedlingsPlanted = 4000;
     journey.program.blocks[0].status = 'planted';
+    // A block still to plant, untouched, on a 1,600 sph prescription.
+    journey.program.blocks.at(-1).sph = 1600;
   }
   if (journey.journeyType === 'planning') {
     Object.assign(journey.blockPlanning.fom, { status: 'public_review', commentLoad: 3, reviewDaysRemaining: 20 });
@@ -230,6 +232,14 @@ const PREMISE_BROKEN = {
     },
   },
   plantedSome: { roles: ['silviculture'], breakIt: (j) => { j.planting.blocksPlanted = 0; j.planting.seedlingsPlanted = 0; } },
+  plantingDense: {
+    roles: ['silviculture'],
+    breakIt: (j) => { for (const block of j.program.blocks) block.sph = 1200; },
+  },
+  pilesStanding: {
+    roles: ['silviculture'],
+    breakIt: (j) => { for (const block of j.program.blocks) if (block.status === 'pending') block.status = 'planting'; },
+  },
   plotsDue: {
     roles: ['silviculture'],
     breakIt: (j) => { for (const block of j.program.blocks) if (block.status === 'planted') block.status = 'inspected'; },
@@ -294,6 +304,22 @@ test('the playtest premise mismatches stay fixed', () => {
   const act = (id) => findIllegalAct(id);
   const silvi = () => journeyFor('silviculture', 'kootenay-wetbelt', 'spring');
   const offered = (id, journey) => actMatchesTemptationContext(act(id), journey);
+
+  // "Pay for 1,200 stems and report the 1,600 the prescription calls for" on
+  // a 1,200 sph prescription.
+  const sparse = silvi();
+  assert.equal(offered('silvi-misreport-planting', sparse), true);
+  for (const block of sparse.program.blocks) block.sph = 1200;
+  assert.equal(offered('silvi-misreport-planting', sparse), false, 'no 1,600 prescription to report');
+  // A burn registration once every block is planted or under way.
+  const noPiles = silvi();
+  assert.equal(offered('permitter-fake-burning-reference', noPiles), true);
+  PREMISE_BROKEN.pilesStanding.breakIt(noPiles);
+  assert.equal(offered('permitter-fake-burning-reference', noPiles), false, 'no piles left to burn');
+  assert.equal(offered('permitter-fake-burning-reference', journeyFor('permitter', 'kootenay-wetbelt', 'fall')), true,
+    'the permit desk registers burns without a program to read');
+  // The bridge design is found on the paper, not under a loaded truck weeks later.
+  assert.doesNotMatch(act('planner-falsify-bridge-design').catch.how, /truck|girder|creek/i);
 
   // Cash for planters and buried boxes once the planting is done.
   const planted = silvi();

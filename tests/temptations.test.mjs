@@ -131,7 +131,9 @@ test('a silviculture supervisor is not offered layout work, and a recce lead is 
   const planting = ILLEGAL_ACTS.find((act) => act.id === 'silvi-misreport-planting');
   assert.equal(actMatchesTemptationContext(ribbon, silvi), false);
   assert.equal(actMatchesTemptationContext(planting, recce), false);
-  assert.equal(actMatchesTemptationContext(planting, silvi), true);
+  // On a 1,600 sph prescription: "report the 1,600 the prescription calls for".
+  assert.equal(actMatchesTemptationContext(planting, silvi), false, 'a 1,400 sph program has no 1,600 to report');
+  assert.equal(actMatchesTemptationContext(planting, journeyFor('silviculture', { areaId: 'fort-st-john-plateau' })), true);
 });
 
 test('season, area and difficulty gates apply to acts', () => {

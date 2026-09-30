@@ -780,7 +780,7 @@ function applyRelationshipEffects(journey, delta, messages) {
 /**
  * Handle crew-specific effects
  */
-function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
+export function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
   let injured = null;
   // A card fitted to the crew (js/modes/silviculture.js fitEventToCrew) names
   // who was hurt; the injury and any evacuation land on that person.
@@ -816,6 +816,8 @@ function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
     if (victim) {
       victim.isActive = false;
       victim.hasQuit = true;
+      // Sent home for a family emergency is not a walk-off (js/game/campaign.js).
+      if (crewEffect.leave && !crewEffect.lose_member) victim.compassionateLeave = true;
       messages.push(`${victim.name} has left the crew.`);
     }
   }
