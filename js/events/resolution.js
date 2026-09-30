@@ -802,6 +802,8 @@ export function handleCrewEffect(journey, crewEffect, messages, rng = Math.rando
     if (victim) {
       victim.isActive = false;
       victim.hasQuit = true;
+      // Sent home for a family emergency is not a walk-off (js/game/campaign.js).
+      if (crewEffect.leave && !crewEffect.lose_member) victim.compassionateLeave = true;
       messages.push(`${victim.name} has left the crew.`);
     }
   }
