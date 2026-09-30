@@ -61,6 +61,8 @@ export function recordProgramShortcut(journey, entry) {
     source: entry.source || 'program',
     day: Number(journey?.day) || 0,
   };
+  // The caught odds the card printed for the season-close read.
+  if (Number.isFinite(entry.closeOdds)) record.closeOdds = entry.closeOdds;
   ledger.records.push(record);
   return record;
 }
@@ -88,6 +90,7 @@ export function recordTemptationOutcome(journey, event) {
     kind: isFalseRecordAct(act) ? 'false-record' : 'shortcut',
     status,
     source: 'temptation',
+    closeOdds: status === 'noticed' ? Number(option?.liveOdds?.bad) : undefined,
   });
 }
 
@@ -112,12 +115,13 @@ export function summarizeIntegrity(journey) {
 
 /**
  * The district's check at season close. A shortcut somebody wrote down at
- * the time gets read against the ground now, at the odds the act's own card
- * gives it today (js/events/selection.js buildShortcutOption: the file's
- * scrutiny and who is watching are in the number). A take nobody noticed
- * stays buried: it already rolled the odds the card stated, and a second
- * check the card never mentioned would make those odds a lie. Runs once per
- * journey, on the day's own dice, so a reload replays the same check.
+ * the time gets read against the ground now, at the caught odds its card
+ * printed when it was taken: the card's noticed line says "the district
+ * reads it again at season close: N% it is caught then" (js/events/
+ * selection.js describeShortcutStakes). A record from before the card said
+ * so reads at the act's odds today. A take nobody noticed stays buried: it
+ * already rolled the odds the card stated. Runs once per journey, on the
+ * day's own dice, so a reload replays the same check.
  * @param {Object} journey
  * @param {Function} [rng]
  * @returns {string[]} lines to print
@@ -132,7 +136,9 @@ export function runSeasonCloseAudit(journey, rng = getDayRng(journey, 'season-cl
   const lines = [];
   for (const record of open) {
     const act = ILLEGAL_ACTS.find((candidate) => candidate?.id === record.id) || null;
-    const chance = act ? buildShortcutOption(act, journey).liveOdds.bad : 0.3;
+    const chance = Number.isFinite(record.closeOdds)
+      ? record.closeOdds
+      : act ? buildShortcutOption(act, journey).liveOdds.bad : 0.3;
     if (rng() < chance) {
       record.status = 'caught';
       record.caughtAtClose = true;

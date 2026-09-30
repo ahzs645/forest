@@ -420,8 +420,14 @@ test('competent, neglectful and fraudulent supervisors separate cleanly across t
     assert.equal(result.won, false, 'skipping fill and half the release is not a delivered program');
     assert.ok(['D', 'F'].includes(result.grade), `${result.area}/${result.seed} fraud graded ${result.grade}`);
   }
-  assert.ok(results.shortcuts.every((result) => result.integrity.caughtFalseRecords + result.integrity.caughtShortcuts > 0),
-    'a season of shortcuts gets found');
+  // The season-close read runs at the odds the card printed, so a season of
+  // shortcuts can, rarely, stay buried; it still grades well under any
+  // competent season.
+  const found = results.shortcuts.filter((result) => result.integrity.caughtFalseRecords + result.integrity.caughtShortcuts > 0);
+  assert.ok(found.length >= results.shortcuts.length - 2, `${found.length} of ${results.shortcuts.length} shortcut seasons found`);
+  const worstCompetent = Math.min(...results.competent.map((result) => result.score));
+  assert.ok(results.shortcuts.every((result) => result.score < worstCompetent - 15),
+    `shortcut seasons ${results.shortcuts.map((result) => result.score)} vs competent ${worstCompetent}`);
   assert.ok(mean(results.shortcuts) < mean(results.competent) - 30,
     `shortcuts ${mean(results.shortcuts)} vs competent ${mean(results.competent)}`);
 });

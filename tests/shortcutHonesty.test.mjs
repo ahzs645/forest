@@ -29,7 +29,7 @@ import { TEMPTATION_FLAG_LABELS, TEMPTATION_WATCH_FLAGS } from '../js/events/odd
 import { collectShortcutsFromJourney, describeShortcutWatch } from '../js/events/shortcutRecord.js';
 import { applyProfessionalComplianceShift } from '../js/engine/professional.js';
 import { calculateScore, formatScoreDisplay, scoreIntegrityPenalty } from '../js/scoring.js';
-import { recordProgramShortcut, runSeasonCloseAudit, summarizeIntegrity } from '../js/modes/silvicultureIntegrity.js';
+import { recordProgramShortcut, recordTemptationOutcome, runSeasonCloseAudit, summarizeIntegrity } from '../js/modes/silvicultureIntegrity.js';
 import { createJourney } from '../js/journey.js';
 import { createInitialState } from '../js/engine/state.js';
 import { adaptIllegalActTemptation, buildIllegalActWatchFlags, drawIssue } from '../js/engine/content.js';
@@ -409,6 +409,30 @@ test('the season-close check reads only what somebody noticed, at the act\'s own
   seeded.daySeed = { day: 30, seed: 12345 };
   const first = runSeasonCloseAudit(clone(seeded)).length;
   assert.equal(runSeasonCloseAudit(clone(seeded)).length, first);
+});
+
+test('a silviculture card says the noticed record is read again at season close, and the close reads it at the odds the card printed', () => {
+  const journey = journeyFor('silviculture');
+  const event = buildTemptationEvent(act('silvi-misreport-planting'), journey);
+  const shortcut = event.options.find((option) => option.liveOdds);
+  const caught = Math.round(shortcut.liveOdds.bad * 100);
+  assert.match(event.stakes[1], new RegExp(`somebody notices \\([^()]*, and the district reads it again at season close: ${caught}% it is caught then\\)`));
+  assert.match(shortcut.partialOutcome, /The district will read that record again at season close\.$/);
+  // No other role's card carries the season-close line.
+  const permit = buildTemptationEvent(act('midnight-variance-forgery'), journeyFor('permitter'));
+  assert.ok(!/season close/.test(permit.stakes[1]));
+
+  // Taken and noticed: the record keeps the printed odds, and the close
+  // rolls against them even when the file's odds have moved since.
+  journey.log.push({ day: 5, type: 'event', eventId: event.id, optionLabel: shortcut.label, outcome: shortcut.partialOutcome, band: 'partial' });
+  const record = recordTemptationOutcome(journey, event);
+  assert.equal(record.status, 'noticed');
+  assert.equal(record.closeOdds, shortcut.liveOdds.bad);
+  journey.scrutiny = 90;
+  const later = clone(journey);
+  assert.equal(runSeasonCloseAudit(later, () => shortcut.liveOdds.bad + 0.01).length, 0, 'above the printed odds: nothing');
+  const found = clone(journey);
+  assert.equal(runSeasonCloseAudit(found, () => shortcut.liveOdds.bad - 0.01).length, 1, 'under the printed odds: caught');
 });
 
 // ── (6) A payoff that cannot land is not promised ───────────────────────────

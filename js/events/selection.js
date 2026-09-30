@@ -1476,6 +1476,10 @@ function describeOddsShifts(option, journey) {
   return { worse, better };
 }
 
+// A silviculture record somebody noticed gets a second read at season close
+// (js/modes/silvicultureIntegrity.js); the noticed outcome says so.
+const SEASON_CLOSE_RECHECK_LINE = ' The district will read that record again at season close.';
+
 /**
  * The shortcut as a three-band gamble.
  *
@@ -1510,7 +1514,7 @@ export function buildShortcutOption(act, journey, { label = TAKE_LABEL, oddsPena
     label,
     outcome: `${clean} What you get: ${payoff.line}. Nobody asks.`,
     effects: { ...payoff.effects, scrutiny: 3 },
-    partialOutcome: `${clean} What you get: ${payoff.line}. Somebody also wrote down what they saw: ${watchSentenceFor(act)}.`,
+    partialOutcome: `${clean} What you get: ${payoff.line}. Somebody also wrote down what they saw: ${watchSentenceFor(act)}.${journey?.journeyType === 'silviculture' ? SEASON_CLOSE_RECHECK_LINE : ''}`,
     partialEffects: { ...payoff.effects, scrutiny: 8, compliance: -2 },
     partialFlags: [watchFlag],
     chanceSuccess,
@@ -1620,6 +1624,12 @@ export function describeShortcutStakes(option, journey) {
   }
   const noticed = describeProjectedChips(noticedCosts, journeyType);
   const watch = TEMPTATION_FLAG_LABELS[option.partialFlags?.[0]] || 'a watch on your file';
+  // A silviculture record somebody wrote down is read again against the
+  // ground at season close, at these same caught odds
+  // (js/modes/silvicultureIntegrity.js runSeasonCloseAudit).
+  const noticedTail = journeyType === 'silviculture'
+    ? [watch, `and the district reads it again at season close: ${bad}% it is caught then`]
+    : [`and ${watch}`];
   const finding = option.failureFallout ? describeEffectChips(option.failureEffects || {}, journeyType).join(', ') : '';
   const determination = option.failureFallout?.effects || option.failureEffects || {};
   const caught = describeEffectChips(determination, journeyType).join(', ');
@@ -1633,7 +1643,7 @@ export function describeShortcutStakes(option, journey) {
 
   const lines = [
     `Take it and you get ${gain}${buried}. Saying no costs nothing.`,
-    `Odds today: ${good}% it stays buried · ${partial}% somebody notices (${[...noticed, `and ${watch}`].join(', ')}) · ${bad}% ${option.caughtBy || 'somebody'} catches it (${caughtText}).`,
+    `Odds today: ${good}% it stays buried · ${partial}% somebody notices (${[...noticed, ...noticedTail].join(', ')}) · ${bad}% ${option.caughtBy || 'somebody'} catches it (${caughtText}).`,
   ];
   const shifts = option.oddsShifts || { worse: [], better: [] };
   if (shifts.worse.length) lines.push(`Worse odds today because ${shifts.worse.join('; ')}.`);
