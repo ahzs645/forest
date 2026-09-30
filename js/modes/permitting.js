@@ -716,6 +716,18 @@ function buildPermittingActionGuidance(journey) {
   let lane = laneAction.laneLabel;
   let headline = `${laneAction.chainId === 'registration' ? getComplianceAdminLabel(journey) : laneAction.actionLabel} to keep the active file moving.`;
 
+  // The last day: a clean answer is decided after the deadline (see
+  // buildActionOptions), so the guide does not call it the move.
+  if (revisionQueue.length > 0 && (journey.day || 1) >= journey.deadline) {
+    const ticket = revisionQueue[0];
+    const file = getPermitFileById(journey, ticket.fileId);
+    lane = 'Deficiency letters';
+    headline = file?.deficiencyProfileId === 'package-completeness'
+      ? `Last day: ${ticket.fileLabel || ticket.id} goes back through screening either way, so no answer reaches the District Manager before the deadline.`
+      : `Last day: a clean response on ${ticket.fileLabel || ticket.id} is decided after the deadline; only a fast-track reaches the District Manager tonight, and a thin answer is likelier to come back.`;
+    return { lane, headline, steps };
+  }
+
   if (revisionQueue.length > 0 && !queueWork) {
     const ticket = revisionQueue[0];
     lane = 'Deficiency letters';
@@ -1403,7 +1415,7 @@ function buildPermittingContextLines(journey) {
     [`Lane: ${guidance.lane}`, getLaneStageLabel(laneAction, guidance.lane)].filter(Boolean).join(' | Stage: '),
   ];
   if (guidance.headline) lines.push(`Next best move: ${guidance.headline}`);
-  lines.push(`Scrutiny: ${Math.round(journey.scrutiny || 0)}%`);
+  lines.push(`Scrutiny: ${Math.round(journey.scrutiny || 0)}%${describeWatchedDesk(journey)}`);
   if (Number.isFinite(journey.regulations?.complianceScore)) {
     lines.push(`Regulatory standing: ${Math.round(journey.regulations.complianceScore)}%`);
   }
@@ -1458,6 +1470,9 @@ function updatePermittingMissionStatus(ui, journey) {
   }
   if (daysRemaining <= 5) {
     alerts.push({ level: 'danger', text: `Deadline pressure: ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining.` });
+  }
+  if (getWatchedDeskPenalty(journey) > 0) {
+    alerts.push({ level: 'warn', text: `Scrutiny ${Math.round(journey.scrutiny)}%${describeWatchedDesk(journey)}` });
   }
 
   ui.setMissionStatus?.({
@@ -1570,11 +1585,17 @@ export function buildActionOptions(journey) {
 
   // When the only live work is a deficiency letter, answering it is the day.
   const lettersFirst = openRevisionTickets.length > 0 && !queueWork;
+  // A clean answer is decided the night after it goes in, so on the last day
+  // of the season it lands after the deadline: it is still the right answer
+  // for the file, but not the move that finishes the season.
+  const lastDay = (journey.day || 1) >= journey.deadline;
   openRevisionTickets.forEach((ticket, index) => {
     const bucket = index === 0 ? primary : support;
     bucket.push({
       label: `Clean response: ${ticket.fileLabel || ticket.id}`,
-      description: `${lettersFirst || openRevisionTickets.length >= 3 ? 'Best move | ' : ''}${ticket.title}: ${ticket.summary}`,
+      description: lastDay
+        ? `${ticket.title}: ${ticket.summary} (decided after the deadline)`
+        : `${lettersFirst || openRevisionTickets.length >= 3 ? 'Best move | ' : ''}${ticket.title}: ${ticket.summary}`,
       value: `revise_permit:${ticket.id}:clean`
     });
     bucket.push({
@@ -2095,7 +2116,11 @@ async function endOfDayProcessing(game, meetingsToday, crisisMode, progressBefor
 
     const milestoneMessages = [];
     recordProgressMilestones(journey, progressBeforeDay, milestoneMessages, Math.max(1, journey.day - 1));
-    for (const message of milestoneMessages) {
+    // The milestones look ahead ("a few clean decisions could finish the
+    // job"); on the night the season ends, or going into its last day, they
+    // promise a calendar that is not there.
+    const seasonEnding = Boolean(checkPermittingEndConditions(journey)) || journey.day >= journey.deadline;
+    for (const message of seasonEnding ? [] : milestoneMessages) {
       ui.writePositive(message);
     }
   } catch (error) {
@@ -2142,7 +2167,36 @@ export function getPermitApprovalRate(journey) {
     ? Math.min(0.15, (professional.auditExposure / 300) + (professional.competenceRisk / 500))
     : 0.2;
   const difficulty = PERMIT_DIFFICULTY[journey?.difficulty] || PERMIT_DIFFICULTY.normal;
-  return Math.max(0.42, 0.8 + difficulty.approval - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
+  const rate = Math.max(0.42, 0.8 + difficulty.approval - scrutinyPenalty - phase3Penalty - roadPenalty - professionalPenalty);
+  // The floor is for a hard area, not a watched desk: it held every desk in a
+  // steep area at the same odds, so taking every shortcut won as often as a
+  // clean file. What the watch costs comes off under it.
+  return rate - getWatchedDeskPenalty(journey);
+}
+
+/**
+ * Scrutiny above which the district reads every file from the desk line by
+ * line, and the most that reading costs a decision. A clean desk opens at 38
+ * and works down from there; a noticed shortcut puts it over.
+ */
+export const WATCHED_DESK_SCRUTINY = 40;
+const WATCHED_DESK_MAX_PENALTY = 0.25;
+
+/**
+ * What a watched desk costs each decision: nothing at or under the line, then
+ * four points of approval for every three of scrutiny past it.
+ * @returns {number} 0 to WATCHED_DESK_MAX_PENALTY
+ */
+export function getWatchedDeskPenalty(journey) {
+  const scrutiny = Number(journey?.scrutiny) || 0;
+  return Math.min(WATCHED_DESK_MAX_PENALTY, Math.max(0, scrutiny - WATCHED_DESK_SCRUTINY) / 75);
+}
+
+/** The watch, said where scrutiny is shown; empty for a desk under the line. */
+function describeWatchedDesk(journey) {
+  const penalty = Math.round(getWatchedDeskPenalty(journey) * 100);
+  if (penalty <= 0) return '';
+  return ` — over ${WATCHED_DESK_SCRUTINY}%, the District Manager reads every file from this desk line by line: each decision is ${penalty} points likelier to come back with a letter`;
 }
 
 /**
@@ -2153,8 +2207,8 @@ export function getPermitApprovalRate(journey) {
  */
 const PERMIT_DIFFICULTY = {
   easy: { approval: 0.05, completeness: -0.03 },
-  normal: { approval: 0, completeness: 0 },
-  hard: { approval: -0.08, completeness: 0.04 },
+  normal: { approval: 0, completeness: 0.02 },
+  hard: { approval: -0.08, completeness: 0.07 },
 };
 
 /** Share of screened files bounced as incomplete. */

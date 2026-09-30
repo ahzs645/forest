@@ -259,10 +259,15 @@ export function buildVictoryNarrative(journey, areaName, crewName, daysUsed) {
  * Whether the run left a documented rupture on the record: a situation that
  * cost the relationships ten or more at once (a Nation writing that
  * engagement was inadequate, an Elder declined, a ceremonial site blamed on
- * the map).
+ * the map). A relationship lost on the defensible call is conduct, not a
+ * rupture: rejecting a contractor's overage and citing the contract left a
+ * clean A-100 plan with a scolding approval line while its epilogue held it
+ * up as the example.
  */
 function hasRelationshipRupture(journey) {
-  return (journey?.log || []).some((entry) => entry?.type === 'event' && Number(entry.effects?.relationships) <= -10);
+  return (journey?.log || []).some((entry) => entry?.type === 'event'
+    && Number(entry.effects?.relationships) <= -10
+    && !(Number(entry.effects?.compliance) > 0));
 }
 
 /** An end reason as a sentence: most are written as labels, without a full stop. */

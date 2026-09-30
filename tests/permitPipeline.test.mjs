@@ -264,7 +264,7 @@ test('an early-approval event signs only what is on the District Manager\'s desk
   assert.equal(getPermitFiles(journey).length, filesBefore.length);
 });
 
-test('a setback event slips clocks but keeps a paused CP and its HCA permit in the queue', () => {
+test('a setback event keeps a paused CP and its HCA permit in the queue, and leaves the Branch\'s clock alone', () => {
   const journey = makeJourney();
   journey.permits = { target: 15, backlog: 0, drafting: 0, submitted: 0, inReferral: 0, inReview: 0, needsRevision: 0, approved: 0 };
   journey.day = 1;
@@ -290,8 +290,10 @@ test('a setback event slips clocks but keeps a paused CP and its HCA permit in t
   assert.equal(cp.pausedBy, hca.id, 'the CP still waits on its HCA permit');
   assert.equal(cp.lane, 'screening');
   assert.equal(journey.permits.backlog, 0, 'no named file was demoted to a nameless backlog entry');
-  assert.ok(hca.clockCloses > hcaClockBefore, 'the setback is a slipped clock on the live file');
-  assert.ok(result.messages.some((message) => /The queue slips: .*HCA permit/.test(message)));
+  // The Archaeology Branch decides the HCA permit on its own clock: a
+  // distracted desk neither slips it nor, on a good day, brings it forward.
+  assert.equal(hca.clockCloses, hcaClockBefore, 'the Branch\'s clock is not the desk\'s to slip');
+  assert.ok(!result.messages.some((message) => /The queue slips: .*HCA permit/.test(message)), result.messages.join(' | '));
 });
 
 test('reconciling a counter shortfall sends the surplus file back to drafted instead of deleting it', () => {

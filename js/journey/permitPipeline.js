@@ -692,8 +692,11 @@ export function getChaseableFiles(journey, lanes) {
   ensurePermitFiles(journey);
   const day = Number(journey?.day) || 1;
   // A clock that closes tonight cannot be brought forward; chase the next one.
+  // An HCA permit is the Archaeology Branch's, on the specialist's clock:
+  // nothing at the desk or the district moves it (a shortcut's day once landed
+  // on one, and a district meeting could "issue" it).
   return getPermitFiles(journey)
-    .filter((file) => lanes.includes(file.lane) && Number.isFinite(file.clockCloses) && file.clockCloses > day && !file.pausedBy)
+    .filter((file) => lanes.includes(file.lane) && Number.isFinite(file.clockCloses) && file.clockCloses > day && !file.pausedBy && countsInQueue(file))
     .sort((a, b) => a.clockCloses - b.clockCloses);
 }
 
@@ -712,11 +715,13 @@ export function shortenPermitClock(journey, lanes, days = 1) {
 /**
  * Push the soonest live clock in those lanes back by a day: a distracted
  * week at the desk. Returns the file, or null when nothing was on a clock.
+ * The Archaeology Branch's clock on an HCA permit is not the desk's to slip,
+ * any more than to chase.
  */
 export function slipPermitClock(journey, lanes, days = 1) {
   ensurePermitFiles(journey);
   const [file] = getPermitFiles(journey)
-    .filter((entry) => lanes.includes(entry.lane) && Number.isFinite(entry.clockCloses) && !entry.pausedBy)
+    .filter((entry) => lanes.includes(entry.lane) && Number.isFinite(entry.clockCloses) && !entry.pausedBy && countsInQueue(entry))
     .sort((a, b) => a.clockCloses - b.clockCloses);
   if (!file) return null;
   file.clockCloses += Math.max(1, days);
@@ -886,27 +891,32 @@ export function advancePermitClocks(journey, options = {}) {
 }
 
 /**
- * The queue work the desk would do today, in the order it matters: draft the
- * backlog, submit what is drafted, otherwise chase whichever clock is closest.
+ * The queue work the desk would do today, in the order it matters: submit
+ * what is drafted, draft the backlog, otherwise chase whichever clock is
+ * closest.
+ *
+ * A finished package goes in the day after it is drafted. The queue used to
+ * draft the whole backlog first, so the first files sat on the desk for a
+ * week while their screening and referral clocks could have been running,
+ * and a competent season came up one permit short on the last day.
  * @returns {{step: 'draft'|'submit'|'chase'|null, count: number, file: Object|null}}
  */
 export function planQueueWork(journey) {
   const permits = ensurePermitFiles(journey);
-  // A drafted HCA permit that is holding a cutting permit is filed before
-  // anything else is drafted: the CP cannot move until it is in.
-  const blockingHca = permits.files.find((file) => file.lane === 'drafted' && file.type === 'HCA' && file.holdsFileId);
-  if (blockingHca) {
-    const drafted = permits.files.filter((file) => file.lane === 'drafted').length;
-    return { step: 'submit', count: Math.min(drafted, DAILY_PERMIT_THROUGHPUT), file: blockingHca };
-  }
-  if ((permits.backlog || 0) > 0) {
-    return { step: 'draft', count: Math.min(permits.backlog, DAILY_PERMIT_THROUGHPUT), file: null };
-  }
   // Counted off the files: an HCA permit waiting to go in is not on the
   // counters but still has to be filed.
   const drafted = permits.files.filter((file) => file.lane === 'drafted').length;
+  // A drafted HCA permit that is holding a cutting permit is filed first:
+  // the CP cannot move until it is in.
+  const blockingHca = permits.files.find((file) => file.lane === 'drafted' && file.type === 'HCA' && file.holdsFileId);
+  if (blockingHca) {
+    return { step: 'submit', count: Math.min(drafted, DAILY_PERMIT_THROUGHPUT), file: blockingHca };
+  }
   if (drafted > 0) {
     return { step: 'submit', count: Math.min(drafted, DAILY_PERMIT_THROUGHPUT), file: null };
+  }
+  if ((permits.backlog || 0) > 0) {
+    return { step: 'draft', count: Math.min(permits.backlog, DAILY_PERMIT_THROUGHPUT), file: null };
   }
   const [file] = getChaseableFiles(journey, ['screening', 'decision']);
   if (file) return { step: 'chase', count: 1, file };

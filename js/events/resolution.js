@@ -266,13 +266,16 @@ export function resolveEvent(journey, event, option) {
  * What a compliance or relationship move does to scrutiny on top of any
  * scrutiny the option names: the file notices a compliance loss at one and a
  * half times its size, and a relationship loss at a third. Gains ease it.
+ * Every knock-on is a whole point, a half rounded up (-3 compliance is +5
+ * scrutiny): the meter and its chips read in whole points, and a +4.5 chip
+ * put the meter at 77.5 and made a later "-12" print as "-11".
  * @param {Object} effects - authored effects
  * @returns {number} the knock-on scrutiny, without `effects.scrutiny` itself
  */
 function coupledScrutiny(effects = {}) {
   let delta = 0;
   if (typeof effects.compliance === 'number' && effects.compliance !== 0) {
-    delta += effects.compliance < 0 ? Math.abs(effects.compliance) * 1.5 : -Math.max(1, Math.round(effects.compliance * 0.5));
+    delta += effects.compliance < 0 ? Math.round(Math.abs(effects.compliance) * 1.5) : -Math.max(1, Math.round(effects.compliance * 0.5));
   }
   if (typeof effects.relationships === 'number' && effects.relationships !== 0) {
     delta += effects.relationships < 0
@@ -331,7 +334,9 @@ export function projectAppliedEffects(effects, journeyType = 'field') {
  */
 export function applyEventEffects(journey, authored, messages) {
   const effects = projectAppliedEffects(authored, journey.journeyType);
-  journey.scrutiny = clampScrutiny(Number(journey.scrutiny || 0));
+  // Whole points (coupledScrutiny); a save carrying a half point from before
+  // that rule is squared up here.
+  journey.scrutiny = clampScrutiny(Math.round(Number(journey.scrutiny || 0)));
 
   // Resource effects (field)
   if (isFieldJourney(journey.journeyType)) {
@@ -501,6 +506,15 @@ export function applyEventEffects(journey, authored, messages) {
         ? `Data readiness ${effects.data > 0 ? 'improved' : 'slipped'} (${sign}${effects.data}%).`
         : `Survey data logged (${sign}${effects.data}).`);
     }
+  }
+
+  // Hours on the professional record's CPD log (a padded record is still the
+  // record the next audit reads).
+  if (typeof effects.cpdHours === 'number' && effects.cpdHours !== 0 && journey.professional) {
+    const professional = journey.professional;
+    const target = Number(professional.cpdTarget) || 0;
+    professional.cpdHours = Math.max(0, Math.min(100, (Number(professional.cpdHours) || 0) + effects.cpdHours));
+    messages.push(`CPD record: ${Math.round(professional.cpdHours)}/${target}h logged this season.`);
   }
 
   // Reputation outside manager mode lands on standing: a field crew's on its

@@ -34,7 +34,7 @@ import { getDayRng } from './dayRng.js';
 import { getSignableFiles } from '../journey/permitPipeline.js';
 import { actFitsStop, eventFitsStop, isPackageBlock, isPackageClosed } from '../journey/packages.js';
 import { falloutLandsIn, getPendingFallout, takeDueFallout } from './fallout.js';
-import { applyEventEffects, projectAppliedEffects } from './resolution.js';
+import { applyEventEffects, describeGoodwillChange, projectAppliedEffects, readGoodwill } from './resolution.js';
 import { applyConsequenceFlags } from './consequences.js';
 import { DESK_RESOURCES, formatDollars } from '../resources.js';
 import { getChaseableFiles } from '../journey/permitPipeline.js';
@@ -655,6 +655,9 @@ const PLANNING_GATE_METRIC = { data: 'dataCompleteness', analysis: 'analysisQual
 // Fewer points than this left under a gate's ceiling is not a payoff.
 const PLANNING_GATE_MIN_PAYOFF = 4;
 
+// Desk roles whose professional record keeps a CPD log the day card shows.
+const DESK_CPD_ROLES = new Set(['planning', 'permitting']);
+
 /** Points a planning gate can still take before its ceiling. */
 function planningGateHeadroom(journey, gate) {
   const metric = PLANNING_GATE_METRIC[gate];
@@ -1176,7 +1179,14 @@ export function buildTemptationPayoff(act, journey) {
   const shifts = kind === 'time' ? amount / 2 : kind === 'volume' ? 1 : amount;
   const isMoney = kind === 'budget' || (kind === 'volume' && journeyType === 'manager');
 
-  if (isMoney) {
+  if (DESK_CPD_ROLES.has(journeyType) && /\bCPD\b/.test(String(payoff.line || ''))) {
+    // A padded CPD record pays on the record it pads: the hours the season is
+    // short, logged on paper. It used to pay a referral clock-day and leave
+    // the log at 0/8, so "twenty hours of CPD" bought nothing it named.
+    const professional = journey?.professional;
+    const gap = Math.round((Number(professional?.cpdTarget) || 0) - (Number(professional?.cpdHours) || 0));
+    if (gap > 0) effects.cpdHours = gap;
+  } else if (isMoney) {
     const dollars = Math.round(kind === 'volume' ? amount * MANAGER_VOLUME_MARGIN : amount);
     if (journeyType === 'recon' || journeyType === 'field') {
       if (dollars <= RECCE_CASH_CAP) effects.budget = dollars;
@@ -1193,7 +1203,12 @@ export function buildTemptationPayoff(act, journey) {
     // Past the gates it is the planner's own time back.
     const wanted = progressForShifts(shifts);
     const named = PLANNING_GATE_BY_LINE.find(([pattern]) => pattern.test(String(payoff.line || '')))?.[1];
-    const gates = [...new Set([named, PLANNING_GATE_BY_PHASE[journey?.plan?.phase]].filter(Boolean))];
+    // Buy-in is people agreeing to the plan; only a shortcut about the
+    // consultation itself can fake it. Hiding volume "that never went through
+    // referral" paid buy-in for the word, and a skipped terrain review paid
+    // more than a stakeholder session because the plan was in that phase.
+    const gates = [...new Set([named, PLANNING_GATE_BY_PHASE[journey?.plan?.phase]].filter(Boolean))]
+      .filter((gate) => gate !== 'buyIn' || act?.category === 'consultation');
     const open = gates.find((gate) => planningGateHeadroom(journey, gate) >= PLANNING_GATE_MIN_PAYOFF);
     if (open) effects[open] = Math.min(wanted, planningGateHeadroom(journey, open));
     else if (planningTimeBackLands(journey)) effects.progress = wanted;
@@ -1855,8 +1870,17 @@ export function resolveTemptationSetAside(journey, event, rng = Math.random) {
     const answer = event.options?.[0] || {};
     const effects = { ...(answer.effects || {}), scrutiny: (Number(answer.effects?.scrutiny) || 0) + 4 };
     const messages = [];
+    const scrutinyBefore = Math.round(Number(journey.scrutiny) || 0);
+    const goodwillBefore = readGoodwill(journey);
     applyEventEffects(journey, effects, messages);
     applyConsequenceFlags(journey, answer.flags || [], messages);
+    // The meters an answered card would report, reported here too: on a desk
+    // goodwill is the meter that ends the run, and it moved without a line.
+    const scrutinyDelta = Math.round(Number(journey.scrutiny) || 0) - scrutinyBefore;
+    if (scrutinyDelta !== 0) {
+      messages.push(`Scrutiny ${scrutinyDelta > 0 ? '+' : ''}${scrutinyDelta} → ${Math.round(journey.scrutiny)}%.`);
+    }
+    messages.push(...describeGoodwillChange(journey, goodwillBefore));
     const outcome = 'You leave it unanswered. It is decided without you, and that reads worse.';
     if (!journey.log) journey.log = [];
     journey.log.push({
