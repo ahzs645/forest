@@ -692,8 +692,11 @@ export function getChaseableFiles(journey, lanes) {
   ensurePermitFiles(journey);
   const day = Number(journey?.day) || 1;
   // A clock that closes tonight cannot be brought forward; chase the next one.
+  // An HCA permit is the Archaeology Branch's, on the specialist's clock:
+  // nothing at the desk or the district moves it (a shortcut's day once landed
+  // on one, and a district meeting could "issue" it).
   return getPermitFiles(journey)
-    .filter((file) => lanes.includes(file.lane) && Number.isFinite(file.clockCloses) && file.clockCloses > day && !file.pausedBy)
+    .filter((file) => lanes.includes(file.lane) && Number.isFinite(file.clockCloses) && file.clockCloses > day && !file.pausedBy && countsInQueue(file))
     .sort((a, b) => a.clockCloses - b.clockCloses);
 }
 
@@ -712,11 +715,13 @@ export function shortenPermitClock(journey, lanes, days = 1) {
 /**
  * Push the soonest live clock in those lanes back by a day: a distracted
  * week at the desk. Returns the file, or null when nothing was on a clock.
+ * The Archaeology Branch's clock on an HCA permit is not the desk's to slip,
+ * any more than to chase.
  */
 export function slipPermitClock(journey, lanes, days = 1) {
   ensurePermitFiles(journey);
   const [file] = getPermitFiles(journey)
-    .filter((entry) => lanes.includes(entry.lane) && Number.isFinite(entry.clockCloses) && !entry.pausedBy)
+    .filter((entry) => lanes.includes(entry.lane) && Number.isFinite(entry.clockCloses) && !entry.pausedBy && countsInQueue(entry))
     .sort((a, b) => a.clockCloses - b.clockCloses);
   if (!file) return null;
   file.clockCloses += Math.max(1, days);

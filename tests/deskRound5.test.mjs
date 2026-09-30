@@ -1,14 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createPermittingJourney } from '../js/journey/factory.js';
+import { createPermittingJourney, createPlanningJourney } from '../js/journey/factory.js';
 import { OPERATING_AREAS } from '../js/data/operatingAreas.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
+import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
 import { describeEffectChips, formatEventForDisplay } from '../js/events/display.js';
 import { applyEventEffects, projectAppliedEffects } from '../js/events/resolution.js';
+import { buildTemptationEvent, buildTemptationPayoff } from '../js/events/selection.js';
 import {
   draftPermits,
   ensurePermitFiles,
+  getChaseableFiles,
   getPermitFilesInLane,
   planQueueWork,
   syncPermitCounters,
@@ -228,4 +231,68 @@ test('an off-book answer with a hidden outcome prints its stakes', () => {
 test('a goodwill cost the compliance gain pays back prints no "0 goodwill" chip', () => {
   const hint = hintFor('media_forestry_controversy', 'Issue a detailed public rebuttal');
   assert.doesNotMatch(hint, /\b0 goodwill/, hint);
+});
+
+// ── Shortcut payoffs land on what they name (round 5, N5-5) ───────────────
+
+function shortcutAct(id) {
+  const found = ILLEGAL_ACTS.find((entry) => entry.id === id);
+  assert.ok(found, `no act ${id}`);
+  return found;
+}
+
+test('"twenty hours of CPD" pads the CPD record it names, not a referral clock', () => {
+  const journey = makePermitter();
+  journey.day = 5;
+  journey.professional.cpdHours = 0;
+  const target = journey.professional.cpdTarget;
+  assert.ok(target > 0);
+  const act = shortcutAct('phantom-cpd-log');
+  const payoff = buildTemptationPayoff(act, journey);
+  assert.deepEqual(payoff.effects, { cpdHours: target });
+
+  const event = buildTemptationEvent(act, journey);
+  const take = event.options.find((option) => option.riskTag === 'OFF-BOOK');
+  assert.match(formatEventForDisplay(event, 'permitting').options[event.options.indexOf(take)].hint, new RegExp(`\\+${target}h on the CPD record`));
+  const clocks = journey.permits.files.map((file) => file.clockCloses);
+  const messages = [];
+  applyEventEffects(journey, payoff.effects, messages);
+  assert.equal(journey.professional.cpdHours, target);
+  assert.ok(messages.some((line) => line === `CPD record: ${target}/${target}h logged this season.`), messages.join(' | '));
+  assert.deepEqual(journey.permits.files.map((file) => file.clockCloses), clocks, 'no permit clock moved');
+
+  // A record already complete has nothing to pad: nothing to offer.
+  assert.equal(buildTemptationPayoff(act, journey).deliverable, false);
+});
+
+test('nothing at the desk moves an HCA permit\'s clock: the Archaeology Branch decides it', () => {
+  const journey = makePermitter('tahltan-highland');
+  const hca = journey.permits.files.find((file) => file.type === 'HCA');
+  for (const file of journey.permits.files) {
+    if (file === hca) continue;
+    if (['screening', 'referral', 'decision'].includes(file.lane)) file.clockCloses = journey.day + 3;
+  }
+  hca.lane = 'decision';
+  hca.clockCloses = journey.day + 1;
+  hca.pausedBy = null;
+  assert.ok(!getChaseableFiles(journey, ['screening', 'referral', 'decision']).includes(hca));
+  // A shortcut's clock-day lands on a district file, never the Branch's.
+  applyEventEffects(journey, { progress: 5 }, []);
+  assert.equal(hca.clockCloses, journey.day + 1);
+});
+
+test('a planner\'s buy-in is paid only by a shortcut about the consultation', () => {
+  const area = OPERATING_AREAS.find((candidate) => candidate.id === 'okanagan-shuswap-drybelt');
+  const planner = createPlanningJourney({ roleId: 'planner', areaId: area.id, area });
+  planner.day = 5;
+  Object.assign(planner.plan, { phase: 'stakeholder_review', dataCompleteness: 90, analysisQuality: 90, stakeholderBuyIn: 40 });
+  Object.assign(planner.protagonist, { energy: 70, stress: 20 });
+
+  const hidden = buildTemptationPayoff(shortcutAct('hush-harvest-units'), planner).effects;
+  assert.equal(hidden.buyIn, undefined, `volume "that never went through referral" is not engagement: ${JSON.stringify(hidden)}`);
+  const terrain = buildTemptationPayoff(shortcutAct('planner-falsify-terrain-stability'), planner).effects;
+  assert.equal(terrain.buyIn, undefined, `a skipped terrain review wins nobody over: ${JSON.stringify(terrain)}`);
+  assert.ok(terrain.progress > 0, 'it is time back on the file');
+  const faked = buildTemptationPayoff(shortcutAct('permitter-forge-fn-consultation'), planner).effects;
+  assert.ok(faked.buyIn > 0, 'a faked engagement record is what fakes engagement');
 });

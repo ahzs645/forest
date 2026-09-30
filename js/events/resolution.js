@@ -508,6 +508,15 @@ export function applyEventEffects(journey, authored, messages) {
     }
   }
 
+  // Hours on the professional record's CPD log (a padded record is still the
+  // record the next audit reads).
+  if (typeof effects.cpdHours === 'number' && effects.cpdHours !== 0 && journey.professional) {
+    const professional = journey.professional;
+    const target = Number(professional.cpdTarget) || 0;
+    professional.cpdHours = Math.max(0, Math.min(100, (Number(professional.cpdHours) || 0) + effects.cpdHours));
+    messages.push(`CPD record: ${Math.round(professional.cpdHours)}/${target}h logged this season.`);
+  }
+
   // Reputation outside manager mode lands on standing: a field crew's on its
   // compliance ledger (the manager branch above routes it to
   // metrics.reputation directly, and a desk's is already folded into the

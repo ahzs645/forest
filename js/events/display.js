@@ -457,6 +457,9 @@ function effectChips(effects, journeyType) {
     if (typeof option.effects.buyIn === 'number' && option.effects.buyIn !== 0) {
       hints.push(`${option.effects.buyIn > 0 ? '+' : ''}${option.effects.buyIn} buy-in`);
     }
+    if (typeof option.effects.cpdHours === 'number' && option.effects.cpdHours !== 0) {
+      hints.push(`${option.effects.cpdHours > 0 ? '+' : ''}${option.effects.cpdHours}h on the CPD record`);
+    }
     if (option.effects.progress !== undefined && option.effects.progress !== 0) {
       const progress = option.effects.progress;
       // Field ground goes through the next leg (applyEventTravelEffect), so

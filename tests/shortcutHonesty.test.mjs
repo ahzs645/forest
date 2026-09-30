@@ -473,7 +473,11 @@ test('a planner is paid only what the gate can take, and a full gate pays the ne
   planner.plan.stakeholderBuyIn = 60;
   const fallThrough = buildTemptationPayoff(launder, planner).effects;
   assert.equal(fallThrough.analysis, undefined, 'a full analysis gate cannot be paid');
-  assert.ok(fallThrough.buyIn > 0, `the gate the plan is on: ${JSON.stringify(fallThrough)}`);
+  // The plan is in engagement, but laundered inventory does not buy anyone's
+  // support: buy-in is paid only by a shortcut about the consultation itself.
+  assert.equal(fallThrough.buyIn, undefined, `no buy-in for an inventory shortcut: ${JSON.stringify(fallThrough)}`);
+  const faked = buildTemptationPayoff(act('permitter-forge-fn-consultation'), planner).effects;
+  assert.ok(faked.buyIn > 0, `a faked engagement record pays the engagement gate: ${JSON.stringify(faked)}`);
 
   planner.plan.analysisQuality = 93;
   const capped = buildTemptationPayoff(launder, planner).effects;
