@@ -14,6 +14,7 @@ import { applyRoundConsequences, createInitialState } from '../js/engine.js';
 import { resolveEvent } from '../js/events/resolution.js';
 import { createPermittingJourney, createPlanningJourney, createReconJourney } from '../js/journey/factory.js';
 import { checkForEvent, checkScheduledEvents } from '../js/events.js';
+import { eventMatchesJourneyContext } from '../js/events/selection.js';
 import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 
@@ -154,4 +155,13 @@ test('the year\'s last season settles what it still owes', () => {
   assert.equal(lines.length, 1);
   assert.match(lines[0], /came back after the season closed/);
   assert.deepEqual(campaign.pendingFollowUps, []);
+});
+
+test('no approaching wildfire on a winter permitting desk', () => {
+  const wildfire = DESK_EVENTS.find((event) => event.id === 'wildfire_threat');
+  const desk = createPermittingJourney({ areaId: 'kootenay-wetbelt' });
+  desk.season = { ...(desk.season || {}), currentSeason: 'winter' };
+  assert.equal(eventMatchesJourneyContext(wildfire, desk), false);
+  desk.season.currentSeason = 'summer';
+  assert.equal(eventMatchesJourneyContext(wildfire, desk), true);
 });

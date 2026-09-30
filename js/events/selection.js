@@ -398,6 +398,13 @@ export function eventMatchesJourneyContext(event, journey, options = {}) {
       return false;
     }
   }
+  // The same gate for a deployment's seat only (`deploymentSeasons`): no
+  // approaching wildfire on a winter permitting desk. A GM plays calendar
+  // months and gates fire weather by month itself (js/modes/manager.js).
+  if (Array.isArray(event.deploymentSeasons) && currentSeason && journey?.journeyType !== 'manager'
+    && !event.deploymentSeasons.includes(currentSeason)) {
+    return false;
+  }
 
   const becCode = journey?.area?.becCode;
   if (Array.isArray(event.becCodes) && event.becCodes.length > 0) {
@@ -950,6 +957,20 @@ export const ACT_PREMISE_CHECKS = {
   plantedSome: (journey) => (silvicultureRun(journey)
     ? (Number(journey.planting.blocksPlanted) || 0) > 0 || (Number(journey.planting.seedlingsPlanted) || 0) > 0
     : null),
+  // "Pay for 1,200 stems and report 1,600" needs a 1,600 prescription: on a
+  // 1,200 sph block the card had the prescription asking for what it does not.
+  plantingDense: (journey) => {
+    if (!silvicultureRun(journey) || !Array.isArray(journey.program?.blocks)) return null;
+    return journey.program.blocks.some((block) => ['pending', 'planting'].includes(block?.status)
+      && (Number(block.sph) || 0) >= 1600);
+  },
+  // A pile burn comes before the planting: a block nobody has started still
+  // has its landing piles. Once every block is planted or under way, there is
+  // no burn on the program to register.
+  pilesStanding: (journey) => {
+    if (!silvicultureRun(journey) || !Array.isArray(journey.program?.blocks)) return null;
+    return journey.program.blocks.some((block) => block?.status === 'pending');
+  },
   plotsDue: (journey) => {
     if (!silvicultureRun(journey) || !Array.isArray(journey.program?.blocks)) return null;
     return journey.program.blocks.some((block) => block?.status === 'planted');

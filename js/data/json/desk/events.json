@@ -3225,6 +3225,11 @@
   "type": "technical",
   "severity": "major",
   "probability": 0.04,
+  "deploymentSeasons": [
+   "spring",
+   "summer",
+   "fall"
+  ],
   "description": "Fire weather is extreme. A wildfire 30 km from the licensee's active blocks is growing. Evacuation hasn't been ordered yet, but the wind forecast is bad.",
   "options": [
    {
