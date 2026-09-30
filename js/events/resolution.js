@@ -766,7 +766,7 @@ function applyRelationshipEffects(journey, delta, messages) {
 /**
  * Handle crew-specific effects
  */
-function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
+export function handleCrewEffect(journey, crewEffect, messages, rng = Math.random) {
   let injured = null;
   // A card fitted to the crew (js/modes/silviculture.js fitEventToCrew) names
   // who was hurt; the injury and any evacuation land on that person.

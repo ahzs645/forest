@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { createPlanningJourney, createReconJourney } from '../js/journey/factory.js';
 import { runDaySituation, situationWeight } from '../js/journey/daySituation.js';
-import { isImposedSituation, pickDeferredCost } from '../js/events/deferral.js';
+import { isCrewCasualtySituation, isImposedSituation, pickDeferredCost } from '../js/events/deferral.js';
+import { FIELD_EVENTS } from '../js/data/fieldEvents.js';
 import { STEEP_EFFECT_THRESHOLDS } from '../js/events/display.js';
 import { isSituationClosedClean, scoreSituationsClosedClean } from '../js/scoring.js';
 
@@ -161,13 +162,64 @@ test('no desk situation set aside charges more than its cheapest answer or its w
     const cost = pickDeferredCost(event, weight, { budgetBase });
     if (!cost) continue;
     imposed += 1;
-    const share = weight >= 3 ? 0.1 : 0.06;
-    assert.ok(-(cost.effects.budget || 0) <= budgetBase * share, `${event.id}: budget ${cost.effects.budget}`);
-    assert.ok(units(cost.effects, { budget: false }) <= (weight >= 3 ? 3 : 2) + 0.3, `${event.id}: ${JSON.stringify(cost.effects)}`);
+    // A safety investigation is never cheaper to walk away from: no cap.
+    if (event.type !== 'safety') {
+      const share = weight >= 3 ? 0.1 : 0.06;
+      assert.ok(-(cost.effects.budget || 0) <= budgetBase * share, `${event.id}: budget ${cost.effects.budget}`);
+      assert.ok(units(cost.effects, { budget: false }) <= (weight >= 3 ? 3 : 2) + 0.3, `${event.id}: ${JSON.stringify(cost.effects)}`);
+    }
     const cheapest = Math.min(...event.options.map((option) => units(expected(option))));
     assert.ok(units(cost.effects) <= cheapest + 0.3,
       `${event.id}: set aside ${JSON.stringify(cost.effects)} costs more than the cheapest answer`);
     assert.ok(Object.values(cost.effects).every((value) => Number.isInteger(value) && value < 0), `${event.id}: whole costs only`);
   }
   assert.ok(imposed >= 20, `imposed desk situations checked: ${imposed}`);
+});
+
+test('setting aside a chainsaw kickback lands the evacuation and the hard road, never less than answering it', async () => {
+  const journey = createReconJourney({ areaId: 'fort-st-john-plateau' });
+  journey.day = 13;
+  journey.scrutiny = 20;
+  journey.resources.budget = 212; // the medevac is off the card
+  const chainsaw = FIELD_EVENTS.find((event) => event.id === 'chainsaw_cut');
+  assert.ok(chainsaw, 'fixture event present');
+  const onCrewBefore = journey.crew.filter((member) => member.isActive).length;
+
+  const cost = pickDeferredCost(chainsaw, situationWeight(chainsaw), { budgetBase: journey.budgetStart, journey });
+  assert.notEqual(cost.option.label, 'Call helicopter medevac', 'the charter the card could not offer is not the charge');
+  assert.ok(cost.crewEffect?.evacuate, 'the crew still takes the injured hand out');
+  assert.ok(cost.effects.compliance <= -6, `the incident review lands: ${JSON.stringify(cost.effects)}`);
+  assert.ok(cost.effects.scrutiny >= 8, 'and the file notices why nobody decided');
+
+  const ui = makeUi();
+  const outcome = await runDaySituation({ ui, journey, gameOver: false }, chainsaw, {
+    setAsideDescription: 'Not today. Take the shift back and spend it on your own work.',
+  });
+  assert.equal(outcome.setAside, true);
+  assert.equal(journey.crew.filter((member) => member.isActive).length, onCrewBefore - 1, 'somebody goes out');
+  assert.ok(journey.crew.some((member) => member.status === 'evacuated'));
+  assert.ok(journey.scrutiny >= 20 + 8 + 3, `scrutiny ${journey.scrutiny}`);
+  const shown = textAfterDeferral(ui);
+  assert.match(shown, /Nobody sets a hurt crew member aside/);
+  assert.doesNotMatch(shown, /the least of it/);
+  assert.equal(journey.log.at(-1).setAside, true);
+});
+
+test('no crew casualty card is cheaper to set aside than to answer', () => {
+  const casualties = FIELD_EVENTS.filter((event) => isCrewCasualtySituation(event));
+  assert.ok(casualties.length >= 4, `casualty cards checked: ${casualties.length}`);
+  const units = (costs) => Object.entries(costs)
+    .filter(([key, value]) => value < 0 && STEEP_EFFECT_THRESHOLDS[key] !== undefined)
+    .reduce((sum, [key, value]) => sum + Math.abs(value) / Math.abs(STEEP_EFFECT_THRESHOLDS[key]), 0);
+  for (const event of casualties) {
+    const cost = pickDeferredCost(event, situationWeight(event), {});
+    assert.ok(cost, `${event.id}: a set-aside lands something`);
+    // Every band of the answer the charge is drawn from costs no more than
+    // the set-aside: its worst band lands, and the deferral on top.
+    const option = cost.option;
+    for (const band of [option.effects, option.partialEffects, option.failureEffects].filter(Boolean)) {
+      assert.ok(units(cost.effects) >= units(band) - 0.01,
+        `${event.id}: set aside ${JSON.stringify(cost.effects)} is cheaper than "${option.label}" ${JSON.stringify(band)}`);
+    }
+  }
 });

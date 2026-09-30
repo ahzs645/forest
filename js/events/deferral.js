@@ -25,11 +25,19 @@
  * minor cards included, with only the budget capped. Scaled down by weight it
  * was the cheapest way through a budget cut or a Nation's engagement request,
  * well under the "Delay engagement" it amounts to, which paid silence.
+ *
+ * Nobody sets a hurt crew member aside for free either. On an injury or an
+ * illness card the crew makes the call without you, and it goes the hard way:
+ * the least answer's worst band lands in full, crew effect included (the
+ * evacuation, the injury). "Set it aside" on a chainsaw kickback used to charge
+ * a little fuel and morale and leave the bleeding crew member on the block,
+ * the cheapest line on the card. A safety investigation is priced in full too.
  */
 
-import { applyEventEffects, describeGoodwillChange, readGoodwill } from './resolution.js';
+import { applyEventEffects, describeGoodwillChange, handleCrewEffect, readGoodwill } from './resolution.js';
 import { deriveOptionRiskTag, INVERTED_EFFECT_KEYS, STEEP_EFFECT_THRESHOLDS } from './display.js';
 import { getOptionShortfall } from './affordability.js';
+import { getDayRng } from './dayRng.js';
 
 /** Effect keys that are not a cost the day can be charged. */
 const NON_COST_KEYS = new Set(['timeUsed', 'progressMode', 'permits_approved', 'discoveryTags', 'blockSelection']);
@@ -71,6 +79,45 @@ function optionDownside(option, effects) {
 /** Desk roles whose set-aside is priced at the cheapest lawful answer in full. */
 const FULL_PRICE_JOURNEYS = new Set(['planning', 'permitting']);
 
+/** Cards where somebody on the crew is already hurt or sick. */
+const CREW_CASUALTY_TYPES = new Set(['injury', 'illness']);
+
+/**
+ * Whether this card is somebody hurt or sick on the crew: setting it aside
+ * does not make them well, so the worst of the least answer lands.
+ * @param {Object} event
+ * @returns {boolean}
+ */
+export function isCrewCasualtySituation(event) {
+  if (String(event?.severity || '').toLowerCase() === 'positive') return false;
+  return CREW_CASUALTY_TYPES.has(String(event?.type || '').toLowerCase());
+}
+
+/** A safety card (an injury, an illness, a WorkSafeBC investigation): never cheaper to walk away from. */
+function isSafetySituation(event) {
+  return isCrewCasualtySituation(event) || String(event?.type || '').toLowerCase() === 'safety';
+}
+
+/**
+ * The worst band of an option, crew effect included: what the crew gets when
+ * it answers a casualty card without you. An option's own crewEffect belongs
+ * to its good band (js/events/resolution.js); a worse band that authors none
+ * of its own still carries it here, because the hurt hand goes out whichever
+ * way the road goes ("the ER stabilizes him").
+ */
+function worstBand(option) {
+  const own = option?.crewEffect || null;
+  const bands = [{ effects: option?.effects || {}, crewEffect: own, outcome: option?.outcome }];
+  if (typeof option?.chancePartial === 'number' && option.partialEffects) {
+    bands.push({ effects: option.partialEffects, crewEffect: option.partialCrewEffect || own, outcome: option.partialOutcome });
+  }
+  if (typeof option?.chanceSuccess === 'number' && option.failureEffects) {
+    bands.push({ effects: option.failureEffects, crewEffect: option.failureCrewEffect || own, outcome: option.failureOutcome });
+  }
+  const score = (band) => downsideScore(band.effects) + (band.crewEffect ? 1 : 0);
+  return bands.reduce((worst, band) => (score(band) > score(worst) ? band : worst));
+}
+
 /** An unlawful answer on an ordinary card: setting the card aside is not choosing it. */
 function isOffBook(option) {
   return option?.riskTag === 'OFF-BOOK';
@@ -85,12 +132,15 @@ function isOffBook(option) {
  * @param {number} weight - situationWeight(event), 1-3
  * @param {Object} [context]
  * @param {boolean} [context.desk] - price it the desk way (see above)
+ * @param {boolean} [context.safety] - an injury, illness or safety card
  * @returns {boolean}
  */
-export function isImposedSituation(event, weight, { desk = false } = {}) {
-  if (weight < (desk ? 1 : 2)) return false;
+export function isImposedSituation(event, weight, { desk = false, safety = isSafetySituation(event) } = {}) {
   const options = Array.isArray(event?.options) ? event.options : [];
   if (!options.length) return false;
+  // Somebody is hurt, or WorkSafeBC is asking: there is no free way out.
+  if (safety) return true;
+  if (weight < (desk ? 1 : 2)) return false;
   return options.every((option) => deriveOptionRiskTag(option) !== 'SAFE');
 }
 
@@ -130,7 +180,7 @@ function expectedCosts(option) {
  * costs shrink together, so the shape of the hit survives; the budget is
  * capped on its own against the run's starting budget.
  */
-function capDeferredCost(costs, weight, budgetBase, { fullPrice = false } = {}) {
+function capDeferredCost(costs, weight, budgetBase, { fullPrice = false, uncappedBudget = false } = {}) {
   const capped = {};
   const { budget, ...rest } = costs;
   const units = downsideScore(rest);
@@ -142,7 +192,9 @@ function capDeferredCost(costs, weight, budgetBase, { fullPrice = false } = {}) 
   }
   if (typeof budget === 'number') {
     const share = DEFERRAL_BUDGET_SHARE[weight] ?? DEFERRAL_BUDGET_SHARE[3];
-    const ceiling = Number(budgetBase) > 0 ? Math.floor((Number(budgetBase) * share) / 100) * 100 : Infinity;
+    const ceiling = !uncappedBudget && Number(budgetBase) > 0
+      ? Math.floor((Number(budgetBase) * share) / 100) * 100
+      : Infinity;
     const charged = Math.max(-ceiling, Math.round(budget / 100) * 100);
     if (charged < 0) capped.budget = charged;
   }
@@ -164,11 +216,19 @@ function capDeferredCost(costs, weight, budgetBase, { fullPrice = false } = {}) 
  * @param {Object} [context.journey] - when given, an option the card left off
  *   because the crew could not pay for it (js/events/affordability.js) is not
  *   the cost that lands either: a $3,000 medevac the card never offered
- * @returns {{option: Object, effects: Object, uncapped: Object}|null}
+ * On a crew casualty card the least answer's worst band lands instead, in
+ * full and with its crew effect: the crew answers it without you.
+ * @returns {{option: Object, effects: Object, uncapped: Object, crewEffect?: Object, outcome?: string}|null}
  */
 export function pickDeferredCost(event, weight, { budgetBase, journey = null } = {}) {
-  const fullPrice = FULL_PRICE_JOURNEYS.has(journey?.journeyType);
-  if (!isImposedSituation(event, weight, { desk: fullPrice })) return null;
+  const desk = FULL_PRICE_JOURNEYS.has(journey?.journeyType);
+  // A GM hears about the injury from a division; the crew on the block is
+  // not the executive team, so head office prices it the ordinary way.
+  const field = journey?.journeyType !== 'manager';
+  const safety = field && isSafetySituation(event);
+  const casualty = field && isCrewCasualtySituation(event);
+  const fullPrice = desk || safety;
+  if (!isImposedSituation(event, weight, { desk, safety })) return null;
   const lawful = event.options.filter((option) => !isOffBook(option));
   const payable = journey ? lawful.filter((option) => !getOptionShortfall(journey, option)) : [];
   const offered = payable.length ? payable : lawful.length ? lawful : event.options;
@@ -184,7 +244,20 @@ export function pickDeferredCost(event, weight, { budgetBase, journey = null } =
   });
   candidates.sort((a, b) => (a.score - b.score) || (a.gamble - b.gamble) || (a.index - b.index));
   const least = candidates[0];
-  const effects = capDeferredCost(least.costs, weight, budgetBase, { fullPrice });
+  if (casualty) {
+    const band = worstBand(least.option);
+    const costs = negativeCosts(band.effects);
+    // Scrutiny is inverted (a rise is the cost), so negativeCosts drops it;
+    // the incident review the worst band opens still lands.
+    const scrutiny = Number(band.effects?.scrutiny);
+    const effects = {
+      ...capDeferredCost(costs, weight, budgetBase, { fullPrice, uncappedBudget: true }),
+      ...(scrutiny > 0 ? { scrutiny } : {}),
+    };
+    if (!Object.keys(effects).length && !band.crewEffect) return null;
+    return { option: least.option, effects, uncapped: costs, crewEffect: band.crewEffect, outcome: band.outcome };
+  }
+  const effects = capDeferredCost(least.costs, weight, budgetBase, { fullPrice, uncappedBudget: safety });
   return Object.keys(effects).length ? { option: least.option, effects, uncapped: least.costs } : null;
 }
 
@@ -212,7 +285,16 @@ export function applyDeferredSituation(journey, event, { weight, imposedCost = t
   } else {
     const budgetBase = Number(journey.budgetStart) > 0 ? journey.budgetStart : journey.resources?.budget;
     const deferred = imposedCost ? pickDeferredCost(event, weight, { budgetBase, journey }) : null;
-    if (deferred) {
+    if (deferred?.crewEffect !== undefined) {
+      // A crew casualty: the crew answers it without you, the hard way.
+      messages.push('Nobody sets a hurt crew member aside. The crew makes the call without you, and it goes the hard way:');
+      if (deferred.outcome) messages.push(deferred.outcome);
+      applyEventEffects(journey, deferred.effects, messages);
+      if (deferred.crewEffect) {
+        handleCrewEffect(journey, deferred.crewEffect, messages, getDayRng(journey, `set-aside:${event?.id || 'event'}`));
+      }
+      applied = deferred.effects;
+    } else if (deferred) {
       messages.push('You set it aside. It lands anyway — the least of it:');
       applyEventEffects(journey, deferred.effects, messages);
       applied = deferred.effects;
