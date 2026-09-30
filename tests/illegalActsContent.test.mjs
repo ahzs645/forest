@@ -322,12 +322,18 @@ test('the playtest premise mismatches stay fixed', () => {
   analysing.plan.phase = 'analysis';
   assert.equal(offered('inventory-data-laundering', analysing), true);
   analysing.plan.analysisQuality = 100;
-  // Still offered, but the promised analysis is not paid: it falls to time back
-  // on the file (js/events/selection.js buildTemptationPayoff), never to a gate
-  // that cannot move.
+  // Still offered to a tired planner, but the promised analysis is not paid:
+  // it falls to time back on the file (js/events/selection.js
+  // buildTemptationPayoff), never to a gate that cannot move.
+  Object.assign(analysing.protagonist, { energy: 70, stress: 20 });
   const gateFull = buildTemptationPayoff(act('inventory-data-laundering'), analysing).effects;
   assert.equal(gateFull.analysis, undefined, 'no analysis is promised at a full analysis gate');
   assert.ok(gateFull.progress > 0, 'the take pays time back on the file instead');
+  assert.equal(offered('inventory-data-laundering', analysing), true);
+  // A rested planner has no time to get back: nothing lands, so it is not offered.
+  Object.assign(analysing.protagonist, { energy: 100, stress: 0 });
+  assert.deepEqual(buildTemptationPayoff(act('inventory-data-laundering'), analysing).effects, {});
+  assert.equal(offered('inventory-data-laundering', analysing), false);
 
   // The blockade act is retired: the GM's year has no blockade to intimidate,
   // and no other role was ever asked it.

@@ -196,6 +196,8 @@ test('every shortcut\'s stakes line is what each band lands, for every act and r
     ['big payoff', (roleId) => {
       const journey = journeyFor(roleId);
       if (journey.plan) Object.assign(journey.plan, { dataCompleteness: 98, analysisQuality: 98, stakeholderBuyIn: 98 });
+      // A tired planner, so the time back has somewhere to land.
+      if (journey.protagonist) Object.assign(journey.protagonist, { energy: 60, stress: 30 });
       return journey;
     }],
   ];
@@ -457,9 +459,20 @@ test('a planner is paid only what the gate can take, and a full gate pays the ne
 
   planner.plan.stakeholderBuyIn = 100;
   planner.plan.analysisQuality = 100;
+  Object.assign(planner.protagonist, { energy: 70, stress: 25 });
   const spent = buildTemptationPayoff(launder, planner).effects;
   assert.ok(spent.progress > 0 && spent.analysis === undefined && spent.buyIn === undefined, JSON.stringify(spent));
   assert.match(formatEventForDisplay(buildTemptationEvent(launder, planner), 'planning').options[1].hint, /time back on the file/);
+  const before = { ...planner.protagonist };
+  const messages = [];
+  applyEventEffects(planner, spent, messages);
+  assert.ok(planner.protagonist.energy > before.energy && planner.protagonist.stress < before.stress, 'the time back lands');
+
+  // Fresh and unstressed, time back would land nothing: no payoff to promise.
+  Object.assign(planner.protagonist, { energy: 100, stress: 0 });
+  const nothing = buildTemptationPayoff(launder, planner);
+  assert.deepEqual(nothing.effects, {});
+  assert.equal(nothing.deliverable, false);
 });
 
 // ── (7) A serious catch costs more than it pays ─────────────────────────────

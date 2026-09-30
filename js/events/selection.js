@@ -990,16 +990,31 @@ const PLANNING_GATE_LEVELS = {
 };
 
 /**
+ * Whether "time back on the file" would land anything: it is paid as energy
+ * up and stress down (js/events/resolution.js applyPlanningProgress), so a
+ * planner at full energy with no stress would be paid nothing but the take's
+ * scrutiny.
+ */
+function planningTimeBackLands(journey) {
+  const protagonist = journey?.protagonist;
+  if (!protagonist) return false;
+  return (Number(protagonist.energy) || 0) < 100 || (Number(protagonist.stress) || 0) > 0;
+}
+
+/**
  * Whether the payoff has something to land on today. Ground on the next leg
  * is worth nothing at the last open block, where there is no next leg that
  * matters; a planning gate that is already met, or too full to take the whole
- * payoff, is not a temptation.
+ * payoff, is not a temptation, and neither is time back for a planner who
+ * has nothing to get back.
  */
 function payoffLandsToday(act, journey) {
   const journeyType = journey?.journeyType;
   if (!['recon', 'field', 'planning'].includes(journeyType)) return true;
   const { effects } = buildTemptationPayoff(act, journey);
   if (journeyType === 'planning') {
+    // Nothing to pay: every gate full and the planner already rested.
+    if (!Object.values(effects).some((value) => Number(value) > 0)) return false;
     return Object.entries(PLANNING_GATE_LEVELS).every(([key, { metric, met }]) => {
       const gain = Number(effects[key]) || 0;
       const level = Number(journey.plan?.[metric]);
@@ -1177,7 +1192,7 @@ export function buildTemptationPayoff(act, journey) {
     const gates = [...new Set([named, PLANNING_GATE_BY_PHASE[journey?.plan?.phase]].filter(Boolean))];
     const open = gates.find((gate) => planningGateHeadroom(journey, gate) >= PLANNING_GATE_MIN_PAYOFF);
     if (open) effects[open] = Math.min(wanted, planningGateHeadroom(journey, open));
-    else effects.progress = wanted;
+    else if (planningTimeBackLands(journey)) effects.progress = wanted;
   } else if (journeyType === 'permitting' || journeyType === 'desk') {
     const wanted = kind === 'files' ? Math.round(shift * amount) : progressForShifts(shifts);
     const clockDays = Math.min(4, Math.max(1, Math.round(wanted / 5)), permitClockCapacity(journey));
