@@ -7,6 +7,7 @@ import { DESK_EVENTS } from '../js/data/deskEvents.js';
 import { ILLEGAL_ACTS } from '../js/data/illegalActs.js';
 import { describeEffectChips, formatEventForDisplay } from '../js/events/display.js';
 import { applyEventEffects, projectAppliedEffects } from '../js/events/resolution.js';
+import { buildVictoryNarrative } from '../js/game/endScreen.js';
 import { buildFalloutEvent, buildTemptationEvent, buildTemptationPayoff, resolveTemptationSetAside } from '../js/events/selection.js';
 import {
   draftPermits,
@@ -317,4 +318,21 @@ test('setting a determination aside prints the goodwill and scrutiny that land',
   assert.equal(journey.scrutiny, 55);
   assert.match(message, /District goodwill -8 → 47\./, message);
   assert.match(message, /Scrutiny \+28 → 55%\./, message);
+});
+
+// ── The approval line follows conduct (round 5, N5-7) ─────────────────────
+
+test('a clean plan that stood on the contract with a contractor is still praised on approval', () => {
+  const area = OPERATING_AREAS.find((candidate) => candidate.id === 'fort-st-john-plateau');
+  const planner = createPlanningJourney({ roleId: 'planner', areaId: area.id, area });
+  const praise = /engagement with the Nations and the public, and careful balancing/;
+  assert.match(buildVictoryNarrative(planner, 'Fort St. John Plateau', 'You', 19), praise);
+
+  // The defensible call: the contractor walks, the file gains standing.
+  planner.log = [{ day: 9, type: 'event', eventId: 'contractor_dispute', eventTitle: 'Contractor Billing Dispute', optionLabel: 'Reject the overage and cite the contract', band: 'bad', effects: { budget: -5000, relationships: -15, compliance: 5, progress: -15 } }];
+  assert.match(buildVictoryNarrative(planner, 'Fort St. John Plateau', 'You', 19), praise);
+
+  // A Nation told its protocol can wait is a rupture.
+  planner.log.push({ day: 12, type: 'event', eventId: 'first_nations_consultation', eventTitle: 'First Nations Engagement', optionLabel: 'Delay engagement (risk deteriorating relationships)', effects: { relationships: -15 } });
+  assert.doesNotMatch(buildVictoryNarrative(planner, 'Fort St. John Plateau', 'You', 19), praise);
 });
