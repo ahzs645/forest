@@ -781,6 +781,10 @@ function ensureTemptationMemory(journey) {
   if (memory.settledFlags.includes('fpbc_file_open') && !Number.isFinite(Number(memory.fpbcFileOpenedDay ?? NaN))) {
     memory.fpbcFileOpenedDay = Number(journey?.day || 1);
   }
+  if (!memory.watchFlagsByInstitution) {
+    memory.watchFlagsByInstitution = true;
+    remapLegacyWatchFlag(journey);
+  }
   getPendingFallout(journey);
   return memory;
 }
@@ -1301,6 +1305,29 @@ function institutionDetermination(act, money, standing, shifts) {
 
 function watchFlagFor(act) {
   return WATCH_FLAG_BY_INSTITUTION[act?.catch?.by] || 'ce_watching';
+}
+
+/**
+ * Before each institution kept its own watch, every noticed or caught
+ * shortcut left `ce_watching`, so a DFO catch in an older save read on the
+ * panel as C&E and moved the next DFO act by the generic amount. Read the
+ * log's noticed and caught takes once and give each its institution's
+ * watch; C&E's stays when one of them was C&E's, or when the log cannot
+ * say where it came from.
+ */
+function remapLegacyWatchFlag(journey) {
+  const flags = Array.isArray(journey?.consequenceFlags) ? journey.consequenceFlags : [];
+  if (!flags.includes('ce_watching')) return;
+  const watched = new Set();
+  for (const entry of journey.log || []) {
+    if (entry?.type !== 'event' || !['partial', 'bad'].includes(entry.band)) continue;
+    const actId = String(entry.eventId || '').match(/^temptation_(?:reoffer_|goaround_)?(.+)$/)?.[1];
+    const act = actId ? getActById(actId) : null;
+    if (act) watched.add(watchFlagFor(act));
+  }
+  if (!watched.size) return;
+  const kept = watched.has('ce_watching') ? flags : flags.filter((flag) => flag !== 'ce_watching');
+  journey.consequenceFlags = [...kept, ...[...watched].filter((flag) => !kept.includes(flag))];
 }
 
 /** Who is now watching, named for the institution that noticed. */

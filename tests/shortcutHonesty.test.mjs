@@ -373,6 +373,32 @@ test('an FPBC file saved open before the review clock existed is still decided e
   assert.equal(journey.professional.registrationStatus, 'active');
 });
 
+test('an older save\'s catch-all C&E watch is given back to the institution that noticed', () => {
+  // Before each institution kept its own watch, a DFO finding was saved as
+  // ce_watching: the panel said C&E and the next DFO act read it as generic.
+  const dfo = ACTIVE_ILLEGAL_ACTS.find((entry) => entry.roles.includes('permitter') && entry.catch?.by === 'DFO');
+  const ce = ACTIVE_ILLEGAL_ACTS.find((entry) => entry.roles.includes('permitter') && entry.catch?.by === 'C&E');
+  const legacy = (acts) => {
+    const journey = journeyFor('permitter');
+    journey.consequenceFlags = ['ce_watching'];
+    journey.temptationMemory = { lastDay: 3, seenActIds: acts.map((entry) => entry.id), takenActIds: acts.map((entry) => entry.id), pending: [] };
+    journey.log = acts.map((entry, index) => ({ day: 2 + index, type: 'event', eventId: `temptation_${entry.id}`, optionLabel: 'Take the shortcut', band: 'partial' }));
+    return journey;
+  };
+  const fresh = journeyFor('permitter');
+  const watched = legacy([dfo]);
+  const option = buildShortcutOption(dfo, watched);
+  assert.deepEqual(watched.consequenceFlags, ['dfo_watching']);
+  assert.ok(option.liveOdds.bad >= buildShortcutOption(dfo, fresh).liveOdds.bad + 0.19, 'DFO reads its own watch closely');
+  assert.ok(describeShortcutWatch(watched).some((alert) => /DFO/.test(alert.text)));
+  assert.ok(!describeShortcutWatch(watched).some((alert) => /C&E/.test(alert.text)));
+
+  // A C&E finding in the same log keeps C&E's watch beside DFO's.
+  const both = legacy([dfo, ce]);
+  buildShortcutOption(dfo, both);
+  assert.deepEqual([...both.consequenceFlags].sort(), ['ce_watching', 'dfo_watching']);
+});
+
 // ── (4) The campaign counts the last shortcut of a season ───────────────────
 
 test('a shortcut taken after the season\'s last offer check is still carried into the year', () => {

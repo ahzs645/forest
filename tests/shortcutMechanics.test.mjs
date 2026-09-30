@@ -331,7 +331,8 @@ test('a campaign carries the season\'s shortcuts, flags and unlanded determinati
   const spring = journeyFor('silviculture');
   spring.log.push({ day: 4, type: 'event', eventId: 'temptation_dont-report-the-spill', optionLabel: 'Take the shortcut', band: 'partial' });
   spring.log.push({ day: 9, type: 'event', eventId: 'temptation_silvi-fake-site-prep', optionLabel: 'Take the shortcut', band: 'bad' });
-  spring.consequenceFlags = ['ce_watching', 'camp_bear'];
+  // The spill was noticed by ENV; the site prep was caught by C&E.
+  spring.consequenceFlags = ['env_watching', 'ce_watching', 'camp_bear'];
   spring.temptationMemory = { seenActIds: ['dont-report-the-spill', 'silvi-fake-site-prep'], takenActIds: ['dont-report-the-spill', 'silvi-fake-site-prep'] };
   spring.day = 9;
   queueFallout(spring, { actId: 'silvi-fake-site-prep', title: 'Mound Ten Hectares and Report Forty', institution: 'C&E', dueIn: 5, effects: { compliance: -10, scrutiny: 15 }, flags: ['ce_watching'] });
@@ -341,7 +342,7 @@ test('a campaign carries the season\'s shortcuts, flags and unlanded determinati
   assert.ok(review.lines.some((line) => /Shortcut, day 4: “Don't Report the Spill” \(noticed/.test(line)), review.lines.join('\n'));
   assert.ok(review.lines.some((line) => /caught by C&E, determination still to land/.test(line)));
   assert.equal(describeSeasonShortcuts(review.counts), ' · 2 shortcuts taken (1 noticed, 1 caught)');
-  assert.deepEqual(campaign.shortcuts.flags, ['ce_watching'], 'the watch carries; the camp bear stays in the spring camp');
+  assert.deepEqual(campaign.shortcuts.flags, ['env_watching', 'ce_watching'], 'the watches carry; the camp bear stays in the spring camp');
 
   const summer = journeyFor('recce');
   const carryLines = carryShortcutsIntoJourney(campaign, summer);
