@@ -639,6 +639,10 @@ export function buildShortcutBrief(gs, item) {
     bands.push({ tone: "danger", text: `If caught: ${caughtText}` });
   }
   const declineIndex = options.findIndex((option, index) => index !== takeIndex && /^(decline|say no)\b/i.test(option?.label || ""));
+  // The reason ends its own sentence; the views close the line (and add
+  // "Saying no costs nothing."), which printed "strong.. Saying no".
+  const oddsReason = String(take.oddsReason || item?.oddsReason || "").replace(/\.\s*$/, "");
+  const oddsLine = odds ? `Odds this season: ${formatShortcutOdds(odds)}` : "";
 
   return {
     takeIndex,
@@ -646,11 +650,12 @@ export function buildShortcutBrief(gs, item) {
     odds,
     // Why the odds moved from the tier's usual line (js/engine/content.js
     // describeIllegalActOddsShifts), so a 32% clean never goes unexplained.
-    oddsText: odds
-      // The reason ends its own sentence; the views close the line (and add
-      // "Saying no costs nothing."), which printed "strong.. Saying no".
-      ? `Odds this season: ${formatShortcutOdds(odds)}${take.oddsReason || item?.oddsReason ? ` — ${String(take.oddsReason || item.oddsReason).replace(/\.\s*$/, "")}` : ""}`
-      : "",
+    oddsText: oddsLine && oddsReason ? `${oddsLine} — ${oddsReason}` : oddsLine,
+    // The same, in two parts, for a view that sets the reason on its own
+    // line (the classic card, where a wrapped reason pushed the odds out of
+    // the panel at 1280x720).
+    oddsLine,
+    oddsReason: odds ? oddsReason : "",
     catcher,
     catcherText: catcher ? `Who checks: ${catcher}` : "",
     payoffLine,

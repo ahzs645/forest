@@ -1155,6 +1155,10 @@ body {
   gap: 0.4rem;
 }
 
+.tui-shortcut-card .tui-copy {
+  line-height: 1.42;
+}
+
 .tui-shortcut-banner {
   align-self: flex-start;
   padding: 0.2rem 0.6rem;
@@ -1201,6 +1205,16 @@ body {
 
 .tui-shortcut-free {
   color: var(--tui-ok, #3fb950);
+}
+
+/* Why the odds moved, under them and a size down: at the odds line's weight
+   a two-reason line wrapped to three and clipped the panel at 1280x720. */
+.tui-shortcut-reason {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--tui-warn, #e3b341);
+  overflow-wrap: anywhere;
 }
 
 .tui-odds-meter {
@@ -1377,6 +1391,10 @@ body {
 
   .tui-option {
     padding: 0.35rem 0.5rem;
+  }
+
+  .tui-shortcut-card {
+    gap: 0.3rem;
   }
 }
 

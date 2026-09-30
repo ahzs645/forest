@@ -49,6 +49,11 @@ function findCard(match) {
 }
 
 const OFFER = findCard((data) => data.type === 'temptation' && data.shortcut?.odds);
+// An offer whose odds carry a two-clause reason ("Worse odds because ...
+// Better odds because ..."): at the odds line's size it wrapped to a third
+// line and clipped the classic panel at 1280x720.
+const LONG_REASON = findCard((data) => data.type === 'temptation' && data.shortcut?.odds
+  && /Worse odds because .+ Better odds because /.test(data.shortcut.oddsReason || ''));
 const FALLOUT = findCard((data) => /^Because you took: /.test(data.provenance || ''));
 
 async function resumeInto(page, card, { view, theme = 'dark' }) {
@@ -157,6 +162,19 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
     expect(errors).toEqual([]);
   });
 }
+
+test('classic view: an offer with a long odds reason still fits whole at 1280x720', async ({ page }) => {
+  const errors = attachRuntimeErrorCollector(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await resumeInto(page, LONG_REASON, { view: 'classic' });
+  await expect(page.locator('.tui-shortcut-banner')).toContainText(/Shortcut offer/i);
+  await expect(page.locator('.tui-shortcut-reason')).toContainText(/^Worse odds because .+ Better odds because .+\.$/);
+  // The odds line closes once, before "Saying no costs nothing."
+  await expect(page.locator('.tui-shortcut-odds')).not.toContainText('..');
+  const fit = await readableWithoutScrolling(page, '.tui-field-main', '.tui-shortcut-banner', '.tui-shortcut-terms');
+  expect(fit.ok, JSON.stringify(fit)).toBe(true);
+  expect(errors).toEqual([]);
+});
 
 for (const view of ['hub', 'classic']) {
   test(`${view}: a shortcut's fallout names the shortcut under its title`, async ({ page }) => {

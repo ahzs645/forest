@@ -75,6 +75,9 @@ test('the odds reason closes once: no "strong.. Saying no costs nothing."', () =
   assert.match(card.oddsReason, /Better odds because .*\.$/);
   const brief = buildShortcutBrief(gs, card);
   assert.doesNotMatch(brief.oddsText, /\.$/, 'the views close the sentence');
+  // The classic card sets the reason on its own line, a size down.
+  assert.match(brief.oddsLine, /^Odds this season: clean \d+% · noticed \d+% · caught \d+%$/);
+  assert.equal(brief.oddsText, `${brief.oddsLine} — ${brief.oddsReason}`);
   const hub = collectShortcutLines({ shortcut: brief }).map((line) => line.text).join(' ');
   assert.doesNotMatch(hub, /\.\./);
   assert.match(hub, /rate you\. Saying no costs nothing\.$/);

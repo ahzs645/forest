@@ -805,15 +805,22 @@ function ShortcutCard({ data }) {
       </div>
       <div className="tui-heading">{data.title}</div>
       {data.headline ? <p className="tui-card-headline tui-shortcut-headline preserve">{data.headline}</p> : null}
-      <p className="tui-copy preserve">{leadCapitalize(data.description)}</p>
+      {/* The quote and the ask as two tight paragraphs: the blank line
+          between them cost a whole line of a 1280x720 panel. */}
+      {String(leadCapitalize(data.description) || "").split(/\n\s*\n/).map((paragraph, index) => (
+        <p className="tui-copy preserve" key={index}>{paragraph}</p>
+      ))}
       <div className="tui-shortcut-terms" ref={endRef}>
         {shortcut.offerText ? <p className="tui-shortcut-offer">{shortcut.offerText}</p> : null}
         {shortcut.oddsText ? (
           <p className="tui-shortcut-odds">
             <OddsMeter odds={shortcut.odds} />
-            <span>{shortcut.oddsText}.</span>
+            <span>{shortcut.oddsLine || shortcut.oddsText}.</span>
             {shortcut.declineText ? <span className="tui-shortcut-free">{` ${shortcut.declineText}`}</span> : null}
           </p>
+        ) : null}
+        {shortcut.oddsLine && shortcut.oddsReason ? (
+          <p className="tui-shortcut-reason">{`${shortcut.oddsReason}.`}</p>
         ) : null}
       </div>
     </div>
