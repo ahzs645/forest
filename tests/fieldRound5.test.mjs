@@ -277,7 +277,8 @@ test('the planters ask to re-price once, never stack it, and never with no trees
 
 // ── F-5: the supply run says it costs the shift ────────────────────────────
 
-test('running into the supply point says it uses the shift', async () => {
+// A storm can ground the first shift before the camp menu opens; pin the deal.
+test('running into the supply point says it uses the shift', () => withSeededRandom(1, async () => {
   const journey = createReconJourney({ areaId: 'kootenay-wetbelt' });
   journey.day = 1;
   journey.distanceTraveled = 0;
@@ -288,7 +289,7 @@ test('running into the supply point says it uses the shift', async () => {
   await runReconDay({ ui, journey, checkpoint() {} });
   const supply = ui.prompts.flatMap((entry) => entry.options).find((o) => o.value === 'resupply');
   assert.equal(supply.description, 'Fuel, food, repairs, kits; uses this shift');
-});
+}));
 
 // ── Low items ──────────────────────────────────────────────────────────────
 
