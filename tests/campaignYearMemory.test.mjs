@@ -20,6 +20,25 @@ import { DESK_EVENTS } from '../js/data/deskEvents.js';
 
 const season = (id) => CAMPAIGN_SEASONS.find((entry) => entry.id === id);
 
+function seededRandomFactory(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+/** A journey's crew and starting conditions roll on Math.random; pin them so the deal is the same every run. */
+async function withSeededRandom(seed, fn) {
+  const original = Math.random;
+  Math.random = seededRandomFactory(seed);
+  try {
+    return await fn();
+  } finally {
+    Math.random = original;
+  }
+}
+
 /** Every ordinary card a journey draws over a run of days, temptations aside. */
 function drawCards(journey, days = 40) {
   const drawn = [];
@@ -51,7 +70,7 @@ test('a campaign year never deals a desk card a second time in a later season', 
   assert.deepEqual(repeated, [], 'the winter desk skips what the fall already dealt');
 });
 
-test('a field season skips what the spring dealt, and still repeats inside its own season when it must', () => {
+test('a field season skips what the spring dealt, and still repeats inside its own season when it must', () => withSeededRandom(4, () => {
   const campaign = { seenEventIds: FIELD_EVENTS.slice(0, 20).map((event) => event.id) };
   const summer = createReconJourney({ areaId: 'fort-st-john-plateau' });
   carrySeenEventsIntoJourney(campaign, summer);
@@ -62,7 +81,7 @@ test('a field season skips what the spring dealt, and still repeats inside its o
   // Without the carry the same seeds do deal them: the filter is doing the work.
   const control = createReconJourney({ areaId: 'fort-st-john-plateau' });
   assert.ok(drawCards(control, 30).some((id) => carried.has(id)), 'control run draws from the whole deck');
-});
+}));
 
 test('a follow-up still owed when the season closes follows you into the next seat that can hear it', () => {
   const campaign = {};
