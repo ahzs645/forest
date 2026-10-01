@@ -61,6 +61,25 @@ function makeRecordingUi(answer) {
   };
 }
 
+function seededRandomFactory(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+/** Pin Math.random, so a test's day deals the same cards every run. */
+async function withSeededRandom(seed, fn) {
+  const original = Math.random;
+  Math.random = seededRandomFactory(seed);
+  try {
+    return await fn();
+  } finally {
+    Math.random = original;
+  }
+}
+
 const byLabel = (label) => (prompt, options) => options.find((o) => String(o.label).startsWith(label))
   || options.find((o) => o.value === 'continue') || options[0];
 
@@ -273,7 +292,8 @@ test('running into the supply point says it uses the shift', async () => {
 
 // ── Low items ──────────────────────────────────────────────────────────────
 
-test('no replacement is brought up on the season\'s last day', async () => {
+// A card on the last day (a washed-out road) takes the day before the crew menu opens; pin the deal.
+test('no replacement is brought up on the season\'s last day', () => withSeededRandom(1, async () => {
   const journey = createSilvicultureJourney({ areaId: 'kootenay-wetbelt' });
   evacuateCrewMember(journey.crew.find((member) => member.role === 'medic'), { day: 1 });
   journey.day = journey.deadline;
@@ -286,7 +306,7 @@ test('no replacement is brought up on the season\'s last day', async () => {
   assert.equal(row.description, 'The season closes today: a replacement OFA 3 attendant would arrive with no day left to work.');
   assert.ok(!journey.crew.some((member) => member.role === 'medic' && member.isActive));
   assert.ok(budget - journey.resources.budget < 1200, 'nobody paid $1,200 for a hire with no day left');
-});
+}));
 
 test('the roster line leaves out empty groups', async () => {
   const journey = createSilvicultureJourney({ areaId: 'kootenay-wetbelt' });
